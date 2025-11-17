@@ -61,6 +61,10 @@ export async function POST(request: NextRequest) {
     // Generate external_session_id if not provided
     const externalSessionId = body.external_session_id || body.chat_session_id || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
+    // Set initial status based on booking_status
+    // If booking is confirmed, set to "Call Booked", otherwise "New Lead"
+    const initialStatus = body.booking_status === 'confirmed' ? 'Call Booked' : 'New Lead'
+
     // Store session in sessions table
     const { data, error } = await supabase
       .from('sessions')
@@ -70,6 +74,7 @@ export async function POST(request: NextRequest) {
         email: body.email,
         phone: body.phone,
         channel: 'web',
+        status: initialStatus,
         booking_status: body.booking_status || null,
         booking_date: body.booking_date || null,
         booking_time: body.booking_time || null,
@@ -91,9 +96,7 @@ export async function POST(request: NextRequest) {
       phone: data.phone,
       source: data.channel,
       timestamp: data.created_at,
-      status: data.booking_status === 'confirmed' ? 'booked' : 
-              data.booking_status === 'pending' ? 'pending' :
-              data.booking_status === 'cancelled' ? 'cancelled' : null,
+      status: data.status || initialStatus,
       booking_date: data.booking_date,
       booking_time: data.booking_time,
       metadata: data.channel_data,

@@ -14,6 +14,7 @@ interface Lead {
   status: string | null
   booking_date: string | null
   booking_time: string | null
+  metadata?: any
 }
 
 export function useRealtimeLeads() {
@@ -33,11 +34,30 @@ export function useRealtimeLeads() {
           .order('timestamp', { ascending: false })
           .limit(1000)
 
-        if (error) throw error
+        if (error) {
+          // Provide more helpful error messages
+          console.error('Supabase error:', error)
+          
+          if (error.message.includes('relation') || error.message.includes('does not exist') || error.code === '42P01') {
+            throw new Error('The unified_leads view does not exist. Please run the database migrations in supabase/migrations/')
+          }
+          if (error.message.includes('permission denied') || error.message.includes('RLS') || error.code === '42501') {
+            throw new Error('Permission denied. Please check your Row Level Security (RLS) policies.')
+          }
+          if (error.message.includes('JWT') || error.message.includes('Invalid API key')) {
+            throw new Error('Invalid Supabase configuration. Please check your NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local')
+          }
+          if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            throw new Error('Unable to connect to Supabase. Please check your internet connection and Supabase project status.')
+          }
+          throw new Error(error.message || 'Failed to fetch leads')
+        }
         setLeads(data || [])
         setLoading(false)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch leads')
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch leads'
+        console.error('Error fetching leads:', err)
+        setError(errorMessage)
         setLoading(false)
       }
     }
