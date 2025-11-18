@@ -20,23 +20,7 @@ jobs:
       run: npm ci
       
     - name: Build
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
-      run: |
-        echo "Building with environment variables..."
-        if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-          echo "⚠️ WARNING: NEXT_PUBLIC_SUPABASE_URL secret is not set!"
-        else
-          echo "✅ NEXT_PUBLIC_SUPABASE_URL is set"
-        fi
-        if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-          echo "⚠️ WARNING: NEXT_PUBLIC_SUPABASE_ANON_KEY secret is not set!"
-        else
-          echo "✅ NEXT_PUBLIC_SUPABASE_ANON_KEY is set"
-        fi
-        npm run build
+      run: npm run build
       
     - name: Deploy to VPS
       uses: appleboy/scp-action@master
