@@ -13,6 +13,8 @@ interface Booking {
   booking_date: string | null
   booking_time: string | null
   source: string | null
+  first_touchpoint?: string | null
+  last_touchpoint?: string | null
   metadata?: any
 }
 
