@@ -93,12 +93,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
     const [hours, minutes = 0] = booking.booking_time.split(':').map(Number)
     
     // Position within the hour slot (0-60 minutes)
-    // Each hour slot is 80px tall, so 1 minute = 80/60 = 1.33px
+    // Each hour slot is 48px tall (40% smaller than 80px), so 1 minute = 48/60 = 0.8px
     const minutesInHour = minutes
-    const topOffset = (minutesInHour / 60) * 80 // Position within the hour slot
+    const topOffset = (minutesInHour / 60) * 48 // Position within the hour slot
     
-    // Default height: 1 hour (80px), but can be adjusted
-    const height = 80 // 1 hour block
+    // Default height: 1 hour (48px), but can be adjusted
+    const height = 48 // 1 hour block (40% smaller)
     
     return {
       top: `${topOffset}px`,
@@ -384,13 +384,13 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             /* Week View */
             <div className="grid grid-cols-8 min-w-full">
               {/* Time column */}
-              <div className="border-r border-gray-200 dark:border-[#262626]">
+              <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10">
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className="h-20 border-b border-gray-100 dark:border-[#262626] px-2 py-1"
+                    className="h-12 border-b border-gray-100 dark:border-[#262626] px-2 py-1 flex items-center"
                   >
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                       {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                     </span>
                   </div>
@@ -436,34 +436,45 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         return (
                           <div
                             key={hour}
-                            className="h-20 border-b border-gray-100 dark:border-[#262626] relative"
+                            className="h-12 border-b border-gray-100 dark:border-[#262626] relative"
                           >
                             {hourBookings.map((booking, idx) => {
                               const style = getBookingStyle(booking, hour)
                               // Handle overlapping bookings by offsetting horizontally
-                              const leftOffset = idx * 2 // Small offset for overlapping bookings
+                              const leftOffset = idx * 50 // Offset for overlapping bookings
+                              const bookingTitle = booking.metadata?.conversation_summary 
+                                || booking.metadata?.title 
+                                || booking.metadata?.summary 
+                                || 'Call'
                               return (
                                 <div
                                   key={booking.id}
                                   onClick={(e) => handleBookingClick(booking, e)}
                                   className={`
-                                    rounded px-2 py-1 text-xs
+                                    rounded px-2 py-0.5 text-[10px] leading-tight
                                     ${getSourceColor(booking.source)}
                                     text-white cursor-pointer hover:opacity-90 hover:shadow-lg
-                                    z-10 transition-all
+                                    z-10 transition-all overflow-hidden
                                   `}
                                   style={{
                                     ...style,
                                     left: `${4 + leftOffset}px`,
-                                    right: `${4 + leftOffset}px`,
+                                    right: `${4 + (hourBookings.length > 1 ? leftOffset + 4 : 0)}px`,
+                                    width: hourBookings.length > 1 ? `calc(50% - ${leftOffset}px)` : undefined,
                                   }}
-                                  title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
+                                  title={`${booking.name || 'Unnamed'} - ${booking.booking_time} - ${bookingTitle}`}
                                 >
-                                  <div className="font-medium truncate">
+                                  <div className="font-semibold truncate mb-0.5">
+                                    {booking.booking_time}
+                                  </div>
+                                  <div className="font-medium truncate mb-0.5">
                                     {booking.name || 'Unnamed Lead'}
                                   </div>
-                                  <div className="text-xs opacity-90">
-                                    {booking.booking_time}
+                                  <div className="text-[9px] opacity-90 truncate">
+                                    {booking.booking_date ? format(new Date(booking.booking_date), 'MMM d') : ''}
+                                  </div>
+                                  <div className="text-[9px] opacity-80 truncate italic">
+                                    {bookingTitle.length > 20 ? bookingTitle.substring(0, 20) + '...' : bookingTitle}
                                   </div>
                                 </div>
                               )
