@@ -39,6 +39,7 @@ interface Lead {
   brand: string | null
   timestamp: string
   last_interaction_at: string | null
+  status?: string | null
   metadata?: any
 }
 
