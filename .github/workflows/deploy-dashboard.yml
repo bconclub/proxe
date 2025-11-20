@@ -35,5 +35,5 @@ jobs:
           npm run build
           pm2 stop dashboard || true
           pm2 delete dashboard || true
-          PORT=3000 pm2 start npm --name dashboard -- start
+          PORT=3001 pm2 start npm --name dashboard -- start
           pm2 save
