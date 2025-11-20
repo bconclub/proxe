@@ -40,6 +40,8 @@ interface Lead {
   timestamp: string
   last_interaction_at: string | null
   status?: string | null
+  booking_date?: string | null
+  booking_time?: string | null
   metadata?: any
 }
 
