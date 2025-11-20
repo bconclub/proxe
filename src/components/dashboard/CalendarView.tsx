@@ -239,9 +239,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-200px)]">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-[calc(100vh-200px)]">
       {/* Left Sidebar - Mini Calendar */}
-      <div className="w-64 flex-shrink-0 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg p-4">
+      <div className="hidden md:block w-64 flex-shrink-0 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg p-4">
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <button
@@ -343,18 +343,18 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
       </div>
 
       {/* Main Calendar View */}
-      <div className="flex-1 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg overflow-hidden">
+      <div className="flex-1 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg overflow-hidden min-w-0">
         {/* Header */}
-        <div className="border-b border-gray-200 dark:border-[#262626] p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="border-b border-gray-200 dark:border-[#262626] p-2 md:p-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 md:gap-4">
               <button
                 onClick={() => navigateDate('prev')}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
               >
                 <MdChevronLeft className="w-5 h-5" />
               </button>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white">
                 {viewMode === 'week'
                   ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`
                   : format(currentDate, 'MMMM yyyy')}
@@ -371,7 +371,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 setCurrentDate(new Date())
                 setSelectedDate(new Date())
               }}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
             >
               Today
             </button>
@@ -379,22 +379,22 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         </div>
 
         {/* Calendar Grid */}
-        <div className="overflow-auto h-[calc(100%-80px)]">
+        <div className="overflow-x-auto overflow-y-auto h-[calc(100%-60px)] md:h-[calc(100%-80px)]">
           {viewMode === 'week' ? (
             /* Week View */
-            <div className="grid grid-cols-8 min-w-full">
+            <div className="grid grid-cols-8 min-w-[800px] md:min-w-full">
               {/* Time column */}
-              <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10">
+              <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10 w-16 md:w-auto">
                 {/* Empty header to align with day headers - exact match */}
-                <div className="border-b border-gray-200 dark:border-[#262626] p-2 text-center flex flex-col justify-center" style={{ height: '73px' }}></div>
+                <div className="border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center flex flex-col justify-center" style={{ height: '60px', minHeight: '60px' }}></div>
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className="h-12 border-b border-gray-100 dark:border-[#262626] px-2 flex items-center"
-                    style={{ height: '48px' }}
+                    className="border-b border-gray-100 dark:border-[#262626] px-1 md:px-2 flex items-center"
+                    style={{ height: '48px', minHeight: '48px' }}
                   >
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                      {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                    <span className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {hour === 0 ? '12A' : hour < 12 ? `${hour}A` : hour === 12 ? '12P' : `${hour - 12}P`}
                     </span>
                   </div>
                 ))}
@@ -414,18 +414,18 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                     {/* Day header */}
                     <div
                       className={`
-                        border-b border-gray-200 dark:border-[#262626] p-2 text-center
+                        border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center
                         ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
                         ${isSelected ? 'bg-primary-100 dark:bg-primary-900/40' : ''}
                       `}
-                      style={{ height: '73px' }}
+                      style={{ height: '60px', minHeight: '60px' }}
                     >
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {DAYS_OF_WEEK[dayIdx]}
+                      <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
+                        {DAYS_OF_WEEK[dayIdx].substring(0, 3)}
                       </div>
                       <div
                         className={`
-                          text-sm font-semibold mt-1
+                          text-xs md:text-sm font-semibold mt-0.5 md:mt-1
                           ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}
                         `}
                       >
@@ -456,26 +456,26 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                   key={booking.id}
                                   onClick={(e) => handleBookingClick(booking, e)}
                                   className={`
-                                    rounded px-2 py-0.5 text-[10px] leading-tight
+                                    rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight
                                     ${getSourceColor(booking.source)}
                                     text-white cursor-pointer hover:opacity-90 hover:shadow-lg
                                     z-10 transition-all overflow-hidden
                                   `}
                                   style={{
                                     ...style,
-                                    left: `${4 + leftOffset}px`,
-                                    right: `${4 + (hourBookings.length > 1 ? leftOffset + 4 : 0)}px`,
+                                    left: `${2 + leftOffset}px`,
+                                    right: `${2 + (hourBookings.length > 1 ? leftOffset + 2 : 0)}px`,
                                     width: hourBookings.length > 1 ? `calc(50% - ${leftOffset}px)` : undefined,
                                   }}
                                   title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
                                 >
-                                  <div className="font-semibold truncate mb-0.5">
+                                  <div className="font-semibold truncate mb-0.5 text-[8px] md:text-[10px]">
                                     {booking.booking_time}
                                   </div>
-                                  <div className="text-[9px] opacity-90 truncate italic mb-0.5">
-                                    {callTitle.length > 25 ? callTitle.substring(0, 25) + '...' : callTitle}
+                                  <div className="text-[8px] md:text-[9px] opacity-90 truncate italic mb-0.5 hidden md:block">
+                                    {callTitle.length > 20 ? callTitle.substring(0, 20) + '...' : callTitle}
                                   </div>
-                                  <div className="font-medium truncate">
+                                  <div className="font-medium truncate text-[8px] md:text-[10px]">
                                     {booking.name || 'Unnamed Customer'}
                                   </div>
                                 </div>
