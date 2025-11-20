@@ -666,6 +666,17 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           </div>
         </div>
       )}
+
+      {/* Client Details Modal */}
+      <LeadDetailsModal
+        lead={selectedLead}
+        isOpen={isLeadModalOpen}
+        onClose={() => {
+          setIsLeadModalOpen(false)
+          setSelectedLead(null)
+        }}
+        onStatusUpdate={handleUpdateLeadStatus}
+      />
     </div>
   )
 }
