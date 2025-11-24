@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS all_leads (
   first_touchpoint TEXT NOT NULL CHECK (first_touchpoint IN ('web', 'whatsapp', 'voice', 'social')),
   last_touchpoint TEXT NOT NULL CHECK (last_touchpoint IN ('web', 'whatsapp', 'voice', 'social')),
   last_interaction_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe', 'windchasers')),
+  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe')),
   unified_context JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_all_leads_created_at ON all_leads(created_at DESC
 CREATE TABLE IF NOT EXISTS web_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id UUID NOT NULL REFERENCES all_leads(id) ON DELETE CASCADE,
-  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe', 'windchasers')),
+  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe')),
   customer_name TEXT,
   customer_email TEXT,
   customer_phone TEXT,
@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_web_sessions_external_session_id ON web_sessions(
 CREATE TABLE IF NOT EXISTS whatsapp_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id UUID NOT NULL REFERENCES all_leads(id) ON DELETE CASCADE,
-  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe', 'windchasers')),
+  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe')),
   customer_name TEXT,
   customer_email TEXT,
   customer_phone TEXT,
@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_sessions_created_at ON whatsapp_sessions
 CREATE TABLE IF NOT EXISTS voice_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id UUID NOT NULL REFERENCES all_leads(id) ON DELETE CASCADE,
-  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe', 'windchasers')),
+  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe')),
   customer_name TEXT,
   customer_email TEXT,
   customer_phone TEXT,
@@ -136,7 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_voice_sessions_created_at ON voice_sessions(creat
 CREATE TABLE IF NOT EXISTS social_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id UUID NOT NULL REFERENCES all_leads(id) ON DELETE CASCADE,
-  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe', 'windchasers')),
+  brand TEXT DEFAULT 'proxe' CHECK (brand IN ('proxe')),
   customer_name TEXT,
   customer_email TEXT,
   customer_phone TEXT,

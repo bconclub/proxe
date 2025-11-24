@@ -77,11 +77,9 @@ Command Center/
 ├── supabase/
 │   └── migrations/                   # Database migrations
 │       ├── 001_dashboard_schema.sql
-│       ├── 002_unified_leads_view.sql
-│       ├── 003_update_unified_leads_with_sessions.sql
-│       ├── 004_migrate_and_remove_dashboard_leads.sql
-│       ├── 005_add_status_column.sql
-│       └── 006_add_sessions_update_policy.sql
+│       ├── 007_rename_sessions_to_all_leads.sql
+│       ├── 008_update_unified_leads_view.sql
+│       └── 009_fix_unified_leads_view_rls.sql
 └── public/                           # Static assets
 ```
 
@@ -486,7 +484,7 @@ Command Center/
   - `first_touchpoint` (web, whatsapp, voice, social)
   - `last_touchpoint` (most recent channel)
   - `last_interaction_at`
-  - `brand` (proxe, windchasers)
+  - `brand` (proxe)
   - `unified_context` (JSONB)
 - **Deduplication**: `(customer_phone_normalized, brand)`
 

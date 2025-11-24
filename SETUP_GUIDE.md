@@ -29,9 +29,13 @@
 3. Copy and paste the contents of `supabase/migrations/001_dashboard_schema.sql`
 4. Click **"Run"** (or press Ctrl+Enter)
 5. Wait for success message
-6. Create a new query and paste contents of `supabase/migrations/002_unified_leads_view.sql`
+6. Create a new query and paste contents of `supabase/migrations/007_rename_sessions_to_all_leads.sql`
 7. Click **"Run"**
-8. Both migrations should complete successfully
+8. Create a new query and paste contents of `supabase/migrations/008_update_unified_leads_view.sql`
+9. Click **"Run"**
+10. Create a new query and paste contents of `supabase/migrations/009_fix_unified_leads_view_rls.sql`
+11. Click **"Run"**
+12. All migrations should complete successfully
 
 ### 2.2 Enable Realtime
 1. Go to **Database** > **Replication** (left sidebar)

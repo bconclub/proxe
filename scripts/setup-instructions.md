@@ -6,7 +6,9 @@
 2. Navigate to SQL Editor
 3. Run the migrations in order:
    - `supabase/migrations/001_dashboard_schema.sql`
-   - `supabase/migrations/002_unified_leads_view.sql`
+   - `supabase/migrations/007_rename_sessions_to_all_leads.sql`
+   - `supabase/migrations/008_update_unified_leads_view.sql`
+   - `supabase/migrations/009_fix_unified_leads_view_rls.sql`
 
 ## 2. Enable Realtime
 

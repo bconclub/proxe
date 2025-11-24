@@ -119,7 +119,7 @@ export interface Database {
           booking_status: 'pending' | 'confirmed' | 'cancelled' | null
           google_event_id: string | null
           booking_created_at: string | null
-          brand: 'proxe' | 'windchasers'
+          brand: 'proxe'
           channel: 'web' | 'whatsapp' | 'voice' | 'social'
           channel_data: Json
           created_at: string
@@ -141,7 +141,7 @@ export interface Database {
           booking_status?: 'pending' | 'confirmed' | 'cancelled' | null
           google_event_id?: string | null
           booking_created_at?: string | null
-          brand?: 'proxe' | 'windchasers'
+          brand?: 'proxe'
           channel: 'web' | 'whatsapp' | 'voice' | 'social'
           channel_data?: Json
           created_at?: string
@@ -163,7 +163,7 @@ export interface Database {
           booking_status?: 'pending' | 'confirmed' | 'cancelled' | null
           google_event_id?: string | null
           booking_created_at?: string | null
-          brand?: 'proxe' | 'windchasers'
+          brand?: 'proxe'
           channel?: 'web' | 'whatsapp' | 'voice' | 'social'
           channel_data?: Json
           created_at?: string

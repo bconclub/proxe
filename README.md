@@ -45,7 +45,7 @@ npm install
 3. **Set up Supabase:**
    - Create Supabase project
    - Run database migrations (`supabase/migrations/`)
-   - Enable Realtime for `chat_sessions` table
+   - Enable Realtime for `all_leads` table
    - Create admin user (see SETUP_GUIDE.md)
 
 4. **Run the development server:**
@@ -81,8 +81,9 @@ The dashboard uses the following main tables:
 - `dashboard_users` - User accounts with roles (admin, viewer)
 - `user_invitations` - Invitation tokens for adding new users
 - `dashboard_settings` - Dashboard configuration
-- `chat_sessions` - Leads from web chat (existing table)
-- `unified_leads` - View combining leads from all sources
+- `all_leads` - Unified lead table across all channels
+- `web_sessions`, `whatsapp_sessions`, `voice_sessions`, `social_sessions` - Channel-specific lead data
+- `unified_leads` - View combining leads from all sources for dashboard display
 
 ## API Routes
 

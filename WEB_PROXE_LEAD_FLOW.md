@@ -1,4 +1,4 @@
-# Web PROXe Lead Flow Documentation
+# Web PROXe Lead Flow Documentation - CORRECTED
 
 ## Overview
 This document explains how leads from Web PROXe are processed, stored, and displayed in the dashboard using the multi-touchpoint schema.
@@ -10,9 +10,9 @@ Web PROXe System
     ↓
 POST /api/integrations/web-agent
     ↓
-Normalize phone number
+Normalize phone number (remove non-digits)
     ↓
-Check all_leads (by phone + brand)
+Check all_leads (by phone_normalized + brand)
     ↓
 [New Lead] → Create all_leads (first_touchpoint='web')
 [Existing] → Update all_leads (last_touchpoint='web')
@@ -33,184 +33,358 @@ Dashboard UI
 **Endpoint**: `POST /api/integrations/web-agent`
 
 ### Authentication
-- Uses service role key (bypasses RLS, no auth required for webhooks)
-- Allows external systems to post leads without user authentication
+- Uses **service role key** (bypasses RLS, no auth required for webhooks)
+- Allows external Web PROXe system to post leads without user authentication
+- Environment variable: `SUPABASE_SERVICE_ROLE_KEY`
 
 ### Request Body (Expected Fields)
+
 ```json
 {
-  "name": "User Name",                    // Required
-  "phone": "+1234567890",                 // Required
-  "email": "user@example.com",            // Optional
-  "brand": "proxe",                       // Optional, defaults to 'proxe'
-  "booking_status": "pending" | "confirmed" | "cancelled",
+  "name": "User Name",
+  "phone": "+1234567890",
+  "email": "user@example.com",
+  "brand": "proxe",
+  "booking_status": "pending",
   "booking_date": "2024-01-15",
   "booking_time": "14:30:00",
-  "external_session_id": "optional_external_id",
-  "chat_session_id": "optional_chat_session_id",
+  "external_session_id": "web_xyz789",
+  "chat_session_id": "chat_abc123",
   "website_url": "https://example.com",
-  "conversation_summary": "AI-generated summary",
-  "user_inputs_summary": {},
+  "conversation_summary": "Customer inquiry about pricing",
+  "user_inputs_summary": {
+    "questions": ["pricing", "service area"],
+    "interests": ["premium_plan"]
+  },
   "message_count": 15,
-  "last_message_at": "2024-01-15T14:30:00Z",
-  "metadata": {
-    // Additional channel-specific data
-  }
+  "last_message_at": "2024-01-15T14:30:00Z"
 }
 ```
 
+### Required Fields
+- `name` - Customer's name
+- `phone` - Customer's phone (any format, will be normalized)
+
+### Optional Fields
+- `email` - Customer's email
+- `brand` - 'proxe' (defaults to 'proxe')
+- `booking_status` - 'pending', 'confirmed', 'cancelled'
+- `booking_date` - Scheduled date (YYYY-MM-DD format)
+- `booking_time` - Scheduled time (HH:MM:SS format)
+- `external_session_id` - External session ID from Web PROXe (will be stored)
+- `chat_session_id` - Chat session ID (will be stored)
+- `website_url` - URL where session originated
+- `conversation_summary` - AI summary of chat
+- `user_inputs_summary` - JSONB object with user inputs
+- `message_count` - Number of messages exchanged
+- `last_message_at` - Timestamp of last message
+
 ### Processing Logic
 
-1. **Validate Required Fields**: 
-   - Checks for `name` and `phone` (required)
-   - Returns 400 error if missing
+**Step 1: Validate Required Fields**
+```typescript
+if (!phone || !name) {
+  return error: 'Missing required fields: phone and name'
+}
+```
 
-2. **Normalize Phone Number**:
-   - Removes all non-digit characters using `normalizePhone()`
-   - Example: `"+91 98765-43210"` → `"919876543210"`
+**Step 2: Normalize Phone Number**
+```typescript
+const normalizedPhone = normalizePhone(phone);
+// "+91 98765-43210" → "919876543210"
+// Removes all non-digit characters
+```
 
-3. **Check for Existing Lead**:
-   - Queries `all_leads` by `(customer_phone_normalized, brand)`
-   - If found: Update `last_touchpoint='web'` and `last_interaction_at`
-   - If not found: Create new `all_leads` with `first_touchpoint='web'`
+**Step 3: Check for Existing Lead**
+```typescript
+const existingLead = await supabase
+  .from('all_leads')
+  .select('id')
+  .eq('customer_phone_normalized', normalizedPhone)
+  .eq('brand', brand)
+  .maybeSingle();
+```
 
-4. **Generate Session ID**: 
-   - Uses `external_session_id` if provided
-   - Falls back to `chat_session_id`
-   - If neither provided, generates: `web_{timestamp}_{random}`
+Uses **deduplication key**: `(customer_phone_normalized, brand)`
+- If found → Use existing lead_id, update last_touchpoint
+- If not found → Create new lead with first_touchpoint='web'
 
-5. **Create Web Session**:
-   - Inserts into `web_sessions` table with full customer data
-   - Links to `all_leads` via `lead_id` foreign key
+**Step 4: Create or Update all_leads**
 
-6. **Insert Message**:
-   - Creates audit trail entry in `messages` table
-   - Sets `channel='web'`, `sender='system'`
+*If NEW lead:*
+```typescript
+const newLead = await supabase
+  .from('all_leads')
+  .insert({
+    customer_name: name,
+    email: email,
+    phone: phone,
+    customer_phone_normalized: normalizedPhone,
+    first_touchpoint: 'web',        // Set on first contact
+    last_touchpoint: 'web',
+    last_interaction_at: NOW(),
+    brand: brand
+  })
+  .select('id')
+  .single();
+
+leadId = newLead.data.id;
+```
+
+*If EXISTING lead:*
+```typescript
+await supabase
+  .from('all_leads')
+  .update({
+    last_touchpoint: 'web',         // Update to current channel
+    last_interaction_at: NOW()
+  })
+  .eq('id', leadId);
+```
+
+**Step 5: Create web_sessions Record**
+```typescript
+await supabase
+  .from('web_sessions')
+  .insert({
+    lead_id: leadId,
+    brand: brand,
+    customer_name: name,
+    customer_email: email,
+    customer_phone: phone,
+    customer_phone_normalized: normalizedPhone,
+    external_session_id: external_session_id,
+    chat_session_id: chat_session_id,
+    website_url: website_url,
+    booking_status: booking_status,
+    booking_date: booking_date,
+    booking_time: booking_time,
+    conversation_summary: conversation_summary,
+    user_inputs_summary: user_inputs_summary,
+    message_count: message_count,
+    last_message_at: last_message_at,
+    session_status: 'active'
+  });
+```
+
+**Step 6: Insert Message (Audit Trail)**
+```typescript
+await supabase
+  .from('messages')
+  .insert({
+    lead_id: leadId,
+    channel: 'web',
+    sender: 'system',
+    content: `Web inquiry from ${name}`,
+    message_type: 'text',
+    metadata: {
+      booking_requested: !!booking_date,
+      booking_date: booking_date
+    }
+  });
+```
+
+**Step 7: Return Response**
+```json
+{
+  "success": true,
+  "lead_id": "7c2c7107-dbdb-4ee2-bdfb-9b3c1a4d80b8",
+  "message": "Lead created successfully"
+}
+```
 
 ## 2. Database Tables
 
 ### Primary Table: `all_leads`
 
-**Purpose**: Minimal unifier table - one record per customer across all channels
+**Purpose**: Minimal unifier - one record per unique customer (phone + brand combo)
 
 **Key Columns**:
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key (auto-generated) |
+| `id` | UUID | Primary key |
 | `customer_name` | TEXT | Customer's name |
 | `email` | TEXT | Customer's email |
-| `phone` | TEXT | Customer's phone (original format) |
-| `customer_phone_normalized` | TEXT | Normalized phone (digits only) - used for deduplication |
-| `first_touchpoint` | ENUM | Channel where customer first interacted: `'web'`, `'whatsapp'`, `'voice'`, `'social'` |
-| `last_touchpoint` | ENUM | Most recent channel: `'web'`, `'whatsapp'`, `'voice'`, `'social'` |
-| `last_interaction_at` | TIMESTAMP | Timestamp of most recent interaction |
-| `brand` | ENUM | `'proxe'` or `'windchasers'` |
-| `unified_context` | JSONB | Aggregated context from all channels |
-| `created_at` | TIMESTAMP | When record was created |
-| `updated_at` | TIMESTAMP | When record was last updated |
+| `phone` | TEXT | Original phone format |
+| `customer_phone_normalized` | TEXT | Normalized phone (digits only, for dedup) |
+| `first_touchpoint` | TEXT | First channel: 'web', 'whatsapp', 'voice', 'social' |
+| `last_touchpoint` | TEXT | Most recent channel |
+| `last_interaction_at` | TIMESTAMP | When they last interacted |
+| `brand` | TEXT | 'proxe' |
+| `unified_context` | JSONB | Orchestrator-populated insights |
+| `created_at` | TIMESTAMP | Record creation time |
+| `updated_at` | TIMESTAMP | Last update time (auto-updated) |
 
-**Deduplication Key**: `(customer_phone_normalized, brand)` - ensures one lead per phone number per brand
+**Deduplication**: Uses unique constraint on `(customer_phone_normalized, brand)`
 
 ### Web Sessions Table: `web_sessions`
 
-**Purpose**: Self-contained table storing all Web PROXe session data
-
-**Key Columns for Web PROXe**:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key (auto-generated) |
-| `lead_id` | UUID | Foreign key to `all_leads.id` |
-| `brand` | ENUM | `'proxe'` or `'windchasers'` |
-| `customer_name` | TEXT | Customer's name |
-| `customer_email` | TEXT | Customer's email |
-| `customer_phone` | TEXT | Customer's phone (original format) |
-| `customer_phone_normalized` | TEXT | Normalized phone for deduplication |
-| `external_session_id` | TEXT | External session identifier from Web PROXe |
-| `chat_session_id` | TEXT | Original chat session ID |
-| `website_url` | TEXT | Website URL where session originated |
-| `booking_status` | ENUM | `'pending'`, `'confirmed'`, or `'cancelled'` |
-| `booking_date` | DATE | Scheduled booking date |
-| `booking_time` | TIME | Scheduled booking time |
-| `google_event_id` | TEXT | Google Calendar event ID (if booked) |
-| `booking_created_at` | TIMESTAMP | When booking was created |
-| `conversation_summary` | TEXT | AI-generated summary of conversation |
-| `user_inputs_summary` | JSONB | Summary of user inputs/interactions |
-| `message_count` | INTEGER | Number of messages in session |
-| `last_message_at` | TIMESTAMP | Timestamp of last message |
-| `session_status` | TEXT | `'active'`, `'completed'`, or `'abandoned'` |
-| `channel_data` | JSONB | Additional channel-specific metadata |
-| `created_at` | TIMESTAMP | When record was created |
-| `updated_at` | TIMESTAMP | When record was last updated |
-
-**Note**: This table is self-contained - all Web PROXe data is stored here. No joins needed if customer only uses Web channel.
-
-### Messages Table: `messages`
-
-**Purpose**: Universal message log - append-only audit trail for all channels
+**Purpose**: Self-contained Web PROXe data - all fields needed even if customer only uses Web
 
 **Key Columns**:
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key (auto-generated) |
-| `lead_id` | UUID | Foreign key to `all_leads.id` |
-| `channel` | ENUM | `'web'`, `'whatsapp'`, `'voice'`, `'social'` |
-| `sender` | ENUM | `'customer'`, `'agent'`, or `'system'` |
+| `id` | UUID | Primary key |
+| `lead_id` | UUID | Foreign key to all_leads.id |
+| `brand` | TEXT | 'proxe' |
+| `customer_name` | TEXT | Customer name (duplicated for independence) |
+| `customer_email` | TEXT | Customer email (duplicated) |
+| `customer_phone` | TEXT | Original phone (duplicated) |
+| `customer_phone_normalized` | TEXT | Normalized phone (duplicated) |
+| `external_session_id` | TEXT | External Web PROXe session ID |
+| `chat_session_id` | TEXT | Chat session ID from Web PROXe |
+| `website_url` | TEXT | Website where session originated |
+| `booking_status` | TEXT | 'pending', 'confirmed', 'cancelled' |
+| `booking_date` | DATE | Scheduled booking date |
+| `booking_time` | TIME | Scheduled booking time |
+| `google_event_id` | TEXT | Google Calendar event ID (if synced) |
+| `booking_created_at` | TIMESTAMP | When booking was created |
+| `conversation_summary` | TEXT | AI summary of conversation |
+| `user_inputs_summary` | JSONB | Summary of user inputs |
+| `message_count` | INTEGER | Number of messages |
+| `last_message_at` | TIMESTAMP | When last message was sent |
+| `session_status` | TEXT | 'active', 'completed', 'abandoned' |
+| `channel_data` | JSONB | Additional metadata |
+| `created_at` | TIMESTAMP | Record creation time |
+| `updated_at` | TIMESTAMP | Last update time (auto-updated) |
+
+**Independence**: This table is completely self-contained. If a customer only uses Web, all their data is here.
+
+### Messages Table: `messages`
+
+**Purpose**: Universal append-only audit trail for all channels
+
+**Key Columns**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary key |
+| `lead_id` | UUID | Foreign key to all_leads.id |
+| `channel` | TEXT | 'web', 'whatsapp', 'voice', 'social' |
+| `sender` | TEXT | 'customer', 'agent', 'system' |
 | `content` | TEXT | Message content |
-| `message_type` | TEXT | `'text'`, `'image'`, `'audio'`, etc. |
-| `metadata` | JSONB | Additional message metadata |
+| `message_type` | TEXT | 'text', 'image', 'audio', 'transcription' |
+| `metadata` | JSONB | Additional context (sentiment, intent, model_used, etc.) |
 | `created_at` | TIMESTAMP | When message was created |
 
-**Note**: Every interaction creates a message entry. Used for building context windows and conversation history.
+**Append-Only**: Never update or delete. Complete audit trail.
 
 ## 3. Unified Leads View
 
-**File**: `supabase/migrations/007_rename_sessions_to_all_leads.sql`
+**Purpose**: Dashboard display - aggregates all customer data from all channels
 
-**Purpose**: Provides a unified view of all leads from all channels for dashboard display
-
-### View Definition
-
-The `unified_leads` view queries from `all_leads` and joins with channel-specific tables to aggregate data:
+### View SQL (Actual Implementation)
 
 ```sql
 CREATE OR REPLACE VIEW unified_leads AS
 SELECT 
   al.id,
+  al.first_touchpoint,
+  al.last_touchpoint,
   al.customer_name AS name,
   al.email,
   al.phone,
-  al.first_touchpoint,
-  al.last_touchpoint,
   al.brand,
   al.created_at AS timestamp,
+  JSONB_BUILD_OBJECT(
+    'web_data', (
+      SELECT JSONB_BUILD_OBJECT(
+        'customer_name', ws.customer_name,
+        'booking_status', ws.booking_status,
+        'booking_date', ws.booking_date,
+        'booking_time', ws.booking_time,
+        'conversation_summary', ws.conversation_summary,
+        'message_count', ws.message_count,
+        'last_message_at', ws.last_message_at
+      )
+      FROM web_sessions ws WHERE ws.lead_id = al.id ORDER BY ws.created_at DESC LIMIT 1
+    ),
+    'whatsapp_data', (
+      SELECT JSONB_BUILD_OBJECT(
+        'message_count', whs.message_count,
+        'last_message_at', whs.last_message_at,
+        'conversation_status', whs.conversation_status,
+        'overall_sentiment', whs.overall_sentiment
+      )
+      FROM whatsapp_sessions whs WHERE whs.lead_id = al.id ORDER BY whs.created_at DESC LIMIT 1
+    ),
+    'voice_data', (
+      SELECT JSONB_BUILD_OBJECT(
+        'call_duration', vs.call_duration_seconds,
+        'call_status', vs.call_status,
+        'sentiment', vs.sentiment
+      )
+      FROM voice_sessions vs WHERE vs.lead_id = al.id ORDER BY vs.created_at DESC LIMIT 1
+    ),
+    'social_data', (
+      SELECT JSONB_AGG(JSONB_BUILD_OBJECT('platform', ss.platform, 'engagement_type', ss.engagement_type))
+      FROM social_sessions ss WHERE ss.lead_id = al.id
+    )
+  ) AS metadata,
   al.last_interaction_at,
-  -- Aggregate metadata from all channels
-  jsonb_build_object(
-    'web', (SELECT row_to_json(ws.*) FROM web_sessions ws WHERE ws.lead_id = al.id LIMIT 1),
-    'whatsapp', (SELECT row_to_json(ws.*) FROM whatsapp_sessions ws WHERE ws.lead_id = al.id LIMIT 1),
-    'voice', (SELECT row_to_json(vs.*) FROM voice_sessions vs WHERE vs.lead_id = al.id LIMIT 1),
-    'social', (SELECT row_to_json(ss.*) FROM social_sessions ss WHERE ss.lead_id = al.id LIMIT 1),
-    'unified_context', al.unified_context
-  ) AS metadata
+  al.unified_context
 FROM all_leads al
-WHERE (
-  al.customer_name IS NOT NULL 
-  OR al.email IS NOT NULL 
-  OR al.phone IS NOT NULL
-);
+ORDER BY al.last_interaction_at DESC;
 ```
 
-### Key Mappings
+### What It Returns
 
-- **name**: Maps from `all_leads.customer_name`
-- **first_touchpoint**: Shows which channel the customer first used (e.g., `'web'`)
-- **last_touchpoint**: Shows most recent channel (e.g., `'web'`)
-- **metadata**: Contains data from all channel tables the customer has interacted with
-  - For Web-only customers: `metadata.web` contains full `web_sessions` data
-  - For multi-channel customers: `metadata` contains data from all channels
+For a Web-only customer:
+```json
+{
+  "id": "lead-123",
+  "first_touchpoint": "web",
+  "last_touchpoint": "web",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+919876543210",
+  "brand": "proxe",
+  "timestamp": "2024-11-20T10:00:00Z",
+  "metadata": {
+    "web_data": {
+      "booking_status": "confirmed",
+      "booking_date": "2024-11-25",
+      "conversation_summary": "Customer booked call"
+    },
+    "whatsapp_data": null,
+    "voice_data": null,
+    "social_data": null
+  },
+  "last_interaction_at": "2024-11-20T14:30:00Z"
+}
+```
+
+For a multi-channel customer (Web → WhatsApp → Voice):
+```json
+{
+  "id": "lead-456",
+  "first_touchpoint": "web",
+  "last_touchpoint": "voice",
+  "name": "Jane Smith",
+  "email": "jane@example.com",
+  "phone": "+919876543211",
+  "brand": "proxe",
+  "timestamp": "2024-11-15T10:00:00Z",
+  "metadata": {
+    "web_data": {
+      "booking_status": "pending",
+      "message_count": 5
+    },
+    "whatsapp_data": {
+      "message_count": 8,
+      "overall_sentiment": "positive"
+    },
+    "voice_data": {
+      "call_duration": 240,
+      "sentiment": "positive"
+    },
+    "social_data": null
+  },
+  "last_interaction_at": "2024-11-20T16:00:00Z"
+}
+```
 
 ## 4. Dashboard Display
 
@@ -218,152 +392,155 @@ WHERE (
 
 **File**: `src/app/api/integrations/web-agent/route.ts` (GET handler)
 
-**Process**:
-1. Fetches from `unified_leads` view
-2. Filters/orders by `timestamp` (descending)
-3. Limits to 100 records
-4. Maps to dashboard format
+**Query**:
+```typescript
+const leads = await supabase
+  .from('unified_leads')
+  .select('*')
+  .order('last_interaction_at', { ascending: false })
+  .limit(100);
+```
 
-### Dashboard Components
-
-**Main Dashboard**: `src/app/dashboard/page.tsx`
-- Displays channel cards including "Web PROXe"
-- Links to `/dashboard/channels/web`
-
-**Web Channel Page**: `src/app/dashboard/channels/web/page.tsx`
-- Shows Web PROXe specific metrics and leads
-
-**Leads Table**: `src/components/dashboard/LeadsTable.tsx`
-- Displays all leads from `unified_leads` view
-- Filters by source = 'web' for Web PROXe leads
+Returns all leads with:
+- `first_touchpoint`: Shows which channel customer started on
+- `last_touchpoint`: Shows most recent channel
+- `metadata`: Contains data from all channels customer has used
 
 ## 5. Real-time Updates
 
 **File**: `src/hooks/useRealtimeLeads.ts`
 
 **Process**:
-- Subscribes to Supabase Realtime changes on `all_leads` table
-- Filters for `first_touchpoint = 'web'` or `last_touchpoint = 'web'`
-- Maps lead data to Lead format:
-  ```typescript
-  {
-    id: lead.id,
-    name: lead.customer_name,
-    email: lead.email,
-    phone: lead.phone,
-    source: lead.first_touchpoint,  // 'web'
-    timestamp: lead.created_at,
-    first_touchpoint: lead.first_touchpoint,
-    last_touchpoint: lead.last_touchpoint,
-    metadata: lead.metadata  // Contains web_sessions data
-  }
-  ```
+1. Subscribes to Supabase Realtime changes on `all_leads` table
+2. Listens for INSERT and UPDATE events
+3. On change: Refetch from `unified_leads` view
+4. Frontend receives updated lead data in real-time
 
 ## 6. Data Flow Summary
 
 ### Creating a Web PROXe Lead
 
-1. **Web PROXe System** sends POST request to `/api/integrations/web-agent`
-2. **API Handler** validates required fields (`name`, `phone`)
-3. **Phone Normalization**: Normalizes phone number (removes non-digits)
-4. **Lead Detection**: 
-   - Queries `all_leads` by `(customer_phone_normalized, brand)`
-   - If new: Creates `all_leads` with `first_touchpoint='web'`, `last_touchpoint='web'`
-   - If existing: Updates `all_leads` with `last_touchpoint='web'`, `last_interaction_at`
-5. **Web Session Creation**:
-   - Inserts into `web_sessions` table with full customer data
-   - Links to `all_leads` via `lead_id`
-6. **Message Log**: Inserts into `messages` table for audit trail
-7. **View Update**: `unified_leads` view automatically includes the new record
-8. **Real-time Notification**: Supabase Realtime broadcasts the change
-9. **Dashboard Update**: Frontend receives real-time update and refreshes
+```
+1. POST /api/integrations/web-agent
+   ↓
+2. Validate: name + phone required
+   ↓
+3. Normalize phone: "+91 98765-43210" → "919876543210"
+   ↓
+4. Query all_leads by (phone_normalized, brand)
+   ↓
+5. NEW LEAD?
+     → Create all_leads (first_touchpoint='web')
+   EXISTING?
+     → Update all_leads (last_touchpoint='web', last_interaction_at=now)
+   ↓
+6. Create web_sessions (with all customer + booking data)
+   ↓
+7. Insert message (audit trail)
+   ↓
+8. Return: { success: true, lead_id: "..." }
+```
 
-### Querying Web PROXe Leads
+### Querying Leads (Dashboard)
 
-1. **Dashboard Request**: Frontend calls `/api/dashboard/leads` or `/api/integrations/web-agent`
-2. **Database Query**: Queries `unified_leads` view with `source = 'web'`
-3. **Data Mapping**: Maps view columns to Lead interface
-4. **Response**: Returns JSON array of leads
+```
+1. GET /api/integrations/web-agent
+   ↓
+2. SELECT * FROM unified_leads
+   ↓
+3. Returns: All leads with aggregated channel data
+```
 
-## 7. Key Details Stored for Web PROXe Leads
+## 7. Multi-Channel Example
 
-### Required Fields
-- `name`: Customer's name
-- `phone`: Customer's phone number (will be normalized)
+### Scenario: Customer uses Web → WhatsApp → Voice
 
-### Optional but Common Fields
-- `email`: Customer's email
-- `brand`: `'proxe'` or `'windchasers'` (defaults to `'proxe'`)
-- `booking_status`: `'pending'`, `'confirmed'`, or `'cancelled'`
-- `booking_date`: Scheduled date
-- `booking_time`: Scheduled time
-- `external_session_id`: External session identifier
-- `chat_session_id`: Original chat session ID from Web PROXe
-- `website_url`: Website where session originated
-- `conversation_summary`: AI-generated summary
-- `user_inputs_summary`: Summary of user inputs (JSONB)
-- `message_count`: Number of messages
-- `last_message_at`: Last message timestamp
-- `metadata`: Additional channel-specific data (JSONB)
+**Time 1: Web inquiry**
+```
+POST /api/integrations/web-agent
+{
+  "name": "Alice",
+  "phone": "+919876543210",
+  "brand": "proxe",
+  "booking_status": "pending"
+}
 
-## 8. Security & Access Control
+Result:
+- all_leads created: first_touchpoint='web'
+- web_sessions created: booking_status='pending'
+- messages created: channel='web'
+```
 
-### Row Level Security (RLS)
-- `all_leads` table: Authenticated users can view all leads
-- `web_sessions` table: Authenticated users can view all web sessions
-- `messages` table: Authenticated users can view all messages
-- `unified_leads` view: Authenticated users can view all leads
+**Time 2: Customer messages on WhatsApp**
+```
+POST /api/integrations/whatsapp (in future)
+{
+  "phone": "+919876543210",
+  "brand": "proxe",
+  "message": "Hi, interested in service"
+}
 
-### API Authentication
-- POST endpoint: Uses service role key (bypasses RLS, allows external webhooks)
-- GET endpoint: Requires authenticated Supabase user (for dashboard access)
+Result:
+- all_leads updated: last_touchpoint='whatsapp'
+- whatsapp_sessions created: (new row, same lead_id)
+- messages created: channel='whatsapp'
+```
 
-## 9. Indexes for Performance
+**Time 3: Customer calls**
+```
+Call arrives for +919876543210
 
-The `all_leads` table has indexes on:
-- `customer_phone_normalized` + `brand` (for lead deduplication)
-- `first_touchpoint` (for filtering by origin channel)
-- `last_touchpoint` (for filtering by recent channel)
-- `created_at` (for sorting by timestamp)
-- `brand` (for filtering by brand)
+Result:
+- all_leads updated: last_touchpoint='voice'
+- voice_sessions created: (new row, same lead_id)
+- messages created: channel='voice'
+```
 
-The `web_sessions` table has indexes on:
-- `lead_id` (for joining with all_leads)
-- `booking_date` (for filtering bookings)
-- `created_at` (for sorting)
-
-## 10. Example Webhook Payload
-
+**unified_leads now shows:**
 ```json
 {
-  "external_session_id": "web_1234567890_abc123",
-  "chat_session_id": "chat_xyz789",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "phone": "+1234567890",
-  "booking_status": "confirmed",
-  "booking_date": "2024-01-15",
-  "booking_time": "14:30:00",
+  "first_touchpoint": "web",
+  "last_touchpoint": "voice",
   "metadata": {
-    "website_url": "https://example.com",
-    "conversation_topic": "Product inquiry",
-    "user_agent": "Mozilla/5.0..."
+    "web_data": { ... },
+    "whatsapp_data": { ... },
+    "voice_data": { ... }
   }
 }
 ```
 
-This creates:
-1. **all_leads** record with:
-   - `first_touchpoint = 'web'`
-   - `last_touchpoint = 'web'`
-   - `customer_phone_normalized = '1234567890'` (normalized)
-2. **web_sessions** record with:
-   - Full customer data
-   - `booking_status = 'confirmed'`
-   - `session_status = 'active'`
-   - `channel_data` contains the metadata object
-3. **messages** record with:
-   - `channel = 'web'`
-   - `sender = 'system'`
-   - Content: "Web inquiry from John Doe"
+## 8. Key Design Principles
 
+1. **Independence**: Each session table is complete (can work standalone)
+2. **Linking**: lead_id connects all tables for same customer
+3. **Deduplication**: Uses (phone_normalized, brand) to prevent duplicates
+4. **Immutability**: first_touchpoint never changes after creation
+5. **Tracking**: last_touchpoint always updates to most recent channel
+6. **Audit Trail**: messages table never updates, only inserts
+
+## 9. Security
+
+### Authentication
+- **Webhooks (POST)**: Service role key (no auth required)
+- **Dashboard (GET)**: Authenticated user required
+
+### Row Level Security
+- All tables have RLS enabled
+- Authenticated users can view all leads
+- Can be refined later for per-user/organization access
+
+## 10. Indexes for Performance
+
+**all_leads**:
+- phone_normalized (deduplication lookups)
+- first_touchpoint (filtering by origin channel)
+- last_interaction_at (sorting by recency)
+
+**web_sessions**:
+- lead_id (joining to all_leads)
+- booking_status (filtering bookings)
+- created_at (sorting)
+
+**messages**:
+- lead_id + channel (quick context lookups)
+- created_at (conversation history)

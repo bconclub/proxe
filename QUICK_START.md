@@ -20,7 +20,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 2. Navigate to SQL Editor
 3. Run these migrations in order:
    - Copy and paste contents of `supabase/migrations/001_dashboard_schema.sql`
-   - Copy and paste contents of `supabase/migrations/002_unified_leads_view.sql`
+   - Copy and paste contents of `supabase/migrations/007_rename_sessions_to_all_leads.sql`
+   - Copy and paste contents of `supabase/migrations/008_update_unified_leads_view.sql`
+   - Copy and paste contents of `supabase/migrations/009_fix_unified_leads_view_rls.sql`
 
 ### Step 3: Create Your First Account
 
