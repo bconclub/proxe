@@ -100,7 +100,7 @@ interface DashboardLayoutProps {
 interface NavItem {
   name: string
   href?: string
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>
   external?: boolean
 }
 
@@ -253,7 +253,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               }}
               aria-label="Close sidebar"
             >
-              <MdClose className="w-5 h-5" />
+              <MdClose size={20} />
             </button>
           ) : (
             <button
@@ -269,9 +269,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {isCollapsed ? (
-                <MdChevronRight className="w-5 h-5" />
+                <MdChevronRight size={20} />
               ) : (
-                <MdChevronLeft className="w-5 h-5" />
+                <MdChevronLeft size={20} />
               )}
             </button>
           )}
@@ -318,9 +318,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
-                      <item.icon 
-                        style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }}
-                      />
+                      <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
+                        <item.icon size={20} />
+                      </span>
                       {!isCollapsed && <span>{item.name}</span>}
                     </a>
                   ) : (
@@ -354,9 +354,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                       }}
                     >
-                      <item.icon 
-                        style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }}
-                      />
+                      <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
+                        <item.icon size={20} />
+                      </span>
                       {!isCollapsed && <span>{item.name}</span>}
                     </Link>
                   )}
@@ -404,9 +404,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
-                      <item.icon 
-                        style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }}
-                      />
+                      <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
+                        <item.icon size={20} />
+                      </span>
                       {!isCollapsed && <span>{item.name}</span>}
                     </a>
                   ) : (
@@ -440,9 +440,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                       }}
                     >
-                      <item.icon 
-                        style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }}
-                      />
+                      <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
+                        <item.icon size={20} />
+                      </span>
                       {!isCollapsed && <span>{item.name}</span>}
                     </Link>
                   )}
@@ -479,11 +479,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            {isDarkMode ? (
-              <MdLightMode style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }} />
-            ) : (
-              <MdDarkMode style={{ width: '20px', height: '20px', marginRight: isCollapsed ? '0' : '12px' }} />
-            )}
+            <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
+              {isDarkMode ? (
+                <MdLightMode size={20} />
+              ) : (
+                <MdDarkMode size={20} />
+              )}
+            </span>
             {!isCollapsed && <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
 
@@ -566,9 +568,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               }}
             >
               {isCollapsed ? (
-                <MdChevronRight className="w-5 h-5" />
+                <MdChevronRight size={20} />
               ) : (
-                <MdChevronLeft className="w-5 h-5" />
+                <MdChevronLeft size={20} />
               )}
             </button>
           )}
@@ -587,7 +589,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           }}
           aria-label="Open sidebar"
         >
-          <MdMenu className="w-6 h-6" />
+          <MdMenu size={24} />
         </button>
       )}
 

@@ -248,7 +248,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
               className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
             >
-              <MdChevronLeft className="w-5 h-5" />
+              <MdChevronLeft size={20} />
             </button>
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               {format(currentDate, 'MMMM yyyy')}
@@ -257,7 +257,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               onClick={() => setCurrentDate(addMonths(currentDate, 1))}
               className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
             >
-              <MdChevronRight className="w-5 h-5" />
+              <MdChevronRight size={20} />
             </button>
           </div>
         </div>
@@ -322,7 +322,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 }
               `}
             >
-              <MdViewWeek className="inline w-4 h-4 mr-1" />
+              <span className="inline mr-1">
+                <MdViewWeek size={16} />
+              </span>
               Week
             </button>
             <button
@@ -335,7 +337,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 }
               `}
             >
-              <MdViewModule className="inline w-4 h-4 mr-1" />
+              <span className="inline mr-1">
+                <MdViewModule size={16} />
+              </span>
               Month
             </button>
           </div>
@@ -352,7 +356,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 onClick={() => navigateDate('prev')}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
               >
-                <MdChevronLeft className="w-5 h-5" />
+                <MdChevronLeft size={20} />
               </button>
               <h2 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white">
                 {viewMode === 'week'
@@ -363,7 +367,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 onClick={() => navigateDate('next')}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
               >
-                <MdChevronRight className="w-5 h-5" />
+                <MdChevronRight size={20} />
               </button>
             </div>
             <button
@@ -575,14 +579,16 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   onClick={() => setIsModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                 >
-                  <MdClose className="w-6 h-6" />
+                  <MdClose size={24} />
                 </button>
               </div>
 
               {/* Booking Info */}
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
-                  <MdPerson className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <span className="text-gray-400 mt-0.5">
+                    <MdPerson size={20} />
+                  </span>
                   <div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">Name</div>
                     <div className="text-base font-medium text-gray-900 dark:text-white">
@@ -593,7 +599,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
                 {selectedBooking.email && (
                   <div className="flex items-start gap-3">
-                    <MdEmail className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <span className="text-gray-400 mt-0.5">
+                      <MdEmail size={20} />
+                    </span>
                     <div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">Email</div>
                       <div className="text-base text-gray-900 dark:text-white">
@@ -605,7 +613,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
                 {selectedBooking.phone && (
                   <div className="flex items-start gap-3">
-                    <MdPhone className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <span className="text-gray-400 mt-0.5">
+                      <MdPhone size={20} />
+                    </span>
                     <div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">Phone</div>
                       <div className="text-base text-gray-900 dark:text-white">
@@ -616,7 +626,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 )}
 
                 <div className="flex items-start gap-3">
-                  <MdCalendarToday className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <span className="text-gray-400 mt-0.5">
+                    <MdCalendarToday size={20} />
+                  </span>
                   <div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">Date</div>
                     <div className="text-base text-gray-900 dark:text-white">
@@ -626,7 +638,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <MdAccessTime className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <span className="text-gray-400 mt-0.5">
+                    <MdAccessTime size={20} />
+                  </span>
                   <div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">Time</div>
                     <div className="text-base text-gray-900 dark:text-white">

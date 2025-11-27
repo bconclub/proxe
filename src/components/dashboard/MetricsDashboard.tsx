@@ -45,7 +45,9 @@ export default function MetricsDashboard({ detailed = false }: MetricsDashboardP
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <MdMessage className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400">
+                  <MdMessage size={32} />
+                </span>
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -65,7 +67,9 @@ export default function MetricsDashboard({ detailed = false }: MetricsDashboardP
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <MdLocalFireDepartment className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400">
+                  <MdLocalFireDepartment size={32} />
+                </span>
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -85,7 +89,9 @@ export default function MetricsDashboard({ detailed = false }: MetricsDashboardP
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <MdAccessTime className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400">
+                  <MdAccessTime size={32} />
+                </span>
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -105,7 +111,9 @@ export default function MetricsDashboard({ detailed = false }: MetricsDashboardP
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <MdAnalytics className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-400">
+                  <MdAnalytics size={32} />
+                </span>
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
