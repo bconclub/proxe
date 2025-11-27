@@ -116,13 +116,7 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
       booking_date: lead.booking_date || null,
       booking_time: lead.booking_time || null,
       metadata: lead.metadata,
-    }
-    // Include unified_context in metadata for modal access
-    if (lead.unified_context) {
-      modalLead.metadata = {
-        ...modalLead.metadata,
-        unified_context: lead.unified_context,
-      }
+      unified_context: lead.unified_context,
     }
     setSelectedLead(modalLead)
     setIsModalOpen(true)
@@ -166,12 +160,12 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'Source', 'Timestamp', 'Status']
+    const headers = ['Name', 'Email', 'Phone', 'First Source', 'Timestamp', 'Status']
     const rows = filteredLeads.map((lead) => [
       lead.name || '',
       lead.email || '',
       lead.phone || '',
-      lead.source || '',
+      lead.first_touchpoint || lead.source || '',
       lead.timestamp,
       lead.status || '',
     ])
@@ -265,7 +259,7 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
                 Phone
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Source
+                First Source
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timestamp
@@ -300,7 +294,7 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
-                      {lead.source || 'unknown'}
+                      {lead.first_touchpoint || lead.source || 'unknown'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

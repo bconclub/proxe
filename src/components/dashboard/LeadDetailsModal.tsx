@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, formatDate } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { format } from 'date-fns'
+import { MdLanguage, MdChat, MdPhone, MdShare } from 'react-icons/md'
 
 const STATUS_OPTIONS = [
   'New Lead',
@@ -37,6 +40,13 @@ interface Lead {
   booking_date: string | null
   booking_time: string | null
   metadata?: any
+  unified_context?: any
+}
+
+interface ChannelSummary {
+  channel: 'web' | 'whatsapp' | 'voice' | 'social'
+  summary: string
+  timestamp: string
 }
 
 interface LeadDetailsModalProps {
@@ -46,9 +56,39 @@ interface LeadDetailsModalProps {
   onStatusUpdate: (leadId: string, newStatus: string) => Promise<void>
 }
 
+const CHANNEL_CONFIG = {
+  web: {
+    name: 'Web',
+    icon: MdLanguage,
+    color: '#3B82F6',
+    emoji: '🌐'
+  },
+  whatsapp: {
+    name: 'WhatsApp',
+    icon: MdChat,
+    color: '#22C55E',
+    emoji: '💬'
+  },
+  voice: {
+    name: 'Voice',
+    icon: MdPhone,
+    color: '#8B5CF6',
+    emoji: '📞'
+  },
+  social: {
+    name: 'Social',
+    icon: MdShare,
+    color: '#EC4899',
+    emoji: '📱'
+  }
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>(lead?.status || 'New Lead')
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [channelSummaries, setChannelSummaries] = useState<ChannelSummary[]>([])
+  const [unifiedSummary, setUnifiedSummary] = useState<string>('')
+  const [loadingSummaries, setLoadingSummaries] = useState(false)
 
   // Update selected status when lead changes
   useEffect(() => {
@@ -56,6 +96,138 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setSelectedStatus(lead.status || 'New Lead')
     }
   }, [lead])
+
+  // Load conversation summaries when lead changes
+  useEffect(() => {
+    if (lead) {
+      loadConversationSummaries()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead])
+
+  const loadConversationSummaries = async () => {
+    if (!lead) return
+
+    setLoadingSummaries(true)
+    try {
+      const summaries: ChannelSummary[] = []
+      const supabase = createClient()
+
+      // First, try to get from unified_context
+      const unifiedContext = lead.unified_context || lead.metadata?.unified_context
+
+      if (unifiedContext) {
+        // Extract summaries from unified_context
+        const channels: Array<'web' | 'whatsapp' | 'voice' | 'social'> = ['web', 'whatsapp', 'voice', 'social']
+        
+        channels.forEach((channel) => {
+          const channelData = unifiedContext[channel]
+          if (channelData?.conversation_summary) {
+            summaries.push({
+              channel,
+              summary: channelData.conversation_summary,
+              timestamp: channelData.last_interaction || channelData.timestamp || ''
+            })
+          }
+        })
+
+        // Get unified summary
+        if (unifiedContext.unified_summary) {
+          setUnifiedSummary(unifiedContext.unified_summary)
+        }
+      }
+
+      // If no summaries from unified_context, fetch from channel tables
+      if (summaries.length === 0) {
+        // Fetch from web_sessions
+        const { data: webSessions } = await supabase
+          .from('web_sessions')
+          .select('conversation_summary, last_message_at, created_at')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (webSessions && webSessions[0]?.conversation_summary) {
+          summaries.push({
+            channel: 'web',
+            summary: webSessions[0].conversation_summary,
+            timestamp: webSessions[0].last_message_at || webSessions[0].created_at || ''
+          })
+        }
+
+        // Fetch from whatsapp_sessions
+        const { data: whatsappSessions } = await supabase
+          .from('whatsapp_sessions')
+          .select('conversation_summary, last_message_at, created_at')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (whatsappSessions && whatsappSessions[0]?.conversation_summary) {
+          summaries.push({
+            channel: 'whatsapp',
+            summary: whatsappSessions[0].conversation_summary,
+            timestamp: whatsappSessions[0].last_message_at || whatsappSessions[0].created_at || ''
+          })
+        }
+
+        // Fetch from voice_sessions (uses call_summary field)
+        const { data: voiceSessions } = await supabase
+          .from('voice_sessions')
+          .select('call_summary, created_at, updated_at')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (voiceSessions && voiceSessions[0]?.call_summary) {
+          summaries.push({
+            channel: 'voice',
+            summary: voiceSessions[0].call_summary,
+            timestamp: voiceSessions[0].updated_at || voiceSessions[0].created_at || ''
+          })
+        }
+
+        // Fetch from social_sessions
+        const { data: socialSessions } = await supabase
+          .from('social_sessions')
+          .select('conversation_summary, last_engagement_at, created_at, updated_at')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (socialSessions && socialSessions[0]?.conversation_summary) {
+          summaries.push({
+            channel: 'social',
+            summary: socialSessions[0].conversation_summary,
+            timestamp: socialSessions[0].last_engagement_at || socialSessions[0].updated_at || socialSessions[0].created_at || ''
+          })
+        }
+      }
+
+      // Fallback: try metadata.web_data
+      if (summaries.length === 0 && lead.metadata?.web_data?.conversation_summary) {
+        summaries.push({
+          channel: 'web',
+          summary: lead.metadata.web_data.conversation_summary,
+          timestamp: lead.metadata.web_data.last_message_at || lead.timestamp
+        })
+      }
+
+      setChannelSummaries(summaries)
+
+      // Set unified summary fallback (most recent summary)
+      if (!unifiedSummary && summaries.length > 0) {
+        const mostRecent = summaries.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        )[0]
+        setUnifiedSummary(mostRecent.summary)
+      }
+    } catch (error) {
+      console.error('Error loading conversation summaries:', error)
+    } finally {
+      setLoadingSummaries(false)
+    }
+  }
 
   if (!isOpen || !lead) return null
 
@@ -87,13 +259,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
-  // Extract conversation summary from various possible locations
-  const conversationSummary = 
-    lead.metadata?.web_data?.conversation_summary ||
-    lead.metadata?.unified_context?.web?.conversation_summary ||
-    lead.metadata?.conversation_summary ||
-    lead.metadata?.summary ||
-    'No summary available'
+  const formatDateString = (dateString: string) => {
+    if (!dateString) return ''
+    try {
+      const date = new Date(dateString)
+      return format(date, 'MMM d, yyyy')
+    } catch {
+      return dateString
+    }
+  }
 
   return (
     <>
@@ -120,7 +294,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
             {/* Contact Information */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contact Information</h3>
@@ -156,13 +330,61 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             </div>
 
-            {/* Conversation Summary */}
+            {/* Conversation History */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Conversation Summary</h3>
-              <div className="bg-gray-50 dark:bg-[#0D0D0D] rounded-lg p-4">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{conversationSummary}</p>
-              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Conversation History</h3>
+              
+              {loadingSummaries ? (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">Loading conversation history...</div>
+              ) : channelSummaries.length === 0 ? (
+                <div className="bg-gray-50 dark:bg-[#0D0D0D] rounded-lg p-4 text-center text-gray-500 dark:text-gray-400">
+                  No conversation history yet
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {channelSummaries.map((channelSummary) => {
+                    const config = CHANNEL_CONFIG[channelSummary.channel]
+                    const Icon = config.icon
+                    
+                    return (
+                      <div
+                        key={channelSummary.channel}
+                        className="rounded-lg border-l-4 mb-3"
+                        style={{
+                          borderLeftColor: config.color,
+                          backgroundColor: 'var(--bg-tertiary)',
+                          padding: '12px',
+                          borderRadius: '8px',
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{config.emoji}</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{config.name}</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-2">
+                          {channelSummary.summary}
+                        </p>
+                        {channelSummary.timestamp && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                            _{formatDateString(channelSummary.timestamp)}_
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
+
+            {/* Unified Summary */}
+            {unifiedSummary && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📋 Unified Summary</h3>
+                <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{unifiedSummary}</p>
+                </div>
+              </div>
+            )}
 
             {/* Status Update */}
             <div>
@@ -234,4 +456,3 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     </>
   )
 }
-

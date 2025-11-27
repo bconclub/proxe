@@ -10,6 +10,7 @@
   /* Light mode theme variables */
   --bg-primary: #f6f6f6;
   --bg-secondary: #ffffff;
+  --bg-tertiary: rgba(0, 0, 0, 0.02);
   --bg-hover: #ececec;
   --border-primary: #d0d0d0;
   --accent-primary: #5B1A8C;
@@ -22,6 +23,7 @@
   /* Dark mode theme variables */
   --bg-primary: #0D0D0D;
   --bg-secondary: #111111;
+  --bg-tertiary: rgba(255, 255, 255, 0.02);
   --bg-hover: #1A1A1A;
   --border-primary: #262626;
   --accent-primary: #5B1A8C;

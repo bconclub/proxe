@@ -9,6 +9,7 @@ export interface Lead {
   booking_date: string | null
   booking_time: string | null
   metadata?: any
+  unified_context?: any
 }
 
 export interface Booking {

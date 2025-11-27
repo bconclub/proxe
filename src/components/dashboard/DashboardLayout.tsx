@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { 
+  MdInbox,
   MdDashboard,
   MdPeople,
   MdCalendarToday,
@@ -107,6 +108,7 @@ interface NavItem {
 // Navigation items in order
 const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
+  { name: 'Inbox', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'All Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Bookings', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Website', href: '/dashboard/channels/web', icon: WebsiteIcon },
@@ -120,8 +122,8 @@ const navigation: NavItem[] = [
   { name: 'Support', href: 'https://support.goproxe.com', icon: MdSupport, external: true },
 ]
 
-// Divider positions: after Bookings (index 2), after Social (index 6), after Settings (index 8)
-const DIVIDER_AFTER_INDICES = [2, 6, 8]
+// Divider positions: after Bookings (index 3), after Social (index 7), after Settings (index 9)
+const DIVIDER_AFTER_INDICES = [3, 7, 9]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -130,6 +132,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [unreadCount] = useState(0) // TODO: Implement unread count logic
 
   // Load collapsed state and theme from localStorage
   useEffect(() => {
@@ -279,12 +282,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Navigation - Split into main nav and account section */}
         <nav className="flex-1 overflow-y-auto flex flex-col" style={{ padding: isCollapsed ? '16px 0' : '16px' }}>
-          {/* Main Navigation (Overview through Settings) */}
+          {/* Main Navigation (Inbox through Settings) */}
           <div className="space-y-1 flex-1">
-            {navigation.slice(0, 9).map((item, index) => {
+            {navigation.slice(0, 10).map((item, index) => {
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               const isActive = pathname === item.href
+              const isInbox = item.name === 'Inbox'
               
               return (
                 <React.Fragment key={item.name}>
@@ -357,7 +361,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <span style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
                         <item.icon size={20} />
                       </span>
-                      {!isCollapsed && <span>{item.name}</span>}
+                      {!isCollapsed && (
+                        <>
+                          <span style={{ flex: 1 }}>{item.name}</span>
+                          {isInbox && unreadCount > 0 && (
+                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </Link>
                   )}
                 </React.Fragment>
@@ -368,7 +381,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Spacer to push account section down */}
           <div className="flex-1" />
 
-          {/* Account Section (Usage, Billing, Docs, Support) */}
+          {/* Account Section (Billing, Docs, Support) */}
           {!isCollapsed && (
             <div 
               style={{
@@ -378,7 +391,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
           )}
           <div className="space-y-1">
-            {navigation.slice(9).map((item) => {
+            {navigation.slice(10).map((item) => {
               const isActive = pathname === item.href
               
               return (
