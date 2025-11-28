@@ -14,6 +14,7 @@
   --bg-hover: #ececec;
   --border-primary: #d0d0d0;
   --accent-primary: #5B1A8C;
+  --accent-light: #8B5CF6;
   --accent-subtle: rgba(91, 26, 140, 0.1);
   --text-primary: #1a1a1a;
   --text-secondary: #666666;
@@ -27,6 +28,7 @@
   --bg-hover: #1A1A1A;
   --border-primary: #262626;
   --accent-primary: #5B1A8C;
+  --accent-light: #A78BFA;
   --accent-subtle: rgba(91, 26, 140, 0.1);
   --text-primary: #ffffff;
   --text-secondary: #999999;
@@ -42,22 +44,17 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: var(--bg-primary);
 }
 
 /* Light mode background */
 body:not(.dark) {
-  background: #f6f6f6;
+  background: var(--bg-primary);
 }
 
 .dark body {
-  background: #0D0D0D;
-  color: #ffffff;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 @layer utilities {
@@ -68,6 +65,32 @@ body:not(.dark) {
   .font-zen-dots {
     font-family: var(--font-zen-dots), sans-serif;
   }
+}
+
+/* Custom Scrollbar Styles */
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-light);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-primary) var(--bg-secondary);
 }
 
 

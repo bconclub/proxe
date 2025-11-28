@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import MetricsDashboard from '@/components/dashboard/MetricsDashboard'
 import LeadsTable from '@/components/dashboard/LeadsTable'
@@ -18,7 +19,7 @@ export default async function DashboardPage() {
 
     if (!user) {
       // Redirect handled by middleware, but just in case
-      return null
+      redirect('/auth/login')
     }
 
     return (
@@ -77,10 +78,10 @@ export default async function DashboardPage() {
         </a>
       </div>
 
-      {/* Recent Leads */}
+      {/* Recent Conversations */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Leads</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Conversations</h2>
           <LeadsTable limit={10} />
         </div>
       </div>

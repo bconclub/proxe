@@ -108,7 +108,7 @@ interface NavItem {
 // Navigation items in order
 const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
-  { name: 'Inbox', href: '/dashboard/inbox', icon: MdInbox },
+  { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'All Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Bookings', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Website', href: '/dashboard/channels/web', icon: WebsiteIcon },
@@ -116,13 +116,13 @@ const navigation: NavItem[] = [
   { name: 'Voice', href: '/dashboard/channels/voice', icon: VoiceIcon },
   { name: 'Social', href: '/dashboard/channels/social', icon: SocialIcon },
   { name: 'Marketing', href: '/dashboard/marketing', icon: MdCampaign },
-  { name: 'Settings', href: '/dashboard/settings', icon: MdSettings },
+  { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
   { name: 'Billing', href: '/dashboard/billing', icon: MdCreditCard },
   { name: 'Docs', href: 'https://docs.goproxe.com', icon: MdMenuBook, external: true },
   { name: 'Support', href: 'https://support.goproxe.com', icon: MdSupport, external: true },
 ]
 
-// Divider positions: after Bookings (index 3), after Social (index 7), after Settings (index 9)
+// Divider positions: after Bookings (index 3), after Social (index 7), after Configure (index 9)
 const DIVIDER_AFTER_INDICES = [3, 7, 9]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -133,42 +133,71 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
+  const [currentDate, setCurrentDate] = useState<string>('')
+
+  // Set current date and time on mount
+  useEffect(() => {
+    const updateDateTime = () => {
+      const now = new Date()
+      const formattedDateTime = now.toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
+      setCurrentDate(formattedDateTime)
+    }
+    updateDateTime()
+    // Update every minute
+    const interval = setInterval(updateDateTime, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Load collapsed state and theme from localStorage
   useEffect(() => {
-    const savedState = localStorage.getItem('sidebar-collapsed')
-    if (savedState !== null) {
-      setIsCollapsed(savedState === 'true')
-    }
-
-    // Load theme preference
-    const savedTheme = localStorage.getItem('theme')
-    if (savedTheme !== null) {
-      const isDark = savedTheme === 'dark'
-      setIsDarkMode(isDark)
-      if (isDark) {
-        document.documentElement.classList.add('dark')
-        document.documentElement.classList.remove('light')
-      } else {
-        document.documentElement.classList.add('light')
-        document.documentElement.classList.remove('dark')
+    try {
+      // Set theme immediately to prevent white screen
+      if (typeof document !== 'undefined') {
+        const savedTheme = localStorage.getItem('theme')
+        if (savedTheme) {
+          if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark')
+            document.documentElement.classList.remove('light')
+            setIsDarkMode(true)
+          } else {
+            document.documentElement.classList.add('light')
+            document.documentElement.classList.remove('dark')
+            setIsDarkMode(false)
+          }
+        } else {
+          // Default to dark mode
+          document.documentElement.classList.add('dark')
+          document.documentElement.classList.remove('light')
+          setIsDarkMode(true)
+        }
       }
-    } else {
-      // Default to dark mode or system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      setIsDarkMode(prefersDark)
-      if (prefersDark) {
+
+      const savedState = localStorage.getItem('sidebar-collapsed')
+      if (savedState !== null) {
+        setIsCollapsed(savedState === 'true')
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error)
+      // Fallback to dark mode
+      if (typeof document !== 'undefined') {
         document.documentElement.classList.add('dark')
         document.documentElement.classList.remove('light')
-      } else {
-        document.documentElement.classList.add('light')
-        document.documentElement.classList.remove('dark')
+        setIsDarkMode(true)
       }
     }
   }, [])
 
   // Check if mobile
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
       if (window.innerWidth >= 768) {
@@ -210,7 +239,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const sidebarContentMargin = isMobile ? '0' : sidebarWidth
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
       {/* Mobile overlay */}
       {isMobile && mobileSidebarOpen && (
         <div 
@@ -282,13 +311,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Navigation - Split into main nav and account section */}
         <nav className="flex-1 overflow-y-auto flex flex-col" style={{ padding: isCollapsed ? '16px 0' : '16px' }}>
-          {/* Main Navigation (Inbox through Settings) */}
+          {/* Main Navigation (Conversations through Settings) */}
           <div className="space-y-1 flex-1">
             {navigation.slice(0, 10).map((item, index) => {
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               const isActive = pathname === item.href
-              const isInbox = item.name === 'Inbox'
+              const isInbox = item.name === 'Conversations'
               
               return (
                 <React.Fragment key={item.name}>
@@ -334,7 +363,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       style={{
                         fontSize: '14px',
                         fontWeight: 500,
-                        color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
+                        color: isActive ? 'var(--accent-light)' : 'var(--text-primary)',
                         backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
                         borderLeft: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
                         padding: isCollapsed ? '10px' : '10px 16px',
@@ -425,11 +454,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   ) : (
                     <Link
                       href={item.href!}
+                      prefetch={true}
                       className="flex items-center rounded-md transition-all duration-200 relative"
                       style={{
                         fontSize: '14px',
                         fontWeight: 500,
-                        color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
+                        color: isActive ? 'var(--accent-light)' : 'var(--text-primary)',
                         backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
                         borderLeft: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
                         padding: isCollapsed ? '10px' : '10px 16px',
@@ -567,7 +597,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {!isMobile && (
             <button
               onClick={toggleSidebar}
-              className="flex items-center justify-center w-full rounded-md transition-all duration-200"
+              className="flex items-center justify-center w-full rounded-md transition-all duration-200 mb-2"
               style={{
                 padding: '10px',
                 color: 'var(--text-primary)',
@@ -586,6 +616,47 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <MdChevronLeft size={20} />
               )}
             </button>
+          )}
+
+          {/* Version Badge and Last Updated */}
+          {!isCollapsed && (
+            <div 
+              className="text-center pt-2 border-t"
+              style={{ 
+                borderColor: 'var(--border-primary)',
+                paddingTop: '12px',
+              }}
+            >
+              <div 
+                className="inline-block px-2 py-1 rounded text-xs font-medium mb-1"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  color: 'white',
+                }}
+              >
+                v1.0.0
+              </div>
+              <p 
+                className="text-xs mt-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Updated: {currentDate || 'Loading...'}
+              </p>
+            </div>
+          )}
+          {isCollapsed && (
+            <div className="text-center pt-2">
+              <div 
+                className="inline-block px-1.5 py-0.5 rounded text-xs font-medium"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  color: 'white',
+                }}
+                title={currentDate ? `v1.0.0 - Updated: ${currentDate}` : 'v1.0.0'}
+              >
+                v1.0
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -612,11 +683,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         style={{
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
+          minHeight: '100vh',
+          width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
         }}
       >
         {/* Page content */}
-        <main className="flex-1">
-          <div className="py-6">
+        <main className="flex-1" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
+          <div className="py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               {children}
             </div>
