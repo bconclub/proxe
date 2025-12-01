@@ -356,6 +356,33 @@ export default function InboxPage() {
     }
   }
 
+  async function updateLeadStatus(leadId: string, newStatus: string) {
+    try {
+      const response = await fetch(`/api/dashboard/leads/${leadId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update lead status');
+      }
+
+      // Update the selected lead's status if it's the same lead
+      if (selectedLead && selectedLead.id === leadId) {
+        setSelectedLead({ ...selectedLead, status: newStatus });
+      }
+
+      // Refresh conversations to reflect status change
+      fetchConversations();
+    } catch (err) {
+      console.error('Error updating lead status:', err);
+      throw err;
+    }
+  }
+
   async function summarizeConversation() {
     if (!selectedLeadId || messages.length === 0) return;
     
@@ -762,6 +789,7 @@ export default function InboxPage() {
             setIsLeadModalOpen(false);
             setSelectedLead(null);
           }}
+          onStatusUpdate={updateLeadStatus}
         />
       )}
     </div>
