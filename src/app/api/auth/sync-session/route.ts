@@ -55,9 +55,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    
-    // Try to get session - this will trigger cookie sync if session exists in request
-    const { data: { session } } = await supabase.auth.getSession()
+    const supabase = await createClient()
     
     // This will read from cookies and ensure they're set
     const { data: { user }, error } = await supabase.auth.getUser()
@@ -65,8 +63,6 @@ export async function GET(request: NextRequest) {
     // Debug logging
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 Sync session API:', {
-        hasAuthHeader: !!authHeader,
-        hasSession: !!session,
         hasUser: !!user,
         error: error?.message,
       })
@@ -79,27 +75,16 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    if (!user && !session) {
+    if (!user) {
       return NextResponse.json(
         { error: 'No session found' },
         { status: 401 }
       )
     }
     
-    // If we have session but no user, that's okay - cookies are being set
-    if (session && !user) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Session found, cookies should be set',
-        hasSession: true,
-        hasUser: false
-      })
-    }
-    
     return NextResponse.json({ 
       success: true, 
       user: { id: user.id, email: user.email },
-      hasSession: !!session,
       hasUser: !!user
     })
   } catch (error) {

@@ -6,7 +6,12 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 const getServiceClient = () => {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        persistSession: false
+      }
+    }
   )
 }
 
@@ -17,13 +22,7 @@ const normalizePhone = (phone: string): string => {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // AUTHENTICATION DISABLED - No auth check needed
 
     // Fetch leads from unified_leads view
     const { data: leads, error } = await supabase
@@ -172,7 +171,7 @@ export async function POST(request: NextRequest) {
     if (webSessionError) throw webSessionError
 
     // Insert message
-    const { error: messageError } = await supabase.from('messages').insert({
+    const { error: messageError, data: messageData } = await supabase.from('conversations').insert({
       lead_id: leadId,
       channel: 'web',
       sender: 'system',
@@ -183,9 +182,29 @@ export async function POST(request: NextRequest) {
         booking_date: booking_date,
         external_session_id: externalSessionId,
       },
-    })
+    }).select()
 
-    if (messageError) throw messageError
+    if (messageError) {
+      console.error('❌ Error inserting message into conversations table:', messageError)
+      console.error('   Lead ID:', leadId)
+      console.error('   Error details:', JSON.stringify(messageError, null, 2))
+      // Don't fail the whole request if message insert fails - log and continue
+    } else {
+      console.log('✅ Message inserted successfully:', messageData?.[0]?.id)
+    }
+
+    // Trigger AI scoring (fire and forget)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    fetch(`${appUrl}/api/webhooks/message-created`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ lead_id: leadId }),
+    }).catch(err => {
+      console.error('Error triggering scoring:', err)
+      // Don't fail the request if scoring fails
+    })
 
     return NextResponse.json({
       success: true,

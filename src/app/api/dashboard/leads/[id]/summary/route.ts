@@ -3,19 +3,39 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+// Helper function to format time ago
+function formatTimeAgo(dateString: string): string {
+  const now = new Date()
+  const date = new Date(dateString)
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - No auth check needed
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
+    
+    // Use a placeholder user ID for logging (since auth is disabled)
+    const user = { id: 'system' }
 
     const leadId = params.id
     console.log('Generating summary for lead:', leadId)
@@ -36,6 +56,231 @@ export async function GET(
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
+    // ============================================
+    // STEP 1: Check unified_context for existing summaries
+    // ============================================
+    const unifiedSummary = lead.unified_context?.unified_summary
+    const webSummary = lead.unified_context?.web?.conversation_summary
+    const whatsappSummary = lead.unified_context?.whatsapp?.conversation_summary
+
+    // Priority 1: Use unified_summary if it exists
+    if (unifiedSummary) {
+      console.log('Using unified_summary from unified_context for lead:', leadId)
+      
+      // Still need to fetch activities and stage history for attribution
+      const { data: lastStageChange } = await supabase
+        .from('stage_history')
+        .select('changed_by, changed_at, new_stage')
+        .eq('lead_id', leadId)
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const { data: recentActivities } = await supabase
+        .from('activities')
+        .select(`
+          activity_type,
+          note,
+          created_at,
+          created_by,
+          dashboard_users:created_by (name, email)
+        `)
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      // Build attribution
+      let attribution = ''
+      if (lastStageChange) {
+        const changedBy = lastStageChange.changed_by
+        let actorName = 'PROXe AI'
+        let action = `changed stage to ${lastStageChange.new_stage}`
+        
+        if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
+          const { data: user } = await supabase
+            .from('dashboard_users')
+            .select('name, email')
+            .eq('id', changedBy)
+            .single()
+          
+          if (user) {
+            actorName = user.name || user.email || 'Team Member'
+          }
+        }
+        
+        const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+        attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
+      } else if (recentActivities && recentActivities.length > 0) {
+        const latestActivity = recentActivities[0]
+        const creator = latestActivity.dashboard_users
+        const actorName = creator?.name || creator?.email || 'Team Member'
+        const timeAgo = formatTimeAgo(latestActivity.created_at)
+        attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
+      }
+
+      // Calculate basic metrics for summaryData
+      const lastInteraction = lead.last_interaction_at || lead.created_at
+      const daysInactive = lastInteraction
+        ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)))
+        : 0
+
+      // Fetch messages for response rate calculation
+      let responseRate = 0
+      try {
+        const { data: messages } = await supabase
+          .from('conversations')
+          .select('sender')
+          .eq('lead_id', leadId)
+
+        if (messages && messages.length > 0) {
+          const customerMessages = messages.filter(m => m.sender === 'customer').length
+          responseRate = Math.round((customerMessages / messages.length) * 100)
+        }
+      } catch (error) {
+        console.error('Error calculating response rate:', error)
+      }
+
+      const summaryData = {
+        leadName: lead.customer_name || 'Customer',
+        lastMessage: null,
+        conversationStatus: 'Active',
+        responseRate,
+        daysInactive,
+        nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
+        keyInfo: {
+          budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
+          serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+          painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
+        },
+        leadStage: lead.lead_stage,
+        subStage: lead.sub_stage,
+        bookingDate: lead.booking_date,
+        bookingTime: lead.booking_time,
+      }
+
+      return NextResponse.json({
+        summary: unifiedSummary,
+        attribution,
+        data: summaryData,
+      })
+    }
+
+    // Priority 2: Combine web and whatsapp summaries if they exist
+    if (webSummary || whatsappSummary) {
+      console.log('Combining web and whatsapp summaries from unified_context for lead:', leadId)
+      
+      let combinedSummary = ''
+      if (webSummary && whatsappSummary) {
+        combinedSummary = `Web: ${webSummary}\n\nWhatsApp: ${whatsappSummary}`
+      } else if (webSummary) {
+        combinedSummary = `Web: ${webSummary}`
+      } else if (whatsappSummary) {
+        combinedSummary = `WhatsApp: ${whatsappSummary}`
+      }
+
+      // Still need to fetch activities and stage history for attribution
+      const { data: lastStageChange } = await supabase
+        .from('stage_history')
+        .select('changed_by, changed_at, new_stage')
+        .eq('lead_id', leadId)
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const { data: recentActivities } = await supabase
+        .from('activities')
+        .select(`
+          activity_type,
+          note,
+          created_at,
+          created_by,
+          dashboard_users:created_by (name, email)
+        `)
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      // Build attribution
+      let attribution = ''
+      if (lastStageChange) {
+        const changedBy = lastStageChange.changed_by
+        let actorName = 'PROXe AI'
+        let action = `changed stage to ${lastStageChange.new_stage}`
+        
+        if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
+          const { data: user } = await supabase
+            .from('dashboard_users')
+            .select('name, email')
+            .eq('id', changedBy)
+            .single()
+          
+          if (user) {
+            actorName = user.name || user.email || 'Team Member'
+          }
+        }
+        
+        const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+        attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
+      } else if (recentActivities && recentActivities.length > 0) {
+        const latestActivity = recentActivities[0]
+        const creator = latestActivity.dashboard_users
+        const actorName = creator?.name || creator?.email || 'Team Member'
+        const timeAgo = formatTimeAgo(latestActivity.created_at)
+        attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
+      }
+
+      // Calculate basic metrics for summaryData
+      const lastInteraction = lead.last_interaction_at || lead.created_at
+      const daysInactive = lastInteraction
+        ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)))
+        : 0
+
+      // Fetch messages for response rate calculation
+      let responseRate = 0
+      try {
+        const { data: messages } = await supabase
+          .from('conversations')
+          .select('sender')
+          .eq('lead_id', leadId)
+
+        if (messages && messages.length > 0) {
+          const customerMessages = messages.filter(m => m.sender === 'customer').length
+          responseRate = Math.round((customerMessages / messages.length) * 100)
+        }
+      } catch (error) {
+        console.error('Error calculating response rate:', error)
+      }
+
+      const summaryData = {
+        leadName: lead.customer_name || 'Customer',
+        lastMessage: null,
+        conversationStatus: 'Active',
+        responseRate,
+        daysInactive,
+        nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
+        keyInfo: {
+          budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
+          serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+          painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
+        },
+        leadStage: lead.lead_stage,
+        subStage: lead.sub_stage,
+        bookingDate: lead.booking_date,
+        bookingTime: lead.booking_time,
+      }
+
+      return NextResponse.json({
+        summary: combinedSummary,
+        attribution,
+        data: summaryData,
+      })
+    }
+
+    // ============================================
+    // STEP 2: No summaries found - fallback to Claude generation
+    // ============================================
+    console.log('No summaries in unified_context, generating new summary via Claude for lead:', leadId)
+
     // Fetch last messages from all channels
     let webMessages = null
     let whatsappMessages = null
@@ -45,7 +290,7 @@ export async function GET(
 
     try {
       const { data, error } = await supabase
-        .from('messages')
+        .from('conversations')
         .select('content, sender, created_at, channel')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: true })
@@ -131,18 +376,70 @@ export async function GET(
       bookingTime: lead.booking_time,
     }
 
+    // Fetch last 10 conversation messages
+    const last10Messages = allMessages.slice(-10).map(m => ({
+      sender: m.sender === 'customer' ? 'Customer' : 'PROXe',
+      content: m.content,
+      timestamp: m.created_at,
+      channel: m.channel,
+    }))
+
+    // Fetch recent activities
+    const { data: recentActivities } = await supabase
+      .from('activities')
+      .select(`
+        activity_type,
+        note,
+        created_at,
+        created_by,
+        dashboard_users:created_by (name, email)
+      `)
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    // Fetch last stage change
+    const { data: lastStageChange } = await supabase
+      .from('stage_history')
+      .select('changed_by, changed_at, new_stage')
+      .eq('lead_id', leadId)
+      .order('changed_at', { ascending: false })
+      .limit(1)
+      .single()
+
     // Generate AI summary if Claude API key is available
     const apiKey = process.env.CLAUDE_API_KEY
     if (apiKey) {
       try {
-        const prompt = `Generate a concise, actionable summary for this lead. Use natural paragraph format, not bullet points.
+        // Build conversation context
+        const conversationContext = last10Messages
+          .map(m => `[${m.timestamp}] ${m.sender} (${m.channel}): ${m.content}`)
+          .join('\n')
+
+        // Build activities context
+        const activitiesContext = recentActivities
+          ?.map(a => {
+            const creator = a.dashboard_users
+            return `[${a.created_at}] ${creator?.name || creator?.email || 'Team'}: ${a.activity_type} - ${a.note}`
+          })
+          .join('\n') || 'No team activities'
+
+        const prompt = `Generate a unified summary for this lead in this EXACT format:
+
+"[Time ago] via [channel]. Customer [last action]. Currently [status]. [Key extracted info: interested in X, budget Y, pain points Z]. Next: [recommended action]."
 
 Lead: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
 
-${summaryData.lastMessage ? `Last Message (${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'}, ${summaryData.lastMessage.channel}, ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}): ${summaryData.lastMessage.content.substring(0, 200)}` : 'No messages yet'}
+Last 10 Messages:
+${conversationContext || 'No messages yet'}
+
+Recent Activities:
+${activitiesContext}
+
+${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 150)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : 'No messages yet'}
 
 Conversation Status: ${conversationStatus}
 ${summaryData.nextTouchpoint ? `Next Touchpoint: ${summaryData.nextTouchpoint}` : ''}
@@ -150,14 +447,7 @@ ${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
 ${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
 ${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
 
-Generate a natural paragraph summary covering:
-1. Last message preview (who sent, when, preview text)
-2. Conversation status (actively chatting/waiting on customer/no response X hours)
-3. Latest action taken (if any)
-4. Next scheduled touchpoint (if any)
-5. Key extracted info (budget, service interest, pain points if mentioned)
-
-Make it contextual, useful, and actionable - not generic.`
+Generate the summary in the exact format specified above. Make it concise and actionable.`
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -182,8 +472,43 @@ Make it contextual, useful, and actionable - not generic.`
           const data = await response.json()
           const aiSummary = data.content?.[0]?.text || ''
           if (aiSummary) {
+            // Build attribution
+            let attribution = ''
+            if (lastStageChange) {
+              const changedBy = lastStageChange.changed_by
+              let actorName = 'PROXe AI'
+              let action = `changed stage to ${lastStageChange.new_stage}`
+              
+              if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
+                // Try to get user name
+                const { data: user } = await supabase
+                  .from('dashboard_users')
+                  .select('name, email')
+                  .eq('id', changedBy)
+                  .single()
+                
+                if (user) {
+                  actorName = user.name || user.email || 'Team Member'
+                }
+              }
+              
+              const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+              attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
+            } else if (recentActivities && recentActivities.length > 0) {
+              const latestActivity = recentActivities[0]
+              const creator = latestActivity.dashboard_users
+              const actorName = creator?.name || creator?.email || 'Team Member'
+              const timeAgo = formatTimeAgo(latestActivity.created_at)
+              attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
+            } else if (summaryData.lastMessage) {
+              const sender = summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'
+              const timeAgo = formatTimeAgo(summaryData.lastMessage.timestamp)
+              attribution = `Last updated by ${sender} ${timeAgo} - message sent`
+            }
+
             return NextResponse.json({
               summary: aiSummary,
+              attribution,
               data: summaryData,
             })
           }
@@ -222,17 +547,42 @@ Make it contextual, useful, and actionable - not generic.`
       if (keyInfo.painPoints) fallbackSummary += `Pain points: ${keyInfo.painPoints}. `
     }
 
+    // Build attribution for fallback
+    let attribution = ''
+    if (lastStageChange) {
+      const changedBy = lastStageChange.changed_by
+      let actorName = 'PROXe AI'
+      let action = `changed stage to ${lastStageChange.new_stage}`
+      
+      if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
+        const { data: user } = await supabase
+          .from('dashboard_users')
+          .select('name, email')
+          .eq('id', changedBy)
+          .single()
+        
+        if (user) {
+          actorName = user.name || user.email || 'Team Member'
+        }
+      }
+      
+      const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+      attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
+    }
+
     console.log('Returning fallback summary for lead:', leadId)
     return NextResponse.json({
       summary: fallbackSummary,
+      attribution,
       data: summaryData,
     })
   } catch (error) {
     console.error('Error generating lead summary:', error)
     // Always return a basic summary even on error
-    const errorSummary = `Unable to generate detailed summary. Please check the lead details manually.`
+    const errorSummary = `Unable to load summary`
     return NextResponse.json({
       summary: errorSummary,
+      attribution: '',
       data: {
         daysInactive: 0,
         responseRate: 0,

@@ -74,31 +74,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setBuildDate(getBuildDate())
   }, [])
 
-  // Client-side auth check - handles case where server-side check fails
+  // AUTHENTICATION DISABLED - Client-side auth check commented out
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       const supabase = createClient()
+  //       
+  //       if (!session) {
+  //         console.log('🚫 No session found client-side, redirecting to login...')
+  //         window.location.href = '/auth/login'
+  //       } else {
+  //         setIsCheckingAuth(false)
+  //       }
+  //     } catch (error) {
+  //       console.error('Auth check error:', error)
+  //       setIsCheckingAuth(false)
+  //     }
+  //   }
+  //   
+  //   // Only check if we're in development (server-side already checked in production)
+  //   if (process.env.NODE_ENV === 'development') {
+  //     checkAuth()
+  //   } else {
+  //     setIsCheckingAuth(false)
+  //   }
+  // }, [])
+  
+  // Set checking auth to false immediately since auth is disabled
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session) {
-          console.log('🚫 No session found client-side, redirecting to login...')
-          window.location.href = '/auth/login'
-        } else {
-          setIsCheckingAuth(false)
-        }
-      } catch (error) {
-        console.error('Auth check error:', error)
-        setIsCheckingAuth(false)
-      }
-    }
-    
-    // Only check if we're in development (server-side already checked in production)
-    if (process.env.NODE_ENV === 'development') {
-      checkAuth()
-    } else {
-      setIsCheckingAuth(false)
-    }
+    setIsCheckingAuth(false)
   }, [])
 
   // Load collapsed state and theme from localStorage
@@ -175,10 +179,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }
 
+  // AUTHENTICATION DISABLED - Logout function disabled
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/auth/login'
+    // const supabase = createClient()
+    // await supabase.auth.signOut()
+    // window.location.href = '/auth/login'
+    console.log('Logout disabled - authentication is not enabled')
   }
 
   const sidebarWidth = isCollapsed ? '64px' : '240px'

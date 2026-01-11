@@ -18,13 +18,17 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - No auth check needed
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
+    
+    // Use a placeholder user ID for logging (since auth is disabled)
+    const user = { id: 'system' }
 
     const { status } = await request.json()
     const leadId = params.id

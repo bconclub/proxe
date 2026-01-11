@@ -76,18 +76,41 @@ export default function LeadStageSelector({
     if (disabled || isUpdating) return
 
     setError(null)
+    
+    // Show activity logger modal first (required for manual override)
+    const oldStage = stage
+    setPendingStageChange({
+      stageChangeId: null,
+      oldStage,
+      newStage,
+    })
+    setShowActivityModal(true)
+  }
+
+  const handleActivitySave = async (activity: {
+    activity_type: 'call' | 'meeting' | 'message' | 'note'
+    note: string
+    duration?: number
+    next_followup?: string
+  }) => {
+    if (!pendingStageChange) return
+
     setIsUpdating(true)
+    setError(null)
 
     try {
-      const oldStage = stage
-      const response = await fetch(`/api/dashboard/leads/${leadId}/stage`, {
-        method: 'PATCH',
+      // Call override endpoint with activity data
+      const response = await fetch(`/api/dashboard/leads/${leadId}/override`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          stage: newStage,
-          sub_stage: newStage === 'High Intent' ? subStage : null,
+          new_stage: pendingStageChange.newStage,
+          activity_type: activity.activity_type,
+          note: activity.note,
+          duration_minutes: activity.duration,
+          next_followup_date: activity.next_followup,
         }),
       })
 
@@ -97,23 +120,16 @@ export default function LeadStageSelector({
       }
 
       const data = await response.json()
-      setStage(newStage)
-      if (newStage !== 'High Intent') {
+      setStage(pendingStageChange.newStage as LeadStage)
+      if (pendingStageChange.newStage !== 'High Intent') {
         setSubStage(null)
       }
 
-      // Show activity logger modal after successful stage change
-      if (data.stage_change_id) {
-        setPendingStageChange({
-          stageChangeId: data.stage_change_id,
-          oldStage,
-          newStage,
-        })
-        setShowActivityModal(true)
-      }
+      setShowActivityModal(false)
+      setPendingStageChange(null)
 
       if (onStageChange) {
-        onStageChange(newStage, newStage === 'High Intent' ? subStage : null)
+        onStageChange(pendingStageChange.newStage as LeadStage, null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update stage')
@@ -159,25 +175,6 @@ export default function LeadStageSelector({
     }
   }
 
-  const handleActivitySave = async (activity: {
-    activity_type: 'call' | 'meeting' | 'message' | 'note'
-    note: string
-    duration?: number
-    next_followup?: string
-  }) => {
-    const response = await fetch(`/api/dashboard/leads/${leadId}/activities`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(activity),
-    })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to save activity')
-    }
-  }
 
   return (
     <>
@@ -245,8 +242,10 @@ export default function LeadStageSelector({
       <ActivityLoggerModal
         isOpen={showActivityModal}
         onClose={() => {
-          setShowActivityModal(false)
-          setPendingStageChange(null)
+          if (!isUpdating) {
+            setShowActivityModal(false)
+            setPendingStageChange(null)
+          }
         }}
         onSave={handleActivitySave}
         stageChange={pendingStageChange ? {

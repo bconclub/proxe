@@ -91,9 +91,22 @@ export default function InboxPage() {
 
   // Fetch conversations (grouped by lead_id)
   useEffect(() => {
+    console.log('useEffect triggered - fetching conversations, channelFilter:', channelFilter)
     fetchConversations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
+  
+  // Debug: Log when conversations state changes
+  useEffect(() => {
+    console.log('Conversations state changed:', {
+      count: conversations.length,
+      conversations: conversations.map(c => ({
+        id: c.lead_id,
+        name: c.lead_name,
+        message: c.last_message?.substring(0, 30)
+      }))
+    })
+  }, [conversations])
 
   // Set default channel when conversation is selected
   useEffect(() => {
@@ -120,7 +133,8 @@ export default function InboxPage() {
 
   // Fetch messages when conversation selected or channel changes
   useEffect(() => {
-    if (selectedLeadId && selectedChannel) {
+    if (selectedLeadId) {
+      // Fetch messages even if channel isn't set yet - will show all messages
       fetchMessages(selectedLeadId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,7 +146,7 @@ export default function InboxPage() {
       .channel('messages-changes')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+        { event: 'INSERT', schema: 'public', table: 'conversations' },
         (payload) => {
           // Refresh conversations list
           fetchConversations()
@@ -153,11 +167,43 @@ export default function InboxPage() {
   async function fetchConversations() {
     setLoading(true)
     try {
-      // Fetch all messages ordered by most recent
+      console.log('Fetching conversations...')
+      
+      // First, try a simple count to see if messages exist
+      const { count: messageCount, error: countError } = await supabase
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+      
+      console.log('Total messages in database:', messageCount, countError ? `Error: ${countError.message}` : '')
+      
+      // If we get an RLS error, log it clearly
+      if (countError) {
+        console.error('❌ RLS Error - Conversations table may be blocked:', countError.message)
+        if (countError.message.includes('permission') || countError.message.includes('policy')) {
+          console.error('⚠️  RLS Policy Error: Make sure migration 018_disable_auth_requirements.sql has been run!')
+        }
+      } else if (messageCount === 0) {
+        // No RLS error but 0 messages - check if we can actually query the table
+        console.log('⚠️  No messages found. Testing RLS access...')
+        const { data: testData, error: testError } = await supabase
+          .from('messages')
+          .select('id')
+          .limit(1)
+        
+        if (testError) {
+          console.error('❌ RLS Test Failed - Cannot query conversations table:', testError.message)
+        } else {
+          console.log('✅ RLS Test Passed - Can query conversations table (it\'s just empty)')
+        }
+      }
+      
+      // Fetch conversations with valid lead_id
       let query = supabase
-        .from('messages')
+        .from('conversations')
         .select('lead_id, channel, content, sender, created_at')
+        .not('lead_id', 'is', null)
         .order('created_at', { ascending: false })
+        .limit(1000) // Limit to prevent performance issues
 
       // Apply channel filter if not "all"
       if (channelFilter !== 'all') {
@@ -168,24 +214,73 @@ export default function InboxPage() {
 
       if (messagesError) {
         console.error('Error fetching messages:', messagesError)
-        setLoading(false)
-        return
-      }
-
-      if (!messagesData || messagesData.length === 0) {
-        console.log('No messages found')
+        console.error('Error details:', JSON.stringify(messagesError, null, 2))
         setConversations([])
         setLoading(false)
         return
       }
 
-      console.log('Fetched messages:', messagesData.length)
+      console.log('Fetched messages:', messagesData?.length || 0)
+      
+      if (!messagesData || messagesData.length === 0) {
+        console.log('No messages found - checking if this is a data issue or query issue')
+        // Try fetching without filters to see if any messages exist
+        const { data: allMessages, error: allError } = await supabase
+          .from('conversations')
+          .select('id, lead_id')
+          .limit(10)
+        
+        console.log('Sample messages (any):', allMessages?.length || 0, allError ? `Error: ${allError.message}` : '')
+        
+        // Fallback: Try to show leads with recent activity even without messages
+        // This helps when messages haven't been created yet but leads exist
+        console.log('Attempting fallback: fetching leads with recent activity...')
+        const { data: activeLeads, error: leadsError } = await supabase
+          .from('all_leads')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint')
+          .not('last_interaction_at', 'is', null)
+          .order('last_interaction_at', { ascending: false })
+          .limit(50)
+        
+        if (!leadsError && activeLeads && activeLeads.length > 0) {
+          console.log('Found active leads as fallback:', activeLeads.length)
+          // Create conversations from leads (even without messages)
+          const fallbackConversations: Conversation[] = activeLeads.map(lead => {
+            const channels: string[] = []
+            if (lead.first_touchpoint) channels.push(lead.first_touchpoint)
+            if (lead.last_touchpoint && !channels.includes(lead.last_touchpoint)) {
+              channels.push(lead.last_touchpoint)
+            }
+            
+            return {
+              lead_id: lead.id,
+              lead_name: lead.customer_name || 'Unknown',
+              lead_email: lead.email || '',
+              lead_phone: lead.phone || '',
+              channels: channels.length > 0 ? channels : ['web'],
+              last_message: 'No messages yet',
+              last_message_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : new Date().toISOString(),
+              unread_count: 0
+            }
+          })
+          
+          setConversations(fallbackConversations)
+          setLoading(false)
+          return
+        }
+        
+        setConversations([])
+        setLoading(false)
+        return
+      }
+
+      console.log('Sample message:', messagesData[0])
 
       // Group by lead_id and collect ALL channels per lead
       const conversationMap = new Map<string, any>()
       
       for (const msg of messagesData) {
-        if (!msg.lead_id) continue;
+        if (!msg.lead_id) continue
         
         if (!conversationMap.has(msg.lead_id)) {
           conversationMap.set(msg.lead_id, {
@@ -194,11 +289,16 @@ export default function InboxPage() {
             last_message: msg.content || '(No content)',
             last_message_at: msg.created_at,
             message_count: 1
-          });
+          })
         } else {
-          const conv = conversationMap.get(msg.lead_id);
-          conv.channels.add(msg.channel);
-          conv.message_count++;
+          const conv = conversationMap.get(msg.lead_id)
+          conv.channels.add(msg.channel)
+          // Update to most recent message
+          if (new Date(msg.created_at) > new Date(conv.last_message_at)) {
+            conv.last_message = msg.content || '(No content)'
+            conv.last_message_at = msg.created_at
+          }
+          conv.message_count++
         }
       }
 
@@ -213,7 +313,7 @@ export default function InboxPage() {
         return
       }
 
-      console.log('Looking up lead IDs:', leadIds)
+      console.log('Looking up lead IDs:', leadIds.length, 'leads')
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
@@ -224,7 +324,25 @@ export default function InboxPage() {
         console.error('Error fetching leads:', leadsError)
       }
 
-      console.log('Leads data returned:', leadsData)
+      console.log('Leads data returned:', leadsData?.length || 0, 'leads')
+
+      // Diagnostic: Check if messages exist for these specific leads
+      if (leadIds.length > 0) {
+        const { data: diagnosticMessages, error: diagError } = await supabase
+          .from('conversations')
+          .select('lead_id, id')
+          .in('lead_id', leadIds.slice(0, 5)) // Check first 5 leads
+          .limit(10)
+        
+        if (diagError) {
+          console.error('❌ Diagnostic: Cannot query messages for leads:', diagError.message)
+        } else {
+          console.log('🔍 Diagnostic: Messages for sample leads:', diagnosticMessages?.length || 0)
+          if (diagnosticMessages && diagnosticMessages.length > 0) {
+            console.log('   Sample message lead_ids:', diagnosticMessages.map(m => m.lead_id))
+          }
+        }
+      }
 
       // Build final conversations array
       const conversationsArray: Conversation[] = []
@@ -233,18 +351,25 @@ export default function InboxPage() {
         // Find matching lead - ensure we're comparing strings
         const lead = leadsData?.find((l: any) => String(l.id) === String(leadId))
         
-        console.log(`Lead ${leadId}:`, lead ? `Found - ${lead.customer_name}` : 'Not found')
-        
-        conversationsArray.push({
+        const conversation: Conversation = {
           lead_id: leadId,
           lead_name: lead?.customer_name || 'Unknown',
           lead_email: lead?.email || '',
           lead_phone: lead?.phone || '',
-          channels: Array.from(convData.channels), // Convert Set to Array
+          channels: Array.from(convData.channels),
           last_message: convData.last_message,
           last_message_at: convData.last_message_at,
           unread_count: 0
+        }
+        
+        console.log('Adding conversation:', {
+          lead_id: conversation.lead_id,
+          lead_name: conversation.lead_name,
+          channels: conversation.channels,
+          last_message: conversation.last_message?.substring(0, 50)
         })
+        
+        conversationsArray.push(conversation)
       }
 
       // Sort by most recent message first
@@ -252,38 +377,79 @@ export default function InboxPage() {
         new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
       )
 
-      console.log('Final conversations:', conversationsArray)
+      console.log('Final conversations array:', conversationsArray.length)
+      console.log('Sample conversation:', conversationsArray[0])
+      console.log('Setting conversations state...')
       setConversations(conversationsArray)
+      console.log('Conversations state set. Array length:', conversationsArray.length)
 
     } catch (err) {
       console.error('Error in fetchConversations:', err)
+      setConversations([])
+      setLoading(false)
+    } finally {
+      // Always set loading to false, even if there was an error
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function fetchMessages(leadId: string) {
     setMessagesLoading(true)
     try {
-      let query = supabase
-        .from('messages')
+      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel)
+      
+      // First, try to fetch messages for the selected channel if one is set
+      if (selectedChannel) {
+        const { data: channelData, error: channelError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('lead_id', leadId)
+          .eq('channel', selectedChannel)
+          .order('created_at', { ascending: true })
+
+        if (channelError) {
+          console.error('Error fetching messages by channel:', channelError)
+        } else if (channelData && channelData.length > 0) {
+          console.log('Fetched messages for channel:', selectedChannel, 'count:', channelData.length)
+          setMessages(channelData)
+          setMessagesLoading(false)
+          return
+        }
+      }
+
+      // Fallback: Fetch all conversations for this lead (regardless of channel)
+      console.log('Fetching all conversations for lead (no channel filter)')
+      const { data, error } = await supabase
+        .from('conversations')
         .select('*')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: true })
-      
-      // Filter by selected channel if one is selected
-      if (selectedChannel) {
-        query = query.eq('channel', selectedChannel)
+
+      if (error) {
+        console.error('Error fetching messages:', error)
+        console.error('Error details:', JSON.stringify(error, null, 2))
+        throw error
       }
-
-      const { data, error } = await query
-
-      if (error) throw error
+      
+      console.log('Fetched messages:', data?.length || 0, 'messages')
+      if (data && data.length > 0) {
+        console.log('Sample message:', data[0])
+        // If we got messages but no channel was selected, set the channel from the first message
+        if (!selectedChannel && data[0].channel) {
+          console.log('Setting channel from first message:', data[0].channel)
+          setSelectedChannel(data[0].channel)
+        }
+      } else {
+        console.log('No messages found for lead:', leadId)
+      }
+      
       setMessages(data || [])
     } catch (err) {
-      console.error('Error fetching messages:', err)
+      console.error('Error in fetchMessages:', err)
       setMessages([])
+    } finally {
+      setMessagesLoading(false)
     }
-    setMessagesLoading(false)
   }
 
   async function openLeadModal(leadId: string) {
@@ -389,10 +555,13 @@ export default function InboxPage() {
     setSummaryLoading(true);
     setShowSummary(true);
     
+    // Get the selected conversation for this function
+    const currentConversation = conversations.find(c => c.lead_id === selectedLeadId);
+    
     try {
       // Build conversation text from messages
       const conversationText = messages
-        .map(msg => `${msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe'}: ${msg.content}`)
+        .map(msg => `${msg.sender === 'customer' ? currentConversation?.lead_name || 'Customer' : 'PROXe'}: ${msg.content}`)
         .join('\n');
       
       // Call Claude API to summarize (you can create a new API route or use existing)
@@ -401,7 +570,7 @@ export default function InboxPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversation: conversationText,
-          leadName: selectedConversation?.lead_name || 'Customer'
+          leadName: currentConversation?.lead_name || 'Customer'
         })
       });
       
@@ -447,7 +616,7 @@ export default function InboxPage() {
   }
 
   // Filter conversations by search
-  const filteredConversations = conversations.filter(conv => {
+  const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
@@ -457,8 +626,9 @@ export default function InboxPage() {
     )
   })
 
-  const selectedConversation = conversations.find(c => c.lead_id === selectedLeadId)
+  const selectedConversation = conversations.find((c) => c.lead_id === selectedLeadId)
 
+  // Render the inbox UI
   return (
     <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
       {/* Loading Overlay */}
@@ -523,9 +693,33 @@ export default function InboxPage() {
             <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>
               Loading...
             </div>
+          ) : conversations.length === 0 ? (
+            <div className="p-4 text-center space-y-2">
+              <p style={{ color: 'var(--text-secondary)' }}>
+                No conversations found
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Messages will appear here once conversations start
+              </p>
+              <button
+                onClick={() => fetchConversations()}
+                className="mt-2 px-3 py-1.5 text-xs rounded-md"
+                style={{
+                  background: 'var(--accent-primary)',
+                  color: 'white'
+                }}
+              >
+                Refresh
+              </button>
+            </div>
           ) : filteredConversations.length === 0 ? (
-            <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>
-              No conversations yet
+            <div className="p-4 text-center space-y-2">
+              <p style={{ color: 'var(--text-secondary)' }}>
+                No conversations match your search
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Try adjusting your search query
+              </p>
             </div>
           ) : (
             filteredConversations.map((conv) => (
@@ -533,7 +727,13 @@ export default function InboxPage() {
                 key={conv.lead_id}
                 onClick={() => {
                   setSelectedLeadId(conv.lead_id);
-                  setSelectedChannel(conv.channels[0] || 'whatsapp'); // Default to first channel
+                  // Set channel if available, otherwise let fetchMessages handle it
+                  if (conv.channels && conv.channels.length > 0) {
+                    setSelectedChannel(conv.channels[0]);
+                  } else {
+                    // Clear channel to show all messages
+                    setSelectedChannel('');
+                  }
                 }}
                 className="p-4 cursor-pointer border-b transition-colors"
                 style={{

@@ -185,19 +185,14 @@ export default function LoginPage() {
         setRateLimited(false)
         setRateLimitUntil(null)
         
-        // Verify session is available
-        if (data?.user && data?.session) {
-          console.log('✅ Login successful, user:', data.user.email)
-          console.log('✅ Session token available:', !!data.session.access_token)
-          
-          // Wait a moment to ensure session is fully established
-          // Then redirect with full page reload to trigger middleware
-          await new Promise(resolve => setTimeout(resolve, 300))
-          
-          // Verify session one more time before redirecting
-          const { data: sessionData } = await supabase.auth.getSession()
-          if (sessionData?.session) {
-            console.log('✅ Session confirmed, making authenticated request to set cookies...')
+          // Verify session is available
+          if (data?.user && data?.session) {
+            console.log('✅ Login successful, user:', data.user.email)
+            console.log('✅ Session token available:', !!data.session.access_token)
+            
+            // Wait a moment to ensure session is fully established
+            // Then redirect with full page reload to trigger middleware
+            await new Promise(resolve => setTimeout(resolve, 300))
             
             // Send session to API to set cookies on server
             try {
@@ -207,12 +202,12 @@ export default function LoginPage() {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  access_token: sessionData.session.access_token,
-                  refresh_token: sessionData.session.refresh_token,
-                  expires_at: sessionData.session.expires_at,
-                  expires_in: sessionData.session.expires_in,
-                  token_type: sessionData.session.token_type,
-                  user: sessionData.session.user,
+                  access_token: data.session.access_token,
+                  refresh_token: data.session.refresh_token,
+                  expires_at: data.session.expires_at,
+                  expires_in: data.session.expires_in,
+                  token_type: data.session.token_type,
+                  user: data.session.user,
                 }),
                 credentials: 'include',
               })
@@ -235,31 +230,16 @@ export default function LoginPage() {
               // Still redirect - client-side check will handle it
               window.location.href = '/dashboard'
             }
-          } else {
-            console.error('❌ Session lost after login')
-            setError('Session error. Please try logging in again.')
-            setLoading(false)
-          }
-        } else if (data?.user) {
-          // User exists but no session - wait and retry
-          console.warn('⚠️ User exists but session not immediately available, waiting...')
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          const { data: retrySession } = await supabase.auth.getSession()
-          if (retrySession?.session) {
-            console.log('✅ Session available on retry, redirecting...')
+          } else if (data?.user) {
+            // User exists but no session - redirect anyway
+            console.warn('⚠️ User exists but session not immediately available, redirecting...')
             router.push('/dashboard')
             router.refresh()
           } else {
-            console.error('❌ Session not available after retry')
-            setError('Session not available. Please try logging in again.')
+            console.error('❌ Login successful but user data not available')
+            setError('Login successful but user data not available. Please try again.')
             setLoading(false)
           }
-        } else {
-          console.error('❌ Login successful but user data not available')
-          setError('Login successful but user data not available. Please try again.')
-          setLoading(false)
-        }
       }
     } catch (err) {
       console.error('Login error:', err)

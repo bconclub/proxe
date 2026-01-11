@@ -6,7 +6,12 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 const getServiceClient = () => {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        persistSession: false
+      }
+    }
   )
 }
 
@@ -20,8 +25,10 @@ async function updateWhatsAppContext(
   leadId: string,
   contextData: {
     conversation_summary?: string
+    conversation_context?: any
     user_inputs_summary?: any
     message_count?: number
+    last_interaction?: string
     booking_status?: string
     booking_date?: string
     booking_time?: string
@@ -48,32 +55,43 @@ async function updateWhatsAppContext(
     const existingContext = lead?.unified_context || {}
     const existingWhatsApp = existingContext.whatsapp || {}
 
+    // Use provided last_interaction timestamp or current time
+    const lastInteractionTimestamp = contextData.last_interaction || new Date().toISOString()
+
     // Merge new WhatsApp data
     const updatedContext = {
       ...existingContext,
       whatsapp: {
         ...existingWhatsApp,
         conversation_summary:
-          contextData.conversation_summary ||
-          existingWhatsApp.conversation_summary ||
-          null,
+          contextData.conversation_summary !== undefined
+            ? contextData.conversation_summary
+            : existingWhatsApp.conversation_summary || null,
+        conversation_context:
+          contextData.conversation_context !== undefined
+            ? contextData.conversation_context
+            : existingWhatsApp.conversation_context || null,
         user_inputs_summary:
-          contextData.user_inputs_summary ||
-          existingWhatsApp.user_inputs_summary ||
-          null,
+          contextData.user_inputs_summary !== undefined
+            ? contextData.user_inputs_summary
+            : existingWhatsApp.user_inputs_summary || null,
         message_count:
-          contextData.message_count ||
-          existingWhatsApp.message_count ||
-          0,
-        last_interaction: new Date().toISOString(),
+          contextData.message_count !== undefined
+            ? contextData.message_count
+            : existingWhatsApp.message_count || 0,
+        last_interaction: lastInteractionTimestamp,
         booking_status:
-          contextData.booking_status ||
-          existingWhatsApp.booking_status ||
-          null,
+          contextData.booking_status !== undefined
+            ? contextData.booking_status
+            : existingWhatsApp.booking_status || null,
         booking_date:
-          contextData.booking_date || existingWhatsApp.booking_date || null,
+          contextData.booking_date !== undefined
+            ? contextData.booking_date
+            : existingWhatsApp.booking_date || null,
         booking_time:
-          contextData.booking_time || existingWhatsApp.booking_time || null,
+          contextData.booking_time !== undefined
+            ? contextData.booking_time
+            : existingWhatsApp.booking_time || null,
       },
     }
 
@@ -83,7 +101,7 @@ async function updateWhatsAppContext(
       .update({
         unified_context: updatedContext,
         last_touchpoint: 'whatsapp',
-        last_interaction_at: new Date().toISOString(),
+        last_interaction_at: lastInteractionTimestamp,
       })
       .eq('id', leadId)
       .select()
@@ -94,7 +112,11 @@ async function updateWhatsAppContext(
       return null
     }
 
-    console.log('Updated unified_context for lead:', leadId)
+    console.log('✅ Updated unified_context.whatsapp for lead:', leadId, {
+      has_summary: !!contextData.conversation_summary,
+      has_context: !!contextData.conversation_context,
+      message_count: contextData.message_count,
+    })
     return updatedLead
   } catch (err) {
     console.error('updateWhatsAppContext error:', err)
@@ -124,9 +146,11 @@ export async function POST(request: NextRequest) {
       external_session_id,
       whatsapp_id,
       conversation_summary,
+      conversation_context,
       user_inputs_summary,
       message_count,
       last_message_at,
+      last_interaction,
       conversation_status,
       overall_sentiment,
       metadata,
@@ -175,9 +199,10 @@ export async function POST(request: NextRequest) {
           unified_context: {
             whatsapp: {
               conversation_summary: conversation_summary || null,
+              conversation_context: conversation_context || null,
               user_inputs_summary: user_inputs_summary || null,
               message_count: message_count || 0,
-              last_interaction: new Date().toISOString(),
+              last_interaction: last_interaction || last_message_at || new Date().toISOString(),
               booking_status: booking_status || null,
               booking_date: booking_date || null,
               booking_time: booking_time || null,
@@ -196,8 +221,10 @@ export async function POST(request: NextRequest) {
       // Update unified_context with WhatsApp data
       await updateWhatsAppContext(supabase, leadId, {
         conversation_summary,
+        conversation_context,
         user_inputs_summary,
         message_count,
+        last_interaction: last_interaction || last_message_at,
         booking_status,
         booking_date,
         booking_time,
@@ -246,8 +273,10 @@ export async function POST(request: NextRequest) {
       // Update unified_context again after session update to ensure sync
       await updateWhatsAppContext(supabase, leadId, {
         conversation_summary,
+        conversation_context,
         user_inputs_summary,
         message_count,
+        last_interaction: last_interaction || last_message_at,
         booking_status,
         booking_date,
         booking_time,
@@ -283,16 +312,18 @@ export async function POST(request: NextRequest) {
       // Update unified_context after creating new session to ensure sync
       await updateWhatsAppContext(supabase, leadId, {
         conversation_summary,
+        conversation_context,
         user_inputs_summary,
         message_count,
+        last_interaction: last_interaction || last_message_at,
         booking_status,
         booking_date,
         booking_time,
       })
     }
 
-    // Insert message into messages table
-    const { error: messageError } = await supabase.from('messages').insert({
+    // Insert message into conversations table
+    const { error: messageError, data: messageData } = await supabase.from('conversations').insert({
       lead_id: leadId,
       channel: 'whatsapp',
       sender: body.sender || 'customer',
@@ -303,11 +334,27 @@ export async function POST(request: NextRequest) {
         external_session_id: externalSessionId,
         ...(metadata || {}),
       },
-    })
+    }).select()
 
     if (messageError) {
-      console.error('Error inserting message:', messageError)
+      console.error('❌ Error inserting message into conversations table:', messageError)
+      console.error('   Lead ID:', leadId)
+      console.error('   Error details:', JSON.stringify(messageError, null, 2))
       // Don't fail the whole request if message insert fails
+    } else {
+      console.log('✅ Message inserted successfully:', messageData?.[0]?.id)
+      // Trigger AI scoring (fire and forget)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      fetch(`${appUrl}/api/webhooks/message-created`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ lead_id: leadId }),
+      }).catch(err => {
+        console.error('Error triggering scoring:', err)
+        // Don't fail the request if scoring fails
+      })
     }
 
     return NextResponse.json({

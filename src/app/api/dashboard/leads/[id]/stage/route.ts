@@ -27,13 +27,17 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - No auth check needed
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
+    
+    // Use a placeholder user ID for logging (since auth is disabled)
+    const user = { id: 'system' }
 
     const leadId = params.id
     const body = await request.json()
@@ -73,10 +77,11 @@ export async function PATCH(
     const oldSubStage = currentLead.sub_stage
     const wasOverridden = currentLead.stage_override
 
-    // Update lead stage
+    // Update lead stage (set both override columns for compatibility)
     const updateData: any = {
       lead_stage: stage,
       stage_override: true, // Mark as manually overridden
+      is_manual_override: true, // Also set this for compatibility
       updated_at: new Date().toISOString()
     }
 
@@ -184,21 +189,26 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - No auth check needed
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
+    
+    // Use a placeholder user ID for logging (since auth is disabled)
+    const user = { id: 'system' }
 
     const leadId = params.id
 
-    // Remove override flag
+    // Remove override flag (clear both columns for compatibility)
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({
         stage_override: false,
+        is_manual_override: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', leadId)

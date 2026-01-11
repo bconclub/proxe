@@ -40,6 +40,254 @@ The PROXe Command Center is a Next.js 14 application built with the App Router, 
 
 ---
 
+## PROXe System - Complete Feature Checklist
+
+**PROXe is a unified AI system with 5 channels:**
+- **Website (Web PROXe)** - Chat widget on goproxe.com
+- **WhatsApp (WhatsApp PROXe)** - WhatsApp Business API integration
+- **Dashboard (Command Center)** - Unified inbox & lead management
+- **Voice (Voice PROXe)** - Phone call integration (future)
+- **Social (Social PROXe)** - Instagram/FB DMs (future)
+
+**All channels feed into:**
+- `all_leads` table - Unified customer records (deduplication by phone)
+- `unified_context` - Cross-channel conversation history & intelligence
+- Dashboard - Unified inbox displaying all channels
+
+---
+
+### 🎯 LEAD INTELLIGENCE (Cross-Channel)
+- [x] **Auto Lead Score (0-100)** - engagement, intent, channel mix, recency
+  - Implemented in `supabase/migrations/011_lead_scoring_system.sql`
+  - Triggered automatically on message creation
+  - Score factors: engagement, intent signals, question depth, channel diversity
+- [ ] **Smart Stage Progression** - auto-detect: Discovery → Interest → Evaluation → Decision
+- [ ] **Buying Signals Detection** - pricing, timeline, budget, decision-maker, competitors
+- [x] **Lead Health Score** - engagement trend, response rate, days since contact
+  - Days inactive calculation in LeadDetailsModal
+  - Response rate calculation in summary API
+- [x] **Quick Stats** - days in pipeline, response rate, avg response time, channels used
+  - Displayed in LeadDetailsModal Score tab
+- [x] **Activity Timeline** - all messages, stage changes, assignments, bookings
+  - Implemented in `/api/dashboard/leads/[id]/activities`
+  - Shows PROXe actions, team actions, customer actions
+
+### 💬 CONVERSATION INTELLIGENCE (Cross-Channel)
+- [x] **Unified Summary** - Web + WhatsApp + Voice + Social
+  - API: `/api/dashboard/leads/[id]/summary`
+  - Reads from `unified_context.unified_summary` (priority 1)
+  - Falls back to `unified_context.web.conversation_summary` + `whatsapp.conversation_summary` (priority 2)
+  - Generates new summary via Claude API if missing (priority 3)
+- [ ] **Intent Detection** - pricing interest, demo request, support, objection, competitor research
+- [ ] **Sentiment Tracking** - positive/neutral/negative, frustration, urgency
+- [x] **Smart Highlights** - budget mentions, timeline signals, pain points, decision process
+  - Extracted from `unified_context` in summary API
+  - Displayed in Summary tab Key Insights section
+- [x] **Key Info Extraction** - auto-extract from ALL channels
+  - Budget, service interest, pain points stored in `unified_context`
+  - Synced from web and WhatsApp channels
+
+### ⚡ AUTOMATION MAGIC (Cross-Channel)
+- [x] **Context-aware AI** - knows Web history when customer contacts via WhatsApp
+  - Implemented in `/api/integrations/whatsapp/system-prompt`
+  - Fetches unified context from `all_leads.unified_context`
+  - Includes web conversation history in WhatsApp prompts
+- [ ] **Smart Auto-Replies** - after-hours, FAQ detection, pricing auto-send
+- [ ] **Auto-Assignment Rules** - route by score/channel/timezone/load balancing
+- [ ] **Smart Follow-ups** - auto-nudge after 24h silence, escalate after 48h
+- [ ] **Event Triggers** - lead goes cold, high score lead, competitor mentioned
+
+### 👥 TEAM COLLABORATION (Dashboard Only)
+- [x] **Assignment System** - assign to user, transfer with context, unassigned queue
+  - Lead stage override with activity logging
+  - Activity logger modal for stage changes
+- [x] **Internal Notes** - @mentions, note history, attachments
+  - Activity logging system in `activities` table
+  - Supports: call, meeting, message, note types
+- [x] **Complete Timeline** - all channels, stage changes, score changes, system events
+  - Activity log shows: PROXe actions, team actions, customer actions
+  - Includes stage history, booking events, message events
+
+### 📊 ANALYTICS POWER (Dashboard Only)
+- [x] **Overview KPIs** - total leads, conversion rate, response time, booking rate
+  - Metrics dashboard at `/dashboard/metrics`
+  - Channel-specific metrics at `/dashboard/channels/[channel]/metrics`
+- [x] **Channel Performance** - leads by source, quality, conversion, response time
+  - Web, WhatsApp, Voice, Social channel pages
+  - ChannelMetrics component displays performance data
+- [ ] **Conversion Funnel** - stage breakdown, drop-off points, bottlenecks
+- [ ] **Revenue Attribution** - pipeline value by source, closed-won by channel
+
+### 🤖 AI SUPERPOWERS (All Channels)
+- [x] **Unified Context** - Web + WhatsApp + Voice + Social in single conversation
+  - Stored in `all_leads.unified_context`
+  - Structure: `{ web: {...}, whatsapp: {...}, voice: {...}, social: {...}, unified_summary: "..." }`
+- [x] **Conversation Summarization** - intelligent extraction, not raw messages
+  - Web: synced to `unified_context.web.conversation_summary`
+  - WhatsApp: synced to `unified_context.whatsapp.conversation_summary`
+  - Unified: stored in `unified_context.unified_summary`
+- [x] **Cross-Channel Recognition** - same customer, different channels = one lead
+  - Deduplication by `customer_phone_normalized` in `all_leads`
+  - All channels update same lead record
+- [ ] **Next Best Action** - suggest pricing send, schedule call, flag for urgent response
+- [ ] **Deal Predictions** - likelihood to close %, predicted close date, risk of churn
+- [ ] **Smart Reply Suggestions** - objection handling, competitive positioning
+- [ ] **Meeting Prep Briefs** - auto-generate before calls with talking points
+
+### 🔥 ADDICTIVE UX (Dashboard Only)
+- [x] **Lead Card on Hover** - mini preview, quick actions
+  - LeadDetailsModal shows full lead information
+  - Quick actions: view conversations, edit stage, add activity
+- [x] **Smart Search** - by name/phone/message content, saved searches
+  - Leads table supports filtering and search
+- [ ] **Keyboard Shortcuts** - j/k navigation, quick assign, add note
+- [x] **Color-Coded** - hot/warm/cold leads, channel badges, stage colors
+  - Lead score color coding (green/orange/yellow/blue)
+  - Stage badges with color coding
+  - Channel icons with active/inactive states
+- [x] **Real-time Updates** - new message badge, typing indicator, push notifications
+  - Supabase Realtime subscriptions for leads and metrics
+  - `useRealtimeLeads` and `useRealtimeMetrics` hooks
+
+---
+
+### Current Status
+
+#### ✅ Implemented Features
+- **Website Integration**: Lead capture, conversation history, session persistence
+  - Endpoint: `/api/integrations/web-agent`
+  - Syncs to `all_leads` and `web_sessions`
+  - Updates `unified_context.web`
+- **WhatsApp Integration**: Direct Meta integration, context-aware responses, unified_context sync
+  - Endpoint: `/api/integrations/whatsapp`
+  - Syncs to `all_leads` and `whatsapp_sessions`
+  - Updates `unified_context.whatsapp` via `updateWhatsAppContext()`
+  - Supports: `conversation_summary`, `conversation_context`, `user_inputs_summary`, `message_count`, `last_interaction`
+- **Dashboard**: Unified inbox, lead details, real-time updates, multi-channel display
+  - Leads table with filtering and sorting
+  - Lead details modal with Score, Activity, Summary tabs
+  - Real-time updates via Supabase Realtime
+  - Channel-specific pages and metrics
+- **Summary Tab**: API fixed to read from `unified_context` first, then generate if missing
+  - Priority: `unified_summary` → `web + whatsapp summaries` → Claude generation
+- **Lead Scoring**: Auto-calculated on message creation
+  - Score range: 0-100
+  - Factors: engagement, intent, question depth, channel diversity
+- **Activity Logging**: Complete timeline of all lead activities
+  - PROXe actions, team actions, customer actions
+  - Stage changes, bookings, messages
+
+#### ⚠️ Partially Implemented
+- **Summary Tab**: API working, needs UI testing
+- **Stage Detection**: Manual stage assignment, no auto-detection yet
+- **Analytics**: Basic metrics implemented, advanced analytics pending
+
+#### ❌ Not Implemented
+- **Automation Rules**: Auto-assignment, follow-ups, triggers
+- **Advanced Analytics**: Conversion funnel, revenue attribution
+- **AI Features**: Next best action, deal predictions, smart replies, meeting prep
+- **Voice Integration**: Phone call integration (future)
+- **Social Integration**: Instagram/FB DMs (future)
+
+---
+
+### Integration Points
+
+#### Website → Dashboard
+- **Endpoint**: `POST /api/integrations/web-agent`
+- **Flow**: Web widget → webhook → `all_leads` + `web_sessions` + `unified_context.web`
+- **Data**: name, email, phone, conversation_summary, user_inputs_summary, metadata
+
+#### WhatsApp → Dashboard
+- **Endpoint**: `POST /api/integrations/whatsapp`
+- **Flow**: WhatsApp backend → webhook → `all_leads` + `whatsapp_sessions` + `unified_context.whatsapp`
+- **Function**: `updateWhatsAppContext()` syncs all WhatsApp data to unified_context
+- **Data**: conversation_summary, conversation_context, user_inputs_summary, message_count, last_interaction
+
+#### Dashboard → Database
+- **View**: `unified_leads` - displays all channels in one view
+- **Table**: `all_leads` - one record per customer (deduplication by phone)
+- **Context**: `unified_context` JSONB - cross-channel conversation data
+- **Messages**: `conversations` table - universal message log (all channels)
+
+#### Future Integrations
+- **Voice**: `POST /api/integrations/voice` (endpoint exists, not fully implemented)
+- **Social**: Instagram/FB DMs (planned)
+
+---
+
+### Database Schema
+
+#### Core Tables
+- **`all_leads`** - One record per customer (deduplication by `customer_phone_normalized`)
+  - `unified_context` JSONB - Cross-channel conversation data
+  - `lead_score` INTEGER - Auto-calculated 0-100 score
+  - `lead_stage` TEXT - Current stage (New, Engaged, Qualified, etc.)
+  - `first_touchpoint` / `last_touchpoint` - Channel tracking
+- **`unified_context` Structure**:
+  ```json
+  {
+    "web": {
+      "conversation_summary": "...",
+      "conversation_context": {...},
+      "user_inputs_summary": {...},
+      "message_count": 10,
+      "last_interaction": "2025-01-01T12:00:00Z"
+    },
+    "whatsapp": {
+      "conversation_summary": "...",
+      "conversation_context": {...},
+      "user_inputs_summary": {...},
+      "message_count": 5,
+      "last_interaction": "2025-01-01T13:00:00Z"
+    },
+    "unified_summary": "Cross-channel unified summary...",
+    "budget": "...",
+    "service_interest": "...",
+    "pain_points": "..."
+  }
+  ```
+- **`web_sessions`**, **`whatsapp_sessions`**, **`voice_sessions`**, **`social_sessions`** - Channel-specific details
+- **`conversations`** - Universal message log (all channels)
+  - `lead_id`, `channel`, `sender`, `content`, `created_at`
+- **`activities`** - Team actions and notes
+  - `lead_id`, `activity_type`, `note`, `created_by`, `created_at`
+- **`stage_history`** - Stage change tracking
+  - `lead_id`, `old_stage`, `new_stage`, `changed_by`, `changed_at`
+
+#### Views
+- **`unified_leads`** - Combines all_leads with channel-specific data
+  - Includes latest session data from each channel
+  - Used by dashboard for displaying leads
+
+---
+
+### API Endpoints Reference
+
+#### Lead Management
+- `GET /api/dashboard/leads` - List all leads
+- `GET /api/dashboard/leads/[id]/summary` - Get lead summary (reads unified_context)
+- `GET /api/dashboard/leads/[id]/activities` - Get activity timeline
+- `POST /api/dashboard/leads/[id]/override` - Override stage with activity
+- `POST /api/dashboard/leads/[id]/stage` - Update lead stage
+- `POST /api/dashboard/leads/[id]/status` - Update lead status
+
+#### Integrations
+- `POST /api/integrations/web-agent` - Web widget webhook
+- `POST /api/integrations/whatsapp` - WhatsApp webhook
+- `GET /api/integrations/whatsapp/system-prompt` - Get context-aware system prompt
+- `POST /api/integrations/voice` - Voice webhook (future)
+
+#### Metrics & Analytics
+- `GET /api/dashboard/metrics` - Overall metrics
+- `GET /api/dashboard/channels/[channel]/metrics` - Channel-specific metrics
+- `GET /api/dashboard/insights` - Insights and trends
+
+#### Webhooks
+- `POST /api/webhooks/message-created` - Trigger lead scoring on new message
+
+---
+
 ## Tech Stack
 
 ### Core Framework

@@ -1,20 +1,22 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+// AUTHENTICATION DISABLED
+// import { redirect } from 'next/navigation'
+// import { createClient } from '@/lib/supabase/server'
 import InsightsCharts from '@/components/dashboard/InsightsCharts'
 import LeadsTable from '@/components/dashboard/LeadsTable'
 import RecentBookings from '@/components/dashboard/RecentBookings'
 
 export default async function DashboardPage() {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - Dashboard is now public access
+    // const supabase = await createClient()
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      // Redirect handled by middleware, but just in case
-      redirect('/auth/login')
-    }
+    // if (!user) {
+    //   // Redirect handled by middleware, but just in case
+    //   redirect('/auth/login')
+    // }
 
     return (
     <div className="space-y-6">
@@ -57,10 +59,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Bookings - Row 3 */}
+      {/* Upcoming Events - Row 3 */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Bookings</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
           <RecentBookings />
         </div>
       </div>

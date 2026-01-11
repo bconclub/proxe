@@ -7,13 +7,14 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // AUTHENTICATION DISABLED - No auth check needed
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
 
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '7', 10)
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Get all messages for conversations
     const { data: messages, error: messagesError } = await supabase
-      .from('messages')
+      .from('conversations')
       .select('created_at, lead_id, channel')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())

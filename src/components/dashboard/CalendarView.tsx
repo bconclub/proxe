@@ -42,7 +42,7 @@ const getSourceColor = (source: string | null) => {
 export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('month')
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
