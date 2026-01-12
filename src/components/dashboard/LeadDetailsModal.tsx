@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
@@ -157,15 +157,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [activities, setActivities] = useState<any[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
   
-  // 100-Day Interaction data
-  const [interaction90Days, setInteraction90Days] = useState<{
+  // 30-Day Interaction data (from first touchpoint)
+  const [interaction30Days, setInteraction30Days] = useState<{
     totalInteractions: number
-    trend: number
     dailyData: Array<{ date: string; count: number }>
-    busiestDay: string
-    avgDaily: number
+    lastTouchDay: string | null
   } | null>(null)
-  const [loading90Days, setLoading90Days] = useState(false)
+  const [loading30Days, setLoading30Days] = useState(false)
   
   // New state for enhanced metrics
   const [channelData, setChannelData] = useState<{
@@ -192,11 +190,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   })
   const [previousScore, setPreviousScore] = useState<number | null>(null)
   const [freshLeadData, setFreshLeadData] = useState<Lead | null>(null)
-  const [scoreBreakdown, setScoreBreakdown] = useState<{
-    aiScore: number
-    activityScore: number
-    businessScore: number
-    totalScore: number
+  const [calculatedScore, setCalculatedScore] = useState<{
+    score: number
+    breakdown: {
+      ai: number
+      activity: number
+      business: number
+    }
   } | null>(null)
 
   // Calculate Lead Score Breakdown
@@ -341,20 +341,32 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       )
       
       return {
-        aiScore: Math.round(aiScore * 0.6), // Already weighted (0-60)
-        activityScore: Math.round(activityScore * 0.3), // Already weighted (0-30)
-        businessScore: Math.round(businessScoreNormalized), // Already normalized to 0-10 for 10% weight
-        totalScore: Math.round(totalScore)
+        score: Math.round(totalScore),
+        breakdown: {
+          ai: Math.round(aiScore * 0.6), // Already weighted (0-60)
+          activity: Math.round(activityScore * 0.3), // Already weighted (0-30)
+          business: Math.round(businessScoreNormalized), // Already normalized to 0-10 for 10% weight
+        }
       }
     } catch (error) {
       console.error('Error calculating lead score:', error)
       return {
-        aiScore: 0,
-        activityScore: 0,
-        businessScore: 0,
-        totalScore: 0
+        score: 0,
+        breakdown: {
+          ai: 0,
+          activity: 0,
+          business: 0
+        }
       }
     }
+  }
+
+  // Calculate and set unified score
+  const calculateAndSetScore = async () => {
+    if (!lead) return
+    const leadData = freshLeadData || lead
+    const result = await calculateLeadScore(leadData)
+    setCalculatedScore(result)
   }
 
   // Fetch fresh lead data from database when modal opens
@@ -428,58 +440,47 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
-  // Load 100-day interaction data
-  const load90DayInteractions = async () => {
+  // Load 30-day interaction data (from first touchpoint)
+  const load30DayInteractions = async () => {
     if (!lead) return
-    setLoading90Days(true)
+    setLoading30Days(true)
     try {
       const supabase = createClient()
       
-      // Get current date and 100 days ago
-      const now = new Date()
-      const oneHundredDaysAgo = new Date(now)
-      oneHundredDaysAgo.setDate(oneHundredDaysAgo.getDate() - 100)
-      const twoHundredDaysAgo = new Date(now)
-      twoHundredDaysAgo.setDate(twoHundredDaysAgo.getDate() - 200)
+      // Get first touchpoint date (created_at)
+      const firstTouchpoint = new Date(lead.created_at || lead.timestamp || new Date())
+      const thirtyDaysLater = new Date(firstTouchpoint)
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
       
-      // Fetch messages from last 100 days (customer messages only)
-      const { data: messages100Days, error: error100 } = await supabase
+      // Fetch messages from first 30 days (customer messages only)
+      const { data: messages30Days, error: error30 } = await supabase
         .from('conversations')
         .select('created_at, sender')
         .eq('lead_id', lead.id)
         .eq('sender', 'customer')
-        .gte('created_at', oneHundredDaysAgo.toISOString())
+        .gte('created_at', firstTouchpoint.toISOString())
+        .lt('created_at', thirtyDaysLater.toISOString())
         .order('created_at', { ascending: true })
       
-      // Fetch messages from previous 100 days (for trend comparison)
-      const { data: messagesPrevious100, error: errorPrev } = await supabase
-        .from('conversations')
-        .select('created_at, sender')
-        .eq('lead_id', lead.id)
-        .eq('sender', 'customer')
-        .gte('created_at', twoHundredDaysAgo.toISOString())
-        .lt('created_at', oneHundredDaysAgo.toISOString())
-      
-      if (error100 || errorPrev) {
-        console.error('Error loading 100-day interactions:', error100 || errorPrev)
-        setLoading90Days(false)
+      if (error30) {
+        console.error('Error loading 30-day interactions:', error30)
+        setLoading30Days(false)
         return
       }
       
-      // Group messages by date for last 100 days
+      // Group messages by date for first 30 days
       const dailyCounts: Record<string, number> = {}
-      const nowDate = new Date(now)
       
-      // Initialize all 100 days with 0
-      for (let i = 0; i < 100; i++) {
-        const date = new Date(nowDate)
-        date.setDate(date.getDate() - i)
+      // Initialize all 30 days with 0
+      for (let i = 0; i < 30; i++) {
+        const date = new Date(firstTouchpoint)
+        date.setDate(date.getDate() + i)
         const dateStr = date.toISOString().split('T')[0]
         dailyCounts[dateStr] = 0
       }
       
       // Count messages per day
-      messages100Days?.forEach((msg: any) => {
+      messages30Days?.forEach((msg: any) => {
         const dateStr = new Date(msg.created_at).toISOString().split('T')[0]
         if (dailyCounts[dateStr] !== undefined) {
           dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1
@@ -492,37 +493,25 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         .sort((a, b) => a.date.localeCompare(b.date))
       
       // Calculate total interactions
-      const totalInteractions = messages100Days?.length || 0
-      const previousTotal = messagesPrevious100?.length || 0
+      const totalInteractions = messages30Days?.length || 0
       
-      // Calculate trend
-      const trend = previousTotal > 0 
-        ? Math.round(((totalInteractions - previousTotal) / previousTotal) * 100)
-        : totalInteractions > 0 ? 100 : 0
+      // Calculate last touch day (most recent day with interactions)
+      let lastTouchDay: string | null = null
+      if (messages30Days && messages30Days.length > 0) {
+        const lastMessage = messages30Days[messages30Days.length - 1]
+        const lastDate = new Date(lastMessage.created_at)
+        lastTouchDay = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      }
       
-      // Calculate busiest day of week
-      const dayCounts: Record<string, number> = {}
-      messages100Days?.forEach((msg: any) => {
-        const dayName = new Date(msg.created_at).toLocaleDateString('en-US', { weekday: 'long' })
-        dayCounts[dayName] = (dayCounts[dayName] || 0) + 1
-      })
-      const busiestDay = Object.entries(dayCounts)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
-      
-      // Calculate average daily
-      const avgDaily = totalInteractions / 100
-      
-      setInteraction90Days({
+      setInteraction30Days({
         totalInteractions,
-        trend,
         dailyData,
-        busiestDay,
-        avgDaily,
+        lastTouchDay,
       })
     } catch (error) {
-      console.error('Error loading 90-day interactions:', error)
+      console.error('Error loading 30-day interactions:', error)
     } finally {
-      setLoading90Days(false)
+      setLoading30Days(false)
     }
   }
 
@@ -535,22 +524,25 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       loadChannelData()
       loadQuickStats()
       loadScoreHistory()
+      // Calculate score immediately with lead prop (will recalculate when freshLeadData loads)
+      calculateAndSetScore()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead, isOpen])
 
-  // Load score breakdown when breakdown tab is active
+  // Recalculate score after fresh lead data is loaded (more accurate)
   useEffect(() => {
-    if (activeTab === 'breakdown' && lead && isOpen) {
-      loadScoreBreakdown()
+    if (freshLeadData && isOpen) {
+      calculateAndSetScore()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, lead, isOpen, freshLeadData])
+  }, [freshLeadData, isOpen])
 
-  // Load 100-day interaction data when interaction tab is active
+
+  // Load 30-day interaction data when interaction tab is active
   useEffect(() => {
     if (activeTab === 'interaction' && lead && isOpen) {
-      load90DayInteractions()
+      load30DayInteractions()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, lead, isOpen])
@@ -559,15 +551,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     if (!lead) return
     setLoadingSummary(true)
     try {
+      console.log('Loading unified summary for lead:', lead.id)
       const response = await fetch(`/api/dashboard/leads/${lead.id}/summary`)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to load summary' }))
+        console.error('Error loading unified summary:', response.status, errorData)
+        setUnifiedSummary('')
+        setSummaryAttribution('')
+        setSummaryData(null)
+        return
+      }
+      
       const data = await response.json()
+      console.log('Summary API response:', { hasSummary: !!data.summary, summaryLength: data.summary?.length })
+      
       if (data.summary) {
         setUnifiedSummary(data.summary)
         setSummaryAttribution(data.attribution || '')
         setSummaryData(data.data || null)
+      } else {
+        // If no summary in response, clear the state
+        console.warn('No summary in API response')
+        setUnifiedSummary('')
+        setSummaryAttribution('')
+        setSummaryData(null)
       }
     } catch (error) {
       console.error('Error loading unified summary:', error)
+      setUnifiedSummary('')
+      setSummaryAttribution('')
+      setSummaryData(null)
     } finally {
       setLoadingSummary(false)
     }
@@ -789,12 +803,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
-  const loadScoreBreakdown = async () => {
-    if (!lead) return
-    const leadData = freshLeadData || lead
-    const breakdown = await calculateLeadScore(leadData)
-    setScoreBreakdown(breakdown)
-  }
 
   if (!isOpen || !lead) return null
 
@@ -815,12 +823,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     null
   const daysInactive = lastInteraction ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
-  // Get health score and color
-  const score = currentLead.lead_score ?? 0
+  // Get health score from calculated score (live calculation)
+  const score = calculatedScore?.score ?? 0
   const getHealthColor = (score: number) => {
-    if (score >= 70) return { bg: '#EF4444', text: '#FFFFFF', label: 'Hot' }
-    if (score >= 40) return { bg: '#F97316', text: '#FFFFFF', label: 'Warm' }
-    return { bg: '#3B82F6', text: '#FFFFFF', label: 'Cold' }
+    if (score >= 70) return { bg: '#EF4444', text: '#FFFFFF', label: 'Hot 🔥' }
+    if (score >= 40) return { bg: '#F97316', text: '#FFFFFF', label: 'Warm ⚡' }
+    return { bg: '#3B82F6', text: '#FFFFFF', label: 'Cold ❄️' }
   }
   const healthColor = getHealthColor(score)
 
@@ -947,7 +955,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
       setShowActivityModal(false)
       setPendingStageChange(null)
-      loadFreshLeadData() // Reload fresh data
+      await loadFreshLeadData() // Reload fresh data
+      await calculateAndSetScore() // Recalculate score after stage update
       loadUnifiedSummary()
       loadActivities()
     } catch (err) {
@@ -986,98 +995,70 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       
       <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4" onClick={onClose}>
         <div 
-          className="relative w-full max-w-4xl bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50"
+          className="relative bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50 flex flex-col"
+          style={{ 
+            width: '54vw', 
+            maxWidth: '720px',
+            height: '85vh',
+            maxHeight: '85vh'
+          }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#262626]">
+          {/* Row 1: Title Row - Name/Email (left) + Lead Health + Stage (right) */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
+            {/* Left: Name + Email (stacked, title style) */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{currentLead.name}</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{currentLead.name || 'Unknown Lead'}</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">{currentLead.email || currentLead.phone || 'No contact info'}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
 
-          {/* TOP SECTION - Lead Health Card */}
-          <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-[#1F1F1F] dark:to-[#262626] border-b border-gray-200 dark:border-[#262626]">
-            <div className="flex items-center justify-between gap-6">
-              {/* Large Score Badge */}
-              <div className="flex items-center gap-4">
-                <div 
-                  className="w-24 h-24 rounded-2xl flex flex-col items-center justify-center shadow-lg"
-                  style={{ backgroundColor: healthColor.bg, color: healthColor.text }}
-                >
-                  <span className="text-4xl font-bold">{score}</span>
-                  <span className="text-xs font-medium opacity-90">{healthColor.label}</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Lead Health</span>
-                    {healthTrend && (
-                      <div className="flex items-center gap-1 text-xs" style={{ color: healthTrend.color }}>
-                        <healthTrend.icon size={16} />
-                        <span>{healthTrend.label}</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {daysInPipeline} days in pipeline • {daysInactive} days inactive
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Last activity: {lastInteraction ? formatDateTimeIST(lastInteraction) : 'Never'}
-                  </p>
-                </div>
+            {/* Right: Lead Health box + Stage badge (inline) */}
+            <div className="flex items-center gap-3">
+              {/* Lead Health Box */}
+              <div 
+                className="w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-md flex-shrink-0"
+                style={{ backgroundColor: healthColor.bg, color: healthColor.text }}
+              >
+                <span className="text-3xl font-bold">{score}</span>
+                <span className="text-xs font-medium opacity-90">{healthColor.label}</span>
               </div>
 
               {/* Stage Badge */}
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className={`px-4 py-2 rounded-lg text-base font-semibold ${getStageBadgeClass(currentStage)}`}
-                    style={currentStage === 'In Sequence' ? {
-                      backgroundColor: 'var(--accent-subtle)',
-                      color: 'var(--accent-primary)'
-                    } : undefined}
-                  >
-                    {currentStage}
-                  </div>
-                  <button
-                    onClick={() => setShowStageDropdown(!showStageDropdown)}
-                    className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                    title="Edit stage"
-                  >
-                    <MdEdit size={18} />
-                  </button>
+              <div className="flex items-center gap-2">
+                <div 
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${getStageBadgeClass(currentStage)}`}
+                  style={currentStage === 'In Sequence' ? {
+                    backgroundColor: 'var(--accent-subtle)',
+                    color: 'var(--accent-primary)'
+                  } : undefined}
+                >
+                  {currentStage}
                 </div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        width: `${getStageProgress()}%`,
-                        backgroundColor: healthColor.bg,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {stageDuration} days in {currentStage}
-                  </p>
-                </div>
+                <button
+                  onClick={() => setShowStageDropdown(!showStageDropdown)}
+                  className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  title="Edit stage"
+                >
+                  <MdEdit size={16} />
+                </button>
               </div>
+
+              {/* Close Button */}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors ml-2"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
             {/* Stage Dropdown */}
             {showStageDropdown && (
               <>
                 <div className="fixed inset-0 z-[60]" onClick={() => setShowStageDropdown(false)} />
-                <div className="absolute right-6 top-32 z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]">
+                <div className="absolute right-4 top-20 z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]">
                   {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'In Sequence', 'Cold'].map((stage) => (
                     <button
                       key={stage}
@@ -1100,66 +1081,65 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             )}
           </div>
 
-          {/* CHANNEL TIMELINE */}
-          {activeChannels.length > 0 && (
-            <div className="p-6 border-b border-gray-200 dark:border-[#262626]">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Customer Journey</h3>
-              <div className="flex items-center gap-4">
-                {activeChannels.map((channel, index) => (
-                  <div key={channel.key} className="flex items-center gap-2">
-                    <div className="flex flex-col items-center">
+          {/* Row 2: Info Row - Customer Journey (left 50%) + Quick Stats (right 50%) */}
+          <div className="grid grid-cols-2 gap-4 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
+            {/* Left 50%: Customer Journey */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
+              {activeChannels.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <div className="flex gap-3 flex-nowrap">
+                    {activeChannels.map((channel) => (
                       <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md"
-                        style={{ backgroundColor: channel.color }}
+                        key={channel.key} 
+                        className="flex items-center gap-2 flex-shrink-0 min-w-[140px]"
                       >
-                        <channel.icon size={24} />
-                      </div>
-                      <div className="mt-2 text-center">
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{channel.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{channel.count} msgs</p>
-                        {channel.firstDate && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            {formatDateIST(channel.firstDate)}
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: channel.color }}
+                        >
+                          <channel.icon size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{channel.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {channel.firstDate ? formatDateIST(channel.firstDate) : '-'}
                           </p>
-                        )}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{channel.count} msgs</p>
+                        </div>
                       </div>
-                    </div>
-                    {index < activeChannels.length - 1 && (
-                      <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600 mx-2" />
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+              )}
             </div>
-          )}
 
-          {/* QUICK STATS ROW */}
-          <div className="p-6 border-b border-gray-200 dark:border-[#262626]">
-            <div className="grid grid-cols-4 gap-4">
-              <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Messages</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{quickStats.totalMessages}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">exchanged</p>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Response Rate</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{quickStats.responseRate}%</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">customer replies</p>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Response</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {quickStats.avgResponseTime > 0 ? `${quickStats.avgResponseTime}m` : '-'}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">response time</p>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Booking</p>
-                {quickStats.hasBooking ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <MdCheckCircle className="text-green-500" size={24} />
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+            {/* Right 50%: Quick Stats (2×2 grid) */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Stats</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Messages</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{quickStats.totalMessages}</p>
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Response Rate</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{quickStats.responseRate}%</p>
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Avg Response</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {quickStats.avgResponseTime > 0 ? `${quickStats.avgResponseTime}m` : '-'}
+                  </p>
+                </div>
+                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Booking</p>
+                  {quickStats.hasBooking ? (
+                    <div className="flex items-center gap-1.5">
+                      <MdCheckCircle className="text-green-500 flex-shrink-0" size={18} />
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                         {formatDateIST(
                           currentLead.booking_date || 
                           currentLead.unified_context?.web?.booking_date || 
@@ -1173,29 +1153,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         )}
                       </p>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {formatBookingTime(
-                        currentLead.booking_time || 
-                        currentLead.unified_context?.web?.booking_time || 
-                        currentLead.unified_context?.web?.booking?.time ||
-                        currentLead.unified_context?.whatsapp?.booking_time ||
-                        currentLead.unified_context?.whatsapp?.booking?.time ||
-                        currentLead.unified_context?.voice?.booking_time ||
-                        currentLead.unified_context?.voice?.booking?.time ||
-                        currentLead.unified_context?.social?.booking_time ||
-                        currentLead.unified_context?.social?.booking?.time
-                      )}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-2xl font-bold text-gray-400 dark:text-gray-500">-</p>
-                )}
+                  ) : (
+                    <p className="text-xl font-bold text-gray-400 dark:text-gray-500">-</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* TABS */}
-          <div className="flex border-b border-gray-200 dark:border-[#262626]">
+          <div className="flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
             <button
               onClick={() => setActiveTab('activity')}
               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
@@ -1234,15 +1201,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              100-Day Interaction
+              30-Day Interaction
             </button>
           </div>
 
-          {/* TAB CONTENT */}
-          <div className="p-6 max-h-[50vh] overflow-y-auto">
-            {/* Activity Tab */}
+          {/* TAB CONTENT - Scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Activity Tab - 70% width with improved message display */}
             {activeTab === 'activity' && (
-              <div>
+              <div className="p-6" style={{ width: '70%', maxWidth: '840px' }}>
                 {loadingActivities ? (
                   <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
                     <div className="animate-pulse">Loading activities...</div>
@@ -1256,55 +1223,82 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     {activities.map((activity, index) => {
                       const getActivityIcon = () => {
                         if (activity.type === 'proxe') {
-                          return activity.icon === 'sequence' ? <MdHistory size={16} /> : <MdMessage size={16} />
+                          return activity.icon === 'sequence' ? <MdHistory size={18} /> : <MdMessage size={18} />
                         } else if (activity.type === 'team') {
                           switch (activity.icon) {
-                            case 'call': return <MdCall size={16} />
-                            case 'meeting': return <MdEvent size={16} />
-                            case 'message': return <MdMessage size={16} />
-                            case 'note': return <MdNote size={16} />
-                            default: return <MdHistory size={16} />
+                            case 'call': return <MdCall size={18} />
+                            case 'meeting': return <MdEvent size={18} />
+                            case 'message': return <MdMessage size={18} />
+                            case 'note': return <MdNote size={18} />
+                            default: return <MdHistory size={18} />
                           }
                         } else {
-                          return activity.icon === 'booking' ? <MdEvent size={16} /> : <MdMessage size={16} />
+                          return activity.icon === 'booking' ? <MdEvent size={18} /> : <MdMessage size={18} />
                         }
                       }
                       const color = activity.color || '#6B7280'
                       const Icon = getActivityIcon()
+                      const isCustomer = activity.type === 'customer'
+                      const isProxe = activity.type === 'proxe'
+                      
                       return (
                         <div key={activity.id} className="flex gap-3">
-                          <div className="flex flex-col items-center">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: color }}>
+                          <div className="flex flex-col items-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: color }}>
                               {Icon}
                             </div>
                             {index < activities.length - 1 && (
                               <div className="w-0.5 flex-1 mt-2" style={{ backgroundColor: color, opacity: 0.3 }} />
                             )}
                           </div>
-                          <div className="flex-1 pb-4">
+                          <div className="flex-1 pb-4 min-w-0">
+                            {/* Message bubble for customer/PROXe messages */}
+                            {activity.content && (isCustomer || isProxe) ? (
+                              <div 
+                                className={`rounded-2xl px-4 py-3 mb-2 ${
+                                  isCustomer 
+                                    ? 'bg-gray-100 dark:bg-gray-800 ml-auto' 
+                                    : 'bg-blue-50 dark:bg-blue-900/20'
+                                }`}
+                                style={{ 
+                                  maxWidth: '95%',
+                                  marginLeft: isCustomer ? 'auto' : '0'
+                                }}
+                              >
+                                <p className="text-sm text-gray-900 dark:text-white leading-relaxed">
+                                  {activity.content}
+                                </p>
+                              </div>
+                            ) : activity.content ? (
+                              <p className="text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
+                                {activity.content}
+                              </p>
+                            ) : null}
+                            
                             <div className="flex items-start justify-between gap-2 mb-1">
-                              <div>
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                                   {activity.action || 'Activity'}
                                 </p>
-                                <p className="text-xs mt-0.5" style={{ color }}>
-                                  {activity.actor || 'Unknown'}
-                                </p>
+                                {activity.channel && (
+                                  <span 
+                                    className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                                    style={{ 
+                                      backgroundColor: `${color}20`,
+                                      color: color
+                                    }}
+                                  >
+                                    {activity.channel}
+                                  </span>
+                                )}
                               </div>
-                              <span className="text-xs whitespace-nowrap text-gray-500 dark:text-gray-400">
+                              <span className="text-xs whitespace-nowrap text-gray-500 dark:text-gray-400 flex-shrink-0">
                                 {formatDateTimeIST(activity.timestamp)}
                               </span>
                             </div>
-                            {activity.content && (
-                              <p className="text-xs mt-1 text-gray-600 dark:text-gray-400">
-                                {activity.content}
-                              </p>
-                            )}
-                            {activity.channel && (
-                              <span className="text-xs mt-1 inline-block px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                                via {activity.channel}
-                              </span>
-                            )}
+                            <p className="text-xs mt-0.5" style={{ color }}>
+                              {activity.actor || 'Unknown'}
+                            </p>
                           </div>
                         </div>
                       )
@@ -1314,8 +1308,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             )}
 
-            {/* Summary Tab */}
-            {activeTab === 'summary' && (
+            {/* Other Tabs - Full Width */}
+            {activeTab !== 'activity' && (
+              <div className="p-6">
+                {/* Summary Tab */}
+                {activeTab === 'summary' && (
               <div className="space-y-4">
                 <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                   <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
@@ -1372,82 +1369,148 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             )}
 
-            {/* Score Breakdown Tab */}
-            {activeTab === 'breakdown' && (
-              <div className="space-y-4">
-                {scoreBreakdown ? (
+                {/* Score Breakdown Tab */}
+                {activeTab === 'breakdown' && (
+              <div className="space-y-6">
+                {calculatedScore ? (
                   <>
-                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
-                      <h3 className="text-sm font-semibold mb-4 text-gray-900 dark:text-white">Score Components</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-xs text-gray-600 dark:text-gray-400">AI Analysis (60%)</span>
-                            <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                              {scoreBreakdown.aiScore}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full bg-blue-500" 
-                              style={{ width: `${Math.min(100, (scoreBreakdown.aiScore / 60) * 100)}%` }} 
-                            />
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Intent signals, sentiment analysis, buying signals from conversation
+                    {/* 3 Cards in Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Card 1 - AI Analysis (60%) */}
+                      <div className="p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-[#1A1A1A]">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MdPsychology size={24} className="text-blue-500 dark:text-blue-400" />
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">AI Analysis</h3>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {calculatedScore.breakdown.ai}/60
+                          </p>
+                          <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {Math.round((calculatedScore.breakdown.ai / 60) * 100)}%
                           </p>
                         </div>
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Activity (30%)</span>
-                            <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                              {scoreBreakdown.activityScore}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full bg-green-500" 
-                              style={{ width: `${Math.min(100, (scoreBreakdown.activityScore / 30) * 100)}%` }} 
-                            />
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Message count, response rate, recency, channel mix
-                          </p>
-                        </div>
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Business Signals (10%)</span>
-                            <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                              {scoreBreakdown.businessScore}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full" 
-                              style={{ 
-                                width: `${Math.min(100, (scoreBreakdown.businessScore / 10) * 100)}%`,
-                                backgroundColor: 'var(--accent-primary)'
-                              }} 
-                            />
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Booking exists, contact info provided, multi-touchpoint
-                          </p>
+                        <div className="flex flex-wrap gap-1.5 mt-4">
+                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            Intent
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            Sentiment
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            Buying
+                          </span>
                         </div>
                       </div>
-                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#262626]">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">Total Score</span>
-                          <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {scoreBreakdown.totalScore}
+
+                      {/* Card 2 - Activity (30%) */}
+                      <div className="p-4 rounded-lg border-2 border-green-200 dark:border-green-800 bg-white dark:bg-[#1A1A1A]">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MdFlashOn size={24} className="text-green-500 dark:text-green-400" />
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity</h3>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {calculatedScore.breakdown.activity}/30
+                          </p>
+                          <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                            {Math.round((calculatedScore.breakdown.activity / 30) * 100)}%
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-4">
+                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            Messages
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            Response Rate
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            Recency
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                            Channels
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card 3 - Business Signals (10%) */}
+                      <div className="p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-[#1A1A1A]">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MdBarChart size={24} className="text-purple-500 dark:text-purple-400" />
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Business Signals</h3>
+                        </div>
+                        <div className="mb-2">
+                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                            {calculatedScore.breakdown.business}/10
+                          </p>
+                          <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                            {Math.round((calculatedScore.breakdown.business / 10) * 100)}%
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-4">
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                            Booking
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                            Contact Info
+                          </span>
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                            Multi-channel
                           </span>
                         </div>
                       </div>
                     </div>
+
+                    {/* Total Score Card - Large with Radial */}
+                    <div className="p-6 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#1F1F1F] dark:to-[#262626] border border-gray-200 dark:border-[#262626]">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Total Score</h3>
+                          <p className="text-5xl font-bold text-gray-900 dark:text-white">
+                            {calculatedScore.score}/100
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {Math.round((calculatedScore.score / 100) * 100)}% complete
+                          </p>
+                        </div>
+                        {/* Radial Progress Circle */}
+                        <div className="relative w-24 h-24 flex-shrink-0">
+                          <svg className="transform -rotate-90 w-24 h-24" viewBox="0 0 100 100">
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="42"
+                              stroke="currentColor"
+                              strokeWidth="8"
+                              fill="none"
+                              className="text-gray-200 dark:text-gray-700"
+                            />
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="42"
+                              stroke="currentColor"
+                              strokeWidth="8"
+                              fill="none"
+                              strokeDasharray={`${2 * Math.PI * 42}`}
+                              strokeDashoffset={`${2 * Math.PI * 42 * (1 - calculatedScore.score / 100)}`}
+                              className="text-blue-500 dark:text-blue-400 transition-all duration-500"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-xl font-bold text-gray-900 dark:text-white">
+                              {Math.round((calculatedScore.score / 100) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Info Footer */}
                     <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Score is calculated automatically based on engagement, intent signals, and activity patterns.
-                        {currentLead.last_scored_at && ` Last updated: ${formatDateTimeIST(currentLead.last_scored_at)}`}
+                        Score is calculated live based on engagement, intent signals, and activity patterns. Updates automatically when the modal opens or when activities change.
                       </p>
                     </div>
                   </>
@@ -1459,181 +1522,156 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             )}
 
-            {/* 100-Day Interaction Tab */}
-            {activeTab === 'interaction' && (
+                {/* 30-Day Interaction Tab (from first touchpoint) */}
+                {activeTab === 'interaction' && (
               <div className="space-y-4">
-                {loading90Days ? (
+                {loading30Days ? (
                   <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
                     <div className="animate-pulse">Loading interaction data...</div>
                   </div>
-                ) : interaction90Days ? (
-                  <>
-                    {/* Main Metric */}
-                    <div className="flex items-end justify-between">
+                ) : interaction30Days ? (
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column - Stats */}
+                    <div className="space-y-6">
+                      {/* Total Interactions */}
                       <div>
                         <p className="text-4xl font-bold text-gray-900 dark:text-white">
-                          {interaction90Days.totalInteractions}
+                          {interaction30Days.totalInteractions}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total interactions</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total interactions (first 30 days)</p>
                       </div>
-                      {interaction90Days.trend !== 0 && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
-                          style={{
-                            backgroundColor: interaction90Days.trend > 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            color: interaction90Days.trend > 0 ? '#22C55E' : '#EF4444'
-                          }}
-                        >
-                          {interaction90Days.trend > 0 ? (
-                            <MdTrendingUp size={14} />
-                          ) : (
-                            <MdTrendingDown size={14} />
-                          )}
-                          <span>{Math.abs(interaction90Days.trend)}%</span>
-                        </div>
-                      )}
+
+                      {/* Last Touch Day */}
+                      <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Touch Day</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {interaction30Days.lastTouchDay || 'No interactions yet'}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Dot Matrix Heatmap - 15 weeks (columns) × 7 days (rows) = 105 cells, showing last 100 days */}
+                    {/* Right Column - Calendar */}
                     <div className="w-full">
-                      <div className="flex flex-col gap-1">
-                        {/* Week labels row (top) - Right to left, most recent first */}
-                        <div className="flex gap-1 mb-1 justify-end">
-                          <div className="w-10 text-xs text-gray-500 dark:text-gray-400"></div>
-                          {Array.from({ length: 15 }, (_, weekIndex) => {
-                            // Reverse order: week 0 (this week) on right, week 14 on left
-                            const reversedIndex = 14 - weekIndex
-                            return (
-                              <div key={weekIndex} className="flex-1 text-center text-xs text-gray-500 dark:text-gray-400 font-medium min-w-[30px]">
-                                {reversedIndex === 0 ? 'Now' : `${reversedIndex}w`}
-                              </div>
-                            )
-                          }).reverse()}
-                        </div>
-                        {/* Day rows - 7 rows (days of week), each with 15 columns (weeks) */}
-                        {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => {
-                          const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                          
-                          // Build a map of date -> count for quick lookup
-                          const dateCountMap = new Map<string, number>()
-                          interaction90Days.dailyData.forEach(d => {
-                            dateCountMap.set(d.date, d.count)
-                          })
-                          
-                          // Calculate dates for this day of week across 15 weeks (right to left)
-                          const today = new Date()
-                          today.setHours(0, 0, 0, 0)
-                          const weekCells: Array<{ date: string; count: number }> = []
-                          
-                          // For each of the 15 weeks (0 = this week, 14 = 14 weeks ago)
-                          for (let weekIndex = 0; weekIndex < 15; weekIndex++) {
-                            // Calculate the date: go back (weekIndex * 7) days, then adjust to this day of week
-                            const baseDate = new Date(today)
-                            baseDate.setDate(baseDate.getDate() - (weekIndex * 7))
-                            
-                            // Find the date that falls on this day of week in this week
-                            const daysToSubtract = (baseDate.getDay() - dayOfWeek + 7) % 7
-                            const targetDate = new Date(baseDate)
-                            targetDate.setDate(targetDate.getDate() - daysToSubtract)
-                            
-                            // Check if this date is within the last 100 days
-                            const daysAgo = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
-                            
-                            if (daysAgo >= 0 && daysAgo < 100) {
-                              const dateStr = targetDate.toISOString().split('T')[0]
-                              const count = dateCountMap.get(dateStr) || 0
-                              weekCells.push({ date: dateStr, count })
-                            } else {
-                              weekCells.push({ date: '', count: 0 })
-                            }
-                          }
-                          
-                          // Reverse the array so most recent is on the right
-                          const reversedCells = [...weekCells].reverse()
-                          
-                          return (
-                            <div key={dayOfWeek} className="flex items-center gap-1 justify-end">
-                              {/* Day label on left */}
-                              <div className="w-10 text-xs text-gray-500 dark:text-gray-400 text-right pr-2 font-medium flex-shrink-0">
-                                {dayNames[dayOfWeek]}
-                              </div>
-                              {/* Days across 15 weeks - reversed (most recent on right) */}
-                              <div className="flex flex-wrap justify-end flex-1" style={{ gap: '3px' }}>
-                                {reversedCells.map((day, weekIndex) => {
-                                  if (!day.date) {
-                                    // Empty cell
-                                    return (
-                                      <div
-                                        key={`${dayOfWeek}-${weekIndex}`}
-                                        className="w-3 h-3 flex-shrink-0"
-                                      />
-                                    )
-                                  }
-                                  
-                                  // Improved color intensity mapping with larger dots
-                                  let opacity = 0.1 // Very faint for 0 msgs
-                                  let size = 10 // Base size (increased)
-                                  
-                                  if (day.count === 0) {
-                                    opacity = 0.08 // Barely visible
-                                    size = 10
-                                  } else if (day.count >= 1 && day.count <= 2) {
-                                    opacity = 0.5 // Medium opacity
-                                    size = 11
-                                  } else if (day.count >= 3 && day.count <= 5) {
-                                    opacity = 0.85 // Bright accent
-                                    size = 12
-                                  } else if (day.count > 5) {
-                                    opacity = 1.0 // Full accent
-                                    size = 12 // Larger dot
-                                  }
-                                  
-                                  // Format date for tooltip
-                                  const date = new Date(day.date)
-                                  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                  
-                                  return (
-                                    <div
-                                      key={`${dayOfWeek}-${weekIndex}`}
-                                      className="rounded-full cursor-pointer transition-all hover:scale-125 flex-shrink-0"
-                                      style={{
-                                        width: `${size}px`,
-                                        height: `${size}px`,
-                                        backgroundColor: 'var(--accent-primary)',
-                                        opacity: opacity,
-                                        minWidth: '10px',
-                                        minHeight: '10px',
-                                      }}
-                                      title={`${dateStr}: ${day.count} message${day.count !== 1 ? 's' : ''}`}
-                                    />
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      {(() => {
+                        // Get first touchpoint date
+                        const firstTouchpoint = new Date(lead?.created_at || lead?.timestamp || new Date())
+                        firstTouchpoint.setHours(0, 0, 0, 0)
+                        
+                        // Build a map of date -> count for quick lookup
+                        const dateCountMap = new Map<string, number>()
+                        interaction30Days.dailyData.forEach(d => {
+                          dateCountMap.set(d.date, d.count)
+                        })
+                        
+                        // Generate all 30 days starting from first touchpoint
+                        const allDays: Array<{ date: Date; dateStr: string; count: number; dayOfWeek: number }> = []
+                        for (let i = 0; i < 30; i++) {
+                          const date = new Date(firstTouchpoint)
+                          date.setDate(date.getDate() + i)
+                          const dateStr = date.toISOString().split('T')[0]
+                          const count = dateCountMap.get(dateStr) || 0
+                          allDays.push({ date, dateStr, count, dayOfWeek: date.getDay() })
+                        }
+                        
+                        // Day names (Sunday = 0, Monday = 1, etc.)
+                        const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+                        
+                        // Calculate number of weeks needed (30 days can span 5 weeks)
+                        const numWeeks = Math.ceil(30 / 7)
+                        
+                        return (
+                          <div className="flex flex-col gap-2">
+                            {/* Day rows - 7 rows (Sunday to Saturday) */}
+                            {[0, 1, 2, 3, 4, 5, 6].map((targetDayOfWeek) => {
+                              // Find all days in the 30-day period that fall on this day of week
+                              const daysForThisRow = allDays.filter(d => d.dayOfWeek === targetDayOfWeek)
+                              
+                              // Group into weeks (each week can have at most 1 day of this type)
+                              const weekCells: Array<{ date: Date; dateStr: string; count: number } | null> = []
+                              
+                              for (let weekIndex = 0; weekIndex < numWeeks; weekIndex++) {
+                                // Find the day that falls in this week
+                                const dayInWeek = daysForThisRow.find(day => {
+                                  const daysFromStart = Math.floor((day.date.getTime() - firstTouchpoint.getTime()) / (1000 * 60 * 60 * 24))
+                                  const weekStart = weekIndex * 7
+                                  const weekEnd = weekStart + 7
+                                  return daysFromStart >= weekStart && daysFromStart < weekEnd
+                                })
+                                
+                                if (dayInWeek) {
+                                  weekCells.push(dayInWeek)
+                                } else {
+                                  weekCells.push(null)
+                                }
+                              }
+                              
+                              return (
+                                <div key={targetDayOfWeek} className="flex items-center gap-2">
+                                  {/* Day label on left */}
+                                  <div className="w-12 text-sm text-gray-500 dark:text-gray-400 text-right pr-3 font-medium flex-shrink-0">
+                                    {dayNames[targetDayOfWeek]}
+                                  </div>
+                                  {/* Days across weeks */}
+                                  <div className="flex flex-1" style={{ gap: '8px' }}>
+                                    {weekCells.map((day, weekIndex) => {
+                                      if (!day) {
+                                        // Empty cell
+                                        return (
+                                          <div
+                                            key={`${targetDayOfWeek}-${weekIndex}`}
+                                            className="w-5 h-5 flex-shrink-0"
+                                          />
+                                        )
+                                      }
+                                      
+                                      // Color intensity mapping with larger dots
+                                      let opacity = 0.1
+                                      let size = 20 // Bigger dots
+                                      
+                                      if (day.count === 0) {
+                                        opacity = 0.08 // Barely visible
+                                      } else if (day.count >= 1 && day.count <= 2) {
+                                        opacity = 0.5 // Medium opacity
+                                      } else if (day.count >= 3 && day.count <= 5) {
+                                        opacity = 0.85 // Bright accent
+                                      } else if (day.count > 5) {
+                                        opacity = 1.0 // Full accent
+                                      }
+                                      
+                                      // Format date for tooltip
+                                      const dateStr = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      
+                                      return (
+                                        <div
+                                          key={`${day.dateStr}-${weekIndex}`}
+                                          className="rounded-full cursor-pointer transition-all hover:scale-125 flex-shrink-0"
+                                          style={{
+                                            width: `${size}px`,
+                                            height: `${size}px`,
+                                            backgroundColor: 'var(--accent-primary)',
+                                            opacity: opacity,
+                                            minWidth: '20px',
+                                            minHeight: '20px',
+                                          }}
+                                          title={`${dateStr}: ${day.count} message${day.count !== 1 ? 's' : ''}`}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
                     </div>
-
-                    {/* Secondary Metrics */}
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="p-3 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Busiest Day</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {interaction90Days.busiestDay}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Daily</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {interaction90Days.avgDaily.toFixed(1)} msgs/day
-                        </p>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="text-sm text-center py-4 text-gray-500 dark:text-gray-400">
                     No interaction data available
                   </div>
+                )}
+              </div>
                 )}
               </div>
             )}

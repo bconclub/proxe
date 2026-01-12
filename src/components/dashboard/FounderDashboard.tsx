@@ -220,6 +220,42 @@ export default function FounderDashboard() {
     }
   }
 
+  // Traffic light colors for At a Glance metrics
+  const getMetricColor = (metricType: 'avgScore' | 'responseRate' | 'bookingRate' | 'avgResponseTime', value: number): string => {
+    const GREEN = '#10b981' // emerald-500
+    const AMBER = '#f59e0b' // amber-500
+    const RED = '#ef4444'   // red-500
+
+    switch (metricType) {
+      case 'avgScore':
+        // Green: 90-99%, Amber: 50-89%, Red: <50%
+        if (value >= 90) return GREEN
+        if (value >= 50) return AMBER
+        return RED
+
+      case 'responseRate':
+        // Green: 95-100%, Amber: 90-94%, Red: <90%
+        if (value >= 95) return GREEN
+        if (value >= 90) return AMBER
+        return RED
+
+      case 'bookingRate':
+        // Green: ≥70%, Amber: 50-69%, Red: <50%
+        if (value >= 70) return GREEN
+        if (value >= 50) return AMBER
+        return RED
+
+      case 'avgResponseTime':
+        // Green: 3-5s, Amber: 5.1-8s, Red: >8s
+        if (value >= 3 && value <= 5) return GREEN
+        if (value > 5 && value <= 8) return AMBER
+        return RED
+
+      default:
+        return GREEN
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -287,77 +323,93 @@ export default function FounderDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Avg Score */}
             <div className="flex flex-col items-center">
-              <RadialProgress
-                value={metrics.radialMetrics.avgScore}
-                label="Avg Score"
-                color="var(--accent-primary)"
-              />
-              {metrics.radialTrends?.avgScore && (
-                <div className="w-full mt-2" style={{ height: '40px' }}>
-                  <Sparkline data={metrics.radialTrends.avgScore} color="var(--accent-primary)" height={40} />
-                </div>
-              )}
+              {(() => {
+                const metricColor = getMetricColor('avgScore', metrics.radialMetrics.avgScore)
+                return (
+                  <>
+                    <RadialProgress
+                      value={metrics.radialMetrics.avgScore}
+                      label="Avg Score"
+                      color={metricColor}
+                    />
+                    {metrics.radialTrends?.avgScore && (
+                      <div className="w-full mt-2" style={{ height: '40px' }}>
+                        <Sparkline data={metrics.radialTrends.avgScore} color={metricColor} height={40} />
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             {/* Response Rate */}
             <div className="flex flex-col items-center">
-              <RadialProgress
-                value={metrics.radialMetrics.responseRate}
-                label="Response Rate"
-                color="var(--accent-primary)"
-              />
-              {metrics.radialTrends?.responseRate && (
-                <div className="w-full mt-2" style={{ height: '40px' }}>
-                  <Sparkline data={metrics.radialTrends.responseRate} color="var(--accent-primary)" height={40} />
-                </div>
-              )}
+              {(() => {
+                const metricColor = getMetricColor('responseRate', metrics.radialMetrics.responseRate)
+                return (
+                  <>
+                    <RadialProgress
+                      value={metrics.radialMetrics.responseRate}
+                      label="Response Rate"
+                      color={metricColor}
+                    />
+                    {metrics.radialTrends?.responseRate && (
+                      <div className="w-full mt-2" style={{ height: '40px' }}>
+                        <Sparkline data={metrics.radialTrends.responseRate} color={metricColor} height={40} />
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             {/* Key Event Rate */}
             <div className="flex flex-col items-center">
-              <RadialProgress
-                value={metrics.radialMetrics.bookingRate}
-                label="Key Event Rate"
-                color="var(--accent-primary)"
-              />
-              {metrics.radialTrends?.bookingRate && (
-                <div className="w-full mt-2" style={{ height: '40px' }}>
-                  <Sparkline data={metrics.radialTrends.bookingRate} color="var(--accent-primary)" height={40} />
-                </div>
-              )}
+              {(() => {
+                const metricColor = getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)
+                return (
+                  <>
+                    <RadialProgress
+                      value={metrics.radialMetrics.bookingRate}
+                      label="Key Event Rate"
+                      color={metricColor}
+                    />
+                    {metrics.radialTrends?.bookingRate && (
+                      <div className="w-full mt-2" style={{ height: '40px' }}>
+                        <Sparkline data={metrics.radialTrends.bookingRate} color={metricColor} height={40} />
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             {/* Avg Response Time */}
             <div className="flex flex-col items-center">
-              <RadialProgress
-                value={metrics.radialMetrics.avgResponseTime}
-                max={15}
-                label="Avg Response"
-                color={
-                  metrics.radialMetrics.avgResponseTime < 5
-                    ? '#22C55E'
-                    : metrics.radialMetrics.avgResponseTime < 10
-                    ? '#F59E0B'
-                    : '#EF4444'
-                }
-                valueFormatter={(v) => `${v.toFixed(1)}s`}
-                showPercentage={false}
-              />
-              {metrics.radialTrends?.avgResponseTime && (
-                <div className="w-full mt-2" style={{ height: '40px' }}>
-                  <Sparkline
-                    data={metrics.radialTrends.avgResponseTime}
-                    color={
-                      metrics.radialMetrics.avgResponseTime < 5
-                        ? '#22C55E'
-                        : metrics.radialMetrics.avgResponseTime < 10
-                        ? '#F59E0B'
-                        : '#EF4444'
-                    }
-                    height={40}
-                  />
-                </div>
-              )}
+              {(() => {
+                const metricColor = getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)
+                return (
+                  <>
+                    <RadialProgress
+                      value={metrics.radialMetrics.avgResponseTime}
+                      max={15}
+                      label="Avg Response"
+                      color={metricColor}
+                      valueFormatter={(v) => `${v.toFixed(1)}s`}
+                      showPercentage={false}
+                    />
+                    {metrics.radialTrends?.avgResponseTime && (
+                      <div className="w-full mt-2" style={{ height: '40px' }}>
+                        <Sparkline
+                          data={metrics.radialTrends.avgResponseTime}
+                          color={metricColor}
+                          height={40}
+                        />
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -367,10 +419,11 @@ export default function FounderDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Card 1: Total Conversations */}
         <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
+            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+            borderColor: 'rgba(59, 130, 246, 0.2)',
+            justifyContent: 'space-between'
           }}
         >
           {/* 1. Title + Filter */}
@@ -437,24 +490,34 @@ export default function FounderDashboard() {
             )}
           </div>
           {/* 4. Sparkline Graph */}
-          {metrics.trends?.conversations && (
-            <div className="w-full mb-2" style={{ height: '40px' }}>
-              <Sparkline 
-                data={metrics.trends.conversations.data} 
-                color="#3B82F6" 
-                height={40} 
-              />
-            </div>
-          )}
-          {/* 5. Action Link - None */}
+          <div className="mt-auto">
+            {metrics.trends?.conversations && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <Sparkline 
+                  data={metrics.trends.conversations.data} 
+                  color="#3B82F6" 
+                  height={40} 
+                />
+              </div>
+            )}
+            {/* 5. Action Link */}
+            <button 
+              onClick={() => router.push('/dashboard/inbox')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: '#3B82F6' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Card 2: Total Leads */}
         <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
+            backgroundColor: 'rgba(139, 92, 246, 0.05)',
+            borderColor: 'rgba(139, 92, 246, 0.2)',
+            justifyContent: 'space-between'
           }}
         >
           {/* 1. Title + Filter */}
@@ -511,25 +574,35 @@ export default function FounderDashboard() {
             </p>
           </div>
           {/* 4. Sparkline Graph */}
-          {metrics.trends?.leads && (
-            <div className="w-full mb-2" style={{ height: '40px' }}>
-              <Sparkline 
-                data={metrics.trends.leads.data} 
-                color="var(--accent-primary)" 
-                height={40}
-                showGradient={true}
-              />
-            </div>
-          )}
-          {/* 5. Action Link - None */}
+          <div className="mt-auto">
+            {metrics.trends?.leads && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <Sparkline 
+                  data={metrics.trends.leads.data} 
+                  color="var(--accent-primary)" 
+                  height={40}
+                  showGradient={true}
+                />
+              </div>
+            )}
+            {/* 5. Action Link */}
+            <button 
+              onClick={() => router.push('/dashboard/leads')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Card 3: Hot Leads - Semantic green for success/positive */}
         <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
             backgroundColor: 'rgba(34, 197, 94, 0.05)',
-            borderColor: 'rgba(34, 197, 94, 0.2)'
+            borderColor: 'rgba(34, 197, 94, 0.2)',
+            justifyContent: 'space-between'
           }}
         >
           {/* 1. Title + Filter */}
@@ -624,31 +697,34 @@ export default function FounderDashboard() {
             )}
           </div>
           {/* 4. Sparkline Graph */}
-          {metrics.trends?.hotLeads && (
-            <div className="w-full mb-2" style={{ height: '40px' }}>
-              <Sparkline 
-                data={metrics.trends.hotLeads.data} 
-                color="#22C55E" 
-                height={40} 
-              />
-            </div>
-          )}
-          {/* 5. Action Link */}
-          <button 
-            onClick={() => router.push('/dashboard/inbox?filter=hot')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            View All <MdArrowForward size={14} />
-          </button>
+          <div className="mt-auto">
+            {metrics.trends?.hotLeads && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <Sparkline 
+                  data={metrics.trends.hotLeads.data} 
+                  color="#22C55E" 
+                  height={40} 
+                />
+              </div>
+            )}
+            {/* 5. Action Link */}
+            <button 
+              onClick={() => router.push('/dashboard/inbox?filter=hot')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Card 4: Upcoming Events - Semantic blue for info/upcoming */}
         <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
             backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            borderColor: 'rgba(59, 130, 246, 0.2)'
+            borderColor: 'rgba(59, 130, 246, 0.2)',
+            justifyContent: 'space-between'
           }}
         >
           {/* 1. Title */}
@@ -708,23 +784,25 @@ export default function FounderDashboard() {
             <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
           )}
           {/* 4. Sparkline Graph */}
-          {metrics.upcomingBookingsTrend && metrics.upcomingBookingsTrend.length > 0 && (
-            <div className="w-full mb-2" style={{ height: '40px' }}>
-              <MiniBarChart 
-                data={metrics.upcomingBookingsTrend} 
-                color="#3B82F6"
-                height={40}
-              />
-            </div>
-          )}
-          {/* 5. Action Link */}
-          <button 
-            onClick={() => router.push('/dashboard/calendar')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline"
-            style={{ color: '#3B82F6' }}
-          >
-            View All <MdArrowForward size={14} />
-          </button>
+          <div className="mt-auto">
+            {metrics.upcomingBookingsTrend && metrics.upcomingBookingsTrend.length > 0 && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <MiniBarChart 
+                  data={metrics.upcomingBookingsTrend} 
+                  color="#3B82F6"
+                  height={40}
+                />
+              </div>
+            )}
+            {/* 5. Action Link */}
+            <button 
+              onClick={() => router.push('/dashboard/calendar')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: '#3B82F6' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
         </div>
       </div>
 

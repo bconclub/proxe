@@ -97,7 +97,10 @@ export async function GET(
 
     if (!teamError && teamActivities) {
       for (const activity of teamActivities) {
-        const creator = activity.dashboard_users
+        // dashboard_users is an array from the relation query, get first element
+        const creator = Array.isArray(activity.dashboard_users) 
+          ? activity.dashboard_users[0] 
+          : activity.dashboard_users
         activities.push({
           id: activity.id,
           type: 'team',

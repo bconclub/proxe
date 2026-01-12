@@ -54,6 +54,25 @@ export async function POST(
       }, { status: 400 })
     }
 
+    // Validate stage
+    const allowedStages = [
+      'New',
+      'Engaged',
+      'Qualified',
+      'High Intent',
+      'Booking Made',
+      'Converted',
+      'Closed Lost',
+      'In Sequence',
+      'Cold'
+    ]
+    if (!allowedStages.includes(new_stage)) {
+      return NextResponse.json(
+        { error: `Invalid stage. Must be one of: ${allowedStages.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     // Round next_followup_date to 30-minute intervals if provided
     let roundedFollowupDate = null
     if (next_followup_date) {

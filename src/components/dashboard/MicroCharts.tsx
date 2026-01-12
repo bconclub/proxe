@@ -347,7 +347,7 @@ export function RadialProgress({
 }) {
   const defaultColor = color || getAccentColor()
   const percentage = Math.min((value / max) * 100, 100)
-  const radius = size / 2 - 8
+  const radius = size / 2 - 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - percentage / 100)
   
@@ -359,35 +359,27 @@ export function RadialProgress({
           style={{ width: size, height: size }}
           viewBox={`0 0 ${size} ${size}`}
         >
-          {/* Dark inner circle background */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius - 4}
-            fill="var(--bg-tertiary)"
-          />
           {/* Background circle (track) */}
           <circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="currentColor"
-            strokeWidth="8"
+            stroke={defaultColor}
+            strokeWidth="2"
             fill="none"
-            className="text-gray-200 dark:text-gray-700"
+            style={{ opacity: 0.2 }}
           />
           {/* Progress circle (stroke only) */}
           <circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="currentColor"
-            strokeWidth="8"
+            stroke={defaultColor}
+            strokeWidth="2"
             fill="none"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             className="transition-all duration-300"
-            style={{ color: defaultColor }}
             strokeLinecap="round"
           />
         </svg>

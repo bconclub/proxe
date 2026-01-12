@@ -43,7 +43,7 @@ export async function GET(
     // Fetch lead data
     const { data: lead, error: leadError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, sub_stage, booking_date, booking_time, unified_context')
+      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, sub_stage, unified_context')
       .eq('id', leadId)
       .single()
 
@@ -55,6 +55,10 @@ export async function GET(
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
+
+    // Extract booking_date and booking_time from unified_context
+    const bookingDate = lead.unified_context?.web?.booking_date || lead.unified_context?.web?.booking?.date || null
+    const bookingTime = lead.unified_context?.web?.booking_time || lead.unified_context?.web?.booking?.time || null
 
     // ============================================
     // STEP 1: Check unified_context for existing summaries
@@ -112,7 +116,10 @@ export async function GET(
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
-        const creator = latestActivity.dashboard_users
+        // dashboard_users is an array from the relation query, get first element
+        const creator = Array.isArray(latestActivity.dashboard_users) 
+          ? latestActivity.dashboard_users[0] 
+          : latestActivity.dashboard_users
         const actorName = creator?.name || creator?.email || 'Team Member'
         const timeAgo = formatTimeAgo(latestActivity.created_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
@@ -154,8 +161,8 @@ export async function GET(
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
-        bookingDate: lead.booking_date,
-        bookingTime: lead.booking_time,
+        bookingDate: bookingDate,
+        bookingTime: bookingTime,
       }
 
       return NextResponse.json({
@@ -223,7 +230,10 @@ export async function GET(
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
-        const creator = latestActivity.dashboard_users
+        // dashboard_users is an array from the relation query, get first element
+        const creator = Array.isArray(latestActivity.dashboard_users) 
+          ? latestActivity.dashboard_users[0] 
+          : latestActivity.dashboard_users
         const actorName = creator?.name || creator?.email || 'Team Member'
         const timeAgo = formatTimeAgo(latestActivity.created_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
@@ -265,8 +275,8 @@ export async function GET(
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
-        bookingDate: lead.booking_date,
-        bookingTime: lead.booking_time,
+        bookingDate: bookingDate,
+        bookingTime: bookingTime,
       }
 
       return NextResponse.json({
@@ -372,8 +382,8 @@ export async function GET(
       keyInfo,
       leadStage: lead.lead_stage,
       subStage: lead.sub_stage,
-      bookingDate: lead.booking_date,
-      bookingTime: lead.booking_time,
+      bookingDate: bookingDate,
+      bookingTime: bookingTime,
     }
 
     // Fetch last 10 conversation messages
@@ -419,7 +429,10 @@ export async function GET(
         // Build activities context
         const activitiesContext = recentActivities
           ?.map(a => {
-            const creator = a.dashboard_users
+            // dashboard_users is an array from the relation query, get first element
+            const creator = Array.isArray(a.dashboard_users) 
+              ? a.dashboard_users[0] 
+              : a.dashboard_users
             return `[${a.created_at}] ${creator?.name || creator?.email || 'Team'}: ${a.activity_type} - ${a.note}`
           })
           .join('\n') || 'No team activities'
