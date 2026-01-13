@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
+import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 const STATUS_OPTIONS = [
   'New Lead',
@@ -45,12 +46,45 @@ const getStageColor = (stage: string | null) => {
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
-const getScoreColor = (score: number | null | undefined): string => {
-  if (score === null || score === undefined) return 'text-gray-500'
-  if (score >= 86) return 'text-green-600 dark:text-green-400'
-  if (score >= 61) return 'text-orange-600 dark:text-orange-400'
-  if (score >= 31) return 'text-yellow-600 dark:text-yellow-400'
-  return 'text-blue-600 dark:text-blue-400'
+const getScoreBadgeStyle = (score: number | null | undefined): { 
+  bg: string; 
+  badgeColor: string; 
+  textColor: string;
+  label: string;
+} => {
+  if (score === null || score === undefined) {
+    return { 
+      bg: 'bg-gray-50 dark:bg-gray-900/20', 
+      badgeColor: 'bg-gray-400', 
+      textColor: 'text-gray-500 dark:text-gray-400',
+      label: 'N/A'
+    }
+  }
+  if (score >= 90) {
+    // Hot (90-100): Green
+    return { 
+      bg: 'bg-green-500/5 dark:bg-green-500/10', 
+      badgeColor: 'bg-green-500', 
+      textColor: 'text-green-700 dark:text-green-400',
+      label: 'Hot'
+    }
+  }
+  if (score >= 70) {
+    // Warm (70-89): Orange
+    return { 
+      bg: 'bg-orange-500/5 dark:bg-orange-500/10', 
+      badgeColor: 'bg-orange-500', 
+      textColor: 'text-orange-700 dark:text-orange-400',
+      label: 'Warm'
+    }
+  }
+  // Cold (0-69): Blue
+  return { 
+    bg: 'bg-blue-500/5 dark:bg-blue-500/10', 
+    badgeColor: 'bg-blue-500', 
+    textColor: 'text-blue-700 dark:text-blue-400',
+    label: 'Cold'
+  }
 }
 
 // Using Lead type from @/types to match LeadDetailsModal expectations
@@ -65,6 +99,8 @@ type ExtendedLead = Lead & {
   lead_stage?: string | null
   sub_stage?: string | null
   stage_override?: boolean | null
+  booking_date?: string | null
+  booking_time?: string | null
 }
 
 interface LeadsTableProps {
@@ -84,6 +120,8 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
+  const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
+  const [calculatingScores, setCalculatingScores] = useState(false)
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -148,6 +186,36 @@ export default function LeadsTable({
     setFilteredLeads(filtered)
   }, [leads, dateFilter, sourceFilter, statusFilter, limit])
 
+  // Calculate scores for filtered leads (same calculation as modal)
+  useEffect(() => {
+    if (filteredLeads.length === 0) return
+    
+    setCalculatingScores(true)
+    const calculateScores = async () => {
+      const scores: Record<string, number> = {}
+      // Calculate scores for visible leads (limit to avoid performance issues)
+      const leadsToCalculate = filteredLeads.slice(0, 50) // Limit to first 50 for performance
+      
+      await Promise.all(
+        leadsToCalculate.map(async (lead) => {
+          try {
+            const result = await calculateLeadScore(lead as Lead)
+            scores[lead.id] = result.score
+          } catch (err) {
+            console.error(`Error calculating score for lead ${lead.id}:`, err)
+            // Fallback to stored score if calculation fails
+            scores[lead.id] = lead.lead_score ?? 0
+          }
+        })
+      )
+      
+      setCalculatedScores(scores)
+      setCalculatingScores(false)
+    }
+    
+    calculateScores()
+  }, [filteredLeads])
+
   const handleRowClick = (lead: ExtendedLead) => {
     // Convert ExtendedLead to Lead type expected by LeadDetailsModal
     const modalLead: Lead = {
@@ -207,15 +275,53 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'First Source', 'Timestamp', 'Status']
-    const rows = filteredLeads.map((lead) => [
-      lead.name || '',
-      lead.email || '',
-      lead.phone || '',
-      lead.first_touchpoint || lead.source || '',
-      lead.timestamp,
-      lead.status || '',
-    ])
+    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'Score', 'Stage', 'Key Event']
+    const rows = filteredLeads.map((lead) => {
+      const bookingDate = lead.booking_date || 
+        lead.unified_context?.web?.booking_date || 
+        lead.unified_context?.web?.booking?.date ||
+        lead.unified_context?.whatsapp?.booking_date ||
+        lead.unified_context?.whatsapp?.booking?.date ||
+        lead.unified_context?.voice?.booking_date ||
+        lead.unified_context?.voice?.booking?.date ||
+        lead.unified_context?.social?.booking_date ||
+        lead.unified_context?.social?.booking?.date;
+      const bookingTime = lead.booking_time || 
+        lead.unified_context?.web?.booking_time || 
+        lead.unified_context?.web?.booking?.time ||
+        lead.unified_context?.whatsapp?.booking_time ||
+        lead.unified_context?.whatsapp?.booking?.time ||
+        lead.unified_context?.voice?.booking_time ||
+        lead.unified_context?.voice?.booking?.time ||
+        lead.unified_context?.social?.booking_time ||
+        lead.unified_context?.social?.booking?.time;
+      const keyEvent = bookingDate && bookingTime 
+        ? `${formatDateTime(bookingDate).split(',')[0]}, ${(() => {
+            const timeParts = bookingTime.toString().split(':');
+            if (timeParts.length < 2) return bookingTime.toString();
+            const hours = parseInt(timeParts[0], 10);
+            const minutes = parseInt(timeParts[1], 10);
+            if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString();
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const hours12 = hours % 12 || 12;
+            const minutesStr = minutes.toString().padStart(2, '0');
+            return `${hours12}:${minutesStr} ${period}`;
+          })()}`
+        : bookingDate 
+          ? formatDateTime(bookingDate).split(',')[0]
+          : bookingTime || '';
+      const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
+      const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
+      return [
+        lead.name || '',
+        lead.email || '',
+        lead.phone || '',
+        lead.first_touchpoint || lead.source || '',
+        score !== null && score !== undefined ? score.toString() : '',
+        stage || '',
+        keyEvent || '',
+      ]
+    })
 
     const csvContent = [
       headers.join(','),
@@ -231,27 +337,27 @@ export default function LeadsTable({
   }
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-900 dark:text-gray-100">Loading leads...</div>
+    return <div className="leads-table-loading text-center py-8 text-gray-900 dark:text-gray-100">Loading leads...</div>
   }
 
   if (error) {
-    return <div className="text-center py-8 text-red-600 dark:text-red-400">Error: {error}</div>
+    return <div className="leads-table-error text-center py-8 text-red-600 dark:text-red-400">Error: {error}</div>
   }
 
   return (
-    <div>
+    <div className="leads-table">
       {/* Header with Limit Selector and View All */}
       {(showLimitSelector || showViewAll) && (
-        <div className="mb-4 flex items-center justify-between">
+        <div className="leads-table-header mb-4 flex items-center justify-between">
           {showLimitSelector && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <div className="leads-table-limit-selector flex items-center gap-2">
+              <span className="leads-table-limit-label text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Show:
               </span>
               <select
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value))}
-                className="px-3 py-1.5 border rounded-md text-sm"
+                className="leads-table-limit-select px-3 py-1.5 border rounded-md text-sm"
                 style={{
                   borderColor: 'var(--border-primary)',
                   backgroundColor: 'var(--bg-secondary)',
@@ -266,7 +372,7 @@ export default function LeadsTable({
           {showViewAll && (
             <Link
               href="/dashboard/leads"
-              className="text-sm font-medium hover:underline"
+              className="leads-table-view-all-link text-sm font-medium hover:underline"
               style={{ color: 'var(--accent-primary)' }}
             >
               View All →
@@ -277,11 +383,11 @@ export default function LeadsTable({
 
       {/* Filters - Only show if not hidden */}
       {!hideFilters && (
-        <div className="mb-4 flex flex-wrap gap-4">
+        <div className="leads-table-filters mb-4 flex flex-wrap gap-4">
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Dates</option>
             <option value="today">Today</option>
@@ -293,7 +399,7 @@ export default function LeadsTable({
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All Sources</option>
               <option value="web">Web</option>
@@ -306,7 +412,7 @@ export default function LeadsTable({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Statuses</option>
             {STATUS_OPTIONS.map((status) => (
@@ -318,7 +424,7 @@ export default function LeadsTable({
 
           <button
             onClick={exportToCSV}
-            className="ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
+            className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
             style={{ backgroundColor: '#5B1A8C' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a1573'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5B1A8C'}
@@ -329,101 +435,153 @@ export default function LeadsTable({
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-visible">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
-          <thead className="bg-gray-50 dark:bg-[#0D0D0D]">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+      <div className="leads-table-container overflow-x-auto overflow-y-visible">
+        <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
+          <thead className="leads-table-thead bg-gray-50 dark:bg-[#0D0D0D]">
+            <tr className="leads-table-thead-row">
+              <th className="leads-table-th leads-table-th-name px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-email px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-phone px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Phone
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                First Touch
+              </th>
+              <th className="leads-table-th leads-table-th-score px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Score
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-stage px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Stage
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                First Source
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Timestamp
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
+              <th className="leads-table-th leads-table-th-key-event px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Key Event
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-[#1A1A1A] divide-y divide-gray-200 dark:divide-[#262626]">
+          <tbody className="leads-table-tbody bg-white dark:bg-[#1A1A1A] divide-y divide-gray-200 dark:divide-[#262626]">
             {filteredLeads.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+              <tr className="leads-table-empty-row">
+                <td colSpan={7} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
             ) : (
               filteredLeads.map((lead) => (
                 <tr 
-                  key={lead.id} 
+                  key={lead.id}
+                  className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#262626] cursor-pointer transition-colors"
                   onClick={() => handleRowClick(lead)}
-                  className="hover:bg-gray-50 dark:hover:bg-[#262626] cursor-pointer transition-colors"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="leads-table-cell leads-table-cell-name px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {lead.name || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-email px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {lead.email || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-phone px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {lead.phone || '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`font-semibold ${getScoreColor(lead.lead_score)}`}>
-                      {lead.lead_score !== null && lead.lead_score !== undefined ? lead.lead_score : '-'}
-                    </span>
-                    {lead.stage_override && (
-                      <span className="ml-1 text-xs text-gray-400" title="Manual override">🔒</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {lead.lead_stage ? (
-                      <span 
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          getStageColor(lead.lead_stage).bg || ''
-                        } ${getStageColor(lead.lead_stage).text || ''}`}
-                        style={(getStageColor(lead.lead_stage) as any).style}
-                      >
-                        {lead.lead_stage}
-                        {lead.sub_stage && (
-                          <span className="ml-1 text-xs opacity-75">({lead.sub_stage})</span>
-                        )}
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
+                  <td className="leads-table-cell leads-table-cell-first-touch px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <span className="leads-table-first-touch-badge px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
                       {lead.first_touchpoint || lead.source || 'unknown'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatDateTime(lead.timestamp)}
+                  <td className="leads-table-cell leads-table-cell-score px-6 py-4 whitespace-nowrap text-sm">
+                    {(() => {
+                      // Use calculated score (same as modal) if available, otherwise fallback to stored score
+                      const calculatedScore = calculatedScores[lead.id]
+                      const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null)
+                      const badgeStyle = getScoreBadgeStyle(score)
+                      return (
+                        <div className={`leads-table-score-badge relative rounded-md px-3 py-2 ${badgeStyle.bg} border border-opacity-20`} style={{ borderColor: badgeStyle.badgeColor + '40' }}>
+                          {/* Colored badge at top */}
+                          <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-md ${badgeStyle.badgeColor}`}></div>
+                          <div className="flex items-center gap-2">
+                            <span className={`leads-table-score-value font-semibold ${badgeStyle.textColor}`}>
+                              {score !== null && score !== undefined ? score : badgeStyle.label}
+                            </span>
+                            {(lead.stage_override || (lead as any).stageOverride) && (
+                              <span className="leads-table-score-override text-xs opacity-60" style={{ color: badgeStyle.badgeColor }} title="Manual override">🔒</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    <span 
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        getStatusColor(lead.status || 'New Lead').bg || ''
-                      } ${getStatusColor(lead.status || 'New Lead').text || ''}`}
-                      style={(getStatusColor(lead.status || 'New Lead') as any).style}
-                    >
-                      {lead.status || 'New Lead'}
-                    </span>
+                  <td className="leads-table-cell leads-table-cell-stage px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      // Try multiple possible property names for stage
+                      const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
+                      const subStage = lead.sub_stage ?? (lead as any).subStage ?? null
+                      // Use default stage 'New' if stage is null/undefined/empty
+                      const displayStage = stage || 'New'
+                      if (displayStage && displayStage !== '-') {
+                        return (
+                          <span 
+                            className={`leads-table-stage-badge px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              getStageColor(displayStage).bg || ''
+                            } ${getStageColor(displayStage).text || ''}`}
+                            style={(getStageColor(displayStage) as any).style}
+                          >
+                            {displayStage}
+                            {subStage && (
+                              <span className="leads-table-stage-substage ml-1 text-xs opacity-75">({subStage})</span>
+                            )}
+                          </span>
+                        )
+                      }
+                      return '-'
+                    })()}
+                  </td>
+                  <td className="leads-table-cell leads-table-cell-key-event px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      const bookingDate = lead.booking_date || 
+                        lead.unified_context?.web?.booking_date || 
+                        lead.unified_context?.web?.booking?.date ||
+                        lead.unified_context?.whatsapp?.booking_date ||
+                        lead.unified_context?.whatsapp?.booking?.date ||
+                        lead.unified_context?.voice?.booking_date ||
+                        lead.unified_context?.voice?.booking?.date ||
+                        lead.unified_context?.social?.booking_date ||
+                        lead.unified_context?.social?.booking?.date;
+                      const bookingTime = lead.booking_time || 
+                        lead.unified_context?.web?.booking_time || 
+                        lead.unified_context?.web?.booking?.time ||
+                        lead.unified_context?.whatsapp?.booking_time ||
+                        lead.unified_context?.whatsapp?.booking?.time ||
+                        lead.unified_context?.voice?.booking_time ||
+                        lead.unified_context?.voice?.booking?.time ||
+                        lead.unified_context?.social?.booking_time ||
+                        lead.unified_context?.social?.booking?.time;
+                      if (bookingDate || bookingTime) {
+                        const dateStr = bookingDate ? formatDateTime(bookingDate).split(',')[0] : '';
+                        const timeStr = bookingTime ? (() => {
+                          const timeParts = bookingTime.toString().split(':');
+                          if (timeParts.length < 2) return bookingTime.toString();
+                          const hours = parseInt(timeParts[0], 10);
+                          const minutes = parseInt(timeParts[1], 10);
+                          if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString();
+                          const period = hours >= 12 ? 'PM' : 'AM';
+                          const hours12 = hours % 12 || 12;
+                          const minutesStr = minutes.toString().padStart(2, '0');
+                          return `${hours12}:${minutesStr} ${period}`;
+                        })() : '';
+                        return (
+                          <Link 
+                            href="/dashboard/bookings" 
+                            className="leads-table-key-event-link text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {dateStr && timeStr ? `${dateStr}, ${timeStr}` : dateStr || timeStr || '-'}
+                          </Link>
+                        );
+                      }
+                      return '-';
+                    })()}
                   </td>
                 </tr>
               ))

@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
 import { LeadStage } from '@/types'
+import { calculateLeadScore as calculateLeadScoreUtil } from '@/lib/leadScoreCalculator'
 
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
@@ -50,6 +51,16 @@ function formatBookingTime(timeString: string | null | undefined): string {
   const hours12 = hours % 12 || 12;
   const minutesStr = minutes.toString().padStart(2, '0');
   return `${hours12}:${minutesStr} ${period}`;
+}
+
+function formatBookingDateShort(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return dateString;
+  }
 }
 
 const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
@@ -199,173 +210,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   } | null>(null)
 
-  // Calculate Lead Score Breakdown
-  const calculateLeadScore = async (leadData: Lead) => {
-    try {
-      const supabase = createClient()
-      
-      // Fetch messages for analysis
-      const { data: messages } = await supabase
-        .from('conversations')
-        .select('content, sender, created_at, channel')
-        .eq('lead_id', leadData.id)
-        .order('created_at', { ascending: true })
-
-      // Get conversation summaries from unified_context
-      const unifiedContext = leadData.unified_context || {}
-      const conversationSummary = 
-        unifiedContext.unified_summary ||
-        unifiedContext.web?.conversation_summary ||
-        unifiedContext.whatsapp?.conversation_summary ||
-        unifiedContext.voice?.conversation_summary ||
-        unifiedContext.social?.conversation_summary ||
-        ''
-      
-      // Combine all text for analysis
-      const allText = [
-        conversationSummary,
-        ...(messages || []).map((m: any) => m.content || '').filter(Boolean)
-      ].join(' ').toLowerCase()
-
-      // ============================================
-      // 1. AI Analysis (60% weight)
-      // ============================================
-      let aiScore = 0
-      
-      // Intent signals detection
-      const intentKeywords = {
-        pricing: ['price', 'cost', 'pricing', 'fee', 'charge', 'afford', 'budget', 'expensive', 'cheap', 'discount', 'offer'],
-        booking: ['book', 'booking', 'schedule', 'appointment', 'reserve', 'available', 'slot', 'time', 'date'],
-        urgency: ['urgent', 'asap', 'soon', 'immediately', 'quickly', 'fast', 'today', 'now', 'hurry', 'rushed']
-      }
-      
-      let intentSignals = 0
-      Object.values(intentKeywords).forEach(keywords => {
-        const found = keywords.some(keyword => allText.includes(keyword))
-        if (found) intentSignals++
-      })
-      // Intent signals: 0-3, normalize to 0-100
-      const intentScore = Math.min(100, (intentSignals / 3) * 100)
-      
-      // Sentiment analysis (simple keyword-based)
-      const positiveWords = ['good', 'great', 'excellent', 'perfect', 'love', 'amazing', 'wonderful', 'happy', 'satisfied', 'interested', 'yes', 'sure', 'definitely']
-      const negativeWords = ['bad', 'terrible', 'worst', 'hate', 'disappointed', 'frustrated', 'angry', 'no', 'not', "don't", "won't", 'cancel']
-      
-      const positiveCount = positiveWords.filter(word => allText.includes(word)).length
-      const negativeCount = negativeWords.filter(word => allText.includes(word)).length
-      const sentimentScore = positiveCount > negativeCount 
-        ? Math.min(100, 50 + (positiveCount * 10))
-        : Math.max(0, 50 - (negativeCount * 10))
-      
-      // Buying signals detection
-      const buyingSignals = [
-        'when can', 'how much', 'what is the price', 'tell me about', 'i want', 'i need',
-        'interested in', 'looking for', 'considering', 'deciding', 'compare', 'options'
-      ]
-      const buyingSignalCount = buyingSignals.filter(signal => allText.includes(signal)).length
-      const buyingSignalScore = Math.min(100, buyingSignalCount * 20)
-      
-      // Combine AI scores (weighted average)
-      aiScore = (intentScore * 0.4 + sentimentScore * 0.3 + buyingSignalScore * 0.3)
-      
-      // ============================================
-      // 2. Activity (30% weight)
-      // ============================================
-      const messageCount = messages?.length || 0
-      // Message count: normalize to 0-1 (100 messages = 1.0, capped at 1.0)
-      const msgCountNormalized = Math.min(1.0, messageCount / 100)
-      
-      // Response rate (52% = good baseline)
-      const customerMessages = messages?.filter((m: any) => m.sender === 'customer').length || 0
-      const agentMessages = messages?.filter((m: any) => m.sender === 'agent').length || 0
-      const responseRate = customerMessages > 0 
-        ? (agentMessages / customerMessages) 
-        : 0
-      // Response rate is already 0-1 (e.g., 0.52 for 52%)
-      
-      // Recency score (days since last interaction)
-      const lastInteraction = 
-        leadData.last_interaction_at || 
-        unifiedContext.whatsapp?.last_interaction ||
-        unifiedContext.web?.last_interaction ||
-        unifiedContext.voice?.last_interaction ||
-        unifiedContext.social?.last_interaction ||
-        leadData.timestamp
-      
-      const daysSinceLastInteraction = lastInteraction
-        ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24))
-        : 999
-      
-      // Recency: 0 days = 1.0, 7 days = 0.5, 30 days = 0 (normalize to 0-1)
-      const recencyScore = Math.max(0, Math.min(1.0, 1.0 - (daysSinceLastInteraction / 30)))
-      
-      // Channel mix bonus (2+ channels = bonus) - add 0.1 to the average
-      const activeChannels = new Set(messages?.map((m: any) => m.channel).filter(Boolean) || []).size
-      const channelMixBonus = activeChannels >= 2 ? 0.1 : 0
-      
-      // Activity score: ((msg_count/100 + response_rate + recency_score) / 3) * 0.3
-      // Then convert to 0-100 scale for display
-      const activityScoreBase = ((msgCountNormalized + responseRate + recencyScore) / 3) + channelMixBonus
-      const activityScore = Math.min(100, activityScoreBase * 100)
-      
-      // ============================================
-      // 3. Business Signals (10% weight)
-      // ============================================
-      let businessScore = 0
-      
-      // Booking exists = +10 points
-      const hasBooking = !!(leadData.booking_date || leadData.booking_time || 
-        unifiedContext.web?.booking_date || unifiedContext.web?.booking?.date ||
-        unifiedContext.whatsapp?.booking_date || unifiedContext.whatsapp?.booking?.date ||
-        unifiedContext.voice?.booking_date || unifiedContext.voice?.booking?.date ||
-        unifiedContext.social?.booking_date || unifiedContext.social?.booking?.date)
-      if (hasBooking) businessScore += 10
-      
-      // Email/phone provided = +5 points
-      if (leadData.email || leadData.phone) businessScore += 5
-      
-      // Multi-touchpoint = +5 points (2+ channels)
-      if (activeChannels >= 2) businessScore += 5
-      
-      // Business score can be 0-20, but we need it to contribute 10% (0-10 points) to total
-      // So we normalize: businessScore (0-20) -> (0-10) for the 10% weight
-      const businessScoreNormalized = Math.min(10, businessScore)
-      
-      // ============================================
-      // Calculate Total Score
-      // ============================================
-      const totalScore = Math.min(100, 
-        (aiScore * 0.6) + 
-        (activityScore * 0.3) + 
-        businessScoreNormalized
-      )
-      
-      return {
-        score: Math.round(totalScore),
-        breakdown: {
-          ai: Math.round(aiScore * 0.6), // Already weighted (0-60)
-          activity: Math.round(activityScore * 0.3), // Already weighted (0-30)
-          business: Math.round(businessScoreNormalized), // Already normalized to 0-10 for 10% weight
-        }
-      }
-    } catch (error) {
-      console.error('Error calculating lead score:', error)
-      return {
-        score: 0,
-        breakdown: {
-          ai: 0,
-          activity: 0,
-          business: 0
-        }
-      }
-    }
-  }
-
-  // Calculate and set unified score
+  // Calculate and set unified score (using shared utility)
   const calculateAndSetScore = async () => {
     if (!lead) return
     const leadData = freshLeadData || lead
-    const result = await calculateLeadScore(leadData)
+    const result = await calculateLeadScoreUtil(leadData)
     setCalculatedScore(result)
   }
 
@@ -546,6 +395,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, lead, isOpen])
+
 
   const loadUnifiedSummary = async () => {
     if (!lead) return
@@ -826,9 +676,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // Get health score from calculated score (live calculation)
   const score = calculatedScore?.score ?? 0
   const getHealthColor = (score: number) => {
-    if (score >= 70) return { bg: '#EF4444', text: '#FFFFFF', label: 'Hot 🔥' }
-    if (score >= 40) return { bg: '#F97316', text: '#FFFFFF', label: 'Warm ⚡' }
-    return { bg: '#3B82F6', text: '#FFFFFF', label: 'Cold ❄️' }
+    if (score >= 90) return { bg: '#22C55E', text: '#15803D', label: 'Hot 🔥' } // Green for Hot (90-100)
+    if (score >= 70) return { bg: '#F97316', text: '#C2410C', label: 'Warm ⚡' } // Orange for Warm (70-89)
+    return { bg: '#3B82F6', text: '#1E40AF', label: 'Cold ❄️' } // Blue for Cold (0-69)
   }
   const healthColor = getHealthColor(score)
 
@@ -991,157 +841,212 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40" onClick={onClose}></div>
+      <div 
+        className="lead-modal-backdrop fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40" 
+        onClick={onClose}
+        aria-hidden="true"
+      ></div>
       
-      <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4" onClick={onClose}>
-        <div 
-          className="relative bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50 flex flex-col"
+      <div 
+        className="lead-modal-overlay fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4" 
+        onClick={onClose}
+        aria-hidden="true"
+      >
+        <dialog 
+          open={isOpen}
+          className="lead-modal-dialog lead-details-modal relative bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50 flex flex-col"
           style={{ 
             width: '54vw', 
             maxWidth: '720px',
-            height: '85vh',
-            maxHeight: '85vh'
+            height: '70vh',
+            maxHeight: '70vh'
           }}
           onClick={(e) => e.stopPropagation()}
+          aria-labelledby="lead-modal-title"
+          aria-modal="true"
         >
-          {/* Row 1: Title Row - Name/Email (left) + Lead Health + Stage (right) */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
-            {/* Left: Name + Email (stacked, title style) */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{currentLead.name || 'Unknown Lead'}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{currentLead.email || currentLead.phone || 'No contact info'}</p>
-            </div>
-
-            {/* Right: Lead Health box + Stage badge (inline) */}
-            <div className="flex items-center gap-3">
-              {/* Lead Health Box */}
-              <div 
-                className="w-16 h-16 rounded-xl flex flex-col items-center justify-center shadow-md flex-shrink-0"
-                style={{ backgroundColor: healthColor.bg, color: healthColor.text }}
-              >
-                <span className="text-3xl font-bold">{score}</span>
-                <span className="text-xs font-medium opacity-90">{healthColor.label}</span>
-              </div>
-
-              {/* Stage Badge */}
-              <div className="flex items-center gap-2">
-                <div 
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${getStageBadgeClass(currentStage)}`}
-                  style={currentStage === 'In Sequence' ? {
-                    backgroundColor: 'var(--accent-subtle)',
-                    color: 'var(--accent-primary)'
-                  } : undefined}
-                >
-                  {currentStage}
-                </div>
-                <button
-                  onClick={() => setShowStageDropdown(!showStageDropdown)}
-                  className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  title="Edit stage"
-                >
-                  <MdEdit size={16} />
-                </button>
-              </div>
-
-              {/* Close Button */}
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors ml-2"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Stage Dropdown */}
-            {showStageDropdown && (
-              <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setShowStageDropdown(false)} />
-                <div className="absolute right-4 top-20 z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]">
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'In Sequence', 'Cold'].map((stage) => (
-                    <button
-                      key={stage}
-                      onClick={() => handleStageChange(stage as LeadStage)}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                        currentStage === stage
-                          ? getStageBadgeClass(stage) + ' font-semibold'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                      }`}
-                      style={currentStage === stage && stage === 'In Sequence' ? {
-                        backgroundColor: 'var(--accent-subtle)',
-                        color: 'var(--accent-primary)'
-                      } : undefined}
-                    >
-                      {stage}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Row 2: Info Row - Customer Journey (left 50%) + Quick Stats (right 50%) */}
-          <div className="grid grid-cols-2 gap-4 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
-            {/* Left 50%: Customer Journey */}
-            <div>
-              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
-              {activeChannels.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <div className="flex gap-3 flex-nowrap">
-                    {activeChannels.map((channel) => (
-                      <div 
-                        key={channel.key} 
-                        className="flex items-center gap-2 flex-shrink-0 min-w-[140px]"
-                      >
-                        <div 
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0"
-                          style={{ backgroundColor: channel.color }}
-                        >
-                          <channel.icon size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{channel.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {channel.firstDate ? formatDateIST(channel.firstDate) : '-'}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{channel.count} msgs</p>
-                        </div>
-                      </div>
-                    ))}
+          {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
+          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0 relative min-h-[160px]">
+            {/* LEFT HALF: Contact Card - Business Card Style */}
+            <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-gray-50/50 dark:bg-gray-800/30 rounded-xl border border-gray-200/50 dark:border-gray-700/30">
+              {/* Top Section: Name, Score, Status */}
+              <div className="lead-contact-card-header">
+                {/* Name + Score badge (top row) */}
+                <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
+                  <h2 
+                    id="lead-modal-title"
+                    className="lead-contact-name text-xl font-bold text-gray-900 dark:text-white leading-tight flex-1 min-w-0 truncate"
+                  >
+                    {currentLead.name || 'Unknown Lead'}
+                  </h2>
+                  
+                  {/* Lead Health Score - Right aligned */}
+                  <div 
+                    className="lead-score-card w-14 h-14 rounded-lg flex flex-col items-center justify-center shadow-sm flex-shrink-0 relative border"
+                    role="status"
+                    aria-label={`Lead score: ${score} out of 100, ${healthColor.label}`}
+                    style={{ 
+                      backgroundColor: score >= 90 
+                        ? 'rgba(34, 197, 94, 0.05)' 
+                        : score >= 70 
+                        ? 'rgba(249, 115, 22, 0.05)' 
+                        : 'rgba(59, 130, 246, 0.05)',
+                      borderColor: score >= 90 
+                        ? 'rgba(34, 197, 94, 0.2)' 
+                        : score >= 70 
+                        ? 'rgba(249, 115, 22, 0.2)' 
+                        : 'rgba(59, 130, 246, 0.2)'
+                    }}
+                  >
+                    {/* Colored badge at top */}
+                    <div 
+                      className="lead-score-indicator absolute top-0 left-0 right-0 h-1 rounded-t-lg"
+                      style={{ 
+                        backgroundColor: score >= 90 
+                          ? '#22C55E' 
+                          : score >= 70 
+                          ? '#F97316' 
+                          : '#3B82F6'
+                      }}
+                    ></div>
+                    <span className="lead-score-value text-lg font-bold leading-none" style={{ color: healthColor.text }}>{score}</span>
+                    <span className="lead-score-label text-[8px] font-medium opacity-90 mt-0.5" style={{ color: healthColor.text }}>{healthColor.label}</span>
                   </div>
                 </div>
-              ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
-              )}
-            </div>
 
-            {/* Right 50%: Quick Stats (2×2 grid) */}
-            <div>
-              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Stats</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Messages</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{quickStats.totalMessages}</p>
+                {/* Status badge below name */}
+                <div className="lead-stage-container flex items-center gap-1 relative">
+                  <span 
+                    className={`lead-stage-badge px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${getStageBadgeClass(currentStage)}`}
+                    style={currentStage === 'In Sequence' ? {
+                      backgroundColor: 'var(--accent-subtle)',
+                      color: 'var(--accent-primary)'
+                    } : undefined}
+                    aria-label={`Current stage: ${currentStage}`}
+                  >
+                    {currentStage}
+                  </span>
+                  <button
+                    ref={stageButtonRef}
+                    onClick={() => setShowStageDropdown(!showStageDropdown)}
+                    className="lead-stage-edit-button p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                    title="Edit stage"
+                    aria-label="Edit lead stage"
+                    aria-expanded={showStageDropdown}
+                    aria-haspopup="true"
+                  >
+                    <MdEdit size={12} className="text-gray-500 dark:text-gray-400" />
+                  </button>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Response Rate</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{quickStats.responseRate}%</p>
-                </div>
-                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Avg Response</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    {quickStats.avgResponseTime > 0 ? `${quickStats.avgResponseTime}m` : '-'}
-                  </p>
-                </div>
-                <div className="p-2 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Booking</p>
-                  {quickStats.hasBooking ? (
-                    <div className="flex items-center gap-1.5">
-                      <MdCheckCircle className="text-green-500 flex-shrink-0" size={18} />
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                        {formatDateIST(
-                          currentLead.booking_date || 
+              </div>
+
+              {/* Contact Info Section - Bottom */}
+              <address className="lead-contact-info space-y-1 mt-auto not-italic">
+                {/* Email with icon */}
+                {currentLead.email && (
+                  <div className="lead-contact-email flex items-center gap-1.5">
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdEmail className="text-gray-600 dark:text-gray-300" size={14} />
+                    </div>
+                    <a 
+                      href={`mailto:${currentLead.email}`}
+                      className="lead-contact-email-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight truncate"
+                    >
+                      {currentLead.email}
+                    </a>
+                  </div>
+                )}
+
+                {/* Phone with icon */}
+                {currentLead.phone && (
+                  <div className="lead-contact-phone flex items-center gap-1.5">
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdPhone className="text-gray-600 dark:text-gray-300" size={14} />
+                    </div>
+                    <a 
+                      href={`tel:${currentLead.phone}`}
+                      className="lead-contact-phone-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight"
+                    >
+                      {currentLead.phone}
+                    </a>
+                  </div>
+                )}
+
+                {!currentLead.email && !currentLead.phone && (
+                  <p className="lead-contact-empty text-sm text-gray-500 dark:text-gray-400">No contact info</p>
+                )}
+              </address>
+            </section>
+
+            {/* RIGHT HALF: Customer Journey + Quick Stats */}
+            <section className="lead-journey-stats-section flex-1 flex flex-col h-full gap-4">
+              {/* Customer Journey - TOP */}
+              <section className="lead-journey-section">
+                <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
+                {activeChannels.length > 0 ? (
+                  <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
+                    {activeChannels.map((channel, index) => (
+                      <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
+                        <div 
+                          className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
+                          style={{ backgroundColor: channel.color }}
+                          title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                          aria-label={`${channel.name} channel`}
+                        >
+                          <channel.icon size={14} />
+                        </div>
+                        {index < activeChannels.length - 1 && (
+                          <MdChevronRight className="lead-journey-separator text-gray-400 dark:text-gray-500 flex-shrink-0" size={16} aria-hidden="true" />
+                        )}
+                      </div>
+                    ))}
+                  </nav>
+                ) : (
+                  <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+                )}
+              </section>
+
+              {/* Quick Stats - BELOW Journey (3 in a row) */}
+              <section className="lead-quick-stats-section">
+                <h3 className="lead-quick-stats-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Stats</h3>
+                <div className="lead-quick-stats-grid grid grid-cols-3 gap-2">
+                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Messages</p>
+                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
+                  </article>
+                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Response Rate</p>
+                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
+                  </article>
+                  <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${
+                    (() => {
+                      const bookingDate = currentLead.booking_date || 
+                        currentLead.unified_context?.web?.booking_date || 
+                        currentLead.unified_context?.web?.booking?.date ||
+                        currentLead.unified_context?.whatsapp?.booking_date ||
+                        currentLead.unified_context?.whatsapp?.booking?.date ||
+                        currentLead.unified_context?.voice?.booking_date ||
+                        currentLead.unified_context?.voice?.booking?.date ||
+                        currentLead.unified_context?.social?.booking_date ||
+                        currentLead.unified_context?.social?.booking?.date;
+                      const bookingTime = currentLead.booking_time || 
+                        currentLead.unified_context?.web?.booking_time || 
+                        currentLead.unified_context?.web?.booking?.time ||
+                        currentLead.unified_context?.whatsapp?.booking_time ||
+                        currentLead.unified_context?.whatsapp?.booking?.time ||
+                        currentLead.unified_context?.voice?.booking_time ||
+                        currentLead.unified_context?.voice?.booking?.time ||
+                        currentLead.unified_context?.social?.booking_time ||
+                        currentLead.unified_context?.social?.booking?.time;
+                      return bookingDate && bookingTime 
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                        : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#262626]';
+                    })()
+                  }`}>
+                    <p className="lead-stat-label text-xs text-gray-400 dark:text-gray-500">Key Event</p>
+                    <div className="lead-stat-content mt-auto">
+                      {(() => {
+                        const bookingDate = currentLead.booking_date || 
                           currentLead.unified_context?.web?.booking_date || 
                           currentLead.unified_context?.web?.booking?.date ||
                           currentLead.unified_context?.whatsapp?.booking_date ||
@@ -1149,77 +1054,186 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           currentLead.unified_context?.voice?.booking_date ||
                           currentLead.unified_context?.voice?.booking?.date ||
                           currentLead.unified_context?.social?.booking_date ||
-                          currentLead.unified_context?.social?.booking?.date
-                        )}
-                      </p>
+                          currentLead.unified_context?.social?.booking?.date;
+                        const bookingTime = currentLead.booking_time || 
+                          currentLead.unified_context?.web?.booking_time || 
+                          currentLead.unified_context?.web?.booking?.time ||
+                          currentLead.unified_context?.whatsapp?.booking_time ||
+                          currentLead.unified_context?.whatsapp?.booking?.time ||
+                          currentLead.unified_context?.voice?.booking_time ||
+                          currentLead.unified_context?.voice?.booking?.time ||
+                          currentLead.unified_context?.social?.booking_time ||
+                          currentLead.unified_context?.social?.booking?.time;
+                        
+                        if (bookingDate && bookingTime) {
+                          const formattedDate = formatBookingDateShort(bookingDate);
+                          const formattedTime = formatBookingTime(bookingTime);
+                          return (
+                            <a 
+                              href="/dashboard/bookings" 
+                              className="lead-booking-link flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Optionally navigate to calendar with date filter
+                              }}
+                              aria-label={`View booking on ${formattedDate} at ${formattedTime}`}
+                            >
+                              <div className="lead-booking-date flex items-center gap-1">
+                                <MdEvent className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={16} aria-hidden="true" />
+                                <time className="text-lg font-bold text-blue-700 dark:text-blue-300" dateTime={bookingDate}>
+                                  {formattedDate}
+                                </time>
+                              </div>
+                              <time className="lead-booking-time text-xs font-medium text-blue-600 dark:text-blue-400 mt-0.5" dateTime={bookingTime}>
+                                {formattedTime}
+                              </time>
+                            </a>
+                          );
+                        }
+                        return (
+                          <p className="lead-stat-empty text-2xl font-bold text-gray-500 dark:text-gray-400" aria-label="No key event">-</p>
+                        );
+                      })()}
                     </div>
-                  ) : (
-                    <p className="text-xl font-bold text-gray-400 dark:text-gray-500">-</p>
-                  )}
+                  </article>
                 </div>
-              </div>
-            </div>
-          </div>
+              </section>
+            </section>
+
+            {/* Close Button - Absolute positioned top right */}
+            <button
+              onClick={onClose}
+              className="lead-modal-close-button absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              aria-label="Close lead details modal"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Stage Dropdown */}
+            {showStageDropdown && stageButtonRef.current && (
+              <>
+                <div 
+                  className="lead-stage-dropdown-backdrop fixed inset-0 z-[60]" 
+                  onClick={() => setShowStageDropdown(false)}
+                  aria-hidden="true"
+                />
+                <menu 
+                  className="lead-stage-dropdown fixed z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]"
+                  style={{
+                    top: `${stageButtonRef.current.getBoundingClientRect().bottom + 8}px`,
+                    left: `${Math.max(8, stageButtonRef.current.getBoundingClientRect().right - 220)}px`,
+                  }}
+                  role="menu"
+                  aria-label="Select lead stage"
+                >
+                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'In Sequence', 'Cold'].map((stage) => (
+                    <li key={stage} role="none">
+                      <button
+                        onClick={() => handleStageChange(stage as LeadStage)}
+                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                          currentStage === stage
+                            ? getStageBadgeClass(stage) + ' font-semibold'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                        }`}
+                        style={currentStage === stage && stage === 'In Sequence' ? {
+                          backgroundColor: 'var(--accent-subtle)',
+                          color: 'var(--accent-primary)'
+                        } : undefined}
+                        role="menuitem"
+                        aria-label={`Change stage to ${stage}`}
+                      >
+                        {stage}
+                      </button>
+                    </li>
+                  ))}
+                </menu>
+              </>
+            )}
+          </header>
 
           {/* TABS */}
-          <div className="flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0">
+          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('activity')}
-              className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'activity'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'activity'}
+              aria-controls="lead-tabpanel-activity"
+              id="lead-tab-activity"
             >
               Activity
             </button>
             <button
               onClick={() => setActiveTab('summary')}
-              className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'summary'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'summary'}
+              aria-controls="lead-tabpanel-summary"
+              id="lead-tab-summary"
             >
               Summary
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
-              className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'breakdown'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'breakdown'}
+              aria-controls="lead-tabpanel-breakdown"
+              id="lead-tab-breakdown"
             >
               Score Breakdown
             </button>
             <button
               onClick={() => setActiveTab('interaction')}
-              className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'interaction'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'interaction'}
+              aria-controls="lead-tabpanel-interaction"
+              id="lead-tab-interaction"
             >
               30-Day Interaction
             </button>
-          </div>
+          </nav>
 
           {/* TAB CONTENT - Scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          <main className="lead-modal-content lead-details-modal-tab-content overflow-y-auto flex-1 min-h-0">
             {/* Activity Tab - 70% width with improved message display */}
             {activeTab === 'activity' && (
-              <div className="p-6" style={{ width: '70%', maxWidth: '840px' }}>
+              <section 
+                id="lead-tabpanel-activity"
+                role="tabpanel"
+                aria-labelledby="lead-tab-activity"
+                className="lead-tabpanel-activity px-4 pt-4 pb-2" 
+                style={{ width: '70%', maxWidth: '840px' }}
+              >
                 {loadingActivities ? (
-                  <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="lead-activity-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
                     <div className="animate-pulse">Loading activities...</div>
                   </div>
                 ) : activities.length === 0 ? (
-                  <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="lead-activity-empty text-sm text-center py-8 text-gray-500 dark:text-gray-400">
                     No activities yet
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <ol className="lead-activity-list space-y-4" aria-label="Lead activity timeline">
                     {activities.map((activity, index) => {
                       const getActivityIcon = () => {
                         if (activity.type === 'proxe') {
@@ -1242,20 +1256,28 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       const isProxe = activity.type === 'proxe'
                       
                       return (
-                        <div key={activity.id} className="flex gap-3">
-                          <div className="flex flex-col items-center flex-shrink-0">
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: color }}>
+                        <li key={activity.id} className="lead-activity-item flex gap-3">
+                          <div className="lead-activity-timeline flex flex-col items-center flex-shrink-0">
+                            <div 
+                              className="lead-activity-icon w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm" 
+                              style={{ backgroundColor: color }}
+                              aria-hidden="true"
+                            >
                               {Icon}
                             </div>
                             {index < activities.length - 1 && (
-                              <div className="w-0.5 flex-1 mt-2" style={{ backgroundColor: color, opacity: 0.3 }} />
+                              <div 
+                                className="lead-activity-connector w-0.5 flex-1 mt-2" 
+                                style={{ backgroundColor: color, opacity: 0.3 }}
+                                aria-hidden="true"
+                              />
                             )}
                           </div>
-                          <div className="flex-1 pb-4 min-w-0">
+                          <article className="lead-activity-content flex-1 pb-2 min-w-0">
                             {/* Message bubble for customer/PROXe messages */}
                             {activity.content && (isCustomer || isProxe) ? (
                               <div 
-                                className={`rounded-2xl px-4 py-3 mb-2 ${
+                                className={`lead-activity-message rounded-2xl px-4 py-3 mb-2 ${
                                   isCustomer 
                                     ? 'bg-gray-100 dark:bg-gray-800 ml-auto' 
                                     : 'bg-blue-50 dark:bg-blue-900/20'
@@ -1270,288 +1292,288 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
+                              <p className="lead-activity-text text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
                                 {activity.content}
                               </p>
                             ) : null}
                             
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="lead-activity-header flex items-start justify-between gap-2 mb-1">
+                              <div className="lead-activity-meta flex items-center gap-2 flex-1 min-w-0">
+                                <h4 className="lead-activity-action text-sm font-medium text-gray-900 dark:text-white">
                                   {activity.action || 'Activity'}
-                                </p>
+                                </h4>
                                 {activity.channel && (
                                   <span 
-                                    className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                                    className="lead-activity-channel text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
                                     style={{ 
                                       backgroundColor: `${color}20`,
                                       color: color
                                     }}
+                                    aria-label={`Channel: ${activity.channel}`}
                                   >
                                     {activity.channel}
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs whitespace-nowrap text-gray-500 dark:text-gray-400 flex-shrink-0">
+                              <time className="lead-activity-time text-xs whitespace-nowrap text-gray-500 dark:text-gray-400 flex-shrink-0" dateTime={activity.timestamp}>
                                 {formatDateTimeIST(activity.timestamp)}
-                              </span>
+                              </time>
                             </div>
-                            <p className="text-xs mt-0.5" style={{ color }}>
+                            <p className="lead-activity-actor text-xs mt-0.5" style={{ color }}>
                               {activity.actor || 'Unknown'}
                             </p>
-                          </div>
-                        </div>
+                          </article>
+                        </li>
                       )
                     })}
-                  </div>
+                  </ol>
                 )}
-              </div>
+              </section>
             )}
 
             {/* Other Tabs - Full Width */}
             {activeTab !== 'activity' && (
-              <div className="p-6">
+              <div className="lead-tabpanel-container px-4 pt-4 pb-2">
                 {/* Summary Tab */}
                 {activeTab === 'summary' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
-                    <MdAutoAwesome size={16} className="text-blue-500" />
-                    Unified Summary
-                    {loadingSummary && (
-                      <span className="text-xs ml-2 text-gray-500 dark:text-gray-400">Generating...</span>
-                    )}
-                  </h3>
-                  {loadingSummary ? (
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      <div className="animate-pulse">Loading summary...</div>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-sm leading-relaxed mb-3 text-gray-700 dark:text-gray-300">
-                        {unifiedSummary || 'No summary available. Summary will be generated on next page load.'}
-                      </p>
-                      {summaryAttribution && (
-                        <p className="text-xs pt-3 border-t border-blue-200 dark:border-blue-800 text-gray-500 dark:text-gray-400">
-                          {summaryAttribution}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {summaryData && (
-                  <div className="space-y-3">
-                    {summaryData.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints) && (
-                      <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
-                        <p className="text-xs font-semibold mb-2 text-gray-900 dark:text-white">Buying Signals</p>
-                        <div className="space-y-1">
-                          {summaryData.keyInfo.budget && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              <span className="font-medium">Budget:</span> {summaryData.keyInfo.budget}
-                            </p>
-                          )}
-                          {summaryData.keyInfo.serviceInterest && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              <span className="font-medium">Interest:</span> {summaryData.keyInfo.serviceInterest}
-                            </p>
-                          )}
-                          {summaryData.keyInfo.painPoints && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              <span className="font-medium">Pain Points:</span> {summaryData.keyInfo.painPoints}
-                            </p>
+                  <section 
+                    id="lead-tabpanel-summary"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-summary"
+                    className="lead-tabpanel-summary space-y-4"
+                  >
+                    <article className="lead-summary-card p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                      <h3 className="lead-summary-title text-sm font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
+                        <MdAutoAwesome size={16} className="text-blue-500" aria-hidden="true" />
+                        Unified Summary
+                        {loadingSummary && (
+                          <span className="lead-summary-loading text-xs ml-2 text-gray-500 dark:text-gray-400" aria-live="polite">Generating...</span>
+                        )}
+                      </h3>
+                      {loadingSummary ? (
+                        <div className="lead-summary-loading-state text-sm text-gray-500 dark:text-gray-400" aria-live="polite">
+                          <div className="animate-pulse">Loading summary...</div>
+                        </div>
+                      ) : (
+                        <div className="lead-summary-content">
+                          <p className="lead-summary-text text-sm leading-relaxed mb-3 text-gray-700 dark:text-gray-300">
+                            {unifiedSummary || 'No summary available. Summary will be generated on next page load.'}
+                          </p>
+                          {summaryAttribution && (
+                            <footer className="lead-summary-attribution text-xs pt-3 border-t border-blue-200 dark:border-blue-800 text-gray-500 dark:text-gray-400">
+                              {summaryAttribution}
+                            </footer>
                           )}
                         </div>
-                      </div>
+                      )}
+                    </article>
+
+                    {summaryData && (
+                      <section className="lead-buying-signals space-y-3">
+                        {summaryData.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints) && (
+                          <article className="lead-buying-signals-card p-3 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
+                            <h4 className="lead-buying-signals-title text-xs font-semibold mb-2 text-gray-900 dark:text-white">Buying Signals</h4>
+                            <dl className="lead-buying-signals-list space-y-1">
+                              {summaryData.keyInfo.budget && (
+                                <div className="lead-buying-signal-item">
+                                  <dt className="font-medium inline">Budget:</dt>
+                                  <dd className="inline text-xs text-gray-600 dark:text-gray-400"> {summaryData.keyInfo.budget}</dd>
+                                </div>
+                              )}
+                              {summaryData.keyInfo.serviceInterest && (
+                                <div className="lead-buying-signal-item">
+                                  <dt className="font-medium inline">Interest:</dt>
+                                  <dd className="inline text-xs text-gray-600 dark:text-gray-400"> {summaryData.keyInfo.serviceInterest}</dd>
+                                </div>
+                              )}
+                              {summaryData.keyInfo.painPoints && (
+                                <div className="lead-buying-signal-item">
+                                  <dt className="font-medium inline">Pain Points:</dt>
+                                  <dd className="inline text-xs text-gray-600 dark:text-gray-400"> {summaryData.keyInfo.painPoints}</dd>
+                                </div>
+                              )}
+                            </dl>
+                          </article>
+                        )}
+                      </section>
                     )}
-                  </div>
+                  </section>
                 )}
-              </div>
-            )}
 
                 {/* Score Breakdown Tab */}
                 {activeTab === 'breakdown' && (
-              <div className="space-y-6">
-                {calculatedScore ? (
-                  <>
-                    {/* 3 Cards in Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Card 1 - AI Analysis (60%) */}
-                      <div className="p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-[#1A1A1A]">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MdPsychology size={24} className="text-blue-500 dark:text-blue-400" />
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">AI Analysis</h3>
-                        </div>
-                        <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                            {calculatedScore.breakdown.ai}/60
-                          </p>
-                          <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            {Math.round((calculatedScore.breakdown.ai / 60) * 100)}%
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 mt-4">
-                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                            Intent
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                            Sentiment
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                            Buying
-                          </span>
-                        </div>
-                      </div>
+                  <section 
+                    id="lead-tabpanel-breakdown"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-breakdown"
+                    className="lead-tabpanel-breakdown space-y-6"
+                  >
+                    {calculatedScore ? (
+                      <>
+                        {/* 3 Cards in Row */}
+                        <div className="lead-score-breakdown-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Card 1 - AI Analysis (60%) */}
+                          <article className="lead-score-card lead-score-ai p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-[#1A1A1A]">
+                            <div className="lead-score-card-header flex items-center gap-2 mb-3">
+                              <MdPsychology size={24} className="text-blue-500 dark:text-blue-400" aria-hidden="true" />
+                              <h3 className="lead-score-card-title text-sm font-semibold text-gray-900 dark:text-white">AI Analysis</h3>
+                            </div>
+                            <div className="lead-score-card-value mb-2">
+                              <p className="text-3xl font-bold text-gray-900 dark:text-white" aria-label={`AI Analysis score: ${calculatedScore.breakdown.ai} out of 60`}>
+                                {calculatedScore.breakdown.ai}/60
+                              </p>
+                              <p className="lead-score-card-percentage text-sm font-medium text-blue-600 dark:text-blue-400">
+                                {Math.round((calculatedScore.breakdown.ai / 60) * 100)}%
+                              </p>
+                            </div>
+                            <ul className="lead-score-card-tags flex flex-wrap gap-1.5 mt-4" aria-label="AI Analysis factors">
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Intent</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Sentiment</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Buying</span></li>
+                            </ul>
+                          </article>
 
-                      {/* Card 2 - Activity (30%) */}
-                      <div className="p-4 rounded-lg border-2 border-green-200 dark:border-green-800 bg-white dark:bg-[#1A1A1A]">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MdFlashOn size={24} className="text-green-500 dark:text-green-400" />
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Activity</h3>
-                        </div>
-                        <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                            {calculatedScore.breakdown.activity}/30
-                          </p>
-                          <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                            {Math.round((calculatedScore.breakdown.activity / 30) * 100)}%
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 mt-4">
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                            Messages
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                            Response Rate
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                            Recency
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                            Channels
-                          </span>
-                        </div>
-                      </div>
+                          {/* Card 2 - Activity (30%) */}
+                          <article className="lead-score-card lead-score-activity p-4 rounded-lg border-2 border-green-200 dark:border-green-800 bg-white dark:bg-[#1A1A1A]">
+                            <div className="lead-score-card-header flex items-center gap-2 mb-3">
+                              <MdFlashOn size={24} className="text-green-500 dark:text-green-400" aria-hidden="true" />
+                              <h3 className="lead-score-card-title text-sm font-semibold text-gray-900 dark:text-white">Activity</h3>
+                            </div>
+                            <div className="lead-score-card-value mb-2">
+                              <p className="text-3xl font-bold text-gray-900 dark:text-white" aria-label={`Activity score: ${calculatedScore.breakdown.activity} out of 30`}>
+                                {calculatedScore.breakdown.activity}/30
+                              </p>
+                              <p className="lead-score-card-percentage text-sm font-medium text-green-600 dark:text-green-400">
+                                {Math.round((calculatedScore.breakdown.activity / 30) * 100)}%
+                              </p>
+                            </div>
+                            <ul className="lead-score-card-tags flex flex-wrap gap-1.5 mt-4" aria-label="Activity factors">
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Messages</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Response Rate</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Recency</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Channels</span></li>
+                            </ul>
+                          </article>
 
-                      {/* Card 3 - Business Signals (10%) */}
-                      <div className="p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-[#1A1A1A]">
-                        <div className="flex items-center gap-2 mb-3">
-                          <MdBarChart size={24} className="text-purple-500 dark:text-purple-400" />
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Business Signals</h3>
+                          {/* Card 3 - Business Signals (10%) */}
+                          <article className="lead-score-card lead-score-business p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-[#1A1A1A]">
+                            <div className="lead-score-card-header flex items-center gap-2 mb-3">
+                              <MdBarChart size={24} className="text-purple-500 dark:text-purple-400" aria-hidden="true" />
+                              <h3 className="lead-score-card-title text-sm font-semibold text-gray-900 dark:text-white">Business Signals</h3>
+                            </div>
+                            <div className="lead-score-card-value mb-2">
+                              <p className="text-3xl font-bold text-gray-900 dark:text-white" aria-label={`Business Signals score: ${calculatedScore.breakdown.business} out of 10`}>
+                                {calculatedScore.breakdown.business}/10
+                              </p>
+                              <p className="lead-score-card-percentage text-sm font-medium text-purple-600 dark:text-purple-400">
+                                {Math.round((calculatedScore.breakdown.business / 10) * 100)}%
+                              </p>
+                            </div>
+                            <ul className="lead-score-card-tags flex flex-wrap gap-1.5 mt-4" aria-label="Business Signals factors">
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">Booking</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">Contact Info</span></li>
+                              <li><span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">Multi-channel</span></li>
+                            </ul>
+                          </article>
                         </div>
-                        <div className="mb-2">
-                          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                            {calculatedScore.breakdown.business}/10
-                          </p>
-                          <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                            {Math.round((calculatedScore.breakdown.business / 10) * 100)}%
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 mt-4">
-                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                            Booking
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                            Contact Info
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                            Multi-channel
-                          </span>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Total Score Card - Large with Radial */}
-                    <div className="p-6 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#1F1F1F] dark:to-[#262626] border border-gray-200 dark:border-[#262626]">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Total Score</h3>
-                          <p className="text-5xl font-bold text-gray-900 dark:text-white">
-                            {calculatedScore.score}/100
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {Math.round((calculatedScore.score / 100) * 100)}% complete
-                          </p>
-                        </div>
-                        {/* Radial Progress Circle */}
-                        <div className="relative w-24 h-24 flex-shrink-0">
-                          <svg className="transform -rotate-90 w-24 h-24" viewBox="0 0 100 100">
-                            <circle
-                              cx="50"
-                              cy="50"
-                              r="42"
-                              stroke="currentColor"
-                              strokeWidth="8"
-                              fill="none"
-                              className="text-gray-200 dark:text-gray-700"
-                            />
-                            <circle
-                              cx="50"
-                              cy="50"
-                              r="42"
-                              stroke="currentColor"
-                              strokeWidth="8"
-                              fill="none"
-                              strokeDasharray={`${2 * Math.PI * 42}`}
-                              strokeDashoffset={`${2 * Math.PI * 42 * (1 - calculatedScore.score / 100)}`}
-                              className="text-blue-500 dark:text-blue-400 transition-all duration-500"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-xl font-bold text-gray-900 dark:text-white">
-                              {Math.round((calculatedScore.score / 100) * 100)}%
-                            </span>
+                        {/* Total Score Card - Large with Radial */}
+                        <article className="lead-total-score-card p-6 rounded-lg border border-gray-200 dark:border-[#262626]" style={{ backgroundColor: healthColor.bg, color: healthColor.text }}>
+                          <div className="lead-total-score-content flex items-center justify-between">
+                            <div className="lead-total-score-info">
+                              <h3 className="lead-total-score-title text-sm font-semibold mb-2" style={{ color: healthColor.text }}>Total Score</h3>
+                              <p className="lead-total-score-value text-5xl font-bold" style={{ color: healthColor.text }} aria-label={`Total lead score: ${calculatedScore.score} out of 100`}>
+                                {calculatedScore.score}/100
+                              </p>
+                              <p className="lead-total-score-percentage text-sm mt-1 opacity-90" style={{ color: healthColor.text }}>
+                                {Math.round((calculatedScore.score / 100) * 100)}% complete
+                              </p>
+                            </div>
+                            {/* Radial Progress Circle */}
+                            <div className="lead-score-radial relative w-24 h-24 flex-shrink-0" aria-hidden="true">
+                              <svg className="transform -rotate-90 w-24 h-24" viewBox="0 0 100 100">
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="42"
+                                  stroke="currentColor"
+                                  strokeWidth="8"
+                                  fill="none"
+                                  className="text-gray-200 dark:text-gray-700"
+                                />
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="42"
+                                  stroke="currentColor"
+                                  strokeWidth="8"
+                                  fill="none"
+                                  strokeDasharray={`${2 * Math.PI * 42}`}
+                                  strokeDashoffset={`${2 * Math.PI * 42 * (1 - calculatedScore.score / 100)}`}
+                                  style={{ color: healthColor.text }}
+                                  className="transition-all duration-500"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xl font-bold text-gray-900 dark:text-white">
+                                  {Math.round((calculatedScore.score / 100) * 100)}%
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
+                        </article>
 
-                    {/* Info Footer */}
-                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Score is calculated live based on engagement, intent signals, and activity patterns. Updates automatically when the modal opens or when activities change.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
-                    <div className="animate-pulse">Calculating score breakdown...</div>
-                  </div>
+                        {/* Info Footer */}
+                        <footer className="lead-score-info-footer p-4 rounded-lg bg-gray-50 dark:bg-[#1F1F1F]">
+                          <p className="lead-score-info-text text-xs text-gray-500 dark:text-gray-400">
+                            Score is calculated live based on engagement, intent signals, and activity patterns. Updates automatically when the modal opens or when activities change.
+                          </p>
+                        </footer>
+                      </>
+                    ) : (
+                      <div className="lead-score-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                        <div className="animate-pulse">Calculating score breakdown...</div>
+                      </div>
+                    )}
+                  </section>
                 )}
-              </div>
-            )}
 
                 {/* 30-Day Interaction Tab (from first touchpoint) */}
                 {activeTab === 'interaction' && (
-              <div className="space-y-4">
-                {loading30Days ? (
-                  <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400">
-                    <div className="animate-pulse">Loading interaction data...</div>
-                  </div>
-                ) : interaction30Days ? (
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Left Column - Stats */}
-                    <div className="space-y-6">
-                      {/* Total Interactions */}
-                      <div>
-                        <p className="text-4xl font-bold text-gray-900 dark:text-white">
-                          {interaction30Days.totalInteractions}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total interactions (first 30 days)</p>
+                  <section 
+                    id="lead-tabpanel-interaction"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-interaction"
+                    className="lead-tabpanel-interaction space-y-4"
+                  >
+                    {loading30Days ? (
+                      <div className="lead-interaction-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                        <div className="animate-pulse">Loading interaction data...</div>
                       </div>
+                    ) : interaction30Days ? (
+                      <div className="lead-interaction-grid grid grid-cols-2 gap-6">
+                        {/* Left Column - Stats */}
+                        <section className="lead-interaction-stats space-y-6">
+                          {/* Total Interactions */}
+                          <article className="lead-interaction-total">
+                            <p className="lead-interaction-total-value text-4xl font-bold text-gray-900 dark:text-white" aria-label={`${interaction30Days.totalInteractions} total interactions in first 30 days`}>
+                              {interaction30Days.totalInteractions}
+                            </p>
+                            <p className="lead-interaction-total-label text-xs text-gray-500 dark:text-gray-400 mt-1">Total interactions (first 30 days)</p>
+                          </article>
 
-                      {/* Last Touch Day */}
-                      <div className="p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Touch Day</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {interaction30Days.lastTouchDay || 'No interactions yet'}
-                        </p>
-                      </div>
-                    </div>
+                          {/* Last Touch Day */}
+                          <article className="lead-interaction-last-touch p-4 bg-gray-50 dark:bg-[#1F1F1F] rounded-lg">
+                            <p className="lead-interaction-last-touch-label text-xs text-gray-500 dark:text-gray-400 mb-1">Last Touch Day</p>
+                            <p className="lead-interaction-last-touch-value text-lg font-semibold text-gray-900 dark:text-white">
+                              {interaction30Days.lastTouchDay || 'No interactions yet'}
+                            </p>
+                          </article>
+                        </section>
 
-                    {/* Right Column - Calendar */}
-                    <div className="w-full">
+                        {/* Right Column - Calendar */}
+                        <section className="lead-interaction-calendar w-full" aria-label="30-day interaction calendar">
                       {(() => {
                         // Get first touchpoint date
                         const firstTouchpoint = new Date(lead?.created_at || lead?.timestamp || new Date())
@@ -1576,107 +1598,113 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         // Day names (Sunday = 0, Monday = 1, etc.)
                         const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
                         
-                        // Calculate number of weeks needed (30 days can span 5 weeks)
-                        const numWeeks = Math.ceil(30 / 7)
+                        // Get the day of week for the first touchpoint (0 = Sunday, 1 = Monday, etc.)
+                        const firstDayOfWeek = firstTouchpoint.getDay()
+                        
+                        // Calculate number of weeks needed (30 days + empty cells at start)
+                        const totalCells = firstDayOfWeek + 30
+                        const numWeeks = Math.ceil(totalCells / 7)
+                        
+                        // Group days into weeks (each week has 7 days, starting from Sunday)
+                        const weeks: Array<Array<{ date: Date; dateStr: string; count: number; dayOfWeek: number } | null>> = []
+                        for (let weekIndex = 0; weekIndex < numWeeks; weekIndex++) {
+                          const weekDays: Array<{ date: Date; dateStr: string; count: number; dayOfWeek: number } | null> = []
+                          
+                          // For each day of week (Sunday to Saturday = 0 to 6)
+                          for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                            // Calculate the absolute day index
+                            const absoluteDayIndex = weekIndex * 7 + dayOfWeek - firstDayOfWeek
+                            
+                            if (absoluteDayIndex >= 0 && absoluteDayIndex < 30) {
+                              weekDays.push(allDays[absoluteDayIndex])
+                            } else {
+                              weekDays.push(null)
+                            }
+                          }
+                          weeks.push(weekDays)
+                        }
                         
                         return (
-                          <div className="flex flex-col gap-2">
-                            {/* Day rows - 7 rows (Sunday to Saturday) */}
-                            {[0, 1, 2, 3, 4, 5, 6].map((targetDayOfWeek) => {
-                              // Find all days in the 30-day period that fall on this day of week
-                              const daysForThisRow = allDays.filter(d => d.dayOfWeek === targetDayOfWeek)
-                              
-                              // Group into weeks (each week can have at most 1 day of this type)
-                              const weekCells: Array<{ date: Date; dateStr: string; count: number } | null> = []
-                              
-                              for (let weekIndex = 0; weekIndex < numWeeks; weekIndex++) {
-                                // Find the day that falls in this week
-                                const dayInWeek = daysForThisRow.find(day => {
-                                  const daysFromStart = Math.floor((day.date.getTime() - firstTouchpoint.getTime()) / (1000 * 60 * 60 * 24))
-                                  const weekStart = weekIndex * 7
-                                  const weekEnd = weekStart + 7
-                                  return daysFromStart >= weekStart && daysFromStart < weekEnd
-                                })
-                                
-                                if (dayInWeek) {
-                                  weekCells.push(dayInWeek)
-                                } else {
-                                  weekCells.push(null)
-                                }
-                              }
-                              
-                              return (
-                                <div key={targetDayOfWeek} className="flex items-center gap-2">
-                                  {/* Day label on left */}
-                                  <div className="w-12 text-sm text-gray-500 dark:text-gray-400 text-right pr-3 font-medium flex-shrink-0">
-                                    {dayNames[targetDayOfWeek]}
-                                  </div>
-                                  {/* Days across weeks */}
-                                  <div className="flex flex-1" style={{ gap: '8px' }}>
-                                    {weekCells.map((day, weekIndex) => {
-                                      if (!day) {
-                                        // Empty cell
-                                        return (
-                                          <div
-                                            key={`${targetDayOfWeek}-${weekIndex}`}
-                                            className="w-5 h-5 flex-shrink-0"
-                                          />
-                                        )
-                                      }
-                                      
-                                      // Color intensity mapping with larger dots
-                                      let opacity = 0.1
-                                      let size = 20 // Bigger dots
-                                      
-                                      if (day.count === 0) {
-                                        opacity = 0.08 // Barely visible
-                                      } else if (day.count >= 1 && day.count <= 2) {
-                                        opacity = 0.5 // Medium opacity
-                                      } else if (day.count >= 3 && day.count <= 5) {
-                                        opacity = 0.85 // Bright accent
-                                      } else if (day.count > 5) {
-                                        opacity = 1.0 // Full accent
-                                      }
-                                      
-                                      // Format date for tooltip
-                                      const dateStr = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                      
+                          <div className="lead-calendar-container flex flex-col gap-1">
+                            {/* Day labels row at top */}
+                            <div className="lead-calendar-header grid grid-cols-7 gap-3 mb-2" role="row">
+                              {dayNames.map((dayName, index) => (
+                                <div key={index} className="lead-calendar-day-label text-center text-xs text-gray-500 dark:text-gray-400 font-medium" role="columnheader">
+                                  {dayName}
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* Week rows */}
+                            <div className="lead-calendar-weeks flex flex-col gap-2">
+                              {weeks.map((week, weekIndex) => (
+                                <div key={weekIndex} className="lead-calendar-week grid grid-cols-7 gap-3" role="row">
+                                  {week.map((day, dayIndex) => {
+                                    if (!day) {
+                                      // Empty cell (beyond 30 days)
                                       return (
                                         <div
-                                          key={`${day.dateStr}-${weekIndex}`}
-                                          className="rounded-full cursor-pointer transition-all hover:scale-125 flex-shrink-0"
-                                          style={{
-                                            width: `${size}px`,
-                                            height: `${size}px`,
-                                            backgroundColor: 'var(--accent-primary)',
-                                            opacity: opacity,
-                                            minWidth: '20px',
-                                            minHeight: '20px',
-                                          }}
-                                          title={`${dateStr}: ${day.count} message${day.count !== 1 ? 's' : ''}`}
+                                          key={`${weekIndex}-${dayIndex}`}
+                                          className="lead-calendar-empty-cell w-4 h-4 flex-shrink-0"
+                                          aria-hidden="true"
                                         />
                                       )
-                                    })}
-                                  </div>
+                                    }
+                                    
+                                    // Color intensity mapping
+                                    let opacity = 0.1
+                                    let size = 16
+                                    
+                                    if (day.count === 0) {
+                                      opacity = 0.08 // Barely visible
+                                    } else if (day.count >= 1 && day.count <= 2) {
+                                      opacity = 0.5 // Medium opacity
+                                    } else if (day.count >= 3 && day.count <= 5) {
+                                      opacity = 0.85 // Bright accent
+                                    } else if (day.count > 5) {
+                                      opacity = 1.0 // Full accent
+                                    }
+                                    
+                                    // Format date for tooltip
+                                    const dateStr = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                    
+                                    return (
+                                      <div
+                                        key={day.dateStr}
+                                        className="lead-calendar-day rounded cursor-pointer transition-all hover:scale-110 flex-shrink-0"
+                                        style={{
+                                          width: `${size}px`,
+                                          height: `${size}px`,
+                                          backgroundColor: 'var(--accent-primary)',
+                                          opacity: opacity,
+                                          minWidth: '16px',
+                                          minHeight: '16px',
+                                        }}
+                                        title={`${dateStr}: ${day.count} message${day.count !== 1 ? 's' : ''}`}
+                                        aria-label={`${dateStr}: ${day.count} message${day.count !== 1 ? 's' : ''}`}
+                                        role="gridcell"
+                                      />
+                                    )
+                                  })}
                                 </div>
-                              )
-                            })}
+                              ))}
+                            </div>
                           </div>
                         )
                       })()}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-center py-4 text-gray-500 dark:text-gray-400">
-                    No interaction data available
-                  </div>
-                )}
-              </div>
+                        </section>
+                      </div>
+                    ) : (
+                      <div className="lead-interaction-empty text-sm text-center py-4 text-gray-500 dark:text-gray-400">
+                        No interaction data available
+                      </div>
+                    )}
+                  </section>
                 )}
               </div>
             )}
-          </div>
-        </div>
+          </main>
+        </dialog>
       </div>
 
       {/* Activity Logger Modal */}
