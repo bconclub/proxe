@@ -298,13 +298,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className={`min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
+    <div className={`login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
       darkMode ? 'bg-[#0D0D0D]' : 'bg-[#f6f6f6]'
     }`}>
       {/* Dark Mode Toggle */}
       <button
         onClick={toggleDarkMode}
-        className={`fixed top-4 right-4 p-2 rounded-full transition-colors ${
+        className={`login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors ${
           darkMode 
             ? 'bg-[#1A1A1A] text-white hover:bg-[#262626] border border-[#262626]' 
             : 'bg-[#ececec] text-black hover:bg-[#d0d0d0]'
@@ -314,48 +314,48 @@ export default function LoginPage() {
         {darkMode ? '☀️' : '🌙'}
       </button>
 
-      <div className={`max-w-md w-full rounded-2xl shadow-xl p-8 ${
+      <div className={`login-page-card max-w-md w-full rounded-2xl shadow-xl p-8 ${
         darkMode ? 'bg-[#1A1A1A] border border-[#262626]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
       }`}>
-        <div className="space-y-8">
+        <div className="login-page-card-content space-y-8">
           {/* Logo and Title */}
-          <div className="text-center">
-            <div className="mx-auto w-16 h-16 mb-4 flex items-center justify-center">
+          <div className="login-page-header text-center">
+            <div className="login-page-logo-container mx-auto w-16 h-16 mb-4 flex items-center justify-center">
               <Image 
-                src={darkMode ? "/PROXE Icon.svg" : "/PROXE Icon Black.svg"}
-                alt="PROXe HQ" 
+                src="/windchasers-icon.png"
+                alt="Windchasers" 
                 width={64}
                 height={64}
-                className="w-full h-full object-contain"
+                className="login-page-logo w-full h-full object-contain"
               />
             </div>
-            <h2 className={`text-3xl font-normal font-exo-2 ${
+            <h2 className={`login-page-title text-3xl font-normal font-exo-2 ${
               darkMode ? 'text-white' : 'text-black'
             }`}>
               Sign in
             </h2>
-            <p className={`mt-2 text-sm font-zen-dots ${
+            <p className={`login-page-subtitle mt-2 text-sm font-zen-dots ${
               darkMode ? 'text-gray-400' : 'text-gray-600'
             }`}>
-              PROXe HQ
+              Windchasers
             </p>
           </div>
 
             {/* Error Message */}
             {error && (
-              <div className={`rounded-lg p-4 border ${
+              <div className={`login-page-error-message rounded-lg p-4 border ${
                 darkMode 
                   ? 'bg-[#0D0D0D] border-red-500/50' 
                   : 'bg-red-50 border-red-200'
               }`}>
-                <div className={`text-sm flex items-start gap-2 ${
+                <div className={`login-page-error-content text-sm flex items-start gap-2 ${
                   darkMode ? 'text-red-400' : 'text-red-600'
                 }`}>
-                  <span className="flex-shrink-0">⚠️</span>
-                  <div className="flex-1">
-                    <div>{error}</div>
+                  <span className="login-page-error-icon flex-shrink-0">⚠️</span>
+                  <div className="login-page-error-text flex-1">
+                    <div className="login-page-error-message-text">{error}</div>
                     {rateLimited && rateLimitCountdown !== null && (
-                      <div className={`mt-2 text-xs font-medium ${
+                      <div className={`login-page-error-countdown mt-2 text-xs font-medium ${
                         darkMode ? 'text-red-300' : 'text-red-700'
                       }`}>
                         Time remaining: {Math.floor(rateLimitCountdown / 60)}:{(rateLimitCountdown % 60).toString().padStart(2, '0')}
@@ -364,7 +364,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 {error.includes('wait') || error.includes('Rate limited') && (
-                  <div className={`mt-2 text-xs ${
+                  <div className={`login-page-error-tip mt-2 text-xs ${
                     darkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
                     💡 <strong>Tip:</strong> Use Google login below - it has separate rate limits and should work immediately.
@@ -374,10 +374,10 @@ export default function LoginPage() {
             )}
 
           {/* Login Form */}
-          <form className="space-y-5" onSubmit={handleLogin}>
+          <form className="login-page-form space-y-5" onSubmit={handleLogin}>
             {/* Email Field */}
-            <div>
-              <label htmlFor="email" className={`block text-sm font-medium mb-2 ${
+            <div className="login-page-form-field">
+              <label htmlFor="email" className={`login-page-form-label block text-sm font-medium mb-2 ${
                 darkMode ? 'text-gray-300' : 'text-gray-700'
               }`}>
                 Email
@@ -388,7 +388,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
+                className={`login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                   darkMode
                     ? 'bg-[#0D0D0D] border-[#262626] text-white placeholder-gray-500 focus:ring-[#333333] focus:border-[#333333]'
                     : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#d0d0d0] focus:border-[#d0d0d0]'
@@ -400,20 +400,20 @@ export default function LoginPage() {
             </div>
 
             {/* Password Field */}
-            <div>
-              <label htmlFor="password" className={`block text-sm font-medium mb-2 ${
+            <div className="login-page-form-field">
+              <label htmlFor="password" className={`login-page-form-label block text-sm font-medium mb-2 ${
                 darkMode ? 'text-gray-300' : 'text-gray-700'
               }`}>
                 Password
               </label>
-              <div className="relative">
+              <div className="login-page-form-password-container relative">
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className={`w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
+                  className={`login-page-form-input-password w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                     darkMode
                       ? 'bg-[#0D0D0D] border-[#262626] text-white placeholder-gray-500 focus:ring-[#333333] focus:border-[#333333]'
                       : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#d0d0d0] focus:border-[#d0d0d0]'
@@ -425,7 +425,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${
+                  className={`login-page-form-password-toggle absolute right-3 top-1/2 -translate-y-1/2 ${
                     darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -438,7 +438,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || rateLimited}
-              className={`w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
+              className={`login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
                 darkMode
                   ? 'bg-white text-black hover:bg-gray-100 focus:ring-gray-700'
                   : 'bg-black text-white hover:bg-gray-900 focus:ring-gray-400'
@@ -453,13 +453,13 @@ export default function LoginPage() {
           </form>
 
           {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
+          <div className="login-page-divider relative">
+            <div className="login-page-divider-line absolute inset-0 flex items-center">
               <div className={`w-full border-t ${
                 darkMode ? 'border-[#262626]' : 'border-[#d0d0d0]'
               }`}></div>
             </div>
-            <div className="relative flex justify-center text-sm">
+            <div className="login-page-divider-text relative flex justify-center text-sm">
               <span className={`px-2 ${
                 darkMode ? 'bg-[#1A1A1A] text-gray-500' : 'bg-[#ffffff] text-gray-500'
               }`}>
@@ -471,13 +471,13 @@ export default function LoginPage() {
           {/* Google Login Button */}
           <button
             onClick={handleGoogleLogin}
-            className={`w-full py-3 px-4 rounded-lg border font-medium transition-colors flex items-center justify-center gap-3 ${
+            className={`login-page-google-button w-full py-3 px-4 rounded-lg border font-medium transition-colors flex items-center justify-center gap-3 ${
               darkMode
                 ? 'bg-[#0D0D0D] border-[#262626] text-white hover:bg-[#1A1A1A]'
                 : 'bg-[#ffffff] border-[#d0d0d0] text-black hover:bg-[#f6f6f6]'
             }`}
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="login-page-google-icon w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
               />
@@ -495,20 +495,20 @@ export default function LoginPage() {
           </button>
 
           {/* Access Info */}
-          <div className="text-center">
-            <p className={`text-xs font-exo-2 ${
+          <div className="login-page-footer text-center">
+            <p className={`login-page-footer-text text-xs font-exo-2 ${
               darkMode ? 'text-gray-500' : 'text-gray-500'
             }`}>
               New? Deploy{' '}
               <a
-                href="https://goproxe.com"
+                href="https://windchasers.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`hover:underline ${
+                className={`login-page-footer-link hover:underline ${
                   darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
                 }`}
               >
-                PROXe
+                Windchasers
               </a>
             </p>
           </div>
