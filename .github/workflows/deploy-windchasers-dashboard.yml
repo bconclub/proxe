@@ -3,6 +3,7 @@ name: Deploy Windchasers Dashboard
 on:
   push:
     branches:
+      - production
       - main
     paths:
       - 'brand/windchasers/build/**'
