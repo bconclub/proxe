@@ -1,178 +1,192 @@
-# PROXe COMMAND CENTER
+# Command Center - Brand-Based Dashboard Structure
 
-A comprehensive Next.js dashboard application for managing leads, bookings, and metrics from multiple channels (Web Agent, WhatsApp, Voice).
+This repository contains standalone Next.js dashboard applications for multiple brands, organized in a brand-based folder structure.
 
-## Features
+## 📁 Repository Structure
 
-- 🔐 **Authentication System** - Secure login with Supabase Auth
-- 👥 **Leads Management** - Real-time leads dashboard with filtering and export
-- 📅 **Bookings Calendar** - View and manage scheduled demos and calls
-- 📈 **Metrics Dashboard** - Comprehensive analytics with charts and KPIs
-- 🔄 **Real-time Updates** - Live data synchronization using Supabase Realtime
-- 🔌 **API Integrations** - Webhooks for WhatsApp and Voice APIs
-
-## Tech Stack
-
-- **Next.js 14** (App Router)
-- **TypeScript**
-- **Supabase** (Database + Auth + Realtime)
-- **Recharts** (Data visualization)
-- **Tailwind CSS** (Styling)
-
-## Getting Started
-
-### Quick Setup Guide
-
-For detailed step-by-step instructions, see **[SETUP_GUIDE.md](./SETUP_GUIDE.md)**
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn
-- Supabase account and project
-- Environment variables configured
-
-### Installation
-
-1. **Install dependencies:**
-```bash
-npm install
+```
+Command Center/
+├── brand/
+│   ├── proxe/
+│   │   ├── build/              # Complete PROXe Next.js application
+│   │   │   ├── src/            # Source code
+│   │   │   ├── public/         # Public assets
+│   │   │   ├── package.json    # Dependencies & scripts
+│   │   │   └── ...
+│   │   ├── supabase/           # Database files
+│   │   │   └── migrations/     # SQL migration files
+│   │   └── docs/               # Documentation
+│   │
+│   └── windchasers/
+│       ├── build/              # Complete Windchasers Next.js application
+│       ├── supabase/           # Database files
+│       └── docs/               # Documentation
+│
+├── BRAND_SEPARATION.md          # Brand separation documentation
+├── RUN_DASHBOARDS.md            # How to run both dashboards
+├── SUPABASE_ENV_VARIABLES.md   # Environment variable setup
+└── CLEANUP_AUDIT_REPORT.md     # Cleanup audit report
 ```
 
-2. **Set up environment variables:**
-   - Copy `.env.local.example` to `.env.local`
-   - Fill in your Supabase credentials (see SETUP_GUIDE.md for details)
+## 🚀 Quick Start
 
-3. **Set up Supabase:**
-   - Create Supabase project
-   - Run database migrations (`supabase/migrations/`)
-   - Enable Realtime for `all_leads` table
-   - Create admin user (see SETUP_GUIDE.md)
+Each brand dashboard is a **complete, standalone Next.js application** that can be run independently.
 
-4. **Run the development server:**
+### PROXe Dashboard
+
 ```bash
+# Navigate to PROXe build directory (IMPORTANT: must be in build/ folder)
+cd brand/proxe/build
+
+# Install dependencies (first time only)
+npm install
+
+# Run development server
 npm run dev
 ```
 
-5. **Access the dashboard:**
-   - Open [http://localhost:3000](http://localhost:3000)
-   - Login with admin credentials (default: proxeadmin@proxe.com / proxepass)
+**⚠️ Important:** You must be inside the `build/` directory. The `package.json` is located at `brand/proxe/build/package.json`, not in the root or `brand/proxe/`.
 
-## Project Structure
+The PROXe dashboard will be available at: **http://localhost:4000**
 
-```
-/dashboard-repo
-  /app
-    /api          # API routes for data aggregation
-    /dashboard    # Dashboard pages
-    /auth         # Authentication pages
-  /src
-    /components   # Dashboard components
-    /lib          # Utilities, Supabase client
-    /hooks        # Custom hooks for real-time data
-    /types        # TypeScript types
-  /supabase
-    /migrations   # Database schema migrations
-```
+### Windchasers Dashboard
 
-## Database Schema
-
-The dashboard uses the following main tables:
-
-- `dashboard_users` - User accounts with roles (admin, viewer)
-- `user_invitations` - Invitation tokens for adding new users
-- `dashboard_settings` - Dashboard configuration
-- `all_leads` - Unified lead table across all channels
-- `web_sessions`, `whatsapp_sessions`, `voice_sessions`, `social_sessions` - Channel-specific lead data
-- `unified_leads` - View combining leads from all sources for dashboard display
-
-## API Routes
-
-### Dashboard APIs
-- `GET /api/dashboard/leads` - Fetch leads with filtering and pagination
-- `GET /api/dashboard/bookings` - Fetch scheduled bookings
-- `GET /api/dashboard/metrics` - Get aggregated metrics
-
-### Authentication APIs
-- `POST /api/auth/invite` - Create user invitation (admin only)
-
-### Integration APIs
-- `GET/POST /api/integrations/web-agent` - Web Agent API integration
-- `POST /api/integrations/whatsapp` - WhatsApp webhook endpoint
-- `POST /api/integrations/voice` - Voice API webhook endpoint
-
-## Features in Detail
-
-### Leads Dashboard
-- Real-time updates when new leads are added
-- Filter by date range, source channel, and status
-- Export leads to CSV
-- Pagination support
-
-### Bookings Calendar
-- View upcoming bookings
-- Filter by date
-- Display booking details (name, email, phone, time)
-
-### Metrics Dashboard
-- Key metrics cards (total conversations, active conversations, conversion rate)
-- Charts: Conversations over time, Leads by source, Conversion funnel, Response time trends
-
-### Real-time Updates
-- Uses Supabase Realtime subscriptions
-- Automatically updates when data changes
-- Fallback to polling if Realtime unavailable
-
-## Development
-
-### Type Checking
 ```bash
-npm run type-check
+# Navigate to Windchasers build directory (IMPORTANT: must be in build/ folder)
+cd brand/windchasers/build
+
+# Install dependencies (first time only)
+npm install
+
+# Run development server
+npm run dev
 ```
 
-### Linting
-```bash
-npm run lint
-```
+**⚠️ Important:** You must be inside the `build/` directory. The `package.json` is located at `brand/windchasers/build/package.json`, not in the root or `brand/windchasers/`.
 
-### Building for Production
+The Windchasers dashboard will be available at: **http://localhost:4001**
+
+## 📦 Brand Structure Details
+
+### `build/` Directory
+
+Each `brand/[brand]/build/` directory contains a **complete Next.js application**:
+
+- **`src/`** - All source code (components, pages, API routes, etc.)
+- **`public/`** - Static assets (images, icons, etc.)
+- **`package.json`** - Dependencies and npm scripts
+- **`next.config.js`** - Next.js configuration
+- **`tsconfig.json`** - TypeScript configuration
+- **`.env.local`** - Environment variables (create from `env.example.txt`)
+
+**To work on a brand:**
+1. `cd brand/[brand]/build`
+2. `npm install` (if needed)
+3. `npm run dev`
+
+### `supabase/` Directory
+
+Contains database-related files:
+
+- **`migrations/`** - SQL migration files (numbered sequentially)
+- **`*-schema.sql`** - Complete schema files (if any)
+
+**To apply migrations:**
+1. Use Supabase CLI or dashboard
+2. Run migrations in order (001, 002, 003, etc.)
+
+### `docs/` Directory
+
+Contains brand-specific documentation:
+
+- Setup guides
+- API documentation
+- Deployment instructions
+- Brand-specific notes
+
+## 🔧 Environment Setup
+
+### PROXe Dashboard
+
+1. Copy environment template:
+   ```bash
+   cd brand/proxe/build
+   cp env.example.txt .env.local
+   ```
+
+2. Edit `.env.local` with PROXe Supabase credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-proxe-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-proxe-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-proxe-service-key
+   ```
+
+### Windchasers Dashboard
+
+1. Copy environment template:
+   ```bash
+   cd brand/windchasers/build
+   cp env.example.txt .env.local
+   ```
+
+2. Edit `.env.local` with Windchasers Supabase credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-windchasers-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-windchasers-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-windchasers-service-key
+   ```
+
+**Important:** Each brand uses a **separate Supabase project**. Do not share credentials between brands.
+
+## 🏗️ Building for Production
+
+### PROXe Dashboard
+
 ```bash
+cd brand/proxe/build
 npm run build
 npm start
 ```
 
-## Deployment
+### Windchasers Dashboard
 
-The dashboard can be deployed to:
-- **Vercel** (recommended for Next.js)
-- **Netlify**
-- **Any Node.js hosting platform**
+```bash
+cd brand/windchasers/build
+npm run build
+npm start
+```
 
-Make sure to:
-1. Set environment variables in your hosting platform
-2. Run database migrations on your Supabase project
-3. Configure CORS settings if needed
+## 📚 Additional Documentation
 
-## Security
+- **[BRAND_SEPARATION.md](./BRAND_SEPARATION.md)** - Details about brand separation architecture
+- **[RUN_DASHBOARDS.md](./RUN_DASHBOARDS.md)** - Instructions for running both dashboards simultaneously
+- **[SUPABASE_ENV_VARIABLES.md](./SUPABASE_ENV_VARIABLES.md)** - Environment variable configuration guide
+- **`brand/[brand]/docs/`** - Brand-specific documentation
 
-- Row Level Security (RLS) policies protect database access
-- Authentication required for all dashboard routes
-- Role-based access control (admin/viewer)
-- API key verification for webhook endpoints
+## 🎯 Key Principles
 
-## Future Enhancements
+1. **Complete Separation** - Each brand is a standalone application with no shared code
+2. **Independent Deployment** - Each brand can be deployed separately
+3. **Brand-Specific Config** - Each brand has its own:
+   - Supabase project
+   - Environment variables
+   - Theme/branding
+   - Documentation
 
-- [ ] Google Calendar integration
-- [ ] Email notifications for new leads
-- [ ] Advanced reporting and analytics
-- [ ] Lead notes and activity tracking
-- [ ] Custom dashboard widgets
-- [ ] Mobile app support
+## 🔍 Finding Files
 
-## License
+- **Source Code:** `brand/[brand]/build/src/`
+- **Database Migrations:** `brand/[brand]/supabase/migrations/`
+- **Documentation:** `brand/[brand]/docs/`
+- **Public Assets:** `brand/[brand]/build/public/`
 
-[Your License Here]
+## ⚠️ Important Notes
 
-## Support
+- **No shared code** between brands - each `build/` directory is independent
+- **Different ports** - PROXe (4000), Windchasers (4001) to run simultaneously
+- **Separate Supabase projects** - Each brand has its own database
+- **Build artifacts** (`.next/`, `node_modules/`) are in each `build/` directory
 
-For issues and questions, please contact [your support email].
+---
 
+**Last Updated:** After brand-based restructuring

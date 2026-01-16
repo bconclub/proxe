@@ -1,0 +1,81 @@
+name: Deploy Windchasers Dashboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'brand/windchasers/build/**'
+      - '.github/workflows/deploy-windchasers-dashboard.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
+      
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.WINDCHASERS_VPS_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to VPS via Rsync
+        run: |
+          rsync -avz --delete \
+            --exclude='.env.local' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.git' \
+            --exclude='*.log' \
+            --exclude='.DS_Store' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            brand/windchasers/build/ \
+            ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/
+      
+      - name: Build and Restart on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.WINDCHASERS_VPS_HOST }}
+          username: ${{ secrets.WINDCHASERS_VPS_USER }}
+          key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
+          port: 22
+          timeout: 300s
+          script: |
+            cd /var/www/windchasers-proxe
+            
+            # Preserve existing .env.local if it exists
+            if [ ! -f .env.local ]; then
+              echo "⚠️  Warning: .env.local not found on VPS. Please create it manually."
+            fi
+            
+            # Install dependencies (production)
+            echo "📦 Installing dependencies..."
+            npm ci --production
+            
+            # Build the application
+            echo "🏗️  Building Next.js application..."
+            npm run build
+            
+            # Restart or start with PM2
+            echo "🔄 Restarting application with PM2..."
+            PORT=3003 pm2 restart windchasers-proxe || PORT=3003 pm2 start npm --name windchasers-proxe -- start
+            
+            # Save PM2 configuration
+            pm2 save
+            
+            # Wait for app to start
+            sleep 5
+            
+            # Health check
+            curl -f http://localhost:3003/health || echo "⚠️  Health check failed"
+            
+            # Show PM2 status
+            echo "✅ Deployment complete. PM2 status:"
+            pm2 list | grep windchasers-proxe || echo "⚠️  Process not found in PM2 list"

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Connection Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Supabase Connection Test</h1>
+    <p>Testing: <strong>wflwsyaejscxmattmiskp.supabase.co</strong></p>
+    <div id="result">Testing...</div>
+    
+    <script>
+        const url = 'https://wflwsyaejscxmattmiskp.supabase.co/rest/v1/';
+        const resultDiv = document.getElementById('result');
+        
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'apikey': 'test'
+            }
+        })
+        .then(response => {
+            resultDiv.innerHTML = '<p class="success">✅ SUCCESS! Project is active and reachable.</p><p>Status: ' + response.status + '</p>';
+        })
+        .catch(error => {
+            if (error.message.includes('Failed to fetch') || error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+                resultDiv.innerHTML = '<p class="error">❌ FAILED: DNS cannot resolve domain.</p><p><strong>Project is likely PAUSED.</strong></p><p>Go to <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a> and resume the project.</p>';
+            } else {
+                resultDiv.innerHTML = '<p class="error">❌ ERROR: ' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html>
