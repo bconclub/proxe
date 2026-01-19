@@ -478,19 +478,23 @@ export default function InboxPage() {
         throw error
       }
       
-      console.log('Fetched messages:', data?.length || 0, 'messages')
-      if (data && data.length > 0) {
-        console.log('Sample message:', data[0])
+      const messagesData = (data ?? []) as Array<{ channel?: string | null }>
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:481',message:'fetchMessages result',data:{count:messagesData.length,hasFirst:!!messagesData[0],firstKeys:messagesData[0]?Object.keys(messagesData[0]).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H10'})}).catch(()=>{});
+      // #endregion agent log
+      console.log('Fetched messages:', messagesData.length, 'messages')
+      if (messagesData.length > 0) {
+        console.log('Sample message:', messagesData[0])
         // If we got messages but no channel was selected, set the channel from the first message
-        if (!selectedChannel && data[0].channel) {
-          console.log('Setting channel from first message:', data[0].channel)
-          setSelectedChannel(data[0].channel)
+        if (!selectedChannel && messagesData[0].channel) {
+          console.log('Setting channel from first message:', messagesData[0].channel)
+          setSelectedChannel(messagesData[0].channel)
         }
       } else {
         console.log('No messages found for lead:', leadId)
       }
       
-      setMessages(data || [])
+      setMessages(messagesData)
     } catch (err) {
       console.error('Error in fetchMessages:', err)
       setMessages([])
