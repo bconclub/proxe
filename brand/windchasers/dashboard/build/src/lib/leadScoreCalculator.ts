@@ -99,8 +99,9 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
     // Response rate is already 0-1 (e.g., 0.52 for 52%)
     
     // Recency score (days since last interaction)
+    const typedLeadData = leadData as any
     const lastInteraction = 
-      leadData.last_interaction_at || 
+      typedLeadData.last_interaction_at || 
       unifiedContext.whatsapp?.last_interaction ||
       unifiedContext.web?.last_interaction ||
       unifiedContext.voice?.last_interaction ||
