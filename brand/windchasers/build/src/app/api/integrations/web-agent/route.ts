@@ -415,6 +415,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Update unified_context with profile and Windchasers data
+      if (!leadId) {
+        throw new Error('Lead ID is required but was not found')
+      }
       await updateWebContext(supabase, leadId, {
         customer_name: name,
         customer_email: email,
