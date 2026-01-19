@@ -3,10 +3,39 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+// In-memory cache for metrics (30 seconds TTL)
+interface CachedMetrics {
+  data: any
+  timestamp: number
+  hotLeadThreshold: number
+}
+
+let metricsCache: CachedMetrics | null = null
+const CACHE_TTL = 30000 // 30 seconds in milliseconds
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const searchParams = request.nextUrl.searchParams
+    const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+    
+    // Check cache
+    const now = Date.now()
+    if (
+      metricsCache &&
+      metricsCache.hotLeadThreshold === hotLeadThreshold &&
+      (now - metricsCache.timestamp) < CACHE_TTL
+    ) {
+      // Return cached data
+      return NextResponse.json(metricsCache.data, {
+        headers: {
+          'X-Cache': 'HIT',
+          'Cache-Control': 'private, max-age=30',
+        },
+      })
+    }
+
+    // Cache miss - proceed with database queries
+    const supabase = await createClient()
     
     // Get all leads with full data (booking_date/booking_time don't exist in all_leads)
     const { data: leads, error: leadsError } = await supabase
@@ -1043,7 +1072,8 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime * 10) / 10 }) // Round to 1 decimal
     }
 
-    return NextResponse.json({
+    // Prepare response data
+    const responseData = {
       hotLeads: {
         count: hotLeads.length,
         leads: hotLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
@@ -1127,6 +1157,20 @@ export async function GET(request: NextRequest) {
         responseRate: dailyTrends.responseRate.map(d => ({ value: d.value })),
         bookingRate: dailyTrends.bookingRate.map(d => ({ value: d.value })),
         avgResponseTime: dailyTrends.avgResponseTime.map(d => ({ value: d.value })),
+      },
+    }
+    
+    // Cache the response
+    metricsCache = {
+      data: responseData,
+      timestamp: Date.now(),
+      hotLeadThreshold,
+    }
+    
+    return NextResponse.json(responseData, {
+      headers: {
+        'X-Cache': 'MISS',
+        'Cache-Control': 'private, max-age=30',
       },
     })
   } catch (error) {

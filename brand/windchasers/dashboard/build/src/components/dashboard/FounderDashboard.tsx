@@ -83,10 +83,31 @@ export default function FounderDashboard() {
   const [showThresholdDropdown, setShowThresholdDropdown] = useState(false)
 
   useEffect(() => {
+    // Initial load
     loadMetrics()
-    // Refresh every 30 seconds
-    const interval = setInterval(loadMetrics, 30000)
-    return () => clearInterval(interval)
+    
+    // Only poll when component is visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMetrics()
+      }
+    }
+    
+    // Poll every 60 seconds (1 minute) instead of 30 seconds
+    const interval = setInterval(() => {
+      // Only poll if page is visible
+      if (document.visibilityState === 'visible') {
+        loadMetrics()
+      }
+    }, 60000)
+    
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [hotLeadThreshold])
 
   const loadMetrics = async () => {
