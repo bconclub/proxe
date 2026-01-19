@@ -99,9 +99,10 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
     // Response rate is already 0-1 (e.g., 0.52 for 52%)
     
     // Recency score (days since last interaction)
-    const typedLeadData = leadData as any
+    // Note: last_interaction_at is defined in the Lead interface but TypeScript may not infer it correctly
+    // Using optional chaining to safely access the property
     const lastInteraction = 
-      typedLeadData.last_interaction_at || 
+      leadData.last_interaction_at || 
       unifiedContext.whatsapp?.last_interaction ||
       unifiedContext.web?.last_interaction ||
       unifiedContext.voice?.last_interaction ||
