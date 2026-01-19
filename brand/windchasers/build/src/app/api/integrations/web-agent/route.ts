@@ -515,6 +515,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Update unified_context.web with message data
+      if (!leadId) {
+        throw new Error('Lead ID is required but was not found')
+      }
       await updateWebContext(supabase, leadId, {
         message_count: newMessageCount,
         last_interaction: now,
@@ -663,6 +666,9 @@ export async function POST(request: NextRequest) {
       if (updateSessionError) throw updateSessionError
 
       // Update unified_context
+      if (!leadId) {
+        throw new Error('Lead ID is required but was not found')
+      }
       await updateWebContext(supabase, leadId, {
         conversation_summary: conversation_summary,
         booking_status: booking_status,
@@ -759,6 +765,9 @@ export async function POST(request: NextRequest) {
     if (webSessionError) throw webSessionError
 
     // Update unified_context
+    if (!leadId) {
+      throw new Error('Lead ID is required but was not found')
+    }
     await updateWebContext(supabase, leadId, {
       customer_name: name,
       customer_email: email,
