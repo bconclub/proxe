@@ -17,6 +17,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Increment build version
+        working-directory: brand/windchasers/dashboard/build
+        run: |
+          node scripts/increment-build.js
+      
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add brand/windchasers/dashboard/build/package.json brand/windchasers/dashboard/build/.build-info
+          git commit -m "chore: auto-increment build version [skip ci]" || echo "No changes to commit"
+          git push || echo "Nothing to push"
       
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -38,7 +58,7 @@ jobs:
             --exclude='*.log' \
             --exclude='.DS_Store' \
             -e "ssh -o StrictHostKeyChecking=no" \
-            brand/windchasers/build/ \
+            brand/windchasers/dashboard/build/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/
       
       - name: Build and Restart on VPS

@@ -76,10 +76,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
   const [buildDate, setBuildDate] = useState<string>('')
+  const [buildVersion, setBuildVersion] = useState<string>('1.0.0')
   
-  // Get build/deployment date (only on client to avoid hydration mismatch)
+  // Get build/deployment date and version (only on client to avoid hydration mismatch)
   useEffect(() => {
-    setBuildDate(getBuildDate())
+    // Fetch build info from API
+    fetch('/api/build-info')
+      .then(res => res.json())
+      .then(data => {
+        setBuildVersion(data.version || '1.0.0')
+        // Use buildDate from API if available, otherwise fallback to getBuildDate()
+        if (data.buildDate) {
+          setBuildDate(data.buildDate)
+        } else {
+          setBuildDate(getBuildDate())
+        }
+      })
+      .catch(() => {
+        // Fallback to existing method if API fails
+        setBuildDate(getBuildDate())
+      })
   }, [])
 
   // AUTHENTICATION DISABLED - Client-side auth check commented out
@@ -589,14 +605,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   color: 'white',
                 }}
               >
-                v1.0.0
+                v{buildVersion}
               </div>
               <p 
                 className="dashboard-layout-version-date text-xs mt-1"
                 style={{ color: 'var(--text-secondary)' }}
                 suppressHydrationWarning
               >
-                Updated: {buildDate || 'Loading...'}
+                Build {buildDate || 'Loading...'}
               </p>
             </div>
           )}
@@ -608,9 +624,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   backgroundColor: 'var(--accent-primary)',
                   color: 'white',
                 }}
-                title={buildDate ? `v1.0.0 - Updated: ${buildDate}` : 'v1.0.0'}
+                title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
               >
-                v1.0
+                v{buildVersion.split('.').slice(0, 2).join('.')}
               </div>
             </div>
           )}

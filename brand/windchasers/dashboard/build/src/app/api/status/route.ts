@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import fs from 'fs'
+import path from 'path'
 
 export const dynamic = 'force-dynamic'
+
+// Helper to read version from package.json
+function getVersion(): string {
+  try {
+    const packageJsonPath = path.join(process.cwd(), 'package.json')
+    if (fs.existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
+      return packageJson.version || '1.0.0'
+    }
+  } catch {
+    // Fallback to default version
+  }
+  return '1.0.0'
+}
 
 interface StatusResponse {
   systemHealth: {
@@ -69,7 +85,7 @@ export async function GET(request: NextRequest) {
   try {
     const status: StatusResponse = {
       systemHealth: {
-        version: '1.0.0', // From package.json
+        version: getVersion(), // From package.json
         status: 'ok',
         timestamp: new Date().toISOString(),
       },
