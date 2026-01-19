@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { Database } from '@/types/database.types'
 
@@ -18,52 +19,41 @@ export async function POST(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
     const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
     
-    let response = NextResponse.next()
-    
+    const cookieStore = await cookies()
+
     const supabase = createServerClient<Database>(
       supabaseUrl,
       supabaseAnonKey,
       {
         cookies: {
           get(name: string) {
-            return request.cookies.get(name)?.value
+            return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            })
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-              sameSite: 'lax' as const,
-              secure: process.env.NODE_ENV === 'production',
-              httpOnly: options.httpOnly ?? false,
-            })
+            try {
+              cookieStore.set({
+                name,
+                value,
+                ...options,
+                sameSite: 'lax' as const,
+                secure: process.env.NODE_ENV === 'production',
+                httpOnly: options.httpOnly ?? false,
+              })
+            } catch (error) {
+              // Cookie setting can fail in some contexts
+            }
           },
           remove(name: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            })
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
+            try {
+              cookieStore.set({
+                name,
+                value: '',
+                ...options,
+                maxAge: 0,
+              })
+            } catch (error) {
+              // Cookie removal can fail in some contexts
+            }
           },
         },
       }
@@ -97,42 +87,18 @@ export async function POST(request: NextRequest) {
     // Log success in development
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Sync session: Successfully synced session for user:', user.email)
-      const allCookies = response.cookies.getAll()
+      const allCookies = cookieStore.getAll()
       const supabaseCookies = allCookies.filter(c => c.name.includes('sb-'))
       console.log('✅ Cookies set:', supabaseCookies.map(c => ({ name: c.name, hasValue: !!c.value })))
     }
     
-    // Create JSON response and copy all cookies from the response object
-    const jsonResponse = NextResponse.json(
+    return NextResponse.json(
       { 
         success: true, 
         user: { id: user.id, email: user.email },
         message: 'Session synced to cookies'
       }
     )
-    
-    // Copy all cookies from the response to the JSON response
-    // This ensures cookies are sent back to the client
-    response.cookies.getAll().forEach(cookie => {
-      jsonResponse.cookies.set({
-        name: cookie.name,
-        value: cookie.value,
-        path: cookie.path || '/',
-        domain: cookie.domain,
-        sameSite: 'lax' as const,
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: cookie.name.includes('auth-token') || cookie.name.includes('sb-'),
-        maxAge: cookie.maxAge,
-      })
-    })
-    
-    // Also copy any Set-Cookie headers from the response
-    const setCookieHeaders = response.headers.getSetCookie()
-    setCookieHeaders.forEach(cookie => {
-      jsonResponse.headers.append('Set-Cookie', cookie)
-    })
-    
-    return jsonResponse
   } catch (error) {
     console.error('Sync session error:', error)
     return NextResponse.json(
@@ -148,52 +114,41 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
     const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
     
-    let response = NextResponse.next()
-    
+    const cookieStore = await cookies()
+
     const supabase = createServerClient<Database>(
       supabaseUrl,
       supabaseAnonKey,
       {
         cookies: {
           get(name: string) {
-            return request.cookies.get(name)?.value
+            return cookieStore.get(name)?.value
           },
           set(name: string, value: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            })
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-              sameSite: 'lax' as const,
-              secure: process.env.NODE_ENV === 'production',
-              httpOnly: options.httpOnly ?? false,
-            })
+            try {
+              cookieStore.set({
+                name,
+                value,
+                ...options,
+                sameSite: 'lax' as const,
+                secure: process.env.NODE_ENV === 'production',
+                httpOnly: options.httpOnly ?? false,
+              })
+            } catch (error) {
+              // Cookie setting can fail in some contexts
+            }
           },
           remove(name: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            })
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
+            try {
+              cookieStore.set({
+                name,
+                value: '',
+                ...options,
+                maxAge: 0,
+              })
+            } catch (error) {
+              // Cookie removal can fail in some contexts
+            }
           },
         },
       }
@@ -229,9 +184,6 @@ export async function GET(request: NextRequest) {
         success: true, 
         user: { id: user.id, email: user.email },
         hasUser: !!user
-      },
-      {
-        headers: response.headers,
       }
     )
   } catch (error) {
