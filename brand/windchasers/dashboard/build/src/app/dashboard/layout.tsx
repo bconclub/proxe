@@ -26,9 +26,6 @@ export default async function Layout({
       data: { user },
       error,
     } = await supabase.auth.getUser()
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:29',message:'auth.getUser result',data:{hasUser:!!user,errorStatus:(error as any)?.status || null,errorMessage:error?.message || null,nodeEnv:process.env.NODE_ENV || null},timestamp:Date.now(),sessionId:'debug-session',runId:'auth-redirect',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion agent log
 
     // Debug logging
     if (process.env.NODE_ENV === 'development') {
@@ -53,9 +50,6 @@ export default async function Layout({
     // Handle errors gracefully
     if (error) {
       const errorStatus = (error as any)?.status
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:51',message:'auth error branch',data:{errorStatus:errorStatus || null,willRedirect:errorStatus === 400 || errorStatus === 401 || process.env.NODE_ENV !== 'development'},timestamp:Date.now(),sessionId:'debug-session',runId:'auth-redirect',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion agent log
       
       // Rate limit - allow access but log warning
       if (errorStatus === 429) {
@@ -65,9 +59,6 @@ export default async function Layout({
       // Invalid session or unauthorized - redirect to login
       else if (errorStatus === 400 || errorStatus === 401) {
         console.warn('🚫 Dashboard layout: Invalid session, redirecting to login')
-        // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:61',message:'redirecting due to invalid session',data:{errorStatus:errorStatus || null},timestamp:Date.now(),sessionId:'debug-session',runId:'auth-redirect',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion agent log
         redirect('/auth/login')
       }
       // Other errors - log but don't block in development
@@ -83,9 +74,6 @@ export default async function Layout({
     // If no user and no error, redirect to login
     if (!user && !error) {
       console.warn('🚫 Dashboard layout: No user found, redirecting to login')
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard/layout.tsx:75',message:'redirecting due to missing user',data:{hasUser:false,hasError:!!error},timestamp:Date.now(),sessionId:'debug-session',runId:'auth-redirect',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion agent log
       redirect('/auth/login')
     }
 
