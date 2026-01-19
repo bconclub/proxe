@@ -55,14 +55,22 @@ export default function WebAgentSettingsClient() {
 
   return (
     <DashboardLayout>
-      <div style={{ width: '100%', height: '100vh', position: 'relative', display: 'flex', overflow: 'hidden' }}>
+      <div style={{ 
+        width: 'calc(100% + 64px)',
+        height: 'calc(100vh - 48px)', 
+        margin: '-24px -32px',
+        padding: 0,
+        position: 'relative',
+        display: 'flex', 
+        overflow: 'hidden',
+      }}>
         {/* Installation Code Panel - Left Side */}
         {showCodePanel && (
           <div 
             style={{
               width: '400px',
-              height: '100vh',
-              position: 'fixed',
+              height: '100%',
+              position: 'relative',
               left: 0,
               top: 0,
               backgroundColor: 'var(--bg-secondary)',
@@ -135,7 +143,7 @@ export default function WebAgentSettingsClient() {
           style={{
             width: showCodePanel ? 'calc(100% - 400px)' : '100%',
             marginLeft: showCodePanel ? '400px' : '0',
-            height: '100vh',
+            height: '100%',
             position: 'relative',
             backgroundColor: 'var(--bg-primary)',
             display: 'flex',
