@@ -132,6 +132,17 @@ jobs:
               exit 1
             fi
             
+            # Check for CSS files
+            if [ -d ".next/static/css" ]; then
+              CSS_COUNT=$(find .next/static/css -name "*.css" | wc -l)
+              echo "✅ Found $CSS_COUNT CSS files"
+              if [ "$CSS_COUNT" -eq 0 ]; then
+                echo "⚠️  WARNING: No CSS files found - styling may be broken"
+              fi
+            else
+              echo "⚠️  WARNING: .next/static/css directory not found - CSS may not be generated"
+            fi
+            
             # Verify build manifest exists
             if [ -f ".next/BUILD_MANIFEST" ] || [ -f ".next/build-manifest.json" ]; then
               echo "✅ Build manifest found"
