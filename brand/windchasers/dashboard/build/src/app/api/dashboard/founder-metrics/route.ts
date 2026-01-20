@@ -19,11 +19,11 @@ export async function GET(request: NextRequest) {
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
     
     // Check cache
-    const now = Date.now()
+    const cacheNow = Date.now()
     if (
       metricsCache &&
       metricsCache.hotLeadThreshold === hotLeadThreshold &&
-      (now - metricsCache.timestamp) < CACHE_TTL
+      (cacheNow - metricsCache.timestamp) < CACHE_TTL
     ) {
       // Return cached data
       return NextResponse.json(metricsCache.data, {
@@ -274,7 +274,7 @@ export async function GET(request: NextRequest) {
     console.log(`  - Previous 7D: ${previous7DUniqueConversations} (for trend: ${trend7D}%)`)
 
     // 1. Hot Leads (score >= threshold, default 70)
-    const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+    // hotLeadThreshold already defined at the top of the function
     const hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
 
     // 2. Today's Activity
