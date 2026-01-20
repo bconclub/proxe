@@ -84,6 +84,11 @@ jobs:
               echo "⚠️  Warning: .env.local not found on VPS. Please create it manually."
             fi
             
+            # Clean previous build to avoid chunk mismatches
+            echo "🧹 Cleaning previous build..."
+            rm -rf .next
+            rm -rf node_modules/.cache
+            
             # Install dependencies (need dev deps for build)
             echo "📦 Installing dependencies..."
             npm ci
@@ -108,16 +113,33 @@ jobs:
               exit 1
             fi
             
-            # Check for BUILD_ID (may not exist in all Next.js versions)
+            # Verify critical build files exist
             if [ -f ".next/BUILD_ID" ]; then
-              echo "✅ BUILD_ID found"
+              echo "✅ BUILD_ID found: $(cat .next/BUILD_ID)"
             else
               echo "⚠️  WARNING: BUILD_ID not found, but build may still be successful"
-              echo ".next directory contents:"
-              ls -la .next | head -10
             fi
             
-            echo "✅ Build successful - .next directory exists"
+            # Check for static chunks directory
+            if [ -d ".next/static/chunks" ]; then
+              CHUNK_COUNT=$(find .next/static/chunks -name "*.js" | wc -l)
+              echo "✅ Found $CHUNK_COUNT chunk files"
+              if [ "$CHUNK_COUNT" -lt 10 ]; then
+                echo "⚠️  WARNING: Very few chunks found, build might be incomplete"
+              fi
+            else
+              echo "❌ ERROR: .next/static/chunks directory not found!"
+              exit 1
+            fi
+            
+            # Verify build manifest exists
+            if [ -f ".next/BUILD_MANIFEST" ] || [ -f ".next/build-manifest.json" ]; then
+              echo "✅ Build manifest found"
+            else
+              echo "⚠️  WARNING: Build manifest not found"
+            fi
+            
+            echo "✅ Build verification complete"
             
             # Create logs directory if it doesn't exist
             mkdir -p logs
@@ -138,10 +160,28 @@ jobs:
             pm2 save
             
             # Wait for app to start
-            sleep 5
+            echo "⏳ Waiting for app to start..."
+            sleep 10
             
-            # Health check
-            curl -f http://localhost:3003/health || echo "⚠️  Health check failed"
+            # Health check with retries
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:3003/health > /dev/null 2>&1; then
+                echo "✅ Health check passed"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+                sleep 3
+              fi
+            done
+            
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "⚠️  Health check failed after $MAX_RETRIES attempts"
+              echo "Checking PM2 logs..."
+              pm2 logs windchasers-dashboard --lines 20 --nostream || true
+            fi
             
             # Show PM2 status
             echo "✅ Deployment complete. PM2 status:"

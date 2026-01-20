@@ -42,6 +42,16 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // Cache static chunks with versioning to prevent stale chunks
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ]
   },
 }
