@@ -243,4 +243,18 @@ jobs:
             
             # Show PM2 status
             echo "✅ Deployment complete. PM2 status:"
-            pm2 list | grep windchasers-proxe || echo "⚠️  Process not found in PM2 list"
+            pm2 list | grep windchasers || echo "⚠️  Process not found in PM2 list"
+            
+            # Verify what's actually running
+            echo ""
+            echo "🔍 Verification:"
+            echo "---------------"
+            echo "PM2 process details:"
+            pm2 describe windchasers-dashboard 2>/dev/null | head -30 || echo "Process not found"
+            echo ""
+            echo "Checking if app is responding:"
+            sleep 5
+            curl -s http://localhost:3003 | head -50 || echo "App not responding on port 3003"
+            echo ""
+            echo "Checking for static HTML files that might interfere:"
+            find /var/www/windchasers-proxe -name "*.html" -type f | head -10 || echo "No HTML files found"
