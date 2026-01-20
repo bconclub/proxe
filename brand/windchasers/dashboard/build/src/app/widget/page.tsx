@@ -306,7 +306,7 @@ export default function WidgetPage() {
               <p style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px', lineHeight: '1.6' }}>
                 1. Deploy the web-agent server separately or serve it from the same domain<br/>
                 2. Set <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>NEXT_PUBLIC_WEB_AGENT_URL</code> environment variable<br/>
-                3. Or ensure the web-agent is accessible at: <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>{typeof window !== 'undefined' ? window.location.origin : 'https://proxe.windchasers.in'}/widget</code>
+                3. Or ensure the web-agent is accessible at: <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>https://pilot.windchasers.in</code>
               </p>
             </div>
           )}

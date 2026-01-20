@@ -51,7 +51,7 @@ export default function WebAgentSettingsClient() {
     }
   }
 
-  const embedCode = `<script src="https://proxe.windchasers.in/widget/embed.js"></script>`
+  const embedCode = `<script src="https://pilot.windchasers.in/widget/embed.js"></script>`
 
   return (
     <DashboardLayout>

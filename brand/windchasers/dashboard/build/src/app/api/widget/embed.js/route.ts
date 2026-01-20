@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 export async function GET() {
   try {
     // Get the base URL for API calls
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.windchasers.in'
+    const baseUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL || 'https://pilot.windchasers.in'
     const apiUrl = `${baseUrl}/api/chat`
 
     // Generate the widget initialization script
