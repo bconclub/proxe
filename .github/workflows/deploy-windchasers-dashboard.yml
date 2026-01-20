@@ -95,7 +95,13 @@ jobs:
             
             # Build the application
             echo "🏗️  Building Next.js application..."
-            npm run build
+            echo "This may take several minutes..."
+            npm run build 2>&1 | tee build.log || {
+              echo "❌ Build command failed!"
+              echo "Last 50 lines of build output:"
+              tail -50 build.log || true
+              exit 1
+            }
             
             # Check build exit code
             BUILD_EXIT_CODE=$?
@@ -124,11 +130,21 @@ jobs:
             if [ -d ".next/static/chunks" ]; then
               CHUNK_COUNT=$(find .next/static/chunks -name "*.js" | wc -l)
               echo "✅ Found $CHUNK_COUNT chunk files"
-              if [ "$CHUNK_COUNT" -lt 10 ]; then
-                echo "⚠️  WARNING: Very few chunks found, build might be incomplete"
+              if [ "$CHUNK_COUNT" -lt 50 ]; then
+                echo "❌ ERROR: Only $CHUNK_COUNT chunks found - build is incomplete!"
+                echo "Expected at least 50 chunks. Build may have failed silently."
+                echo "Checking build logs..."
+                exit 1
               fi
             else
               echo "❌ ERROR: .next/static/chunks directory not found!"
+              exit 1
+            fi
+            
+            # Verify BUILD_ID exists (critical for Next.js)
+            if [ ! -f ".next/BUILD_ID" ]; then
+              echo "❌ ERROR: BUILD_ID file not found - build is incomplete!"
+              echo "Next.js requires BUILD_ID for proper static file serving."
               exit 1
             fi
             

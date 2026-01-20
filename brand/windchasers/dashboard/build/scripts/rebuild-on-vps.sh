@@ -24,7 +24,13 @@ npm ci
 
 # Build
 echo "🏗️  Building application..."
-npm run build
+echo "This may take several minutes..."
+npm run build 2>&1 | tee build.log || {
+  echo "❌ Build command failed!"
+  echo "Last 50 lines of build output:"
+  tail -50 build.log || true
+  exit 1
+}
 
 # Verify build
 if [ ! -d ".next" ]; then
@@ -32,11 +38,31 @@ if [ ! -d ".next" ]; then
   exit 1
 fi
 
+# Check BUILD_ID (critical)
+if [ ! -f ".next/BUILD_ID" ]; then
+  echo "❌ ERROR: BUILD_ID file not found - build is incomplete!"
+  exit 1
+fi
+echo "✅ BUILD_ID found: $(cat .next/BUILD_ID)"
+
+# Check chunks
 CHUNK_COUNT=$(find .next/static/chunks -name "*.js" 2>/dev/null | wc -l)
-if [ "$CHUNK_COUNT" -lt 10 ]; then
-  echo "⚠️  WARNING: Only $CHUNK_COUNT chunks found, build might be incomplete"
+if [ "$CHUNK_COUNT" -lt 50 ]; then
+  echo "❌ ERROR: Only $CHUNK_COUNT chunks found - build is incomplete!"
+  echo "Expected at least 50 chunks. Checking build.log for errors..."
+  tail -50 build.log || true
+  exit 1
 else
   echo "✅ Found $CHUNK_COUNT chunk files"
+fi
+
+# Check CSS files
+if [ -d ".next/static/css" ]; then
+  CSS_COUNT=$(find .next/static/css -name "*.css" 2>/dev/null | wc -l)
+  echo "✅ Found $CSS_COUNT CSS files"
+  if [ "$CSS_COUNT" -eq 0 ]; then
+    echo "⚠️  WARNING: No CSS files found - styling may be broken"
+  fi
 fi
 
 # Restart
