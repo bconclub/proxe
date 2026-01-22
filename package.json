@@ -1,0 +1,18 @@
+{
+  "name": "command-center",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"proxe,dashboard,web-agent\" -c \"green,cyan,magenta\" \"npm run dev:proxe\" \"npm run dev:dashboard\" \"npm run dev:web-agent\"",
+    "dev:proxe": "cd brand/proxe/build && npm run dev",
+    "dev:dashboard": "cd brand/windchasers/dashboard/build && npm run dev:dashboard",
+    "dev:web-agent": "cd brand/windchasers/web-agent/build && npm run dev",
+    "build": "npm run build:proxe && npm run build:dashboard && npm run build:web-agent",
+    "build:proxe": "cd brand/proxe/build && npm run build",
+    "build:dashboard": "cd brand/windchasers/dashboard/build && npm run build",
+    "build:web-agent": "cd brand/windchasers/web-agent/build && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
