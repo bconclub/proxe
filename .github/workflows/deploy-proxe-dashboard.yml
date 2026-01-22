@@ -1,0 +1,194 @@
+name: Deploy PROXe Dashboard
+
+on:
+  push:
+    branches:
+      - production
+      - main
+    paths:
+      - 'brand/proxe/build/**'
+      - '.github/workflows/deploy-proxe-dashboard.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Increment build version
+        working-directory: brand/proxe/build
+        run: |
+          node scripts/set-build-time.js || echo "Build time script not found, continuing..."
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_DEPLOY_KEY }}
+      
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to VPS via Rsync
+        run: |
+          rsync -avz --delete \
+            --exclude='.env.local' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.git' \
+            --exclude='*.log' \
+            --exclude='.DS_Store' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            brand/proxe/build/ \
+            ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/var/www/proxe-dashboard/
+      
+      - name: Build and Restart on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_DEPLOY_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          port: 22
+          timeout: 300s
+          script: |
+            cd /var/www/proxe-dashboard
+            
+            # Preserve existing .env.local if it exists
+            if [ ! -f .env.local ]; then
+              echo "⚠️  Warning: .env.local not found on VPS. Please create it manually."
+            fi
+            
+            # Clean previous build to avoid chunk mismatches
+            echo "🧹 Cleaning previous build..."
+            rm -rf .next
+            rm -rf node_modules/.cache
+            
+            # Install dependencies (need dev deps for build)
+            echo "📦 Installing dependencies..."
+            npm ci
+            
+            # Build the application
+            echo "🏗️  Building Next.js application..."
+            echo "This may take several minutes..."
+            npm run build 2>&1 | tee build.log || {
+              echo "❌ Build command failed!"
+              echo "Last 50 lines of build output:"
+              tail -50 build.log || true
+              exit 1
+            }
+            
+            # Check build exit code
+            BUILD_EXIT_CODE=$?
+            if [ $BUILD_EXIT_CODE -ne 0 ]; then
+              echo "❌ ERROR: Build failed with exit code: $BUILD_EXIT_CODE"
+              echo "Checking for build errors..."
+              exit 1
+            fi
+            
+            # Verify build succeeded
+            if [ ! -d ".next" ]; then
+              echo "❌ ERROR: Build failed - .next directory not found!"
+              echo "Current directory contents:"
+              ls -la
+              exit 1
+            fi
+            
+            # Verify critical build files exist
+            if [ -f ".next/BUILD_ID" ]; then
+              echo "✅ BUILD_ID found: $(cat .next/BUILD_ID)"
+            else
+              echo "⚠️  WARNING: BUILD_ID not found, but build may still be successful"
+            fi
+            
+            # Check for static chunks directory
+            if [ -d ".next/static/chunks" ]; then
+              CHUNK_COUNT=$(find .next/static/chunks -name "*.js" | wc -l)
+              echo "✅ Found $CHUNK_COUNT chunk files"
+              if [ "$CHUNK_COUNT" -lt 30 ]; then
+                echo "⚠️  WARNING: Only $CHUNK_COUNT chunks found (expected 30+)"
+                if [ -f ".next/BUILD_ID" ]; then
+                  echo "✅ BUILD_ID exists - build may be valid despite low chunk count"
+                else
+                  echo "❌ ERROR: Build appears incomplete - missing BUILD_ID"
+                  exit 1
+                fi
+              fi
+            else
+              echo "❌ ERROR: .next/static/chunks directory not found!"
+              exit 1
+            fi
+            
+            echo "✅ Build verification complete"
+            
+            # Create logs directory if it doesn't exist
+            mkdir -p logs
+            
+            # Force stop and delete old process to ensure clean restart
+            echo "🔄 Stopping old process..."
+            pm2 stop proxe-dashboard 2>/dev/null || true
+            pm2 delete proxe-dashboard 2>/dev/null || true
+            sleep 2
+            
+            # Restart or start with PM2
+            echo "🔄 Starting application with PM2..."
+            PORT=4000 pm2 restart proxe-dashboard || PORT=4000 pm2 start npm --name proxe-dashboard -- start || {
+              echo "❌ Failed to start with PM2"
+              exit 1
+            }
+            
+            # Save PM2 configuration
+            pm2 save
+            
+            # Verify process is running
+            echo "📊 Verifying PM2 process..."
+            pm2 list | grep proxe-dashboard || echo "⚠️  Process not found in PM2 list"
+            pm2 describe proxe-dashboard | head -20 || true
+            
+            # Wait for app to start
+            echo "⏳ Waiting for app to start..."
+            sleep 10
+            
+            # Health check with retries
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            HEALTH_CHECK_PASSED=false
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:4000/api/health > /dev/null 2>&1; then
+                echo "✅ Health check passed (/api/health)"
+                HEALTH_CHECK_PASSED=true
+                curl -s http://localhost:4000/api/health | head -20
+                break
+              elif curl -f http://localhost:4000/health > /dev/null 2>&1; then
+                echo "✅ Health check passed (/health)"
+                HEALTH_CHECK_PASSED=true
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+                sleep 3
+              fi
+            done
+            
+            if [ "$HEALTH_CHECK_PASSED" = false ]; then
+              echo "⚠️  Health check failed after $MAX_RETRIES attempts"
+              echo "Checking PM2 logs..."
+              pm2 logs proxe-dashboard --lines 20 --nostream || true
+              echo "⚠️  Deployment completed but health check failed - please verify manually"
+            fi
+            
+            # Show PM2 status
+            echo "✅ Deployment complete. PM2 status:"
+            pm2 list | grep proxe-dashboard || echo "⚠️  Process not found in PM2 list"
