@@ -1,0 +1,180 @@
+.loadingOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.8s ease-out, backdrop-filter 0.8s ease-out, -webkit-backdrop-filter 0.8s ease-out;
+  pointer-events: auto;
+  animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loadingOverlay.fadeOut {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loadingContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 400px;
+  padding: 0 40px;
+}
+
+@media (max-width: 768px) {
+  .loadingContent {
+    max-width: 380px;
+  }
+}
+
+.loadingBarWrapper {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.loadingBar {
+  height: 100%;
+  background: linear-gradient(90deg, 
+    #8B2FD9 0%, 
+    #FF6BFF 20%,
+    #A03BA8 40%, 
+    #FF6BFF 60%,
+    #8B2FD9 80%,
+    #FF6BFF 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 
+    0 0 20px rgba(255, 107, 255, 1),
+    0 0 40px rgba(160, 59, 168, 0.8),
+    0 0 60px rgba(139, 47, 217, 0.6),
+    inset 0 0 10px rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  transition: width 0.1s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.loadingBar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  animation: none;
+}
+
+/* Enable animations only on mobile */
+@media (max-width: 768px) {
+  .loadingBar {
+    animation: loadingBarFlow 1s linear infinite, tubeGlow 1.5s ease-in-out infinite;
+  }
+
+  .loadingBar::before {
+    animation: tubeShine 1s ease-in-out infinite;
+  }
+}
+
+@keyframes tubeShine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes tubeGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(255, 107, 255, 1),
+      0 0 40px rgba(160, 59, 168, 0.8),
+      0 0 60px rgba(139, 47, 217, 0.6),
+      inset 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(255, 107, 255, 1.2),
+      0 0 60px rgba(160, 59, 168, 1),
+      0 0 90px rgba(139, 47, 217, 0.8),
+      inset 0 0 15px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.loadingPercentage {
+  font-family: var(--font-exo2), 'Exo 2', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.1em;
+}
+
+@keyframes loadingBarFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+[data-theme="warm-frost"] .loadingBar {
+  background: linear-gradient(90deg, 
+    #C4A574 0%, 
+    #D4B88A 25%, 
+    #8B6B4A 50%, 
+    #D4B88A 75%, 
+    #C4A574 100%
+  );
+  background-size: 200% 100%;
+  box-shadow: 0 0 10px rgba(212, 184, 138, 0.6);
+}
+

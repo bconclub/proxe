@@ -1,0 +1,73 @@
+/* Master Theme CSS Variables - Black/White/Gray Palette */
+[data-brand="master"],
+[data-theme="default"] {
+  /* Main Colors - Black/White/Gray Palette */
+  --chatbox-bg: #000000;
+  --accent-1: #FFFFFF; /* White */
+  --accent-2: #000000; /* Black */
+  --accent-3: #666666; /* Medium Gray */
+  --accent-4: #CCCCCC; /* Light Gray */
+  --accent-5: #333333; /* Dark Gray */
+  --accent-6: #999999; /* Medium-Light Gray */
+  --accent-7: #E5E5E5; /* Very Light Gray */
+  
+  /* Theme Colors */
+  --primary-color: #000000;
+  --primary-light: #FFFFFF;
+  --primary-dark: #000000;
+  --primary-vibrant: #666666;
+  
+  /* Backgrounds */
+  --dark-bg: #000000;
+  --dark-card: rgba(255, 255, 255, 0.1);
+  --dark-surface: rgba(255, 255, 255, 0.05);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --white: #FFFFFF;
+  
+  /* Borders */
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.2);
+  --border-accent: rgba(255, 255, 255, 0.3);
+  --border-glow: rgba(255, 255, 255, 0.4);
+  --border-color: rgba(255, 255, 255, 0.15);
+  --chat-border-color: rgba(255, 255, 255, 0.2);
+  
+  /* Other */
+  --green-success: #10B981;
+  --cyan-accent: #666666;
+  --bg-header: rgba(0, 0, 0, 0.9);
+  --bg-message-area: rgba(255, 255, 255, 0.02);
+  --bg-primary: rgba(0, 0, 0, 0.05);
+  --bg-hover: rgba(255, 255, 255, 0.1);
+  --bg-active: rgba(255, 255, 255, 0.15);
+  
+  /* Bubble backgrounds - Black/White/Gray */
+  /* User bubble: Light gray/white tint */
+  --bubble-user-bg: rgba(255, 255, 255, 0.15);
+  --bubble-user-border: rgba(255, 255, 255, 0.4);
+  --bubble-user-shadow: 0 8px 32px rgba(255, 255, 255, 0.1);
+  
+  /* AI bubble: Dark gray/black tint */
+  --bubble-ai-bg: rgba(0, 0, 0, 0.3);
+  --bubble-ai-border: rgba(255, 255, 255, 0.2);
+  --bubble-ai-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  
+  /* Buttons */
+  --button-bg: rgba(255, 255, 255, 0.1);
+  --button-hover: rgba(255, 255, 255, 0.2);
+  --button-active: rgba(255, 255, 255, 0.3);
+  
+  /* Blur */
+  --blur-sm: blur(8px);
+  --blur-md: blur(12px);
+  --blur-lg: blur(16px);
+  --blur-xl: blur(24px);
+}

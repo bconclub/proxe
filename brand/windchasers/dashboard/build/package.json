@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"dashboard,web-agent\" -c \"cyan,magenta\" \"npm run dev:dashboard\" \"npm run dev:web-agent\"",
-    "dev:dashboard": "next dev -p 4001",
+    "dev:dashboard": "next dev -p 4002",
     "dev:web-agent": "cd ../../web-agent/build && npm run dev",
     "prebuild": "node scripts/set-build-time.js",
-    "build": "NEXT_PUBLIC_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ) next build",
-    "start": "next start -p ${PORT:-4001}",
+    "build": "next build",
+    "start": "next start -p ${PORT:-4002}",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },

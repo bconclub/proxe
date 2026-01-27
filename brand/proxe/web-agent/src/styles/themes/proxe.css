@@ -1,0 +1,73 @@
+/* PROXe Theme CSS Variables - New Purple Palette */
+[data-brand="proxe"],
+[data-theme="purple-frost"] {
+  /* Main Colors - Updated to match new theme */
+  --chatbox-bg: #0F0D0F;
+  --accent-1: #5B1A8C; /* Main Purple */
+  --accent-2: #2B4A7D; /* Blue-Purple */
+  --accent-3: #A03BA8; /* Lighter Purple */
+  --accent-4: #6EA5D4; /* Light Blue */
+  --accent-5: #5B1A8C; /* Main Purple */
+  --accent-6: #A03BA8; /* Lighter Purple */
+  --accent-7: #6EA5D4; /* Light Blue */
+  
+  /* Theme Colors - Updated to new purple scheme */
+  --primary-color: #5B1A8C;
+  --primary-light: #FDFEFD;
+  --primary-dark: #2B4A7D;
+  --primary-vibrant: #A03BA8;
+  
+  /* Backgrounds */
+  --dark-bg: #0F0D0F;
+  --dark-card: rgba(91, 26, 140, 0.3);
+  --dark-surface: rgba(43, 74, 125, 0.4);
+  --glass-bg: rgba(91, 26, 140, 0.05);
+  --glass-border: rgba(253, 254, 253, 0.1);
+  --glass-shadow: rgba(91, 26, 140, 0.2);
+  
+  /* Text */
+  --text-primary: #FDFEFD;
+  --text-secondary: rgba(253, 254, 253, 0.7);
+  --text-tertiary: rgba(253, 254, 253, 0.5);
+  --text-muted: rgba(253, 254, 253, 0.4);
+  --white: #FDFEFD;
+  
+  /* Borders */
+  --border-light: rgba(253, 254, 253, 0.08);
+  --border-medium: rgba(253, 254, 253, 0.12);
+  --border-accent: rgba(91, 26, 140, 0.3);
+  --border-glow: rgba(91, 26, 140, 0.4);
+  --border-color: rgba(91, 26, 140, 0.2);
+  
+  /* Other */
+  --green-success: #10B981;
+  --cyan-accent: #6EA5D4;
+  --bg-header: rgba(43, 74, 125, 0.85);
+  --bg-message-area: rgba(91, 26, 140, 0.03);
+  --bg-primary: rgba(43, 74, 125, 0.05);
+  --bg-hover: rgba(91, 26, 140, 0.12);
+  --bg-active: rgba(91, 26, 140, 0.15);
+  
+  /* Bubble backgrounds - Differentiated tints with higher opacity for visibility */
+  /* User bubble: Purple tint (#5B1A8C) - more visible with definitive borders */
+  --bubble-user-bg: rgba(91, 26, 140, 0.25);
+  --bubble-user-border: rgba(91, 26, 140, 0.7);
+  --bubble-user-shadow: 0 8px 32px rgba(91, 26, 140, 0.25);
+  
+  /* AI bubble: Blue-purple tint (#2B4A7D) - more visible with definitive borders */
+  --bubble-ai-bg: rgba(43, 74, 125, 0.3);
+  --bubble-ai-border: rgba(43, 74, 125, 0.7);
+  --bubble-ai-shadow: 0 8px 32px rgba(43, 74, 125, 0.25);
+  
+  /* Buttons */
+  --button-bg: rgba(91, 26, 140, 0.12);
+  --button-hover: rgba(91, 26, 140, 0.2);
+  --button-active: rgba(91, 26, 140, 0.3);
+  
+  /* Blur */
+  --blur-sm: blur(8px);
+  --blur-md: blur(12px);
+  --blur-lg: blur(16px);
+  --blur-xl: blur(24px);
+}
+

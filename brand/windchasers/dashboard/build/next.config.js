@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    trustProxy: true,
-  },
   eslint: {
     // Don't fail build on ESLint errors during production builds
     ignoreDuringBuilds: false,

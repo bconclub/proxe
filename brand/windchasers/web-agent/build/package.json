@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "node node_modules/.bin/next dev -p 4003",
+    "build": "node node_modules/.bin/next build",
+    "start": "node node_modules/.bin/next start",
+    "lint": "node node_modules/.bin/next lint"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

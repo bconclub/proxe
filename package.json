@@ -3,14 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"proxe,dashboard,web-agent\" -c \"green,cyan,magenta\" \"npm run dev:proxe\" \"npm run dev:dashboard\" \"npm run dev:web-agent\"",
-    "dev:proxe": "cd brand/proxe/build && npm run dev",
-    "dev:dashboard": "cd brand/windchasers/dashboard/build && npm run dev:dashboard",
-    "dev:web-agent": "cd brand/windchasers/web-agent/build && npm run dev",
-    "build": "npm run build:proxe && npm run build:dashboard && npm run build:web-agent",
-    "build:proxe": "cd brand/proxe/build && npm run build",
-    "build:dashboard": "cd brand/windchasers/dashboard/build && npm run build",
-    "build:web-agent": "cd brand/windchasers/web-agent/build && npm run build"
+    "dev": "node node_modules/.bin/concurrently -n \"master-dash,master-agent,proxe-dash,proxe-agent,wind-dash,wind-agent\" -c \"blue,blue,green,green,cyan,cyan\" \"npm run dev:master-dash\" \"npm run dev:master-agent\" \"npm run dev:proxe-dash\" \"npm run dev:proxe-agent\" \"npm run dev:windchasers-dash\" \"npm run dev:windchasers-agent\"",
+    "dev:master-dash": "cd brand/master/dashboard/build && npm run dev:dashboard",
+    "dev:master-agent": "cd brand/master/web-agent/build && npm run dev",
+    "dev:proxe-dash": "cd brand/proxe/dashboard/build && npm run dev",
+    "dev:proxe-agent": "cd brand/proxe/web-agent && npm run dev",
+    "dev:windchasers-dash": "cd brand/windchasers/dashboard/build && npm run dev:dashboard",
+    "dev:windchasers-agent": "cd brand/windchasers/web-agent/build && npm run dev",
+    "dev:master": "node node_modules/.bin/concurrently -n \"master-dash,master-agent\" -c \"blue,blue\" \"npm run dev:master-dash\" \"npm run dev:master-agent\"",
+    "dev:proxe": "node node_modules/.bin/concurrently -n \"proxe-dash,proxe-agent\" -c \"green,green\" \"npm run dev:proxe-dash\" \"npm run dev:proxe-agent\"",
+    "dev:windchasers": "node node_modules/.bin/concurrently -n \"wind-dash,wind-agent\" -c \"cyan,cyan\" \"npm run dev:windchasers-dash\" \"npm run dev:windchasers-agent\"",
+    "build": "npm run build:proxe && npm run build:windchasers",
+    "build:proxe": "cd brand/proxe/dashboard/build && npm run build",
+    "build:windchasers": "cd brand/windchasers/dashboard/build && npm run build",
+    "kill-ports": "bash scripts/kill-build-ports.sh"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

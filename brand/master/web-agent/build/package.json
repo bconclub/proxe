@@ -1,0 +1,31 @@
+{
+  "name": "master-website",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 4101",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "@calcom/embed-react": "^1.5.3",
+    "@supabase/supabase-js": "^2.38.4",
+    "googleapis": "^164.1.0",
+    "lottie-react": "^2.4.1",
+    "motion": "^12.23.24",
+    "next": "^14.2.33",
+    "ogl": "^1.0.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^3.4.1"
+  },
+  "devDependencies": {
+    "@next/swc-win32-x64-msvc": "^16.1.4",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.0"
+  }
+}

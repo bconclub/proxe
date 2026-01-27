@@ -1,0 +1,578 @@
+/* Calendar Container - Uses brand CSS variables */
+.calendarContainer {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--dark-card, rgba(0, 0, 0, 0.4));
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--border-accent, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  min-height: 500px;
+  box-sizing: border-box;
+}
+
+/* Vertical layout: Calendar on top, Time slots below (same as mobile) */
+.calendarLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.calendarSection {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.timeSlotsSection {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Calendar Header */
+.calendarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 12px;
+}
+
+.monthYear {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  text-transform: capitalize;
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  color: var(--text-primary, #ffffff);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.navButton:hover {
+  background: var(--bg-active, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+/* Month Grid */
+.monthGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.monthDaysHeader {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.monthDayHeader {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 6px 0;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthDaysGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.monthDateButton {
+  aspect-ratio: 1;
+  border: none;
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  color: var(--text-primary, #ffffff);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monthDateButton:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  color: var(--text-primary, #ffffff);
+}
+
+.monthDateOther {
+  opacity: 0.3;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.dateToday {
+  background: var(--primary-color, rgba(91, 26, 140, 0.3));
+  border: 2px solid var(--primary-color, rgba(91, 26, 140, 0.5));
+  color: var(--text-primary, #ffffff);
+}
+
+.dateSelected {
+  background: var(--primary-color, #5B1A8C);
+  color: var(--white, #ffffff);
+  font-weight: 600;
+  box-shadow: 0 4px 16px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+.datePast {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.datePast:hover:not(:disabled) {
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  transform: none;
+}
+
+/* Time Slots Section */
+.timeSlotsTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.timeSlotsList {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.timeSlot {
+  padding: 12px 16px;
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  color: var(--text-primary, #ffffff);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  width: 100%;
+}
+
+.timeSlot:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.timeSlotSelected {
+  background: var(--primary-color, #5B1A8C);
+  border-color: var(--primary-color, #5B1A8C);
+  color: var(--white, #ffffff);
+  font-weight: 600;
+  box-shadow: 0 4px 12px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+.timeSlotUnavailable {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.timeSlotUnavailable:hover {
+  background: rgba(0, 0, 0, 0.3);
+  transform: none;
+}
+
+.timeSlotsPlaceholder {
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.loadingText {
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.errorMessage {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ff6b6b;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.warningMessage {
+  background: rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fbbf24;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.closeButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 50%;
+  color: var(--text-primary, #ffffff);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: var(--bg-active, rgba(255, 255, 255, 0.2));
+  transform: scale(1.1);
+}
+
+.closeButton svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* Form View */
+.calendarContainer[data-view="form"] {
+  min-height: 400px;
+}
+
+.formContainer {
+  padding: 20px 0;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.formTitle {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.formSubtitle {
+  font-size: 16px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  margin-bottom: 32px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.bookingForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroup input {
+  padding: 14px 16px;
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 12px;
+  color: var(--text-primary, #ffffff);
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.formGroup input::placeholder {
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.formGroup input:focus {
+  outline: none;
+  border-color: var(--primary-color, rgba(91, 26, 140, 0.5));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.15));
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.backButton {
+  flex: 1;
+  padding: 14px;
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 12px;
+  color: var(--text-primary, #ffffff);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.submitButton {
+  flex: 2;
+  padding: 14px;
+  background: var(--primary-color, #5B1A8C);
+  border: none;
+  border-radius: 12px;
+  color: var(--white, #ffffff);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px var(--primary-color, rgba(91, 26, 140, 0.3));
+}
+
+.submitButton:hover {
+  background: var(--primary-vibrant, #A03BA8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+/* Confirmation View */
+.calendarContainer[data-view="confirmation"] {
+  min-height: 400px;
+}
+
+.confirmationContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 40px;
+  text-align: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.confirmationIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--greenSuccess, #10b981);
+  color: #ffffff;
+  font-size: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  flex-shrink: 0;
+}
+
+.confirmationTitle {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin: 0;
+  margin-bottom: 0;
+}
+
+.confirmationText {
+  font-size: 18px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.9));
+  margin: 0;
+  margin-bottom: 0;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.confirmationText span {
+  display: block;
+}
+
+.confirmationText strong {
+  color: var(--text-primary, #ffffff);
+  font-weight: 600;
+  font-size: 20px;
+  display: block;
+}
+
+.confirmationDetails {
+  font-size: 16px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+  margin: 0;
+  margin-top: 0;
+  line-height: 1.6;
+}
+
+.confirmationDetails strong {
+  color: var(--text-primary, #ffffff);
+  font-weight: 500;
+  display: block;
+  margin-top: 4px;
+}
+
+.calendarActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 400px;
+  margin-top: 4px;
+}
+
+.addToCalendarButton,
+.downloadICSButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  width: 100%;
+}
+
+.addToCalendarButton {
+  background: var(--primary-color, #5B1A8C);
+  color: var(--white, #ffffff);
+  box-shadow: 0 4px 16px var(--primary-color, rgba(91, 26, 140, 0.3));
+}
+
+.addToCalendarButton:hover {
+  background: var(--primary-vibrant, #A03BA8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+.downloadICSButton {
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  color: var(--text-primary, #ffffff);
+}
+
+.downloadICSButton:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.addToCalendarButton svg,
+.downloadICSButton svg {
+  flex-shrink: 0;
+}
+
+/* Brand-specific styling */
+[data-brand="proxe"] .dateSelected {
+  background: var(--primary-color, #5B1A8C);
+}
+
+[data-brand="proxe"] .timeSlotSelected {
+  background: var(--primary-color, #5B1A8C);
+}
+
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .calendarContainer {
+    padding: 16px;
+  }
+
+  /* Keep buttons inline on mobile - same as desktop */
+  .formActions {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .backButton {
+    flex: 1;
+  }
+
+  .submitButton {
+    flex: 2;
+  }
+}
