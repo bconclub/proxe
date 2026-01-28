@@ -37,7 +37,7 @@ export default function WidgetPage() {
     <div style={{ 
       width: '100vw', 
       height: '100vh',
-      backgroundColor: 'transparent',
+      backgroundColor: '#0F0A06', // Match widget theme dark background for visibility
       position: 'fixed',
       top: 0,
       left: 0,
@@ -45,7 +45,7 @@ export default function WidgetPage() {
       padding: 0,
       overflow: 'hidden'
     }}>
-      <ChatWidget apiUrl={apiUrl} widgetStyle="searchbar" />
+      <ChatWidget apiUrl={apiUrl} widgetStyle="bubble" />
     </div>
   )
 }

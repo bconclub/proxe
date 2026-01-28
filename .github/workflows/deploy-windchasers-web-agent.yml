@@ -48,6 +48,17 @@ jobs:
             brand/windchasers/web-agent/build/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-web-agent/
       
+      - name: Deploy PM2 Ecosystem Config
+        run: |
+          if [ -f brand/windchasers/web-agent/build/ecosystem.config.js ]; then
+            rsync -avz \
+              -e "ssh -o StrictHostKeyChecking=no" \
+              brand/windchasers/web-agent/build/ecosystem.config.js \
+              ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-web-agent/ecosystem.config.js
+          else
+            echo "⚠️  Ecosystem config not found, will use individual PM2 process"
+          fi
+      
       - name: Build and Restart on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -62,10 +73,27 @@ jobs:
             # Create logs directory if it doesn't exist
             mkdir -p logs
             
-            # Preserve existing .env.local if it exists
+            # Verify .env.local exists and contains required Supabase variables
             if [ ! -f .env.local ]; then
-              echo "⚠️  Warning: .env.local not found on VPS. Please create it manually."
+              echo "❌ ERROR: .env.local not found on VPS!"
+              echo "Please create .env.local with required Supabase credentials:"
+              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
+              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+              echo "  - WINDCHASERS_SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)"
+              echo "  - CLAUDE_API_KEY"
+              exit 1
             fi
+            
+            # Check for required Supabase environment variables
+            echo "🔍 Verifying Supabase environment variables..."
+            if ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local; then
+              echo "❌ ERROR: Required Supabase environment variables not found in .env.local"
+              echo "Missing variables:"
+              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
+              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+              exit 1
+            fi
+            echo "✅ Supabase environment variables found in .env.local"
             
             # Install dependencies (need dev deps for build)
             echo "📦 Installing dependencies..."
@@ -93,27 +121,111 @@ jobs:
             
             echo "✅ Build successful - .next directory exists"
             
-            # Restart using PM2 ecosystem (if exists) or individual process
-            echo "🔄 Restarting web-agent with PM2..."
-            if [ -f /var/www/windchasers-proxe/ecosystem.config.js ]; then
-              # Use ecosystem file if it exists
-              pm2 restart ecosystem.config.js --only windchasers-web-agent || \
-              pm2 start /var/www/windchasers-proxe/ecosystem.config.js --only windchasers-web-agent
+            # Deploy ecosystem config if it exists
+            if [ -f ecosystem.config.js ]; then
+              echo "✅ Ecosystem config found, will use for PM2"
+            else
+              echo "⚠️  Ecosystem config not found, will use individual PM2 process"
+            fi
+            
+            # Force stop and delete old process to ensure clean restart
+            echo "🔄 Stopping old process..."
+            pm2 stop windchasers-web-agent 2>/dev/null || true
+            pm2 delete windchasers-web-agent 2>/dev/null || true
+            pm2 stop ecosystem.config.js --only windchasers-web-agent 2>/dev/null || true
+            sleep 2
+            
+            # Restart using PM2 ecosystem (if exists in web-agent directory) or individual process
+            echo "🔄 Starting web-agent with PM2..."
+            if [ -f ecosystem.config.js ]; then
+              # Use ecosystem file from web-agent directory
+              pm2 start ecosystem.config.js --only windchasers-web-agent || {
+                echo "❌ Failed to start with ecosystem, trying fallback..."
+                PORT=3001 pm2 start npm --name windchasers-web-agent -- start
+              }
             else
               # Fallback to individual process
-              PORT=3001 pm2 restart windchasers-web-agent || \
               PORT=3001 pm2 start npm --name windchasers-web-agent -- start
             fi
             
             # Save PM2 configuration
             pm2 save
             
-            # Wait for app to start
-            sleep 5
+            # Save PM2 configuration
+            pm2 save
             
-            # Health check
-            curl -f http://localhost:3001/widget || echo "⚠️  Health check failed"
+            # Verify process is running
+            echo "📊 Verifying PM2 process..."
+            pm2 list | grep windchasers-web-agent || echo "⚠️  Process not found in PM2 list"
+            pm2 describe windchasers-web-agent | head -20 || true
+            
+            # Wait for app to start
+            echo "⏳ Waiting for app to start..."
+            sleep 10
+            
+            # Health check with retries
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            HEALTH_CHECK_PASSED=false
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:3001/widget > /dev/null 2>&1; then
+                echo "✅ Health check passed (widget endpoint)"
+                HEALTH_CHECK_PASSED=true
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+                  sleep 3
+                fi
+              fi
+            done
+            
+            if [ "$HEALTH_CHECK_PASSED" = false ]; then
+              echo "⚠️  Health check failed after $MAX_RETRIES attempts"
+              echo "Checking PM2 logs..."
+              pm2 logs windchasers-web-agent --lines 20 --nostream || true
+            fi
+            
+            # Verify Supabase client initialization (check logs for errors)
+            echo ""
+            echo "🔍 Verifying Supabase connection..."
+            sleep 3
+            SUPABASE_ERRORS=$(pm2 logs windchasers-web-agent --lines 50 --nostream 2>&1 | grep -i "supabase\|supabase" | grep -i "error\|fail" || echo "")
+            
+            if [ -n "$SUPABASE_ERRORS" ]; then
+              echo "⚠️  WARNING: Potential Supabase errors found in logs:"
+              echo "$SUPABASE_ERRORS" | head -5
+            else
+              echo "✅ No Supabase errors found in logs"
+            fi
+            
+            # Check if Supabase environment variables are being used
+            echo "📋 Supabase environment check:"
+            if grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local; then
+              SUPABASE_URL=$(grep "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+              if [ -n "$SUPABASE_URL" ] && [ "$SUPABASE_URL" != "placeholder" ]; then
+                echo "  ✅ NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL is set"
+              else
+                echo "  ⚠️  NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL appears to be placeholder"
+              fi
+            else
+              echo "  ❌ NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL not found"
+            fi
+            
+            if grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local; then
+              ANON_KEY=$(grep "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+              if [ -n "$ANON_KEY" ] && [ "$ANON_KEY" != "placeholder" ] && [ ${#ANON_KEY} -gt 50 ]; then
+                echo "  ✅ NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY is set and appears valid"
+              else
+                echo "  ⚠️  NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY appears invalid or placeholder"
+              fi
+            else
+              echo "  ❌ NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY not found"
+            fi
             
             # Show PM2 status
+            echo ""
             echo "✅ Deployment complete. PM2 status:"
             pm2 list | grep windchasers-web-agent || echo "⚠️  Process not found in PM2 list"

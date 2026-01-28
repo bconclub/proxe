@@ -100,9 +100,17 @@ export default function WidgetPage() {
     // Determine the web-agent URL
     let agentUrl: string
     
+    const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const isOldPort = envVar.includes(':3001')
+    
     // Check if we have an environment variable set
-    if (process.env.NEXT_PUBLIC_WEB_AGENT_URL) {
-      agentUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
+    if (envVar && !isOldPort) {
+      // Use env var if it's set and correct (not old port 3001)
+      agentUrl = envVar
+    } else if (isLocalhost && isOldPort) {
+      // Override old port 3001 with correct port 4003 for localhost
+      agentUrl = 'http://localhost:4003'
     } else {
       // Auto-detect based on current location
       if (typeof window !== 'undefined') {
@@ -114,12 +122,12 @@ export default function WidgetPage() {
           // On production, widget is at /widget path on same domain
           agentUrl = `${currentProtocol}//${currentHost}`
         } else {
-          // Development - use localhost
-          agentUrl = 'http://localhost:3001'
+          // Development - use localhost:4003 (Windchasers web-agent dev port)
+          agentUrl = 'http://localhost:4003'
         }
       } else {
         // Server-side fallback
-        agentUrl = 'http://localhost:3001'
+        agentUrl = 'http://localhost:4003'
       }
     }
     
@@ -229,8 +237,7 @@ export default function WidgetPage() {
                 }
               }, 2000)
             }}
-            onLoad={(e) => {
-              console.log('✅ Widget iframe loaded')
+            onLoad={() => {
               setServerAvailable(true)
               setShowFallback(false)
             }}

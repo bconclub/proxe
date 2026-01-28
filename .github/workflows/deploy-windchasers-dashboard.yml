@@ -79,10 +79,27 @@ jobs:
           script: |
             cd /var/www/windchasers-proxe
             
-            # Preserve existing .env.local if it exists
+            # Verify .env.local exists and contains required Supabase variables
             if [ ! -f .env.local ]; then
-              echo "⚠️  Warning: .env.local not found on VPS. Please create it manually."
+              echo "❌ ERROR: .env.local not found on VPS!"
+              echo "Please create .env.local with required Supabase credentials:"
+              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
+              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+              echo "  - SUPABASE_SERVICE_ROLE_KEY"
+              echo "  - CLAUDE_API_KEY"
+              exit 1
             fi
+            
+            # Check for required Supabase environment variables
+            echo "🔍 Verifying Supabase environment variables..."
+            if ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local; then
+              echo "❌ ERROR: Required Supabase environment variables not found in .env.local"
+              echo "Missing variables:"
+              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
+              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+              exit 1
+            fi
+            echo "✅ Supabase environment variables found in .env.local"
             
             # Clean previous build to avoid chunk mismatches
             echo "🧹 Cleaning previous build..."
@@ -239,6 +256,57 @@ jobs:
               echo "Checking PM2 logs..."
               pm2 logs windchasers-dashboard --lines 20 --nostream || true
               echo "⚠️  Deployment completed but health check failed - please verify manually"
+            fi
+            
+            # Verify Supabase connection via /api/status endpoint
+            echo ""
+            echo "🔍 Verifying Supabase connection..."
+            MAX_SUPABASE_RETRIES=5
+            SUPABASE_RETRY_COUNT=0
+            SUPABASE_CONNECTED=false
+            
+            while [ $SUPABASE_RETRY_COUNT -lt $MAX_SUPABASE_RETRIES ]; do
+              STATUS_RESPONSE=$(curl -s http://localhost:3003/api/status 2>/dev/null || echo "")
+              
+              if [ -n "$STATUS_RESPONSE" ]; then
+                # Check if jq is available for JSON parsing
+                if command -v jq &> /dev/null; then
+                  CAN_REACH=$(echo "$STATUS_RESPONSE" | jq -r '.connectivity.canReachSupabase // false')
+                  DB_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.database.status // "unknown"')
+                  
+                  if [ "$CAN_REACH" = "true" ] && [ "$DB_STATUS" = "connected" ]; then
+                    echo "✅ Supabase connection verified!"
+                    echo "   - Can reach Supabase: $CAN_REACH"
+                    echo "   - Database status: $DB_STATUS"
+                    SUPABASE_CONNECTED=true
+                    break
+                  else
+                    echo "⚠️  Supabase connection check: canReachSupabase=$CAN_REACH, database=$DB_STATUS"
+                  fi
+                else
+                  # Fallback: check if response contains "canReachSupabase":true
+                  if echo "$STATUS_RESPONSE" | grep -q '"canReachSupabase":true'; then
+                    echo "✅ Supabase connection verified (canReachSupabase: true)"
+                    SUPABASE_CONNECTED=true
+                    break
+                  fi
+                fi
+              fi
+              
+              SUPABASE_RETRY_COUNT=$((SUPABASE_RETRY_COUNT + 1))
+              if [ $SUPABASE_RETRY_COUNT -lt $MAX_SUPABASE_RETRIES ]; then
+                echo "⏳ Supabase verification attempt $SUPABASE_RETRY_COUNT/$MAX_SUPABASE_RETRIES failed, retrying..."
+                sleep 3
+              fi
+            done
+            
+            if [ "$SUPABASE_CONNECTED" = false ]; then
+              echo "⚠️  WARNING: Supabase connection verification failed after $MAX_SUPABASE_RETRIES attempts"
+              echo "Checking status endpoint response:"
+              curl -s http://localhost:3003/api/status | head -50 || echo "Status endpoint not responding"
+              echo ""
+              echo "Please verify Supabase credentials in .env.local and check PM2 logs:"
+              echo "  pm2 logs windchasers-dashboard --lines 50"
             fi
             
             # Show PM2 status

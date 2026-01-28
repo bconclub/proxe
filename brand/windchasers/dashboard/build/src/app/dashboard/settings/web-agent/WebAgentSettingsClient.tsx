@@ -10,12 +10,30 @@ export default function WebAgentSettingsClient() {
 
   // Auto-load preview when component mounts
   useEffect(() => {
-    // Determine widget URL - use environment variable or default to localhost in development
-    const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL 
-      ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
-      : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:4003/widget'
-      : 'https://widget.proxe.windchasers.in/widget'
+    // Determine widget URL - use environment variable or default to same origin
+    // IMPORTANT: If env var shows 3001 (old value), force 4003 for localhost development
+    const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const isOldPort = envVar.includes(':3001')
+    
+    let widgetUrl: string
+    if (isLocalhost && (isOldPort || !envVar)) {
+      // Force correct port for localhost development (safety fallback)
+      // Use root page (/) to show hero title + widget, not just /widget
+      widgetUrl = 'http://localhost:4003/'
+    } else if (envVar && !isOldPort) {
+      // Use env var if it's set and correct - use root page for full preview
+      widgetUrl = `${envVar}/`
+    } else if (isLocalhost) {
+      // Localhost fallback - use root page
+      widgetUrl = 'http://localhost:4003/'
+    } else if (typeof window !== 'undefined') {
+      // Production fallback - use root page
+      widgetUrl = `${window.location.origin}/`
+    } else {
+      // Server-side fallback
+      widgetUrl = '/'
+    }
     
     // Ensure iframe loads when component mounts
     if (iframeRef.current) {
@@ -49,7 +67,9 @@ export default function WebAgentSettingsClient() {
         ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
         : typeof window !== 'undefined' && window.location.hostname === 'localhost'
         ? 'http://localhost:4003/widget'
-        : 'https://widget.proxe.windchasers.in/widget'
+        : typeof window !== 'undefined'
+        ? `${window.location.origin}/widget`
+        : '/widget'
       
       // Reload the iframe to reset the widget state
       if (iframeRef.current) {
@@ -237,16 +257,30 @@ export default function WebAgentSettingsClient() {
               flex: 1,
               position: 'relative',
               overflow: 'hidden',
-              backgroundColor: 'var(--bg-primary)',
+              backgroundColor: 'transparent', // Transparent to show widget's own background
             }}
           >
             <iframe
               ref={iframeRef}
-              src={process.env.NEXT_PUBLIC_WEB_AGENT_URL 
-                ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
-                : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                ? 'http://localhost:4003/widget'
-                : 'https://widget.proxe.windchasers.in/widget'}
+              src={(() => {
+                // Use same logic as widgetUrl resolution above
+                // Use root page (/) to show hero title + widget, not just /widget
+                const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
+                const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                const isOldPort = envVar.includes(':3001')
+                
+                if (isLocalhost && (isOldPort || !envVar)) {
+                  return 'http://localhost:4003/'
+                } else if (envVar && !isOldPort) {
+                  return `${envVar}/`
+                } else if (isLocalhost) {
+                  return 'http://localhost:4003/'
+                } else if (typeof window !== 'undefined') {
+                  return `${window.location.origin}/`
+                } else {
+                  return '/'
+                }
+              })()}
               className="w-full h-full border-0"
               style={{
                 width: '100%',
@@ -259,8 +293,8 @@ export default function WebAgentSettingsClient() {
               onError={(e) => {
                 console.error('Widget iframe error:', e)
               }}
-              onLoad={(e) => {
-                console.log('Widget iframe loaded')
+              onLoad={() => {
+                // Widget iframe loaded successfully
               }}
             />
           </div>
