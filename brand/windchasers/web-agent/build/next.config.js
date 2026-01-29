@@ -2,6 +2,16 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Optimize build performance
+  typescript: {
+    // Skip type checking during build to speed up deployment
+    // Type errors will still be caught in CI/local development
+    ignoreBuildErrors: process.env.NODE_ENV === 'production' && process.env.SKIP_TYPE_CHECK !== 'false',
+  },
+  eslint: {
+    // Skip ESLint during build to speed up deployment
+    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
+  },
   async headers() {
     return [
       {

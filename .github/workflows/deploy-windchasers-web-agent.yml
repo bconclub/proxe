@@ -66,7 +66,8 @@ jobs:
           username: ${{ secrets.WINDCHASERS_VPS_USER }}
           key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
           port: 22
-          timeout: 300s
+          timeout: 900s
+          command_timeout: 15m
           script: |
             cd /var/www/windchasers-web-agent
             
@@ -98,9 +99,12 @@ jobs:
             # Install dependencies (need dev deps for build)
             echo "📦 Installing dependencies..."
             npm ci
-            
+
             # Build the application
             echo "🏗️  Building Next.js application..."
+            echo "⏱️  This may take 5-10 minutes (including type checking)..."
+            # Set NODE_OPTIONS to increase memory if needed
+            export NODE_OPTIONS="--max-old-space-size=4096"
             npm run build
             
             # Check build exit code
