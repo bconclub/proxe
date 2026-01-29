@@ -32,12 +32,43 @@ const nextConfig = {
     },
     // Optimize package imports
     optimizePackageImports: ['@supabase/supabase-js', 'recharts', 'lottie-react'],
+    // Exclude client-only packages from server bundles
+    serverComponentsExternalPackages: ['ogl', 'lottie-react'],
   },
   
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
-    // Production-only optimizations
-    if (!dev) {
+    // Fix for client-side code in server bundles
+    if (isServer) {
+      // Provide fallbacks for browser globals that don't exist in Node.js
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+      }
+      
+      // Define browser globals for server builds to prevent "self is not defined" errors
+      const webpack = require('webpack')
+      config.plugins.push(
+        new webpack.ProvidePlugin({
+          'self': 'globalThis',
+        })
+      )
+      
+      // Exclude client-only packages from server bundle
+      config.externals = config.externals || []
+      if (Array.isArray(config.externals)) {
+        config.externals.push({
+          'ogl': false,
+          'lottie-react': false,
+        })
+      }
+    }
+    
+    // Production-only optimizations (client-side only)
+    if (!dev && !isServer) {
       // Reduce bundle size
       config.optimization = {
         ...config.optimization,
@@ -48,7 +79,7 @@ const nextConfig = {
           cacheGroups: {
             default: false,
             vendors: false,
-            // Vendor chunk for node_modules
+            // Vendor chunk for node_modules (client-side only)
             vendor: {
               name: 'vendor',
               chunks: 'all',
