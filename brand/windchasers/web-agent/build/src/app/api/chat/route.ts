@@ -23,7 +23,7 @@ console.log('[Chat API] Initializing Claude API:', {
 
 const anthropic = claudeApiKey ? new Anthropic({ apiKey: claudeApiKey }) : null;
 
-// Search knowledge base
+// Search knowledge base with enhanced full-text search
 async function searchKnowledgeBase(query: string, limit: number = 3) {
   try {
     const supabaseClient = windchasersSupabase;
@@ -31,8 +31,104 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
       return [];
     }
 
+    const allResults: any[] = [];
+
+    // Enhanced full-text search for knowledge_base using PostgreSQL function
+    try {
+      const { data: kbResults, error: kbError } = await supabaseClient
+        .rpc('search_knowledge_base', {
+          query_text: query,
+          match_limit: limit * 2, // Get more results for ranking
+          filter_category: null,
+          filter_subcategory: null
+        });
+
+      if (!kbError && kbResults && Array.isArray(kbResults)) {
+        kbResults.forEach((item: any) => {
+          // Format content combining question, answer, and content fields
+          let contentParts: string[] = [];
+          
+          if (item.question) {
+            contentParts.push(`Q: ${item.question}`);
+          }
+          if (item.answer) {
+            contentParts.push(`A: ${item.answer}`);
+          }
+          if (item.content) {
+            contentParts.push(item.content);
+          }
+          
+          const content = contentParts.length > 0 
+            ? contentParts.join('\n\n')
+            : item.description || item.title || '';
+
+          if (content.trim()) {
+            allResults.push({
+              id: item.id,
+              content: content.trim(),
+              metadata: {
+                table: 'knowledge_base',
+                brand: item.brand || BRAND,
+                category: item.category,
+                subcategory: item.subcategory,
+                relevance: item.relevance || 0
+              }
+            });
+          }
+        });
+      }
+    } catch (kbError) {
+      console.error('[Search KB] Error in full-text search, falling back to ILIKE:', kbError);
+      // Fallback to ILIKE search if full-text search fails
+      try {
+        const { data: fallbackResults } = await supabaseClient
+          .from('knowledge_base')
+          .select('*')
+          .eq('brand', BRAND)
+          .or(`question.ilike.%${query}%,answer.ilike.%${query}%,content.ilike.%${query}%`)
+          .limit(limit * 2);
+
+        if (fallbackResults && Array.isArray(fallbackResults)) {
+          fallbackResults.forEach((item: any) => {
+            let contentParts: string[] = [];
+            
+            if (item.question) {
+              contentParts.push(`Q: ${item.question}`);
+            }
+            if (item.answer) {
+              contentParts.push(`A: ${item.answer}`);
+            }
+            if (item.content) {
+              contentParts.push(item.content);
+            }
+            
+            const content = contentParts.length > 0 
+              ? contentParts.join('\n\n')
+              : item.description || item.title || '';
+
+            if (content.trim()) {
+              allResults.push({
+                id: item.id,
+                content: content.trim(),
+                metadata: {
+                  table: 'knowledge_base',
+                  brand: item.brand || BRAND,
+                  category: item.category,
+                  subcategory: item.subcategory,
+                  relevance: 0.5 // Default relevance for ILIKE matches
+                }
+              });
+            }
+          });
+        }
+      } catch (fallbackError) {
+        console.error('[Search KB] Fallback search also failed:', fallbackError);
+      }
+    }
+
+    // Search other tables (keep existing functionality)
     const searchTable = async (table: string, columns: string[], searchTerm: string, perColumnLimit: number = 2) => {
-      const allResults = [];
+      const tableResults = [];
       for (const column of columns) {
         try {
           const result = await Promise.race([
@@ -45,17 +141,16 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
           ]) as any;
           
           if (!result.error && result.data) {
-            allResults.push(...result.data);
+            tableResults.push(...result.data);
           }
         } catch (error) {
           // Continue with other columns
         }
       }
-      return Array.from(new Map(allResults.map((item: any) => [item.id, item])).values());
+      return Array.from(new Map(tableResults.map((item: any) => [item.id, item])).values());
     };
 
     const queryPromises = [
-      searchTable('knowledge_base', ['content', 'title', 'description', 'category'], query, 3).catch(() => []),
       searchTable('system_prompts', ['content', 'title', 'description'], query, 2).catch(() => []),
       searchTable('agents', ['agent_name', 'what_it_does', 'pain_point_mapped_to'], query, 2).catch(() => []),
       searchTable('conversation_states', ['state_name', 'description', 'notes'], query, 2).catch(() => []),
@@ -65,8 +160,7 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
     ];
 
     const results = await Promise.allSettled(queryPromises);
-    const allResults: any[] = [];
-    const tableNames = ['knowledge_base', 'system_prompts', 'agents', 'conversation_states', 'cta_triggers', 'model_context', 'chatbot_responses'];
+    const tableNames = ['system_prompts', 'agents', 'conversation_states', 'cta_triggers', 'model_context', 'chatbot_responses'];
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled' && result.value && Array.isArray(result.value)) {
@@ -75,9 +169,6 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
           const metadata: any = { table: tableNames[index], brand: item.brand || BRAND };
 
           switch (tableNames[index]) {
-            case 'knowledge_base':
-              content = item.content || item.description || item.title || '';
-              break;
             case 'system_prompts':
               content = `${item.title || item.prompt_type || 'System Prompt'}: ${item.content}`;
               break;
@@ -105,11 +196,29 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
       }
     });
 
-    const priorityOrder: Record<string, number> = { 'knowledge_base': 4, 'system_prompts': 3, 'agents': 2, 'conversation_states': 1, 'cta_triggers': 1, 'model_context': 0, 'chatbot_responses': 1 };
-    const sortedResults = allResults.sort((a, b) => (priorityOrder[b.metadata.table] || 0) - (priorityOrder[a.metadata.table] || 0));
+    // Sort by priority: knowledge_base first (highest priority), then by relevance
+    const priorityOrder: Record<string, number> = { 
+      'knowledge_base': 4, 
+      'system_prompts': 3, 
+      'agents': 2, 
+      'conversation_states': 1, 
+      'cta_triggers': 1, 
+      'model_context': 0, 
+      'chatbot_responses': 1 
+    };
+    
+    const sortedResults = allResults.sort((a, b) => {
+      const priorityDiff = (priorityOrder[b.metadata.table] || 0) - (priorityOrder[a.metadata.table] || 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      // If same priority, sort by relevance (for knowledge_base)
+      const relevanceA = a.metadata.relevance || 0;
+      const relevanceB = b.metadata.relevance || 0;
+      return relevanceB - relevanceA;
+    });
     
     return sortedResults.slice(0, limit * 3);
   } catch (error) {
+    console.error('[Search KB] Error in searchKnowledgeBase:', error);
     return [];
   }
 }
@@ -774,7 +883,9 @@ export async function POST(request: NextRequest) {
                     
                     if (createdLeadId) {
                       // Update web_sessions with the new lead_id
-                      const { error: updateError } = await supabase
+                      // Use service client for update to bypass RLS if available
+                      const updateClient = getSupabaseServiceClient() || supabase;
+                      const { error: updateError } = await updateClient
                         .from('web_sessions')
                         .update({ lead_id: createdLeadId })
                         .eq('external_session_id', externalSessionId);

@@ -1739,10 +1739,34 @@ export async function logMessage(
     return null;
   }
 
-  const supabase = getSupabaseClient();
+  // Use service role client for message logging (bypasses RLS, more reliable)
+  // Fallback to anon client if service client unavailable
+  let supabase = getSupabaseServiceClient();
+  const usingServiceClient = !!supabase;
   
   if (!supabase) {
-    console.error('[logMessage] Supabase client not available');
+    console.warn('[logMessage] Service role client not available, falling back to anon client', {
+      hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+      envCheck: {
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
+    supabase = getSupabaseClient();
+  } else {
+    console.log('[logMessage] Using service role client (bypasses RLS)', {
+      urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
+    });
+  }
+  
+  if (!supabase) {
+    console.error('[logMessage] No Supabase client available (neither service nor anon)', {
+      envCheck: {
+        hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
     return null;
   }
   
