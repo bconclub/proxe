@@ -781,15 +781,20 @@ export async function POST(request: NextRequest) {
 
           // Update session profile with client-provided data (if any)
           // This ensures profile data is saved to database and lead_id is created/updated
+          // CRITICAL: This must happen BEFORE lead_id fetch to ensure data is saved
           if (externalSessionId && (userProfile?.userName || userProfile?.email || userProfile?.phone)) {
-            console.log('[Chat API] Updating session profile with client data:', {
+            console.log('[Chat API] ✓ Updating session profile with client data:', {
               hasName: !!userProfile?.userName,
               hasEmail: !!userProfile?.email,
               hasPhone: !!userProfile?.phone,
               name: userProfile?.userName,
               email: userProfile?.email,
               phone: userProfile?.phone,
-              fullUserProfile: userProfile
+              phoneLength: userProfile?.phone?.length,
+              emailLength: userProfile?.email?.length,
+              nameLength: userProfile?.userName?.length,
+              fullUserProfile: userProfile,
+              externalSessionId
             });
             
             try {
@@ -803,6 +808,11 @@ export async function POST(request: NextRequest) {
                 },
                 brand as 'windchasers'
               );
+              
+              console.log('[Chat API] updateSessionProfile completed', {
+                hasResult: !!updateResult,
+                externalSessionId
+              });
               console.log('[Chat API] updateSessionProfile completed successfully', {
                 result: updateResult,
                 externalSessionId

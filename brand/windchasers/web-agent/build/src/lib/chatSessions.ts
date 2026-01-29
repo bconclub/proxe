@@ -792,9 +792,34 @@ export async function updateSessionProfile(
 ) {
   console.log('[updateSessionProfile] Called', { externalSessionId, brand, profile });
   
-  const supabase = getSupabaseClient();
+  // Use service role client for profile updates (bypasses RLS, more reliable)
+  // Fallback to anon client if service client unavailable
+  let supabase = getSupabaseServiceClient();
+  const usingServiceClient = !!supabase;
+  
   if (!supabase) {
-    console.warn('[chatSessions] Supabase client unavailable in updateSessionProfile', { brand });
+    console.warn('[updateSessionProfile] Service role client not available, falling back to anon client', {
+      hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+      envCheck: {
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
+    supabase = getSupabaseClient();
+  } else {
+    console.log('[updateSessionProfile] Using service role client (bypasses RLS)', {
+      urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
+    });
+  }
+  
+  if (!supabase) {
+    console.error('[updateSessionProfile] No Supabase client available (neither service nor anon)', {
+      envCheck: {
+        hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
     return;
   }
 
@@ -836,6 +861,18 @@ export async function updateSessionProfile(
     .select();
 
   if (error) {
+    console.error('[updateSessionProfile] ✗ Update failed', {
+      error,
+      errorCode: error.code,
+      errorMessage: error.message,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      externalSessionId,
+      updates,
+      usingServiceClient,
+      tableName
+    });
+    
     // Fallback to old sessions table if web_sessions doesn't exist
     if (error.code === '42P01' || error.code === '42703') {
       console.log('[updateSessionProfile] Trying fallback to sessions table');
@@ -859,16 +896,30 @@ export async function updateSessionProfile(
         .eq('external_session_id', externalSessionId);
       
       if (fallbackError) {
-        console.error('[Supabase] Failed to update session profile (fallback)', { error: fallbackError, externalSessionId });
+        console.error('[updateSessionProfile] ✗ Fallback update also failed', { 
+          error: fallbackError, 
+          externalSessionId,
+          fallbackUpdates
+        });
         return;
       }
     } else {
-      console.error('[Supabase] Failed to update session profile', { error, externalSessionId, updates });
+      console.error('[updateSessionProfile] ✗ Update failed with non-table error', { 
+        error, 
+        externalSessionId, 
+        updates,
+        usingServiceClient
+      });
       return;
     }
   }
 
-  console.log('[updateSessionProfile] Update successful', { externalSessionId, updatedRows: data?.length });
+  console.log('[updateSessionProfile] ✓ Update successful', { 
+    externalSessionId, 
+    updatedRows: data?.length,
+    updatedData: data,
+    usingServiceClient
+  });
 
   // Fetch the complete updated profile from database
   const { data: updatedSession } = await supabase
