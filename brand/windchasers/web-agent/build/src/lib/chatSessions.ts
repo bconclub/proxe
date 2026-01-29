@@ -171,26 +171,29 @@ export async function ensureAllLeads(
 
   const supabase = getSupabaseClient();
   if (!supabase) {
-    console.error('[ensureAllLeads] Supabase client not available');
+    console.error('[ensureAllLeads] Supabase client not available', {
+      envCheck: {
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
     return null;
   }
+  
+  console.log('[ensureAllLeads] Supabase client available', {
+    urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
+  });
 
-  // Need at least phone or email for deduplication
+  // Phone is REQUIRED for lead creation - email alone is not enough
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) {
-    // Try email as fallback if phone normalization failed
-    if (!email) {
-      console.warn('[ensureAllLeads] Cannot create lead: no valid phone or email', {
-        phone,
-        email,
-        customerName
-      });
-      return null;
-    }
-    console.log('[ensureAllLeads] Phone normalization failed, will use email for lookup', {
+    console.warn('[ensureAllLeads] Cannot create lead: phone number is required', {
       phone,
-      email
+      email,
+      customerName,
+      reason: 'Phone number is mandatory for lead creation'
     });
+    return null;
   }
 
   try {
@@ -256,6 +259,20 @@ export async function ensureAllLeads(
         });
         return null;
       }
+      
+      // Check for RLS/permission errors
+      if (fetchError.code === '42501' || fetchError.message?.includes('permission') || fetchError.message?.includes('RLS')) {
+        console.error('[ensureAllLeads] Permission/RLS error checking all_leads', {
+          error: fetchError,
+          code: fetchError.code,
+          message: fetchError.message,
+          hint: 'Check RLS policies on all_leads table',
+          normalizedPhone,
+          email,
+          brand
+        });
+      }
+      
       console.error('[ensureAllLeads] Failed to check all_leads', {
         error: fetchError,
         code: fetchError.code,
@@ -263,7 +280,8 @@ export async function ensureAllLeads(
         details: fetchError.details,
         hint: fetchError.hint,
         normalizedPhone,
-        email
+        email,
+        brand
       });
       return null;
     }
@@ -323,12 +341,13 @@ export async function ensureAllLeads(
     }
 
     // Create new all_leads record
-    // Need at least phone or email to create
-    if (!normalizedPhone && !email) {
-      console.warn('[ensureAllLeads] Cannot create lead: no phone or email', {
+    // Phone is REQUIRED - email alone is not enough
+    if (!normalizedPhone) {
+      console.warn('[ensureAllLeads] Cannot create lead: phone number is required', {
         phone,
         email,
-        customerName
+        customerName,
+        reason: 'Phone number is mandatory for lead creation'
       });
       return null;
     }
@@ -355,11 +374,31 @@ export async function ensureAllLeads(
       hasNormalizedPhone: !!insertData.customer_phone_normalized
     });
 
+    console.log('[ensureAllLeads] About to insert into all_leads', {
+      table: 'all_leads',
+      insertData: {
+        ...insertData,
+        phone: insertData.phone ? insertData.phone.substring(0, 5) + '...' : null,
+        customer_phone_normalized: insertData.customer_phone_normalized
+      },
+      brand
+    });
+
     const { data: created, error: createError } = await supabase
       .from('all_leads')
       .insert(insertData)
       .select('id')
       .single();
+
+    console.log('[ensureAllLeads] Insert result', {
+      hasData: !!created,
+      hasError: !!createError,
+      createdId: created?.id,
+      errorCode: createError?.code,
+      errorMessage: createError?.message,
+      errorDetails: createError?.details,
+      errorHint: createError?.hint
+    });
 
     if (createError) {
       // Handle unique constraint violation (duplicate phone/email)
@@ -400,6 +439,21 @@ export async function ensureAllLeads(
         }
       }
       
+      // Check for RLS/permission errors
+      if (createError.code === '42501' || createError.message?.includes('permission') || createError.message?.includes('RLS')) {
+        console.error('[ensureAllLeads] Permission/RLS error creating all_leads', {
+          error: createError,
+          code: createError.code,
+          message: createError.message,
+          hint: 'Check RLS policies on all_leads table - INSERT permission may be missing',
+          brand,
+          insertData: {
+            ...insertData,
+            phone: insertData.phone ? insertData.phone.substring(0, 5) + '...' : null
+          }
+        });
+      }
+      
       console.error('[ensureAllLeads] Failed to create all_leads', {
         error: createError,
         code: createError.code,
@@ -409,7 +463,8 @@ export async function ensureAllLeads(
         insertData: {
           ...insertData,
           phone: insertData.phone ? insertData.phone.substring(0, 5) + '...' : null
-        }
+        },
+        brand
       });
       return null;
     }
@@ -826,7 +881,18 @@ export async function updateSessionProfile(
     });
 
     // Ensure all_leads record exists/updated after profile update using complete database values
-    if (mergedProfile.userName || mergedProfile.email || mergedProfile.phone) {
+    // Phone is REQUIRED for lead creation
+    if (mergedProfile.phone) {
+      console.log('[updateSessionProfile] Calling ensureAllLeads with profile data', {
+        hasName: !!mergedProfile.userName,
+        hasEmail: !!mergedProfile.email,
+        hasPhone: !!mergedProfile.phone,
+        phone: mergedProfile.phone ? mergedProfile.phone.substring(0, 5) + '...' : null,
+        email: mergedProfile.email,
+        brand,
+        externalSessionId
+      });
+      
       const leadId = await ensureAllLeads(
         mergedProfile.userName,
         mergedProfile.email,
@@ -835,17 +901,54 @@ export async function updateSessionProfile(
         externalSessionId
       );
 
+      console.log('[updateSessionProfile] ensureAllLeads returned:', leadId);
+
       // Update web_sessions with lead_id if we got one
       if (leadId) {
-        const { error: leadIdError } = await supabase
+        console.log('[updateSessionProfile] Updating web_sessions with lead_id', {
+          leadId,
+          externalSessionId,
+          tableName
+        });
+        
+        const { error: leadIdError, data: updateData } = await supabase
           .from(tableName)
           .update({ lead_id: leadId })
-          .eq('external_session_id', externalSessionId);
+          .eq('external_session_id', externalSessionId)
+          .select('id, lead_id');
 
-        if (leadIdError && leadIdError.code !== '42702') { // Ignore "column doesn't exist" errors
-          console.warn('[updateSessionProfile] Failed to update lead_id', leadIdError);
+        if (leadIdError) {
+          console.error('[updateSessionProfile] Failed to update lead_id', {
+            error: leadIdError,
+            code: leadIdError.code,
+            message: leadIdError.message,
+            details: leadIdError.details,
+            leadId,
+            externalSessionId
+          });
+        } else {
+          console.log('[updateSessionProfile] Successfully updated web_sessions with lead_id', {
+            leadId,
+            externalSessionId,
+            updatedRows: updateData?.length,
+            verifiedLeadId: updateData?.[0]?.lead_id
+          });
         }
+      } else {
+        console.warn('[updateSessionProfile] ensureAllLeads returned null - no lead created', {
+          hasPhone: !!mergedProfile.phone,
+          hasEmail: !!mergedProfile.email,
+          hasName: !!mergedProfile.userName,
+          phone: mergedProfile.phone,
+          reason: 'ensureAllLeads may have failed or phone normalization failed'
+        });
       }
+    } else {
+      console.log('[updateSessionProfile] Skipping lead creation - phone number is required but missing', {
+        hasName: !!mergedProfile.userName,
+        hasEmail: !!mergedProfile.email,
+        hasPhone: !!mergedProfile.phone
+      });
     }
   } else {
     console.warn('[updateSessionProfile] Could not fetch updated session', { externalSessionId });

@@ -315,6 +315,16 @@ export async function POST(request: NextRequest) {
     const memoryMetadata = metadata.memory || {};
     const userProfile = sessionMetadata.user || {};
     const externalSessionId = sessionMetadata.externalId || sessionMetadata.externalSessionId || sessionMetadata.sessionId || null;
+    
+    // Debug: Log profile data received
+    console.log('[Chat API] Profile data received from client:', {
+      hasUserProfile: !!userProfile,
+      userName: userProfile?.userName,
+      email: userProfile?.email,
+      phone: userProfile?.phone,
+      userProfileKeys: Object.keys(userProfile || {}),
+      externalSessionId
+    });
     const summary: string = typeof memoryMetadata.summary === 'string' ? memoryMetadata.summary : '';
     const recentHistory: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(memoryMetadata.recentHistory)
       ? memoryMetadata.recentHistory
@@ -669,11 +679,12 @@ export async function POST(request: NextRequest) {
               hasPhone: !!userProfile?.phone,
               name: userProfile?.userName,
               email: userProfile?.email,
-              phone: userProfile?.phone
+              phone: userProfile?.phone,
+              fullUserProfile: userProfile
             });
             
             try {
-              await updateSessionProfile(
+              const updateResult = await updateSessionProfile(
                 externalSessionId,
                 {
                   userName: userProfile?.userName,
@@ -683,10 +694,26 @@ export async function POST(request: NextRequest) {
                 },
                 brand as 'windchasers'
               );
-              console.log('[Chat API] updateSessionProfile completed successfully');
-            } catch (err) {
-              console.error('[Chat API] Failed to update session profile:', err);
+              console.log('[Chat API] updateSessionProfile completed successfully', {
+                result: updateResult,
+                externalSessionId
+              });
+            } catch (err: any) {
+              console.error('[Chat API] Failed to update session profile:', {
+                error: err,
+                errorMessage: err?.message,
+                errorStack: err?.stack,
+                externalSessionId,
+                userProfile
+              });
             }
+          } else {
+            console.log('[Chat API] Skipping updateSessionProfile - no profile data or session ID', {
+              hasExternalSessionId: !!externalSessionId,
+              hasUserName: !!userProfile?.userName,
+              hasEmail: !!userProfile?.email,
+              hasPhone: !!userProfile?.phone
+            });
           }
 
           // Fetch lead_id now (after profile may have been updated)
@@ -726,8 +753,8 @@ export async function POST(request: NextRequest) {
                   const profileEmail = session?.customer_email || userProfile?.email || null;
                   const profilePhone = session?.customer_phone || userProfile?.phone || null;
                   
-                  // Try to create lead if we have phone OR email
-                  if (!leadId && (profilePhone || profileEmail)) {
+                  // Try to create lead if we have phone (phone is REQUIRED)
+                  if (!leadId && profilePhone) {
                     console.log('[Chat API] No lead_id found, attempting to ensure lead exists', {
                       hasPhone: !!profilePhone,
                       hasEmail: !!profileEmail,
@@ -759,17 +786,18 @@ export async function POST(request: NextRequest) {
                         console.log('[Chat API] Created/ensured lead and updated web_sessions:', leadId);
                       }
                     } else {
-                      console.log('[Chat API] Could not create lead - ensureAllLeads returned null', {
+                      console.log('[Chat API] Could not create lead - ensureAllLeads returned null (phone required)', {
                         phone: profilePhone,
                         email: profileEmail,
                         normalizedPhone: profilePhone ? profilePhone.replace(/\D/g, '').slice(-10) : null
                       });
                     }
-                  } else if (!leadId && !profilePhone && !profileEmail) {
-                    console.log('[Chat API] Cannot create lead - phone or email is required but both are missing', {
+                  } else if (!leadId && !profilePhone) {
+                    console.log('[Chat API] Cannot create lead - phone number is required but missing', {
                       hasName: !!profileName,
                       hasEmail: !!profileEmail,
-                      hasPhone: !!profilePhone
+                      hasPhone: !!profilePhone,
+                      reason: 'Phone number is mandatory for lead creation'
                     });
                   } else if (leadId) {
                     console.log('[Chat API] Using existing lead_id:', leadId);
