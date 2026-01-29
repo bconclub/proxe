@@ -1868,8 +1868,33 @@ export async function logMessage(
   });
   
   try {
+    // Verify lead exists before inserting (foreign key constraint)
+    console.log('[logMessage] Verifying lead exists before insert...');
+    const { data: leadCheck, error: leadCheckError } = await supabase
+      .from('all_leads')
+      .select('id')
+      .eq('id', leadId)
+      .maybeSingle();
+    
+    if (leadCheckError) {
+      console.error('[logMessage] ✗ Error checking if lead exists:', {
+        error: leadCheckError,
+        leadId
+      });
+      // Continue anyway - might be a permission issue, but insert might still work
+    } else if (!leadCheck) {
+      console.error('[logMessage] ✗ Lead does not exist in all_leads table:', {
+        leadId,
+        message: 'Cannot insert message - foreign key constraint will fail'
+      });
+      return null;
+    } else {
+      console.log('[logMessage] ✓ Lead exists, proceeding with insert');
+    }
+    
     console.log('[logMessage] Executing Supabase insert to "conversations" table...');
     console.log('[logMessage] Table name verified:', tableName === 'conversations' ? '✓ "conversations"' : `✗ "${tableName}"`);
+    console.log('[logMessage] Insert data:', JSON.stringify(insertData, null, 2));
     
     const { data, error } = await supabase
       .from(tableName)
@@ -1889,8 +1914,19 @@ export async function logMessage(
         leadId,
         channel,
         sender,
-        tableName
+        tableName,
+        insertData: JSON.stringify(insertData, null, 2),
+        usingServiceClient
       });
+      
+      // If it's a foreign key constraint error, the lead might not exist
+      if (error.code === '23503') {
+        console.error('[logMessage] ✗ Foreign key constraint violation - lead_id does not exist in all_leads:', {
+          leadId,
+          errorMessage: error.message
+        });
+      }
+      
       return null;
     }
 
