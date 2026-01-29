@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node node_modules/.bin/next dev -p 4003",
     "build": "node node_modules/.bin/next build",
+    "build:fast": "SKIP_TYPE_CHECK=true TSC_COMPILE_ON_ERROR=true node node_modules/.bin/next build --no-lint",
     "start": "node node_modules/.bin/next start",
     "lint": "node node_modules/.bin/next lint"
   },
