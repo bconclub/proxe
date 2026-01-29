@@ -19,6 +19,11 @@ const nextConfig = {
         splitChunks: false, // Disable chunk splitting for server-side to avoid @ symbol issues
       }
     }
+    // Ensure @ alias resolves correctly
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, 'src'),
+    }
     return config
   },
   async headers() {
