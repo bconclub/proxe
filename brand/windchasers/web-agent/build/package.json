@@ -1,6 +1,6 @@
 {
   "name": "windchasers-website",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "scripts": {
     "dev": "node node_modules/.bin/next dev -p 4003",
