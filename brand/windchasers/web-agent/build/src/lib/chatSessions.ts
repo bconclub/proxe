@@ -96,16 +96,60 @@ function getISTTimestamp(): string {
 }
 
 // Helper function to normalize phone number for all_leads deduplication
+// Handles various formats: international (+91), with/without country codes, spaces, dashes, etc.
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   
   // Remove all non-digit characters
   const digits = phone.replace(/\D/g, '');
   
-  if (!digits || digits.length < 10) return null;
+  if (!digits || digits.length < 10) {
+    console.log('[normalizePhone] Phone number too short or invalid', { 
+      original: phone, 
+      digits, 
+      length: digits?.length 
+    });
+    return null;
+  }
   
-  // Always return last 10 digits for matching
-  return digits.slice(-10);
+  // Handle international formats
+  // Remove common country codes (India: +91, US: +1, etc.)
+  let cleanedDigits = digits;
+  
+  // Remove India country code (+91)
+  if (cleanedDigits.startsWith('91') && cleanedDigits.length > 10) {
+    cleanedDigits = cleanedDigits.slice(2);
+  }
+  // Remove US/Canada country code (+1)
+  else if (cleanedDigits.startsWith('1') && cleanedDigits.length === 11) {
+    cleanedDigits = cleanedDigits.slice(1);
+  }
+  
+  // Remove leading zeros
+  cleanedDigits = cleanedDigits.replace(/^0+/, '');
+  
+  // Need at least 10 digits after cleaning
+  if (cleanedDigits.length < 10) {
+    console.log('[normalizePhone] Phone number too short after cleaning', { 
+      original: phone, 
+      digits, 
+      cleanedDigits,
+      length: cleanedDigits.length 
+    });
+    return null;
+  }
+  
+  // Always return last 10 digits for matching (handles cases with extra digits)
+  const normalized = cleanedDigits.slice(-10);
+  
+  console.log('[normalizePhone] Normalized phone', { 
+    original: phone, 
+    normalized,
+    digits,
+    cleanedDigits
+  });
+  
+  return normalized;
 }
 
 // Helper function to ensure all_leads record exists and return lead_id
@@ -116,15 +160,37 @@ export async function ensureAllLeads(
   brand: 'proxe' | 'windchasers' | 'windchasers',
   externalSessionId?: string
 ): Promise<string | null> {
+  console.log('[ensureAllLeads] Called', {
+    hasName: !!customerName,
+    hasEmail: !!email,
+    hasPhone: !!phone,
+    phone: phone ? phone.substring(0, 5) + '...' : null,
+    brand,
+    externalSessionId
+  });
+
   const supabase = getSupabaseClient();
   if (!supabase) {
+    console.error('[ensureAllLeads] Supabase client not available');
     return null;
   }
 
-  // Need at least phone for deduplication
+  // Need at least phone or email for deduplication
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) {
-    return null;
+    // Try email as fallback if phone normalization failed
+    if (!email) {
+      console.warn('[ensureAllLeads] Cannot create lead: no valid phone or email', {
+        phone,
+        email,
+        customerName
+      });
+      return null;
+    }
+    console.log('[ensureAllLeads] Phone normalization failed, will use email for lookup', {
+      phone,
+      email
+    });
   }
 
   try {
@@ -151,25 +217,65 @@ export async function ensureAllLeads(
       }
     }
 
-    // Check if all_leads table exists (might not be migrated yet)
-    const { data: existing, error: fetchError } = await supabase
-      .from('all_leads')
-      .select('id, unified_context')
-      .eq('customer_phone_normalized', normalizedPhone)
-      .eq('brand', brand)
-      .maybeSingle();
+    // Check if all_leads table exists and find existing lead
+    let existing: any = null;
+    let fetchError: any = null;
+
+    if (normalizedPhone) {
+      // Try to find by normalized phone first
+      const { data, error } = await supabase
+        .from('all_leads')
+        .select('id, unified_context, email, customer_name, phone')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .eq('brand', brand)
+        .maybeSingle();
+      
+      existing = data;
+      fetchError = error;
+    }
+
+    // If not found by phone and we have email, try email
+    if (!existing && email) {
+      const { data, error } = await supabase
+        .from('all_leads')
+        .select('id, unified_context, email, customer_name, phone')
+        .eq('email', email)
+        .eq('brand', brand)
+        .maybeSingle();
+      
+      if (!fetchError) fetchError = error;
+      if (data) existing = data;
+    }
 
     if (fetchError) {
       // Table might not exist yet - that's okay, we'll continue without lead_id
       if (fetchError.code === '42P01') {
-        console.log('[chatSessions] all_leads table not found, continuing without lead_id');
+        console.log('[ensureAllLeads] all_leads table not found, continuing without lead_id', {
+          code: fetchError.code,
+          message: fetchError.message
+        });
         return null;
       }
-      console.warn('[chatSessions] Failed to check all_leads', fetchError);
+      console.error('[ensureAllLeads] Failed to check all_leads', {
+        error: fetchError,
+        code: fetchError.code,
+        message: fetchError.message,
+        details: fetchError.details,
+        hint: fetchError.hint,
+        normalizedPhone,
+        email
+      });
       return null;
     }
 
     if (existing) {
+      console.log('[ensureAllLeads] Found existing lead', {
+        leadId: existing.id,
+        existingName: existing.customer_name,
+        existingEmail: existing.email,
+        existingPhone: existing.phone
+      });
+
       // Merge with existing unified_context
       const existingContext = existing.unified_context || {};
       const mergedContext = {
@@ -191,37 +297,134 @@ export async function ensureAllLeads(
       if (customerName) updates.customer_name = customerName;
       if (email) updates.email = email;
       if (phone) updates.phone = phone;
+      if (normalizedPhone) updates.customer_phone_normalized = normalizedPhone;
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('all_leads')
         .update(updates)
         .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('[ensureAllLeads] Failed to update existing lead', {
+          error: updateError,
+          code: updateError.code,
+          message: updateError.message,
+          details: updateError.details,
+          leadId: existing.id,
+          updates
+        });
+        return null;
+      }
+
+      console.log('[ensureAllLeads] Successfully updated existing lead', {
+        leadId: existing.id
+      });
       return existing.id;
     }
 
     // Create new all_leads record
+    // Need at least phone or email to create
+    if (!normalizedPhone && !email) {
+      console.warn('[ensureAllLeads] Cannot create lead: no phone or email', {
+        phone,
+        email,
+        customerName
+      });
+      return null;
+    }
+
+    const insertData: any = {
+      customer_name: customerName,
+      email: email,
+      phone: phone,
+      first_touchpoint: 'web',
+      last_touchpoint: 'web',
+      last_interaction_at: new Date().toISOString(),
+      brand: brand,
+      unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
+    };
+
+    if (normalizedPhone) {
+      insertData.customer_phone_normalized = normalizedPhone;
+    }
+
+    console.log('[ensureAllLeads] Creating new lead', {
+      hasName: !!insertData.customer_name,
+      hasEmail: !!insertData.email,
+      hasPhone: !!insertData.phone,
+      hasNormalizedPhone: !!insertData.customer_phone_normalized
+    });
+
     const { data: created, error: createError } = await supabase
       .from('all_leads')
-      .insert({
-        customer_name: customerName,
-        email: email,
-        phone: phone,
-        customer_phone_normalized: normalizedPhone,
-        first_touchpoint: 'web',
-        last_touchpoint: 'web',
-        last_interaction_at: new Date().toISOString(),
-        brand: brand,
-        unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
-      })
+      .insert(insertData)
       .select('id')
       .single();
 
     if (createError) {
-      console.warn('[chatSessions] Failed to create all_leads', createError);
+      // Handle unique constraint violation (duplicate phone/email)
+      if (createError.code === '23505' || createError.message?.includes('duplicate')) {
+        console.log('[ensureAllLeads] Duplicate lead detected, fetching existing', {
+          error: createError,
+          normalizedPhone,
+          email
+        });
+        
+        // Try to fetch the existing record
+        let existingLead: any = null;
+        if (normalizedPhone) {
+          const { data } = await supabase
+            .from('all_leads')
+            .select('id')
+            .eq('customer_phone_normalized', normalizedPhone)
+            .eq('brand', brand)
+            .maybeSingle();
+          existingLead = data;
+        }
+        
+        if (!existingLead && email) {
+          const { data } = await supabase
+            .from('all_leads')
+            .select('id')
+            .eq('email', email)
+            .eq('brand', brand)
+            .maybeSingle();
+          existingLead = data;
+        }
+        
+        if (existingLead) {
+          console.log('[ensureAllLeads] Found existing lead after conflict', {
+            leadId: existingLead.id
+          });
+          return existingLead.id;
+        }
+      }
+      
+      console.error('[ensureAllLeads] Failed to create all_leads', {
+        error: createError,
+        code: createError.code,
+        message: createError.message,
+        details: createError.details,
+        hint: createError.hint,
+        insertData: {
+          ...insertData,
+          phone: insertData.phone ? insertData.phone.substring(0, 5) + '...' : null
+        }
+      });
       return null;
     }
 
-    return created?.id || null;
+    if (!created || !created.id) {
+      console.error('[ensureAllLeads] Created lead but no ID returned', {
+        created
+      });
+      return null;
+    }
+
+    console.log('[ensureAllLeads] Successfully created new lead', {
+      leadId: created.id
+    });
+    return created.id;
   } catch (error) {
     console.warn('[chatSessions] Error ensuring all_leads', error);
     return null;

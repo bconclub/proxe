@@ -726,8 +726,14 @@ export async function POST(request: NextRequest) {
                   const profileEmail = session?.customer_email || userProfile?.email || null;
                   const profilePhone = session?.customer_phone || userProfile?.phone || null;
                   
-                  if (!leadId && profilePhone) {
-                    console.log('[Chat API] No lead_id found, attempting to ensure lead exists with phone:', profilePhone);
+                  // Try to create lead if we have phone OR email
+                  if (!leadId && (profilePhone || profileEmail)) {
+                    console.log('[Chat API] No lead_id found, attempting to ensure lead exists', {
+                      hasPhone: !!profilePhone,
+                      hasEmail: !!profileEmail,
+                      phone: profilePhone ? profilePhone.substring(0, 5) + '...' : null,
+                      email: profileEmail
+                    });
                     
                     const createdLeadId = await ensureAllLeads(
                       profileName,
@@ -755,11 +761,12 @@ export async function POST(request: NextRequest) {
                     } else {
                       console.log('[Chat API] Could not create lead - ensureAllLeads returned null', {
                         phone: profilePhone,
+                        email: profileEmail,
                         normalizedPhone: profilePhone ? profilePhone.replace(/\D/g, '').slice(-10) : null
                       });
                     }
-                  } else if (!leadId && !profilePhone) {
-                    console.log('[Chat API] Cannot create lead - phone number is required but missing', {
+                  } else if (!leadId && !profilePhone && !profileEmail) {
+                    console.log('[Chat API] Cannot create lead - phone or email is required but both are missing', {
                       hasName: !!profileName,
                       hasEmail: !!profileEmail,
                       hasPhone: !!profilePhone
