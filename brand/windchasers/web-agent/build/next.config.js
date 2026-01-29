@@ -51,20 +51,16 @@ const nextConfig = {
       
       // Define browser globals for server builds to prevent "self is not defined" errors
       const webpack = require('webpack')
+      // Ensure plugins array exists
+      if (!config.plugins) {
+        config.plugins = []
+      }
+      // Replace 'self' with 'globalThis' in server builds
       config.plugins.push(
-        new webpack.ProvidePlugin({
+        new webpack.DefinePlugin({
           'self': 'globalThis',
         })
       )
-      
-      // Exclude client-only packages from server bundle
-      config.externals = config.externals || []
-      if (Array.isArray(config.externals)) {
-        config.externals.push({
-          'ogl': false,
-          'lottie-react': false,
-        })
-      }
     }
     
     // Production-only optimizations (client-side only)
