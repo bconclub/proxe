@@ -1797,23 +1797,28 @@ export async function logMessage(
   
   if (!supabase) {
     console.warn('[logMessage] Service role client not available, falling back to anon client', {
-      hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+      hasServiceKey: !!(process.env.WINDCHASERS_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
       envCheck: {
+        WINDCHASERS_SUPABASE_SERVICE_KEY: process.env.WINDCHASERS_SUPABASE_SERVICE_KEY ? 'SET' : 'NOT SET',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
         hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
         hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
       }
     });
     supabase = getSupabaseClient();
   } else {
-    console.log('[logMessage] Using service role client (bypasses RLS)', {
-      urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
+    console.log('[logMessage] ✓ Using service role client (bypasses RLS)', {
+      urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A',
+      usingServiceClient: true
     });
   }
   
   if (!supabase) {
-    console.error('[logMessage] No Supabase client available (neither service nor anon)', {
+    console.error('[logMessage] ✗ No Supabase client available (neither service nor anon)', {
       envCheck: {
-        hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+        hasServiceKey: !!(process.env.WINDCHASERS_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
+        WINDCHASERS_SUPABASE_SERVICE_KEY: process.env.WINDCHASERS_SUPABASE_SERVICE_KEY ? 'SET' : 'NOT SET',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
         hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
         hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
       }

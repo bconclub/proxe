@@ -941,10 +941,42 @@ export async function POST(request: NextRequest) {
           }
 
           // Log customer message to conversations table (immediately after lead_id is available)
+          // CRITICAL: If leadId is still null, try to fetch it one more time from the session
+          // Use service client to bypass RLS if available
+          if (!leadId && externalSessionId) {
+            console.log('[Chat API] leadId is null, attempting to fetch from session before logging message...');
+            try {
+              const fetchClient = getSupabaseServiceClient() || getSupabaseClient();
+              if (fetchClient) {
+                const { data: sessionData, error: fetchError } = await fetchClient
+                  .from('web_sessions')
+                  .select('lead_id, customer_phone, customer_email')
+                  .eq('external_session_id', externalSessionId)
+                  .maybeSingle();
+                
+                if (fetchError) {
+                  console.error('[Chat API] Error fetching leadId from session:', fetchError);
+                } else if (sessionData?.lead_id) {
+                  leadId = sessionData.lead_id;
+                  console.log('[Chat API] ✓ Fetched leadId from session:', leadId);
+                } else {
+                  console.log('[Chat API] No lead_id found in session yet', { 
+                    externalSessionId,
+                    hasPhone: !!sessionData?.customer_phone,
+                    hasEmail: !!sessionData?.customer_email
+                  });
+                }
+              }
+            } catch (fetchErr) {
+              console.error('[Chat API] Exception fetching leadId before message log:', fetchErr);
+            }
+          }
+          
           console.log('[Chat API] Checking if lead_id exists for customer message logging...', {
             hasLeadId: !!leadId,
             leadId: leadId || 'NULL',
-            messageLength: message?.length || 0
+            messageLength: message?.length || 0,
+            externalSessionId
           });
           
           if (leadId) {
@@ -983,11 +1015,43 @@ export async function POST(request: NextRequest) {
           }
 
           // Log AI response to conversations table (after response is generated)
+          // CRITICAL: If leadId is still null, try to fetch it one more time from the session
+          // Use service client to bypass RLS if available
+          if (!leadId && externalSessionId) {
+            console.log('[Chat API] leadId is null before agent log, attempting to fetch from session...');
+            try {
+              const fetchClient = getSupabaseServiceClient() || getSupabaseClient();
+              if (fetchClient) {
+                const { data: sessionData, error: fetchError } = await fetchClient
+                  .from('web_sessions')
+                  .select('lead_id, customer_phone, customer_email')
+                  .eq('external_session_id', externalSessionId)
+                  .maybeSingle();
+                
+                if (fetchError) {
+                  console.error('[Chat API] Error fetching leadId from session for agent log:', fetchError);
+                } else if (sessionData?.lead_id) {
+                  leadId = sessionData.lead_id;
+                  console.log('[Chat API] ✓ Fetched leadId from session for agent log:', leadId);
+                } else {
+                  console.log('[Chat API] No lead_id found in session for agent log', { 
+                    externalSessionId,
+                    hasPhone: !!sessionData?.customer_phone,
+                    hasEmail: !!sessionData?.customer_email
+                  });
+                }
+              }
+            } catch (fetchErr) {
+              console.error('[Chat API] Exception fetching leadId before agent log:', fetchErr);
+            }
+          }
+          
           console.log('[Chat API] Checking if lead_id and response exist for AI response logging...', {
             hasLeadId: !!leadId,
             leadId: leadId || 'NULL',
             hasResponse: !!cleanedResponse,
-            responseLength: cleanedResponse?.length || 0
+            responseLength: cleanedResponse?.length || 0,
+            externalSessionId
           });
           
           if (leadId && cleanedResponse) {
