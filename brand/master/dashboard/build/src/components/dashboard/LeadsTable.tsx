@@ -125,8 +125,6 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
-  const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 10)
@@ -180,28 +178,13 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => lead.status === statusFilter)
     }
 
-    // Apply brand-specific filters
-    if (userTypeFilter !== 'all') {
-      filtered = filtered.filter((lead) => {
-        const masterData = lead.unified_context?.master || {}
-        return {{brand_name}}Data.user_type === userTypeFilter
-      })
-    }
-
-    if (courseInterestFilter !== 'all') {
-      filtered = filtered.filter((lead) => {
-        const masterData = lead.unified_context?.master || {}
-        return masterData.course_interest === courseInterestFilter
-      })
-    }
-
     // Apply limit
     if (limit) {
       filtered = filtered.slice(0, limit)
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit])
+  }, [leads, dateFilter, sourceFilter, statusFilter, limit])
 
   // Calculate scores for filtered leads (same calculation as modal)
   useEffect(() => {
@@ -292,7 +275,7 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
       const bookingDate = lead.booking_date || 
         lead.unified_context?.web?.booking_date || 
@@ -329,18 +312,13 @@ export default function LeadsTable({
           : bookingTime || '';
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
-      // Brand-specific fields from unified_context
       const masterData = lead.unified_context?.master || {}
-      const userType = masterData.user_type || ''
-      const courseInterest = masterData.course_interest || ''
       const timeline = masterData.plan_to_fly || masterData.timeline || ''
       return [
         lead.name || '',
         lead.email || '',
         lead.phone || '',
         lead.first_touchpoint || lead.source || '',
-        userType,
-        courseInterest,
         timeline,
         score !== null && score !== undefined ? score.toString() : '',
         stage || '',
@@ -447,31 +425,6 @@ export default function LeadsTable({
             ))}
           </select>
 
-          {/* Brand-specific filters */}
-          <select
-            value={userTypeFilter}
-            onChange={(e) => setUserTypeFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3a3a3a] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white rounded-md text-sm"
-          >
-            <option value="all">All User Types</option>
-            <option value="student">Student</option>
-            <option value="parent">Parent</option>
-            <option value="professional">Professional</option>
-          </select>
-
-          <select
-            value={courseInterestFilter}
-            onChange={(e) => setCourseInterestFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3a3a3a] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white rounded-md text-sm"
-          >
-            <option value="all">All Courses</option>
-            <option value="DGCA">DGCA</option>
-            <option value="Flight">Flight</option>
-            <option value="Heli">Heli</option>
-            <option value="Cabin">Cabin</option>
-            <option value="Drone">Drone</option>
-          </select>
-
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
@@ -501,12 +454,6 @@ export default function LeadsTable({
               <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 First Touch
               </th>
-              <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                User Type
-              </th>
-              <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Course Interest
-              </th>
               <th className="leads-table-th leads-table-th-timeline px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timeline
               </th>
@@ -524,7 +471,7 @@ export default function LeadsTable({
           <tbody className="leads-table-tbody bg-white dark:bg-[#0a0a0a] divide-y divide-gray-200 dark:divide-[#3a3a3a]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={10} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -548,30 +495,6 @@ export default function LeadsTable({
                     <span className="leads-table-first-touch-badge px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
                       {lead.first_touchpoint || lead.source || 'unknown'}
                     </span>
-                  </td>
-                  <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const masterData = lead.unified_context?.master || {}
-                      const userType = {{brand_name}}Data.user_type
-                      if (!userType) return '-'
-                      return (
-                        <span className="px-2 inline-flex text-xs leading-5 font-medium rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                          {userType}
-                        </span>
-                      )
-                    })()}
-                  </td>
-                  <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const masterData = lead.unified_context?.master || {}
-                      const courseInterest = masterData.course_interest
-                      if (!courseInterest) return '-'
-                      return (
-                        <span className="px-2 inline-flex text-xs leading-5 font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
-                          {courseInterest}
-                        </span>
-                      )
-                    })()}
                   </td>
                   <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {

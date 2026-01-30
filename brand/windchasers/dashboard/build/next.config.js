@@ -22,15 +22,7 @@ const nextConfig = {
       config.externals = [
         '@supabase/supabase-js',
         '@supabase/ssr',
-        'fs',
-        'path',
-        'crypto',
         ...(config.externals || [])
-      ]
-      // Prevent bundling of parent directories
-      config.resolve.modules = [
-        'node_modules',
-        require('path').resolve(__dirname, 'src'),
       ]
     }
     // Ensure @ alias resolves correctly

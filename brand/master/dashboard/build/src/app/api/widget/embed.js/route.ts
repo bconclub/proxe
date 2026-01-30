@@ -8,12 +8,12 @@ export const runtime = 'nodejs'
  * Returns bundled JavaScript that initializes the ChatWidget
  * 
  * This endpoint serves the widget as a standalone script that can be embedded
- * on any website using: <script src="https://proxe.{{brand_name}}.in/widget/embed.js"></script>
+ * on any website using: <script src="https://proxe.master.in/widget/embed.js"></script>
  */
 export async function GET() {
   try {
     // Get the base URL for API calls
-    const baseUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.{{brand_name}}.in'
+    const baseUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.master.in'
     const apiUrl = `${baseUrl}/api/chat`
 
     // Generate the widget initialization script
@@ -23,16 +23,16 @@ export async function GET() {
   'use strict';
   
   // Prevent multiple initializations
-  if (window.{{BRAND_NAME}}WidgetInitialized) {
+  if (window.MasterWidgetInitialized) {
     return;
   }
-  window.{{BRAND_NAME}}WidgetInitialized = true;
+  window.MasterWidgetInitialized = true;
 
   // Widget configuration
   const config = {
     apiUrl: '${apiUrl}',
-    brand: '{{brand_name}}',
-    name: '{{BRAND_NAME}}',
+    brand: 'master',
+    name: 'Master',
     colors: {
       primary: '#000000',
       primaryLight: '#FFFFFF',
@@ -64,13 +64,13 @@ export async function GET() {
   // Create widget container
   function createWidgetContainer() {
     // Check if container already exists
-    const existingContainer = document.getElementById('{{brand_name}}-widget-container');
+    const existingContainer = document.getElementById('master-widget-container');
     if (existingContainer) {
       return existingContainer;
     }
 
     const container = document.createElement('div');
-    container.id = '{{brand_name}}-widget-container';
+    container.id = 'master-widget-container';
     container.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999; pointer-events: none;';
     document.body.appendChild(container);
     return container;
@@ -82,7 +82,7 @@ export async function GET() {
     
     // Create iframe
     const iframe = document.createElement('iframe');
-    iframe.id = '{{brand_name}}-widget-iframe';
+    iframe.id = 'master-widget-iframe';
     iframe.src = '${baseUrl}/widget';
     iframe.style.cssText = 'width: 100%; height: 100%; border: none; pointer-events: auto;';
     iframe.setAttribute('allow', 'microphone; camera');
@@ -98,7 +98,7 @@ export async function GET() {
       }
       
       // Handle widget messages if needed
-      if (event.data && event.data.type === '{{brand_name}}-widget') {
+      if (event.data && event.data.type === 'master-widget') {
         // Process widget messages
         console.log('Widget message:', event.data);
       }
@@ -113,21 +113,21 @@ export async function GET() {
   }
 
   // Export widget API for programmatic control
-  window.{{BRAND_NAME}}Widget = {
+  window.MasterWidget = {
     open: function() {
-      const container = document.getElementById('{{brand_name}}-widget-container');
+      const container = document.getElementById('master-widget-container');
       if (container) {
         container.style.display = 'block';
       }
     },
     close: function() {
-      const container = document.getElementById('{{brand_name}}-widget-container');
+      const container = document.getElementById('master-widget-container');
       if (container) {
         container.style.display = 'none';
       }
     },
     toggle: function() {
-      const container = document.getElementById('{{brand_name}}-widget-container');
+      const container = document.getElementById('master-widget-container');
       if (container) {
         container.style.display = container.style.display === 'none' ? 'block' : 'none';
       }
@@ -150,7 +150,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error generating widget embed script:', error)
     const errorScript = `
-console.error('Failed to initialize {{BRAND_NAME}} widget:', ${JSON.stringify(error instanceof Error ? error.message : 'Unknown error')});
+console.error('Failed to initialize Master widget:', ${JSON.stringify(error instanceof Error ? error.message : 'Unknown error')});
 `.trim()
 
     return new NextResponse(errorScript, {

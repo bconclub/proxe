@@ -52,8 +52,11 @@ function formatTimeForDisplay(time24: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  // `date` is used in success and error responses; declare outside `try`
+  // so it's available in `catch` even if parsing fails.
+  let date: string | undefined
   try {
-    const { date } = await request.json()
+    ;({ date } = await request.json())
 
     if (!date) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 })

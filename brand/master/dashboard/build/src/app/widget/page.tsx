@@ -60,7 +60,7 @@ export default function WidgetPage() {
           // For localhost or same origin, always try to load iframe (CORS might block fetch but iframe works)
           if (widgetUrl.includes('localhost') || 
               widgetUrl.includes('127.0.0.1') ||
-              widgetUrl.includes('{{brand_name}}.in') || 
+              widgetUrl.includes('master.in') || 
               (typeof window !== 'undefined' && widgetUrl.startsWith(window.location.origin))) {
             setServerAvailable(true)
             setShowFallback(false)
@@ -81,7 +81,7 @@ export default function WidgetPage() {
       // For localhost or same-origin, always try to load the iframe
       if (widgetUrl.includes('localhost') || 
           widgetUrl.includes('127.0.0.1') ||
-          widgetUrl.includes('{{brand_name}}.in') || 
+          widgetUrl.includes('master.in') || 
           (typeof window !== 'undefined' && widgetUrl.startsWith(window.location.origin))) {
         setServerAvailable(true)
         setShowFallback(false)
@@ -109,8 +109,8 @@ export default function WidgetPage() {
         const currentHost = window.location.hostname
         const currentProtocol = window.location.protocol
         
-        // If we're on production domain (proxe.{{brand_name}}.in), use same domain
-        if (currentHost.includes('{{brand_name}}.in') || currentHost.includes('proxe.{{brand_name}}.in')) {
+        // If we're on production domain (proxe.master.in), use same domain
+        if (currentHost.includes('master.in') || currentHost.includes('proxe.master.in')) {
           // On production, widget is at /widget path on same domain
           agentUrl = `${currentProtocol}//${currentHost}`
         } else {
@@ -170,7 +170,7 @@ export default function WidgetPage() {
           lineHeight: '1.2',
           letterSpacing: '-0.02em'
         }}>
-          {{BRAND_NAME}}
+          Master
         </h1>
         
         {/* Tagline */}
@@ -183,7 +183,7 @@ export default function WidgetPage() {
           lineHeight: '1.6',
           opacity: 0.9
         }}>
-          {{BRAND_TAGLINE}}
+          Your AI-powered command center. Chat with us to learn more and book a call.
         </p>
       </div>
 
@@ -284,11 +284,11 @@ export default function WidgetPage() {
             Web-Agent Server Not Running
           </p>
           <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '15px', lineHeight: '1.6' }}>
-            {typeof window !== 'undefined' && window.location.hostname.includes('{{brand_name}}.in')
+            {typeof window !== 'undefined' && window.location.hostname.includes('master.in')
               ? 'The web-agent server needs to be deployed and accessible. Set NEXT_PUBLIC_WEB_AGENT_URL environment variable if the web-agent is on a different domain.'
               : 'The widget preview requires the web-agent server to be running.'}
           </p>
-          {typeof window !== 'undefined' && !window.location.hostname.includes('{{brand_name}}.in') && (
+          {typeof window !== 'undefined' && !window.location.hostname.includes('master.in') && (
             <div style={{ 
               backgroundColor: 'rgba(255, 255, 255, 0.1)', 
               padding: '15px', 
@@ -308,12 +308,12 @@ export default function WidgetPage() {
                 borderRadius: '4px',
                 fontFamily: 'monospace'
               }}>
-                cd brand/{{brand_name}}/web-agent/build<br/>
+                cd brand/master/web-agent/build<br/>
                 npm run dev
               </code>
             </div>
           )}
-          {typeof window !== 'undefined' && window.location.hostname.includes('{{brand_name}}.in') && (
+          {typeof window !== 'undefined' && window.location.hostname.includes('master.in') && (
             <div style={{ 
               backgroundColor: 'rgba(255, 255, 255, 0.1)', 
               padding: '15px', 
@@ -327,7 +327,7 @@ export default function WidgetPage() {
               <p style={{ fontSize: '11px', opacity: 0.9, marginBottom: '8px', lineHeight: '1.6' }}>
                 1. Deploy the web-agent server separately or serve it from the same domain<br/>
                 2. Set <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>NEXT_PUBLIC_WEB_AGENT_URL</code> environment variable<br/>
-                3. Or ensure the web-agent is accessible at: <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>{typeof window !== 'undefined' ? window.location.origin : 'https://proxe.{{brand_name}}.in'}/widget</code>
+                3. Or ensure the web-agent is accessible at: <code style={{ backgroundColor: 'rgba(26, 15, 10, 0.5)', padding: '2px 4px', borderRadius: '2px' }}>{typeof window !== 'undefined' ? window.location.origin : 'https://proxe.master.in'}/widget</code>
               </p>
             </div>
           )}
