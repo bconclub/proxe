@@ -1,3 +1,5 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Use 'standalone' for VPS deployments, default for Vercel
@@ -96,6 +98,11 @@ const nextConfig = {
       }
     }
     
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+    }
+
     return config
   },
   async headers() {
