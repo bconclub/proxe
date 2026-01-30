@@ -20,6 +20,5 @@ README.md
 # Exclude build artifacts that aren't needed
 .next/cache/**
 
-# Exclude migrations and database files
-supabase/
-**/supabase/migrations/**
+# Exclude root-level supabase (migrations) only - do NOT match src/lib/supabase
+/supabase/
