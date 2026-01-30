@@ -83,9 +83,13 @@ export default async function Layout({
         <DashboardLayout>{children}</DashboardLayout>
       </ThemeProvider>
     )
-  } catch (error) {
-    console.error('Dashboard layout error:', error)
-    // On unexpected errors, redirect to login
+  } catch (err: unknown) {
+    // Re-throw Next.js redirect (digest starts with NEXT_REDIRECT) so the framework handles it
+    const digest = (err as Error & { digest?: string })?.digest ?? ''
+    if (String(digest).startsWith('NEXT_REDIRECT')) {
+      throw err
+    }
+    console.error('Dashboard layout error:', err)
     redirect('/auth/login')
   }
 }

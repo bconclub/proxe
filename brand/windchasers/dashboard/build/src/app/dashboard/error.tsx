@@ -10,9 +10,10 @@ export default function DashboardError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Next.js redirect() throws an error with digest NEXT_REDIRECT - we must re-throw
-  // so the framework can perform the redirect instead of showing this UI
-  if (error?.digest === 'NEXT_REDIRECT' || error?.message === 'NEXT_REDIRECT') {
+  // Next.js redirect() throws with digest starting NEXT_REDIRECT - re-throw so redirect works
+  const digest = error?.digest ?? ''
+  const message = error?.message ?? ''
+  if (String(digest).startsWith('NEXT_REDIRECT') || String(message).includes('NEXT_REDIRECT')) {
     throw error
   }
 
