@@ -10,6 +10,12 @@ export default function DashboardError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // Next.js redirect() throws an error with digest NEXT_REDIRECT - we must re-throw
+  // so the framework can perform the redirect instead of showing this UI
+  if (error?.digest === 'NEXT_REDIRECT' || error?.message === 'NEXT_REDIRECT') {
+    throw error
+  }
+
   useEffect(() => {
     console.error('Dashboard error:', error)
   }, [error])
