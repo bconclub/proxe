@@ -1,7 +1,7 @@
 // Shared lead score calculation utility
 // Used by both LeadsTable and LeadDetailsModal to ensure consistent scoring
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from './supabase/client'
 import type { Lead } from '@/types'
 
 export interface ScoreBreakdown {
