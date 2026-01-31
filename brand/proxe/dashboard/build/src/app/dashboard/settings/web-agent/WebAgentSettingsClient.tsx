@@ -11,12 +11,12 @@ export default function WebAgentSettingsClient() {
   // Auto-load preview when component mounts
   useEffect(() => {
     // Determine widget URL - use environment variable or default to localhost in development
-    const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL 
+    const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
       ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
       : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:4001/widget'
-      : 'https://widget.proxe.in/widget'
-    
+        ? 'http://localhost:4001/widget'
+        : 'https://widget.proxe.in/widget'
+
     // Ensure iframe loads when component mounts
     if (iframeRef.current) {
       iframeRef.current.src = widgetUrl
@@ -25,7 +25,7 @@ export default function WebAgentSettingsClient() {
 
   const handleResetWidget = () => {
     if (typeof window === 'undefined') return
-    
+
     setIsResetting(true)
     try {
       // Clear all localStorage items related to the widget
@@ -43,19 +43,19 @@ export default function WebAgentSettingsClient() {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
-      
+
       // Determine widget URL
-      const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL 
+      const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
         ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
         : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:4001/widget'
-        : 'https://widget.proxe.in/widget'
-      
+          ? 'http://localhost:4001/widget'
+          : 'https://widget.proxe.in/widget'
+
       // Reload the iframe to reset the widget state
       if (iframeRef.current) {
         iframeRef.current.src = widgetUrl
       }
-      
+
       setTimeout(() => {
         setIsResetting(false)
       }, 500)
@@ -69,20 +69,20 @@ export default function WebAgentSettingsClient() {
 
   return (
     <DashboardLayout>
-      <div style={{ 
+      <div style={{
         width: 'calc(100% + 64px)',
-        height: 'calc(100vh - 48px)', 
+        height: 'calc(100vh - 48px)',
         margin: '-24px -32px',
         padding: 0,
         position: 'relative',
-        display: 'flex', 
+        display: 'flex',
         overflow: 'hidden',
       }}>
         {/* Installation Code Panel - Left Side */}
         {showCodePanel && (
-          <div 
+          <div
             style={{
-              width: '400px',
+              width: '500px',
               height: '100%',
               position: 'relative',
               left: 0,
@@ -96,40 +96,44 @@ export default function WebAgentSettingsClient() {
               boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)',
             }}
           >
-            <div style={{ padding: '24px', flex: 1 }}>
-              <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            <div style={{ padding: '32px', flex: 1 }}>
+              <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
                 Installation
               </h2>
-              
-              <div className="p-6 rounded-lg" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
-                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+
+              <div className="p-8 rounded-xl" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
+                <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Add this script tag to your website to embed the chat widget:
                 </p>
-                
-                <div className="relative">
-                  <pre
-                    className="p-4 rounded-lg overflow-x-auto text-sm font-mono"
+
+                <div className="relative group">
+                  <div
+                    className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
                     style={{
                       backgroundColor: 'var(--bg-tertiary)',
                       border: '1px solid var(--border-primary)',
                       color: 'var(--text-primary)',
-                      fontSize: '12px',
+                      minHeight: '100px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      paddingRight: '60px'
                     }}
                   >
-                    <code>{embedCode}</code>
-                  </pre>
-                  
+                    <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
+                  </div>
+
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(embedCode)
-                      // You could add a toast notification here
                     }}
-                    className="absolute top-2 right-2 px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                    className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center justify-center"
                     style={{
                       backgroundColor: 'var(--bg-hover)',
                       color: 'var(--text-primary)',
                       border: '1px solid var(--border-primary)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                     }}
+                    title="Copy to clipboard"
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
                     }}
@@ -140,11 +144,11 @@ export default function WebAgentSettingsClient() {
                     Copy
                   </button>
                 </div>
-                
-                <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+
+                <div className="mt-8 p-5 rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
                   <p className="text-xs" style={{ color: 'var(--accent-primary)' }}>
-                    <strong>Note:</strong> The widget will automatically initialize when the script loads. 
-                    Make sure to place this script tag before the closing &lt;/body&gt; tag for best performance.
+                    <strong>Note:</strong> The widget will automatically initialize when the script loads.
+                    Place this script tag before the closing &lt;/body&gt; tag.
                   </p>
                 </div>
               </div>
@@ -153,20 +157,20 @@ export default function WebAgentSettingsClient() {
         )}
 
         {/* Full Screen Preview */}
-        <div 
+        <div
           style={{
-            width: showCodePanel ? 'calc(100% - 400px)' : '100%',
-            marginLeft: showCodePanel ? '400px' : '0',
+            width: showCodePanel ? 'calc(100% - 500px)' : '100%',
+            marginLeft: showCodePanel ? '0' : '0',
             height: '100%',
             position: 'relative',
             backgroundColor: 'var(--bg-primary)',
             display: 'flex',
             flexDirection: 'column',
-            transition: 'width 0.3s ease, margin-left 0.3s ease',
+            transition: 'width 0.3s ease',
           }}
         >
           {/* Header with controls */}
-          <div 
+          <div
             style={{
               padding: '16px 24px',
               borderBottom: '1px solid var(--border-primary)',
@@ -232,7 +236,7 @@ export default function WebAgentSettingsClient() {
           </div>
 
           {/* Widget Container - Full Screen */}
-          <div 
+          <div
             style={{
               flex: 1,
               position: 'relative',
@@ -242,11 +246,11 @@ export default function WebAgentSettingsClient() {
           >
             <iframe
               ref={iframeRef}
-              src={process.env.NEXT_PUBLIC_WEB_AGENT_URL 
+              src={process.env.NEXT_PUBLIC_WEB_AGENT_URL
                 ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
                 : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                ? 'http://localhost:4001/widget'
-                : 'https://widget.proxe.in/widget'}
+                  ? 'http://localhost:4001/widget'
+                  : 'https://widget.proxe.in/widget'}
               className="w-full h-full border-0"
               style={{
                 width: '100%',

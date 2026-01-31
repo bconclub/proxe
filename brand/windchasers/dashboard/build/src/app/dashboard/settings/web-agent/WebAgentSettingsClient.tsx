@@ -104,7 +104,7 @@ export default function WebAgentSettingsClient() {
         {/* Installation Code Panel - Left Side Sidebar */}
         <div
           style={{
-            width: showCodePanel ? '400px' : '0px',
+            width: showCodePanel ? '500px' : '0px',
             height: '100%',
             backgroundColor: 'var(--bg-secondary)',
             borderRight: showCodePanel ? '1px solid var(--border-primary)' : '0 solid transparent',
@@ -115,51 +115,49 @@ export default function WebAgentSettingsClient() {
             transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-right 0.4s linear',
           }}
         >
-          <div style={{ padding: '32px 24px', width: '400px', flex: 1, opacity: showCodePanel ? 1 : 0, transition: 'opacity 0.3s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MdCode size={24} style={{ color: 'var(--accent-primary)' }} />
-                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <div style={{ padding: '32px 32px', width: '500px', flex: 1, opacity: showCodePanel ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <MdCode size={28} style={{ color: 'var(--accent-primary)' }} />
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   Installation
                 </h2>
               </div>
               <button
                 onClick={() => setShowCodePanel(false)}
-                className="p-1 rounded-full transition-colors"
-                style={{ color: 'var(--text-secondary)', backgroundColor: 'transparent' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                className="p-2 rounded-full transition-colors hover:bg-white/5"
+                style={{ color: 'var(--text-secondary)' }}
               >
                 <MdClose size={24} />
               </button>
             </div>
 
             <div
-              className="p-6 rounded-xl"
+              className="p-8 rounded-2xl"
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid var(--border-primary)',
                 boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)'
               }}
             >
-              <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+              <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
                 Add this script tag to your website's footer to embed the chat widget.
               </p>
 
               <div className="relative group">
                 <div
-                  className="p-4 rounded-lg overflow-x-auto text-xs font-mono"
+                  className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
                   style={{
                     backgroundColor: 'var(--bg-primary)',
                     border: '1px solid var(--border-primary)',
                     color: 'var(--accent-primary)',
-                    minHeight: '80px',
+                    minHeight: '100px',
                     display: 'flex',
                     alignItems: 'center',
                     paddingRight: '60px'
                   }}
                 >
-                  <code style={{ wordBreak: 'break-all' }}>{embedCode}</code>
+                  <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
                 </div>
 
                 <button

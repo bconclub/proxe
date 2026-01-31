@@ -762,10 +762,13 @@ export default function InboxPage() {
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${channelFilter === ch
-                  ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
-                  : 'bg-transparent border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-amber-500/30'
-                  }`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border`}
+                style={{
+                  background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
+                  borderColor: channelFilter === ch ? 'var(--accent-primary)' : 'var(--border-primary)',
+                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
+                  boxShadow: channelFilter === ch ? '0 4px 14px 0 rgba(0,0,0,0.1)' : 'none'
+                }}
               >
                 {ch}
               </button>
@@ -823,14 +826,15 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? 'bg-amber-500/5 dark:bg-amber-500/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'
                     }`}
                   style={{
-                    borderColor: 'var(--border-primary)'
+                    borderColor: 'var(--border-primary)',
+                    background: isSelected ? 'var(--accent-subtle)' : 'transparent'
                   }}
                 >
                   {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'var(--accent-primary)' }} />
                   )}
 
                   <div className="flex items-center gap-3">
@@ -848,7 +852,7 @@ export default function InboxPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className={`text-[13px] font-bold truncate ${isSelected ? 'text-amber-600 dark:text-amber-500' : 'text-gray-900 dark:text-gray-100'}`}>
+                        <span className={`text-[13px] font-bold truncate ${isSelected ? '' : 'text-gray-900 dark:text-gray-100'}`} style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
                         <div className="flex items-center gap-2">
@@ -1036,10 +1040,13 @@ export default function InboxPage() {
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
                         ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
-                        : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/30'
+                        : ''
                         }`}
                       style={{
-                        position: 'relative'
+                        position: 'relative',
+                        background: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-subtle)' : undefined,
+                        borderColor: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-primary)' : undefined,
+                        borderWidth: '1px'
                       }}
                     >
                       {/* Message header - show sender name and channel */}
