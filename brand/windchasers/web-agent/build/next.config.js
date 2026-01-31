@@ -124,6 +124,14 @@ const nextConfig = {
             key: 'Access-Control-Allow-Headers',
             value: 'Content-Type, Authorization',
           },
+          {
+            key: 'X-Frame-Options',
+            value: 'ALLOW-FROM https://pilot.windchasers.in',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://pilot.windchasers.in",
+          },
         ],
       },
       {
