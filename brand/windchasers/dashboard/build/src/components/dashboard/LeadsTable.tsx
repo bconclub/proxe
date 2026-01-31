@@ -593,7 +593,15 @@ export default function LeadsTable({
                       const userType = windchasersData.user_type
                       if (!userType) return '-'
                       return (
-                        <span className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        <span
+                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                          style={{
+                            backgroundColor: 'var(--accent-subtle)',
+                            color: 'var(--accent-primary)',
+                            borderColor: 'var(--accent-primary)',
+                            opacity: 0.9
+                          }}
+                        >
                           {userType}
                         </span>
                       )
@@ -605,7 +613,15 @@ export default function LeadsTable({
                       const courseInterest = windchasersData.course_interest
                       if (!courseInterest) return '-'
                       return (
-                        <span className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20">
+                        <span
+                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                          style={{
+                            backgroundColor: 'var(--accent-subtle)',
+                            color: 'var(--accent-primary)',
+                            borderColor: 'var(--accent-primary)',
+                            opacity: 0.9
+                          }}
+                        >
                           {courseInterest}
                         </span>
                       )

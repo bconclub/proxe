@@ -101,100 +101,120 @@ export default function WebAgentSettingsClient() {
         overflow: 'hidden',
         backgroundColor: 'var(--bg-primary)',
       }}>
-        {/* Installation Code Panel - Left Side Sidebar */}
-        <div
-          style={{
-            width: showCodePanel ? '500px' : '0px',
-            height: '100%',
-            backgroundColor: 'var(--bg-secondary)',
-            borderRight: showCodePanel ? '1px solid var(--border-primary)' : '0 solid transparent',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            zIndex: 100,
-            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-right 0.4s linear',
-          }}
-        >
-          <div style={{ padding: '32px 32px', width: '500px', flex: 1, opacity: showCodePanel ? 1 : 0, transition: 'opacity 0.3s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <MdCode size={28} style={{ color: 'var(--accent-primary)' }} />
-                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Installation
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowCodePanel(false)}
-                className="p-2 rounded-full transition-colors hover:bg-white/5"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                <MdClose size={24} />
-              </button>
-            </div>
-
+        {/* Installation Code Modal */}
+        {showCodePanel && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => setShowCodePanel(false)}
+          >
             <div
-              className="p-8 rounded-2xl"
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
+                width: '100%',
+                maxWidth: '600px',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '16px',
                 border: '1px solid var(--border-primary)',
-                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)'
+                boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+                position: 'relative',
+                overflow: 'hidden'
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                Add this script tag to your website's footer to embed the chat widget.
-              </p>
-
-              <div className="relative group">
-                <div
-                  className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
-                  style={{
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-primary)',
-                    color: 'var(--accent-primary)',
-                    minHeight: '100px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    paddingRight: '60px'
-                  }}
-                >
-                  <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
+              <div style={{ padding: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <MdCode size={28} style={{ color: 'var(--accent-primary)' }} />
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                      Installation
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setShowCodePanel(false)}
+                    className="p-2 rounded-full transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <MdClose size={24} />
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleCopyCode}
-                  className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center gap-2"
+                <div
+                  className="p-8 rounded-2xl"
                   style={{
-                    backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                    color: copySuccess ? 'white' : 'var(--text-primary)',
+                    background: 'rgba(255, 255, 255, 0.03)',
                     border: '1px solid var(--border-primary)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)'
                   }}
-                  title="Copy to clipboard"
                 >
-                  {copySuccess ? <MdCheckCircle size={18} /> : <MdContentCopy size={18} />}
-                  <span className="text-xs font-medium">{copySuccess ? 'Copied' : ''}</span>
-                </button>
-              </div>
-
-              <div
-                className="mt-8 p-5 rounded-xl flex gap-3"
-                style={{
-                  backgroundColor: 'var(--accent-subtle)',
-                  border: '1px dashed var(--accent-primary)'
-                }}
-              >
-                <MdInfoOutline size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                <div>
-                  <h4 className="text-xs font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Integration Note</h4>
-                  <p className="text-xs opacity-80" style={{ color: 'var(--text-primary)', lineHeight: '1.5' }}>
-                    The widget will automatically initialize when the script loads.
-                    Place it before the closing <code>&lt;/body&gt;</code> tag.
+                  <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                    Add this script tag to your website's footer to embed the chat widget.
                   </p>
+
+                  <div className="relative group">
+                    <div
+                      className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
+                      style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        border: '1px solid var(--border-primary)',
+                        color: 'var(--accent-primary)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        paddingRight: '60px'
+                      }}
+                    >
+                      <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
+                    </div>
+
+                    <button
+                      onClick={handleCopyCode}
+                      className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center gap-2"
+                      style={{
+                        backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                        color: copySuccess ? 'white' : 'var(--text-primary)',
+                        border: '1px solid var(--border-primary)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                      }}
+                      title="Copy to clipboard"
+                    >
+                      {copySuccess ? <MdCheckCircle size={18} /> : <MdContentCopy size={18} />}
+                      <span className="text-xs font-medium">{copySuccess ? 'Copied' : ''}</span>
+                    </button>
+                  </div>
+
+                  <div
+                    className="mt-8 p-5 rounded-xl flex gap-3"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      border: '1px dashed var(--accent-primary)'
+                    }}
+                  >
+                    <MdInfoOutline size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                    <div>
+                      <h4 className="text-xs font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Integration Note</h4>
+                      <p className="text-xs opacity-80" style={{ color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                        The widget will automatically initialize when the script loads.
+                        Place it before the closing <code>&lt;/body&gt;</code> tag.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Main Preview Container */}
         <div

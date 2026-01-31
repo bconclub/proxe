@@ -78,78 +78,102 @@ export default function WebAgentSettingsClient() {
         display: 'flex',
         overflow: 'hidden',
       }}>
-        {/* Installation Code Panel - Left Side */}
+        {/* Installation Code Modal */}
         {showCodePanel && (
           <div
             style={{
-              width: '500px',
-              height: '100%',
-              position: 'relative',
-              left: 0,
+              position: 'fixed',
               top: 0,
-              backgroundColor: 'var(--bg-secondary)',
-              borderRight: '1px solid var(--border-primary)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflowY: 'auto',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
               zIndex: 1000,
-              boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
             }}
+            onClick={() => setShowCodePanel(false)}
           >
-            <div style={{ padding: '32px', flex: 1 }}>
-              <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
-                Installation
-              </h2>
-
-              <div className="p-8 rounded-xl" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
-                <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Add this script tag to your website to embed the chat widget:
-                </p>
-
-                <div className="relative group">
-                  <div
-                    className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
-                    style={{
-                      backgroundColor: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-primary)',
-                      color: 'var(--text-primary)',
-                      minHeight: '100px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      paddingRight: '60px'
-                    }}
-                  >
-                    <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
-                  </div>
-
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '600px',
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-primary)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ padding: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                  <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Installation
+                  </h2>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(embedCode)
-                    }}
-                    className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center justify-center"
-                    style={{
-                      backgroundColor: 'var(--bg-hover)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-primary)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                    }}
-                    title="Copy to clipboard"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
+                    onClick={() => setShowCodePanel(false)}
+                    className="p-2 rounded-full transition-colors hover:bg-white/5"
+                    style={{ color: 'var(--text-secondary)' }}
                   >
-                    Copy
+                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg"><path fill="none" d="M0 0h24v24H0z"></path><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
                   </button>
                 </div>
 
-                <div className="mt-8 p-5 rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                  <p className="text-xs" style={{ color: 'var(--accent-primary)' }}>
-                    <strong>Note:</strong> The widget will automatically initialize when the script loads.
-                    Place this script tag before the closing &lt;/body&gt; tag.
+                <div className="p-8 rounded-xl" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
+                  <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                    Add this script tag to your website to embed the chat widget:
                   </p>
+
+                  <div className="relative group">
+                    <div
+                      className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
+                      style={{
+                        backgroundColor: 'var(--bg-tertiary)',
+                        border: '1px solid var(--border-primary)',
+                        color: 'var(--text-primary)',
+                        minHeight: '100px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        paddingRight: '60px'
+                      }}
+                    >
+                      <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{embedCode}</code>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(embedCode)
+                      }}
+                      className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center justify-center"
+                      style={{
+                        backgroundColor: 'var(--bg-hover)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-primary)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }}
+                      title="Copy to clipboard"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+
+                  <div className="mt-8 p-5 rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
+                    <p className="text-xs" style={{ color: 'var(--accent-primary)' }}>
+                      <strong>Note:</strong> The widget will automatically initialize when the script loads.
+                      Place this script tag before the closing &lt;/body&gt; tag.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
