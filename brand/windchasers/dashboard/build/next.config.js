@@ -26,10 +26,10 @@ const nextConfig = {
       ]
     }
     // Ensure @ alias resolves correctly
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': require('path').resolve(__dirname, 'src'),
-    }
+    // config.resolve.alias = {
+    //   ...config.resolve.alias,
+    //   '@': require('path').resolve(__dirname, 'src'),
+    // }
     return config
   },
   async headers() {

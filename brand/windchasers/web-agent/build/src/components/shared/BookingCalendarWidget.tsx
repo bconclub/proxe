@@ -130,7 +130,7 @@ export function BookingCalendarWidget({
 
     try {
       const dateStr = formatDateForAPI(selectedDate);
-      
+
       const response = await fetch(getApiUrl('/api/calendar/availability'), {
         method: 'POST',
         headers: {
@@ -140,14 +140,14 @@ export function BookingCalendarWidget({
       });
 
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }));
-      
+
       if (!response.ok) {
         const errorMsg = data.error || 'Failed to check availability';
         const detailsMsg = data.details ? `: ${data.details}` : '';
         const suggestionMsg = data.suggestion ? ` ${data.suggestion}` : '';
         throw new Error(`${errorMsg}${detailsMsg}${suggestionMsg}`);
       }
-      
+
       // Show warning if credentials are not configured
       if (data.warning) {
         setBookingError(data.warning);
@@ -155,7 +155,7 @@ export function BookingCalendarWidget({
       } else {
         setIsWarning(false);
       }
-      
+
       // Map API response to our time slots
       const slots: TimeSlot[] = AVAILABLE_SLOTS.map((slot) => {
         // Find matching slot from API response (API returns displayTime format)
@@ -163,7 +163,7 @@ export function BookingCalendarWidget({
           const apiTime = s.time || s.displayTime || '';
           return apiTime.trim() === slot;
         });
-        
+
         return {
           time: slot,
           displayTime: slot,
@@ -220,11 +220,11 @@ export function BookingCalendarWidget({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.email || !formData.phone || !selectedDate || !selectedTime) {
       return;
     }
-    
+
     // Require session type selection
     if (!formData.sessionType) {
       setBookingError('Please select session type (Online or Facility Visit)');
@@ -236,7 +236,7 @@ export function BookingCalendarWidget({
 
     try {
       const dateStr = formatDateForAPI(selectedDate);
-      
+
       const response = await fetch(getApiUrl('/api/calendar/book'), {
         method: 'POST',
         headers: {
@@ -279,7 +279,7 @@ export function BookingCalendarWidget({
           phone: formData.phone,
         });
       }
-      
+
       if (onBookingComplete) {
         onBookingComplete(bookingData);
       }
@@ -353,67 +353,68 @@ export function BookingCalendarWidget({
   // Generate Google Calendar link
   const generateGoogleCalendarLink = (): string => {
     if (!selectedDate || !selectedTime) return '';
-    
+
     const dateStr = formatDateForAPI(selectedDate);
     const [timePart, period] = selectedTime.split(' ');
     const [hour, minute] = timePart.split(':');
     let hourNum = parseInt(hour);
     if (period === 'PM' && hourNum !== 12) hourNum += 12;
     if (period === 'AM' && hourNum === 12) hourNum = 0;
-    
+
     const startDate = new Date(`${dateStr}T${hourNum.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
     const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    
+
     const formatGoogleDate = (date: Date): string => {
       return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     };
-    
+
     const startStr = formatGoogleDate(startDate);
     const endStr = formatGoogleDate(endDate);
-    
-    const title = encodeURIComponent('PROXe Demo');
-    const details = encodeURIComponent(`Meeting Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
-    const location = encodeURIComponent('Online Meeting');
-    
+
+    const eventTitle = config?.name ? `${config.name} Consultation` : 'Aviation Consultation';
+    const title = encodeURIComponent(eventTitle);
+    const details = encodeURIComponent(`Consultation Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
+    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)');
+
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
   };
 
   // Generate ICS file content
   const generateICSFile = (): string => {
     if (!selectedDate || !selectedTime) return '';
-    
+
     const dateStr = formatDateForAPI(selectedDate);
     const [timePart, period] = selectedTime.split(' ');
     const [hour, minute] = timePart.split(':');
     let hourNum = parseInt(hour);
     if (period === 'PM' && hourNum !== 12) hourNum += 12;
     if (period === 'AM' && hourNum === 12) hourNum = 0;
-    
+
     const startDate = new Date(`${dateStr}T${hourNum.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
     const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    
+
     const formatICSDate = (date: Date): string => {
       return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     };
-    
+
     const startStr = formatICSDate(startDate);
     const endStr = formatICSDate(endDate);
     const nowStr = formatICSDate(new Date());
-    
+
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//PROXe//Booking Calendar//EN',
+      'PRODID:-//Windchasers//Booking Calendar//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      `UID:${Date.now()}@proxe.com`,
+      `UID:${Date.now()}@windchasers.in`,
       `DTSTAMP:${nowStr}`,
       `DTSTART:${startStr}`,
       `DTEND:${endStr}`,
-      `SUMMARY:PROXe Demo`,
-      `DESCRIPTION:Meeting Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
-      `LOCATION:Online Meeting`,
+      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'Aviation Consultation'}`,
+      `DESCRIPTION:Consultation Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
+      `LOCATION:${formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)'}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',
@@ -424,7 +425,7 @@ export function BookingCalendarWidget({
       'END:VEVENT',
       'END:VCALENDAR'
     ].join('\r\n');
-    
+
     return icsContent;
   };
 
@@ -457,14 +458,14 @@ export function BookingCalendarWidget({
           <h2 className={styles.confirmationTitle}>Booking Confirmed!</h2>
           <div className={styles.confirmationText}>
             <span>Your demo is scheduled for</span>
-            <strong>{selectedDate?.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
+            <strong>{selectedDate?.toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric'
             })} at {selectedTime} - {getEndTime(selectedTime!)}</strong>
           </div>
           <div className={styles.calendarActions}>
-            <button 
+            <button
               onClick={handleOpenGoogleCalendar}
               className={styles.addToCalendarButton}
             >
@@ -488,17 +489,17 @@ export function BookingCalendarWidget({
         <div className={styles.formContainer}>
           <h2 className={styles.formTitle}>Booking Details</h2>
           <p className={styles.formSubtitle}>
-            {selectedDate?.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
+            {selectedDate?.toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric'
             })} at {selectedTime} - {getEndTime(selectedTime!)}
           </p>
-          
+
           {bookingError && (
             <div className={isWarning ? styles.warningMessage : styles.errorMessage}>{bookingError}</div>
           )}
-          
+
           <form onSubmit={handleFormSubmit} className={styles.bookingForm}>
             <div className={styles.formGroup}>
               <input
@@ -541,9 +542,9 @@ export function BookingCalendarWidget({
                 Session Type <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   cursor: 'pointer',
                   padding: '10px 16px',
                   border: `2px solid ${formData.sessionType === 'online' ? '#3b82f6' : '#e5e7eb'}`,
@@ -565,9 +566,9 @@ export function BookingCalendarWidget({
                   />
                   <span>Online Session</span>
                 </label>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   cursor: 'pointer',
                   padding: '10px 16px',
                   border: `2px solid ${formData.sessionType === 'offline' ? '#3b82f6' : '#e5e7eb'}`,
@@ -657,7 +658,7 @@ export function BookingCalendarWidget({
                 const isSelected = selectedDate?.toDateString() === day.toDateString();
                 const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
                 const isSunday = day.getDay() === 0;
-                
+
                 return (
                   <button
                     key={index}

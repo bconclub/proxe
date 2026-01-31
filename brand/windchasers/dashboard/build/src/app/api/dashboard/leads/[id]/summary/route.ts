@@ -33,12 +33,14 @@ export async function GET(
     // if (!user) {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     // }
-    
+
     // Use a placeholder user ID for logging (since auth is disabled)
     const user = { id: 'system' }
 
     const leadId = params.id
-    console.log('Generating summary for lead:', leadId)
+    const { searchParams } = new URL(request.url)
+    const forceRefresh = searchParams.get('refresh') === 'true'
+    console.log('Generating summary for lead:', leadId, { forceRefresh })
 
     // Fetch lead data
     const { data: lead, error: leadError } = await supabase
@@ -67,10 +69,10 @@ export async function GET(
     const webSummary = lead.unified_context?.web?.conversation_summary
     const whatsappSummary = lead.unified_context?.whatsapp?.conversation_summary
 
-    // Priority 1: Use unified_summary if it exists
-    if (unifiedSummary) {
+    // Priority 1: Use unified_summary if it exists (unless forced refresh)
+    if (unifiedSummary && !forceRefresh) {
       console.log('Using unified_summary from unified_context for lead:', leadId)
-      
+
       // Still need to fetch activities and stage history for attribution
       const { data: lastStageChangeData } = await supabase
         .from('stage_history')
@@ -78,7 +80,7 @@ export async function GET(
         .eq('lead_id', leadId)
         .order('changed_at', { ascending: false })
         .limit(1)
-      
+
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
@@ -100,26 +102,26 @@ export async function GET(
         const changedBy = lastStageChange.changed_by
         let actorName = 'PROXe AI'
         let action = `changed stage to ${lastStageChange.new_stage}`
-        
+
         if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
           const { data: user } = await supabase
             .from('dashboard_users')
             .select('name, email')
             .eq('id', changedBy)
             .single()
-          
+
           if (user) {
             actorName = user.name || user.email || 'Team Member'
           }
         }
-        
+
         const timeAgo = formatTimeAgo(lastStageChange.changed_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
         // dashboard_users is an array from the relation query, get first element
-        const creator = Array.isArray(latestActivity.dashboard_users) 
-          ? latestActivity.dashboard_users[0] 
+        const creator = Array.isArray(latestActivity.dashboard_users)
+          ? latestActivity.dashboard_users[0]
           : latestActivity.dashboard_users
         const actorName = creator?.name || creator?.email || 'Team Member'
         const timeAgo = formatTimeAgo(latestActivity.created_at)
@@ -177,10 +179,10 @@ export async function GET(
     }
 
     // Priority 2: Generate unified summary from web and whatsapp summaries if they exist
-    // (but unified_summary doesn't exist yet)
-    if (webSummary || whatsappSummary) {
+    // (but unified_summary doesn't exist yet, or we're refreshing)
+    if ((webSummary || whatsappSummary) || forceRefresh) {
       console.log('Generating unified summary from web/whatsapp summaries for lead:', leadId)
-      
+
       // Fetch additional context needed for unified summary generation
       const { data: lastStageChangeData } = await supabase
         .from('stage_history')
@@ -188,7 +190,7 @@ export async function GET(
         .eq('lead_id', leadId)
         .order('changed_at', { ascending: false })
         .limit(1)
-      
+
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
@@ -241,8 +243,8 @@ export async function GET(
       // Build activities context
       const activitiesContext = recentActivities
         ?.map(a => {
-          const creator = Array.isArray(a.dashboard_users) 
-            ? a.dashboard_users[0] 
+          const creator = Array.isArray(a.dashboard_users)
+            ? a.dashboard_users[0]
             : a.dashboard_users
           return `[${a.created_at}] ${creator?.name || creator?.email || 'Team'}: ${a.activity_type} - ${a.note}`
         })
@@ -287,23 +289,17 @@ export async function GET(
           const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead by intelligently combining information from multiple communication channels. The summary should be informative and provide a complete picture of the lead's journey and status.
 
 FORMAT REQUIREMENTS:
-- Write 3-5 sentences (not just one line)
-- Intelligently merge information from all channels into a cohesive narrative
-- Include context about when they first contacted, through which channel(s)
-- Describe their current status and engagement level across all channels
-- Mention key details like user type, course interest, timeline if available
-- Include any budget, pain points, or specific interests mentioned
-- Note their current stage in the sales funnel
-- Suggest next steps or recommended actions
+- Write exactly 2-3 concise, punchy sentences.
+- Use markdown **bolding** for critical information like course interest, status, or intent.
+- Intelligently merge information from all channels into a single narrative.
+- Summarize first contact, current status, and next steps.
 
 CRITICAL RULES:
-- ONLY state actions explicitly confirmed in messages
-- "ok done" or "sure" does NOT mean signup completed
-- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]"
-- NEVER assume actions that aren't explicitly stated
-- Use actual message content, not inferred intent
-- Be descriptive and provide context, not just a single sentence
-- Create a unified narrative that flows naturally, don't just list channel summaries
+- BE CONCISE. No fluff. No "This user is...". Just the facts.
+- ONLY state actions explicitly confirmed in messages.
+- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
+- NEVER assume actions that aren't explicitly stated.
+- Use markdown to make the summary scannable.
 
 Lead Information:
 Name: ${lead.customer_name || 'Customer'}
@@ -329,7 +325,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
           // Add timeout to prevent hanging
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-          
+
           let response
           try {
             response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -372,25 +368,25 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
                 const changedBy = lastStageChange.changed_by
                 let actorName = 'PROXe AI'
                 let action = `changed stage to ${lastStageChange.new_stage}`
-                
+
                 if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
                   const { data: user } = await supabase
                     .from('dashboard_users')
                     .select('name, email')
                     .eq('id', changedBy)
                     .single()
-                  
+
                   if (user) {
                     actorName = user.name || user.email || 'Team Member'
                   }
                 }
-                
+
                 const timeAgo = formatTimeAgo(lastStageChange.changed_at)
                 attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
               } else if (recentActivities && recentActivities.length > 0) {
                 const latestActivity = recentActivities[0]
-                const creator = Array.isArray(latestActivity.dashboard_users) 
-                  ? latestActivity.dashboard_users[0] 
+                const creator = Array.isArray(latestActivity.dashboard_users)
+                  ? latestActivity.dashboard_users[0]
                   : latestActivity.dashboard_users
                 const actorName = creator?.name || creator?.email || 'Team Member'
                 const timeAgo = formatTimeAgo(latestActivity.created_at)
@@ -409,6 +405,20 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
                 subStage: lead.sub_stage,
                 bookingDate: bookingDate,
                 bookingTime: bookingTime,
+              }
+
+              // Save the new summary to the database
+              try {
+                const newUnifiedContext = {
+                  ...(lead.unified_context || {}),
+                  unified_summary: unifiedSummary
+                };
+                await supabase
+                  .from('all_leads')
+                  .update({ unified_context: newUnifiedContext })
+                  .eq('id', leadId);
+              } catch (dbError) {
+                console.error('Error saving updated unified_summary:', dbError);
               }
 
               return NextResponse.json({
@@ -440,7 +450,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
       } else if (whatsappSummary) {
         fallbackSummary = `${lead.customer_name || 'Customer'} engaged via WhatsApp. ${whatsappSummary} Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
       }
-      
+
       // Safety check: ensure we always have a summary
       if (!fallbackSummary || fallbackSummary.trim() === '') {
         fallbackSummary = `${lead.customer_name || 'Customer'} is currently in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
@@ -452,25 +462,25 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
         const changedBy = lastStageChange.changed_by
         let actorName = 'PROXe AI'
         let action = `changed stage to ${lastStageChange.new_stage}`
-        
+
         if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
           const { data: user } = await supabase
             .from('dashboard_users')
             .select('name, email')
             .eq('id', changedBy)
             .single()
-          
+
           if (user) {
             actorName = user.name || user.email || 'Team Member'
           }
         }
-        
+
         const timeAgo = formatTimeAgo(lastStageChange.changed_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
-        const creator = Array.isArray(latestActivity.dashboard_users) 
-          ? latestActivity.dashboard_users[0] 
+        const creator = Array.isArray(latestActivity.dashboard_users)
+          ? latestActivity.dashboard_users[0]
           : latestActivity.dashboard_users
         const actorName = creator?.name || creator?.email || 'Team Member'
         const timeAgo = formatTimeAgo(latestActivity.created_at)
@@ -632,7 +642,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
       .eq('lead_id', leadId)
       .order('changed_at', { ascending: false })
       .limit(1)
-    
+
     const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
     // Generate AI summary if Claude API key is available
@@ -648,8 +658,8 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
         const activitiesContext = recentActivities
           ?.map(a => {
             // dashboard_users is an array from the relation query, get first element
-            const creator = Array.isArray(a.dashboard_users) 
-              ? a.dashboard_users[0] 
+            const creator = Array.isArray(a.dashboard_users)
+              ? a.dashboard_users[0]
               : a.dashboard_users
             return `[${a.created_at}] ${creator?.name || creator?.email || 'Team'}: ${a.activity_type} - ${a.note}`
           })
@@ -690,21 +700,16 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
         const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead. The summary should be informative and provide a complete picture of the lead's journey and status.
 
 FORMAT REQUIREMENTS:
-- Write 3-5 sentences (not just one line)
-- Include context about when they first contacted, through which channel
-- Describe their current status and engagement level
-- Mention key details like user type, course interest, timeline if available
-- Include any budget, pain points, or specific interests mentioned
-- Note their current stage in the sales funnel
-- Suggest next steps or recommended actions
+- Write exactly 2-3 concise, punchy sentences.
+- Use markdown **bolding** for critical information like course interest, status, or intent.
+- Summarize first contact, current status, and next steps.
 
 CRITICAL RULES:
-- ONLY state actions explicitly confirmed in messages
-- "ok done" or "sure" does NOT mean signup completed
-- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]"
-- NEVER assume actions that aren't explicitly stated
-- Use actual message content, not inferred intent
-- Be descriptive and provide context, not just a single sentence
+- BE CONCISE. No fluff or filler phrases.
+- ONLY state actions explicitly confirmed in messages.
+- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
+- NEVER assume actions that aren't explicitly stated.
+- Use markdown to make the summary scannable.
 
 Lead Information:
 Name: ${summaryData.leadName}
@@ -732,7 +737,7 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         // Add timeout to prevent hanging
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-        
+
         let response
         try {
           response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -769,13 +774,27 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
           const data = await response.json()
           const aiSummary = data.content?.[0]?.text || ''
           if (aiSummary) {
+            // Save the new summary to the database
+            try {
+              const newUnifiedContext = {
+                ...(lead.unified_context || {}),
+                unified_summary: aiSummary
+              };
+              await supabase
+                .from('all_leads')
+                .update({ unified_context: newUnifiedContext })
+                .eq('id', leadId);
+            } catch (dbError) {
+              console.error('Error saving regenerated unified_summary:', dbError);
+            }
+
             // Build attribution
             let attribution = ''
             if (lastStageChange) {
               const changedBy = lastStageChange.changed_by
               let actorName = 'PROXe AI'
               let action = `changed stage to ${lastStageChange.new_stage}`
-              
+
               if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
                 // Try to get user name
                 const { data: user } = await supabase
@@ -783,21 +802,22 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
                   .select('name, email')
                   .eq('id', changedBy)
                   .single()
-                
+
                 if (user) {
                   actorName = user.name || user.email || 'Team Member'
                 }
               }
-              
+
               const timeAgo = formatTimeAgo(lastStageChange.changed_at)
               attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
             } else if (recentActivities && recentActivities.length > 0) {
               const latestActivity = recentActivities[0]
-              const creator = Array.isArray(latestActivity.dashboard_users) 
-                ? latestActivity.dashboard_users[0] 
+              const creator = Array.isArray(latestActivity.dashboard_users)
+                ? latestActivity.dashboard_users[0]
                 : latestActivity.dashboard_users
               const actorName = creator?.name || creator?.email || 'Team Member'
               const timeAgo = formatTimeAgo(latestActivity.created_at)
+
               attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
             } else if (summaryData.lastMessage) {
               const sender = summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'
@@ -884,19 +904,19 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
       const changedBy = lastStageChange.changed_by
       let actorName = 'PROXe AI'
       let action = `changed stage to ${lastStageChange.new_stage}`
-      
+
       if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
         const { data: user } = await supabase
           .from('dashboard_users')
           .select('name, email')
           .eq('id', changedBy)
           .single()
-        
+
         if (user) {
           actorName = user.name || user.email || 'Team Member'
         }
       }
-      
+
       const timeAgo = formatTimeAgo(lastStageChange.changed_at)
       attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
     }

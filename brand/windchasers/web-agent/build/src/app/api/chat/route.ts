@@ -47,7 +47,7 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
         kbResults.forEach((item: any) => {
           // Format content combining question, answer, and content fields
           let contentParts: string[] = [];
-          
+
           if (item.question) {
             contentParts.push(`Q: ${item.question}`);
           }
@@ -57,8 +57,8 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
           if (item.content) {
             contentParts.push(item.content);
           }
-          
-          const content = contentParts.length > 0 
+
+          const content = contentParts.length > 0
             ? contentParts.join('\n\n')
             : item.description || item.title || '';
 
@@ -91,7 +91,7 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
         if (fallbackResults && Array.isArray(fallbackResults)) {
           fallbackResults.forEach((item: any) => {
             let contentParts: string[] = [];
-            
+
             if (item.question) {
               contentParts.push(`Q: ${item.question}`);
             }
@@ -101,8 +101,8 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
             if (item.content) {
               contentParts.push(item.content);
             }
-            
-            const content = contentParts.length > 0 
+
+            const content = contentParts.length > 0
               ? contentParts.join('\n\n')
               : item.description || item.title || '';
 
@@ -139,7 +139,7 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
               .limit(perColumnLimit),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
           ]) as any;
-          
+
           if (!result.error && result.data) {
             tableResults.push(...result.data);
           }
@@ -197,16 +197,16 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
     });
 
     // Sort by priority: knowledge_base first (highest priority), then by relevance
-    const priorityOrder: Record<string, number> = { 
-      'knowledge_base': 4, 
-      'system_prompts': 3, 
-      'agents': 2, 
-      'conversation_states': 1, 
-      'cta_triggers': 1, 
-      'model_context': 0, 
-      'chatbot_responses': 1 
+    const priorityOrder: Record<string, number> = {
+      'knowledge_base': 4,
+      'system_prompts': 3,
+      'agents': 2,
+      'conversation_states': 1,
+      'cta_triggers': 1,
+      'model_context': 0,
+      'chatbot_responses': 1
     };
-    
+
     const sortedResults = allResults.sort((a, b) => {
       const priorityDiff = (priorityOrder[b.metadata.table] || 0) - (priorityOrder[a.metadata.table] || 0);
       if (priorityDiff !== 0) return priorityDiff;
@@ -215,7 +215,7 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
       const relevanceB = b.metadata.relevance || 0;
       return relevanceB - relevanceA;
     });
-    
+
     return sortedResults.slice(0, limit * 3);
   } catch (error) {
     console.error('[Search KB] Error in searchKnowledgeBase:', error);
@@ -277,7 +277,7 @@ Output ONLY the button label text. No quotes. No explanation.`;
 
       // Use environment variable for model, fallback to claude-haiku-4-5-20251001
       const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
-      
+
       const followUpResponse = await anthropic.messages.create({
         model: model,
         max_tokens: 60,
@@ -332,7 +332,7 @@ Output ONLY the label text. No quotes. No explanation.`;
 
     // Use environment variable for model, fallback to claude-haiku-4-5-20251001
     const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
-    
+
     const followUpResponse = await anthropic.messages.create({
       model: model,
       max_tokens: 60,
@@ -363,15 +363,15 @@ Output ONLY the label text. No quotes. No explanation.`;
 function areSimilarBookingButtons(button1: string, button2: string): boolean {
   const lower1 = button1.toLowerCase().trim();
   const lower2 = button2.toLowerCase().trim();
-  
+
   // Exact match
   if (lower1 === lower2) return true;
-  
+
   // Check if both contain booking-related keywords
   const bookingKeywords = ['call', 'demo', 'book', 'schedule', 'meeting', 'appointment'];
   const hasBooking1 = bookingKeywords.some(keyword => lower1.includes(keyword));
   const hasBooking2 = bookingKeywords.some(keyword => lower2.includes(keyword));
-  
+
   // If both are booking-related, they're similar
   if (hasBooking1 && hasBooking2) {
     // Check if they have the same core action (call or demo)
@@ -379,13 +379,13 @@ function areSimilarBookingButtons(button1: string, button2: string): boolean {
     const hasCall2 = lower2.includes('call');
     const hasDemo1 = lower1.includes('demo');
     const hasDemo2 = lower2.includes('demo');
-    
+
     // If both mention "call" or both mention "demo", they're similar
     if ((hasCall1 && hasCall2) || (hasDemo1 && hasDemo2)) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -424,7 +424,7 @@ export async function POST(request: NextRequest) {
     const memoryMetadata = metadata.memory || {};
     const userProfile = sessionMetadata.user || {};
     const externalSessionId = sessionMetadata.externalId || sessionMetadata.externalSessionId || sessionMetadata.sessionId || null;
-    
+
     // Debug: Log profile data received
     // NOTE: Client sends user.name, user.email, user.phone (not userName)
     console.log('[Chat API] Profile data received from client:', {
@@ -440,16 +440,16 @@ export async function POST(request: NextRequest) {
     const summary: string = typeof memoryMetadata.summary === 'string' ? memoryMetadata.summary : '';
     const recentHistory: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(memoryMetadata.recentHistory)
       ? memoryMetadata.recentHistory
-          .filter(
-            (entry: any) =>
-              entry &&
-              (entry.role === 'user' || entry.role === 'assistant') &&
-              typeof entry.content === 'string'
-          )
-          .map((entry: any) => ({
-            role: entry.role,
-            content: entry.content,
-          }))
+        .filter(
+          (entry: any) =>
+            entry &&
+            (entry.role === 'user' || entry.role === 'assistant') &&
+            typeof entry.content === 'string'
+        )
+        .map((entry: any) => ({
+          role: entry.role,
+          content: entry.content,
+        }))
       : [];
 
     if (!message || message.trim() === '') {
@@ -460,20 +460,15 @@ export async function POST(request: NextRequest) {
 
     // Track every interaction: Save user input to web_sessions and update message count
     if (externalSessionId) {
-      // Update message count and last_message_at
-      addUserInput(externalSessionId, message, undefined, 'windchasers' as 'windchasers').catch(err => {
-        console.error('[Chat API] Failed to save user input:', err);
-      });
-
       // Extract user profile data from message and button clicks
       const lowerMessage = message.toLowerCase();
       const profileUpdates: any = {};
-      
+
       // Track button clicks
       if (usedButtons && usedButtons.length > 0) {
         profileUpdates.button_clicks = usedButtons;
       }
-      
+
       // Track questions asked
       const questions: string[] = [];
       if (lowerMessage.includes('cost') || lowerMessage.includes('price') || lowerMessage.includes('fee')) {
@@ -521,7 +516,13 @@ export async function POST(request: NextRequest) {
         profileUpdates.timeline = '1yr+';
       }
 
-      // Update Windchasers profile if we have any data
+      // Update message count and last_message_at with structured data
+      // This ensures data is captured in the session even if no lead exists yet
+      addUserInput(externalSessionId, message, undefined, 'windchasers' as 'windchasers', profileUpdates).catch(err => {
+        console.error('[Chat API] Failed to save user input:', err);
+      });
+
+      // Update Windchasers profile if we have any data (directly to all_leads if leadId exists)
       if (Object.keys(profileUpdates).length > 0) {
         updateWindchasersProfile(externalSessionId, profileUpdates, 'windchasers').catch(err => {
           console.error('[Chat API] Failed to update Windchasers profile:', err);
@@ -539,8 +540,8 @@ export async function POST(request: NextRequest) {
     // Check if we have any AI provider available
     if (!anthropic) {
       return Response.json(
-        { 
-          error: 'No AI provider configured. Please set CLAUDE_API_KEY in environment variables.' 
+        {
+          error: 'No AI provider configured. Please set CLAUDE_API_KEY in environment variables.'
         },
         { status: 500 }
       );
@@ -551,12 +552,12 @@ export async function POST(request: NextRequest) {
     // Check if this is a booking attempt and if user already has a booking
     const containsBookingKeywords = (text: string): boolean => {
       const lowerText = text.toLowerCase().trim();
-      return lowerText.includes('call') || 
-             lowerText.includes('demo') || 
-             lowerText.includes('book') ||
-             lowerText.includes('schedule') ||
-             lowerText.includes('meeting') ||
-             lowerText.includes('appointment');
+      return lowerText.includes('call') ||
+        lowerText.includes('demo') ||
+        lowerText.includes('book') ||
+        lowerText.includes('schedule') ||
+        lowerText.includes('meeting') ||
+        lowerText.includes('appointment');
     };
 
     const isBookingAttempt = containsBookingKeywords(message);
@@ -605,7 +606,7 @@ export async function POST(request: NextRequest) {
     const isThirdMessage = messageCount === 3;
 
     // If user already has a booking, modify the message to inform them
-    const finalMessage = existingBookingMessage 
+    const finalMessage = existingBookingMessage
       ? `${existingBookingMessage}\n\nUser's message: ${message}`
       : message;
 
@@ -642,7 +643,7 @@ export async function POST(request: NextRequest) {
 
           // Use environment variable for model, fallback to claude-haiku-4-5-20251001
           const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
-          
+
           console.log('[Chat API] Starting Claude stream', {
             hasApiKey: Boolean(claudeApiKey),
             model: model,
@@ -653,7 +654,7 @@ export async function POST(request: NextRequest) {
           const maxRetries = 3;
           let lastError: any = null;
           let anthropicStream;
-          
+
           for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
               if (attempt > 0) {
@@ -661,10 +662,10 @@ export async function POST(request: NextRequest) {
                 console.log(`[Chat API] Retry attempt ${attempt}/${maxRetries} after ${retryDelay}ms`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
               }
-              
-    // Use environment variable for model, fallback to claude-haiku-4-5-20251001
-    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
-              
+
+              // Use environment variable for model, fallback to claude-haiku-4-5-20251001
+              const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+
               anthropicStream = await anthropic.messages.stream({
                 model: model,
                 max_tokens: 768,
@@ -679,9 +680,9 @@ export async function POST(request: NextRequest) {
             } catch (streamError: any) {
               lastError = streamError;
               const errorType = streamError?.error?.type;
-              const isOverloaded = errorType === 'overloaded_error' || 
-                                   streamError?.message?.includes('overloaded');
-              
+              const isOverloaded = errorType === 'overloaded_error' ||
+                streamError?.message?.includes('overloaded');
+
               console.error(`[Chat API] Stream creation failed (attempt ${attempt + 1}/${maxRetries + 1}):`, {
                 error: streamError,
                 message: streamError?.message,
@@ -690,14 +691,14 @@ export async function POST(request: NextRequest) {
                 isOverloaded: isOverloaded,
                 status: streamError?.status,
               });
-              
+
               // Only retry on overloaded errors, not on other errors
               if (!isOverloaded || attempt >= maxRetries) {
                 throw streamError;
               }
             }
           }
-          
+
           if (!anthropicStream) {
             throw lastError || new Error('Failed to create stream after retries');
           }
@@ -710,13 +711,13 @@ export async function POST(request: NextRequest) {
                 // Process content block deltas with text
                 if (chunk.type === 'content_block_delta' && 'delta' in chunk && chunk.delta && chunk.delta.type === 'text_delta') {
                   const text = chunk.delta.text || '';
-                  console.log('[Chat API] Processing text delta:', { 
+                  console.log('[Chat API] Processing text delta:', {
                     textType: typeof text,
                     textLength: text?.length,
                     textPreview: typeof text === 'string' ? text.substring(0, 50) : text,
                     deltaType: chunk.delta?.type
                   });
-                  
+
                   if (text && typeof text === 'string') {
                     rawResponse += text;
                     const sseData = `data: ${JSON.stringify({ type: 'chunk', text: text })}\n\n`;
@@ -746,7 +747,7 @@ export async function POST(request: NextRequest) {
               retryAfter: streamError?.headers?.get?.('retry-after'),
               stack: streamError?.stack,
             });
-            
+
             // If the error message contains JSON with error info, extract it
             if (streamError?.message && streamError.message.includes('"type":"error"')) {
               try {
@@ -758,13 +759,13 @@ export async function POST(request: NextRequest) {
                 // Not JSON, continue
               }
             }
-            
+
             // Check if this is an overloaded error that happened during iteration
             // (not during creation, so retry logic didn't catch it)
-            const errorType = streamError?.error?.type || 
-                             (streamError?.message?.includes('"type":"error"') ? 
-                               JSON.parse(streamError.message)?.error?.type : null);
-            
+            const errorType = streamError?.error?.type ||
+              (streamError?.message?.includes('"type":"error"') ?
+                JSON.parse(streamError.message)?.error?.type : null);
+
             if (errorType === 'overloaded_error') {
               // This error happened during stream iteration, not creation
               // We can't retry the stream at this point, but we can show a helpful message
@@ -772,7 +773,7 @@ export async function POST(request: NextRequest) {
               const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : 6;
               throw { ...streamError, retrySeconds, isOverloaded: true };
             }
-            
+
             throw streamError; // Re-throw to be caught by outer catch
           }
 
@@ -792,7 +793,7 @@ export async function POST(request: NextRequest) {
           const userName = userProfile?.name || userProfile?.userName;
           const userEmail = userProfile?.email;
           const userPhone = userProfile?.phone;
-          
+
           if (externalSessionId && (userName || userEmail || userPhone)) {
             console.log('[Chat API] ✓ Updating session profile with client data:', {
               hasName: !!userName,
@@ -807,7 +808,7 @@ export async function POST(request: NextRequest) {
               fullUserProfile: userProfile,
               externalSessionId
             });
-            
+
             try {
               const updateResultLeadId = await updateSessionProfile(
                 externalSessionId,
@@ -819,13 +820,13 @@ export async function POST(request: NextRequest) {
                 },
                 brand as 'windchasers'
               );
-              
+
               console.log('[Chat API] updateSessionProfile completed', {
                 hasResult: !!updateResultLeadId,
                 leadId: updateResultLeadId,
                 externalSessionId
               });
-              
+
               // Use leadId from updateSessionProfile if available
               if (updateResultLeadId) {
                 leadId = updateResultLeadId;
@@ -866,12 +867,12 @@ export async function POST(request: NextRequest) {
                   .select('lead_id, customer_name, customer_email, customer_phone')
                   .eq('external_session_id', externalSessionId)
                   .single();
-                
+
                 if (sessionError) {
                   console.error('[Chat API] Error fetching session:', sessionError);
                 } else {
                   leadId = session?.lead_id || null;
-                  
+
                   console.log('[Chat API] Fetched session data:', {
                     leadId,
                     hasPhone: !!session?.customer_phone,
@@ -881,14 +882,14 @@ export async function POST(request: NextRequest) {
                     email: session?.customer_email,
                     name: session?.customer_name
                   });
-                  
+
                   // If no lead_id but we have profile data, try to ensure/create the lead
                   // Use database data first, fallback to client profile data
                   // NOTE: Client sends user.name (not userName)
                   const profileName = session?.customer_name || userProfile?.name || userProfile?.userName || null;
                   const profileEmail = session?.customer_email || userProfile?.email || null;
                   const profilePhone = session?.customer_phone || userProfile?.phone || null;
-                  
+
                   // Try to create lead if we have phone (phone is REQUIRED)
                   if (!leadId && profilePhone) {
                     console.log('[Chat API] No lead_id found, attempting to ensure lead exists', {
@@ -897,7 +898,7 @@ export async function POST(request: NextRequest) {
                       phone: profilePhone ? profilePhone.substring(0, 5) + '...' : null,
                       email: profileEmail
                     });
-                    
+
                     const createdLeadId = await ensureAllLeads(
                       profileName,
                       profileEmail,
@@ -905,9 +906,9 @@ export async function POST(request: NextRequest) {
                       brand as 'windchasers',
                       externalSessionId
                     );
-                    
+
                     console.log('[Chat API] ensureAllLeads result:', createdLeadId);
-                    
+
                     if (createdLeadId) {
                       // Update web_sessions with the new lead_id
                       // Use service client for update to bypass RLS if available
@@ -916,7 +917,7 @@ export async function POST(request: NextRequest) {
                         .from('web_sessions')
                         .update({ lead_id: createdLeadId })
                         .eq('external_session_id', externalSessionId);
-                      
+
                       if (updateError) {
                         console.error('[Chat API] Failed to update web_sessions with lead_id:', updateError);
                       } else {
@@ -960,14 +961,14 @@ export async function POST(request: NextRequest) {
                   .select('lead_id, customer_phone, customer_email')
                   .eq('external_session_id', externalSessionId)
                   .maybeSingle();
-                
+
                 if (fetchError) {
                   console.error('[Chat API] Error fetching leadId from session:', fetchError);
                 } else if (sessionData?.lead_id) {
                   leadId = sessionData.lead_id;
                   console.log('[Chat API] ✓ Fetched leadId from session:', leadId);
                 } else {
-                  console.log('[Chat API] No lead_id found in session yet', { 
+                  console.log('[Chat API] No lead_id found in session yet', {
                     externalSessionId,
                     hasPhone: !!sessionData?.customer_phone,
                     hasEmail: !!sessionData?.customer_email
@@ -978,26 +979,26 @@ export async function POST(request: NextRequest) {
               console.error('[Chat API] Exception fetching leadId before message log:', fetchErr);
             }
           }
-          
+
           console.log('[Chat API] Checking if lead_id exists for customer message logging...', {
             hasLeadId: !!leadId,
             leadId: leadId || 'NULL',
             messageLength: message?.length || 0,
             externalSessionId
           });
-          
+
           if (leadId) {
             console.log('[Chat API] ✓ Lead ID exists:', leadId);
             console.log('[Chat API] Customer message:', message);
             console.log('[Chat API] About to call logMessage() for customer message to "conversations" table...');
-            
+
             try {
               console.log('=== BEFORE CUSTOMER LOG ===');
               const customerLogResult = await logMessage(leadId, 'web', 'customer', message, 'text', {
                 input_received_at: inputReceivedAt
               });
               console.log('=== AFTER CUSTOMER LOG ===');
-              
+
               console.log('[Chat API] Insert result (customer):', customerLogResult ? '✓ Success' : '✗ Failed', {
                 messageId: customerLogResult?.id || null,
                 leadId,
@@ -1017,14 +1018,11 @@ export async function POST(request: NextRequest) {
             // CRITICAL DEBUG: Log why leadId is null - this is the root cause
             console.error('[Chat API] ✗✗✗ CRITICAL: leadId is NULL when trying to log customer message', {
               externalSessionId,
-              hasUpdateSessionProfileResult: !!updateResultLeadId,
-              updateResultLeadId,
-              updateResultLeadIdValue: updateResultLeadId || 'NULL',
               currentLeadId: leadId || 'NULL',
               message: 'This message will NOT be logged - messages require leadId',
               troubleshooting: 'Check if updateSessionProfile returned leadId and if it was assigned to leadId variable'
             });
-            
+
             console.log('[Chat API] ✗ No lead_id available, skipping customer message logging', {
               externalSessionId,
               hasSupabaseClient: !!getSupabaseClient(),
@@ -1045,14 +1043,14 @@ export async function POST(request: NextRequest) {
                   .select('lead_id, customer_phone, customer_email')
                   .eq('external_session_id', externalSessionId)
                   .maybeSingle();
-                
+
                 if (fetchError) {
                   console.error('[Chat API] Error fetching leadId from session for agent log:', fetchError);
                 } else if (sessionData?.lead_id) {
                   leadId = sessionData.lead_id;
                   console.log('[Chat API] ✓ Fetched leadId from session for agent log:', leadId);
                 } else {
-                  console.log('[Chat API] No lead_id found in session for agent log', { 
+                  console.log('[Chat API] No lead_id found in session for agent log', {
                     externalSessionId,
                     hasPhone: !!sessionData?.customer_phone,
                     hasEmail: !!sessionData?.customer_email
@@ -1063,7 +1061,7 @@ export async function POST(request: NextRequest) {
               console.error('[Chat API] Exception fetching leadId before agent log:', fetchErr);
             }
           }
-          
+
           console.log('[Chat API] Checking if lead_id and response exist for AI response logging...', {
             hasLeadId: !!leadId,
             leadId: leadId || 'NULL',
@@ -1071,14 +1069,14 @@ export async function POST(request: NextRequest) {
             responseLength: cleanedResponse?.length || 0,
             externalSessionId
           });
-          
+
           if (leadId && cleanedResponse) {
             const outputSentAt = Date.now();
-            
+
             console.log('[Chat API] ✓ Lead ID exists:', leadId);
             console.log('[Chat API] AI response (preview):', cleanedResponse.substring(0, 100) + '...');
             console.log('[Chat API] About to call logMessage() for agent response to "conversations" table...');
-            
+
             try {
               console.log('=== BEFORE AGENT LOG ===');
               const agentLogResult = await logMessage(leadId, 'web', 'agent', cleanedResponse, 'text', {
@@ -1087,7 +1085,7 @@ export async function POST(request: NextRequest) {
                 input_to_output_gap_ms: outputSentAt - inputReceivedAt
               });
               console.log('=== AFTER AGENT LOG ===');
-              
+
               console.log('[Chat API] Insert result (agent):', agentLogResult ? '✓ Success' : '✗ Failed', {
                 messageId: agentLogResult?.id || null,
                 leadId,
@@ -1115,7 +1113,7 @@ export async function POST(request: NextRequest) {
           // Generate follow-ups based on 3-2-1 button structure
           const lowerMessage = message.toLowerCase();
           const isFirstMessage = messageCount === 1 || messageCount === 0;
-          
+
           // Check if user already has a booking scheduled
           let hasExistingBooking = false;
           let existingBookingDetails = null;
@@ -1126,7 +1124,7 @@ export async function POST(request: NextRequest) {
                 userProfile.email || null,
                 normalizedBrand as 'windchasers'
               );
-              
+
               if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
                 hasExistingBooking = true;
                 existingBookingDetails = existingBooking;
@@ -1136,27 +1134,27 @@ export async function POST(request: NextRequest) {
               console.error('[Chat API] Error checking existing booking for button filtering:', bookingCheckError);
             }
           }
-          
+
           // Get brand config
           const brandConfig = windchasersConfig;
           const exploreButtons = brandConfig.exploreButtons || [];
-          
+
           // Helper function to check if a button is booking-related
           const isBookingButton = (button: string): boolean => {
             const lowerButton = button.toLowerCase();
             const bookingKeywords = ['book', 'schedule', 'call', 'demo', 'meeting', 'appointment'];
             return bookingKeywords.some(keyword => lowerButton.includes(keyword));
           };
-          
+
           let followUpsArray: string[] = [];
-          
+
           // Track used buttons (normalize to lowercase for comparison)
           const usedButtonsLower = (usedButtons || []).map((b: string) => b.toLowerCase());
-          
+
           // Check if user clicked "Explore Training Options" - show 4 program buttons
-          const isExploreTrainingClick = lowerMessage.includes('explore training options') || 
-                                         lowerMessage.includes('explore training');
-          
+          const isExploreTrainingClick = lowerMessage.includes('explore training options') ||
+            lowerMessage.includes('explore training');
+
           if (isExploreTrainingClick && exploreButtons.length > 0) {
             // Show all 4 program buttons
             followUpsArray = exploreButtons;
@@ -1164,12 +1162,12 @@ export async function POST(request: NextRequest) {
           // If user has existing booking, filter out booking buttons
           else if (hasExistingBooking) {
             const bookingActionButtons = ['Reschedule Call', 'View Booking Details'];
-            
+
             // First message: 2 buttons (non-booking + booking actions)
             if (isFirstMessage) {
               const nonBookingButtons = ['Get Course Details', 'Check Eligibility', 'Financing Options'];
               followUpsArray = [...nonBookingButtons, ...bookingActionButtons].slice(0, 2);
-            } 
+            }
             // Subsequent messages: 1 button
             else {
               const availableButtons = [
@@ -1178,12 +1176,12 @@ export async function POST(request: NextRequest) {
                 'Financing Options',
                 ...bookingActionButtons
               ];
-              
+
               const unusedButtons = availableButtons.filter(btn => {
                 const lowerBtn = btn.toLowerCase();
                 return !usedButtonsLower.includes(lowerBtn) && !isSimilarToAny(btn, usedButtons);
               });
-              
+
               const buttonsToChooseFrom = unusedButtons.length > 0 ? unusedButtons : availableButtons;
               if (buttonsToChooseFrom.length > 0) {
                 const randomIndex = Math.floor(Math.random() * buttonsToChooseFrom.length);
@@ -1192,19 +1190,19 @@ export async function POST(request: NextRequest) {
                 followUpsArray = ['Reschedule Call'];
               }
             }
-          } 
+          }
           // Normal flow: 3-2-1 button structure
           else {
             // First message: Generate 2 contextual buttons using Claude
             if (isFirstMessage) {
               try {
                 const generatedButtons = await generateFollowUpSuggestion(message, cleanedResponse, messageCount);
-                
+
                 if (generatedButtons) {
                   // Claude returns a single button, we need 2 for first message
                   // Generate second button based on context
                   const lowerResponse = cleanedResponse.toLowerCase();
-                  
+
                   // Default button pool for first message
                   const firstMessagePool = [
                     'Explore Training Options',
@@ -1213,20 +1211,20 @@ export async function POST(request: NextRequest) {
                     'Check Eligibility',
                     'Learn More'
                   ];
-                  
+
                   // Filter out the generated button and used buttons
                   const availableButtons = firstMessagePool.filter(btn => {
                     const lowerBtn = btn.toLowerCase();
-                    return lowerBtn !== generatedButtons.toLowerCase() && 
-                           !usedButtonsLower.includes(lowerBtn) &&
-                           !isSimilarToAny(btn, [generatedButtons, ...usedButtons]);
+                    return lowerBtn !== generatedButtons.toLowerCase() &&
+                      !usedButtonsLower.includes(lowerBtn) &&
+                      !isSimilarToAny(btn, [generatedButtons, ...usedButtons]);
                   });
-                  
+
                   // Select second button
-                  const secondButton = availableButtons.length > 0 
+                  const secondButton = availableButtons.length > 0
                     ? availableButtons[Math.floor(Math.random() * availableButtons.length)]
                     : 'Book a Demo Session';
-                  
+
                   followUpsArray = [generatedButtons, secondButton].filter(Boolean);
                 } else {
                   // Fallback: use contextual buttons
@@ -1244,28 +1242,28 @@ export async function POST(request: NextRequest) {
                 // Fallback
                 followUpsArray = ['Explore Training Options', 'Book a Demo Session'];
               }
-            } 
+            }
             // Subsequent messages: Generate 1 contextual button
             else {
               const lowerResponse = cleanedResponse.toLowerCase();
-              
+
               // Check context for smart button generation
-              const isAskingCost = lowerMessage.includes('cost') || 
-                                  lowerMessage.includes('price') || 
-                                  lowerMessage.includes('fee') ||
-                                  lowerMessage.includes('investment') ||
-                                  lowerResponse.includes('₹') ||
-                                  lowerResponse.includes('lakh');
-              
-              const isInterestedInCourse = lowerMessage.includes('pilot') || 
-                                          lowerMessage.includes('helicopter') ||
-                                          lowerMessage.includes('cabin crew') ||
-                                          lowerMessage.includes('drone') ||
-                                          lowerResponse.includes('program');
-              
+              const isAskingCost = lowerMessage.includes('cost') ||
+                lowerMessage.includes('price') ||
+                lowerMessage.includes('fee') ||
+                lowerMessage.includes('investment') ||
+                lowerResponse.includes('₹') ||
+                lowerResponse.includes('lakh');
+
+              const isInterestedInCourse = lowerMessage.includes('pilot') ||
+                lowerMessage.includes('helicopter') ||
+                lowerMessage.includes('cabin crew') ||
+                lowerMessage.includes('drone') ||
+                lowerResponse.includes('program');
+
               // Build contextual button pool
               let contextualButtons: string[] = [];
-              
+
               if (isAskingCost) {
                 contextualButtons = ['Get Cost Breakdown', 'Financing Options', 'Talk to Counselor'];
               } else if (isInterestedInCourse) {
@@ -1279,15 +1277,15 @@ export async function POST(request: NextRequest) {
                   'Talk to Counselor'
                 ];
               }
-              
+
               // Filter out used buttons
               const unusedButtons = contextualButtons.filter(btn => {
                 const lowerBtn = btn.toLowerCase();
                 return !usedButtonsLower.includes(lowerBtn) && !isSimilarToAny(btn, usedButtons);
               });
-              
+
               const buttonsToChooseFrom = unusedButtons.length > 0 ? unusedButtons : contextualButtons;
-              
+
               // Try to generate with Claude first
               try {
                 const generatedButton = await generateFollowUpSuggestion(message, cleanedResponse, messageCount);
@@ -1312,7 +1310,7 @@ export async function POST(request: NextRequest) {
               }
             }
           }
-          
+
           // Final fallback: ensure we always have at least 1 follow-up button
           if (followUpsArray.length === 0 || !followUpsArray[0]) {
             followUpsArray = hasExistingBooking ? ['Reschedule Call'] : ['Book a Demo Session'];
@@ -1321,17 +1319,17 @@ export async function POST(request: NextRequest) {
           // Send follow-ups and done
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'followUps', followUps: followUpsArray })}\n\n`));
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
-          
+
           // Generate and save conversation summary (async, don't wait)
           // For Windchasers: Generate summary every 5 messages
-          const shouldGenerateSummary = BRAND === 'windchasers' 
+          const shouldGenerateSummary = BRAND === 'windchasers'
             ? (messageCount % 5 === 0 || messageCount === 1) // Every 5 messages or first message
             : true; // For other brands, generate every time
-          
+
           if (externalSessionId && cleanedResponse && shouldGenerateSummary) {
             // Strip HTML from cleanedResponse before using it
             const strippedResponse = cleanedResponse.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-            
+
             // Build conversation history for summarization
             const conversationHistory = [
               ...recentHistory,
@@ -1427,7 +1425,7 @@ export async function POST(request: NextRequest) {
               }
             })();
           }
-          
+
           controller.close();
         } catch (error: any) {
           console.error('[Chat API] Stream error:', {
@@ -1439,12 +1437,12 @@ export async function POST(request: NextRequest) {
             errorType: error?.error?.type,
             stack: error?.stack,
           });
-          
+
           // Extract error details - Claude API error structure is nested
           let claudeErrorType = error?.error?.type;
           let claudeErrorMessage = error?.error?.message;
           const errorMessage = error?.message || error?.toString() || 'Unknown error occurred';
-          
+
           // Try to parse error message if it's JSON (Claude sometimes returns JSON string)
           if (!claudeErrorType && errorMessage && errorMessage.includes('"type":"error"')) {
             try {
@@ -1457,13 +1455,13 @@ export async function POST(request: NextRequest) {
               // Not JSON, continue with original error message
             }
           }
-          
+
           const errorType = claudeErrorType || error?.type || error?.status_code || 'unknown_error';
           const retryAfter = error?.headers?.get?.('retry-after');
-          
+
           // Handle specific error types
           let userFriendlyMessage = claudeErrorMessage || errorMessage;
-          
+
           if (errorType === 'overloaded_error' || errorMessage.toLowerCase().includes('overloaded') || error?.isOverloaded) {
             // Use retrySeconds from error object if available (from stream iteration error)
             const retrySeconds = error?.retrySeconds || (retryAfter ? parseInt(retryAfter, 10) : 6);
@@ -1482,16 +1480,16 @@ export async function POST(request: NextRequest) {
               userFriendlyMessage = `Error: ${claudeErrorMessage || errorMessage}`;
             }
           }
-          
+
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-              type: 'error', 
-              error: userFriendlyMessage 
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: 'error',
+              error: userFriendlyMessage
             })}\n\n`));
           } catch (encodeError) {
             console.error('[Chat API] Failed to encode error:', encodeError);
           }
-          
+
           try {
             controller.close();
           } catch (closeError) {
@@ -1516,7 +1514,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return Response.json(
       { error: 'Error processing request', message: error.message },
-      { 
+      {
         status: 500,
         headers: {
           'Access-Control-Allow-Origin': '*',

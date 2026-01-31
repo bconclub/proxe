@@ -840,9 +840,55 @@ export async function GET(request: NextRequest) {
     //
     // The final score is capped at 100 and stored in all_leads.lead_score
     // This metric shows the average health/quality of all leads in the system.
-    const avgScore = safeLeads.length > 0
-      ? Math.round(safeLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / safeLeads.length)
+    //
+    // IMPORTANT: If lead_score is null/undefined, calculate it on-the-fly using database function
+    // This ensures scores are always available, especially when there's only one lead
+    let totalScore = 0
+    let leadsWithScores = 0
+    
+    for (const lead of safeLeads) {
+      let score = lead.lead_score
+      
+      // If score is null/undefined, try to calculate it using database function
+      if (score === null || score === undefined) {
+        try {
+          const { data: calculatedScore, error: scoreError } = await supabase.rpc('calculate_lead_score', {
+            lead_uuid: lead.id
+          })
+          
+          if (!scoreError && calculatedScore !== null && calculatedScore !== undefined) {
+            score = typeof calculatedScore === 'number' ? calculatedScore : parseFloat(calculatedScore)
+            // Update the lead's score in memory for later use
+            lead.lead_score = score
+          } else {
+            // If calculation fails, default to 0
+            score = 0
+          }
+        } catch (error) {
+          console.warn(`Failed to calculate score for lead ${lead.id}:`, error)
+          score = 0
+        }
+      }
+      
+      totalScore += score || 0
+      leadsWithScores++
+    }
+    
+    const avgScore = leadsWithScores > 0
+      ? Math.round(totalScore / leadsWithScores)
       : 0
+    
+    // Debug logging for score calculation
+    console.log('📊 Average Score Calculation:')
+    console.log(`  - Total leads: ${safeLeads.length}`)
+    console.log(`  - Leads with scores: ${leadsWithScores}`)
+    console.log(`  - Total score sum: ${totalScore}`)
+    console.log(`  - Average score: ${avgScore}`)
+    console.log(`  - Sample lead scores:`, safeLeads.slice(0, 5).map(l => ({
+      id: l.id,
+      name: l.customer_name,
+      score: l.lead_score ?? 'null'
+    })))
     
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)

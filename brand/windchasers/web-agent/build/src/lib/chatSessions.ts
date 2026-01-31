@@ -43,6 +43,11 @@ export interface UserInput {
   input: string;
   intent?: string;
   created_at: string;
+  // Windchasers specific fields
+  user_type?: string;
+  course_interest?: string;
+  timeline?: string;
+  education?: string;
 }
 
 export interface SessionSummary {
@@ -77,7 +82,7 @@ function getISTTimestamp(): string {
       second: '2-digit',
       hour12: false
     });
-    
+
     const parts = formatter.formatToParts(now);
     const year = parts.find(p => p.type === 'year')?.value || '2024';
     const month = parts.find(p => p.type === 'month')?.value || '01';
@@ -86,7 +91,7 @@ function getISTTimestamp(): string {
     const minutes = parts.find(p => p.type === 'minute')?.value || '00';
     const seconds = parts.find(p => p.type === 'second')?.value || '00';
     const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-    
+
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}+05:30`;
   } catch (error) {
     // Fallback to UTC if IST conversion fails
@@ -99,23 +104,23 @@ function getISTTimestamp(): string {
 // Handles various formats: international (+91), with/without country codes, spaces, dashes, etc.
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
-  
+
   // Remove all non-digit characters
   const digits = phone.replace(/\D/g, '');
-  
+
   if (!digits || digits.length < 10) {
-    console.log('[normalizePhone] Phone number too short or invalid', { 
-      original: phone, 
-      digits, 
-      length: digits?.length 
+    console.log('[normalizePhone] Phone number too short or invalid', {
+      original: phone,
+      digits,
+      length: digits?.length
     });
     return null;
   }
-  
+
   // Handle international formats
   // Remove common country codes (India: +91, US: +1, etc.)
   let cleanedDigits = digits;
-  
+
   // Remove India country code (+91)
   if (cleanedDigits.startsWith('91') && cleanedDigits.length > 10) {
     cleanedDigits = cleanedDigits.slice(2);
@@ -124,31 +129,31 @@ function normalizePhone(phone: string | null | undefined): string | null {
   else if (cleanedDigits.startsWith('1') && cleanedDigits.length === 11) {
     cleanedDigits = cleanedDigits.slice(1);
   }
-  
+
   // Remove leading zeros
   cleanedDigits = cleanedDigits.replace(/^0+/, '');
-  
+
   // Need at least 10 digits after cleaning
   if (cleanedDigits.length < 10) {
-    console.log('[normalizePhone] Phone number too short after cleaning', { 
-      original: phone, 
-      digits, 
+    console.log('[normalizePhone] Phone number too short after cleaning', {
+      original: phone,
+      digits,
       cleanedDigits,
-      length: cleanedDigits.length 
+      length: cleanedDigits.length
     });
     return null;
   }
-  
+
   // Always return last 10 digits for matching (handles cases with extra digits)
   const normalized = cleanedDigits.slice(-10);
-  
-  console.log('[normalizePhone] Normalized phone', { 
-    original: phone, 
+
+  console.log('[normalizePhone] Normalized phone', {
+    original: phone,
     normalized,
     digits,
     cleanedDigits
   });
-  
+
   return normalized;
 }
 
@@ -173,7 +178,7 @@ export async function ensureAllLeads(
   // Fallback to anon client if service client unavailable
   let supabase = getSupabaseServiceClient();
   const usingServiceClient = !!supabase;
-  
+
   if (!supabase) {
     console.warn('[ensureAllLeads] Service role client not available, falling back to anon client', {
       hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
@@ -188,7 +193,7 @@ export async function ensureAllLeads(
       urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
     });
   }
-  
+
   if (!supabase) {
     console.error('[ensureAllLeads] No Supabase client available (neither service nor anon)', {
       envCheck: {
@@ -222,13 +227,13 @@ export async function ensureAllLeads(
         .select('conversation_summary, booking_status, booking_date, booking_time, user_inputs_summary')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
-      
+
       if (sessionData) {
         // Extract windchasers data from user_inputs_summary
-        const userInputs: any[] = Array.isArray(sessionData.user_inputs_summary) 
-          ? sessionData.user_inputs_summary 
+        const userInputs: any[] = Array.isArray(sessionData.user_inputs_summary)
+          ? sessionData.user_inputs_summary
           : [];
-        
+
         // Find windchasers profile data from user inputs
         const windchasersData: any = {};
         userInputs.forEach((input: any) => {
@@ -266,7 +271,7 @@ export async function ensureAllLeads(
         .eq('customer_phone_normalized', normalizedPhone)
         .eq('brand', brand)
         .maybeSingle();
-      
+
       existing = data;
       fetchError = error;
     }
@@ -279,7 +284,7 @@ export async function ensureAllLeads(
         .eq('email', email)
         .eq('brand', brand)
         .maybeSingle();
-      
+
       if (!fetchError) fetchError = error;
       if (data) existing = data;
     }
@@ -293,7 +298,7 @@ export async function ensureAllLeads(
         });
         return null;
       }
-      
+
       // Check for RLS/permission errors
       if (fetchError.code === '42501' || fetchError.message?.includes('permission') || fetchError.message?.includes('RLS')) {
         console.error('[ensureAllLeads] Permission/RLS error checking all_leads', {
@@ -306,7 +311,7 @@ export async function ensureAllLeads(
           brand
         });
       }
-      
+
       console.error('[ensureAllLeads] Failed to check all_leads', {
         error: fetchError,
         code: fetchError.code,
@@ -400,7 +405,7 @@ export async function ensureAllLeads(
       brand: brand,
       unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
     };
-    
+
     // Ensure windchasers data is included if present
     if (unifiedContext.windchasers && Object.keys(unifiedContext.windchasers).length > 0) {
       insertData.unified_context = insertData.unified_context || {};
@@ -452,7 +457,7 @@ export async function ensureAllLeads(
           normalizedPhone,
           email
         });
-        
+
         // Try to fetch the existing record
         let existingLead: any = null;
         if (normalizedPhone) {
@@ -464,7 +469,7 @@ export async function ensureAllLeads(
             .maybeSingle();
           existingLead = data;
         }
-        
+
         if (!existingLead && email) {
           const { data } = await supabase
             .from('all_leads')
@@ -474,7 +479,7 @@ export async function ensureAllLeads(
             .maybeSingle();
           existingLead = data;
         }
-        
+
         if (existingLead) {
           console.log('[ensureAllLeads] Found existing lead after conflict', {
             leadId: existingLead.id
@@ -482,7 +487,7 @@ export async function ensureAllLeads(
           return existingLead.id;
         }
       }
-      
+
       // Check for RLS/permission errors
       if (createError.code === '42501' || createError.message?.includes('permission') || createError.message?.includes('RLS')) {
         console.error('[ensureAllLeads] Permission/RLS error creating all_leads', {
@@ -497,7 +502,7 @@ export async function ensureAllLeads(
           }
         });
       }
-      
+
       console.error('[ensureAllLeads] Failed to create all_leads', {
         error: createError,
         code: createError.code,
@@ -645,12 +650,12 @@ export async function ensureSession(
         .select('*')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
-      
+
       if (fallbackError) {
         console.error('[Supabase] Failed to fetch session', fallbackError);
         return null;
       }
-      
+
       if (fallbackData) {
         return mapSession(fallbackData);
       }
@@ -685,9 +690,9 @@ export async function ensureSession(
 
   if (insertError) {
     // Handle duplicate key errors (23505 = unique constraint violation, HTTP 409)
-    if (insertError.code === '23505' || 
-        insertError.message?.includes('duplicate key value') ||
-        insertError.message?.includes('already exists')) {
+    if (insertError.code === '23505' ||
+      insertError.message?.includes('duplicate key value') ||
+      insertError.message?.includes('already exists')) {
       console.log('[chatSessions] Duplicate session detected, fetching existing session');
       // Try to fetch the existing record
       const { data: existing, error: fetchError } = await supabase
@@ -713,7 +718,7 @@ export async function ensureSession(
       console.log('[chatSessions] Channel table not available or wrong structure, creating in fallback sessions table', insertError);
       const { data: fallbackCreated, error: fallbackError } = await supabase
         .from('sessions')
-        .insert({ 
+        .insert({
           external_session_id: externalSessionId,
           brand: brand,
           channel: channel,
@@ -721,19 +726,19 @@ export async function ensureSession(
         })
         .select('*')
         .single();
-      
+
       if (fallbackError) {
         console.error('[Supabase] Failed to create session in fallback table', fallbackError);
         return null;
       }
-      
+
       if (fallbackCreated) {
         return mapSession(fallbackCreated);
       }
     } else {
       // Log detailed error information for debugging
-      console.error('[Supabase] Failed to create session', { 
-        error: insertError, 
+      console.error('[Supabase] Failed to create session', {
+        error: insertError,
         code: insertError.code,
         message: insertError.message,
         details: insertError.details,
@@ -741,7 +746,7 @@ export async function ensureSession(
         tableName,
         insertData
       });
-      
+
       // If it's a NOT NULL constraint error (23502), try with minimal fields only
       // This happens when lead_id is required but we don't have customer data yet
       if (insertError.code === '23502' || insertError.code === '42702' || insertError.code === '42703') {
@@ -750,23 +755,23 @@ export async function ensureSession(
           external_session_id: externalSessionId,
           brand: brand,
         };
-        
+
         // Don't include lead_id, session_status, or channel_data if they're causing issues
         // Let database defaults handle them
-        
+
         const { data: minimalCreated, error: minimalError } = await supabase
           .from(tableName)
           .insert(minimalInsert)
           .select('*')
           .single();
-        
+
         if (minimalError) {
           // If still failing, try fallback to old sessions table
           if (minimalError.code === '23502' || minimalError.code === '42P01') {
             console.log('[chatSessions] Minimal insert failed, trying fallback to sessions table');
             const { data: fallbackCreated, error: fallbackError } = await supabase
               .from('sessions')
-              .insert({ 
+              .insert({
                 external_session_id: externalSessionId,
                 brand: brand,
                 channel: channel,
@@ -774,12 +779,12 @@ export async function ensureSession(
               })
               .select('*')
               .single();
-            
+
             if (fallbackError) {
               console.error('[Supabase] Failed to create session in fallback table', fallbackError);
               return null;
             }
-            
+
             if (fallbackCreated) {
               return mapSession(fallbackCreated);
             }
@@ -787,12 +792,12 @@ export async function ensureSession(
           console.error('[Supabase] Failed to create session with minimal fields', minimalError);
           return null;
         }
-        
+
         if (minimalCreated) {
           return mapSession(minimalCreated);
         }
       }
-      
+
       return null;
     }
   }
@@ -819,12 +824,12 @@ export async function updateSessionProfile(
   brand: 'proxe' | 'windchasers' = 'proxe'
 ): Promise<string | null> {
   console.log('[updateSessionProfile] Called', { externalSessionId, brand, profile });
-  
+
   // Use service role client for profile updates (bypasses RLS, more reliable)
   // Fallback to anon client if service client unavailable
   let supabase = getSupabaseServiceClient();
   const usingServiceClient = !!supabase;
-  
+
   if (!supabase) {
     console.warn('[updateSessionProfile] Service role client not available, falling back to anon client', {
       hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
@@ -839,7 +844,7 @@ export async function updateSessionProfile(
       urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
     });
   }
-  
+
   if (!supabase) {
     console.error('[updateSessionProfile] No Supabase client available (neither service nor anon)', {
       envCheck: {
@@ -869,9 +874,9 @@ export async function updateSessionProfile(
   if (profile.websiteUrl !== undefined) {
     updates.website_url = profile.websiteUrl ? profile.websiteUrl.trim() : null;
   }
-  
+
   console.log('[updateSessionProfile] Updates to apply', { updates, updateCount: Object.keys(updates).length });
-  
+
   // If no updates to make, return early
   if (Object.keys(updates).length === 0) {
     console.warn('[updateSessionProfile] No updates to apply, returning early');
@@ -900,7 +905,7 @@ export async function updateSessionProfile(
       usingServiceClient,
       tableName
     });
-    
+
     // Fallback to old sessions table if web_sessions doesn't exist
     if (error.code === '42P01' || error.code === '42703') {
       console.log('[updateSessionProfile] Trying fallback to sessions table');
@@ -917,24 +922,24 @@ export async function updateSessionProfile(
       if (profile.websiteUrl !== undefined) {
         fallbackUpdates.website_url = profile.websiteUrl ? profile.websiteUrl.trim() : null;
       }
-      
+
       const { error: fallbackError } = await supabase
         .from('sessions')
         .update(fallbackUpdates)
         .eq('external_session_id', externalSessionId);
-      
+
       if (fallbackError) {
-        console.error('[updateSessionProfile] ✗ Fallback update also failed', { 
-          error: fallbackError, 
+        console.error('[updateSessionProfile] ✗ Fallback update also failed', {
+          error: fallbackError,
           externalSessionId,
           fallbackUpdates
         });
         return;
       }
     } else {
-      console.error('[updateSessionProfile] ✗ Update failed with non-table error', { 
-        error, 
-        externalSessionId, 
+      console.error('[updateSessionProfile] ✗ Update failed with non-table error', {
+        error,
+        externalSessionId,
         updates,
         usingServiceClient
       });
@@ -942,8 +947,8 @@ export async function updateSessionProfile(
     }
   }
 
-  console.log('[updateSessionProfile] ✓ Update successful', { 
-    externalSessionId, 
+  console.log('[updateSessionProfile] ✓ Update successful', {
+    externalSessionId,
     updatedRows: data?.length,
     updatedData: data,
     usingServiceClient
@@ -963,8 +968,8 @@ export async function updateSessionProfile(
       phone: updatedSession.customer_phone ?? null,
     };
     const completeLead = isCompleteLead(mergedProfile);
-    
-    console.log('[Supabase] Session profile updated', { 
+
+    console.log('[Supabase] Session profile updated', {
       externalSessionId,
       completeLead,
       hasName: Boolean(mergedProfile.userName?.trim()),
@@ -987,7 +992,7 @@ export async function updateSessionProfile(
         brand,
         externalSessionId
       });
-      
+
       const leadId = await ensureAllLeads(
         mergedProfile.userName,
         mergedProfile.email,
@@ -1005,7 +1010,7 @@ export async function updateSessionProfile(
           externalSessionId,
           tableName
         });
-        
+
         const { error: leadIdError, data: updateData } = await supabase
           .from(tableName)
           .update({ lead_id: leadId })
@@ -1054,7 +1059,7 @@ export async function updateSessionProfile(
     console.warn('[updateSessionProfile] Could not fetch updated session', { externalSessionId });
     return null;
   }
-  
+
   // Return null if no updates were made
   return null;
 }
@@ -1063,7 +1068,8 @@ export async function addUserInput(
   externalSessionId: string,
   input: string,
   intent?: string,
-  brand: 'proxe' | 'windchasers' = 'proxe'
+  brand: 'proxe' | 'windchasers' = 'proxe',
+  metadata: Record<string, any> = {}
 ) {
   const supabase = getSupabaseClient();
   if (!supabase) {
@@ -1095,22 +1101,22 @@ export async function addUserInput(
         .select('user_inputs_summary, message_count')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
-      
+
       if (fallbackError || !fallbackSession) {
         console.error('[Supabase] Failed to fetch session for addUserInput', fallbackError || 'Session not found');
         return;
       }
-      
-      const existingInputs: UserInput[] = Array.isArray(fallbackSession?.user_inputs_summary) 
-        ? fallbackSession.user_inputs_summary 
+
+      const existingInputs: UserInput[] = Array.isArray(fallbackSession?.user_inputs_summary)
+        ? fallbackSession.user_inputs_summary
         : [];
-      
+
       const newInput: UserInput = {
         input: input.trim(),
         intent: intent,
         created_at: getISTTimestamp(),
       };
-      
+
       const updatedInputs = [...existingInputs, newInput].slice(-20);
       const messageCount = (fallbackSession?.message_count ?? 0) + 1;
 
@@ -1137,14 +1143,15 @@ export async function addUserInput(
     return;
   }
 
-  const existingInputs: UserInput[] = Array.isArray(currentSession?.user_inputs_summary) 
-    ? currentSession.user_inputs_summary 
+  const existingInputs: UserInput[] = Array.isArray(currentSession?.user_inputs_summary)
+    ? currentSession.user_inputs_summary
     : [];
 
   const newInput: UserInput = {
     input: input.trim(),
     intent: intent,
     created_at: new Date().toISOString(),
+    ...metadata,
   };
 
   // Add new input and keep last 20 inputs
@@ -1174,7 +1181,7 @@ export async function upsertSummary(
   brand: 'proxe' | 'windchasers' = 'proxe'
 ) {
   console.log('[upsertSummary] Called', { externalSessionId, brand, summaryLength: summary.length });
-  
+
   const supabase = getSupabaseClient();
   if (!supabase) {
     console.warn('[chatSessions] Supabase client unavailable in upsertSummary', { brand });
@@ -1189,7 +1196,7 @@ export async function upsertSummary(
   // Always update summary (don't require complete lead)
   // Summaries are useful for maintaining conversation context even before lead is complete
   console.log('[upsertSummary] Updating summary', { externalSessionId, summaryLength: summary.length });
-  
+
   const { data, error } = await supabase
     .from(tableName)
     .update({
@@ -1209,7 +1216,7 @@ export async function upsertSummary(
           last_message_at: lastMessageCreatedAt,
         })
         .eq('external_session_id', externalSessionId);
-      
+
       if (fallbackError) {
         console.error('[Supabase] Failed to upsert summary (fallback)', { error: fallbackError, externalSessionId });
       } else {
@@ -1220,7 +1227,7 @@ export async function upsertSummary(
     }
   } else {
     console.log('[Supabase] Successfully updated summary', { externalSessionId, updatedRows: data?.length });
-    
+
     // Update unified_context in all_leads if lead_id exists
     if (data && data.length > 0 && data[0].lead_id) {
       const sessionData = data[0];
@@ -1286,14 +1293,14 @@ export async function fetchSummary(
         .select('conversation_summary, last_message_at')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
-      
+
       if (fallbackError) {
         console.error('[Supabase] Failed to fetch summary (fallback)', fallbackError);
         return null;
       }
-      
+
       if (!fallbackData || !fallbackData.conversation_summary) return null;
-      
+
       return {
         summary: cleanSummary(fallbackData.conversation_summary),
         lastMessageCreatedAt: fallbackData.last_message_at || getISTTimestamp(),
@@ -1328,35 +1335,66 @@ export async function storeBooking(
   },
   brand: 'proxe' | 'windchasers' = 'proxe'
 ) {
-  const supabase = getSupabaseClient();
+  // Use service role client for booking storage (bypasses RLS, more reliable)
+  let supabase = getSupabaseServiceClient();
   if (!supabase) {
-    console.warn('[chatSessions] Supabase client unavailable in storeBooking', { brand });
+    console.warn('[chatSessions] Service role client unavailable, falling back to anon client in storeBooking', { brand });
+    supabase = getSupabaseClient();
+  }
+
+  if (!supabase) {
+    console.error('[chatSessions] No Supabase client available in storeBooking');
     return;
   }
 
   const tableName = getChannelTable('web');
 
-  // If contact info is provided, update the session first
+  // If contact info is provided, update the session profile first
+  // This also handles lead_id creation/linking
+  let currentLeadId: string | null = null;
   if (booking.name || booking.email || booking.phone) {
     const profileUpdates: { userName?: string; email?: string; phone?: string } = {};
     if (booking.name) profileUpdates.userName = booking.name;
     if (booking.email) profileUpdates.email = booking.email;
     if (booking.phone) profileUpdates.phone = booking.phone;
-    
-    await updateSessionProfile(externalSessionId, profileUpdates, brand);
+
+    currentLeadId = await updateSessionProfile(externalSessionId, profileUpdates, brand);
   }
 
-  // Always store booking details (don't require complete lead)
-  // Booking details are valuable even if contact info isn't complete yet
+  // Fetch current session state for merging
+  const { data: currentSession } = await supabase
+    .from(tableName)
+    .select('metadata, conversation_summary, lead_id, user_inputs_summary')
+    .eq('external_session_id', externalSessionId)
+    .eq('brand', brand.toLowerCase())
+    .maybeSingle();
 
-  // Build booking metadata with details
+  // Build booking metadata
   const bookingMetadata: Record<string, any> = {
     googleEventId: booking.googleEventId ?? null,
     courseInterest: booking.courseInterest || null,
     sessionType: booking.sessionType || null,
     description: booking.description || null,
     conversationSummary: booking.conversationSummary || null,
+    booking_confirmed_at: getISTTimestamp(),
   };
+
+  // Merge with existing metadata
+  const existingMetadata = currentSession?.metadata || {};
+  const mergedMetadata = {
+    ...existingMetadata,
+    ...bookingMetadata,
+  };
+
+  // Prepare updated summary
+  let updatedSummary = booking.conversationSummary || currentSession?.conversation_summary || '';
+  const bookingStatusMsg = `[Booking Status: Confirmed for ${booking.date} at ${booking.time}]`;
+
+  if (updatedSummary && !updatedSummary.includes('[Booking Status:')) {
+    updatedSummary = `${updatedSummary}\n\n${bookingStatusMsg}`;
+  } else if (!updatedSummary) {
+    updatedSummary = bookingStatusMsg;
+  }
 
   // Build update object
   const bookingUpdate: Record<string, any> = {
@@ -1365,19 +1403,23 @@ export async function storeBooking(
     google_event_id: booking.googleEventId ?? null,
     booking_status: booking.status ?? 'Call Booked',
     booking_created_at: getISTTimestamp(),
-    metadata: bookingMetadata,
+    metadata: mergedMetadata,
+    conversation_summary: updatedSummary,
   };
 
   const { data, error } = await supabase
     .from(tableName)
     .update(bookingUpdate)
     .eq('external_session_id', externalSessionId)
+    .eq('brand', brand.toLowerCase())
     .select('lead_id, conversation_summary, user_inputs_summary, metadata');
 
   if (error) {
+    console.error('[Supabase] Failed to store booking', error);
+
     // Fallback to old sessions table
     if (error.code === '42P01' || error.code === '42703') {
-      const { error: fallbackError } = await supabase
+      await supabase
         .from('sessions')
         .update({
           booking_date: booking.date,
@@ -1386,68 +1428,69 @@ export async function storeBooking(
           booking_status: booking.status ?? 'Call Booked',
           booking_created_at: getISTTimestamp(),
         })
-        .eq('external_session_id', externalSessionId);
-      
-      if (fallbackError) {
-        console.error('[Supabase] Failed to store booking (fallback)', fallbackError);
-      }
-    } else {
-      console.error('[Supabase] Failed to store booking', error);
+        .eq('external_session_id', externalSessionId)
+        .eq('brand', brand.toLowerCase());
     }
-  } else if (data && data.length > 0 && data[0].lead_id) {
-    // Update unified_context in all_leads
+  } else if (data && data.length > 0) {
     const sessionData = data[0];
-    const existingMetadata = sessionData.metadata || {};
-    const mergedMetadata = {
-      ...existingMetadata,
-      ...bookingMetadata,
-    };
-    
-    const unifiedContext = {
-      web: {
-        conversation_summary: cleanSummary(booking.conversationSummary || sessionData.conversation_summary) || null,
-        booking_status: booking.status ?? 'Call Booked',
-        booking_date: booking.date,
-        booking_time: booking.time,
-        user_inputs: sessionData.user_inputs_summary || [],
-        booking_details: {
-          courseInterest: booking.courseInterest || null,
-          sessionType: booking.sessionType || null,
-          description: booking.description || null,
-        },
-      }
-    };
+    const leadId = sessionData.lead_id || currentLeadId;
 
-    // Get existing unified_context and merge
-    const { data: existingLead } = await supabase
-      .from('all_leads')
-      .select('unified_context, metadata')
-      .eq('id', data[0].lead_id)
-      .maybeSingle();
+    if (leadId) {
+      // Update unified_context in all_leads
+      const unifiedContext = {
+        web: {
+          conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
+          booking_status: booking.status ?? 'Call Booked',
+          booking_date: booking.date,
+          booking_time: booking.time,
+          user_inputs: sessionData.user_inputs_summary || [],
+          booking_details: {
+            courseInterest: booking.courseInterest || null,
+            sessionType: booking.sessionType || null,
+            description: booking.description || null,
+          },
+        }
+      };
 
-    const existingContext = existingLead?.unified_context || {};
-    const existingLeadMetadata = existingLead?.metadata || {};
-    const mergedContext = {
-      ...existingContext,
-      web: {
-        ...(existingContext.web || {}),
-        ...unifiedContext.web,
-      }
-    };
+      // Get existing all_leads unified_context and metadata
+      const { data: existingLead } = await supabase
+        .from('all_leads')
+        .select('unified_context, metadata')
+        .eq('id', leadId)
+        .maybeSingle();
 
-    // Update both unified_context and metadata in all_leads
-    await supabase
-      .from('all_leads')
-      .update({
-        unified_context: mergedContext,
-        metadata: {
-          ...existingLeadMetadata,
-          ...mergedMetadata,
-        },
-      })
-      .eq('id', data[0].lead_id);
+      const existingContext = existingLead?.unified_context || {};
+      const existingLeadMetadata = existingLead?.metadata || {};
+
+      const mergedContext = {
+        ...existingContext,
+        web: {
+          ...(existingContext.web || {}),
+          ...unifiedContext.web,
+        }
+      };
+
+      // Update both unified_context and metadata in all_leads
+      await supabase
+        .from('all_leads')
+        .update({
+          unified_context: mergedContext,
+          last_touchpoint: 'web',
+          last_interaction_at: getISTTimestamp(),
+          metadata: {
+            ...existingLeadMetadata,
+            ...mergedMetadata,
+          },
+        })
+        .eq('id', leadId);
+
+      console.log('[chatSessions] Successfully updated all_leads with booking info', { leadId });
+    } else {
+      console.warn('[chatSessions] No lead_id found for booking, all_leads not updated', { externalSessionId });
+    }
   }
 }
+
 
 export async function checkExistingBooking(
   phone?: string | null,
@@ -1493,7 +1536,7 @@ export async function checkExistingBooking(
         .order('booking_created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (phoneData && phoneData.booking_date) {
         data = phoneData;
       } else if (phoneError && (phoneError.code === '42P01' || phoneError.code === '42703')) {
@@ -1512,7 +1555,7 @@ export async function checkExistingBooking(
             .order('booking_created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-          
+
           if (normalizedData && normalizedData.booking_date) {
             data = normalizedData;
           } else if (normalizedError && normalizedError.code !== '42703') {
@@ -1537,7 +1580,7 @@ export async function checkExistingBooking(
         .order('booking_created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (emailData && emailData.booking_date) {
         data = emailData;
       } else {
@@ -1573,7 +1616,7 @@ export async function checkExistingBooking(
           .order('booking_created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        
+
         if (phoneData && phoneData.booking_date) {
           fallbackData = phoneData;
         } else {
@@ -1593,7 +1636,7 @@ export async function checkExistingBooking(
           .order('booking_created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        
+
         if (emailData && emailData.booking_date) {
           fallbackData = emailData;
         } else {
@@ -1682,8 +1725,8 @@ export async function updateWindchasersProfile(
   }
 
   // Build unified_context for all_leads
-  const existingInputs: UserInput[] = Array.isArray(currentSession.user_inputs_summary) 
-    ? currentSession.user_inputs_summary 
+  const existingInputs: UserInput[] = Array.isArray(currentSession.user_inputs_summary)
+    ? currentSession.user_inputs_summary
     : [];
 
   // Extract profile data from conversation
@@ -1715,16 +1758,16 @@ export async function updateWindchasersProfile(
   // 1. If session already has lead_id, use that directly (fastest)
   // 2. If we have phone, use ensureAllLeads (creates lead if needed)
   // 3. Otherwise, try to find lead by email
-  
+
   let leadId: string | null = null;
   const phone = profileData.phone || currentSession.customer_phone;
-  
+
   // Method 1: Check if session already has lead_id (fastest path)
   if (currentSession.lead_id) {
     leadId = currentSession.lead_id;
     console.log('[updateWindchasersProfile] Using existing lead_id from session:', leadId);
   }
-  
+
   // Method 2: Try to get/create lead via phone
   if (!leadId && phone) {
     leadId = await ensureAllLeads(
@@ -1738,7 +1781,7 @@ export async function updateWindchasersProfile(
       console.log('[updateWindchasersProfile] Created/found lead via phone:', leadId);
     }
   }
-  
+
   // Method 3: Try to find lead by email if no phone
   if (!leadId && currentSession.customer_email) {
     const { data: leadByEmail } = await supabase
@@ -1747,7 +1790,7 @@ export async function updateWindchasersProfile(
       .eq('brand', brand)
       .eq('email', currentSession.customer_email)
       .maybeSingle();
-    
+
     if (leadByEmail?.id) {
       leadId = leadByEmail.id;
       console.log('[updateWindchasersProfile] Found lead by email:', leadId);
@@ -1774,12 +1817,12 @@ export async function updateWindchasersProfile(
 
       const { error: updateError } = await supabase
         .from('all_leads')
-        .update({ 
+        .update({
           unified_context: updatedContext,
           last_interaction_at: getISTTimestamp()
         })
         .eq('id', leadId);
-      
+
       if (updateError) {
         console.error('[updateWindchasersProfile] Failed to update lead unified_context:', updateError);
       } else {
@@ -1819,12 +1862,12 @@ export async function updateChannelData(
         .select('channel_data')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
-      
+
       if (fallbackError) {
         console.error('[Supabase] Failed to fetch session for updateChannelData (fallback)', fallbackError);
         return;
       }
-      
+
       const currentData = fallbackSession?.channel_data ?? {};
       const mergedData = { ...currentData, ...channelData };
 
@@ -1906,7 +1949,7 @@ export async function logMessage(
   // Fallback to anon client if service client unavailable
   let supabase = getSupabaseServiceClient();
   const usingServiceClient = !!supabase;
-  
+
   if (!supabase) {
     console.warn('[logMessage] Service role client not available, falling back to anon client', {
       hasServiceKey: !!(process.env.WINDCHASERS_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -1924,7 +1967,7 @@ export async function logMessage(
       usingServiceClient: true
     });
   }
-  
+
   if (!supabase) {
     console.error('[logMessage] ✗ No Supabase client available (neither service nor anon)', {
       envCheck: {
@@ -1937,11 +1980,11 @@ export async function logMessage(
     });
     return null;
   }
-  
+
   // Strip HTML from content before logging
   const cleanedContent = stripHTML(content);
   const tableName = 'conversations';
-  
+
   const insertData = {
     lead_id: leadId,
     channel: channel,
@@ -1965,7 +2008,7 @@ export async function logMessage(
     contentLength: insertData.content?.length,
     message_type: insertData.message_type
   });
-  
+
   // Verify table name and lead_id before insert
   console.log('[logMessage] About to insert to table:', tableName);
   console.log('[logMessage] Lead ID exists?', !!insertData.lead_id, 'Value:', insertData.lead_id);
@@ -1978,7 +2021,7 @@ export async function logMessage(
     contentPreview: insertData.content?.substring(0, 100),
     metadataKeys: Object.keys(insertData.metadata || {})
   });
-  
+
   try {
     // Verify lead exists before inserting (foreign key constraint)
     console.log('[logMessage] Verifying lead exists before insert...');
@@ -1987,7 +2030,7 @@ export async function logMessage(
       .select('id')
       .eq('id', leadId)
       .maybeSingle();
-    
+
     if (leadCheckError) {
       console.error('[logMessage] ✗ Error checking if lead exists:', {
         error: leadCheckError,
@@ -2003,11 +2046,11 @@ export async function logMessage(
     } else {
       console.log('[logMessage] ✓ Lead exists, proceeding with insert');
     }
-    
+
     console.log('[logMessage] Executing Supabase insert to "conversations" table...');
     console.log('[logMessage] Table name verified:', tableName === 'conversations' ? '✓ "conversations"' : `✗ "${tableName}"`);
     console.log('[logMessage] Insert data:', JSON.stringify(insertData, null, 2));
-    
+
     const { data, error } = await supabase
       .from(tableName)
       .insert(insertData)
@@ -2030,7 +2073,7 @@ export async function logMessage(
         insertData: JSON.stringify(insertData, null, 2),
         usingServiceClient
       });
-      
+
       // If it's a foreign key constraint error, the lead might not exist
       if (error.code === '23503') {
         console.error('[logMessage] ✗ Foreign key constraint violation - lead_id does not exist in all_leads:', {
@@ -2038,7 +2081,7 @@ export async function logMessage(
           errorMessage: error.message
         });
       }
-      
+
       return null;
     }
 
@@ -2084,7 +2127,7 @@ export async function fetchConversations(
   limit: number = 50
 ): Promise<ConversationMessage[]> {
   const supabase = getSupabaseClient();
-  
+
   if (!supabase) {
     console.error('[fetchConversations] Supabase client not available');
     return [];

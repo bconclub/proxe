@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import { getBuildDate } from '@/lib/buildInfo'
-import { 
+import {
   MdInbox,
   MdDashboard,
   MdPeople,
@@ -56,9 +56,9 @@ const navigation: NavItem[] = [
   { name: 'Flows', href: '/dashboard/flows', icon: MdAccountTree },
   { name: 'Audience', href: '/dashboard/audience', icon: MdGroup, comingSoon: true },
   // SYSTEM
-  { 
-    name: 'Configure', 
-    href: '/dashboard/settings', 
+  {
+    name: 'Configure',
+    href: '/dashboard/settings',
     icon: MdSettings,
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
@@ -87,7 +87,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildVersion, setBuildVersion] = useState<string>('1.0.0')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
-  
+  const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+  const [sidebarInteractionTime, setSidebarInteractionTime] = useState<number | null>(null)
+
   // Get build/deployment date and version (only on client to avoid hydration mismatch)
   useEffect(() => {
     // Fetch build info from API
@@ -133,7 +135,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   //     setIsCheckingAuth(false)
   //   }
   // }, [])
-  
+
   // Set checking auth to false immediately since auth is disabled
   useEffect(() => {
     setIsCheckingAuth(false)
@@ -207,13 +209,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (autoHideTimeoutRef.current) {
         clearTimeout(autoHideTimeoutRef.current)
       }
+      if (sidebarCloseTimeoutRef.current) {
+        clearTimeout(sidebarCloseTimeoutRef.current)
+      }
     }
   }, [isCollapsed, isHovered, isScrolled, isMobile, isCheckingAuth])
 
   // Initial auto-hide after page load (only on desktop)
   useEffect(() => {
     if (isMobile || isCheckingAuth) return
-    
+
     // Only auto-hide if user hasn't manually set a preference
     const savedState = localStorage.getItem('sidebar-collapsed')
     if (savedState !== null) return // User has a preference, don't override
@@ -231,10 +236,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [isMobile, isCheckingAuth]) // Run when mobile/auth state changes
 
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (autoHideTimeoutRef.current) {
+        clearTimeout(autoHideTimeoutRef.current)
+      }
+      if (sidebarCloseTimeoutRef.current) {
+        clearTimeout(sidebarCloseTimeoutRef.current)
+      }
+    }
+  }, [])
+
   // Check if mobile
   useEffect(() => {
     if (typeof window === 'undefined') return
-    
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
       if (window.innerWidth >= 768) {
@@ -252,7 +269,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsHovered(false)
     setIsScrolled(false)
     localStorage.setItem('sidebar-collapsed', String(newState))
-    
+
     // Clear auto-hide timer when manually toggled
     if (autoHideTimeoutRef.current) {
       clearTimeout(autoHideTimeoutRef.current)
@@ -267,34 +284,69 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (isCollapsed) {
       setIsCollapsed(false)
     }
-    // Clear auto-hide timer
+    // Clear any close timers
     if (autoHideTimeoutRef.current) {
       clearTimeout(autoHideTimeoutRef.current)
       autoHideTimeoutRef.current = null
+    }
+    if (sidebarCloseTimeoutRef.current) {
+      clearTimeout(sidebarCloseTimeoutRef.current)
+      sidebarCloseTimeoutRef.current = null
     }
   }
 
   const handleSidebarMouseLeave = () => {
     if (isMobile) return
     setIsHovered(false)
-    // Collapse immediately when mouse leaves (no delay)
-    if (!isCollapsed && !isScrolled) {
-      // Clear any existing timer
-      if (autoHideTimeoutRef.current) {
-        clearTimeout(autoHideTimeoutRef.current)
-        autoHideTimeoutRef.current = null
-      }
-      // Collapse immediately
-      setIsCollapsed(true)
-      localStorage.setItem('sidebar-collapsed', 'true')
+
+    // Don't close if manually expanded or scrolled
+    if (isScrolled) return
+
+    // Calculate delay based on recent interaction
+    // If user clicked something recently, keep it open longer
+    const baseDelay = 1500 // 1.5 seconds base delay
+    const interactionBonus = sidebarInteractionTime
+      ? Math.min(2000, Date.now() - sidebarInteractionTime) // Up to 2 seconds bonus
+      : 0
+    const delay = baseDelay + interactionBonus
+
+    // Clear any existing close timer
+    if (sidebarCloseTimeoutRef.current) {
+      clearTimeout(sidebarCloseTimeoutRef.current)
+      sidebarCloseTimeoutRef.current = null
     }
+
+    // Set timer to close smoothly after delay
+    if (!isCollapsed) {
+      sidebarCloseTimeoutRef.current = setTimeout(() => {
+        setIsCollapsed(true)
+        localStorage.setItem('sidebar-collapsed', 'true')
+        sidebarCloseTimeoutRef.current = null
+      }, delay)
+    }
+  }
+
+  // Handle clicks on sidebar items - keep sidebar open longer
+  const handleSidebarItemClick = () => {
+    if (isMobile) return
+    // Record interaction time to extend close delay
+    setSidebarInteractionTime(Date.now())
+    // Clear any close timers
+    if (sidebarCloseTimeoutRef.current) {
+      clearTimeout(sidebarCloseTimeoutRef.current)
+      sidebarCloseTimeoutRef.current = null
+    }
+    // Reset interaction time after a delay
+    setTimeout(() => {
+      setSidebarInteractionTime(null)
+    }, 3000)
   }
 
   const toggleTheme = () => {
     const newMode = !isDarkMode
     setIsDarkMode(newMode)
     localStorage.setItem('theme', newMode ? 'dark' : 'light')
-    
+
     if (newMode) {
       document.documentElement.classList.add('dark')
       document.documentElement.classList.remove('light')
@@ -321,7 +373,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="dashboard-layout-auth-loader min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="dashboard-layout-auth-loader-content text-center">
           <div className="dashboard-layout-auth-loader-icon-container relative mb-4">
-            <div 
+            <div
               className="dashboard-layout-auth-loader-pulse absolute inset-0 rounded-full animate-ping opacity-30"
               style={{
                 backgroundColor: 'var(--accent-primary)',
@@ -350,17 +402,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="dashboard-layout min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
       {/* Mobile overlay */}
       {isMobile && mobileSidebarOpen && (
-        <div 
+        <div
           className="dashboard-layout-mobile-overlay fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
       {/* Fixed Sidebar */}
-      <div 
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
-          isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
-        }`}
+      <div
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+          }`}
         style={{
           width: sidebarWidth,
           backgroundColor: 'var(--bg-secondary)',
@@ -370,16 +421,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onMouseLeave={handleSidebarMouseLeave}
       >
         {/* Logo and Toggle */}
-        <div 
+        <div
           className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
-          style={{ 
+          style={{
             padding: isCollapsed ? '20px' : '20px 16px',
             justifyContent: isCollapsed ? 'center' : 'space-between',
           }}
         >
           {!isCollapsed && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Windchasers</h1>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -415,9 +466,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </>
           )}
           {isCollapsed && (
-            <div 
+            <div
               className="dashboard-layout-sidebar-logo-collapsed flex items-center justify-center cursor-pointer"
-              style={{ 
+              style={{
                 width: '40px',
                 height: '40px',
               }}
@@ -449,35 +500,61 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               const isActive = pathname === item.href || (item.children && item.children.some(child => pathname === child.href))
               const isInbox = item.name === 'Conversations'
               const hasChildren = item.children && item.children.length > 0
-              
+
               const renderNavItem = (navItem: NavItem, isChild = false) => {
                 const itemIsActive = pathname === navItem.href
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
+
+                // Premium Item Style
                 const baseStyle: React.CSSProperties = {
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: itemIsActive ? 'var(--accent-light)' : 'var(--text-primary)',
+                  fontSize: '13px',
+                  fontWeight: itemIsActive ? 700 : 500,
+                  color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
-                  borderLeft: itemIsActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                  padding: isCollapsed ? '10px' : isChild ? '10px 16px 10px 40px' : '10px 16px',
-                  paddingLeft: itemIsActive && !isCollapsed && !isChild ? '14px' : isCollapsed ? '10px' : isChild ? '40px' : '16px',
+                  margin: isCollapsed ? '4px 8px' : '4px 12px',
+                  borderRadius: '12px',
+                  padding: isCollapsed ? '12px' : isChild ? '10px 16px 10px 44px' : '10px 16px',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  opacity: navItem.comingSoon ? 0.6 : 1,
+                  opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }
+
+                // Sub-active indicator glow
+                const activeGlow = itemIsActive && !isCollapsed ? (
+                  <div
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(201,169,97,0.8)]"
+                  />
+                ) : null;
 
                 const content = (
                   <>
-                    <span className="dashboard-layout-nav-item-icon" style={{ marginRight: isCollapsed ? '0' : '12px', display: 'flex', alignItems: 'center' }}>
-                      <navItem.icon size={20} />
+                    {activeGlow}
+                    <span
+                      className="dashboard-layout-nav-item-icon"
+                      style={{
+                        marginRight: isCollapsed ? '0' : '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: itemIsActive ? 'var(--accent-primary)' : 'inherit',
+                        transform: itemIsActive ? 'scale(1.1)' : 'scale(1)',
+                        transition: 'transform 0.3s ease'
+                      }}
+                    >
+                      <navItem.icon size={18} />
                     </span>
                     {!isCollapsed && (
                       <>
-                        <span className="dashboard-layout-nav-item-label" style={{ flex: 1 }}>{navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate">{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
-                          <span className="dashboard-layout-nav-item-badge bg-red-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                          <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
                           </span>
+                        )}
+                        {navItem.comingSoon && (
+                          <span className="text-[9px] uppercase tracking-tighter opacity-50 font-black ml-2 px-1 bg-gray-500/10 rounded">Soon</span>
                         )}
                       </>
                     )}
@@ -517,6 +594,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       className="dashboard-layout-nav-item dashboard-layout-nav-item-external flex items-center rounded-md transition-all duration-200"
                       style={baseStyle}
                       title={isCollapsed ? navItem.name : undefined}
+                      onClick={() => {
+                        if (!isMobile) {
+                          handleSidebarItemClick()
+                        }
+                      }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                       }}
@@ -539,6 +621,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       onClick={() => {
                         if (isMobile) {
                           setMobileSidebarOpen(false)
+                        } else {
+                          handleSidebarItemClick()
                         }
                       }}
                       onMouseEnter={(e) => {
@@ -557,11 +641,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   )
                 }
               }
-              
+
               return (
                 <React.Fragment key={item.name}>
                   {needsDivider && !isCollapsed && (
-                    <div 
+                    <div
                       className="dashboard-layout-nav-divider"
                       style={{
                         borderTop: '1px solid var(--border-primary)',
@@ -569,9 +653,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       }}
                     />
                   )}
-                  
+
                   {renderNavItem(item)}
-                  
+
                   {/* Render children if not collapsed */}
                   {hasChildren && !isCollapsed && (
                     <div className="dashboard-layout-nav-children space-y-1">
@@ -585,16 +669,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
 
         {/* Footer Section: User, Icon Bar, Version */}
-        <div 
+        <div
           className="dashboard-layout-sidebar-footer flex-shrink-0 border-t flex flex-col"
-          style={{ 
+          style={{
             borderColor: 'var(--border-primary)',
           }}
         >
           {/* 1. User Section - Center-aligned */}
-          <div 
+          <div
             className="dashboard-layout-user-section flex items-center justify-center"
-            style={{ 
+            style={{
               padding: '16px',
             }}
           >
@@ -617,10 +701,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
-                <div 
+                <div
                   className="dashboard-layout-user-avatar rounded-full flex items-center justify-center text-white font-medium flex-shrink-0"
-                  style={{ 
-                    width: '32px', 
+                  style={{
+                    width: '32px',
                     height: '32px',
                     minWidth: '32px',
                     minHeight: '32px',
@@ -634,9 +718,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </div>
                 {!isCollapsed && <span className="dashboard-layout-user-label">User</span>}
               </button>
-              
+
               {userMenuOpen && !isCollapsed && (
-                <div 
+                <div
                   className="dashboard-layout-user-menu-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
                   style={{
                     backgroundColor: 'var(--bg-secondary)',
@@ -667,9 +751,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* 2. Icon Bar - Below User Section (only show when expanded, or show three-dot menu when collapsed) */}
           {!isCollapsed ? (
-            <div 
+            <div
               className="dashboard-layout-icon-bar flex-shrink-0 border-t flex items-center justify-center"
-              style={{ 
+              style={{
                 borderColor: 'var(--border-primary)',
                 backgroundColor: 'transparent',
                 padding: '12px',
@@ -777,9 +861,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <MdMoreHoriz size={24} />
                 </button>
-                
+
                 {moreOptionsOpen && (
-                  <div 
+                  <div
                     className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
                     style={{
                       backgroundColor: 'var(--bg-secondary)',
@@ -851,12 +935,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                 )}
               </div>
-          </div>
+            </div>
           ) : (
             /* When collapsed, show only three-dot menu */
-            <div 
+            <div
               className="dashboard-layout-icon-bar-collapsed flex-shrink-0 border-t flex items-center justify-center"
-              style={{ 
+              style={{
                 borderColor: 'var(--border-primary)',
                 backgroundColor: 'transparent',
                 padding: '12px 8px',
@@ -888,9 +972,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <MdMoreHoriz size={20} />
                 </button>
-                
+
                 {moreOptionsOpen && (
-                  <div 
+                  <div
                     className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
                     style={{
                       backgroundColor: 'var(--bg-secondary)',
@@ -1031,19 +1115,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                 )}
               </div>
-          </div>
+            </div>
           )}
 
           {/* 3. Version Badge - Below Icon Bar */}
-          <div 
+          <div
             className="dashboard-layout-version-info text-center"
-            style={{ 
+            style={{
               padding: '12px 16px',
             }}
           >
             {!isCollapsed ? (
               <>
-                <div 
+                <div
                   className="dashboard-layout-version-badge inline-block px-2 py-1 rounded text-xs font-medium mb-1"
                   style={{
                     backgroundColor: 'var(--accent-primary)',
@@ -1052,7 +1136,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   v{buildVersion}
                 </div>
-                <p 
+                <p
                   className="dashboard-layout-version-date text-xs mt-1"
                   style={{ color: 'var(--text-secondary)' }}
                   suppressHydrationWarning
@@ -1061,7 +1145,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </p>
               </>
             ) : (
-              <div 
+              <div
                 className="dashboard-layout-version-badge-collapsed inline-block px-1.5 py-0.5 rounded text-xs font-medium"
                 style={{
                   backgroundColor: 'var(--accent-primary)',
@@ -1093,7 +1177,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       )}
 
       {/* Main Content */}
-      <div 
+      <div
         className="dashboard-layout-main-content flex flex-col min-h-screen transition-all duration-300 ease-in-out"
         style={{
           marginLeft: sidebarContentMargin,
@@ -1104,7 +1188,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
-        
+
         {/* Page content */}
         <main className="dashboard-layout-main-content-wrapper flex-1" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
           <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>

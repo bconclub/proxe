@@ -38,14 +38,14 @@ interface ChatWidgetProps {
 // PROXE Logo component (white icon version)
 const PROXELogo = () => (
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 643 643" style={{ width: '100%', height: '100%' }}>
-    <path d="M0 0 C2.55518105 -0.00322395 5.11036192 -0.00658882 7.6655426 -0.01008606 C12.99993388 -0.01603919 18.33430821 -0.01797345 23.66870117 -0.01733398 C29.7556638 -0.01673585 35.84253706 -0.02725095 41.92947716 -0.04307765 C47.87319933 -0.05795756 53.81689546 -0.0613159 59.76063728 -0.06072426 C62.24751207 -0.06188581 64.73438789 -0.06620156 67.22125053 -0.07405663 C89.27651721 -0.13719172 111.50963207 0.39970382 133.25390625 4.41796875 C134.45168701 4.63267822 135.64946777 4.8473877 136.88354492 5.06860352 C147.60885456 7.06782473 158.02060533 9.75624396 168.37890625 13.16796875 C169.07161621 13.39033203 169.76432617 13.61269531 170.47802734 13.84179688 C191.49998952 20.69734064 211.08444408 32.02655021 227.1953125 47.16015625 C229.37705947 49.22309608 229.37705947 49.22309608 231.88671875 51.109375 C236.4059078 54.84231015 239.77832631 59.57161291 243.37890625 64.16796875 C244.02988281 64.96847656 244.68085937 65.76898438 245.3515625 66.59375 C261.74568838 87.70076627 270.32398638 114.04301497 274.37890625 140.16796875 C274.49459961 140.85906738 274.61029297 141.55016602 274.72949219 142.26220703 C282.29318243 189.02466583 276.19902808 244.9042784 249.0546875 284.67578125 C242.86549658 293.12246066 235.81558031 300.81162913 228.37890625 308.16796875 C227.6209375 308.92335938 226.86296875 309.67875 226.08203125 310.45703125 C183.60584066 350.90410446 121.23455315 356.3199838 65.62890625 356.3359375 C63.63650026 356.33834297 61.64409426 356.34075098 59.65168858 356.34339792 C53.40043889 356.35147619 47.14920354 356.35398837 40.89794922 356.35327148 C34.53035799 356.35267292 28.16285207 356.363196 21.79528236 356.37901515 C16.25824922 356.3922615 10.72124335 356.39744833 5.18419456 356.39681607 C1.90836564 356.39656594 -1.36737224 356.40012154 -4.64318848 356.40999413 C-26.38672218 356.46938784 -48.32070333 356.0589274 -69.74609375 351.98046875 C-71.47291382 351.65900879 -71.47291382 351.65900879 -73.23461914 351.33105469 C-105.21391229 345.11926535 -134.61598121 333.2708796 -159.62109375 312.16796875 C-160.48605469 311.44480469 -161.35101563 310.72164063 -162.2421875 309.9765625 C-167.1711856 305.72914592 -171.55937074 301.24923357 -175.62109375 296.16796875 C-176.44351563 295.14445312 -177.2659375 294.1209375 -178.11328125 293.06640625 C-203.72182995 260.22737116 -212.112449 219.37733841 -211.93359375 178.54296875 C-211.93177094 177.67255951 -211.92994812 176.80215027 -211.92807007 175.90536499 C-211.79053856 136.73576322 -204.02988251 95.33486431 -178.62109375 64.16796875 C-178.19634766 63.63397461 -177.77160156 63.09998047 -177.33398438 62.54980469 C-147.98305281 25.80939317 -103.87677367 9.67884258 -58.62109375 2.98046875 C-57.50653809 2.81329346 -56.39198242 2.64611816 -55.24365234 2.47387695 C-36.90877248 -0.10235019 -18.47621475 0.00554858 0 0 Z M-100.62109375 91.16796875 C-101.4615625 91.91691406 -102.30203125 92.66585937 -103.16796875 93.4375 C-117.16855627 106.56835405 -124.00505891 123.93954179 -128.62109375 142.16796875 C-128.62109375 143.15796875 -128.62109375 144.14796875 -128.62109375 145.16796875 C-22.36109375 145.16796875 83.89890625 145.16796875 193.37890625 145.16796875 C188.17784025 120.8963274 178.51473758 98.48989587 157.00390625 84.41796875 C155.14428381 83.30844612 153.26890815 82.22491196 151.37890625 81.16796875 C150.44304687 80.64460938 149.5071875 80.12125 148.54296875 79.58203125 C115.02122643 61.87751855 75.19191438 63.8227628 38.39355469 63.90722656 C33.38502202 63.91862023 28.37670188 63.91184575 23.36817646 63.90034962 C-42.92876378 62.5392535 -42.92876378 62.5392535 -100.62109375 91.16796875 Z M-128.62109375 210.16796875 C-125.15512694 229.23078619 -118.87165345 245.7767931 -105.62109375 260.16796875 C-105.08226562 260.79832031 -104.5434375 261.42867188 -103.98828125 262.078125 C-85.80274544 282.13704515 -54.52949136 289.03297211 -28.62109375 291.16796875 C-24.65424345 291.3166575 -20.69031115 291.33505996 -16.72094727 291.3449707 C-15.56170746 291.3515419 -14.40246765 291.3581131 -13.20809937 291.36488342 C-9.38873207 291.38451451 -5.56940411 291.39626245 -1.75 291.40625 C-0.43370039 291.41032553 0.88259922 291.41440105 2.2387867 291.41860008 C8.50187462 291.43762766 14.76495108 291.45185362 21.02806228 291.46021205 C28.1796475 291.46992108 35.33091798 291.49608268 42.48239273 291.53671294 C48.05745887 291.56726177 53.63243696 291.58171756 59.20758492 291.58499306 C62.51390939 291.58730356 65.81963419 291.59782163 69.12591362 291.62145424 C103.19356045 291.84963689 140.10551561 288.14765068 166.37890625 264.16796875 C167.10851562 263.51957031 167.838125 262.87117188 168.58984375 262.203125 C173.95691046 257.17535561 177.75339023 251.53934043 181.37890625 245.16796875 C181.97832031 244.11738281 182.57773437 243.06679688 183.1953125 241.984375 C188.18472261 232.66290687 193.37890625 220.92132356 193.37890625 210.16796875 C87.11890625 210.16796875 -19.14109375 210.16796875 -128.62109375 210.16796875 Z " fill="#FFFFFF" transform="translate(281.62109375,128.83203125)"/>
+    <path d="M0 0 C2.55518105 -0.00322395 5.11036192 -0.00658882 7.6655426 -0.01008606 C12.99993388 -0.01603919 18.33430821 -0.01797345 23.66870117 -0.01733398 C29.7556638 -0.01673585 35.84253706 -0.02725095 41.92947716 -0.04307765 C47.87319933 -0.05795756 53.81689546 -0.0613159 59.76063728 -0.06072426 C62.24751207 -0.06188581 64.73438789 -0.06620156 67.22125053 -0.07405663 C89.27651721 -0.13719172 111.50963207 0.39970382 133.25390625 4.41796875 C134.45168701 4.63267822 135.64946777 4.8473877 136.88354492 5.06860352 C147.60885456 7.06782473 158.02060533 9.75624396 168.37890625 13.16796875 C169.07161621 13.39033203 169.76432617 13.61269531 170.47802734 13.84179688 C191.49998952 20.69734064 211.08444408 32.02655021 227.1953125 47.16015625 C229.37705947 49.22309608 229.37705947 49.22309608 231.88671875 51.109375 C236.4059078 54.84231015 239.77832631 59.57161291 243.37890625 64.16796875 C244.02988281 64.96847656 244.68085937 65.76898438 245.3515625 66.59375 C261.74568838 87.70076627 270.32398638 114.04301497 274.37890625 140.16796875 C274.49459961 140.85906738 274.61029297 141.55016602 274.72949219 142.26220703 C282.29318243 189.02466583 276.19902808 244.9042784 249.0546875 284.67578125 C242.86549658 293.12246066 235.81558031 300.81162913 228.37890625 308.16796875 C227.6209375 308.92335938 226.86296875 309.67875 226.08203125 310.45703125 C183.60584066 350.90410446 121.23455315 356.3199838 65.62890625 356.3359375 C63.63650026 356.33834297 61.64409426 356.34075098 59.65168858 356.34339792 C53.40043889 356.35147619 47.14920354 356.35398837 40.89794922 356.35327148 C34.53035799 356.35267292 28.16285207 356.363196 21.79528236 356.37901515 C16.25824922 356.3922615 10.72124335 356.39744833 5.18419456 356.39681607 C1.90836564 356.39656594 -1.36737224 356.40012154 -4.64318848 356.40999413 C-26.38672218 356.46938784 -48.32070333 356.0589274 -69.74609375 351.98046875 C-71.47291382 351.65900879 -71.47291382 351.65900879 -73.23461914 351.33105469 C-105.21391229 345.11926535 -134.61598121 333.2708796 -159.62109375 312.16796875 C-160.48605469 311.44480469 -161.35101563 310.72164063 -162.2421875 309.9765625 C-167.1711856 305.72914592 -171.55937074 301.24923357 -175.62109375 296.16796875 C-176.44351563 295.14445312 -177.2659375 294.1209375 -178.11328125 293.06640625 C-203.72182995 260.22737116 -212.112449 219.37733841 -211.93359375 178.54296875 C-211.93177094 177.67255951 -211.92994812 176.80215027 -211.92807007 175.90536499 C-211.79053856 136.73576322 -204.02988251 95.33486431 -178.62109375 64.16796875 C-178.19634766 63.63397461 -177.77160156 63.09998047 -177.33398438 62.54980469 C-147.98305281 25.80939317 -103.87677367 9.67884258 -58.62109375 2.98046875 C-57.50653809 2.81329346 -56.39198242 2.64611816 -55.24365234 2.47387695 C-36.90877248 -0.10235019 -18.47621475 0.00554858 0 0 Z M-100.62109375 91.16796875 C-101.4615625 91.91691406 -102.30203125 92.66585937 -103.16796875 93.4375 C-117.16855627 106.56835405 -124.00505891 123.93954179 -128.62109375 142.16796875 C-128.62109375 143.15796875 -128.62109375 144.14796875 -128.62109375 145.16796875 C-22.36109375 145.16796875 83.89890625 145.16796875 193.37890625 145.16796875 C188.17784025 120.8963274 178.51473758 98.48989587 157.00390625 84.41796875 C155.14428381 83.30844612 153.26890815 82.22491196 151.37890625 81.16796875 C150.44304687 80.64460938 149.5071875 80.12125 148.54296875 79.58203125 C115.02122643 61.87751855 75.19191438 63.8227628 38.39355469 63.90722656 C33.38502202 63.91862023 28.37670188 63.91184575 23.36817646 63.90034962 C-42.92876378 62.5392535 -42.92876378 62.5392535 -100.62109375 91.16796875 Z M-128.62109375 210.16796875 C-125.15512694 229.23078619 -118.87165345 245.7767931 -105.62109375 260.16796875 C-105.08226562 260.79832031 -104.5434375 261.42867188 -103.98828125 262.078125 C-85.80274544 282.13704515 -54.52949136 289.03297211 -28.62109375 291.16796875 C-24.65424345 291.3166575 -20.69031115 291.33505996 -16.72094727 291.3449707 C-15.56170746 291.3515419 -14.40246765 291.3581131 -13.20809937 291.36488342 C-9.38873207 291.38451451 -5.56940411 291.39626245 -1.75 291.40625 C-0.43370039 291.41032553 0.88259922 291.41440105 2.2387867 291.41860008 C8.50187462 291.43762766 14.76495108 291.45185362 21.02806228 291.46021205 C28.1796475 291.46992108 35.33091798 291.49608268 42.48239273 291.53671294 C48.05745887 291.56726177 53.63243696 291.58171756 59.20758492 291.58499306 C62.51390939 291.58730356 65.81963419 291.59782163 69.12591362 291.62145424 C103.19356045 291.84963689 140.10551561 288.14765068 166.37890625 264.16796875 C167.10851562 263.51957031 167.838125 262.87117188 168.58984375 262.203125 C173.95691046 257.17535561 177.75339023 251.53934043 181.37890625 245.16796875 C181.97832031 244.11738281 182.57773437 243.06679688 183.1953125 241.984375 C188.18472261 232.66290687 193.37890625 220.92132356 193.37890625 210.16796875 C87.11890625 210.16796875 -19.14109375 210.16796875 -128.62109375 210.16796875 Z " fill="#FFFFFF" transform="translate(281.62109375,128.83203125)" />
   </svg>
 );
 
 // Infinity symbol component (white)
 const InfinitySymbol = () => (
   <svg xmlns="http://www.w3.org/2000/svg" enableBackground="new 0 0 32 32" viewBox="0 0 32 32" style={{ width: '100%', height: '100%' }}>
-    <path d="M27.89453,10.09025c-2.22363-1.14404-4.86914-0.95166-6.9043,0.50146L16,14.15666l-4.99023-3.56494c-2.03516-1.45313-4.68262-1.64551-6.9043-0.50146C1.88184,11.23478,0.5,13.49894,0.5,15.99992s1.38184,4.76514,3.60547,5.90967c2.22461,1.14355,4.86914,0.95215,6.9043-0.50146L16,17.84318l4.99023,3.56494c1.15332,0.82373,2.50195,1.24219,3.85938,1.24219c1.03809,0,2.08203-0.24512,3.04492-0.74072C30.11816,20.76506,31.5,18.5009,31.5,15.99992S30.11816,11.23478,27.89453,10.09025z M9.26563,18.96672c-1.13281,0.80957-2.54688,0.91357-3.78809,0.27539C4.23926,18.60441,3.5,17.3925,3.5,15.99992s0.73926-2.60449,1.97754-3.24219c0.53906-0.27686,1.11133-0.41406,1.67871-0.41406c0.73828,0,1.46875,0.23193,2.10938,0.68945l4.15332,2.9668L9.26563,18.96672z M26.52246,19.24211c-1.24023,0.63818-2.6543,0.53418-3.78809-0.27539l-4.15332-2.9668l4.15332-2.9668c1.13379-0.80957,2.54785-0.91162,3.78809-0.27539C27.76074,13.39543,28.5,14.60734,28.5,15.99992S27.76074,18.60441,26.52246,19.24211z" fill="#ffffff"/>
+    <path d="M27.89453,10.09025c-2.22363-1.14404-4.86914-0.95166-6.9043,0.50146L16,14.15666l-4.99023-3.56494c-2.03516-1.45313-4.68262-1.64551-6.9043-0.50146C1.88184,11.23478,0.5,13.49894,0.5,15.99992s1.38184,4.76514,3.60547,5.90967c2.22461,1.14355,4.86914,0.95215,6.9043-0.50146L16,17.84318l4.99023,3.56494c1.15332,0.82373,2.50195,1.24219,3.85938,1.24219c1.03809,0,2.08203-0.24512,3.04492-0.74072C30.11816,20.76506,31.5,18.5009,31.5,15.99992S30.11816,11.23478,27.89453,10.09025z M9.26563,18.96672c-1.13281,0.80957-2.54688,0.91357-3.78809,0.27539C4.23926,18.60441,3.5,17.3925,3.5,15.99992s0.73926-2.60449,1.97754-3.24219c0.53906-0.27686,1.11133-0.41406,1.67871-0.41406c0.73828,0,1.46875,0.23193,2.10938,0.68945l4.15332,2.9668L9.26563,18.96672z M26.52246,19.24211c-1.24023,0.63818-2.6543,0.53418-3.78809-0.27539l-4.15332-2.9668l4.15332-2.9668c1.13379-0.80957,2.54785-0.91162,3.78809-0.27539C27.76074,13.39543,28.5,14.60734,28.5,15.99992S27.76074,18.60441,26.52246,19.24211z" fill="#ffffff" />
   </svg>
 );
 
@@ -83,8 +83,8 @@ const ICONS = {
   ),
   user: (
     <svg viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="12" cy="8" r="4"/>
-      <path d="M12 14c-6 0-8 3-8 3v7h16v-7s-2-3-8-3z"/>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M12 14c-6 0-8 3-8 3v7h16v-7s-2-3-8-3z" />
     </svg>
   ),
   ai: (brand: string, config?: BrandConfig) => {
@@ -191,7 +191,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
   const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
-  const brandKey: 'proxe' = 'proxe';
+  const brandKey = (brand.toLowerCase() || 'windchasers') as 'proxe' | 'windchasers';
 
   const handleOpenChat = useCallback(() => {
     setShowCloseConfirm(false);
@@ -251,13 +251,13 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
         // Always create session (even for incomplete leads) so we can track the conversation
         // But only populate with data when it becomes a complete lead
-        const hasCompleteLead = storedUser && 
-          storedUser.name?.trim() && 
-          storedUser.email?.trim() && 
+        const hasCompleteLead = storedUser &&
+          storedUser.name?.trim() &&
+          storedUser.email?.trim() &&
           storedUser.phone?.trim();
 
         let record: SessionRecord | null = null;
-        
+
         // Create session regardless of lead completeness
         record = await ensureSession(storedId, 'web', brandKey);
         if (!record) {
@@ -271,7 +271,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           }
           return;
         }
-        
+
         // Only set session record if it's a complete lead
         // This ensures we only track complete leads in the UI state
         if (hasCompleteLead) {
@@ -285,14 +285,14 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             });
           }
         }
-        
+
         if (cancelled) return;
 
         // Sync profile differences back to Supabase/local storage
         const updates: LocalUserProfile = { ...storedUser };
         let needsUpdate = false;
         let needsSupabaseSync = false;
-        
+
         // Sync from Supabase to localStorage
         if (record.userName && record.userName !== storedUser?.name) {
           updates.name = record.userName;
@@ -310,7 +310,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           updates.websiteUrl = record.websiteUrl;
           needsUpdate = true;
         }
-        
+
         // Sync from localStorage to Supabase (if localStorage has data Supabase doesn't)
         if (storedUser?.name && !record.userName) {
           needsSupabaseSync = true;
@@ -324,7 +324,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         if (storedUser?.websiteUrl && !record.websiteUrl) {
           needsSupabaseSync = true;
         }
-        
+
         if (needsUpdate) {
           storeUserProfile(updates, brandKey);
           setUserProfile(updates);
@@ -338,7 +338,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             setHasAskedPhone(true);
           }
         }
-        
+
         // Sync localStorage data to Supabase if needed
         if (needsSupabaseSync && storedUser) {
           await updateSessionProfile(
@@ -380,7 +380,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           } else if (process.env.NODE_ENV !== 'production') {
             console.log('[ChatWidget] No prior user inputs for session', { sessionId: record.id });
           }
-          
+
           // Fetch and restore conversation messages if we have a lead_id
           // Get lead_id from web_sessions
           const supabase = getSupabaseClient();
@@ -391,7 +391,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                 .select('lead_id')
                 .eq('external_session_id', storedId)
                 .maybeSingle();
-              
+
               if (!sessionError && sessionData?.lead_id) {
                 const conversations = await fetchConversations(sessionData.lead_id, 'web', brandKey);
                 if (conversations.length > 0 && !cancelled) {
@@ -524,14 +524,14 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
   const persistUserProfile = useCallback(async (updates: LocalUserProfile, options: { sync?: boolean } = {}) => {
     const { sync = true } = options;
     console.log('[persistUserProfile] Called', { updates, sync, externalSessionId, brandKey });
-    
+
     applyLocalProfile(updates);
 
     if (!sync) {
       console.log('[persistUserProfile] Sync disabled, skipping Supabase update');
       return;
     }
-    
+
     if (!externalSessionId) {
       console.warn('[persistUserProfile] No externalSessionId, cannot update Supabase', { updates });
       return;
@@ -550,19 +550,19 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     if (Object.prototype.hasOwnProperty.call(updates, 'websiteUrl') && updates.websiteUrl !== undefined) {
       supabaseUpdates.websiteUrl = updates.websiteUrl && updates.websiteUrl.trim() ? updates.websiteUrl.trim() : null;
     }
-    
+
     console.log('[persistUserProfile] Prepared Supabase updates', { supabaseUpdates, updateCount: Object.keys(supabaseUpdates).length });
-    
+
     if (Object.keys(supabaseUpdates).length > 0) {
       console.log('[persistUserProfile] Calling updateSessionProfile', { externalSessionId, supabaseUpdates, brandKey });
       await updateSessionProfile(externalSessionId, supabaseUpdates, brandKey);
-      
+
       // After updating profile, check if we now have a complete lead and create session if needed
       const updatedProfile = { ...userProfile, ...updates };
-      const hasCompleteLead = updatedProfile.name?.trim() && 
-                              updatedProfile.email?.trim() && 
-                              updatedProfile.phone?.trim();
-      
+      const hasCompleteLead = updatedProfile.name?.trim() &&
+        updatedProfile.email?.trim() &&
+        updatedProfile.phone?.trim();
+
       if (hasCompleteLead && !sessionRecord) {
         // Session was just created, fetch it to update state
         const newRecord = await ensureSession(externalSessionId, 'web', brandKey);
@@ -653,7 +653,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
   }, []);
 
   const deployFormRef = useRef<HTMLDivElement>(null);
-  
+
   const closeDeployForm = useCallback(() => {
     setShowDeployForm(null);
     deployFormScrolledRef.current = false;
@@ -721,22 +721,22 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         console.log('[ChatWidget] Requesting name before first AI response');
       }
       setHasAskedName(true);
-      
+
       // Add user's message to chat immediately so it shows before the name prompt
       addUserMessage(message);
-      
+
       // Queue the message for AI response after name is provided
       queuePendingMessage(message, buttons, 'name');
-      
+
       // Set flag to skip adding user message again when sending to AI
       setSkipAddingUserMessage(true);
-      
+
       // Ensure chat is open to show the name prompt
       setIsOpen(true);
       setIsInputActive(true);
       setIsExpanded(false);
       setShowQuickButtons(false);
-      
+
       setShowNamePrompt(true);
       return true;
     }
@@ -828,7 +828,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
     // Send contextual message (with name context) to AI, but display original message in chat
     sendMessage(contextualMessage, nextCount, buttons, buildRequestPayload(), skipAddingUserMessage, displayMessage);
-    
+
     // Reset the flag after using it
     if (skipAddingUserMessage) {
       setSkipAddingUserMessage(false);
@@ -888,7 +888,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     setHasAskedName(true);
     setNamePromptDismissed(false);
     setShowNamePrompt(false);
-    
+
     await persistUserProfile({
       name: nameInput.trim(),
       phoneSkipped: userProfile.phoneSkipped,
@@ -912,7 +912,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     // Set flag immediately to prevent re-asking
     setHasAskedEmail(true);
     setShowEmailPrompt(false);
-    
+
     await persistUserProfile({
       email: emailInput.trim(),
       emailSkipped: false,
@@ -939,7 +939,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     // Set flag immediately to prevent re-asking
     setHasAskedPhone(true);
     setShowPhonePrompt(false);
-    
+
     await persistUserProfile({
       phone: phoneInput.trim(),
       phoneSkipped: false,
@@ -1049,9 +1049,9 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     const fixSearchbarPosition = () => {
       if (!searchbarWrapperRef.current) return;
       if (keyboardHeight > 0) return; // let keyboard handler control position
-      
+
       const isMobile = window.innerWidth < 769;
-      
+
       if (isMobile) {
         // Mobile: Full width at bottom with consistent padding
         searchbarWrapperRef.current.style.setProperty('position', 'fixed', 'important');
@@ -1075,16 +1075,16 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         searchbarWrapperRef.current.style.setProperty('z-index', '9999', 'important');
       }
     };
-    
+
     // Fix immediately
     fixSearchbarPosition();
-    
+
     // Fix on resize
     window.addEventListener('resize', fixSearchbarPosition);
-    
+
     // Fix periodically to prevent any CSS from overriding
     const interval = setInterval(fixSearchbarPosition, 200);
-    
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('resize', fixSearchbarPosition);
@@ -1306,7 +1306,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       const windowHeight = window.innerHeight;
       const viewportHeight = viewport.height;
       const calculatedKeyboardHeight = windowHeight - viewportHeight;
-      
+
       setKeyboardHeight(calculatedKeyboardHeight);
 
       // Adjust searchbar position when keyboard is visible
@@ -1326,7 +1326,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         const footerElement = chatboxContainerRef.current?.querySelector(`.${styles.chatFooter}`) as HTMLElement;
         const messagesArea = messagesAreaRef.current;
         const mobileQuickActionsElement = chatboxContainerRef.current?.querySelector(`.${styles.mobileQuickActions}`) as HTMLElement;
-        
+
         if (calculatedKeyboardHeight > 0) {
           // Keyboard is visible - adjust layout without cutting off top
           if (chatboxContainerRef.current) {
@@ -1337,7 +1337,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             chatboxContainerRef.current.style.setProperty('max-height', '100dvh', 'important');
             chatboxContainerRef.current.style.setProperty('overscroll-behavior', 'none', 'important');
           }
-          
+
           if (inputAreaElement) {
             inputAreaElement.style.setProperty('position', 'fixed', 'important');
             inputAreaElement.style.setProperty('bottom', '0', 'important');
@@ -1361,7 +1361,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             inputAreaElement.style.setProperty('width', '100%', 'important');
             inputAreaElement.style.setProperty('box-sizing', 'border-box', 'important');
           }
-          
+
           // Position mobile quick actions and adjust messages area after input is positioned
           // Use requestAnimationFrame to ensure accurate measurements
           requestAnimationFrame(() => {
@@ -1377,7 +1377,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
               mobileQuickActionsElement.style.setProperty('z-index', '9998', 'important');
               mobileQuickActionsElement.style.setProperty('padding-left', 'max(16px, env(safe-area-inset-left, 16px))', 'important');
               mobileQuickActionsElement.style.setProperty('padding-right', 'max(16px, env(safe-area-inset-right, 16px))', 'important');
-              
+
               // Adjust messages area padding to account for both input area and quick actions
               if (messagesArea) {
                 const quickActionsHeight = mobileQuickActionsElement.offsetHeight || 0;
@@ -1391,7 +1391,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
               messagesArea.style.setProperty('padding-bottom', `${inputAreaHeight + footerHeight + 10}px`, 'important');
             }
           });
-          
+
           // Keep footer visible but ensure it has background and proper positioning
           if (footerElement) {
             footerElement.style.removeProperty('display');
@@ -1423,12 +1423,12 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             chatboxContainerRef.current.style.setProperty('max-height', '100dvh', 'important');
             chatboxContainerRef.current.style.setProperty('overscroll-behavior', 'none', 'important');
           }
-          
+
           // Restore messages area padding
           if (messagesArea) {
             messagesArea.style.setProperty('padding-bottom', '100px', 'important');
           }
-          
+
           if (inputAreaElement) {
             inputAreaElement.style.removeProperty('position');
             inputAreaElement.style.removeProperty('bottom');
@@ -1451,7 +1451,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             inputAreaElement.style.removeProperty('width');
             inputAreaElement.style.removeProperty('box-sizing');
           }
-          
+
           // Restore mobile quick actions to normal sticky positioning
           if (mobileQuickActionsElement) {
             mobileQuickActionsElement.style.removeProperty('position');
@@ -1462,7 +1462,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             mobileQuickActionsElement.style.removeProperty('padding-left');
             mobileQuickActionsElement.style.removeProperty('padding-right');
           }
-          
+
           // Restore footer to normal positioning when keyboard is hidden
           if (footerElement) {
             footerElement.style.removeProperty('display');
@@ -1482,7 +1482,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     // Listen for viewport changes (keyboard show/hide)
     viewport.addEventListener('resize', handleViewportChange);
     viewport.addEventListener('scroll', handleViewportChange);
-    
+
     // Initial check
     handleViewportChange();
 
@@ -1595,10 +1595,10 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       if (storedUser?.websiteUrl && externalSessionId) {
         await persistUserProfile({ websiteUrl: storedUser.websiteUrl });
       }
-      
+
       // Add confirmation message to chat
       addAIMessage("Thanks! We've received your details. Our team will review them and get back to you within 24 hours. In the meantime, feel free to ask any questions about PROXe!");
-      
+
       // Open chat to show the confirmation message
       setIsOpen(true);
       setIsInputActive(true);
@@ -1619,13 +1619,13 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     if (isOpen && conversationsToRestoreRef.current.length > 0 && !hasRestoredMessagesRef.current && messages.length === 0 && addUserMessage && addAIMessage) {
       // Restore messages from conversations table
       const conversations = conversationsToRestoreRef.current;
-      
+
       if (process.env.NODE_ENV !== 'production') {
         console.log('[ChatWidget] Restoring conversation messages', {
           count: conversations.length
         });
       }
-      
+
       // Restore messages in order
       conversations.forEach((conv) => {
         if (conv.type === 'user') {
@@ -1634,11 +1634,11 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           addAIMessage(conv.text);
         }
       });
-      
+
       // Mark as restored so we don't restore again
       hasRestoredMessagesRef.current = true;
       hasShownWelcomeRef.current = true; // Don't show welcome if we restored messages
-      
+
       // Scroll to bottom after restoring
       setTimeout(() => {
         if (messagesEndRef.current) {
@@ -1661,7 +1661,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
               .select('lead_id')
               .eq('external_session_id', externalSessionId)
               .maybeSingle();
-            
+
             if (!sessionError && sessionData?.lead_id) {
               const conversations = await fetchConversations(sessionData.lead_id, 'web', brandKey);
               if (conversations.length > 0) {
@@ -1672,7 +1672,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                   text: conv.content,
                   created_at: conv.created_at
                 }));
-                
+
                 // Trigger restoration
                 if (addUserMessage && addAIMessage) {
                   conversations.forEach((conv) => {
@@ -1682,10 +1682,10 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                       addAIMessage(conv.content);
                     }
                   });
-                  
+
                   hasRestoredMessagesRef.current = true;
                   hasShownWelcomeRef.current = true;
-                  
+
                   // Scroll to bottom after restoring
                   setTimeout(() => {
                     if (messagesEndRef.current) {
@@ -1700,7 +1700,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
         }
       };
-      
+
       fetchConversationsOnReopen();
     }
   }, [isOpen, externalSessionId, messages.length, addUserMessage, addAIMessage, brandKey]);
@@ -1718,7 +1718,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
               .select('lead_id')
               .eq('external_session_id', externalSessionId)
               .maybeSingle();
-            
+
             if (!sessionError && sessionData?.lead_id) {
               const conversations = await fetchConversations(sessionData.lead_id, 'web', brandKey);
               if (conversations.length > 0 && addUserMessage && addAIMessage) {
@@ -1729,7 +1729,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                   text: conv.content,
                   created_at: conv.created_at
                 }));
-                
+
                 // Restore messages
                 conversations.forEach((conv) => {
                   if (conv.sender === 'customer') {
@@ -1738,22 +1738,22 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                     addAIMessage(conv.content);
                   }
                 });
-                
+
                 hasRestoredMessagesRef.current = true;
                 hasShownWelcomeRef.current = true;
-                
+
                 // Scroll to bottom after restoring
                 setTimeout(() => {
                   if (messagesEndRef.current) {
                     messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
                   }
                 }, 100);
-                
+
                 return; // Don't show welcome message
               }
             }
           }
-          
+
           // No conversations found, show welcome message
           if (addAIMessage) {
             addAIMessage("Hey!👋 I am PROXe, ask me anything");
@@ -1768,7 +1768,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           }
         }
       };
-      
+
       fetchConversationsOnReopen();
     } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
@@ -1782,7 +1782,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     if (isOpen && messagesAreaRef.current) {
       // Force scroll to absolute top when chat opens
       messagesAreaRef.current.scrollTop = 0;
-      
+
       // Also ensure the container itself is at top
       if (chatboxContainerRef.current) {
         chatboxContainerRef.current.scrollTop = 0;
@@ -1797,12 +1797,12 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       setTimeout(() => {
         // Check if last message is a booking confirmation
         const lastMessage = messages[messages.length - 1];
-        const isBookingConfirmation = lastMessage && 
-          lastMessage.type === 'ai' && 
-          lastMessage.text && 
+        const isBookingConfirmation = lastMessage &&
+          lastMessage.type === 'ai' &&
+          lastMessage.text &&
           lastMessage.text.includes('scheduled for') &&
           bookingCompleted;
-        
+
         if (isBookingConfirmation) {
           // Find and scroll to the booking confirmation message
           const messageElement = document.querySelector(`[data-message-id="${lastMessage.id}"]`);
@@ -1821,25 +1821,25 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         }
       }, 300);
     }
-    
+
     // Check if we should show calendar widget after AI response completes
     if (pendingCalendar && messages.length > 0 && !bookingCompleted) {
       const lastMessage = messages[messages.length - 1];
-      
+
       // Wait for AI message to be fully streamed and not currently streaming
       // Also check that message has text content (more reliable than just hasStreamed)
       if (lastMessage && lastMessage.type === 'ai' && !lastMessage.isStreaming && lastMessage.text && lastMessage.text.length > 0) {
         // Use setTimeout to ensure state updates properly
         const timer = setTimeout(async () => {
           setPendingCalendar(false);
-          
+
           // Check for existing booking before showing calendar
           const phone = userProfile.phone;
           const email = userProfile.email;
-          
+
           if (phone || email) {
             const existingBooking = await checkExistingBooking(phone, email, brandKey);
-            
+
             if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
               // Format date and time for display
               const date = new Date(existingBooking.bookingDate);
@@ -1849,20 +1849,20 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                 month: 'long',
                 day: 'numeric',
               });
-              
+
               // Format time (assuming it's in "HH:MM AM/PM" format)
               const formattedTime = existingBooking.bookingTime;
-              
+
               // Show message about existing booking
               const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-              
+
               // Add as AI message using addAIMessage from hook
               addAIMessage(bookingMessage);
               setBookingCompleted(true);
               return; // Don't show calendar
             }
           }
-          
+
           // No existing booking, show calendar
           const calendarMessageId = `calendar-${Date.now()}`;
           setShowCalendly(calendarMessageId);
@@ -1872,11 +1872,11 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
             setCalendarAnchorId(null);
           }
         }, 500);
-        
+
         return () => clearTimeout(timer);
       }
     }
-    
+
   }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey]);
 
   // Handle booking completion
@@ -1896,7 +1896,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         setShowPhonePrompt(false);
         setHasAskedPhone(true);
       }
-      
+
       // Persist the contact information
       await handleContactPersist({
         name: bookingData.name,
@@ -1944,7 +1944,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
   const checkAndShowBooking = useCallback(async () => {
     const phone = userProfile.phone;
     const email = userProfile.email;
-    
+
     if (!phone && !email) {
       // No contact info yet, allow booking
       return true;
@@ -1952,7 +1952,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
     const { checkExistingBooking } = await import('@/lib/chatSessions');
     const existingBooking = await checkExistingBooking(phone, email, brandKey);
-    
+
     if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
       // Format date and time for display
       const date = new Date(existingBooking.bookingDate);
@@ -1962,20 +1962,20 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         month: 'long',
         day: 'numeric',
       });
-      
+
       // Format time (assuming it's in "HH:MM AM/PM" format)
       const formattedTime = existingBooking.bookingTime;
-      
+
       // Show message about existing booking
       const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-      
+
       // Add as AI message using addAIMessage from hook
       addAIMessage(bookingMessage);
       setBookingCompleted(true);
-      
+
       return false; // Don't show calendar
     }
-    
+
     return true; // Allow booking
   }, [userProfile.phone, userProfile.email, brandKey, addAIMessage]);
 
@@ -1998,10 +1998,10 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         if (inputBottom > viewportHeight - 10) {
           requestAnimationFrame(() => {
             setTimeout(() => {
-              input.scrollIntoView({ 
-                behavior: 'smooth', 
+              input.scrollIntoView({
+                behavior: 'smooth',
                 block: 'center',
-                inline: 'nearest' 
+                inline: 'nearest'
               });
             }, 150);
           });
@@ -2061,12 +2061,12 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
         // Check if scrolling horizontally (shift + wheel) or convert vertical to horizontal
         const isHorizontalScroll = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        
+
         if (isHorizontalScroll || Math.abs(e.deltaX) > 0) {
           // Horizontal scroll - allow default behavior
           return;
         }
-        
+
         // Convert vertical scroll to horizontal
         e.preventDefault();
         quickButtonsElement.scrollBy({
@@ -2092,10 +2092,10 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      
+
       const x = e.pageX - quickButtonsElement.offsetLeft;
       const deltaX = Math.abs(x - dragStartX.current);
-      
+
       // Only prevent default and scroll if user has moved more than 5px (to distinguish from clicks)
       if (deltaX > 5) {
         hasDraggedRef.current = true;
@@ -2112,7 +2112,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         quickButtonsElement.style.userSelect = '';
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        
+
         // If user dragged, prevent click event on buttons
         if (hasDraggedRef.current) {
           e.preventDefault();
@@ -2134,16 +2134,16 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
     // Only enable drag on desktop (not touch devices)
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
+
     quickButtonsElement.addEventListener('wheel', handleWheel, { passive: false });
-    
+
     if (!isTouchDevice) {
       quickButtonsElement.addEventListener('mousedown', handleMouseDown);
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       quickButtonsElement.addEventListener('mouseleave', handleMouseLeave);
     }
-    
+
     return () => {
       quickButtonsElement.removeEventListener('wheel', handleWheel);
       if (!isTouchDevice) {
@@ -2159,12 +2159,12 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
     // Check for booking-related keywords
-    return lowerText.includes('call') || 
-           lowerText.includes('demo') || 
-           lowerText.includes('book') ||
-           lowerText.includes('schedule') ||
-           lowerText.includes('meeting') ||
-           lowerText.includes('appointment');
+    return lowerText.includes('call') ||
+      lowerText.includes('demo') ||
+      lowerText.includes('book') ||
+      lowerText.includes('schedule') ||
+      lowerText.includes('meeting') ||
+      lowerText.includes('appointment');
   };
 
   const handleSend = () => {
@@ -2263,15 +2263,15 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       if (showPhonePrompt) {
         setShowPhonePrompt(false);
       }
-      
+
       setIsOpen(true);
       setIsExpanded(false);
       setShowQuickButtons(false);
       setIsInputActive(false);
-      
+
       // Add user message to chat
       addUserMessage('Deploy PROXe');
-      
+
       // Show deploy form after the user message is added
       // Use a longer timeout to ensure the message is in the array
       setTimeout(() => {
@@ -2279,13 +2279,13 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         setShowDeployForm(deployMessageId);
         deployFormScrolledRef.current = false;
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[ChatWidget] Deploy form opened', { 
+          console.log('[ChatWidget] Deploy form opened', {
             messagesCount: messages.length,
             deployMessageId
           });
         }
       }, 300);
-      
+
       return;
     }
 
@@ -2297,17 +2297,17 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       setIsExpanded(false);
       setShowQuickButtons(false);
       setIsInputActive(false);
-      
+
       // Add user message to chat and get the message object
       const userMessage = addUserMessage('Watch Video');
-      
+
       // Show video after the user message
       setTimeout(() => {
         const videoMessageId = `video-${Date.now()}`;
         setShowVideo(videoMessageId);
         setVideoAnchorId(userMessage.id);
       }, 100);
-      
+
       return;
     }
 
@@ -2394,11 +2394,11 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     setIsInputActive(true);
     if (!isOpen) {
       // Check if there's an existing conversation
-      const hasExistingConversation = 
-        messages.length > 0 || 
-        conversationSummary.trim().length > 0 || 
+      const hasExistingConversation =
+        messages.length > 0 ||
+        conversationSummary.trim().length > 0 ||
         (sessionRecord?.userInputsSummary && sessionRecord.userInputsSummary.length > 0);
-      
+
       // If there's an existing conversation, open the chat directly
       if (hasExistingConversation) {
         setIsDockedBubble(true);
@@ -2412,12 +2412,12 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         }
         return;
       }
-      
+
       setIsExpanded(true);
       // Show quick buttons only when expanded and no existing conversation
       setShowQuickButtons(true);
     }
-    
+
     // Scroll input into view above keyboard on mobile
     // Use Visual Viewport API if available for better keyboard handling
     const scrollInputIntoView = () => {
@@ -2428,30 +2428,30 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           const viewport = window.visualViewport;
           const inputRect = input.getBoundingClientRect();
           const viewportHeight = viewport.height;
-          
+
           // Calculate if input is hidden by keyboard
           const inputBottom = inputRect.bottom;
           const visibleHeight = viewportHeight;
-          
+
           if (inputBottom > visibleHeight) {
             // Scroll the input to be visible above keyboard
-            input.scrollIntoView({ 
-              behavior: 'smooth', 
+            input.scrollIntoView({
+              behavior: 'smooth',
               block: 'center',
-              inline: 'nearest' 
+              inline: 'nearest'
             });
           }
         } else {
           // Fallback for browsers without Visual Viewport API
-          input.scrollIntoView({ 
-            behavior: 'smooth', 
+          input.scrollIntoView({
+            behavior: 'smooth',
             block: 'center',
-            inline: 'nearest' 
+            inline: 'nearest'
           });
         }
       }
     };
-    
+
     // Use requestAnimationFrame for immediate execution, then small delay for keyboard
     requestAnimationFrame(() => {
       setTimeout(scrollInputIntoView, 150);
@@ -2464,7 +2464,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
     if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
       return;
     }
-    
+
     setTimeout(() => {
       if (!inputValue.trim() && !isOpen) {
         setShowQuickButtons(false);
@@ -2483,7 +2483,7 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
       .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
       .trim();
-    
+
     // Basic markdown to HTML conversion
     // Convert double newlines to breaks
     // Preserve single newlines (they indicate intentional line breaks for formatting)
@@ -2497,21 +2497,21 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
   };
-  
+
   useEffect(() => {
     if (isOpen) {
       hasEverOpenedRef.current = true;
     }
   }, [isOpen]);
-  
+
   const hasConversation = messages.length > 0;
-  const hasExistingConversation = 
-    hasConversation || 
-    conversationSummary.trim().length > 0 || 
+  const hasExistingConversation =
+    hasConversation ||
+    conversationSummary.trim().length > 0 ||
     (sessionRecord?.userInputsSummary && sessionRecord.userInputsSummary.length > 0);
   const searchbar = (
-    <div 
-      ref={searchbarWrapperRef} 
+    <div
+      ref={searchbarWrapperRef}
       className={styles.searchbarWrapper}
       aria-hidden={isOpen}
       style={isOpen ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
@@ -2522,23 +2522,23 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
         setIsSearchbarHovered(false);
       }}
     >
-      <div 
+      <div
         className={`${styles.searchbar} ${isExpanded ? styles.searchbarExpanded : ''}`}
         onMouseDown={(e) => {
           // Don't prevent default - let click event fire
         }}
         onClick={(e) => {
           e.stopPropagation();
-            handleSearchWidgetPress();
+          handleSearchWidgetPress();
         }}
         onTouchStart={(e) => {
-            handleSearchWidgetPress();
+          handleSearchWidgetPress();
         }}
         style={{ cursor: 'pointer' }}
       >
         <div className={styles.searchIcon} onClick={(e) => {
           e.stopPropagation();
-            handleSearchWidgetPress();
+          handleSearchWidgetPress();
         }}>
           {ICONS.search}
         </div>
@@ -2552,13 +2552,13 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           data-form-type="other"
           data-lpignore="true"
           onChange={(e) => {
-              const nextValue = e.target.value;
-              setInputValue(nextValue);
-              if (!isOpen && isMobileNewChat && nextValue.trim()) {
-                openChatAndFocus();
-              }
+            const nextValue = e.target.value;
+            setInputValue(nextValue);
+            if (!isOpen && isMobileNewChat && nextValue.trim()) {
+              openChatAndFocus();
+            }
             // Close any open prompt cards when user starts typing in searchbar
-              if (nextValue && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
+            if (nextValue && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
               if (showNamePrompt) {
                 setShowNamePrompt(false);
                 setNamePromptDismissed(true);
@@ -2574,14 +2574,14 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           onClick={(e) => {
             e.stopPropagation();
             setHasInteractedWithSearchbar(true);
-              handleSearchWidgetPress();
+            handleSearchWidgetPress();
           }}
           onFocus={(e) => {
             setHasInteractedWithSearchbar(true);
             if (showDeployForm) {
               closeDeployForm();
             }
-              handleSearchWidgetPress();
+            handleSearchWidgetPress();
           }}
           onBlur={handleInputBlur}
           onKeyPress={(e) => {
@@ -2591,8 +2591,8 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
           }}
         />
         {inputValue.trim() && (
-          <button 
-            className={styles.sendBtn} 
+          <button
+            className={styles.sendBtn}
             onClick={(e) => {
               e.stopPropagation();
               handleSend();
@@ -2628,226 +2628,283 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
 
   return (
     <>
-    {searchbar}
-    <div 
-      ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${styles.chatboxDocked} ${isResponding ? styles.chatboxResponding : ''}`}
-      data-brand={brand}
-    >
-          <div className={styles.chatContent}>
-        {showResetConfirm && (
-          <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
-            <div className={styles.closeConfirmCard}>
-              <p className={styles.closeConfirmMessage}>Chat history will be lost. Do you wish to continue?</p>
-              <div className={styles.closeConfirmActions}>
-                <button className={styles.closeConfirmEndBtn} onClick={handleConfirmResetChat}>
-                  Reset Chat
-                </button>
-                <button className={styles.closeConfirmContinueBtn} onClick={handleCancelResetChat}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {showCloseConfirm && (
-          <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
-            <div className={styles.closeConfirmCard}>
-              <p className={styles.closeConfirmMessage}>Do you want to end this chat?</p>
-              <div className={styles.closeConfirmActions}>
-                <button className={styles.closeConfirmEndBtn} onClick={handleConfirmCloseChat}>
-                  End Chat
-                </button>
-                <button className={styles.closeConfirmContinueBtn} onClick={handleCancelCloseChat}>
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        <div className={styles.chatHeader}>
-        <div className={styles.brandName}>
-          <div className={styles.avatar}>
-            {brand === 'proxe' ? <PROXELogo /> : ICONS.ai(brand, config)}
-          </div>
-          <span>{config.name}</span>
-        </div>
-        <div className={styles.headerActions}>
-          <button 
-            className={styles.resetBtn} 
-            onClick={handleRequestResetChat}
-            title="Reset chat"
-          >
-            {ICONS.reset}
-          </button>
-          <button
-            className={styles.closeBtn}
-            onClick={handleRequestCloseChat}
-          >
-            {ICONS.close}
-          </button>
-        </div>
-      </div>
-      <div 
-        ref={messagesAreaRef}
-        className={styles.messagesArea}
-        data-scroll-lock="allow"
-        onClick={(e) => {
-          // Only close widgets if clicking directly on the messages area, not on messages or buttons
-          const target = e.target as HTMLElement;
-          const isClickOnMessage = target.closest(`.${styles.message}`);
-          const isClickOnButton = target.closest(`.${styles.quickBtn}`) || target.closest(`.${styles.followUpBtn}`);
-          const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
-          const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
-          
-          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo) {
-            // Close widgets when clicking in empty messages area (clicking away)
-            closeCalendarWidget();
-            closeVideoWidget();
-          }
-        }}
+      {searchbar}
+      <div
+        ref={chatboxContainerRef}
+        className={`${styles.chatboxContainer} ${styles.chatboxDocked} ${isResponding ? styles.chatboxResponding : ''}`}
+        data-brand={brand}
       >
-        {messages.map((message, index) => {
-          // Rotate through accent colors (0-6 for 7 colors)
-          const accentIndex = index % 7;
-          const accentClass = `accent-${accentIndex}`;
-          
-          return (
-          <React.Fragment key={message.id}>
-            <div 
-              className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
-              data-message-id={message.id}
-            >
-              <div className={styles.messageContent}>
-                <div className={styles.bubble}>
-                  {message.isStreaming && !message.text ? (
-                    <InfinityLoader />
-                  ) : (
-                    <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {message.type === 'ai' ? config.name : 'You'}
-                        </span>
-                      </div>
-                      
-                      {/* Message content */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                        <div
-                          className={styles.messageText}
-                          style={{ flex: '1 1 auto', minWidth: 0 }}
-                          dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                        />
-                        {message.isStreaming && message.text && (
-                          <span className={styles.streamingCursor}>▋</span>
+        <div className={styles.chatContent}>
+          {showResetConfirm && (
+            <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
+              <div className={styles.closeConfirmCard}>
+                <p className={styles.closeConfirmMessage}>Chat history will be lost. Do you wish to continue?</p>
+                <div className={styles.closeConfirmActions}>
+                  <button className={styles.closeConfirmEndBtn} onClick={handleConfirmResetChat}>
+                    Reset Chat
+                  </button>
+                  <button className={styles.closeConfirmContinueBtn} onClick={handleCancelResetChat}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {showCloseConfirm && (
+            <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
+              <div className={styles.closeConfirmCard}>
+                <p className={styles.closeConfirmMessage}>Do you want to end this chat?</p>
+                <div className={styles.closeConfirmActions}>
+                  <button className={styles.closeConfirmEndBtn} onClick={handleConfirmCloseChat}>
+                    End Chat
+                  </button>
+                  <button className={styles.closeConfirmContinueBtn} onClick={handleCancelCloseChat}>
+                    Continue
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className={styles.chatHeader}>
+            <div className={styles.brandName}>
+              <div className={styles.avatar}>
+                {brand === 'proxe' ? <PROXELogo /> : ICONS.ai(brand, config)}
+              </div>
+              <span>{config.name}</span>
+            </div>
+            <div className={styles.headerActions}>
+              <button
+                className={styles.resetBtn}
+                onClick={handleRequestResetChat}
+                title="Reset chat"
+              >
+                {ICONS.reset}
+              </button>
+              <button
+                className={styles.closeBtn}
+                onClick={handleRequestCloseChat}
+              >
+                {ICONS.close}
+              </button>
+            </div>
+          </div>
+          <div
+            ref={messagesAreaRef}
+            className={styles.messagesArea}
+            data-scroll-lock="allow"
+            onClick={(e) => {
+              // Only close widgets if clicking directly on the messages area, not on messages or buttons
+              const target = e.target as HTMLElement;
+              const isClickOnMessage = target.closest(`.${styles.message}`);
+              const isClickOnButton = target.closest(`.${styles.quickBtn}`) || target.closest(`.${styles.followUpBtn}`);
+              const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
+              const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
+
+              if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo) {
+                // Close widgets when clicking in empty messages area (clicking away)
+                closeCalendarWidget();
+                closeVideoWidget();
+              }
+            }}
+          >
+            {messages.map((message, index) => {
+              // Rotate through accent colors (0-6 for 7 colors)
+              const accentIndex = index % 7;
+              const accentClass = `accent-${accentIndex}`;
+
+              return (
+                <React.Fragment key={message.id}>
+                  <div
+                    className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
+                    data-message-id={message.id}
+                  >
+                    <div className={styles.messageContent}>
+                      <div className={styles.bubble}>
+                        {message.isStreaming && !message.text ? (
+                          <InfinityLoader />
+                        ) : (
+                          <div className={styles.bubbleContent}>
+                            {/* Header with avatar and name inside the bubble */}
+                            <div className={styles.bubbleHeader}>
+                              <div className={styles.bubbleAvatar}>
+                                {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
+                              </div>
+                              <span className={styles.bubbleName}>
+                                {message.type === 'ai' ? config.name : 'You'}
+                              </span>
+                            </div>
+
+                            {/* Message content */}
+                            <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                              <div
+                                className={styles.messageText}
+                                style={{ flex: '1 1 auto', minWidth: 0 }}
+                                dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                              />
+                              {message.isStreaming && message.text && (
+                                <span className={styles.streamingCursor}>▋</span>
+                              )}
+                            </div>
+
+                            {/* Follow-up buttons inside the bubble for AI messages */}
+                            {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
+                              <div className={styles.followUpButtons}>
+                                {message.followUps.map((followUp, followUpIndex) => {
+                                  // Rotate through accent colors for follow-up buttons
+                                  const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
+                                  const buttonAccentClass = `accent-${buttonAccentIndex}`;
+
+                                  return (
+                                    <button
+                                      key={followUpIndex}
+                                      className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
+                                      onClick={() => handleQuickButtonClick(followUp)}
+                                    >
+                                      {followUp}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                      
-                      {/* Follow-up buttons inside the bubble for AI messages */}
-                      {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
-                        <div className={styles.followUpButtons}>
-                          {message.followUps.map((followUp, followUpIndex) => {
-                            // Rotate through accent colors for follow-up buttons
-                            const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
-                            const buttonAccentClass = `accent-${buttonAccentIndex}`;
-                            
-                            return (
-                            <button
-                              key={followUpIndex}
-                              className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
-                              onClick={() => handleQuickButtonClick(followUp)}
-                            >
-                              {followUp}
-                            </button>
-                            );
-                          })}
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {showCalendly && calendarAnchorId === message.id && (
-              <div 
-                key={showCalendly}
-                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-                onClick={(e) => e.stopPropagation()}
-                ref={(el) => {
-                  if (el) {
-                    requestAnimationFrame(() => {
-                      setTimeout(() => {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                      }, 100);
-                    });
-                  }
-                }}
-              >
-                <div className={styles.messageContent}>
-                  <div className={styles.bubble}>
-                    <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.calendarCloseBtn}
-                      onClick={closeCalendarWidget}
-                      aria-label="Close booking widget"
-                    >
-                      {ICONS.close}
-                    </button>
                   </div>
-                      
-                      {/* Custom Google Calendar widget */}
-                  <div
-                    className={styles.calendarScrollArea}
-                    data-scroll-lock="allow"
-                  >
-                        <BookingCalendarWidget
-                          {...({
-                            brand,
-                            config,
-                            sessionId: externalSessionId || undefined,
-                            onBookingComplete: handleBookingComplete,
-                            prefillName: userProfile.name || '',
-                            prefillEmail: userProfile.email || '',
-                            prefillPhone: userProfile.phone || '',
-                            onContactDraft: handleContactDraft,
-                            onContactSubmit: handleContactPersist,
-                          } satisfies BookingCalendarWidgetProps)}
-                        />
+
+                  {showCalendly && calendarAnchorId === message.id && (
+                    <div
+                      key={showCalendly}
+                      className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                      onClick={(e) => e.stopPropagation()}
+                      ref={(el) => {
+                        if (el) {
+                          requestAnimationFrame(() => {
+                            setTimeout(() => {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }, 100);
+                          });
+                        }
+                      }}
+                    >
+                      <div className={styles.messageContent}>
+                        <div className={styles.bubble}>
+                          <div className={styles.bubbleContent}>
+                            {/* Header with avatar and name inside the bubble */}
+                            <div className={styles.bubbleHeader}>
+                              <div className={styles.bubbleAvatar}>
+                                {ICONS.ai(brand, config)}
+                              </div>
+                              <span className={styles.bubbleName}>
+                                {config.name}
+                              </span>
+                              <button
+                                type="button"
+                                className={styles.calendarCloseBtn}
+                                onClick={closeCalendarWidget}
+                                aria-label="Close booking widget"
+                              >
+                                {ICONS.close}
+                              </button>
+                            </div>
+
+                            {/* Custom Google Calendar widget */}
+                            <div
+                              className={styles.calendarScrollArea}
+                              data-scroll-lock="allow"
+                            >
+                              <BookingCalendarWidget
+                                {...({
+                                  brand,
+                                  config,
+                                  sessionId: externalSessionId || undefined,
+                                  onBookingComplete: handleBookingComplete,
+                                  prefillName: userProfile.name || '',
+                                  prefillEmail: userProfile.email || '',
+                                  prefillPhone: userProfile.phone || '',
+                                  onContactDraft: handleContactDraft,
+                                  onContactSubmit: handleContactPersist,
+                                } satisfies BookingCalendarWidgetProps)}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                  )}
 
 
-            {showVideo && videoAnchorId === message.id && (
-              <div 
-                key={showVideo}
+                  {showVideo && videoAnchorId === message.id && (
+                    <div
+                      key={showVideo}
+                      className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                      onClick={(e) => e.stopPropagation()}
+                      ref={(el) => {
+                        if (el) {
+                          requestAnimationFrame(() => {
+                            setTimeout(() => {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                            }, 100);
+                          });
+                        }
+                      }}
+                    >
+                      <div className={styles.messageContent}>
+                        <div className={styles.bubble}>
+                          <div className={styles.bubbleContent}>
+                            {/* Header with avatar and name inside the bubble */}
+                            <div className={styles.bubbleHeader}>
+                              <div className={styles.bubbleAvatar}>
+                                {ICONS.ai(brand, config)}
+                              </div>
+                              <span className={styles.bubbleName}>
+                                {config.name}
+                              </span>
+                              <button
+                                type="button"
+                                className={styles.calendarCloseBtn}
+                                onClick={closeVideoWidget}
+                                aria-label="Close video"
+                              >
+                                {ICONS.close}
+                              </button>
+                            </div>
+
+                            {/* Video player */}
+                            <div
+                              className={styles.videoContainer}
+                              data-scroll-lock="allow"
+                            >
+                              <video
+                                controls
+                                autoPlay
+                                playsInline
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '400px',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#000',
+                                }}
+                              >
+                                <source src="/brands/proxe/assets/Markx.mp4" type="video/mp4" />
+                                Your browser does not support the video tag.
+                              </video>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+
+            {showDeployForm && (
+              <div
+                ref={deployFormRef}
+                key={showDeployForm}
                 className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
                 onClick={(e) => e.stopPropagation()}
-                ref={(el) => {
-                  if (el) {
-                    requestAnimationFrame(() => {
-                      setTimeout(() => {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
-                      }, 100);
-                    });
-                  }
-                }}
               >
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
@@ -2863,420 +2920,363 @@ export function ChatWidget({ brand, config, apiUrl, widgetStyle = 'searchbar' }:
                         <button
                           type="button"
                           className={styles.calendarCloseBtn}
-                          onClick={closeVideoWidget}
-                          aria-label="Close video"
+                          onClick={closeDeployForm}
+                          aria-label="Close deploy form"
                         >
                           {ICONS.close}
                         </button>
                       </div>
-                      
-                      {/* Video player */}
-                      <div
-                        className={styles.videoContainer}
-                        data-scroll-lock="allow"
-                      >
-                        <video
-                          controls
-                          autoPlay
-                          playsInline
-                          style={{
-                            width: '100%',
-                            maxHeight: '400px',
-                            borderRadius: '8px',
-                            backgroundColor: '#000',
-                          }}
-                        >
-                          <source src="/brands/proxe/assets/Markx.mp4" type="video/mp4" />
-                          Your browser does not support the video tag.
-                        </video>
+
+                      {/* Deploy Form */}
+                      <DeployFormInline
+                        brand={brand}
+                        config={config}
+                        userProfile={userProfile}
+                        onContactDraft={handleContactDraft}
+                        onContactSubmit={handleContactPersist}
+                        onFormSubmit={async () => {
+                          // Sync websiteUrl from localStorage to Supabase
+                          const storedUser = getStoredUser(brandKey);
+                          if (storedUser?.websiteUrl && externalSessionId) {
+                            await persistUserProfile({ websiteUrl: storedUser.websiteUrl });
+                          }
+
+                          // Add confirmation message to chat
+                          addAIMessage("Thanks! We've received your details. Our team will review them and get back to you within 24 hours. In the meantime, feel free to ask any questions about PROXe!");
+
+                          // Close the form
+                          closeDeployForm();
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {exploreButtons && exploreButtons.length > 0 && (
+              <div
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                      </div>
+                      <p className={styles.exploreTitle}>Choose your PROXe</p>
+                      <div className={styles.exploreButtonGroup}>
+                        {exploreButtons.map((option, optionIndex) => {
+                          // Map each PROXe type to its specific color class from "Meet Our PROXes" section
+                          let proxeColorClass = '';
+                          if (option.toLowerCase().includes('web')) {
+                            proxeColorClass = styles.exploreWeb;
+                          } else if (option.toLowerCase().includes('whatsapp')) {
+                            proxeColorClass = styles.exploreWhatsapp;
+                          } else if (option.toLowerCase().includes('voice')) {
+                            proxeColorClass = styles.exploreVoice;
+                          } else if (option.toLowerCase().includes('social')) {
+                            proxeColorClass = styles.exploreSocial;
+                          }
+                          return (
+                            <button
+                              key={optionIndex}
+                              className={`${styles.followUpBtn} ${proxeColorClass}`}
+                              onClick={() => {
+                                setExploreButtons(null);
+                                // Send a message about the specific PROXe type
+                                const proxeMessage = `Tell me more about ${option}`;
+                                handleQuickButtonClick(proxeMessage);
+                              }}
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-          </React.Fragment>
-          );
-        })}
 
-        {showDeployForm && (
-          <div 
-            ref={deployFormRef}
-            key={showDeployForm}
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.calendarCloseBtn}
-                      onClick={closeDeployForm}
-                      aria-label="Close deploy form"
-                    >
-                      {ICONS.close}
-                    </button>
-                  </div>
-                  
-                  {/* Deploy Form */}
-                  <DeployFormInline
-                    brand={brand}
-                    config={config}
-                    userProfile={userProfile}
-                    onContactDraft={handleContactDraft}
-                    onContactSubmit={handleContactPersist}
-                    onFormSubmit={async () => {
-                      // Sync websiteUrl from localStorage to Supabase
-                      const storedUser = getStoredUser(brandKey);
-                      if (storedUser?.websiteUrl && externalSessionId) {
-                        await persistUserProfile({ websiteUrl: storedUser.websiteUrl });
-                      }
-                      
-                      // Add confirmation message to chat
-                      addAIMessage("Thanks! We've received your details. Our team will review them and get back to you within 24 hours. In the meantime, feel free to ask any questions about PROXe!");
-                      
-                      // Close the form
-                      closeDeployForm();
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {exploreButtons && exploreButtons.length > 0 && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
-            }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
-                  <p className={styles.exploreTitle}>Choose your PROXe</p>
-                  <div className={styles.exploreButtonGroup}>
-                    {exploreButtons.map((option, optionIndex) => {
-                      // Map each PROXe type to its specific color class from "Meet Our PROXes" section
-                      let proxeColorClass = '';
-                      if (option.toLowerCase().includes('web')) {
-                        proxeColorClass = styles.exploreWeb;
-                      } else if (option.toLowerCase().includes('whatsapp')) {
-                        proxeColorClass = styles.exploreWhatsapp;
-                      } else if (option.toLowerCase().includes('voice')) {
-                        proxeColorClass = styles.exploreVoice;
-                      } else if (option.toLowerCase().includes('social')) {
-                        proxeColorClass = styles.exploreSocial;
-                      }
-                      return (
+            {/* Inline Name Prompt Card */}
+            {showNamePrompt && !showCalendly && !showDeployForm && (
+              <div
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
                         <button
-                          key={optionIndex}
-                          className={`${styles.followUpBtn} ${proxeColorClass}`}
-                          onClick={() => {
-                            setExploreButtons(null);
-                            // Send a message about the specific PROXe type
-                            const proxeMessage = `Tell me more about ${option}`;
-                            handleQuickButtonClick(proxeMessage);
-                          }}
+                          type="button"
+                          className={styles.inlinePromptClose}
+                          onClick={handleNameDismiss}
+                          aria-label="Close name prompt"
                         >
-                          {option}
+                          {ICONS.close}
                         </button>
-                      );
-                    })}
+                      </div>
+                      <p className={styles.inlinePromptText}>What should we call you?</p>
+                      <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
+                        <div className={styles.inlinePromptInputWrapper}>
+                          <input
+                            ref={namePromptInputRef}
+                            className={styles.inlinePromptInput}
+                            placeholder="Your name"
+                            value={nameInput}
+                            onChange={(event) => setNameInput(event.target.value)}
+                          />
+                          <button type="submit" className={styles.inlinePromptSendBtn} disabled={!nameInput.trim()}>
+                            {ICONS.send}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Inline Name Prompt Card */}
-        {showNamePrompt && !showCalendly && !showDeployForm && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
-            }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
+            {/* Inline Email Prompt Card */}
+            {showEmailPrompt && !showCalendly && !showDeployForm && (
+              <div
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.inlinePromptClose}
+                          onClick={handleEmailSkip}
+                          aria-label="Close email prompt"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      <p className={styles.inlinePromptText}>Where can we reach you?</p>
+                      <form onSubmit={handleEmailSubmit} className={styles.inlinePromptForm}>
+                        <div className={styles.inlinePromptInputWrapper}>
+                          <input
+                            ref={emailPromptInputRef}
+                            className={styles.inlinePromptInput}
+                            placeholder="name@example.com"
+                            type="email"
+                            value={emailInput}
+                            onChange={(event) => setEmailInput(event.target.value)}
+                          />
+                          <button type="submit" className={styles.inlinePromptSendBtn} disabled={!emailInput.trim()}>
+                            {ICONS.send}
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.inlinePromptClose}
-                      onClick={handleNameDismiss}
-                      aria-label="Close name prompt"
-                    >
-                      {ICONS.close}
-                    </button>
                   </div>
-                  <p className={styles.inlinePromptText}>What should we call you?</p>
-                  <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
-                    <div className={styles.inlinePromptInputWrapper}>
-                      <input
-                        ref={namePromptInputRef}
-                        className={styles.inlinePromptInput}
-                        placeholder="Your name"
-                        value={nameInput}
-                        onChange={(event) => setNameInput(event.target.value)}
-                      />
-                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!nameInput.trim()}>
-                        {ICONS.send}
-                      </button>
-                    </div>
-                  </form>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Inline Email Prompt Card */}
-        {showEmailPrompt && !showCalendly && !showDeployForm && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
-            }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
+            {/* Inline Phone Prompt Card */}
+            {showPhonePrompt && !showCalendly && !showDeployForm && (
+              <div
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.inlinePromptClose}
+                          onClick={handlePhoneSkip}
+                          aria-label="Close phone prompt"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      <p className={styles.inlinePromptText}>Share your phone number so we can follow up</p>
+                      <form onSubmit={handlePhoneSubmit} className={styles.inlinePromptForm}>
+                        <div className={styles.inlinePromptInputWrapper}>
+                          <input
+                            ref={phonePromptInputRef}
+                            className={styles.inlinePromptInput}
+                            type="tel"
+                            placeholder="Enter your phone number"
+                            value={phoneInput}
+                            onChange={(event) => setPhoneInput(event.target.value)}
+                          />
+                          <button type="submit" className={styles.inlinePromptSendBtn} disabled={!phoneInput.trim()}>
+                            {ICONS.send}
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.inlinePromptClose}
-                      onClick={handleEmailSkip}
-                      aria-label="Close email prompt"
-                    >
-                      {ICONS.close}
-                    </button>
                   </div>
-                  <p className={styles.inlinePromptText}>Where can we reach you?</p>
-                  <form onSubmit={handleEmailSubmit} className={styles.inlinePromptForm}>
-                    <div className={styles.inlinePromptInputWrapper}>
-                      <input
-                        ref={emailPromptInputRef}
-                        className={styles.inlinePromptInput}
-                        placeholder="name@example.com"
-                        type="email"
-                        value={emailInput}
-                        onChange={(event) => setEmailInput(event.target.value)}
-                      />
-                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!emailInput.trim()}>
-                        {ICONS.send}
-                      </button>
-                    </div>
-                  </form>
                 </div>
               </div>
-            </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
+          {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
+          {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
 
-        {/* Inline Phone Prompt Card */}
-        {showPhonePrompt && !showCalendly && !showDeployForm && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
-            }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.inlinePromptClose}
-                      onClick={handlePhoneSkip}
-                      aria-label="Close phone prompt"
-                    >
-                      {ICONS.close}
-                    </button>
-                  </div>
-                  <p className={styles.inlinePromptText}>Share your phone number so we can follow up</p>
-                  <form onSubmit={handlePhoneSubmit} className={styles.inlinePromptForm}>
-                    <div className={styles.inlinePromptInputWrapper}>
-                      <input
-                        ref={phonePromptInputRef}
-                        className={styles.inlinePromptInput}
-                        type="tel"
-                        placeholder="Enter your phone number"
-                        value={phoneInput}
-                        onChange={(event) => setPhoneInput(event.target.value)}
-                      />
-                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!phoneInput.trim()}>
-                        {ICONS.send}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+          {/* Desktop: quick buttons near input when showing welcome message */}
+          {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
+
+          <div className={styles.inputArea}>
+            {isOpen && showPrivacyNotice && (
+              <div className={styles.privacyNotice}>
+                <span className={styles.privacyPoweredIcon}>
+                  <PROXELogo />
+                </span>
+                <span>Powered by PROXe</span>
               </div>
+            )}
+            <div className={styles.chatInputRow}>
+              <div className={styles.chatInputWrapper}>
+                <input
+                  ref={chatInputRef}
+                  type="text"
+                  className={styles.chatInput}
+                  placeholder="Type your message..."
+                  value={inputValue}
+                  autoComplete="off"
+                  data-form-type="other"
+                  data-lpignore="true"
+                  onChange={(e) => {
+                    setInputValue(e.target.value);
+                    // Close any open prompt cards when user starts typing
+                    if (e.target.value && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
+                      if (showNamePrompt) {
+                        setShowNamePrompt(false);
+                        setNamePromptDismissed(true);
+                      }
+                      if (showEmailPrompt) {
+                        setShowEmailPrompt(false);
+                      }
+                      if (showPhonePrompt) {
+                        setShowPhonePrompt(false);
+                      }
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (showCalendly) {
+                      closeCalendarWidget();
+                    }
+                    if (showVideo) {
+                      closeVideoWidget();
+                    }
+                    if (showDeployForm) {
+                      closeDeployForm();
+                    }
+                    // Scroll input into view above keyboard on mobile
+                    const scrollInputIntoView = () => {
+                      const input = e.target;
+                      if (input) {
+                        if (window.visualViewport) {
+                          return; // rely on visual viewport adjustments
+                        } else {
+                          input.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'end',
+                            inline: 'nearest'
+                          });
+                        }
+                      }
+                    };
+                    requestAnimationFrame(() => {
+                      setTimeout(scrollInputIntoView, 150);
+                    });
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && inputValue.trim()) {
+                      handleSend();
+                    }
+                  }}
+                />
+              </div>
+              <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
+                {ICONS.send}
+              </button>
             </div>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
-      {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
-
-      {/* Desktop: quick buttons near input when showing welcome message */}
-      {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
-
-      <div className={styles.inputArea}>
-        {isOpen && showPrivacyNotice && (
-          <div className={styles.privacyNotice}>
-            <span className={styles.privacyPoweredIcon}>
-              <PROXELogo />
-            </span>
-            <span>Powered by PROXe</span>
-          </div>
-        )}
-        <div className={styles.chatInputRow}>
-          <div className={styles.chatInputWrapper}>
-            <input
-              ref={chatInputRef}
-              type="text"
-              className={styles.chatInput}
-              placeholder="Type your message..."
-              value={inputValue}
-              autoComplete="off"
-              data-form-type="other"
-              data-lpignore="true"
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                // Close any open prompt cards when user starts typing
-                if (e.target.value && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
-                  if (showNamePrompt) {
-                    setShowNamePrompt(false);
-                    setNamePromptDismissed(true);
-                  }
-                  if (showEmailPrompt) {
-                    setShowEmailPrompt(false);
-                  }
-                  if (showPhonePrompt) {
-                    setShowPhonePrompt(false);
-                  }
-                }
-              }}
-              onFocus={(e) => {
-                if (showCalendly) {
-                  closeCalendarWidget();
-                }
-                if (showVideo) {
-                  closeVideoWidget();
-                }
-                if (showDeployForm) {
-                  closeDeployForm();
-                }
-                // Scroll input into view above keyboard on mobile
-    const scrollInputIntoView = () => {
-                const input = e.target;
-                if (input) {
-                  if (window.visualViewport) {
-          return; // rely on visual viewport adjustments
-        } else {
-          input.scrollIntoView({
-            behavior: 'smooth',
-            block: 'end',
-            inline: 'nearest'
-          });
-                  }
-                }
-              };
-              requestAnimationFrame(() => {
-                setTimeout(scrollInputIntoView, 150);
-              });
-            }}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && inputValue.trim()) {
-                handleSend();
-              }
-            }}
-          />
         </div>
-        <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
-          {ICONS.send}
+      </div>
+      {isDesktop && (
+        <button
+          className={styles.bubbleButton}
+          onClick={isOpen ? handleCloseChat : handleOpenChat}
+          aria-label={isOpen ? "Close chat" : "Open chat"}
+          style={{ zIndex: 10001 }}
+        >
+          <div className={styles.bubbleIcon}>
+            {isOpen ? ICONS.chevronDown : (brand === 'proxe' ? <PROXELogo /> : ICONS.ai(brand, config))}
+          </div>
         </button>
-        </div>
-      </div>
-      </div>
-    </div>
-    {isDesktop && (
-      <button
-        className={styles.bubbleButton}
-        onClick={isOpen ? handleCloseChat : handleOpenChat}
-        aria-label={isOpen ? "Close chat" : "Open chat"}
-        style={{ zIndex: 10001 }}
-      >
-        <div className={styles.bubbleIcon}>
-          {isOpen ? ICONS.chevronDown : (brand === 'proxe' ? <PROXELogo /> : ICONS.ai(brand, config))}
-        </div>
-      </button>
-    )}
-  </>
+      )}
+    </>
   );
 }
 

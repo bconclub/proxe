@@ -1,16 +1,12 @@
 import type { Metadata } from 'next'
-import { Exo_2, Zen_Dots } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 
-const exo2 = Exo_2({ 
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-exo-2',
-})
-const zenDots = Zen_Dots({ 
-  subsets: ['latin'],
-  weight: '400',
-  variable: '--font-zen-dots',
+  variable: '--font-inter',
+  weight: ['400', '500', '600', '700', '800', '900'],
 })
 
 export const metadata: Metadata = {
@@ -30,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning data-brand="windchasers" data-theme="aviation-gold">
-      <body className={`${exo2.className} ${zenDots.variable}`} suppressHydrationWarning>
+      <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
           strategy="beforeInteractive"

@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams } from 'next/navigation'
-import { 
-  MdInbox, 
-  MdSend, 
+import {
+  MdInbox,
+  MdSend,
   MdSearch,
   MdAutoAwesome
 } from 'react-icons/md'
@@ -18,7 +18,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
     opacity: active ? 1 : 0.3,
     filter: 'invert(1) brightness(2)', // Inverts black to white for dark mode
   };
-  
+
   switch (channel) {
     case 'web':
       return <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={style} title="Website" />;
@@ -33,7 +33,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
   }
 };
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
+const ALL_CHANNELS = ['web', 'whatsapp'];
 
 // Types
 interface Conversation {
@@ -58,6 +58,34 @@ interface Message {
   created_at: string
 }
 
+
+function cleanMessageContent(text: string): string {
+  if (!text) return '';
+
+  // Remove [User's name is ...] metadata
+  return text.replace(/\[User's name is [^\]]+\]\s*/g, '').trim();
+}
+
+function renderMarkdown(text: string) {
+  if (!text) return null;
+
+  // Clean the text first
+  const cleanedText = cleanMessageContent(text);
+
+  // Simple regex to handle **bold** text
+  const parts = cleanedText.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={i} className="font-bold" style={{ color: 'inherit' }}>
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -79,7 +107,7 @@ export default function InboxPage() {
   useEffect(() => {
     const leadParam = searchParams.get('lead')
     const channelParam = searchParams.get('channel')
-    
+
     if (leadParam) {
       setSelectedLeadId(leadParam)
       if (channelParam) {
@@ -95,7 +123,7 @@ export default function InboxPage() {
     fetchConversations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
-  
+
   // Debug: Log when conversations state changes
   useEffect(() => {
     console.log('Conversations state changed:', {
@@ -168,14 +196,14 @@ export default function InboxPage() {
     setLoading(true)
     try {
       console.log('Fetching conversations...')
-      
+
       // First, try a simple count to see if messages exist
       const { count: messageCount, error: countError } = await supabase
         .from('conversations')
         .select('*', { count: 'exact', head: true })
-      
+
       console.log('Total messages in database:', messageCount, countError ? `Error: ${countError.message}` : '')
-      
+
       // If we get an RLS error, log it clearly
       if (countError) {
         console.error('❌ RLS Error - Conversations table may be blocked:', countError.message)
@@ -189,14 +217,14 @@ export default function InboxPage() {
           .from('messages')
           .select('id')
           .limit(1)
-        
+
         if (testError) {
           console.error('❌ RLS Test Failed - Cannot query conversations table:', testError.message)
         } else {
           console.log('✅ RLS Test Passed - Can query conversations table (it\'s just empty)')
         }
       }
-      
+
       // Fetch conversations with valid lead_id
       let query = supabase
         .from('conversations')
@@ -221,7 +249,7 @@ export default function InboxPage() {
       }
 
       console.log('Fetched messages:', messagesData?.length || 0)
-      
+
       if (!messagesData || messagesData.length === 0) {
         console.log('No messages found - checking if this is a data issue or query issue')
         // Try fetching without filters to see if any messages exist
@@ -229,9 +257,9 @@ export default function InboxPage() {
           .from('conversations')
           .select('id, lead_id')
           .limit(10)
-        
+
         console.log('Sample messages (any):', allMessages?.length || 0, allError ? `Error: ${allError.message}` : '')
-        
+
         // Fallback: Try to show leads with recent activity even without messages
         // This helps when messages haven't been created yet but leads exist
         console.log('Attempting fallback: fetching leads with recent activity...')
@@ -241,7 +269,7 @@ export default function InboxPage() {
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
-        
+
         if (!leadsError && activeLeads && activeLeads.length > 0) {
           console.log('Found active leads as fallback:', activeLeads.length)
           // Create conversations from leads (even without messages)
@@ -251,7 +279,7 @@ export default function InboxPage() {
             if (lead.last_touchpoint && !channels.includes(lead.last_touchpoint)) {
               channels.push(lead.last_touchpoint)
             }
-            
+
             return {
               lead_id: lead.id,
               lead_name: lead.customer_name || 'Unknown',
@@ -263,12 +291,12 @@ export default function InboxPage() {
               unread_count: 0
             }
           })
-          
+
           setConversations(fallbackConversations)
           setLoading(false)
           return
         }
-        
+
         setConversations([])
         setLoading(false)
         return
@@ -285,10 +313,10 @@ export default function InboxPage() {
 
       // Group by lead_id and collect ALL channels per lead
       const conversationMap = new Map<string, any>()
-      
+
       for (const msg of messages) {
         if (!msg.lead_id) continue
-        
+
         if (!conversationMap.has(msg.lead_id)) {
           conversationMap.set(msg.lead_id, {
             lead_id: msg.lead_id,
@@ -342,7 +370,7 @@ export default function InboxPage() {
           .select('lead_id, id')
           .in('lead_id', leadIds.slice(0, 5)) // Check first 5 leads
           .limit(10)
-        
+
         if (diagError) {
           console.error('❌ Diagnostic: Cannot query messages for leads:', diagError.message)
         } else {
@@ -367,25 +395,34 @@ export default function InboxPage() {
       for (const [leadId, convData] of conversationMap) {
         // Find matching lead - ensure we're comparing strings
         const lead = typedLeads.find((l) => String(l.id) === String(leadId))
-        
+
+        // Clean the last message content
+        const cleanedLastMessage = cleanMessageContent(convData.last_message || '');
+
+        // Skip conversations with no actual message content (only metadata or empty)
+        if (!cleanedLastMessage || cleanedLastMessage.length === 0) {
+          console.log('Skipping conversation with no content:', leadId);
+          continue;
+        }
+
         const conversation: Conversation = {
           lead_id: leadId,
           lead_name: lead?.customer_name || 'Unknown',
           lead_email: lead?.email || '',
           lead_phone: lead?.phone || '',
           channels: Array.from(convData.channels),
-          last_message: convData.last_message,
+          last_message: cleanedLastMessage,
           last_message_at: convData.last_message_at,
           unread_count: 0
         }
-        
+
         console.log('Adding conversation:', {
           lead_id: conversation.lead_id,
           lead_name: conversation.lead_name,
           channels: conversation.channels,
           last_message: conversation.last_message?.substring(0, 50)
         })
-        
+
         conversationsArray.push(conversation)
       }
 
@@ -414,7 +451,7 @@ export default function InboxPage() {
     setMessagesLoading(true)
     try {
       console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel)
-      
+
       // First, try to fetch messages for the selected channel if one is set
       if (selectedChannel) {
         const { data: channelData, error: channelError } = await supabase
@@ -447,7 +484,7 @@ export default function InboxPage() {
         console.error('Error details:', JSON.stringify(error, null, 2))
         throw error
       }
-      
+
       const messagesData = (data ?? []).map((msg: any): Message => ({
         id: String(msg?.id ?? ''),
         lead_id: String(msg?.lead_id ?? ''),
@@ -469,7 +506,7 @@ export default function InboxPage() {
       } else {
         console.log('No messages found for lead:', leadId)
       }
-      
+
       setMessages(messagesData)
     } catch (err) {
       console.error('Error in fetchMessages:', err)
@@ -487,12 +524,12 @@ export default function InboxPage() {
         .select('*')
         .eq('id', leadId)
         .single();
-      
+
       if (error) {
         console.error('Error fetching lead:', error);
         return;
       }
-      
+
       const typedLead = (lead ?? {}) as {
         id?: string
         customer_name?: string | null
@@ -509,7 +546,7 @@ export default function InboxPage() {
           whatsapp?: { booking_date?: any; booking_time?: any }
         }
       }
-      
+
       // Fetch booking data from web_sessions (most recent booking)
       const { data: webSession } = await supabase
         .from('web_sessions')
@@ -518,29 +555,29 @@ export default function InboxPage() {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       const typedWebSession = (webSession ?? {}) as {
         booking_date?: string | null
         booking_time?: string | number | null
         booking_status?: string | null
       }
-      
+
       // Also check unified_context for booking data
       const bookingFromContext = typedLead.unified_context?.web?.booking_date || typedLead.unified_context?.whatsapp?.booking_date;
       const bookingTimeFromContext = typedLead.unified_context?.web?.booking_time || typedLead.unified_context?.whatsapp?.booking_time;
-      
+
       // Convert booking_time to string if it's a Time object
       let bookingTime = null;
       if (typedWebSession.booking_time) {
-        bookingTime = typeof typedWebSession.booking_time === 'string' 
-          ? typedWebSession.booking_time 
+        bookingTime = typeof typedWebSession.booking_time === 'string'
+          ? typedWebSession.booking_time
           : String(typedWebSession.booking_time);
       } else if (bookingTimeFromContext) {
         bookingTime = typeof bookingTimeFromContext === 'string'
           ? bookingTimeFromContext
           : String(bookingTimeFromContext);
       }
-      
+
       // Transform to match the Lead interface expected by LeadDetailsModal
       const leadData = {
         id: typedLead.id,
@@ -557,14 +594,14 @@ export default function InboxPage() {
         unified_context: typedLead.unified_context || null,
         metadata: typedLead.metadata || {}
       };
-      
+
       console.log('Lead modal data:', {
         booking_date: leadData.booking_date,
         booking_time: leadData.booking_time,
         webSession: typedWebSession,
         unified_context: typedLead.unified_context
       });
-      
+
       setSelectedLead(leadData);
       setIsLeadModalOpen(true);
     } catch (err) {
@@ -601,19 +638,19 @@ export default function InboxPage() {
 
   async function summarizeConversation() {
     if (!selectedLeadId || messages.length === 0) return;
-    
+
     setSummaryLoading(true);
     setShowSummary(true);
-    
+
     // Get the selected conversation for this function
     const currentConversation = conversations.find(c => c.lead_id === selectedLeadId);
-    
+
     try {
       // Build conversation text from messages
       const conversationText = messages
         .map(msg => `${msg.sender === 'customer' ? currentConversation?.lead_name || 'Customer' : 'PROXe'}: ${msg.content}`)
         .join('\n');
-      
+
       // Call Claude API to summarize (you can create a new API route or use existing)
       const response = await fetch('/api/dashboard/summarize', {
         method: 'POST',
@@ -623,7 +660,7 @@ export default function InboxPage() {
           leadName: currentConversation?.lead_name || 'Customer'
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setConversationSummary(data.summary);
@@ -637,7 +674,7 @@ export default function InboxPage() {
       console.error('Error summarizing:', err);
       setConversationSummary('Unable to generate summary');
     }
-    
+
     setSummaryLoading(false);
   }
 
@@ -682,56 +719,55 @@ export default function InboxPage() {
   return (
     <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
       {/* Loading Overlay */}
-      <LoadingOverlay 
-        isLoading={loading || messagesLoading} 
-        message={loading ? "Loading conversations..." : "Loading messages..."} 
+      <LoadingOverlay
+        isLoading={loading || messagesLoading}
+        message={loading ? "Loading conversations..." : "Loading messages..."}
       />
-      
+
       {/* Left Panel - Conversations List */}
-      <div 
+      <div
         className="w-[350px] flex flex-col border-r"
-        style={{ 
-          background: 'var(--bg-secondary)', 
-          borderColor: 'var(--border-primary)' 
+        style={{
+          background: 'var(--bg-secondary)',
+          borderColor: 'var(--border-primary)'
         }}
       >
         {/* Header */}
         <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-          <h1 className="text-xl font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
-            Inbox
+          <h1 className="text-2xl font-black tracking-tight mb-3" style={{ color: 'var(--accent-primary)' }}>
+            INBOX
           </h1>
-          
+
           {/* Search */}
-          <div 
-            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+          <div
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-amber-500/50 mb-4"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
-              <MdSearch size={20} />
+              <MdSearch size={18} />
             </span>
             <input
               type="text"
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-sm"
+              className="bg-transparent border-none outline-none flex-1 text-sm font-medium"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
 
           {/* Channel Filter */}
-          <div className="flex gap-2 mt-3">
-            {['all', 'web', 'whatsapp', 'voice', 'social'].map((ch) => (
+          <div className="flex flex-wrap gap-2">
+            {['all', 'web', 'whatsapp'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                style={{
-                  background: channelFilter === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)'
-                }}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${channelFilter === ch
+                  ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
+                  : 'bg-transparent border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-amber-500/30'
+                  }`}
               >
-                {ch === 'all' ? 'All' : ch.charAt(0).toUpperCase() + ch.slice(1)}
+                {ch}
               </button>
             ))}
           </div>
@@ -772,56 +808,73 @@ export default function InboxPage() {
               </p>
             </div>
           ) : (
-            filteredConversations.map((conv) => (
-              <div
-                key={conv.lead_id}
-                onClick={() => {
-                  setSelectedLeadId(conv.lead_id);
-                  // Set channel if available, otherwise let fetchMessages handle it
-                  if (conv.channels && conv.channels.length > 0) {
-                    setSelectedChannel(conv.channels[0]);
-                  } else {
-                    // Clear channel to show all messages
-                    setSelectedChannel('');
-                  }
-                }}
-                className="p-4 cursor-pointer border-b transition-colors"
-                style={{
-                  background: selectedLeadId === conv.lead_id ? 'var(--bg-tertiary)' : 'transparent',
-                  borderColor: 'var(--border-primary)'
-                }}
-              >
-                <div className="flex items-start justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
-                      {conv.lead_name || conv.lead_phone || 'Unknown'}
-                    </span>
-                  </div>
-                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {timeAgo(conv.last_message_at)}
-                  </span>
-                </div>
-                
-                {/* Channel icons row */}
-                <div className="flex items-center gap-1 mb-2">
-                  {ALL_CHANNELS.map((ch) => (
-                    <ChannelIcon 
-                      key={ch} 
-                      channel={ch} 
-                      size={14} 
-                      active={conv.channels.includes(ch)} 
-                    />
-                  ))}
-                </div>
-                
-                <p 
-                  className="text-sm truncate"
-                  style={{ color: 'var(--text-secondary)' }}
+            filteredConversations.map((conv) => {
+              const isSelected = selectedLeadId === conv.lead_id;
+              const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+              return (
+                <div
+                  key={conv.lead_id}
+                  onClick={() => {
+                    setSelectedLeadId(conv.lead_id);
+                    if (conv.channels && conv.channels.length > 0) {
+                      setSelectedChannel(conv.channels[0]);
+                    } else {
+                      setSelectedChannel('');
+                    }
+                  }}
+                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? 'bg-amber-500/5 dark:bg-amber-500/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                    }`}
+                  style={{
+                    borderColor: 'var(--border-primary)'
+                  }}
                 >
-                  {conv.last_message}
-                </p>
-              </div>
-            ))
+                  {isSelected && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500" />
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'
+                        }`}
+                      style={{
+                        background: isSelected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                        color: isSelected ? 'white' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {initials}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`text-[13px] font-bold truncate ${isSelected ? 'text-amber-600 dark:text-amber-500' : 'text-gray-900 dark:text-gray-100'}`}>
+                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                        </span>
+                        <span className="text-[10px] font-medium opacity-60 ml-2 whitespace-nowrap">
+                          {timeAgo(conv.last_message_at)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0.5">
+                          {ALL_CHANNELS.map((ch) => (
+                            conv.channels.includes(ch) && (
+                              <div key={ch} className="opacity-80">
+                                <ChannelIcon channel={ch} size={10} active={true} />
+                              </div>
+                            )
+                          ))}
+                        </div>
+                        <p className="text-[12px] truncate opacity-60 flex-1">
+                          {conv.last_message}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
       </div>
@@ -840,14 +893,14 @@ export default function InboxPage() {
         ) : (
           <>
             {/* Conversation Header with Channel Tabs */}
-            <div 
+            <div
               className="border-b"
               style={{ borderColor: 'var(--border-primary)' }}
             >
               {/* Lead Info - Clickable name */}
               <div className="p-4 flex items-center justify-between">
                 <div>
-                  <h2 
+                  <h2
                     className="font-semibold cursor-pointer hover:underline"
                     style={{ color: 'var(--accent-primary)' }}
                     onClick={() => openLeadModal(selectedLeadId!)}
@@ -859,7 +912,7 @@ export default function InboxPage() {
                     {selectedConversation?.lead_phone}
                   </p>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {/* AI Summary Button */}
                   <button
@@ -875,7 +928,7 @@ export default function InboxPage() {
                   >
                     <MdAutoAwesome size={18} className={summaryLoading ? 'animate-spin' : ''} />
                   </button>
-                  
+
                   {/* View Details Button */}
                   <button
                     onClick={() => openLeadModal(selectedLeadId!)}
@@ -889,7 +942,7 @@ export default function InboxPage() {
                   </button>
                 </div>
               </div>
-              
+
               {/* Channel Tabs - Only show channels this customer has used */}
               <div className="flex items-center gap-1 px-4 pb-3">
                 {selectedConversation?.channels.map((ch) => (
@@ -911,10 +964,10 @@ export default function InboxPage() {
 
             {/* AI Summary Panel */}
             {showSummary && (
-              <div 
+              <div
                 className="mx-4 mb-4 p-4 rounded-lg border"
-                style={{ 
-                  background: 'var(--bg-tertiary)', 
+                style={{
+                  background: 'var(--bg-tertiary)',
                   borderColor: 'var(--accent-primary)',
                   borderWidth: '1px'
                 }}
@@ -926,7 +979,7 @@ export default function InboxPage() {
                       AI Summary
                     </span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setShowSummary(false)}
                     className="text-xs"
                     style={{ color: 'var(--text-secondary)' }}
@@ -934,15 +987,15 @@ export default function InboxPage() {
                     ✕ Close
                   </button>
                 </div>
-                
+
                 {summaryLoading ? (
                   <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     Generating summary...
                   </p>
                 ) : (
-                  <div 
+                  <div
                     className="text-sm whitespace-pre-wrap"
-                    style={{ 
+                    style={{
                       color: 'var(--text-secondary)',
                       lineHeight: '1.6'
                     }}
@@ -957,7 +1010,13 @@ export default function InboxPage() {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div
+              className="flex-1 overflow-y-auto p-6 space-y-6 relative"
+              style={{
+                backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
+                backgroundSize: '24px 24px'
+              }}
+            >
               {messagesLoading ? (
                 <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
                   Loading messages...
@@ -973,28 +1032,41 @@ export default function InboxPage() {
                     className={`flex ${msg.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
                   >
                     <div
-                      className="max-w-[95%] rounded-lg px-4 py-2"
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
+                        ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
+                        : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/30'
+                        }`}
                       style={{
-                        background: msg.sender === 'customer' ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
-                        color: 'var(--text-primary)'
+                        position: 'relative'
                       }}
                     >
                       {/* Message header - show sender name and channel */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <ChannelIcon channel={msg.channel} size={12} active={true} />
-                        <span className="text-xs font-medium" style={{ color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'rgba(255,255,255,0.8)' }}>
-                          {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe'}
+                      <div className="flex items-center justify-between gap-4 mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelIcon channel={msg.channel} size={10} active={true} />
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            style={{
+                              color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'var(--accent-primary)'
+                            }}
+                          >
+                            {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                          </span>
+                        </div>
+                        <span
+                          className="text-[9px] font-medium"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {formatTime(msg.created_at)}
                         </span>
                       </div>
-                      
-                      <p className="text-sm">{msg.content}</p>
-                      
-                      <p 
-                        className="text-xs mt-1 text-right"
-                        style={{ color: msg.sender === 'customer' ? 'var(--text-muted)' : 'rgba(255,255,255,0.7)' }}
+
+                      <div
+                        className="text-sm leading-relaxed"
+                        style={{ color: 'var(--text-primary)' }}
                       >
-                        {formatTime(msg.created_at)}
-                      </p>
+                        {renderMarkdown(msg.content)}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -1002,11 +1074,11 @@ export default function InboxPage() {
             </div>
 
             {/* Message Input (Read-only for now) */}
-            <div 
+            <div
               className="p-4 border-t"
               style={{ borderColor: 'var(--border-primary)' }}
             >
-              <div 
+              <div
                 className="flex items-center gap-2 px-4 py-3 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
               >
@@ -1017,7 +1089,7 @@ export default function InboxPage() {
                   className="bg-transparent border-none outline-none flex-1 text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 />
-                <button 
+                <button
                   disabled
                   className="p-2 rounded-lg opacity-50"
                   style={{ background: 'var(--accent-primary)' }}
