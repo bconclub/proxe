@@ -2028,6 +2028,12 @@
   max-height: 500px !important;
   height: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Strip dark background and effects in bubble mode */
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 @keyframes slideUpBubble {
