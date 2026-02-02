@@ -10,15 +10,14 @@ export default function BubbleLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" style={{ background: 'transparent' }}>
-      <body style={{
-        background: 'transparent',
-        backgroundColor: 'transparent',
-        margin: 0,
-        padding: 0
-      }}>
-        {children}
-      </body>
-    </html>
+    <>
+      <style>{`
+        html, body {
+          background: transparent !important;
+          background-color: transparent !important;
+        }
+      `}</style>
+      {children}
+    </>
   )
 }

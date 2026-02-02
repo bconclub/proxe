@@ -8,7 +8,8 @@ export async function GET() {
   const iframe = document.createElement('iframe');
   iframe.id = 'wc-chat-widget';
   iframe.src = 'https://agent.windchasers.in/widget/bubble';
-   iframe.style.cssText = 'position:fixed;bottom:20px;right:20px;width:80px;height:80px;border:none;background:transparent;z-index:999999;pointer-events:none;';
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:400px;height:700px;border:none;background:transparent;z-index:999999;';
+  iframe.setAttribute('allowtransparency', 'true');
   document.body.appendChild(iframe);
 })();
   `;
