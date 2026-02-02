@@ -1927,6 +1927,11 @@
   pointer-events: auto !important;
 }
 
+/* Hide bubble button when chat is open */
+.bubbleButtonHidden {
+  display: none !important;
+}
+
 .bubbleButton:hover {
   transform: scale(1.1);
   box-shadow: 
