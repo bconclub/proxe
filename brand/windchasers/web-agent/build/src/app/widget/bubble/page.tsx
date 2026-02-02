@@ -29,14 +29,17 @@ export default function BubblePage() {
       margin: 0,
       padding: 0,
       border: 'none',
-      width: '100vw',
-      height: '100vh',
-      pointerEvents: 'none'
+      width: '100%',
+      height: '100%',
+      overflow: 'visible',
+      pointerEvents: 'auto'
     }}>
-      <ChatWidget
-        apiUrl="https://agent.windchasers.in/api/chat"
-        widgetStyle="bubble"
-      />
+      <div style={{ width: '100%', height: '100%' }}>
+        <ChatWidget
+          apiUrl="https://agent.windchasers.in/api/chat"
+          widgetStyle="bubble"
+        />
+      </div>
     </div>
   )
 }
