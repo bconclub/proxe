@@ -18,6 +18,8 @@ export default function BubbleLayout({
           margin: 0 !important;
           padding: 0 !important;
           overflow: hidden !important;
+          width: 100% !important;
+          height: 100% !important;
         }
       `}</style>
       {children}

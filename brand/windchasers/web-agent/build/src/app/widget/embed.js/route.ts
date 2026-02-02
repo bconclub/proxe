@@ -10,34 +10,35 @@ export async function GET() {
   iframe.src = 'https://agent.windchasers.in/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
-  // Check if mobile
-  var isMobile = window.innerWidth <= 768;
+  // Start with small iframe just for bubble button (77px + padding)
+  // Expands when chat opens via postMessage
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
 
-  // Desktop: fixed size for bubble + chatbox
-  // Mobile: full viewport size for fullscreen chat
-  if (isMobile) {
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;background:transparent;z-index:2147483647;';
-  } else {
-    iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:650px;border:none;background:transparent;z-index:2147483647;';
-  }
-
-  // Handle resize to switch between mobile/desktop
-  window.addEventListener('resize', function() {
-    var nowMobile = window.innerWidth <= 768;
-    if (nowMobile) {
-      iframe.style.top = '0';
-      iframe.style.left = '0';
-      iframe.style.bottom = 'auto';
-      iframe.style.right = 'auto';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-    } else {
+  // Listen for messages from widget to resize iframe
+  window.addEventListener('message', function(e) {
+    if (e.data === 'wc-chat-open') {
+      // Expand for chat modal
+      if (window.innerWidth <= 768) {
+        // Mobile: fullscreen
+        iframe.style.top = '0';
+        iframe.style.left = '0';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+      } else {
+        // Desktop: sized for chatbox + bubble
+        iframe.style.width = '450px';
+        iframe.style.height = '700px';
+      }
+    } else if (e.data === 'wc-chat-close') {
+      // Shrink back to bubble size
       iframe.style.top = 'auto';
       iframe.style.left = 'auto';
-      iframe.style.bottom = '0';
       iframe.style.right = '0';
-      iframe.style.width = '450px';
-      iframe.style.height = '650px';
+      iframe.style.bottom = '0';
+      iframe.style.width = '125px';
+      iframe.style.height = '125px';
     }
   });
 
