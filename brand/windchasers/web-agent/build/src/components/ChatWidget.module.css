@@ -2036,9 +2036,9 @@
   box-shadow: none !important;
 }
 
-/* Hide header in bubble mode */
+/* Show header in bubble mode for close button access */
 .chatboxBubble .chatHeader {
-  display: none !important;
+  display: flex !important;
 }
 
 /* Hide animations/effects in bubble mode */
