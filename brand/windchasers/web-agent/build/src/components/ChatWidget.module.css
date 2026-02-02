@@ -1907,8 +1907,8 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 64px;
-  height: 64px;
+  width: 77px;
+  height: 77px;
   border-radius: 50%;
   background: #1A0F0A;
   border: 2px solid #C9A961;
@@ -2000,8 +2000,8 @@
 }
 
 .bubbleIcon {
-  width: 36px;
-  height: 36px;
+  width: 43px;
+  height: 43px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2063,13 +2063,13 @@
   .bubbleButton {
     bottom: 20px;
     right: 20px;
-    width: 56px;
-    height: 56px;
+    width: 67px;
+    height: 67px;
   }
 
   .bubbleIcon {
-    width: 32px;
-    height: 32px;
+    width: 38px;
+    height: 38px;
   }
 
   .chatboxBubble {
