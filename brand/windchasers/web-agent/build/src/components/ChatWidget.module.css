@@ -1924,6 +1924,7 @@
   padding: 0;
   overflow: visible;
   isolation: isolate;
+  pointer-events: auto !important;
 }
 
 .bubbleButton:hover {

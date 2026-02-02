@@ -202,6 +202,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsExpanded(false);
     setShowQuickButtons(false);
     setIsInputActive(true);
+    // Notify parent iframe to enable pointer events
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-open', '*');
+    }
   }, []);
 
   // Once chat opens, keep widget in docked bubble mode so it docks right as a bubble
@@ -697,6 +701,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setExploreButtons(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
     // Only reset if user explicitly resets the chat
+    // Notify parent iframe to disable pointer events
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-close', '*');
+    }
   }, [closeCalendarWidget, closeVideoWidget, closeDeployForm]);
 
   const handleRequestCloseChat = useCallback(() => {

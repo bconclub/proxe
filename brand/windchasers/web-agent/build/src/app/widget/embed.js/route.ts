@@ -10,19 +10,18 @@ export async function GET() {
   iframe.src = 'https://agent.windchasers.in/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
-  // Responsive sizing - full screen on mobile, exact match to agent.windchasers.in on desktop
-  function updateSize() {
-    var isMobile = window.innerWidth <= 768;
-    if (isMobile) {
-      iframe.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;border:none;background:transparent;z-index:999999;';
-    } else {
-      // Desktop: 450px wide, 700px tall to fit chatbox (520px) + bubble button (96px) + padding
-      iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:700px;border:none;background:transparent;z-index:999999;';
-    }
-  }
+  // Fixed size iframe - pointer-events handled inside the iframe
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:700px;border:none;background:transparent;z-index:999999;pointer-events:none;';
 
-  updateSize();
-  window.addEventListener('resize', updateSize);
+  // Listen for messages from iframe to enable/disable pointer events
+  window.addEventListener('message', function(e) {
+    if (e.data === 'wc-chat-open') {
+      iframe.style.pointerEvents = 'auto';
+    } else if (e.data === 'wc-chat-close') {
+      iframe.style.pointerEvents = 'none';
+    }
+  });
+
   document.body.appendChild(iframe);
 })();
   `;
