@@ -48,7 +48,7 @@ export function middleware(request: NextRequest) {
       // Production: Set restrictive CSP
       response.headers.set(
         'Content-Security-Policy',
-        "frame-ancestors 'self' https://proxe.windchasers.in https://windchasers.in"
+        "frame-ancestors 'self' https://proxe.windchasers.in https://windchasers.in https://pilot.windchasers.in http://localhost:* http://localhost:3000 http://localhost:3001"
       )
       response.headers.set('X-Frame-Options', 'SAMEORIGIN')
     }

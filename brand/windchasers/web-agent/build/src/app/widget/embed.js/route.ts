@@ -4,50 +4,35 @@ export async function GET() {
   const embedCode = `
 (function() {
   // Prevent duplicate injection
-  if (document.getElementById('windchasers-chat-button')) return;
+  if (document.getElementById('windchasers-bubble-iframe')) return;
   
-  // Create button
-  const button = document.createElement('button');
-  button.id = 'windchasers-chat-button';
-  button.innerHTML = '<img src="https://pilot.windchasers.in/Windchasers Icon.png" width="30" alt="Windchasers" style="border-radius: 50%;">';
-  button.title = 'Chat with Windchasers';
-  button.onclick = () => window.open('https://agent.windchasers.in/widget', '_blank', 'width=400,height=600');
-  Object.assign(button.style, {
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    background: '#C5A572',
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-    zIndex: '10000',
-    fontSize: '24px',
-    transition: 'transform 0.2s',
-    padding: '0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  });
+  // Create iframe container
+  const iframe = document.createElement('iframe');
+  iframe.id = 'windchasers-bubble-iframe';
+  iframe.src = 'https://agent.windchasers.in/widget/bubble';
   
-  button.onmouseover = () => button.style.transform = 'scale(1.1)';
-  button.onmouseout = () => button.style.transform = 'scale(1)';
+  // Style the iframe
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:400px;height:100vh;border:none;background:transparent;pointer-events:none;z-index:999999;';
+  
+  // Allow pointer events for interactive elements
+  iframe.style.pointerEvents = 'auto';
+  
+  // Add allowlist for iframe permissions
+  iframe.setAttribute('allow', 'microphone; camera; geolocation');
+  iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-popups allow-forms allow-modals');
   
   // Append to body
-  document.body.appendChild(button);
+  document.body.appendChild(iframe);
   
-  // Mobile responsive
+  // Mobile responsive styles
   const style = document.createElement('style');
   style.textContent = \`
     @media (max-width: 768px) {
-      #windchasers-chat-button {
-        bottom: 15px !important;
-        right: 15px !important;
-        width: 56px !important;
-        height: 56px !important;
+      #windchasers-bubble-iframe {
+        width: 100% !important;
+        height: 100vh !important;
+        bottom: 0 !important;
+        right: 0 !important;
       }
     }
   \`;
