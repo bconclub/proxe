@@ -2667,7 +2667,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${styles.chatboxDocked} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile === false ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
