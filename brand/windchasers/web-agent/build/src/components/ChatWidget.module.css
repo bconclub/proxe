@@ -1907,8 +1907,8 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 77px;
-  height: 77px;
+  width: 69px;
+  height: 69px;
   border-radius: 50%;
   background: #1A0F0A;
   border: 2px solid #C9A961;
@@ -2005,8 +2005,8 @@
 }
 
 .bubbleIcon {
-  width: 43px;
-  height: 43px;
+  width: 39px;
+  height: 39px;
   display: flex;
   align-items: center;
   justify-content: center;
