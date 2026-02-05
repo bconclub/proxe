@@ -28,10 +28,11 @@ export async function GET() {
         iframe.style.width = '100%';
         iframe.style.height = '100%';
       } else {
-        // Desktop: chatbox is 520px at bottom:96px, bubble is 77px at bottom:24px
-        // Total needed: 520 + 96 = 616px, adding buffer for safety
+        // Desktop: chat modal is 520px at bottom:110px, bubble is 69px at bottom:24px
+        // Total needed: 520 + 110 = 630px + buffer = 660px
+        // Width: 400px modal + 24px right margin + buffer = 450px
         iframe.style.width = '450px';
-        iframe.style.height = '650px';
+        iframe.style.height = '660px';
       }
       // Tell widget whether parent is mobile
       iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');

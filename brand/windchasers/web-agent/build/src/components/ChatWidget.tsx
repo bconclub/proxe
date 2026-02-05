@@ -1147,7 +1147,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
-    const isMobile = window.innerWidth < 769;
+    // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
+    const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
 
     el.style.setProperty('position', 'fixed', 'important');
     el.style.setProperty('transform', 'none', 'important');
@@ -1164,15 +1165,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('max-height', '100vh', 'important');
     } else {
       el.style.setProperty('right', '24px', 'important');
-      el.style.setProperty('bottom', '96px', 'important');
+      el.style.setProperty('bottom', '110px', 'important');
       el.style.setProperty('left', 'auto', 'important');
       el.style.setProperty('top', 'auto', 'important');
-      el.style.setProperty('width', '420px', 'important');
-      el.style.setProperty('max-width', '90vw', 'important');
-      el.style.setProperty('height', '80vh', 'important');
-      el.style.setProperty('max-height', '80vh', 'important');
+      el.style.setProperty('width', '400px', 'important');
+      el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
+      el.style.setProperty('height', '520px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
     }
-  }, [isOpen, isDesktop]);
+  }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
   // Lock body scroll when interacting with the floating search bar (allow background interaction while chat is open)
   useEffect(() => {
