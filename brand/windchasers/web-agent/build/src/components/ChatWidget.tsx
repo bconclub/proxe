@@ -1363,7 +1363,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
 
       // Adjust input area and chat container when keyboard is visible (mobile only)
-      if (isOpen && window.innerWidth < 769) {
+      // In bubble/embed mode, use parent viewport size (not iframe width) to decide if mobile
+      const isMobileForKeyboard = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
+      if (isOpen && isMobileForKeyboard) {
         const inputAreaElement = chatboxContainerRef.current?.querySelector(`.${styles.inputArea}`) as HTMLElement;
         const footerElement = chatboxContainerRef.current?.querySelector(`.${styles.chatFooter}`) as HTMLElement;
         const messagesArea = messagesAreaRef.current;
