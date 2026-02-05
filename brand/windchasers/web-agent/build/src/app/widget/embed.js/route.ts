@@ -28,11 +28,11 @@ export async function GET() {
         iframe.style.width = '100%';
         iframe.style.height = '100%';
       } else {
-        // Desktop: chat modal is 520px at bottom:110px, bubble is 69px at bottom:24px
-        // Modal top edge = 110 + 520 = 630px from bottom
-        // 700px iframe gives 70px clearance above for border-radius + box-shadow
+        // Desktop: chat modal is 580px at bottom:104px, bubble is 69px at bottom:24px
+        // Modal top edge = 104 + 580 = 684px from bottom
+        // 760px iframe gives 76px clearance above for border-radius + box-shadow
         iframe.style.width = '450px';
-        iframe.style.height = '700px';
+        iframe.style.height = '760px';
       }
       // Tell widget whether parent is mobile
       iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');

@@ -1165,12 +1165,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('max-height', '100vh', 'important');
     } else {
       el.style.setProperty('right', '24px', 'important');
-      el.style.setProperty('bottom', '110px', 'important');
+      el.style.setProperty('bottom', '104px', 'important');
       el.style.setProperty('left', 'auto', 'important');
       el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', '520px', 'important');
+      el.style.setProperty('height', '580px', 'important');
       el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
