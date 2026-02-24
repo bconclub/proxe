@@ -67,8 +67,9 @@ export interface ProcessingResult {
  * Extract text from a PDF buffer using pdf-parse
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  // Dynamic import to avoid bundling issues
-  const pdfParse = (await import('pdf-parse')).default
+  // Import the inner module to avoid pdf-parse's test file loading on import
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const pdfParse = require('pdf-parse/lib/pdf-parse.js')
   const result = await pdfParse(buffer)
   return result.text || ''
 }
