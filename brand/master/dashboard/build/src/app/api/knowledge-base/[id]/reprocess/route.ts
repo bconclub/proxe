@@ -3,8 +3,6 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
-
 // POST /api/knowledge-base/[id]/reprocess — Reprocess a pending/error item
 // For items that were uploaded before content extraction was available
 export async function POST(
@@ -25,7 +23,6 @@ export async function POST(
       .from('knowledge_base')
       .select('*')
       .eq('id', id)
-      .eq('brand', BRAND)
       .single()
 
     if (fetchError || !item) {
@@ -79,7 +76,6 @@ export async function POST(
       if (chunks.length > 0) {
         const chunkRows = chunks.map((chunk: any, i: number) => ({
           knowledge_base_id: id,
-          brand: BRAND,
           chunk_index: chunk.index ?? i,
           content: chunk.text,
           char_start: chunk.charStart ?? null,

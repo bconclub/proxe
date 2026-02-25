@@ -39,7 +39,6 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
         .rpc('search_knowledge_base', {
           query_text: query,
           match_limit: limit * 2,
-          filter_brand: BRAND,
           filter_category: null,
           filter_subcategory: null
         });

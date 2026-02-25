@@ -4,8 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { processFile } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
-
 const ALLOWED_TYPES: Record<string, string> = {
   'application/pdf': 'pdf',
   'text/plain': 'text',
@@ -79,7 +77,6 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: BRAND,
         type: fileType as 'pdf' | 'doc' | 'text',
         title: file.name,
         content,
@@ -106,7 +103,6 @@ export async function POST(request: NextRequest) {
     if (data && chunks.length > 0) {
       const chunkRows = chunks.map((chunk: any, i: number) => ({
         knowledge_base_id: data.id,
-        brand: BRAND,
         chunk_index: chunk.index ?? i,
         content: chunk.text,
         char_start: chunk.charStart ?? null,

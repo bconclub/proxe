@@ -4,8 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { chunkText } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
-
 // Basic HTML tag stripping for content extraction
 function stripHtmlTags(html: string): string {
   // Remove script and style blocks entirely
@@ -95,7 +93,6 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: BRAND,
         type: 'url' as const,
         title: itemTitle,
         source_url: parsedUrl.toString(),
@@ -125,7 +122,6 @@ export async function POST(request: NextRequest) {
     if (data && chunks.length > 0) {
       const chunkRows = chunks.map((chunk: any, i: number) => ({
         knowledge_base_id: data.id,
-        brand: BRAND,
         chunk_index: chunk.index ?? i,
         content: chunk.text,
         char_start: chunk.charStart ?? null,

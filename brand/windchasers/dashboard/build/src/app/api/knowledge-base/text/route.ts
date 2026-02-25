@@ -4,8 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { chunkText } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
 
-const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
-
 // POST /api/knowledge-base/text — Add manual text entry
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +33,6 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: BRAND,
         type: 'text' as const,
         title: effectiveTitle,
         content: searchableContent,
@@ -68,7 +65,6 @@ export async function POST(request: NextRequest) {
     if (data && chunks.length > 0) {
       const chunkRows = chunks.map((chunk: any, i: number) => ({
         knowledge_base_id: data.id,
-        brand: BRAND,
         chunk_index: chunk.index ?? i,
         content: chunk.text,
         char_start: chunk.charStart ?? null,
