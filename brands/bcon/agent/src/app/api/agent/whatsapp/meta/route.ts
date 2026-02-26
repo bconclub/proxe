@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN;
+  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || 'bcon-proxe-verify';
 
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('[meta/webhook] Verification successful');
