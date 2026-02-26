@@ -10,22 +10,22 @@ export function createClient() {
     return supabaseClient
   }
 
-  // Windchasers Supabase configuration
-  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
-  
+  // Brand-agnostic Supabase configuration
+  const brand = (process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
+  const supabaseUrl = process.env[`NEXT_PUBLIC_${brand}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const supabaseAnonKey = process.env[`NEXT_PUBLIC_${brand}_SUPABASE_ANON_KEY`] || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+
   // Enhanced error checking
-  const hasUrl = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
-  const hasKey = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
-  
+  const hasUrl = supabaseUrl !== 'https://placeholder.supabase.co'
+  const hasKey = supabaseAnonKey !== 'placeholder-key'
+
   if (!hasUrl || !hasKey) {
-    console.error('❌ Supabase environment variables are not set!')
+    console.error(`❌ Supabase environment variables are not set! (brand=${brand})`)
     console.error('   Missing:', {
       url: !hasUrl,
       anonKey: !hasKey,
     })
-    console.error('   Please configure NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL and NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY in your .env.local file')
-    console.error('   Check: http://localhost:4001/api/status for connection diagnostics')
+    console.error(`   Please configure NEXT_PUBLIC_${brand}_SUPABASE_URL and NEXT_PUBLIC_${brand}_SUPABASE_ANON_KEY in your .env.local file`)
   } else {
     // Validate URL format
     if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {

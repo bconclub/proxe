@@ -19,8 +19,8 @@ export default function WidgetLayout({
   return (
     <div
       className={exo2.variable}
-      data-brand="windchasers"
-      data-theme="aviation-gold"
+      data-brand="bcon"
+      data-theme="electric-purple"
       style={{ width: '100%', height: '100%' }}
     >
       <DeployModalProvider>

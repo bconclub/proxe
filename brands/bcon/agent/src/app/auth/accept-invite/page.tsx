@@ -155,19 +155,19 @@ function AcceptInviteForm() {
           <div className="text-center mb-4">
             <div 
               className="mx-auto w-16 h-16 flex items-center justify-center rounded-full font-bold text-2xl mb-4"
-              style={{ 
-                backgroundColor: '#C9A961',
-                color: '#1A0F0A'
+              style={{
+                backgroundColor: '#8B5CF6',
+                color: '#ffffff'
               }}
             >
-              W
+              B
             </div>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold dark:text-white text-gray-900">
             Accept Invitation
           </h2>
-          <p className="mt-2 text-center text-sm dark:text-[#C9A961] text-gray-600">
-            WindChasers Aviation Academy
+          <p className="mt-2 text-center text-sm dark:text-[#8B5CF6] text-gray-600">
+            BCON Club
           </p>
           <p className="mt-1 text-center text-sm dark:text-gray-400 text-gray-500">
             Create your account to access the dashboard

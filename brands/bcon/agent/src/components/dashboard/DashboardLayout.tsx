@@ -431,7 +431,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {!isCollapsed && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON Club</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
