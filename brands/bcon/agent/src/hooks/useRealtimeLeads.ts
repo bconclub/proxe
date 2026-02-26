@@ -81,7 +81,7 @@ export function useRealtimeLeads() {
             throw new Error('Permission denied. Please check your Row Level Security (RLS) policies.')
           }
           if (error.message.includes('JWT') || error.message.includes('Invalid API key')) {
-            throw new Error('Invalid Supabase configuration. Please check your NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL and NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY in .env.local')
+            throw new Error('Invalid Supabase configuration. Please check your NEXT_PUBLIC_BCON_SUPABASE_URL and NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY in .env.local')
           }
           if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
             throw new Error('Unable to connect to Supabase. Please check your internet connection and Supabase project status.')

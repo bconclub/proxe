@@ -158,8 +158,8 @@ export async function GET(request: NextRequest) {
 
     // Check Environment Keys
     const envKeys = [
-      'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
-      'NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY',
+      'NEXT_PUBLIC_BCON_SUPABASE_URL',
+      'NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY',
       'SUPABASE_SERVICE_ROLE_KEY',
       'CLAUDE_API_KEY',
       'CLAUDE_MODEL',
@@ -173,8 +173,8 @@ export async function GET(request: NextRequest) {
     }))
 
     // Check Supabase Configuration (Windchasers brand-prefixed)
-    const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
-    const anonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
+    const anonKey = process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     status.supabaseConfig.url = supabaseUrl || null
@@ -185,10 +185,10 @@ export async function GET(request: NextRequest) {
     status.supabaseConfig.serviceRoleKeyValid = !!serviceRoleKey && serviceRoleKey.length > 50
 
     if (!status.supabaseConfig.urlValid) {
-      status.recommendations.push('NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL is missing or invalid. Check your .env.local file.')
+      status.recommendations.push('NEXT_PUBLIC_BCON_SUPABASE_URL is missing or invalid. Check your .env.local file.')
     }
     if (!status.supabaseConfig.anonKeyValid) {
-      status.recommendations.push('NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY is missing or invalid. Get it from Supabase Dashboard > Settings > API.')
+      status.recommendations.push('NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY is missing or invalid. Get it from Supabase Dashboard > Settings > API.')
     }
     if (!status.supabaseConfig.serviceRoleKeyValid) {
       status.recommendations.push('SUPABASE_SERVICE_ROLE_KEY is missing or invalid. This is needed for webhooks.')

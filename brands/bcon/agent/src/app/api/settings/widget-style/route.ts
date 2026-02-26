@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     // Windchasers Supabase configuration
-    const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+    const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {

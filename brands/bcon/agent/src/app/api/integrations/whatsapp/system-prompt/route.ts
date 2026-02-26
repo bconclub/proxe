@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 // Service role client for fetching context (bypasses RLS)
 const getServiceClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL!
+  const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL!
   return createClient(
     supabaseUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
