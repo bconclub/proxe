@@ -1,0 +1,162 @@
+name: Deploy BCON Agent
+
+on:
+  push:
+    branches:
+      - production
+      - main
+    paths:
+      - 'brands/bcon/agent/**'
+      - '.github/workflows/deploy-bcon.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: brands/bcon/agent/package-lock.json
+
+      - name: Increment build version
+        working-directory: brands/bcon/agent
+        run: |
+          node scripts/increment-build.js
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add brands/bcon/agent/package.json brands/bcon/agent/.build-info
+          git commit -m "chore: auto-increment build version [skip ci]" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.BCON_VPS_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.BCON_VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS via Rsync
+        run: |
+          rsync -avz --delete \
+            --exclude='.env.local' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.git' \
+            --exclude='*.log' \
+            --exclude='.DS_Store' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            brands/bcon/agent/ \
+            ${{ secrets.BCON_VPS_USER }}@${{ secrets.BCON_VPS_HOST }}:/var/www/bcon-proxe/
+
+      - name: Deploy PM2 Ecosystem Config
+        run: |
+          rsync -avz \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            brands/bcon/agent/ecosystem.config.js \
+            ${{ secrets.BCON_VPS_USER }}@${{ secrets.BCON_VPS_HOST }}:/var/www/bcon-proxe/ecosystem.config.js
+
+      - name: Build and Restart on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BCON_VPS_HOST }}
+          username: ${{ secrets.BCON_VPS_USER }}
+          key: ${{ secrets.BCON_VPS_SSH_KEY }}
+          port: 22
+          timeout: 1200s
+          command_timeout: 20m
+          script: |
+            cd /var/www/bcon-proxe
+
+            # Verify .env.local exists
+            if [ ! -f .env.local ]; then
+              echo "❌ ERROR: .env.local not found on VPS!"
+              echo "Please create .env.local with required credentials:"
+              echo "  - NEXT_PUBLIC_BCON_SUPABASE_URL"
+              echo "  - NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY"
+              echo "  - SUPABASE_SERVICE_ROLE_KEY"
+              echo "  - CLAUDE_API_KEY"
+              exit 1
+            fi
+
+            # Check for required env variables
+            echo "🔍 Verifying environment variables..."
+            if ! grep -q "NEXT_PUBLIC_BCON_SUPABASE_URL" .env.local || ! grep -q "NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY" .env.local; then
+              echo "❌ ERROR: Required Supabase environment variables not found"
+              exit 1
+            fi
+            echo "✅ Environment variables found"
+
+            # Clean install
+            echo "🧹 Cleaning previous build..."
+            rm -rf node_modules .next
+
+            echo "📦 Installing dependencies..."
+            npm ci --prefer-offline --no-audit --no-fund --loglevel=warn
+
+            echo "🏗️  Building Next.js application..."
+            export NODE_OPTIONS="--max-old-space-size=4096"
+            export NODE_ENV=production
+            export NEXT_TELEMETRY_DISABLED=1
+
+            npm run build 2>&1 | tee build.log || {
+              echo "❌ Build failed!"
+              tail -50 build.log || true
+              exit 1
+            }
+
+            # Verify build
+            if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
+              echo "❌ ERROR: Build incomplete!"
+              exit 1
+            fi
+            echo "✅ Build verified"
+
+            # Restart PM2
+            mkdir -p logs
+            pm2 stop bcon-dashboard 2>/dev/null || true
+            pm2 delete bcon-dashboard 2>/dev/null || true
+            sleep 2
+
+            if [ -f ecosystem.config.js ]; then
+              pm2 start ecosystem.config.js --only bcon-dashboard || {
+                PORT=3005 pm2 start npm --name bcon-dashboard -- start
+              }
+            else
+              PORT=3005 pm2 start npm --name bcon-dashboard -- start
+            fi
+
+            pm2 save
+
+            # Health check
+            echo "⏳ Waiting for app to start..."
+            sleep 10
+
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:3005/api/health > /dev/null 2>&1; then
+                echo "✅ Health check passed"
+                break
+              fi
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES..."
+              sleep 3
+            done
+
+            echo "✅ Deployment complete"
+            pm2 list | grep bcon || echo "⚠️  Process not found"

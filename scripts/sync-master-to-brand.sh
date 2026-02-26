@@ -20,13 +20,13 @@ BRAND=$1
 
 if [ -z "$BRAND" ]; then
   echo "Usage: ./scripts/sync-master-to-brand.sh [brand]"
-  echo "  brand: proxe, windchasers"
+  echo "  brand: proxe, windchasers, bcon"
   exit 1
 fi
 
 # Validate brand
-if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ]; then
-  echo "❌ Unknown brand '$BRAND'. Supported: proxe, windchasers"
+if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ] && [ "$BRAND" != "bcon" ]; then
+  echo "❌ Unknown brand '$BRAND'. Supported: proxe, windchasers, bcon"
   exit 1
 fi
 

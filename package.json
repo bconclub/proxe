@@ -3,14 +3,16 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "dev": "npx concurrently -n \"wc,proxe\" -c \"cyan,green\" \"npm run dev:windchasers\" \"npm run dev:proxe\"",
+    "dev": "npx concurrently -n \"wc,proxe,bcon\" -c \"cyan,green,magenta\" \"npm run dev:windchasers\" \"npm run dev:proxe\" \"npm run dev:bcon\"",
     "dev:master": "cd master/agent && npm run dev",
     "dev:windchasers": "cd brands/windchasers/agent && npm run dev",
     "dev:proxe": "cd brands/proxe/agent && npm run dev",
-    "build": "npm run build:windchasers && npm run build:proxe",
+    "dev:bcon": "cd brands/bcon/agent && npm run dev",
+    "build": "npm run build:windchasers && npm run build:proxe && npm run build:bcon",
     "build:master": "cd master/agent && npm run build",
     "build:windchasers": "cd brands/windchasers/agent && npm run build",
     "build:proxe": "cd brands/proxe/agent && npm run build",
+    "build:bcon": "cd brands/bcon/agent && npm run build",
     "sync": "bash scripts/sync-all-brands.sh",
     "kill-ports": "bash scripts/kill-build-ports.sh"
   },
