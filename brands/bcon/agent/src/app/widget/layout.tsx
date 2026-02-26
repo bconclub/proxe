@@ -20,7 +20,7 @@ export default function WidgetLayout({
     <div
       className={exo2.variable}
       data-brand="bcon"
-      data-theme="electric-purple"
+      data-theme="neon-dark"
       style={{ width: '100%', height: '100%' }}
     >
       <DeployModalProvider>

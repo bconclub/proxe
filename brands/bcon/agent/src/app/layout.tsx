@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="electric-purple">
+    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="neon-dark">
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"

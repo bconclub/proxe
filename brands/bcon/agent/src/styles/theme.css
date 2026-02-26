@@ -1,69 +1,70 @@
 /* BCON Club Theme CSS Variables */
+/* Brand: Neon Lime (#CCFF00) + Electric Purple (#6B2FE8) on dark */
 [data-brand="bcon"],
-[data-theme="electric-purple"] {
-  /* Main Colors - Electric Purple Palette */
-  --chatbox-bg: #0D0A14;
-  --accent-1: #8B5CF6; /* Main Purple */
-  --accent-2: #1A1025; /* Dark Purple */
-  --accent-3: #A78BFA; /* Light Purple */
-  --accent-4: #E0D4FC; /* Cream Purple */
-  --accent-5: #8B5CF6; /* Main Purple */
-  --accent-6: #A78BFA; /* Light Purple */
-  --accent-7: #E0D4FC; /* Cream Purple */
+[data-theme="neon-dark"] {
+  /* Main Colors - Neon Lime / Electric Purple on Black */
+  --chatbox-bg: #0A0A0A;
+  --accent-1: #CCFF00; /* Neon Lime - Primary */
+  --accent-2: #0A0A0A; /* Black */
+  --accent-3: #6B2FE8; /* Electric Purple - Secondary */
+  --accent-4: #FFFFFF; /* White */
+  --accent-5: #CCFF00; /* Neon Lime */
+  --accent-6: #6B2FE8; /* Electric Purple */
+  --accent-7: #FFFFFF; /* White */
 
   /* Theme Colors */
-  --primary-color: #8B5CF6;
-  --primary-light: #E0D4FC;
-  --primary-dark: #1A1025;
-  --primary-vibrant: #A78BFA;
+  --primary-color: #CCFF00;
+  --primary-light: #FFFFFF;
+  --primary-dark: #0A0A0A;
+  --primary-vibrant: #6B2FE8;
 
   /* Backgrounds */
-  --dark-bg: #0D0A14;
-  --dark-card: rgba(139, 92, 246, 0.3);
-  --dark-surface: rgba(26, 16, 37, 0.4);
-  --glass-bg: rgba(139, 92, 246, 0.05);
-  --glass-border: rgba(224, 212, 252, 0.1);
-  --glass-shadow: rgba(139, 92, 246, 0.2);
+  --dark-bg: #0A0A0A;
+  --dark-card: rgba(28, 28, 28, 0.4);
+  --dark-surface: rgba(28, 28, 28, 0.6);
+  --glass-bg: rgba(204, 255, 0, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(107, 47, 232, 0.2);
 
   /* Text */
-  --text-primary: #E0D4FC;
-  --text-secondary: rgba(224, 212, 252, 0.7);
-  --text-tertiary: rgba(224, 212, 252, 0.5);
-  --text-muted: rgba(224, 212, 252, 0.4);
-  --white: #E0D4FC;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-muted: #A3A3A3;
+  --white: #FFFFFF;
 
   /* Borders */
-  --border-light: rgba(224, 212, 252, 0.08);
-  --border-medium: rgba(224, 212, 252, 0.12);
-  --border-accent: rgba(139, 92, 246, 0.3);
-  --border-glow: rgba(139, 92, 246, 0.4);
-  --border-color: rgba(139, 92, 246, 0.2);
-  --chat-border-color: rgba(139, 92, 246, 0.4);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-accent: rgba(204, 255, 0, 0.3);
+  --border-glow: rgba(204, 255, 0, 0.4);
+  --border-color: rgba(204, 255, 0, 0.15);
+  --chat-border-color: rgba(204, 255, 0, 0.4);
 
   /* Other */
-  --green-success: #10B981;
-  --cyan-accent: #A78BFA;
-  --bg-header: rgba(26, 16, 37, 0.85);
-  --bg-message-area: rgba(139, 92, 246, 0.03);
-  --bg-primary: rgba(26, 16, 37, 0.05);
-  --bg-hover: rgba(139, 92, 246, 0.12);
-  --bg-active: rgba(139, 92, 246, 0.15);
+  --green-success: #CCFF00;
+  --cyan-accent: #6B2FE8;
+  --bg-header: rgba(10, 10, 10, 0.9);
+  --bg-message-area: rgba(204, 255, 0, 0.02);
+  --bg-primary: rgba(28, 28, 28, 0.05);
+  --bg-hover: rgba(204, 255, 0, 0.08);
+  --bg-active: rgba(204, 255, 0, 0.12);
 
   /* Bubble backgrounds */
-  /* User bubble: Purple tint */
-  --bubble-user-bg: rgba(139, 92, 246, 0.25);
-  --bubble-user-border: rgba(139, 92, 246, 0.7);
-  --bubble-user-shadow: 0 8px 32px rgba(139, 92, 246, 0.25);
+  /* User bubble: Neon lime tint */
+  --bubble-user-bg: rgba(204, 255, 0, 0.15);
+  --bubble-user-border: rgba(204, 255, 0, 0.5);
+  --bubble-user-shadow: 0 8px 32px rgba(204, 255, 0, 0.15);
 
-  /* AI bubble: Dark purple tint */
-  --bubble-ai-bg: rgba(26, 16, 37, 0.3);
-  --bubble-ai-border: rgba(26, 16, 37, 0.7);
-  --bubble-ai-shadow: 0 8px 32px rgba(26, 16, 37, 0.25);
+  /* AI bubble: Purple tint */
+  --bubble-ai-bg: rgba(107, 47, 232, 0.15);
+  --bubble-ai-border: rgba(107, 47, 232, 0.4);
+  --bubble-ai-shadow: 0 8px 32px rgba(107, 47, 232, 0.15);
 
   /* Buttons */
-  --button-bg: rgba(139, 92, 246, 0.12);
-  --button-hover: rgba(139, 92, 246, 0.2);
-  --button-active: rgba(139, 92, 246, 0.3);
+  --button-bg: rgba(204, 255, 0, 0.08);
+  --button-hover: rgba(204, 255, 0, 0.15);
+  --button-active: rgba(204, 255, 0, 0.25);
 
   /* Blur */
   --blur-sm: blur(8px);

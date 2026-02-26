@@ -329,14 +329,14 @@ export default function LoginPage() {
 
   return (
     <div className={`login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
-      darkMode ? 'bg-[#1A1025]' : 'bg-[#f6f6f6]'
+      darkMode ? 'bg-[#0A0A0A]' : 'bg-[#f6f6f6]'
     }`}>
       {/* Dark Mode Toggle */}
       <button
         onClick={toggleDarkMode}
         className={`login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors ${
           darkMode
-            ? 'bg-[#2A1F3A] text-white hover:bg-[#3A2F4A] border border-[#3A2F4A]'
+            ? 'bg-[#1C1C1C] text-white hover:bg-[#2D2D2D] border border-[#2D2D2D]'
             : 'bg-[#ececec] text-black hover:bg-[#d0d0d0]'
         }`}
         aria-label="Toggle dark mode"
@@ -345,7 +345,7 @@ export default function LoginPage() {
       </button>
 
       <div className={`login-page-card max-w-md w-full rounded-2xl shadow-xl p-8 ${
-        darkMode ? 'bg-[#1A1025] border border-[#3A2F4A]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
+        darkMode ? 'bg-[#0A0A0A] border border-[#2D2D2D]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
       }`}>
         <div className="login-page-card-content space-y-8">
           {/* Logo and Title */}
@@ -354,8 +354,8 @@ export default function LoginPage() {
               <div
                 className="login-page-logo w-full h-full flex items-center justify-center rounded-full font-bold text-2xl"
                 style={{
-                  backgroundColor: '#8B5CF6',
-                  color: '#ffffff'
+                  backgroundColor: '#CCFF00',
+                  color: '#000000'
                 }}
               >
                 B
@@ -367,7 +367,7 @@ export default function LoginPage() {
               Sign in
             </h2>
             <p className={`login-page-subtitle mt-2 text-sm font-zen-dots ${
-              darkMode ? 'text-[#8B5CF6]' : 'text-[#7C3AED]'
+              darkMode ? 'text-[#CCFF00]' : 'text-[#B8E600]'
             }`}>
               BCON Club
             </p>
@@ -422,8 +422,8 @@ export default function LoginPage() {
                 required
                 className={`login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                   darkMode
-                    ? 'bg-[#1A1025] border-[#3A2F4A] text-white placeholder-gray-500 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]'
-                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]'
+                    ? 'bg-[#0A0A0A] border-[#2D2D2D] text-white placeholder-gray-500 focus:ring-[#CCFF00] focus:border-[#CCFF00]'
+                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#CCFF00] focus:border-[#CCFF00]'
                 }`}
                 placeholder="demo@test.com"
                 value={email}
@@ -447,8 +447,8 @@ export default function LoginPage() {
                   required
                   className={`login-page-form-input-password w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                     darkMode
-                      ? 'bg-[#1A1025] border-[#3A2F4A] text-white placeholder-gray-500 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]'
-                      : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]'
+                      ? 'bg-[#0A0A0A] border-[#2D2D2D] text-white placeholder-gray-500 focus:ring-[#CCFF00] focus:border-[#CCFF00]'
+                      : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#CCFF00] focus:border-[#CCFF00]'
                   }`}
                   placeholder="Enter your password"
                   value={password}
@@ -472,8 +472,8 @@ export default function LoginPage() {
               disabled={loading || rateLimited}
               className={`login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
                 darkMode
-                  ? 'bg-[#8B5CF6] text-white hover:bg-[#7C3AED] focus:ring-[#8B5CF6]'
-                  : 'bg-[#8B5CF6] text-white hover:bg-[#7C3AED] focus:ring-[#8B5CF6]'
+                  ? 'bg-[#CCFF00] text-black hover:bg-[#B8E600] focus:ring-[#CCFF00]'
+                  : 'bg-[#CCFF00] text-black hover:bg-[#B8E600] focus:ring-[#CCFF00]'
               }`}
             >
               {rateLimited 
@@ -495,7 +495,7 @@ export default function LoginPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`login-page-footer-link hover:underline ${
-                  darkMode ? 'text-[#8B5CF6] hover:text-[#A78BFA]' : 'text-[#7C3AED] hover:text-[#8B5CF6]'
+                  darkMode ? 'text-[#CCFF00] hover:text-[#CCFF00]' : 'text-[#B8E600] hover:text-[#CCFF00]'
                 }`}
               >
                 bconclub.com
