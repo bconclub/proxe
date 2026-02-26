@@ -4,7 +4,7 @@
  */
 
 import { Channel, HistoryEntry } from './types';
-import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
+import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
 
 interface PromptOptions {
   channel: Channel;
@@ -72,7 +72,7 @@ function buildSystemPrompt(
     ? `\n\n=================================================================================\nCROSS-CHANNEL CONTEXT\n=================================================================================\n${crossChannelContext}`
     : '';
 
-  return getWindchasersSystemPrompt(knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote;
+  return getBconSystemPrompt(knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote;
 }
 
 /**
