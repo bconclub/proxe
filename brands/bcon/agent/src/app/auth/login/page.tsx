@@ -377,7 +377,7 @@ export default function LoginPage() {
             {error && (
               <div className={`login-page-error-message rounded-lg p-4 border ${
                 darkMode 
-                  ? 'bg-[#1A0F0A] border-red-500/50' 
+                  ? 'bg-[#0A0A0A] border-red-500/50' 
                   : 'bg-red-50 border-red-200'
               }`}>
                 <div className={`login-page-error-content text-sm flex items-start gap-2 ${

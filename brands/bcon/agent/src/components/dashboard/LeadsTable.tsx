@@ -433,7 +433,7 @@ export default function LeadsTable({
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#2D2D2D] bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Dates</option>
             <option value="today">Today</option>
@@ -445,7 +445,7 @@ export default function LeadsTable({
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#2D2D2D] bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All Sources</option>
               <option value="web">Web</option>
@@ -458,7 +458,7 @@ export default function LeadsTable({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#2D2D2D] bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Statuses</option>
             {STATUS_OPTIONS.map((status) => (
@@ -472,7 +472,7 @@ export default function LeadsTable({
           <select
             value={userTypeFilter}
             onChange={(e) => setUserTypeFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#2D2D2D] bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All User Types</option>
             <option value="student">Student</option>
@@ -483,7 +483,7 @@ export default function LeadsTable({
           <select
             value={courseInterestFilter}
             onChange={(e) => setCourseInterestFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#2D2D2D] bg-white dark:bg-[#0A0A0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Courses</option>
             <option value="DGCA">DGCA</option>
@@ -496,9 +496,9 @@ export default function LeadsTable({
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-            style={{ backgroundColor: '#C9A961' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8964f'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#C9A961'}
+            style={{ backgroundColor: '#CCFF00' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8ff00'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#CCFF00'}
           >
             Export CSV
           </button>
@@ -508,7 +508,7 @@ export default function LeadsTable({
       {/* Table */}
       <div className="leads-table-container overflow-x-auto overflow-y-visible">
         <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
-          <thead className="leads-table-thead bg-gray-50 dark:bg-[#1A0F0A]">
+          <thead className="leads-table-thead bg-gray-50 dark:bg-[#0A0A0A]">
             <tr className="leads-table-thead-row">
               <th className="leads-table-th leads-table-th-name px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Name
@@ -542,7 +542,7 @@ export default function LeadsTable({
               </th>
             </tr>
           </thead>
-          <tbody className="leads-table-tbody bg-white dark:bg-[#1A0F0A] divide-y divide-gray-200 dark:divide-[#3A2F2A]">
+          <tbody className="leads-table-tbody bg-white dark:bg-[#0A0A0A] divide-y divide-gray-200 dark:divide-[#2D2D2D]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
                 <td colSpan={10} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -553,7 +553,7 @@ export default function LeadsTable({
               filteredLeads.map((lead) => (
                 <tr
                   key={lead.id}
-                  className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#2A1F1A] cursor-pointer transition-colors"
+                  className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#2D2D2D] cursor-pointer transition-colors"
                   onClick={() => handleRowClick(lead)}
                 >
                   <td className="leads-table-cell leads-table-cell-name px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">

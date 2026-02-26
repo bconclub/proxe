@@ -249,16 +249,16 @@
   box-shadow: none;
 }
 
-/* BCON brand - Gold/Brown colors */
+/* BCON brand - Neon lime colors */
 [data-brand="bcon"] .quickBtn,
-[data-theme="aviation-gold"] .quickBtn {
+[data-theme="neon-dark"] .quickBtn {
   background: var(--button-bg, rgba(201, 169, 97, 0.12));
   border-color: var(--border-accent, rgba(201, 169, 97, 0.3));
   box-shadow: none;
 }
 
 [data-brand="bcon"] .quickBtn:hover,
-[data-theme="aviation-gold"] .quickBtn:hover {
+[data-theme="neon-dark"] .quickBtn:hover {
   background: var(--button-hover, rgba(201, 169, 97, 0.2));
   border-color: var(--border-glow, rgba(201, 169, 97, 0.4));
   box-shadow: none;
@@ -534,7 +534,7 @@
 
 /* BCON - Rainbow border when responding */
 .chatboxResponding[data-brand="bcon"]::after,
-.chatboxResponding[data-theme="aviation-gold"]::after {
+.chatboxResponding[data-theme="neon-dark"]::after {
   background: linear-gradient(90deg, 
     #FF0000 0%, 
     #FF7F00 14.28%,
@@ -1910,8 +1910,8 @@
   width: 69px;
   height: 69px;
   border-radius: 50%;
-  background: #1A0F0A;
-  border: 2px solid #C9A961;
+  background: #0A0A0A;
+  border: 2px solid #CCFF00;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1982,11 +1982,11 @@
 .bubbleButton[data-theme="warm-frost"]::after,
 .bubbleButton[data-brand="bcon"]::after {
   background: linear-gradient(90deg, 
-    #C9A961 0%, 
-    #D4AF37 25%,
+    #CCFF00 0%, 
+    #6B2FE8 25%,
     #E8D5B7 50%,
-    #D4AF37 75%,
-    #C9A961 100%
+    #6B2FE8 75%,
+    #CCFF00 100%
   );
   background-size: 200% 100%;
 }

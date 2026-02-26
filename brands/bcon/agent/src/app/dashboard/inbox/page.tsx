@@ -740,7 +740,7 @@ export default function InboxPage() {
 
           {/* Search */}
           <div
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-amber-500/50 mb-4"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-[#CCFF00]/50 mb-4"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
@@ -1039,7 +1039,7 @@ export default function InboxPage() {
                   >
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
-                        ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
+                        ? 'bg-white dark:bg-[#2D2D2D] border-gray-200 dark:border-[#2D2D2D]'
                         : ''
                         }`}
                       style={{

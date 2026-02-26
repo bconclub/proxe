@@ -526,7 +526,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 // Sub-active indicator glow
                 const activeGlow = itemIsActive && !isCollapsed ? (
                   <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(201,169,97,0.8)]"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#CCFF00] rounded-r-full shadow-[0_0_10px_rgba(204,255,0,0.8)]"
                   />
                 ) : null;
 
@@ -550,7 +550,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <>
                         <span className="dashboard-layout-nav-item-label flex-1 truncate">{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
-                          <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
+                          <span className="dashboard-layout-nav-item-badge bg-[#CCFF00] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
                           </span>
                         )}

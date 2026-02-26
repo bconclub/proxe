@@ -128,7 +128,7 @@ function AcceptInviteForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#0A0A0A] bg-gray-50">
         <div className="text-center">
           <h2 className="text-2xl font-bold dark:text-white text-gray-900">Invalid Invitation</h2>
           <p className="mt-2 dark:text-gray-400 text-gray-600">This invitation link is invalid.</p>
@@ -139,9 +139,9 @@ function AcceptInviteForm() {
 
   if (!invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#0A0A0A] bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CCFF00] mx-auto"></div>
           <p className="mt-4 dark:text-gray-400 text-gray-600">Verifying invitation...</p>
         </div>
       </div>
@@ -149,7 +149,7 @@ function AcceptInviteForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center dark:bg-[#0A0A0A] bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="text-center mb-4">
@@ -245,7 +245,7 @@ function AcceptInviteForm() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-[#1A0F0A] bg-[#C9A961] hover:bg-[#b8964f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C9A961] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-[#0A0A0A] bg-[#CCFF00] hover:bg-[#b8ff00] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#CCFF00] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Accept Invitation & Sign Up'}
             </button>
@@ -259,9 +259,9 @@ function AcceptInviteForm() {
 export default function AcceptInvitePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#0A0A0A] bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CCFF00] mx-auto"></div>
           <p className="mt-4 dark:text-gray-400 text-gray-600">Loading...</p>
         </div>
       </div>

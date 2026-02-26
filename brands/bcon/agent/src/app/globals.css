@@ -7,31 +7,31 @@
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
   
-  /* Light mode theme variables */
-  --bg-primary: #f6f6f6;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: rgba(0, 0, 0, 0.02);
-  --bg-hover: #ececec;
-  --border-primary: #d0d0d0;
-  --accent-primary: #C9A961;
-  --accent-light: #C9A961;
-  --accent-subtle: #C9A96120;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
+  /* Light mode theme variables - BCON */
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #1C1C1C;
+  --bg-tertiary: rgba(255, 255, 255, 0.02);
+  --bg-hover: #2D2D2D;
+  --border-primary: #2D2D2D;
+  --accent-primary: #CCFF00;
+  --accent-light: #CCFF00;
+  --accent-subtle: #CCFF0020;
+  --text-primary: #ffffff;
+  --text-secondary: #A3A3A3;
 }
 
 .dark {
-  /* Dark mode theme variables */
-  --bg-primary: #1A0F0A;
-  --bg-secondary: #1A0F0A;
+  /* Dark mode theme variables - BCON */
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #1C1C1C;
   --bg-tertiary: rgba(255, 255, 255, 0.02);
-  --bg-hover: #2A1F1A;
-  --border-primary: #3A2F2A;
-  --accent-primary: #C9A961;
-  --accent-light: #C9A961;
-  --accent-subtle: #C9A96120;
+  --bg-hover: #2D2D2D;
+  --border-primary: #2D2D2D;
+  --accent-primary: #CCFF00;
+  --accent-light: #CCFF00;
+  --accent-subtle: #CCFF0020;
   --text-primary: #ffffff;
-  --text-secondary: #999999;
+  --text-secondary: #A3A3A3;
 }
 
 @media (prefers-color-scheme: dark) {
