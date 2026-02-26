@@ -11,6 +11,9 @@
     "src/app/api/agent/whatsapp/respond/route.ts": {
       "maxDuration": 30
     },
+    "src/app/api/agent/whatsapp/meta/route.ts": {
+      "maxDuration": 30
+    },
     "src/app/api/**/*.ts": {
       "maxDuration": 10
     }

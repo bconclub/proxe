@@ -1,12 +1,13 @@
 /**
  * services/supabase.ts — Service-role Supabase client for server-side operations
  *
- * The dashboard has two existing Supabase clients:
- *   - lib/supabase/server.ts  (cookie-based SSR for dashboard pages)
- *   - lib/supabase/client.ts  (singleton anon client for API routes)
+ * Brand-agnostic: resolves env vars using NEXT_PUBLIC_BRAND to find the
+ * correct Supabase project for each brand deployment.
  *
- * Services need a SERVICE-ROLE client that bypasses RLS for reliable
- * lead creation, message logging, and booking storage.
+ * Lookup order (URL example):
+ *   1. NEXT_PUBLIC_{BRAND}_SUPABASE_URL   (e.g. NEXT_PUBLIC_BCON_SUPABASE_URL)
+ *   2. NEXT_PUBLIC_SUPABASE_URL           (generic)
+ *   3. NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL (legacy fallback)
  *
  * Extracted from: web-agent/src/lib/supabase.ts (getSupabaseServiceClient)
  */
@@ -17,6 +18,19 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 let serviceClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
+/** Return the BRAND slug uppercased, e.g. "BCON", "WINDCHASERS" */
+function brandPrefix(): string {
+  return (process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase();
+}
+
+/** Resolve a Supabase env var with brand-specific → generic → legacy fallback */
+function resolveEnv(...keys: string[]): string | undefined {
+  for (const k of keys) {
+    if (process.env[k]) return process.env[k];
+  }
+  return undefined;
+}
+
 /**
  * Get a service-role Supabase client (bypasses RLS)
  * Used for all service operations: lead creation, message logging, booking, etc.
@@ -24,17 +38,25 @@ let anonClient: SupabaseClient | null = null;
 export function getServiceClient(): SupabaseClient | null {
   if (serviceClient) return serviceClient;
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL ??
-    process.env.WINDCHASERS_SUPABASE_URL;
+  const bp = brandPrefix();
 
-  const serviceKey =
-    process.env.WINDCHASERS_SUPABASE_SERVICE_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = resolveEnv(
+    `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
+    `${bp}_SUPABASE_URL`,
+    'WINDCHASERS_SUPABASE_URL',
+  );
+
+  const serviceKey = resolveEnv(
+    `${bp}_SUPABASE_SERVICE_KEY`,
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'WINDCHASERS_SUPABASE_SERVICE_KEY',
+  );
 
   if (!supabaseUrl || !serviceKey) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('[services/supabase] Missing URL or service key', {
+      console.warn(`[services/supabase] Missing URL or service key (brand=${bp})`, {
         hasUrl: !!supabaseUrl,
         hasServiceKey: !!serviceKey,
       });
@@ -56,17 +78,27 @@ export function getServiceClient(): SupabaseClient | null {
 export function getAnonClient(): SupabaseClient | null {
   if (anonClient) return anonClient;
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL ??
-    process.env.WINDCHASERS_SUPABASE_URL;
+  const bp = brandPrefix();
 
-  const anonKey =
-    process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY ??
-    process.env.WINDCHASERS_SUPABASE_ANON_KEY;
+  const supabaseUrl = resolveEnv(
+    `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
+    `${bp}_SUPABASE_URL`,
+    'WINDCHASERS_SUPABASE_URL',
+  );
+
+  const anonKey = resolveEnv(
+    `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`,
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY',
+    `${bp}_SUPABASE_ANON_KEY`,
+    'WINDCHASERS_SUPABASE_ANON_KEY',
+  );
 
   if (!supabaseUrl || !anonKey) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('[services/supabase] Missing URL or anon key', {
+      console.warn(`[services/supabase] Missing URL or anon key (brand=${bp})`, {
         hasUrl: !!supabaseUrl,
         hasAnonKey: !!anonKey,
       });

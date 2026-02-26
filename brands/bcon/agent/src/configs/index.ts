@@ -2,7 +2,7 @@ import { proxeConfig } from './proxe.config';
 import type { BrandConfig } from './proxe.config';
 
 export const brandConfigs: Record<string, BrandConfig> = {
-  bcon: proxeConfig,
+  proxe: proxeConfig,
 };
 
 export function getBrandConfig(brand: string): BrandConfig {

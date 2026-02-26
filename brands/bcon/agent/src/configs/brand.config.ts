@@ -1,11 +1,11 @@
 import type { BrandConfig } from '@/configs';
 
-export const bconConfig: BrandConfig = {
-  name: 'BCON',
-  brand: 'bcon',
+export const windchasersConfig: BrandConfig = {
+  name: 'Windchasers',
+  brand: 'windchasers',
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
-    path: '@/api/prompts/bcon-prompt',
+    path: '@/api/prompts/windchasers-prompt',
   },
   styles: {
     themePath: '@/styles/theme.css',
@@ -16,84 +16,84 @@ export const bconConfig: BrandConfig = {
     maxFollowUps: 3,
     avatar: {
       type: 'image',
-      source: '/bcon-icon.png',
+      source: '/windchasers-icon.png',
     },
   },
   colors: {
-    // Primary Colors - Dark/Electric Purple Palette
-    primary: '#8B5CF6',              // Electric purple
-    primaryLight: '#E0D4FC',          // Light lavender
-    primaryDark: '#0A0A0B',           // Near black
-    primaryVibrant: '#A78BFA',        // Vibrant purple
+    // Primary Colors - Gold/Brown/Cream Palette
+    primary: '#C9A961',              // Main gold
+    primaryLight: '#E8D5B7',          // Cream (light text/background)
+    primaryDark: '#1A0F0A',           // Dark brown
+    primaryVibrant: '#D4AF37',         // Vibrant gold accent
 
     // Gradient
-    gradientStart: '#0A0A0B',
-    gradientMid: '#8B5CF6',
-    gradientEnd: '#A78BFA',
+    gradientStart: '#1A0F0A',
+    gradientMid: '#C9A961',
+    gradientEnd: '#D4AF37',
 
     // Backgrounds
-    darkBg: '#0A0A0B',
-    darkCard: 'rgba(139, 92, 246, 0.3)',
-    darkSurface: 'rgba(10, 10, 11, 0.4)',
-    glassBg: 'rgba(139, 92, 246, 0.05)',
-    glassBorder: 'rgba(224, 212, 252, 0.1)',
-    glassShadow: 'rgba(139, 92, 246, 0.2)',
+    darkBg: '#0F0A06',
+    darkCard: 'rgba(201, 169, 97, 0.3)',
+    darkSurface: 'rgba(26, 15, 10, 0.4)',
+    glassBg: 'rgba(201, 169, 97, 0.05)',
+    glassBorder: 'rgba(232, 213, 183, 0.1)',
+    glassShadow: 'rgba(201, 169, 97, 0.2)',
 
     // Text Colors
-    textPrimary: '#E0D4FC',
-    textSecondary: 'rgba(224, 212, 252, 0.7)',
-    textTertiary: 'rgba(224, 212, 252, 0.5)',
-    textMuted: 'rgba(224, 212, 252, 0.4)',
-    white: '#E0D4FC',
+    textPrimary: '#E8D5B7',
+    textSecondary: 'rgba(232, 213, 183, 0.7)',
+    textTertiary: 'rgba(232, 213, 183, 0.5)',
+    textMuted: 'rgba(232, 213, 183, 0.4)',
+    white: '#E8D5B7',
 
     // Borders
-    borderLight: 'rgba(224, 212, 252, 0.08)',
-    borderMedium: 'rgba(224, 212, 252, 0.12)',
-    borderAccent: 'rgba(139, 92, 246, 0.3)',
-    borderGlow: 'rgba(139, 92, 246, 0.4)',
-    borderColor: 'rgba(139, 92, 246, 0.2)',
+    borderLight: 'rgba(232, 213, 183, 0.08)',
+    borderMedium: 'rgba(232, 213, 183, 0.12)',
+    borderAccent: 'rgba(201, 169, 97, 0.3)',
+    borderGlow: 'rgba(201, 169, 97, 0.4)',
+    borderColor: 'rgba(201, 169, 97, 0.2)',
 
     // Accents
     greenSuccess: '#10B981',
-    cyanAccent: '#A78BFA',
-    orangeAccent: '#8B5CF6',
-    goldAccent: '#A78BFA',
+    cyanAccent: '#D4AF37',            // Gold accent
+    orangeAccent: '#C9A961',          // Gold accent
+    goldAccent: '#D4AF37',            // Vibrant gold
 
     // Background Variants
-    bgPrimary: 'rgba(10, 10, 11, 0.05)',
-    bgHeader: 'rgba(10, 10, 11, 0.85)',
-    bgMessageArea: 'rgba(139, 92, 246, 0.03)',
-    bgHover: 'rgba(139, 92, 246, 0.12)',
-    bgActive: 'rgba(139, 92, 246, 0.15)',
+    bgPrimary: 'rgba(26, 15, 10, 0.05)',
+    bgHeader: 'rgba(26, 15, 10, 0.85)',
+    bgMessageArea: 'rgba(201, 169, 97, 0.03)',
+    bgHover: 'rgba(201, 169, 97, 0.12)',
+    bgActive: 'rgba(201, 169, 97, 0.15)',
 
     // Chat Bubbles
-    bubbleUserBg: 'rgba(139, 92, 246, 0.25)',
-    bubbleUserBorder: 'rgba(139, 92, 246, 0.7)',
-    bubbleUserShadow: '0 8px 32px rgba(139, 92, 246, 0.25)',
-    bubbleAiBg: 'rgba(10, 10, 11, 0.3)',
-    bubbleAiBorder: 'rgba(10, 10, 11, 0.7)',
-    bubbleAiShadow: '0 8px 32px rgba(10, 10, 11, 0.25)',
+    bubbleUserBg: 'rgba(201, 169, 97, 0.25)',
+    bubbleUserBorder: 'rgba(201, 169, 97, 0.7)',
+    bubbleUserShadow: '0 8px 32px rgba(201, 169, 97, 0.25)',
+    bubbleAiBg: 'rgba(26, 15, 10, 0.3)',
+    bubbleAiBorder: 'rgba(26, 15, 10, 0.7)',
+    bubbleAiShadow: '0 8px 32px rgba(26, 15, 10, 0.25)',
 
     // Buttons
-    buttonBg: 'rgba(139, 92, 246, 0.12)',
-    buttonHover: 'rgba(139, 92, 246, 0.2)',
-    buttonActive: 'rgba(139, 92, 246, 0.3)',
+    buttonBg: 'rgba(201, 169, 97, 0.12)',
+    buttonHover: 'rgba(201, 169, 97, 0.2)',
+    buttonActive: 'rgba(201, 169, 97, 0.3)',
   },
   // Quick Actions: 3 buttons shown when chat opens
   quickButtons: [
-    'Explore AI Solutions',
-    'Book a Strategy Call',
-    'See Our Work'
+    'Start Pilot Training',
+    'Book a Demo Session',
+    'Explore Training Options'
   ],
-  // Explore Buttons: 4 service buttons
+  // Explore Buttons: 4 program buttons shown when "Explore Training Options" is clicked
   exploreButtons: [
-    'AI in Business',
-    'Brand Marketing',
-    'Business Apps',
-    'PROXe Platform'
+    'Pilot Training',
+    'Helicopter Training',
+    'Drone Training',
+    'Cabin Crew'
   ],
-  // Follow-up Buttons: Dynamic, generated by Claude
-  followUpButtons: [],
-  // First Message Buttons: Dynamic, generated by Claude
-  firstMessageButtons: [],
+  // Follow-up Buttons: Dynamic, generated by Claude (1 button per subsequent message)
+  followUpButtons: [], // Dynamic, generated by Claude
+  // First Message Buttons: Dynamic, generated by Claude (2 buttons after first user message)
+  firstMessageButtons: [], // Dynamic, generated by Claude
 };
