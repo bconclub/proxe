@@ -7,9 +7,15 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  // Windchasers Supabase configuration
-  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
+  // Static env var access — Next.js requires static keys for NEXT_PUBLIC_* inlining
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    'https://placeholder.supabase.co'
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    'placeholder-key'
   
   const supabase = createServerClient<Database>(
     supabaseUrl,
