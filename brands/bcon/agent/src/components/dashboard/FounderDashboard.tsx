@@ -313,8 +313,8 @@ export default function FounderDashboard() {
             />
             <div className="relative animate-pulse">
               <Image
-                src="/windchasers-icon.png"
-                alt="Windchasers"
+                src="/bcon-icon.png"
+                alt="BCON Club"
                 width={80}
                 height={80}
                 className="drop-shadow-lg"

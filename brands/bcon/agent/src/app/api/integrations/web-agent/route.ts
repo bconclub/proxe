@@ -35,7 +35,7 @@ async function updateWebContext(
     customer_name?: string
     customer_email?: string
     customer_phone?: string
-    windchasers_data?: {
+    bcon_data?: {
       user_type?: string
       course_interest?: string
       timeline?: string
@@ -68,7 +68,7 @@ async function updateWebContext(
 
     const existingContext = lead?.unified_context || {}
     const existingWeb = existingContext.web || {}
-    const existingWindchasers = existingContext.windchasers || {}
+    const existingBcon = existingContext.bcon || {}
 
     // Use provided last_interaction timestamp or current time
     const lastInteractionTimestamp = contextData.last_interaction || new Date().toISOString()
@@ -115,19 +115,19 @@ async function updateWebContext(
           : existingWeb.customer_phone || null,
     }
 
-    // Merge Windchasers aviation-specific data
-    const updatedWindchasersContext = contextData.windchasers_data
+    // Merge BCON business-specific data
+    const updatedBconContext = contextData.bcon_data
       ? {
-          ...existingWindchasers,
-          ...contextData.windchasers_data,
+          ...existingBcon,
+          ...contextData.bcon_data,
         }
-      : existingWindchasers
+      : existingBcon
 
     // Build updated unified_context
     const updatedContext = {
       ...existingContext,
       web: updatedWebContext,
-      windchasers: updatedWindchasersContext,
+      bcon: updatedBconContext,
     }
 
     // Update all_leads
@@ -150,7 +150,7 @@ async function updateWebContext(
     console.log('✅ Updated unified_context.web for lead:', leadId, {
       message_count: updatedWebContext.message_count,
       has_summary: !!updatedWebContext.conversation_summary,
-      has_windchasers_data: Object.keys(updatedWindchasersContext).length > 0,
+      has_bcon_data: Object.keys(updatedBconContext).length > 0,
     })
 
     return updatedLead
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       // Session data
-      brand = 'windchasers',
+      brand = 'bcon',
       external_session_id,
       chat_session_id,
       website_url,
@@ -227,8 +227,8 @@ export async function POST(request: NextRequest) {
       user_inputs_summary,
       message_count,
       last_message_at,
-      // Windchasers aviation-specific data
-      windchasers_data,
+      // BCON business-specific data
+      bcon_data,
       // Metadata
       metadata,
       // Action type
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
         // Update unified_context if we have any initial data
         if (metadata) {
           await updateWebContext(supabase, leadId || '', {
-            windchasers_data: windchasers_data,
+            bcon_data: bcon_data,
           })
         }
       }
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
                 message_count: 0,
                 last_interaction: new Date().toISOString(),
               },
-              windchasers: windchasers_data || {},
+              bcon: bcon_data || {},
             },
           })
           .select('id')
@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
         webSessionId = newSession.id
       }
 
-      // Update unified_context with profile and Windchasers data
+      // Update unified_context with profile and BCON data
       if (!leadId) {
         throw new Error('Lead ID is required but was not found')
       }
@@ -422,7 +422,7 @@ export async function POST(request: NextRequest) {
         customer_name: name,
         customer_email: email,
         customer_phone: phone,
-        windchasers_data: windchasers_data,
+        bcon_data: bcon_data,
       })
 
       // Insert system message about profile collection
@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
       if (leadId) {
         await updateWebContext(supabase, leadId, {
           user_inputs_summary: updatedInputs,
-          windchasers_data: windchasers_data,
+          bcon_data: bcon_data,
         })
 
         // Insert button click as system message
@@ -778,7 +778,7 @@ export async function POST(request: NextRequest) {
       booking_status: booking_status,
       booking_date: booking_date,
       booking_time: booking_time,
-      windchasers_data: windchasers_data,
+      bcon_data: bcon_data,
     })
 
     // Insert system message

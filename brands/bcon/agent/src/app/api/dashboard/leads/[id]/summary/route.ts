@@ -161,9 +161,9 @@ export async function GET(
           budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
           serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
           painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-          userType: lead.unified_context?.windchasers?.user_type || null,
-          courseInterest: lead.unified_context?.windchasers?.course_interest || null,
-          planToFly: lead.unified_context?.windchasers?.plan_to_fly || lead.unified_context?.windchasers?.timeline || null,
+          userType: lead.unified_context?.bcon?.user_type || null,
+          courseInterest: lead.unified_context?.bcon?.course_interest || null,
+          planToFly: lead.unified_context?.bcon?.plan_to_fly || lead.unified_context?.bcon?.timeline || null,
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
@@ -229,15 +229,15 @@ export async function GET(
       }
 
       // Extract key info
-      const windchasersData = lead.unified_context?.windchasers || {}
+      const bconData = lead.unified_context?.bcon || {}
       const keyInfo = {
         budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
         serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
         painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-        userType: windchasersData.user_type || null,
-        courseInterest: windchasersData.course_interest || null,
-        planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
-        education: windchasersData.education || null,
+        userType: bconData.user_type || null,
+        courseInterest: bconData.course_interest || null,
+        planToFly: bconData.plan_to_fly || bconData.timeline || null,
+        education: bconData.education || null,
       }
 
       // Build activities context
@@ -250,10 +250,10 @@ export async function GET(
         })
         .join('\n') || 'No team activities'
 
-      // Build windchasers-specific info
-      const windchasersInfo = []
+      // Build bcon-specific info
+      const bconInfo = []
       if (keyInfo.userType) {
-        windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+        bconInfo.push(`User Type: ${keyInfo.userType}`)
       }
       if (keyInfo.courseInterest) {
         const courseMap: Record<string, string> = {
@@ -267,7 +267,7 @@ export async function GET(
           'Cabin': 'Cabin Crew Training',
           'Drone': 'Drone Training'
         }
-        windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+        bconInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
       }
       if (keyInfo.planToFly) {
         const timelineMap: Record<string, string> = {
@@ -276,10 +276,10 @@ export async function GET(
           '6+mo': '6+ Months',
           '1yr+': '1 Year+'
         }
-        windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+        bconInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
       }
       if (keyInfo.education) {
-        windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+        bconInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
       }
 
       // Try to generate unified summary using Claude API
@@ -306,7 +306,7 @@ Name: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
-${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
+${bconInfo.length > 0 ? `\nBusiness Details:\n${bconInfo.join('\n')}` : ''}
 
 Channel Summaries to Unify:
 ${webSummary ? `Web Channel Summary:\n${webSummary}\n` : ''}
@@ -568,15 +568,15 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
     const nextTouchpoint = lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step
 
     // Extract key info from unified_context
-    const windchasersData = lead.unified_context?.windchasers || {}
+    const bconData = lead.unified_context?.bcon || {}
     const keyInfo = {
       budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
       serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
       painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-      userType: windchasersData.user_type || null,
-      courseInterest: windchasersData.course_interest || null,
-      planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
-      education: windchasersData.education || null,
+      userType: bconData.user_type || null,
+      courseInterest: bconData.course_interest || null,
+      planToFly: bconData.plan_to_fly || bconData.timeline || null,
+      education: bconData.education || null,
     }
 
     // Determine conversation status
@@ -666,9 +666,9 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
           .join('\n') || 'No team activities'
 
         // Build comprehensive context for summary
-        const windchasersInfo = []
+        const bconInfo = []
         if (keyInfo.userType) {
-          windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+          bconInfo.push(`User Type: ${keyInfo.userType}`)
         }
         if (keyInfo.courseInterest) {
           const courseMap: Record<string, string> = {
@@ -682,7 +682,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
             'Cabin': 'Cabin Crew Training',
             'Drone': 'Drone Training'
           }
-          windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+          bconInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
         }
         if (keyInfo.planToFly) {
           const timelineMap: Record<string, string> = {
@@ -691,10 +691,10 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
             '6+mo': '6+ Months',
             '1yr+': '1 Year+'
           }
-          windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+          bconInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
         }
         if (keyInfo.education) {
-          windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+          bconInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
         }
 
         const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead. The summary should be informative and provide a complete picture of the lead's journey and status.
@@ -716,7 +716,7 @@ Name: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
-${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
+${bconInfo.length > 0 ? `\nBusiness Details:\n${bconInfo.join('\n')}` : ''}
 
 Last 10 Messages:
 ${conversationContext || 'No messages yet'}
@@ -848,10 +848,10 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
     }
     fallbackSummary += `. `
 
-    // Add windchasers-specific info
-    const windchasersDetails = []
+    // Add bcon-specific info
+    const bconDetails = []
     if (keyInfo.userType) {
-      windchasersDetails.push(`User Type: ${keyInfo.userType}`)
+      bconDetails.push(`User Type: ${keyInfo.userType}`)
     }
     if (keyInfo.courseInterest) {
       const courseMap: Record<string, string> = {
@@ -865,7 +865,7 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         'Cabin': 'Cabin Crew Training',
         'Drone': 'Drone Training'
       }
-      windchasersDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+      bconDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
     }
     if (keyInfo.planToFly) {
       const timelineMap: Record<string, string> = {
@@ -874,10 +874,10 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         '6+mo': '6+ Months',
         '1yr+': '1 Year+'
       }
-      windchasersDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+      bconDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
     }
-    if (windchasersDetails.length > 0) {
-      fallbackSummary += `${windchasersDetails.join(', ')}. `
+    if (bconDetails.length > 0) {
+      fallbackSummary += `${bconDetails.join(', ')}. `
     }
 
     if (summaryData.lastMessage) {

@@ -165,9 +165,9 @@ async function generateContextualButton(
   assistantMessage: string,
   messageCount: number
 ): Promise<string | null> {
-  const systemPrompt = `You create one short, direct follow-up call-to-action button label for WindChasers aviation training chatbot.
+  const systemPrompt = `You create one short, direct follow-up call-to-action button label for BCON Club aviation training chatbot.
 
-WindChasers is an honest, transparent aviation training academy offering:
+BCON Club is an honest, transparent aviation training academy offering:
 - Commercial Pilot License (CPL) training
 - Helicopter Pilot Training
 - Cabin Crew Training

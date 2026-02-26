@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Windchasers Supabase configuration
+    // BCON Supabase configuration
     const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY
     
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Windchasers Supabase configuration
+    // BCON Supabase configuration
     const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL || 'https://placeholder.supabase.co'
     const supabaseAnonKey = process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY || 'placeholder-key'
     

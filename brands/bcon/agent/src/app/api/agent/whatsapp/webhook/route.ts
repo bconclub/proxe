@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       message_type = 'text',
       external_session_id,
       whatsapp_id,
-      brand = 'windchasers',
+      brand = 'bcon',
       conversation_summary,
       conversation_context,
       user_inputs_summary,

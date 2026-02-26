@@ -387,8 +387,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/windchasers-icon.png"
-                alt="Windchasers"
+                src="/bcon-icon.png"
+                alt="BCON Club"
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -482,8 +482,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               title="Click to expand sidebar"
             >
               <img
-                src="/windchasers-icon.png"
-                alt="Windchasers"
+                src="/bcon-icon.png"
+                alt="BCON Club"
                 className="w-full h-full object-contain"
                 style={{ maxWidth: '40px', maxHeight: '40px' }}
               />

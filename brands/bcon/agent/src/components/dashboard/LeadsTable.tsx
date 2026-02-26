@@ -204,15 +204,15 @@ export default function LeadsTable({
     // Apply aviation-specific filters
     if (userTypeFilter !== 'all') {
       filtered = filtered.filter((lead) => {
-        const windchasersData = lead.unified_context?.windchasers || {}
-        return windchasersData.user_type === userTypeFilter
+        const bconData = lead.unified_context?.bcon || {}
+        return bconData.user_type === userTypeFilter
       })
     }
 
     if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
-        const windchasersData = lead.unified_context?.windchasers || {}
-        return windchasersData.course_interest === courseInterestFilter
+        const bconData = lead.unified_context?.bcon || {}
+        return bconData.course_interest === courseInterestFilter
       })
     }
 
@@ -351,10 +351,10 @@ export default function LeadsTable({
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
       // Aviation-specific fields from unified_context
-      const windchasersData = lead.unified_context?.windchasers || {}
-      const userType = windchasersData.user_type || ''
-      const courseInterest = windchasersData.course_interest || ''
-      const timeline = windchasersData.plan_to_fly || windchasersData.timeline || ''
+      const bconData = lead.unified_context?.bcon || {}
+      const userType = bconData.user_type || ''
+      const courseInterest = bconData.course_interest || ''
+      const timeline = bconData.plan_to_fly || bconData.timeline || ''
       return [
         lead.name || '',
         lead.email || '',
@@ -589,8 +589,8 @@ export default function LeadsTable({
                   </td>
                   <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
-                      const userType = windchasersData.user_type
+                      const bconData = lead.unified_context?.bcon || {}
+                      const userType = bconData.user_type
                       if (!userType) return '-'
                       return (
                         <span
@@ -609,8 +609,8 @@ export default function LeadsTable({
                   </td>
                   <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
-                      const courseInterest = windchasersData.course_interest
+                      const bconData = lead.unified_context?.bcon || {}
+                      const courseInterest = bconData.course_interest
                       if (!courseInterest) return '-'
                       return (
                         <span
@@ -629,9 +629,9 @@ export default function LeadsTable({
                   </td>
                   <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
+                      const bconData = lead.unified_context?.bcon || {}
                       // Check both plan_to_fly and timeline for backward compatibility
-                      const timeline = windchasersData.plan_to_fly || windchasersData.timeline
+                      const timeline = bconData.plan_to_fly || bconData.timeline
                       if (!timeline) return '-'
                       // Format timeline for display
                       const timelineMap: Record<string, string> = {

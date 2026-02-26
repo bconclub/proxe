@@ -456,7 +456,7 @@ export async function createCalendarEvent(booking: {
     }
 
     // Description
-    let description = `Windchasers Aviation Academy - Consultation Booking\n`;
+    let description = `BCON Club - Consultation Booking\n`;
     description += `BOOKING STATUS: CONFIRMED\n\n`;
     description += `Candidate Information:\nName: ${booking.name}\nEmail: ${booking.email}\nPhone: ${booking.phone}\n\n`;
     if (courseDisplayName !== 'Aviation Course Inquiry') {
@@ -488,7 +488,7 @@ export async function createCalendarEvent(booking: {
     };
 
     if (booking.sessionType === 'offline') {
-      event.location = 'Windchasers Aviation Academy Facility';
+      event.location = 'BCON Club Facility';
     } else if (booking.sessionType === 'online') {
       event.location = 'Online Session (Video Call)';
     }

@@ -35,7 +35,7 @@ export default function WebAgentSettingsClient() {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
         if (key && (
-          key.startsWith('windchasers-') ||
+          key.startsWith('bcon-') ||
           key.startsWith('chat-') ||
           key.startsWith('session-') ||
           key.includes('widget') ||

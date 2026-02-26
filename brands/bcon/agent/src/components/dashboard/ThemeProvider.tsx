@@ -9,12 +9,12 @@ export default function ThemeProvider({
 }) {
   // Load saved accent theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('windchasers-accent-theme');
+    const savedTheme = localStorage.getItem('bcon-accent-theme');
     if (savedTheme) {
       const themes: Record<string, string> = {
-        'windchasers': '#C9A961', // Windchasers gold
-        'gold': '#C9A961',
-        'orange': '#fc7301',
+        'bcon': '#CCFF00', // BCON neon lime
+        'lime': '#CCFF00',
+        'purple': '#6B2FE8',
         'grey': '#6B7280',
       };
       const color = themes[savedTheme];
@@ -24,8 +24,8 @@ export default function ThemeProvider({
         document.documentElement.style.setProperty('--accent-subtle', `${color}20`);
       }
     } else {
-      // Default to Windchasers gold if no theme saved
-      const defaultColor = '#C9A961';
+      // Default to BCON neon lime
+      const defaultColor = '#CCFF00';
       document.documentElement.style.setProperty('--accent-primary', defaultColor);
       document.documentElement.style.setProperty('--accent-light', defaultColor);
       document.documentElement.style.setProperty('--accent-subtle', `${defaultColor}20`);

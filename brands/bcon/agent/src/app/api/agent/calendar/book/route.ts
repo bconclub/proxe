@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       courseInterest,
       sessionType,
-      brand = 'windchasers',
+      brand = 'bcon',
       checkOnly = false,
     } = body;
 

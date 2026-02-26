@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       isSet: !!process.env[key],
     }))
 
-    // Check Supabase Configuration (Windchasers brand-prefixed)
+    // Check Supabase Configuration (BCON brand-prefixed)
     const supabaseUrl = process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
     const anonKey = process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY

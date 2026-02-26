@@ -651,12 +651,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 </div>
 
                 {/* Course Interest */}
-                {(selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest) && (
+                {(selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.bcon?.course_interest) && (
                   <div>
                     <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
                     <div className="text-base text-gray-900 dark:text-white">
                       {(() => {
-                        const courseInterest = selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest;
+                        const courseInterest = selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.bcon?.course_interest;
                         const courseNameMap: Record<string, string> = {
                           'pilot': 'Pilot Training',
                           'helicopter': 'Helicopter Training',
@@ -712,7 +712,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             inDetails = true;
                             continue;
                           }
-                          if (trimmed && inDetails && !trimmed.includes('Windchasers Aviation Academy')) {
+                          if (trimmed && inDetails && !trimmed.includes('BCON Club')) {
                             keyLines.push(trimmed);
                           }
                         }

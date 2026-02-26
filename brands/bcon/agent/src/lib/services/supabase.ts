@@ -18,9 +18,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 let serviceClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
-/** Return the BRAND slug uppercased, e.g. "BCON", "WINDCHASERS" */
+/** Return the BRAND slug uppercased, e.g. "BCON" */
 function brandPrefix(): string {
-  return (process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase();
+  return (process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase();
 }
 
 /** Resolve a Supabase env var with brand-specific → generic → legacy fallback */

@@ -2,7 +2,7 @@
  * services/contextBuilder.ts — Cross-channel context assembly
  *
  * Extracted from:
- *   - web-agent/src/lib/chatSessions.ts: updateWindchasersProfile() (1685-1835)
+ *   - web-agent/src/lib/chatSessions.ts: updateBconProfile() (1685-1835)
  *   - dashboard/api/integrations/whatsapp/system-prompt/route.ts:
  *       fetchCustomerContext() (18-143), extractTopics() (148-171),
  *       formatBookingDate() (176-200)
@@ -31,7 +31,7 @@ export interface CustomerContext {
   socialSummary: { summary: string; lastInteraction: string | null } | null;
 }
 
-export interface WindchasersUserProfile {
+export interface BconUserProfile {
   name?: string;
   phone?: string;
   email?: string;
@@ -63,7 +63,7 @@ export function extractTopics(summary: string): string[] {
     'implementation', 'setup', 'onboarding',
     'support', 'help', 'assistance',
     'qualification', 'qualify', 'lead',
-    // Aviation-specific (Windchasers)
+    // Business-specific (BCON)
     'pilot', 'helicopter', 'drone', 'cabin crew',
     'dgca', 'cpl', 'atpl', 'training', 'license',
   ];
@@ -240,12 +240,12 @@ export async function fetchCustomerContext(
 // ─── Brand Profile Updates ──────────────────────────────────────────────────
 
 /**
- * Update brand-specific user profile data (e.g. Windchasers aviation preferences)
+ * Update brand-specific user profile data (e.g. BCON business preferences)
  * Syncs to both the channel session and all_leads.unified_context
  */
 export async function updateBrandProfile(
   externalSessionId: string,
-  profileData: Partial<WindchasersUserProfile>,
+  profileData: Partial<BconUserProfile>,
   channel: Channel = 'web',
   supabase?: SupabaseClient | null,
 ): Promise<void> {
@@ -325,7 +325,7 @@ export async function updateBrandProfile(
     }
   }
 
-  // Update all_leads.unified_context.windchasers
+  // Update all_leads.unified_context.bcon
   if (leadId) {
     const { data: leadData } = await client
       .from('all_leads')
@@ -337,8 +337,8 @@ export async function updateBrandProfile(
       const existingCtx = leadData.unified_context || {};
       const updatedCtx = {
         ...existingCtx,
-        windchasers: {
-          ...(existingCtx.windchasers || {}),
+        bcon: {
+          ...(existingCtx.bcon || {}),
           ...brandContext,
         },
       };

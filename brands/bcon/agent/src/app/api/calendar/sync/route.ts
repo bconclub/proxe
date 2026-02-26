@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         const eventEnd = `${bookingDate}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
         // Build event title and description using booking details from metadata if available
-        const courseInterest = booking.metadata?.courseInterest || booking.unified_context?.windchasers?.course_interest;
+        const courseInterest = booking.metadata?.courseInterest || booking.unified_context?.bcon?.course_interest;
         const sessionType = booking.metadata?.sessionType;
         const conversationSummary = booking.metadata?.conversationSummary || booking.metadata?.conversation_summary || booking.unified_context?.web?.conversation_summary;
         
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
           eventTitle += ` [${sessionTypeLabel}]`;
         } else {
           // Fallback to simple title if no details
-          eventTitle = `Windchasers Demo - ${booking.name || 'Unnamed'}`;
+          eventTitle = `BCON Strategy Call - ${booking.name || 'Unnamed'}`;
         }
 
         // Build description - use stored description if available, otherwise build from details
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
           description = booking.metadata.description;
         } else {
           // Build description from available details
-          description = `Windchasers Aviation Academy - Consultation Booking\n\n`;
+          description = `BCON Club - Consultation Booking\n\n`;
           description += `Candidate Information:\n`;
           description += `Name: ${booking.name || 'N/A'}\n`;
           description += `Email: ${booking.email || 'N/A'}\n`;
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
 
         // Add location based on session type
         if (sessionType === 'offline') {
-          eventData.location = 'Windchasers Aviation Academy Facility';
+          eventData.location = 'BCON Club Facility';
         } else if (sessionType === 'online') {
           eventData.location = 'Online Session (Video Call)';
         }

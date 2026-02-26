@@ -249,15 +249,15 @@
   box-shadow: none;
 }
 
-/* Windchasers brand - Gold/Brown colors */
-[data-brand="windchasers"] .quickBtn,
+/* BCON brand - Gold/Brown colors */
+[data-brand="bcon"] .quickBtn,
 [data-theme="aviation-gold"] .quickBtn {
   background: var(--button-bg, rgba(201, 169, 97, 0.12));
   border-color: var(--border-accent, rgba(201, 169, 97, 0.3));
   box-shadow: none;
 }
 
-[data-brand="windchasers"] .quickBtn:hover,
+[data-brand="bcon"] .quickBtn:hover,
 [data-theme="aviation-gold"] .quickBtn:hover {
   background: var(--button-hover, rgba(201, 169, 97, 0.2));
   border-color: var(--border-glow, rgba(201, 169, 97, 0.4));
@@ -532,8 +532,8 @@
   background-size: 200% 100%;
 }
 
-/* Windchasers - Rainbow border when responding */
-.chatboxResponding[data-brand="windchasers"]::after,
+/* BCON - Rainbow border when responding */
+.chatboxResponding[data-brand="bcon"]::after,
 .chatboxResponding[data-theme="aviation-gold"]::after {
   background: linear-gradient(90deg, 
     #FF0000 0%, 
@@ -1980,7 +1980,7 @@
 }
 
 .bubbleButton[data-theme="warm-frost"]::after,
-.bubbleButton[data-brand="windchasers"]::after {
+.bubbleButton[data-brand="bcon"]::after {
   background: linear-gradient(90deg, 
     #C9A961 0%, 
     #D4AF37 25%,
@@ -2018,7 +2018,7 @@
   height: 100%;
 }
 
-/* Chatbox container for bubble style - matches agent.windchasers.in */
+/* Chatbox container for bubble style - matches agent.bcon.in */
 .chatboxBubble {
   position: fixed !important;
   bottom: 96px !important;
