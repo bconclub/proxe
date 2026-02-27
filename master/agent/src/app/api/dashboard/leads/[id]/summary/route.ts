@@ -75,10 +75,10 @@ export async function GET(
 
       // Still need to fetch activities and stage history for attribution
       const { data: lastStageChangeData } = await supabase
-        .from('stage_history')
-        .select('changed_by, changed_at, new_stage')
+        .from('lead_stage_changes')
+        .select('changed_by, created_at, new_stage')
         .eq('lead_id', leadId)
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
 
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
@@ -115,7 +115,7 @@ export async function GET(
           }
         }
 
-        const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+        const timeAgo = formatTimeAgo(lastStageChange.created_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
@@ -185,10 +185,10 @@ export async function GET(
 
       // Fetch additional context needed for unified summary generation
       const { data: lastStageChangeData } = await supabase
-        .from('stage_history')
-        .select('changed_by, changed_at, new_stage')
+        .from('lead_stage_changes')
+        .select('changed_by, created_at, new_stage')
         .eq('lead_id', leadId)
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
 
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
@@ -381,7 +381,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
                   }
                 }
 
-                const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+                const timeAgo = formatTimeAgo(lastStageChange.created_at)
                 attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
               } else if (recentActivities && recentActivities.length > 0) {
                 const latestActivity = recentActivities[0]
@@ -475,7 +475,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
           }
         }
 
-        const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+        const timeAgo = formatTimeAgo(lastStageChange.created_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
@@ -637,10 +637,10 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
 
     // Fetch last stage change
     const { data: lastStageChangeData } = await supabase
-      .from('stage_history')
-      .select('changed_by, changed_at, new_stage')
+      .from('lead_stage_changes')
+      .select('changed_by, created_at, new_stage')
       .eq('lead_id', leadId)
-      .order('changed_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
 
     const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
@@ -808,7 +808,7 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
                 }
               }
 
-              const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+              const timeAgo = formatTimeAgo(lastStageChange.created_at)
               attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
             } else if (recentActivities && recentActivities.length > 0) {
               const latestActivity = recentActivities[0]
@@ -917,7 +917,7 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         }
       }
 
-      const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+      const timeAgo = formatTimeAgo(lastStageChange.created_at)
       attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
     }
 

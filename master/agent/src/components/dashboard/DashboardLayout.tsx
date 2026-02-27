@@ -30,6 +30,7 @@ import {
   MdKeyboard,
   MdBugReport,
   MdFeedback,
+  MdTimeline,
 } from 'react-icons/md'
 
 interface DashboardLayoutProps {
@@ -63,6 +64,7 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
       { name: 'Knowledge Base', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
+      { name: 'Sequences', href: '/dashboard/settings/sequences', icon: MdTimeline },
     ]
   },
   { name: 'Billing', href: '/dashboard/billing', icon: MdCreditCard, comingSoon: true },
@@ -182,62 +184,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [])
 
-  // Auto-hide sidebar after inactivity (only on desktop, not mobile)
-  useEffect(() => {
-    if (isMobile || isCheckingAuth) return
-
-    const startAutoHideTimer = () => {
-      // Clear existing timer
-      if (autoHideTimeoutRef.current) {
-        clearTimeout(autoHideTimeoutRef.current)
-      }
-
-      // Only auto-hide if not manually expanded and not hovered
-      if (!isCollapsed && !isHovered && !isScrolled) {
-        autoHideTimeoutRef.current = setTimeout(() => {
-          setIsCollapsed(true)
-          localStorage.setItem('sidebar-collapsed', 'true')
-        }, 3000) // Auto-hide after 3 seconds of inactivity
-      }
-    }
-
-    // Start timer when sidebar is expanded and not hovered/scrolled
-    if (!isCollapsed && !isHovered && !isScrolled) {
-      startAutoHideTimer()
-    }
-
-    return () => {
-      if (autoHideTimeoutRef.current) {
-        clearTimeout(autoHideTimeoutRef.current)
-      }
-      if (sidebarCloseTimeoutRef.current) {
-        clearTimeout(sidebarCloseTimeoutRef.current)
-      }
-    }
-  }, [isCollapsed, isHovered, isScrolled, isMobile, isCheckingAuth])
-
-  // Initial auto-hide after page load (only on desktop)
-  useEffect(() => {
-    if (isMobile || isCheckingAuth) return
-
-    // Only auto-hide if user hasn't manually set a preference
-    const savedState = localStorage.getItem('sidebar-collapsed')
-    if (savedState !== null) return // User has a preference, don't override
-
-    // Start auto-hide timer after initial load (give user time to see sidebar)
-    const initialTimer = setTimeout(() => {
-      if (!isHovered && !isScrolled && !isCollapsed) {
-        setIsCollapsed(true)
-        localStorage.setItem('sidebar-collapsed', 'true')
-      }
-    }, 5000) // Auto-hide after 5 seconds on initial load
-
-    return () => {
-      clearTimeout(initialTimer)
-    }
-  }, [isMobile, isCheckingAuth]) // Run when mobile/auth state changes
-
-  // Cleanup all timeouts on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (autoHideTimeoutRef.current) {
@@ -281,66 +228,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const handleSidebarMouseEnter = () => {
     if (isMobile) return
     setIsHovered(true)
-    // Expand sidebar on hover if collapsed
-    if (isCollapsed) {
-      setIsCollapsed(false)
-    }
-    // Clear any close timers
-    if (autoHideTimeoutRef.current) {
-      clearTimeout(autoHideTimeoutRef.current)
-      autoHideTimeoutRef.current = null
-    }
-    if (sidebarCloseTimeoutRef.current) {
-      clearTimeout(sidebarCloseTimeoutRef.current)
-      sidebarCloseTimeoutRef.current = null
-    }
   }
 
   const handleSidebarMouseLeave = () => {
     if (isMobile) return
     setIsHovered(false)
-
-    // Don't close if manually expanded or scrolled
-    if (isScrolled) return
-
-    // Calculate delay based on recent interaction
-    // If user clicked something recently, keep it open longer
-    const baseDelay = 1500 // 1.5 seconds base delay
-    const interactionBonus = sidebarInteractionTime
-      ? Math.min(2000, Date.now() - sidebarInteractionTime) // Up to 2 seconds bonus
-      : 0
-    const delay = baseDelay + interactionBonus
-
-    // Clear any existing close timer
-    if (sidebarCloseTimeoutRef.current) {
-      clearTimeout(sidebarCloseTimeoutRef.current)
-      sidebarCloseTimeoutRef.current = null
-    }
-
-    // Set timer to close smoothly after delay
-    if (!isCollapsed) {
-      sidebarCloseTimeoutRef.current = setTimeout(() => {
-        setIsCollapsed(true)
-        localStorage.setItem('sidebar-collapsed', 'true')
-        sidebarCloseTimeoutRef.current = null
-      }, delay)
-    }
   }
 
-  // Handle clicks on sidebar items - keep sidebar open longer
   const handleSidebarItemClick = () => {
-    if (isMobile) return
-    // Record interaction time to extend close delay
-    setSidebarInteractionTime(Date.now())
-    // Clear any close timers
-    if (sidebarCloseTimeoutRef.current) {
-      clearTimeout(sidebarCloseTimeoutRef.current)
-      sidebarCloseTimeoutRef.current = null
-    }
-    // Reset interaction time after a delay
-    setTimeout(() => {
-      setSidebarInteractionTime(null)
-    }, 3000)
+    // No-op — sidebar stays open/closed via manual toggle only
   }
 
   const toggleTheme = () => {
@@ -411,7 +307,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
           }`}
         style={{
           width: sidebarWidth,
@@ -526,7 +422,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 // Sub-active indicator glow
                 const activeGlow = itemIsActive && !isCollapsed ? (
                   <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(201,169,97,0.8)]"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
+                    style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 10px var(--accent-primary)' }}
                   />
                 ) : null;
 

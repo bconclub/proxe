@@ -1,4 +1,4 @@
-export type StorageBrandKey = 'proxe' | 'windchasers';
+export type StorageBrandKey = 'proxe' | 'windchasers' | 'bcon';
 
 const getKeys = (brand: StorageBrandKey) => ({
   sessionKey: `${brand}.chat.sessionId`,

@@ -2,6 +2,7 @@
 
 import { Exo_2 } from 'next/font/google'
 import { DeployModalProvider } from '@/contexts/DeployModalContext'
+import { getCurrentBrandId, brandThemeMap } from '@/configs'
 import '@/styles/theme.css'
 
 const exo2 = Exo_2({
@@ -16,11 +17,14 @@ export default function WidgetLayout({
 }: {
   children: React.ReactNode
 }) {
+  const brand = getCurrentBrandId()
+  const theme = brandThemeMap[brand] || 'aviation-gold'
+
   return (
     <div
       className={exo2.variable}
-      data-brand="windchasers"
-      data-theme="aviation-gold"
+      data-brand={brand}
+      data-theme={theme}
       style={{ width: '100%', height: '100%' }}
     >
       <DeployModalProvider>

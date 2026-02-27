@@ -34,10 +34,10 @@ const getSourceColor = (source: string | null) => {
   const colors: Record<string, string> = {
     web: 'bg-blue-500',
     whatsapp: 'bg-green-500',
-    voice: 'bg-primary-600',
+    voice: 'bg-violet-500',
     social: 'bg-orange-500',
   }
-  return colors[source || 'web'] || 'bg-primary-600'
+  return colors[source || 'web'] || 'bg-blue-500'
 }
 
 export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
@@ -288,11 +288,15 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 className={`
                   aspect-square text-xs p-1 rounded
                   ${!isCurrentMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-900 dark:text-gray-100'}
-                  ${isSelected ? 'bg-primary-600 text-white font-semibold' : ''}
-                  ${isToday && !isSelected ? 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 font-semibold' : ''}
+                  ${isSelected ? 'text-white font-semibold' : ''}
+                  ${isToday && !isSelected ? 'font-semibold' : ''}
                   hover:bg-gray-100 dark:hover:bg-[#262626]
                   relative
                 `}
+                style={{
+                  ...(isSelected ? { backgroundColor: 'var(--accent-primary)', color: 'white' } : {}),
+                  ...(isToday && !isSelected ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } : {}),
+                }}
               >
                 {format(day, 'd')}
                 {dayBookings.length > 0 && (
@@ -300,7 +304,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                     {dayBookings.slice(0, 3).map((_, i) => (
                       <div
                         key={i}
-                        className="w-1 h-1 rounded-full bg-primary-600"
+                        className="w-1 h-1 rounded-full"
+                        style={{ backgroundColor: 'var(--accent-primary)' }}
                       />
                     ))}
                   </div>
@@ -317,11 +322,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               onClick={() => setViewMode('week')}
               className={`
                 flex-1 px-3 py-2 text-sm rounded-md transition-colors
-                ${viewMode === 'week' 
-                  ? 'bg-primary-600 text-white' 
+                ${viewMode === 'week'
+                  ? 'text-white'
                   : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
                 }
               `}
+              style={viewMode === 'week' ? { backgroundColor: 'var(--accent-primary)' } : undefined}
             >
               <span className="inline mr-1">
                 <MdViewWeek size={16} />
@@ -332,11 +338,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               onClick={() => setViewMode('month')}
               className={`
                 flex-1 px-3 py-2 text-sm rounded-md transition-colors
-                ${viewMode === 'month' 
-                  ? 'bg-primary-600 text-white' 
+                ${viewMode === 'month'
+                  ? 'text-white'
                   : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
                 }
               `}
+              style={viewMode === 'month' ? { backgroundColor: 'var(--accent-primary)' } : undefined}
             >
               <span className="inline mr-1">
                 <MdViewModule size={16} />
@@ -376,7 +383,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 setCurrentDate(new Date())
                 setSelectedDate(new Date())
               }}
-              className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm text-white rounded-md hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: 'var(--accent-primary)' }}
             >
               Today
             </button>
@@ -418,12 +426,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   >
                     {/* Day header */}
                     <div
-                      className={`
-                        border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center
-                        ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
-                        ${isSelected ? 'bg-primary-100 dark:bg-primary-900/40' : ''}
-                      `}
-                      style={{ height: '60px', minHeight: '60px' }}
+                      className="border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center"
+                      style={{
+                        height: '60px',
+                        minHeight: '60px',
+                        ...(isSelected ? { backgroundColor: 'var(--accent-subtle)' } : isToday ? { backgroundColor: 'var(--accent-subtle)' } : {}),
+                      }}
                     >
                       <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
                         {DAYS_OF_WEEK[dayIdx].substring(0, 3)}
@@ -431,8 +439,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                       <div
                         className={`
                           text-xs md:text-sm font-semibold mt-0.5 md:mt-1
-                          ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}
+                          ${!isToday ? 'text-gray-900 dark:text-white' : ''}
                         `}
+                        style={isToday ? { color: 'var(--accent-primary)' } : undefined}
                       >
                         {format(day, 'd')}
                       </div>
@@ -522,16 +531,19 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                       className={`
                         min-h-24 p-2 border border-gray-200 dark:border-[#262626] rounded
                         ${!isCurrentMonth ? 'bg-gray-50 dark:bg-[#0D0D0D] opacity-50' : 'bg-white dark:bg-[#1A1A1A]'}
-                        ${isSelected ? 'ring-2 ring-primary-600' : ''}
-                        ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
                         cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]
                       `}
+                      style={{
+                        ...(isSelected ? { boxShadow: '0 0 0 2px var(--accent-primary)' } : {}),
+                        ...(isToday ? { backgroundColor: 'var(--accent-subtle)' } : {}),
+                      }}
                     >
                       <div
                         className={`
                           text-sm font-semibold mb-1
-                          ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}
+                          ${!isToday ? 'text-gray-900 dark:text-white' : ''}
                         `}
+                        style={isToday ? { color: 'var(--accent-primary)' } : undefined}
                       >
                         {format(day, 'd')}
                       </div>
@@ -650,24 +662,27 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   </div>
                 </div>
 
-                {/* Course Interest */}
-                {(selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest) && (
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
-                    <div className="text-base text-gray-900 dark:text-white">
-                      {(() => {
-                        const courseInterest = selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest;
-                        const courseNameMap: Record<string, string> = {
-                          'pilot': 'Pilot Training',
-                          'helicopter': 'Helicopter Training',
-                          'drone': 'Drone Training',
-                          'cabin': 'Cabin Crew Training',
-                        };
-                        return courseNameMap[courseInterest?.toLowerCase()] || courseInterest || '-';
-                      })()}
+                {/* Course Interest (Windchasers-specific) */}
+                {(() => {
+                  const brandId = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BRAND_ID || 'windchasers') : 'windchasers'
+                  const brandData = selectedBooking.unified_context?.[brandId]
+                  const courseInterest = selectedBooking.metadata?.courseInterest || brandData?.course_interest
+                  if (!courseInterest || brandId !== 'windchasers') return null
+                  const courseNameMap: Record<string, string> = {
+                    'pilot': 'Pilot Training',
+                    'helicopter': 'Helicopter Training',
+                    'drone': 'Drone Training',
+                    'cabin': 'Cabin Crew Training',
+                  }
+                  return (
+                    <div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
+                      <div className="text-base text-gray-900 dark:text-white">
+                        {courseNameMap[courseInterest?.toLowerCase()] || courseInterest || '-'}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* Session Type */}
                 {(selectedBooking.metadata?.sessionType) && (
@@ -743,7 +758,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#262626] flex gap-3">
                 <button
                   onClick={handleViewClientDetails}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium"
+                  className="flex-1 px-4 py-2 text-white rounded-md hover:opacity-90 transition-all text-sm font-medium"
+                  style={{ backgroundColor: 'var(--accent-primary)' }}
                 >
                   View Client Details
                 </button>

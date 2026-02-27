@@ -6,6 +6,7 @@ import type { Message } from '@/hooks/useChatStream';
 import { InfinityLoader } from '@/components/widget/InfinityLoader';
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import type { BrandConfig } from '@/configs';
 import { useDeployModal } from '@/contexts/DeployModalContext';
 import styles from './ChatWidget.module.css';
@@ -30,9 +31,9 @@ import {
   getStoredUser,
   storeUserProfile,
   type LocalUserProfile,
+  type StorageBrandKey,
 } from '@/lib/chatLocalStorage';
 import { createClient } from '@/lib/supabase/client';
-import { windchasersConfig } from '@/configs/brand.config';
 
 interface ChatWidgetProps {
   apiUrl?: string;
@@ -111,6 +112,16 @@ const ICONS = {
   infinity: <InfinitySymbol />,
 };
 
+// Brand-aware welcome message
+const welcomeMessages: Record<string, string> = {
+  windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
+  bcon: "Hey! I'm BCON's AI advisor. I help businesses plug in AI that actually works. What can I help with?",
+  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
+};
+function getWelcomeMessage(brand: string): string {
+  return welcomeMessages[brand] || welcomeMessages['proxe'];
+}
+
 // Helper function to clean metadata strings from conversation summary
 const cleanSummary = (summary: string | null | undefined): string => {
   if (!summary) return '';
@@ -122,8 +133,8 @@ const cleanSummary = (summary: string | null | undefined): string => {
 };
 
 export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProps) {
-  const brand = 'windchasers';
-  const config = windchasersConfig;
+  const brand = getCurrentBrandId();
+  const config = getBrandConfig(brand);
   const { openModal: openDeployModal, setOnFormSubmit } = useDeployModal();
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -198,8 +209,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
-  const brandKey: 'windchasers' = 'windchasers';
-  const finalApiUrl = apiUrl || config.apiUrl || '/api/windchasers/chat';
+  const brandKey = brand as StorageBrandKey;
+  const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
 
   const handleOpenChat = useCallback(() => {
     setShowCloseConfirm(false);
@@ -238,10 +249,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   useEffect(() => {
     let cancelled = false;
 
-    const initializeSession = async () => {
+    const doInitSession = async () => {
       try {
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[ChatWidget Windchasers] Initialising session', { brandKey });
+          console.log(`[ChatWidget ${brandKey}] Initialising session`, { brandKey });
         }
 
         let storedId = getStoredSessionId(brandKey);
@@ -255,19 +266,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         if (cancelled) return;
         setExternalSessionId(storedId);
 
-        // Initialize session in Supabase immediately when chat opens (Windchasers only)
-        if (brandKey === 'windchasers') {
-          try {
-            const sessionRecord = await initializeSession(storedId, 'web');
-            if (sessionRecord) {
-              console.log('[ChatWidget] Session initialized in Supabase', { 
-                externalSessionId: storedId,
-                sessionId: sessionRecord.id 
-              });
-            }
-          } catch (error) {
-            console.error('[ChatWidget] Failed to initialize session in Supabase', error);
+        // Initialize session in Supabase immediately when chat opens
+        try {
+          const sessionRecord = await initializeSession(storedId, 'web');
+          if (sessionRecord) {
+            console.log('[ChatWidget] Session initialized in Supabase', {
+              externalSessionId: storedId,
+              sessionId: sessionRecord.id
+            });
           }
+        } catch (error) {
+          console.error('[ChatWidget] Failed to initialize session in Supabase', error);
         }
 
         const storedUser = getStoredUser(brandKey);
@@ -390,7 +399,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               phone: storedUser.phone ?? null,
               websiteUrl: storedUser.websiteUrl ?? null,
             },
-            brandKey
+            'web'
           );
         }
 
@@ -462,7 +471,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
     };
 
-    initializeSession();
+    doInitSession();
 
     return () => {
       cancelled = true;
@@ -1542,7 +1551,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
 
   const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage } = useChat({
-    brand: 'windchasers',
+    brand,
     apiUrl: finalApiUrl,
     onMessageComplete: handleAssistantMessageComplete,
   });
@@ -1804,14 +1813,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           
           // No conversations found, show welcome message
           if (addAIMessage) {
-            addAIMessage("Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.");
+            addAIMessage(getWelcomeMessage(brand));
             hasShownWelcomeRef.current = true;
           }
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
           if (addAIMessage) {
-            addAIMessage("Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.");
+            addAIMessage(getWelcomeMessage(brand));
             hasShownWelcomeRef.current = true;
           }
         }
@@ -1820,7 +1829,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       fetchConversationsOnReopen();
     } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
-      addAIMessage("Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.");
+      addAIMessage(getWelcomeMessage(brand));
       hasShownWelcomeRef.current = true;
     }
   }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);

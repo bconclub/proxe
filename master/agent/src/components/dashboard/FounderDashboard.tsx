@@ -579,8 +579,8 @@ export default function FounderDashboard() {
         <div 
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
-            backgroundColor: 'rgba(201, 169, 97, 0.05)',
-            borderColor: 'rgba(201, 169, 97, 0.2)',
+            backgroundColor: 'var(--accent-subtle)',
+            borderColor: 'var(--accent-primary)',
             justifyContent: 'space-between'
           }}
         >

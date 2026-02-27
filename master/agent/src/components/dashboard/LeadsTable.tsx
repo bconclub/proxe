@@ -7,6 +7,7 @@ import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
+import { getCurrentBrandId } from '@/configs'
 import {
   MdLanguage,
   MdChat,
@@ -140,6 +141,8 @@ export default function LeadsTable({
   showViewAll = false,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
+  const brandId = getCurrentBrandId()
+  const isWindchasers = brandId === 'windchasers'
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
   const [calculatingScores, setCalculatingScores] = useState(false)
@@ -201,18 +204,18 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => lead.status === statusFilter)
     }
 
-    // Apply aviation-specific filters
+    // Apply brand-specific filters
     if (userTypeFilter !== 'all') {
       filtered = filtered.filter((lead) => {
-        const windchasersData = lead.unified_context?.windchasers || {}
-        return windchasersData.user_type === userTypeFilter
+        const brandData = lead.unified_context?.[brandId] || {}
+        return (brandData.user_type || brandData.business_type) === userTypeFilter
       })
     }
 
-    if (courseInterestFilter !== 'all') {
+    if (isWindchasers && courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
-        const windchasersData = lead.unified_context?.windchasers || {}
-        return windchasersData.course_interest === courseInterestFilter
+        const brandData = lead.unified_context?.[brandId] || {}
+        return brandData.course_interest === courseInterestFilter
       })
     }
 
@@ -313,7 +316,9 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+    const headers = isWindchasers
+      ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+      : ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
       const bookingDate = lead.booking_date ||
         lead.unified_context?.web?.booking_date ||
@@ -350,18 +355,32 @@ export default function LeadsTable({
           : bookingTime || '';
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
-      // Aviation-specific fields from unified_context
-      const windchasersData = lead.unified_context?.windchasers || {}
-      const userType = windchasersData.user_type || ''
-      const courseInterest = windchasersData.course_interest || ''
-      const timeline = windchasersData.plan_to_fly || windchasersData.timeline || ''
+      // Brand-specific fields from unified_context
+      const brandData = lead.unified_context?.[brandId] || {}
+      const userType = brandData.user_type || brandData.business_type || ''
+      const courseInterest = brandData.course_interest || ''
+      const timeline = brandData.plan_to_fly || brandData.timeline || ''
+      const interest = brandData.pain_point || brandData.course_interest || ''
+      if (isWindchasers) {
+        return [
+          lead.name || '',
+          lead.email || '',
+          lead.phone || '',
+          lead.first_touchpoint || lead.source || '',
+          userType,
+          courseInterest,
+          timeline,
+          score !== null && score !== undefined ? score.toString() : '',
+          stage || '',
+          keyEvent || '',
+        ]
+      }
       return [
         lead.name || '',
         lead.email || '',
         lead.phone || '',
         lead.first_touchpoint || lead.source || '',
-        userType,
-        courseInterest,
+        interest,
         timeline,
         score !== null && score !== undefined ? score.toString() : '',
         stage || '',
@@ -468,37 +487,41 @@ export default function LeadsTable({
             ))}
           </select>
 
-          {/* Aviation-specific filters */}
-          <select
-            value={userTypeFilter}
-            onChange={(e) => setUserTypeFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
-          >
-            <option value="all">All User Types</option>
-            <option value="student">Student</option>
-            <option value="parent">Parent</option>
-            <option value="professional">Professional</option>
-          </select>
+          {/* Brand-specific filters */}
+          {isWindchasers && (
+            <select
+              value={userTypeFilter}
+              onChange={(e) => setUserTypeFilter(e.target.value)}
+              className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            >
+              <option value="all">All User Types</option>
+              <option value="student">Student</option>
+              <option value="parent">Parent</option>
+              <option value="professional">Professional</option>
+            </select>
+          )}
 
-          <select
-            value={courseInterestFilter}
-            onChange={(e) => setCourseInterestFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
-          >
-            <option value="all">All Courses</option>
-            <option value="DGCA">DGCA</option>
-            <option value="Flight">Flight</option>
-            <option value="Heli">Heli</option>
-            <option value="Cabin">Cabin</option>
-            <option value="Drone">Drone</option>
-          </select>
+          {isWindchasers && (
+            <select
+              value={courseInterestFilter}
+              onChange={(e) => setCourseInterestFilter(e.target.value)}
+              className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            >
+              <option value="all">All Courses</option>
+              <option value="DGCA">DGCA</option>
+              <option value="Flight">Flight</option>
+              <option value="Heli">Heli</option>
+              <option value="Cabin">Cabin</option>
+              <option value="Drone">Drone</option>
+            </select>
+          )}
 
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-            style={{ backgroundColor: '#C9A961' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8964f'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#C9A961'}
+            style={{ backgroundColor: 'var(--primary-color, #C9A961)' }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
             Export CSV
           </button>
@@ -522,12 +545,16 @@ export default function LeadsTable({
               <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 First Touch
               </th>
-              <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                User Type
-              </th>
-              <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Course Interest
-              </th>
+              {isWindchasers && (
+                <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  User Type
+                </th>
+              )}
+              {isWindchasers && (
+                <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Course Interest
+                </th>
+              )}
               <th className="leads-table-th leads-table-th-timeline px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timeline
               </th>
@@ -545,7 +572,7 @@ export default function LeadsTable({
           <tbody className="leads-table-tbody bg-white dark:bg-[#1A0F0A] divide-y divide-gray-200 dark:divide-[#3A2F2A]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={10} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={isWindchasers ? 10 : 8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -587,51 +614,55 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
-                      const userType = windchasersData.user_type
-                      if (!userType) return '-'
-                      return (
-                        <span
-                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
-                          style={{
-                            backgroundColor: 'var(--accent-subtle)',
-                            color: 'var(--accent-primary)',
-                            borderColor: 'var(--accent-primary)',
-                            opacity: 0.9
-                          }}
-                        >
-                          {userType}
-                        </span>
-                      )
-                    })()}
-                  </td>
-                  <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
-                      const courseInterest = windchasersData.course_interest
-                      if (!courseInterest) return '-'
-                      return (
-                        <span
-                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
-                          style={{
-                            backgroundColor: 'var(--accent-subtle)',
-                            color: 'var(--accent-primary)',
-                            borderColor: 'var(--accent-primary)',
-                            opacity: 0.9
-                          }}
-                        >
-                          {courseInterest}
-                        </span>
-                      )
-                    })()}
-                  </td>
+                  {isWindchasers && (
+                    <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {(() => {
+                        const brandData = lead.unified_context?.[brandId] || {}
+                        const userType = brandData.user_type
+                        if (!userType) return '-'
+                        return (
+                          <span
+                            className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                            style={{
+                              backgroundColor: 'var(--accent-subtle)',
+                              color: 'var(--accent-primary)',
+                              borderColor: 'var(--accent-primary)',
+                              opacity: 0.9
+                            }}
+                          >
+                            {userType}
+                          </span>
+                        )
+                      })()}
+                    </td>
+                  )}
+                  {isWindchasers && (
+                    <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {(() => {
+                        const brandData = lead.unified_context?.[brandId] || {}
+                        const courseInterest = brandData.course_interest
+                        if (!courseInterest) return '-'
+                        return (
+                          <span
+                            className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                            style={{
+                              backgroundColor: 'var(--accent-subtle)',
+                              color: 'var(--accent-primary)',
+                              borderColor: 'var(--accent-primary)',
+                              opacity: 0.9
+                            }}
+                          >
+                            {courseInterest}
+                          </span>
+                        )
+                      })()}
+                    </td>
+                  )}
                   <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
-                      const windchasersData = lead.unified_context?.windchasers || {}
+                      const brandData = lead.unified_context?.[brandId] || {}
                       // Check both plan_to_fly and timeline for backward compatibility
-                      const timeline = windchasersData.plan_to_fly || windchasersData.timeline
+                      const timeline = brandData.plan_to_fly || brandData.timeline
                       if (!timeline) return '-'
                       // Format timeline for display
                       const timelineMap: Record<string, string> = {

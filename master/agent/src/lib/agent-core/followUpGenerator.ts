@@ -1,10 +1,91 @@
 /**
  * Follow-Up Button Generator — Claude-powered contextual buttons
- * Extracted from web-agent/api/chat/route.ts (lines 199-331, 1086-1289)
+ * Brand-aware: uses brand config for button pools and Claude prompt context
  */
 
 import { generateShort } from './claudeClient';
 import { Channel } from './types';
+
+/** Brand-specific button pools for fallback/static generation */
+const brandButtonPools: Record<string, {
+  firstMessage: string[];
+  defaultFallback: string;
+  costButtons: string[];
+  interestButtons: string[];
+  genericButtons: string[];
+  bookingAware: string[];
+  claudeContext: string;
+  exploreKeywords: string[];
+}> = {
+  windchasers: {
+    firstMessage: ['Explore Training Options', 'Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Learn More'],
+    defaultFallback: 'Book a Demo Session',
+    costButtons: ['Get Cost Breakdown', 'Financing Options', 'Talk to Counselor'],
+    interestButtons: ['Book 1:1 Consultation', 'Book Demo Online', 'Get Course Timeline'],
+    genericButtons: ['Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Explore Training Options', 'Talk to Counselor'],
+    bookingAware: ['Get Course Details', 'Check Eligibility', 'Financing Options'],
+    claudeContext: `WindChasers aviation training chatbot.
+WindChasers is an honest, transparent aviation training academy offering:
+- Commercial Pilot License (CPL) training
+- Helicopter Pilot Training
+- Cabin Crew Training
+- Drone Pilot Training
+- DGCA Ground Classes
+
+AVAILABLE BUTTON TYPES:
+- Information: "Get Course Details", "Check Eligibility", "Learn More"
+- Exploration: "Explore Training Options", "See Programs"
+- Booking: "Book a Demo Session", "Book 1:1 Consultation", "Schedule Call"
+- Next Steps: "Get Cost Breakdown", "Financing Options", "Course Timeline"`,
+    exploreKeywords: ['explore training options', 'explore training'],
+  },
+  bcon: {
+    firstMessage: ['Explore AI Solutions', 'Book a Strategy Call', 'See Our Work', 'How It Works', 'Learn More'],
+    defaultFallback: 'Book a Strategy Call',
+    costButtons: ['Get a Proposal', 'See Pricing', 'Book Strategy Call'],
+    interestButtons: ['Book Strategy Call', 'See Case Studies', 'Start a Project'],
+    genericButtons: ['Book a Strategy Call', 'Explore AI Solutions', 'See Our Work', 'Get a Proposal', 'How It Works'],
+    bookingAware: ['See Case Studies', 'How It Works', 'Get a Proposal'],
+    claudeContext: `BCON AI business solutions chatbot.
+BCON helps businesses understand and implement AI solutions:
+- AI in Business — Custom AI automation, chatbots, workflow optimization
+- Brand Marketing — AI-powered campaigns, content strategy
+- Business Apps — Custom web apps, dashboards, SaaS products
+- PROXe Platform — AI-powered business operating system
+
+AVAILABLE BUTTON TYPES:
+- Information: "Learn More", "See Case Studies", "How It Works"
+- Exploration: "Explore AI Solutions", "See Our Work"
+- Booking: "Book Strategy Call", "Schedule Demo"
+- Next Steps: "Get a Proposal", "Start a Project"`,
+    exploreKeywords: ['explore ai solutions', 'explore ai'],
+  },
+  proxe: {
+    firstMessage: ['Deploy PROXe', 'Book a Demo', 'PROXe Pricing', 'Learn More'],
+    defaultFallback: 'Book a Demo',
+    costButtons: ['PROXe Pricing', 'Compare Plans', 'Book a Demo'],
+    interestButtons: ['Deploy PROXe', 'Book a Demo', 'See Features'],
+    genericButtons: ['Deploy PROXe', 'Book a Demo', 'PROXe Pricing', 'See Features'],
+    bookingAware: ['See Features', 'Compare Plans', 'Deploy PROXe'],
+    claudeContext: `PROXe AI-powered business platform chatbot.
+PROXe is an AI-powered business operating system:
+- Web PROXe — AI chat widget for websites
+- WhatsApp PROXe — WhatsApp AI agent
+- Voice PROXe — Voice AI agent
+- Social PROXe — Social media AI agent
+
+AVAILABLE BUTTON TYPES:
+- Information: "Learn More", "See Features", "Compare Plans"
+- Exploration: "What's PROXe", "See Integrations"
+- Booking: "Book a Demo", "Schedule Call"
+- Next Steps: "Deploy PROXe", "PROXe Pricing"`,
+    exploreKeywords: ['explore proxe', "what's proxe"],
+  },
+};
+
+function getBrandPool(brand?: string) {
+  return brandButtonPools[brand || 'windchasers'] || brandButtonPools['windchasers'];
+}
 
 /**
  * Generate follow-up buttons based on conversation context
@@ -17,8 +98,10 @@ export async function generateFollowUps(params: {
   usedButtons: string[];
   hasExistingBooking: boolean;
   exploreButtons: string[];
+  brand?: string;
 }): Promise<string[]> {
-  const { channel, userMessage, assistantMessage, messageCount, usedButtons, hasExistingBooking, exploreButtons } = params;
+  const { channel, userMessage, assistantMessage, messageCount, usedButtons, hasExistingBooking, exploreButtons, brand } = params;
+  const pool = getBrandPool(brand);
 
   // WhatsApp and other non-web channels don't get buttons
   if (channel !== 'web') {
@@ -29,22 +112,22 @@ export async function generateFollowUps(params: {
   const isFirstMessage = messageCount === 1 || messageCount === 0;
   const usedButtonsLower = usedButtons.map(b => b.toLowerCase());
 
-  // Check for "Explore Training Options" click → show 4 program buttons
-  if ((lowerMessage.includes('explore training options') || lowerMessage.includes('explore training')) && exploreButtons.length > 0) {
+  // Check for explore click → show explore buttons from brand config
+  if (pool.exploreKeywords.some(kw => lowerMessage.includes(kw)) && exploreButtons.length > 0) {
     return exploreButtons;
   }
 
   // User has existing booking → filter out booking buttons
   if (hasExistingBooking) {
-    return generateBookingAwareButtons(isFirstMessage, usedButtons, usedButtonsLower);
+    return generateBookingAwareButtons(isFirstMessage, usedButtons, usedButtonsLower, pool);
   }
 
   // Normal flow: 3-2-1 button structure
   if (isFirstMessage) {
-    return await generateFirstMessageButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower);
+    return await generateFirstMessageButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower, pool);
   }
 
-  return await generateSubsequentButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower);
+  return await generateSubsequentButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower, pool);
 }
 
 /**
@@ -53,22 +136,22 @@ export async function generateFollowUps(params: {
 function generateBookingAwareButtons(
   isFirstMessage: boolean,
   usedButtons: string[],
-  usedButtonsLower: string[]
+  usedButtonsLower: string[],
+  pool: ReturnType<typeof getBrandPool>
 ): string[] {
   const bookingActionButtons = ['Reschedule Call', 'View Booking Details'];
 
   if (isFirstMessage) {
-    const nonBookingButtons = ['Get Course Details', 'Check Eligibility', 'Financing Options'];
-    return [...nonBookingButtons, ...bookingActionButtons].slice(0, 2);
+    return [...pool.bookingAware, ...bookingActionButtons].slice(0, 2);
   }
 
-  const availableButtons = ['Get Course Details', 'Check Eligibility', 'Financing Options', ...bookingActionButtons];
+  const availableButtons = [...pool.bookingAware, ...bookingActionButtons];
   const unusedButtons = availableButtons.filter(btn =>
     !usedButtonsLower.includes(btn.toLowerCase()) && !isSimilarToAny(btn, usedButtons)
   );
 
-  const pool = unusedButtons.length > 0 ? unusedButtons : availableButtons;
-  return pool.length > 0 ? [pool[Math.floor(Math.random() * pool.length)]] : ['Reschedule Call'];
+  const finalPool = unusedButtons.length > 0 ? unusedButtons : availableButtons;
+  return finalPool.length > 0 ? [finalPool[Math.floor(Math.random() * finalPool.length)]] : ['Reschedule Call'];
 }
 
 /**
@@ -79,18 +162,14 @@ async function generateFirstMessageButtons(
   assistantMessage: string,
   messageCount: number,
   usedButtons: string[],
-  usedButtonsLower: string[]
+  usedButtonsLower: string[],
+  pool: ReturnType<typeof getBrandPool>
 ): Promise<string[]> {
   try {
-    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount);
+    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount, pool);
 
     if (generated) {
-      const firstMessagePool = [
-        'Explore Training Options', 'Book a Demo Session',
-        'Get Cost Breakdown', 'Check Eligibility', 'Learn More'
-      ];
-
-      const availableButtons = firstMessagePool.filter(btn =>
+      const availableButtons = pool.firstMessage.filter(btn =>
         btn.toLowerCase() !== generated.toLowerCase() &&
         !usedButtonsLower.includes(btn.toLowerCase()) &&
         !isSimilarToAny(btn, [generated, ...usedButtons])
@@ -98,14 +177,14 @@ async function generateFirstMessageButtons(
 
       const secondButton = availableButtons.length > 0
         ? availableButtons[Math.floor(Math.random() * availableButtons.length)]
-        : 'Book a Demo Session';
+        : pool.defaultFallback;
 
       return [generated, secondButton].filter(Boolean);
     }
 
-    return ['Explore Training Options', 'Book a Demo Session'];
+    return [pool.firstMessage[0], pool.defaultFallback];
   } catch {
-    return ['Explore Training Options', 'Book a Demo Session'];
+    return [pool.firstMessage[0], pool.defaultFallback];
   }
 }
 
@@ -117,7 +196,8 @@ async function generateSubsequentButtons(
   assistantMessage: string,
   messageCount: number,
   usedButtons: string[],
-  usedButtonsLower: string[]
+  usedButtonsLower: string[],
+  pool: ReturnType<typeof getBrandPool>
 ): Promise<string[]> {
   const lowerMessage = userMessage.toLowerCase();
   const lowerResponse = assistantMessage.toLowerCase();
@@ -127,33 +207,34 @@ async function generateSubsequentButtons(
 
   const isAskingCost = lowerMessage.includes('cost') || lowerMessage.includes('price') ||
     lowerMessage.includes('fee') || lowerMessage.includes('investment') ||
-    lowerResponse.includes('₹') || lowerResponse.includes('lakh');
+    lowerResponse.includes('₹') || lowerResponse.includes('pricing');
 
-  const isInterestedInCourse = lowerMessage.includes('pilot') || lowerMessage.includes('helicopter') ||
+  const isInterestedInService = lowerMessage.includes('pilot') || lowerMessage.includes('helicopter') ||
     lowerMessage.includes('cabin crew') || lowerMessage.includes('drone') ||
-    lowerResponse.includes('program');
+    lowerMessage.includes('ai') || lowerMessage.includes('automation') ||
+    lowerResponse.includes('program') || lowerResponse.includes('solution');
 
   if (isAskingCost) {
-    contextualButtons = ['Get Cost Breakdown', 'Financing Options', 'Talk to Counselor'];
-  } else if (isInterestedInCourse) {
-    contextualButtons = ['Book 1:1 Consultation', 'Book Demo Online', 'Get Course Timeline'];
+    contextualButtons = pool.costButtons;
+  } else if (isInterestedInService) {
+    contextualButtons = pool.interestButtons;
   } else {
-    contextualButtons = ['Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Explore Training Options', 'Talk to Counselor'];
+    contextualButtons = pool.genericButtons;
   }
 
   const unusedButtons = contextualButtons.filter(btn =>
     !usedButtonsLower.includes(btn.toLowerCase()) && !isSimilarToAny(btn, usedButtons)
   );
-  const pool = unusedButtons.length > 0 ? unusedButtons : contextualButtons;
+  const finalPool = unusedButtons.length > 0 ? unusedButtons : contextualButtons;
 
   try {
-    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount);
+    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount, pool);
     if (generated && !usedButtonsLower.includes(generated.toLowerCase())) {
       return [generated];
     }
-    return pool.length > 0 ? [pool[Math.floor(Math.random() * pool.length)]] : ['Book a Demo Session'];
+    return finalPool.length > 0 ? [finalPool[Math.floor(Math.random() * finalPool.length)]] : [pool.defaultFallback];
   } catch {
-    return pool.length > 0 ? [pool[Math.floor(Math.random() * pool.length)]] : ['Book a Demo Session'];
+    return finalPool.length > 0 ? [finalPool[Math.floor(Math.random() * finalPool.length)]] : [pool.defaultFallback];
   }
 }
 
@@ -163,22 +244,10 @@ async function generateSubsequentButtons(
 async function generateContextualButton(
   userMessage: string,
   assistantMessage: string,
-  messageCount: number
+  messageCount: number,
+  pool: ReturnType<typeof getBrandPool>
 ): Promise<string | null> {
-  const systemPrompt = `You create one short, direct follow-up call-to-action button label for WindChasers aviation training chatbot.
-
-WindChasers is an honest, transparent aviation training academy offering:
-- Commercial Pilot License (CPL) training
-- Helicopter Pilot Training
-- Cabin Crew Training
-- Drone Pilot Training
-- DGCA Ground Classes
-
-AVAILABLE BUTTON TYPES (create contextual variations):
-- Information: "Get Course Details", "Check Eligibility", "Learn More"
-- Exploration: "Explore Training Options", "See Programs"
-- Booking: "Book a Demo Session", "Book 1:1 Consultation", "Schedule Call"
-- Next Steps: "Get Cost Breakdown", "Financing Options", "Course Timeline"
+  const systemPrompt = `You create one short, direct follow-up call-to-action button label for ${pool.claudeContext}
 
 BUTTON GENERATION RULES:
 - First user message (messageCount = 1): Generate 1 button most relevant to their question
@@ -188,7 +257,7 @@ BUTTON GENERATION RULES:
 - NEVER repeat what was just explained
 - NEVER suggest something they already understood
 
-TONE: Direct, honest, professional. Aviation career advisor voice. No sales-y language.
+TONE: Direct, professional. No sales-y language.
 
 If no relevant follow-up is appropriate, respond with only: SKIP
 Output ONLY the button label text. No quotes. No explanation.`;
@@ -217,7 +286,7 @@ function areSimilarBookingButtons(button1: string, button2: string): boolean {
 
   if (lower1 === lower2) return true;
 
-  const bookingKeywords = ['call', 'demo', 'book', 'schedule', 'meeting', 'appointment'];
+  const bookingKeywords = ['call', 'demo', 'book', 'schedule', 'meeting', 'appointment', 'strategy'];
   const hasBooking1 = bookingKeywords.some(k => lower1.includes(k));
   const hasBooking2 = bookingKeywords.some(k => lower2.includes(k));
 

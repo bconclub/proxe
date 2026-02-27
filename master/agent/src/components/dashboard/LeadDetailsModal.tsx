@@ -686,15 +686,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     try {
       const supabase = createClient()
       const { data: history } = await supabase
-        .from('stage_history')
-        .select('score_at_change, changed_at')
+        .from('lead_stage_changes')
+        .select('new_score, created_at')
         .eq('lead_id', lead.id)
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(2)
 
       if (history && Array.isArray(history) && history.length > 1) {
         const prev = history[1] as any
-        setPreviousScore(prev.score_at_change)
+        setPreviousScore(prev.new_score)
       }
     } catch (error) {
       console.error('Error loading score history:', error)
@@ -760,7 +760,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const getStageDuration = () => {
     try {
       const supabase = createClient()
-      // This would need to fetch from stage_history, simplified for now
+      // This would need to fetch from lead_stage_changes, simplified for now
       return daysInPipeline
     } catch {
       return daysInPipeline

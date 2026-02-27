@@ -409,7 +409,7 @@ export async function createCalendarEvent(booking: {
   date: string;
   time: string;
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   courseInterest?: string;
   sessionType?: string;
@@ -458,7 +458,7 @@ export async function createCalendarEvent(booking: {
     // Description
     let description = `Windchasers Aviation Academy - Consultation Booking\n`;
     description += `BOOKING STATUS: CONFIRMED\n\n`;
-    description += `Candidate Information:\nName: ${booking.name}\nEmail: ${booking.email}\nPhone: ${booking.phone}\n\n`;
+    description += `Candidate Information:\nName: ${booking.name}\nEmail: ${booking.email || 'Not provided'}\nPhone: ${booking.phone}\n\n`;
     if (courseDisplayName !== 'Aviation Course Inquiry') {
       description += `Course Interest: ${courseDisplayName}\n\n`;
     }
@@ -470,14 +470,18 @@ export async function createCalendarEvent(booking: {
       description += `Conversation Summary:\n${booking.conversationSummary}\n\n`;
     }
     description += `Booking Details:\nDate: ${formatDate(booking.date)}\nTime: ${formatTimeForDisplay(`${hour}:${minute.toString().padStart(2, '0')}`)}\n\n`;
-    description += `Contact: ${booking.email}`;
+    description += `Contact: ${booking.email || booking.phone}`;
+
+    const hasRealEmail = booking.email &&
+      !booking.email.includes('noemail@') &&
+      booking.email.includes('@');
 
     const event: any = {
       summary: eventTitle,
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
-      attendees: [{ email: booking.email, displayName: booking.name }],
+      ...(hasRealEmail ? { attendees: [{ email: booking.email, displayName: booking.name }] } : {}),
       reminders: {
         useDefault: false,
         overrides: [

@@ -271,16 +271,18 @@ Respond with ONLY a JSON object in this exact format:
       return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
     }
 
-    // Log to stage_history if stage changed
+    // Log to lead_stage_changes if stage changed
     if (oldStage !== newStage) {
       await supabase
-        .from('stage_history')
+        .from('lead_stage_changes')
         .insert({
           lead_id: lead_id,
           old_stage: oldStage,
           new_stage: newStage,
-          score_at_change: aiScore,
-          changed_by: 'PROXe AI',
+          old_score: lead.lead_score || null,
+          new_score: aiScore,
+          is_automatic: true,
+          change_reason: 'PROXe AI scoring',
         })
     }
 

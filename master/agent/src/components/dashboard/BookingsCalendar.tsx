@@ -115,9 +115,10 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
                 transition-colors
                 ${syncing
                   ? 'bg-gray-400 cursor-not-allowed text-white'
-                  : 'bg-primary-600 hover:bg-primary-700 text-white'
+                  : 'text-white hover:opacity-90'
                 }
               `}
+              style={!syncing ? { backgroundColor: 'var(--accent-primary)' } : undefined}
             >
               <MdSync className={syncing ? 'animate-spin' : ''} size={18} />
               {syncing ? 'Syncing...' : 'Sync with Google Calendar'}

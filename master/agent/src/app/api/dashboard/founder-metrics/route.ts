@@ -453,25 +453,25 @@ export async function GET(request: NextRequest) {
       metadata?: any
     }> = []
 
-    // Get stage changes from stage_history
+    // Get stage changes from lead_stage_changes
     const { data: stageChanges } = await supabase
-      .from('stage_history')
-      .select('lead_id, old_stage, new_stage, score_at_change, changed_at, changed_by')
-      .order('changed_at', { ascending: false })
+      .from('lead_stage_changes')
+      .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
+      .order('created_at', { ascending: false })
       .limit(50)
 
     stageChanges?.forEach((change: any) => {
       const lead = safeLeads.find(l => l.id === change.lead_id)
       if (lead && change.old_stage && change.old_stage !== change.new_stage) {
         keyEvents.push({
-          id: `stage-${change.lead_id}-${change.changed_at}`,
+          id: `stage-${change.lead_id}-${change.created_at}`,
           leadId: change.lead_id,
           leadName: lead.customer_name || 'Unknown',
           eventType: 'stage_change',
-          timestamp: change.changed_at,
+          timestamp: change.created_at,
           content: `${lead.customer_name || 'Unknown'} entered ${change.new_stage} stage${change.old_stage ? ` (from ${change.old_stage})` : ''}`,
           channel: lead.first_touchpoint || lead.last_touchpoint || 'web',
-          metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.score_at_change },
+          metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.new_score },
         })
       }
     })
@@ -539,18 +539,18 @@ export async function GET(request: NextRequest) {
       return daysAgo <= 7
     })
 
-    // Track score changes from stage_history (compare consecutive entries)
+    // Track score changes from lead_stage_changes (compare consecutive entries)
     const scoreChanges: Record<string, { oldScore: number; newScore: number; timestamp: string }> = {}
     stageChanges?.forEach((change: any, index: number) => {
-      if (change.score_at_change && index < stageChanges.length - 1) {
+      if (change.new_score && index < stageChanges.length - 1) {
         const prevChange = stageChanges[index + 1]
-        if (prevChange.lead_id === change.lead_id && prevChange.score_at_change) {
-          const scoreDiff = change.score_at_change - prevChange.score_at_change
+        if (prevChange.lead_id === change.lead_id && prevChange.new_score) {
+          const scoreDiff = change.new_score - prevChange.new_score
           if (Math.abs(scoreDiff) >= 20) {
             scoreChanges[change.lead_id] = {
-              oldScore: prevChange.score_at_change,
-              newScore: change.score_at_change,
-              timestamp: change.changed_at,
+              oldScore: prevChange.new_score,
+              newScore: change.new_score,
+              timestamp: change.created_at,
             }
           }
         }
@@ -578,10 +578,10 @@ export async function GET(request: NextRequest) {
     // Detect new hot leads (score >= threshold) - show if recently became hot
     recentHotLeads.forEach(lead => {
       // Check if this lead recently became hot (has a recent stage change to hot stage or score >= threshold)
-      const recentStageChange = stageChanges?.find((sc: any) => 
-        sc.lead_id === lead.id && 
-        new Date(sc.changed_at) >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) &&
-        (sc.new_stage === 'High Intent' || sc.new_stage === 'Booking Made' || (sc.score_at_change && sc.score_at_change >= hotLeadThreshold))
+      const recentStageChange = stageChanges?.find((sc: any) =>
+        sc.lead_id === lead.id &&
+        new Date(sc.created_at) >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) &&
+        (sc.new_stage === 'High Intent' || sc.new_stage === 'Booking Made' || (sc.new_score && sc.new_score >= hotLeadThreshold))
       )
 
       // Only show if it's a new hot lead (not already tracked as score change)

@@ -130,6 +130,140 @@ export async function generateResponse(
   throw lastError || new Error('Failed to generate response after retries');
 }
 
+// ─── Tool Use Types ──────────────────────────────────────────────────────────
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+}
+
+export type ToolHandler = (input: Record<string, any>) => Promise<string>;
+
+export interface ToolUseOptions {
+  tools: ToolDefinition[];
+  toolHandlers: Record<string, ToolHandler>;
+  maxToolRounds?: number;
+}
+
+// ─── Tool Use Response ───────────────────────────────────────────────────────
+
+/**
+ * Generate a response with tool use support (for WhatsApp booking, etc.)
+ * Implements the Anthropic tool_use message loop.
+ */
+export async function generateResponseWithTools(
+  systemPrompt: string,
+  userPrompt: string,
+  toolOptions: ToolUseOptions,
+  maxTokens: number = 1024
+): Promise<string> {
+  const anthropic = getClient();
+  const model = getModel();
+  const { tools, toolHandlers, maxToolRounds = 5 } = toolOptions;
+
+  const messages: Array<{ role: 'user' | 'assistant'; content: any }> = [
+    { role: 'user', content: userPrompt },
+  ];
+
+  const maxRetries = 3;
+
+  for (let round = 0; round < maxToolRounds; round++) {
+    let lastError: any = null;
+    let response: any = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          console.log(`[ClaudeClient] Tool round ${round}, retry ${attempt}/${maxRetries} after ${retryDelay}ms`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+
+        response = await anthropic.messages.create({
+          model,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages,
+          tools: tools as any,
+        });
+        break;
+      } catch (error: any) {
+        lastError = error;
+        const isOverloaded = error?.error?.type === 'overloaded_error' ||
+          error?.message?.includes('overloaded');
+        if (!isOverloaded || attempt >= maxRetries) throw error;
+      }
+    }
+
+    if (!response) throw lastError || new Error('Failed after retries');
+
+    // Extract text from this response (may accompany tool_use blocks)
+    const textBlocks = response.content.filter((b: any) => b.type === 'text');
+    const responseText = textBlocks.map((b: any) => b.text).join('').trim();
+
+    // If Claude is done (no tool calls), return the text
+    if (response.stop_reason === 'end_turn') {
+      return responseText;
+    }
+
+    // If Claude wants to use tools
+    if (response.stop_reason === 'tool_use') {
+      // Add Claude's full response as assistant message
+      messages.push({ role: 'assistant', content: response.content });
+
+      // Process each tool_use block
+      const toolResults: Array<{
+        type: 'tool_result';
+        tool_use_id: string;
+        content: string;
+      }> = [];
+
+      for (const block of response.content) {
+        if (block.type === 'tool_use') {
+          const handler = toolHandlers[block.name];
+          if (!handler) {
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: JSON.stringify({ error: `Unknown tool: ${block.name}` }),
+            });
+            continue;
+          }
+
+          try {
+            console.log(`[ClaudeClient] Executing tool: ${block.name}`, JSON.stringify(block.input));
+            const result = await handler(block.input);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: result,
+            });
+            console.log(`[ClaudeClient] Tool ${block.name} completed`);
+          } catch (err: any) {
+            console.error(`[ClaudeClient] Tool ${block.name} failed:`, err);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: JSON.stringify({ error: err.message || 'Tool execution failed' }),
+            });
+          }
+        }
+      }
+
+      // Send tool results back to Claude
+      messages.push({ role: 'user', content: toolResults });
+      continue;
+    }
+
+    // Unexpected stop_reason — return whatever text we have
+    return responseText;
+  }
+
+  console.warn('[ClaudeClient] Tool loop exhausted maxToolRounds');
+  return 'I apologize, I encountered an issue processing your request. Please try again or contact us directly.';
+}
+
 /**
  * Generate a short response (for buttons, summaries, etc.)
  */

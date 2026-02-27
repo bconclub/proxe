@@ -132,16 +132,19 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
     }
 
-    // Log to stage_history
+    // Log to lead_stage_changes
     if (oldStage !== new_stage) {
       await supabase
-        .from('stage_history')
+        .from('lead_stage_changes')
         .insert({
           lead_id: leadId,
           old_stage: oldStage,
           new_stage: new_stage,
-          score_at_change: lead.lead_score,
+          old_score: lead.lead_score,
+          new_score: lead.lead_score,
           changed_by: user.id,
+          is_automatic: false,
+          change_reason: note || 'Manual override',
         })
     }
 

@@ -1185,7 +1185,6 @@
 .followUpBtn.accent-6 {
   background: var(--button-bg);
   border-color: var(--border-accent);
-  opacity: 0.9;
 }
 
 .followUpBtn.accent-0:hover,
@@ -1198,7 +1197,6 @@
   background: var(--button-hover);
   border-color: var(--border-glow);
   box-shadow: 0 4px 12px var(--glass-shadow);
-  opacity: 1;
 }
 
 .exploreTitle {
