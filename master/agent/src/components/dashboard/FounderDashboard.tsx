@@ -1039,7 +1039,41 @@ export default function FounderDashboard() {
                     }
                   }
                   
-                  // 4. ENGAGEMENT (Channel-specific, but text-based)
+                  // 4. NEW LEAD / NEW MESSAGE
+                  if (type === 'new_lead_scored' || (textLower.includes('scored') && textLower.includes('entered'))) {
+                    return {
+                      icon: MdFlashOn,
+                      color: '#8B5CF6', // Purple
+                      bgColor: '#8B5CF6',
+                      opacity: 0.2
+                    }
+                  }
+                  if (type === 'new_lead' || textLower.includes('arrived via')) {
+                    return {
+                      icon: MdPeople,
+                      color: '#3B82F6', // Blue
+                      bgColor: '#3B82F6',
+                      opacity: 0.2
+                    }
+                  }
+                  if (type === 'new_message' || textLower.includes('sent a message')) {
+                    return {
+                      icon: MdChatBubble,
+                      color: '#6366F1', // Indigo
+                      bgColor: '#6366F1',
+                      opacity: 0.2
+                    }
+                  }
+                  if (type === 'went_cold' || textLower.includes('went cold')) {
+                    return {
+                      icon: MdWarning,
+                      color: '#F59E0B', // Amber
+                      bgColor: '#F59E0B',
+                      opacity: 0.2
+                    }
+                  }
+
+                  // 5. ENGAGEMENT (Channel-specific, but text-based)
                   if (textLower.includes('engaged via whatsapp')) {
                     return { 
                       icon: MdWhatsapp, 

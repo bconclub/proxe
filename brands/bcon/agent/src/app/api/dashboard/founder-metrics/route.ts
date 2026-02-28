@@ -335,17 +335,19 @@ export async function GET(request: NextRequest) {
       console.warn('Error calculating avg response time:', error)
     }
 
-    // 5. Leads Needing Attention (high score, recent interaction)
+    // 5. Leads Needing Attention (top leads with recent interaction, sorted by score)
     const leadsNeedingAttention = safeLeads
       .filter(lead => {
         const score = lead.lead_score || 0
         const lastInteraction = lead.last_interaction_at ? new Date(lead.last_interaction_at) : null
-        const daysSinceInteraction = lastInteraction 
+        const daysSinceInteraction = lastInteraction
           ? (now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24)
           : 999
-        
-        return score > 50 && daysSinceInteraction < 7
+
+        // Show any lead with a score that has interacted in the last 14 days
+        return score > 0 && daysSinceInteraction < 14
       })
+      .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
       .slice(0, 5)
       .map(lead => ({
         id: lead.id,
@@ -462,14 +464,16 @@ export async function GET(request: NextRequest) {
 
     stageChanges?.forEach((change: any) => {
       const lead = safeLeads.find(l => l.id === change.lead_id)
-      if (lead && change.old_stage && change.old_stage !== change.new_stage) {
+      if (lead && change.old_stage !== change.new_stage) {
         keyEvents.push({
           id: `stage-${change.lead_id}-${change.created_at}`,
           leadId: change.lead_id,
           leadName: lead.customer_name || 'Unknown',
-          eventType: 'stage_change',
+          eventType: change.old_stage ? 'stage_change' : 'new_lead_scored',
           timestamp: change.created_at,
-          content: `${lead.customer_name || 'Unknown'} entered ${change.new_stage} stage${change.old_stage ? ` (from ${change.old_stage})` : ''}`,
+          content: change.old_stage
+            ? `${lead.customer_name || 'Unknown'} entered ${change.new_stage} stage (from ${change.old_stage})`
+            : `${lead.customer_name || 'Unknown'} scored ${change.new_score || 0} — entered ${change.new_stage} stage`,
           channel: lead.first_touchpoint || lead.last_touchpoint || 'web',
           metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.new_score },
         })
@@ -664,6 +668,64 @@ export async function GET(request: NextRequest) {
           channel: msg.channel || 'web',
           metadata: msg.metadata,
         })
+      }
+    })
+
+    // Add "new lead created" events for recent leads (catches leads with no stage changes)
+    safeLeads.forEach(lead => {
+      const createdAt = new Date(lead.created_at)
+      const daysSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
+      if (daysSinceCreation <= 14) {
+        // Only add if this lead doesn't already have events in keyEvents
+        const hasExistingEvent = keyEvents.some(e => e.leadId === lead.id)
+        if (!hasExistingEvent) {
+          keyEvents.push({
+            id: `new-lead-${lead.id}`,
+            leadId: lead.id,
+            leadName: lead.customer_name || 'Unknown',
+            eventType: 'new_lead',
+            timestamp: lead.created_at,
+            content: `${lead.customer_name || 'Unknown'} arrived via ${lead.first_touchpoint || 'web'}`,
+            channel: lead.first_touchpoint || lead.last_touchpoint || 'web',
+          })
+        }
+      }
+    })
+
+    // Add first-message events from conversations (recent customer messages)
+    const recentCustomerMessages = messages?.filter((msg: any) => {
+      if (msg.sender !== 'customer') return false
+      const msgDate = new Date(msg.created_at)
+      const daysAgo = (now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24)
+      return daysAgo <= 7
+    }) || []
+
+    // Group by lead_id and take only the most recent message per lead
+    const latestMessagePerLead: Record<string, any> = {}
+    recentCustomerMessages.forEach((msg: any) => {
+      if (!latestMessagePerLead[msg.lead_id] || new Date(msg.created_at) > new Date(latestMessagePerLead[msg.lead_id].created_at)) {
+        latestMessagePerLead[msg.lead_id] = msg
+      }
+    })
+
+    Object.values(latestMessagePerLead).forEach((msg: any) => {
+      const lead = safeLeads.find(l => l.id === msg.lead_id)
+      if (lead) {
+        // Only add if this lead doesn't already have a more meaningful event
+        const hasHigherPriorityEvent = keyEvents.some(e =>
+          e.leadId === msg.lead_id && ['booking_made', 'hot_lead', 'score_change', 'stage_change', 'new_lead_scored'].includes(e.eventType)
+        )
+        if (!hasHigherPriorityEvent) {
+          keyEvents.push({
+            id: `message-${msg.lead_id}-${msg.created_at}`,
+            leadId: msg.lead_id,
+            leadName: lead.customer_name || 'Unknown',
+            eventType: 'new_message',
+            timestamp: msg.created_at,
+            content: `${lead.customer_name || 'Unknown'} sent a message via ${msg.channel || lead.last_touchpoint || 'web'}`,
+            channel: msg.channel || lead.last_touchpoint || 'web',
+          })
+        }
       }
     })
 
