@@ -92,9 +92,17 @@ export async function POST(request: NextRequest) {
     };
 
     // Generate AI response (non-streaming for WhatsApp)
+    const aiStartTime = Date.now();
     const result = await processMessage(agentInput, supabase);
+    const responseTimeMs = Date.now() - aiStartTime;
 
     // Log messages to conversations table if we have a lead
+    const responseMetadata = {
+      session_id: sessionId,
+      ai_generated: true,
+      input_to_output_gap_ms: responseTimeMs,
+    };
+
     if (customerContext?.leadId) {
       // Log customer message
       await logMessage(
@@ -107,7 +115,7 @@ export async function POST(request: NextRequest) {
         supabase,
       );
 
-      // Log AI response
+      // Log AI response (with response time for dashboard metrics)
       if (result.response) {
         await logMessage(
           customerContext.leadId,
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest) {
           'agent',
           result.response,
           'text',
-          { session_id: sessionId, ai_generated: true },
+          responseMetadata,
           supabase,
         );
       }
@@ -133,7 +141,7 @@ export async function POST(request: NextRequest) {
       if (leadId) {
         await logMessage(leadId, 'whatsapp', 'customer', message, 'text', {}, supabase);
         if (result.response) {
-          await logMessage(leadId, 'whatsapp', 'agent', result.response, 'text', { ai_generated: true }, supabase);
+          await logMessage(leadId, 'whatsapp', 'agent', result.response, 'text', responseMetadata, supabase);
         }
       }
     }

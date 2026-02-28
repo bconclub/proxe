@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Create SSE stream
     const encoder = new TextEncoder();
+    const requestStartTime = Date.now();
     const stream = new ReadableStream({
       async start(controller) {
         let fullResponse = '';
@@ -109,6 +110,8 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          const responseTimeMs = Date.now() - requestStartTime;
+
           // ── Post-streaming: business logic (fire-and-forget) ──────────
 
           // Run all post-processing in parallel, don't block the stream
@@ -119,6 +122,7 @@ export async function POST(request: NextRequest) {
             userProfile,
             agentInput,
             supabase,
+            responseTimeMs,
           ).catch(err => console.error('[agent/web/chat] Post-processing error:', err));
 
         } catch (error: any) {
@@ -157,6 +161,7 @@ async function postProcess(
   userProfile: { name?: string; email?: string; phone?: string },
   agentInput: AgentInput,
   supabase: any,
+  responseTimeMs?: number,
 ): Promise<void> {
   try {
     // 1. Update session profile + create/link lead
@@ -197,7 +202,7 @@ async function postProcess(
         supabase,
       );
 
-      // Log agent response
+      // Log agent response (with response time for dashboard metrics)
       if (assistantResponse) {
         await logMessage(
           leadId,
@@ -205,7 +210,11 @@ async function postProcess(
           'agent',
           assistantResponse,
           'text',
-          { session_id: externalSessionId },
+          {
+            session_id: externalSessionId,
+            ai_generated: true,
+            ...(responseTimeMs ? { input_to_output_gap_ms: responseTimeMs } : {}),
+          },
           supabase,
         );
       }
