@@ -19,24 +19,22 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Windchasers Supabase configuration
-    const supabaseUrl = process.env[`NEXT_PUBLIC_${(process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
-    const supabaseAnonKey = process.env[`NEXT_PUBLIC_${(process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()}_SUPABASE_ANON_KEY`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
-    
-    // Log in development to help debug
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Sync session: Environment check', {
-        hasSupabaseUrl: !!supabaseUrl,
-        supabaseUrlPreview: supabaseUrl?.substring(0, 30) + '...',
-        hasAnonKey: !!supabaseAnonKey,
-        anonKeyLength: supabaseAnonKey?.length,
-      })
-    }
-    
+    // Static env var access (Next.js requires static string keys for NEXT_PUBLIC_*)
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL ||
+      ''
+    const supabaseAnonKey =
+      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY ||
+      ''
+
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error('❌ Sync session: Supabase environment variables not set')
       return NextResponse.json(
-        { 
+        {
           error: 'Server configuration error: Supabase credentials not configured',
           details: process.env.NODE_ENV === 'development' ? {
             missingUrl: !supabaseUrl,
@@ -175,9 +173,17 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Windchasers Supabase configuration
-    const supabaseUrl = process.env[`NEXT_PUBLIC_${(process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
-    const supabaseAnonKey = process.env[`NEXT_PUBLIC_${(process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()}_SUPABASE_ANON_KEY`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
+    // Static env var access (Next.js requires static string keys for NEXT_PUBLIC_*)
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL ||
+      ''
+    const supabaseAnonKey =
+      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY ||
+      ''
     
     const cookieStore = await cookies()
 

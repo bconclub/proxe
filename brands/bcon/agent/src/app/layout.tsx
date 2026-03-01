@@ -10,12 +10,12 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'WindChasers Dashboard',
-  description: 'WindChasers Aviation Academy - Dashboard for managing leads, bookings, and metrics',
+  title: 'PROXe BCON',
+  description: 'BCON Club - Dashboard for managing leads, bookings, and metrics',
   icons: {
-    icon: '/windchasers-icon.png',
-    shortcut: '/windchasers-icon.png',
-    apple: '/windchasers-icon.png',
+    icon: '/bcon-icon.png',
+    shortcut: '/bcon-icon.png',
+    apple: '/bcon-icon.png',
   },
 }
 
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="windchasers" data-theme="aviation-gold">
+    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="bcon-electric">
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"

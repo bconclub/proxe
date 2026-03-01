@@ -2,37 +2,23 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Database } from '@/types/database.types'
 
-/** Get brand prefix for env var lookup */
-function brandPrefix(): string {
-  return (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
-}
-
-/** Resolve env var with brand-specific → generic → legacy fallback */
-function resolveEnv(...keys: string[]): string | undefined {
-  for (const k of keys) {
-    if (process.env[k]) return process.env[k]
-  }
-  return undefined
-}
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
-  const bp = brandPrefix()
+  // IMPORTANT: Next.js requires static string access for NEXT_PUBLIC_* env vars.
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL ||
+    ''
 
-  const supabaseUrl = resolveEnv(
-    `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
-  ) || 'https://placeholder.supabase.co'
-
-  const supabaseAnonKey = resolveEnv(
-    `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`,
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY',
-  ) || 'placeholder-key'
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY ||
+    ''
 
   const supabase = createServerClient<Database>(
     supabaseUrl,
