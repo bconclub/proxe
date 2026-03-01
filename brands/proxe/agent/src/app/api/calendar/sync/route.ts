@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
+import { getBrandConfig, getCurrentBrandId } from '@/configs'
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com'
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata'
@@ -57,20 +58,116 @@ export async function POST(request: NextRequest) {
     const auth = await getAuthClient()
     const calendar = google.calendar({ version: 'v3', auth })
 
-    // Get all bookings from database (include metadata and unified_context)
-    const { data: bookings, error: bookingsError } = await supabase
-      .from('unified_leads')
-      .select('id, name, email, phone, booking_date, booking_time, first_touchpoint, last_touchpoint, source, metadata, unified_context')
-      .not('booking_date', 'is', null)
-      .not('booking_time', 'is', null)
-      .not('booking_date', 'eq', '')
-      .not('booking_time', 'eq', '')
+    // Get brand config for event titles/descriptions
+    const brandId = getCurrentBrandId()
+    const brandConfig = getBrandConfig(brandId)
+    const brandName = brandConfig.name
 
-    if (bookingsError) {
-      throw bookingsError
+    // Get all leads with booking data from all_leads + session tables
+    const { data: leads, error: leadsError } = await supabase
+      .from('all_leads')
+      .select('id, customer_name, email, phone, first_touchpoint, last_touchpoint, unified_context, created_at')
+
+    if (leadsError) {
+      throw leadsError
     }
 
-    if (!bookings || bookings.length === 0) {
+    // Get booking data from session tables
+    const { data: webSessions } = await supabase
+      .from('web_sessions')
+      .select('lead_id, booking_date, booking_time, booking_status, metadata')
+      .not('booking_date', 'is', null)
+
+    const { data: whatsappSessions } = await supabase
+      .from('whatsapp_sessions')
+      .select('lead_id, booking_date, booking_time, booking_status, metadata')
+      .not('booking_date', 'is', null)
+
+    // Build booking records by merging lead data with session booking data
+    const bookings: Array<{
+      id: string
+      name: string
+      email: string | null
+      phone: string | null
+      booking_date: string
+      booking_time: string
+      first_touchpoint: string | null
+      last_touchpoint: string | null
+      unified_context: any
+      metadata: any
+      channel: string
+    }> = []
+
+    const safeLeads = leads || []
+
+    // Helper: extract booking from unified_context
+    const getUnifiedContextBooking = (lead: any) => {
+      const ctx = lead.unified_context || {}
+      for (const channel of ['web', 'whatsapp', 'voice', 'social']) {
+        const channelCtx = ctx[channel] || {}
+        const bookingDate = channelCtx.booking_date
+        const bookingTime = channelCtx.booking_time
+        if (bookingDate && bookingTime) {
+          return { bookingDate, bookingTime, channel, metadata: channelCtx.metadata || {} }
+        }
+      }
+      return null
+    }
+
+    // Collect bookings from session tables
+    const processedLeadIds = new Set<string>()
+
+    const addSessionBookings = (sessions: any[], channel: string) => {
+      sessions?.forEach((session: any) => {
+        if (!session.lead_id || !session.booking_date || !session.booking_time) return
+        if (processedLeadIds.has(session.lead_id)) return
+
+        const lead = safeLeads.find(l => l.id === session.lead_id)
+        if (!lead) return
+
+        processedLeadIds.add(session.lead_id)
+        bookings.push({
+          id: lead.id,
+          name: lead.customer_name || 'Unknown',
+          email: lead.email,
+          phone: lead.phone,
+          booking_date: session.booking_date,
+          booking_time: session.booking_time,
+          first_touchpoint: lead.first_touchpoint,
+          last_touchpoint: lead.last_touchpoint,
+          unified_context: lead.unified_context,
+          metadata: session.metadata || {},
+          channel,
+        })
+      })
+    }
+
+    addSessionBookings(webSessions || [], 'web')
+    addSessionBookings(whatsappSessions || [], 'whatsapp')
+
+    // Also check unified_context for leads not already found via sessions
+    safeLeads.forEach(lead => {
+      if (processedLeadIds.has(lead.id)) return
+      const ucBooking = getUnifiedContextBooking(lead)
+      if (ucBooking) {
+        processedLeadIds.add(lead.id)
+        bookings.push({
+          id: lead.id,
+          name: lead.customer_name || 'Unknown',
+          email: lead.email,
+          phone: lead.phone,
+          booking_date: ucBooking.bookingDate,
+          booking_time: ucBooking.bookingTime,
+          first_touchpoint: lead.first_touchpoint,
+          last_touchpoint: lead.last_touchpoint,
+          unified_context: lead.unified_context,
+          metadata: ucBooking.metadata,
+          channel: ucBooking.channel,
+        })
+      }
+    })
+
+    if (bookings.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No bookings to sync',
@@ -138,67 +235,28 @@ export async function POST(request: NextRequest) {
         const endHour = hour + 1
         const eventEnd = `${bookingDate}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
-        // Build event title and description using booking details from metadata if available
-        const courseInterest = booking.metadata?.courseInterest || booking.unified_context?.windchasers?.course_interest;
-        const sessionType = booking.metadata?.sessionType;
-        const conversationSummary = booking.metadata?.conversationSummary || booking.metadata?.conversation_summary || booking.unified_context?.web?.conversation_summary;
-        
-        // Map course interest codes to readable names
-        const courseNameMap: Record<string, string> = {
-          'pilot': 'Pilot Training',
-          'helicopter': 'Helicopter Training',
-          'drone': 'Drone Training',
-          'cabin': 'Cabin Crew Training',
-        };
-        const courseDisplayName = courseInterest && courseNameMap[courseInterest.toLowerCase()] 
-          ? courseNameMap[courseInterest.toLowerCase()] 
-          : courseInterest || 'Aviation Course Inquiry';
+        // Build event title and description using booking details
+        const conversationSummary = booking.metadata?.conversationSummary || booking.metadata?.conversation_summary || booking.unified_context?.web?.conversation_summary
 
-        // Build event title: Candidate Name - Course Details [Session Type]
-        let eventTitle = `${booking.name || 'Unnamed'} - ${courseDisplayName}`;
-        if (sessionType) {
-          const sessionTypeLabel = sessionType === 'offline' ? 'Facility Visit' : 'Online';
-          eventTitle += ` [${sessionTypeLabel}]`;
-        } else {
-          // Fallback to simple title if no details
-          eventTitle = `Windchasers Demo - ${booking.name || 'Unnamed'}`;
+        // Build event title: Brand - Candidate Name [Channel]
+        const channelLabel = booking.channel === 'whatsapp' ? 'WhatsApp' : booking.channel === 'web' ? 'Web' : booking.channel || 'Web'
+        const eventTitle = `${brandName} Booking - ${booking.name} [${channelLabel}]`
+
+        // Build description
+        let description = `${brandName} - Consultation Booking\n\n`
+        description += `Contact Information:\n`
+        description += `Name: ${booking.name || 'N/A'}\n`
+        description += `Email: ${booking.email || 'N/A'}\n`
+        description += `Phone: ${booking.phone || 'N/A'}\n\n`
+
+        if (conversationSummary) {
+          description += `Conversation Summary:\n${conversationSummary}\n\n`
         }
 
-        // Build description - use stored description if available, otherwise build from details
-        let description = '';
-        if (booking.metadata?.description) {
-          // Use stored description (shorter unified description)
-          description = booking.metadata.description;
-        } else {
-          // Build description from available details
-          description = `Windchasers Aviation Academy - Consultation Booking\n\n`;
-          description += `Candidate Information:\n`;
-          description += `Name: ${booking.name || 'N/A'}\n`;
-          description += `Email: ${booking.email || 'N/A'}\n`;
-          description += `Phone: ${booking.phone || 'N/A'}\n\n`;
-          
-          if (courseDisplayName && courseDisplayName !== 'Aviation Course Inquiry') {
-            description += `Course Interest: ${courseDisplayName}\n\n`;
-          }
-          
-          if (sessionType) {
-            const sessionTypeDisplay = sessionType === 'offline' 
-              ? 'Offline / Facility Visit' 
-              : sessionType === 'online' 
-              ? 'Online Session' 
-              : sessionType;
-            description += `Session Type: ${sessionTypeDisplay}\n\n`;
-          }
-          
-          if (conversationSummary) {
-            description += `Conversation Summary:\n${conversationSummary}\n\n`;
-          }
-          
-          description += `Booking Details:\n`;
-          description += `Date: ${bookingDate}\n`;
-          description += `Time: ${bookingTime}\n\n`;
-          description += `Source: ${booking.first_touchpoint || booking.last_touchpoint || booking.source || 'web'}`;
-        }
+        description += `Booking Details:\n`
+        description += `Date: ${bookingDate}\n`
+        description += `Time: ${bookingTime}\n`
+        description += `Source: ${booking.first_touchpoint || booking.last_touchpoint || 'web'}`
 
         const eventData = {
           summary: eventTitle,
@@ -214,13 +272,6 @@ export async function POST(request: NextRequest) {
           attendees: booking.email
             ? [{ email: booking.email, displayName: booking.name || 'Guest' }]
             : [],
-        }
-
-        // Add location based on session type
-        if (sessionType === 'offline') {
-          eventData.location = 'Windchasers Aviation Academy Facility';
-        } else if (sessionType === 'online') {
-          eventData.location = 'Online Session (Video Call)';
         }
 
         const googleEventId = booking.metadata?.googleEventId
@@ -242,17 +293,8 @@ export async function POST(request: NextRequest) {
                 requestBody: eventData,
               })
 
-              // Update booking metadata with new event ID
-              await supabase
-                .from('unified_leads')
-                .update({
-                  metadata: {
-                    ...booking.metadata,
-                    googleEventId: newEvent.data.id,
-                  },
-                })
-                .eq('id', booking.id)
-
+              // Store google event ID in the session table metadata
+              await updateBookingMetadata(supabase, booking, newEvent.data.id)
               created++
             } else {
               errors.push(`Failed to update booking ${booking.id}: ${updateError.message}`)
@@ -266,17 +308,8 @@ export async function POST(request: NextRequest) {
               requestBody: eventData,
             })
 
-            // Update booking metadata with event ID
-            await supabase
-              .from('unified_leads')
-              .update({
-                metadata: {
-                  ...booking.metadata,
-                  googleEventId: newEvent.data.id,
-                },
-              })
-              .eq('id', booking.id)
-
+            // Store google event ID in the session table metadata
+            await updateBookingMetadata(supabase, booking, newEvent.data.id)
             created++
           } catch (createError: any) {
             errors.push(`Failed to create event for booking ${booking.id}: ${createError.message}`)
@@ -304,5 +337,31 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * Update booking metadata with Google Event ID.
+ * Writes to the appropriate session table based on the booking channel.
+ */
+async function updateBookingMetadata(supabase: any, booking: any, googleEventId: string | null | undefined) {
+  if (!googleEventId) return
+
+  const table = booking.channel === 'whatsapp' ? 'whatsapp_sessions' : 'web_sessions'
+
+  // Try updating the session table metadata
+  const { error } = await supabase
+    .from(table)
+    .update({
+      metadata: {
+        ...(booking.metadata || {}),
+        googleEventId,
+      },
+    })
+    .eq('lead_id', booking.id)
+    .not('booking_date', 'is', null)
+
+  if (error) {
+    console.warn(`Failed to store googleEventId for booking ${booking.id}:`, error)
   }
 }
