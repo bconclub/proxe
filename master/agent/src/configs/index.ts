@@ -17,18 +17,40 @@ export const brandThemeMap: Record<string, string> = {
 };
 
 /**
- * Get brand config. Checks explicit brand param first, then NEXT_PUBLIC_BRAND_ID env var, falls back to windchasers.
+ * Resolve brand ID from env vars.
+ * Supports both NEXT_PUBLIC_BRAND_ID and NEXT_PUBLIC_BRAND for backwards compat.
+ */
+function getBrandFromEnv(): string | undefined {
+  return process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || undefined;
+}
+
+/**
+ * Detect brand from hostname when env var is missing.
+ * Runs client-side only (ThemeProvider, etc.).
+ */
+function detectBrandFromHostname(): string | null {
+  if (typeof window === 'undefined') return null;
+  const host = window.location.hostname.toLowerCase();
+  if (host.includes('bcon')) return 'bcon';
+  if (host.includes('proxe')) return 'proxe';
+  if (host.includes('windchasers')) return 'windchasers';
+  return null;
+}
+
+/**
+ * Get brand config. Checks explicit brand param first, then env vars,
+ * then hostname detection, falls back to windchasers.
  */
 export function getBrandConfig(brand?: string): BrandConfig {
-  const brandId = brand || process.env.NEXT_PUBLIC_BRAND_ID || 'windchasers';
+  const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
   return brandConfigs[brandId.toLowerCase()] || windchasersConfig;
 }
 
 /**
- * Get current brand ID from env var, with fallback.
+ * Get current brand ID from env vars, hostname detection, or fallback.
  */
 export function getCurrentBrandId(): string {
-  return process.env.NEXT_PUBLIC_BRAND_ID || 'windchasers';
+  return getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
 }
 
 export { proxeConfig, windchasersConfig, bconConfig };

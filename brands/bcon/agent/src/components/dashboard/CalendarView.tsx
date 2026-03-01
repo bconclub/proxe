@@ -664,7 +664,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
                 {/* Course Interest (Windchasers-specific) */}
                 {(() => {
-                  const brandId = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BRAND_ID || 'windchasers') : 'windchasers'
+                  const brandId = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers') : 'windchasers'
                   const brandData = selectedBooking.unified_context?.[brandId]
                   const courseInterest = selectedBooking.metadata?.courseInterest || brandData?.course_interest
                   if (!courseInterest || brandId !== 'windchasers') return null

@@ -455,8 +455,14 @@ export async function createCalendarEvent(booking: {
       eventTitle += ` [${label}]`;
     }
 
-    // Description
-    let description = `Windchasers Aviation Academy - Consultation Booking\n`;
+    // Description — brand-aware
+    const brandName = (() => {
+      try {
+        const { getBrandConfig, getCurrentBrandId } = require('@/configs');
+        return getBrandConfig(getCurrentBrandId()).name;
+      } catch { return 'Consultation'; }
+    })();
+    let description = `${brandName} - Consultation Booking\n`;
     description += `BOOKING STATUS: CONFIRMED\n\n`;
     description += `Candidate Information:\nName: ${booking.name}\nEmail: ${booking.email || 'Not provided'}\nPhone: ${booking.phone}\n\n`;
     if (courseDisplayName !== 'Aviation Course Inquiry') {
@@ -492,7 +498,7 @@ export async function createCalendarEvent(booking: {
     };
 
     if (booking.sessionType === 'offline') {
-      event.location = 'Windchasers Aviation Academy Facility';
+      event.location = `${brandName} Facility`;
     } else if (booking.sessionType === 'online') {
       event.location = 'Online Session (Video Call)';
     }
