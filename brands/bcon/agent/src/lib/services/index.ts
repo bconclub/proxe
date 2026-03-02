@@ -72,6 +72,7 @@ export {
 // Cross-channel context
 export {
   type CustomerContext,
+  type BrandUserProfile,
   type WindchasersUserProfile,
   extractTopics,
   formatBookingInfo,

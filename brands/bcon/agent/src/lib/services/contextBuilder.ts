@@ -31,18 +31,22 @@ export interface CustomerContext {
   socialSummary: { summary: string; lastInteraction: string | null } | null;
 }
 
-export interface WindchasersUserProfile {
+export interface BrandUserProfile {
   name?: string;
   phone?: string;
   email?: string;
-  user_type?: 'student' | 'parent' | 'professional';
-  education?: '12th_completed' | 'in_school';
-  course_interest?: 'pilot' | 'helicopter' | 'drone' | 'cabin';
-  timeline?: 'asap' | '1-3mo' | '6+mo' | '1yr+';
+  user_type?: string;
+  education?: string;
+  course_interest?: string;
+  service_interest?: string;
+  timeline?: string;
   button_clicks?: string[];
   questions_asked?: string[];
   stage?: 'exploration' | 'consideration' | 'ready' | 'booked';
 }
+
+/** @deprecated Use BrandUserProfile instead */
+export type WindchasersUserProfile = BrandUserProfile;
 
 // ─── Topic Extraction ───────────────────────────────────────────────────────
 
@@ -63,9 +67,10 @@ export function extractTopics(summary: string): string[] {
     'implementation', 'setup', 'onboarding',
     'support', 'help', 'assistance',
     'qualification', 'qualify', 'lead',
-    // Aviation-specific (Windchasers)
+    // Industry-specific keywords
     'pilot', 'helicopter', 'drone', 'cabin crew',
     'dgca', 'cpl', 'atpl', 'training', 'license',
+    'ai', 'automation', 'chatbot', 'brand', 'marketing',
   ];
 
   keywords.forEach(keyword => {
@@ -240,12 +245,12 @@ export async function fetchCustomerContext(
 // ─── Brand Profile Updates ──────────────────────────────────────────────────
 
 /**
- * Update brand-specific user profile data (e.g. Windchasers aviation preferences)
+ * Update brand-specific user profile data (e.g. BCON service interests)
  * Syncs to both the channel session and all_leads.unified_context
  */
 export async function updateBrandProfile(
   externalSessionId: string,
-  profileData: Partial<WindchasersUserProfile>,
+  profileData: Partial<BrandUserProfile>,
   channel: Channel = 'web',
   supabase?: SupabaseClient | null,
 ): Promise<void> {
@@ -325,7 +330,7 @@ export async function updateBrandProfile(
     }
   }
 
-  // Update all_leads.unified_context.windchasers
+  // Update all_leads.unified_context.bcon (brand-specific context)
   if (leadId) {
     const { data: leadData } = await client
       .from('all_leads')
@@ -337,8 +342,8 @@ export async function updateBrandProfile(
       const existingCtx = leadData.unified_context || {};
       const updatedCtx = {
         ...existingCtx,
-        windchasers: {
-          ...(existingCtx.windchasers || {}),
+        bcon: {
+          ...(existingCtx.bcon || existingCtx.windchasers || {}),
           ...brandContext,
         },
       };

@@ -167,8 +167,8 @@ export async function GET(request: NextRequest) {
     }))
 
     // Check Supabase Configuration (brand-prefixed)
-    const supabaseUrl = process.env[supabaseUrlKey] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
-    const anonKey = process.env[supabaseAnonKeyName] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
+    const supabaseUrl = process.env[supabaseUrlKey] || process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
+    const anonKey = process.env[supabaseAnonKeyName] || process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     status.supabaseConfig.url = supabaseUrl || null

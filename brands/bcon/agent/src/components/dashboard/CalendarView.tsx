@@ -662,12 +662,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   </div>
                 </div>
 
-                {/* Course Interest (Windchasers-specific) */}
+                {/* Service/Course Interest */}
                 {(() => {
                   const brandId = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon') : 'bcon'
-                  const brandData = selectedBooking.unified_context?.[brandId]
-                  const courseInterest = selectedBooking.metadata?.courseInterest || brandData?.course_interest
-                  if (!courseInterest || brandId !== 'windchasers') return null
+                  const brandData = selectedBooking.unified_context?.[brandId] || selectedBooking.unified_context?.windchasers
+                  const courseInterest = selectedBooking.metadata?.courseInterest || brandData?.service_interest || brandData?.course_interest
+                  if (!courseInterest) return null
                   const courseNameMap: Record<string, string> = {
                     'pilot': 'Pilot Training',
                     'helicopter': 'Helicopter Training',
@@ -727,7 +727,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             inDetails = true;
                             continue;
                           }
-                          if (trimmed && inDetails && !trimmed.includes('Windchasers Aviation Academy')) {
+                          if (trimmed && inDetails && !trimmed.includes('BCON Club')) {
                             keyLines.push(trimmed);
                           }
                         }

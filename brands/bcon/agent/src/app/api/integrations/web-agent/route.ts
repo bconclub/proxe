@@ -5,7 +5,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 /** Resolve brand-specific Supabase URL */
 function resolveSupabaseUrl(): string {
   const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
-  return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || ''
+  return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_BCON_SUPABASE_URL || ''
 }
 
 // Service role client for webhooks (bypasses RLS)
@@ -41,16 +41,15 @@ async function updateWebContext(
     customer_name?: string
     customer_email?: string
     customer_phone?: string
-    windchasers_data?: {
+    brand_data?: {
       user_type?: string
+      service_interest?: string
       course_interest?: string
       timeline?: string
       city?: string
       training_type?: string
-      class_12_science?: boolean
       plan_to_fly?: string
       budget_awareness?: string
-      dgca_completed?: boolean
     }
   }
 ) {
@@ -74,7 +73,7 @@ async function updateWebContext(
 
     const existingContext = lead?.unified_context || {}
     const existingWeb = existingContext.web || {}
-    const existingWindchasers = existingContext.windchasers || {}
+    const existingBrandData = existingContext.bcon || existingContext.windchasers || {}
 
     // Use provided last_interaction timestamp or current time
     const lastInteractionTimestamp = contextData.last_interaction || new Date().toISOString()
@@ -121,19 +120,19 @@ async function updateWebContext(
           : existingWeb.customer_phone || null,
     }
 
-    // Merge Windchasers aviation-specific data
-    const updatedWindchasersContext = contextData.windchasers_data
+    // Merge brand-specific data
+    const updatedBrandContext = contextData.brand_data
       ? {
-          ...existingWindchasers,
-          ...contextData.windchasers_data,
+          ...existingBrandData,
+          ...contextData.brand_data,
         }
-      : existingWindchasers
+      : existingBrandData
 
     // Build updated unified_context
     const updatedContext = {
       ...existingContext,
       web: updatedWebContext,
-      windchasers: updatedWindchasersContext,
+      bcon: updatedBrandContext,
     }
 
     // Update all_leads
@@ -156,7 +155,7 @@ async function updateWebContext(
     console.log('✅ Updated unified_context.web for lead:', leadId, {
       message_count: updatedWebContext.message_count,
       has_summary: !!updatedWebContext.conversation_summary,
-      has_windchasers_data: Object.keys(updatedWindchasersContext).length > 0,
+      has_brand_data: Object.keys(updatedBrandContext).length > 0,
     })
 
     return updatedLead
@@ -233,13 +232,17 @@ export async function POST(request: NextRequest) {
       user_inputs_summary,
       message_count,
       last_message_at,
-      // Windchasers aviation-specific data
-      windchasers_data,
+      // Brand-specific data (legacy: windchasers_data, new: brand_data)
+      brand_data: _brand_data,
+      windchasers_data: _windchasers_data,
       // Metadata
       metadata,
       // Action type
       action = 'message', // 'open' | 'message' | 'profile' | 'button' | 'summary'
     } = body
+
+    // Normalize: accept both brand_data and legacy windchasers_data
+    const brandData = _brand_data || _windchasers_data || undefined
 
     // Generate external_session_id if not provided
     const externalSessionId =
@@ -292,7 +295,7 @@ export async function POST(request: NextRequest) {
         // Update unified_context if we have any initial data
         if (metadata) {
           await updateWebContext(supabase, leadId || '', {
-            windchasers_data: windchasers_data,
+            brand_data: brandData,
           })
         }
       }
@@ -343,7 +346,7 @@ export async function POST(request: NextRequest) {
                 message_count: 0,
                 last_interaction: new Date().toISOString(),
               },
-              windchasers: windchasers_data || {},
+              bcon: brandData || {},
             },
           })
           .select('id')
@@ -420,7 +423,7 @@ export async function POST(request: NextRequest) {
         webSessionId = newSession.id
       }
 
-      // Update unified_context with profile and Windchasers data
+      // Update unified_context with profile and brand data
       if (!leadId) {
         throw new Error('Lead ID is required but was not found')
       }
@@ -428,7 +431,7 @@ export async function POST(request: NextRequest) {
         customer_name: name,
         customer_email: email,
         customer_phone: phone,
-        windchasers_data: windchasers_data,
+        brand_data: brandData,
       })
 
       // Insert system message about profile collection
@@ -598,7 +601,7 @@ export async function POST(request: NextRequest) {
       if (leadId) {
         await updateWebContext(supabase, leadId, {
           user_inputs_summary: updatedInputs,
-          windchasers_data: windchasers_data,
+          brand_data: brandData,
         })
 
         // Insert button click as system message
@@ -784,7 +787,7 @@ export async function POST(request: NextRequest) {
       booking_status: booking_status,
       booking_date: booking_date,
       booking_time: booking_time,
-      windchasers_data: windchasers_data,
+      brand_data: brandData,
     })
 
     // Insert system message

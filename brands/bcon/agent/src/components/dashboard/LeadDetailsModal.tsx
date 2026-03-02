@@ -1472,14 +1472,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         )}
 
                         {/* Divider Line */}
-                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && currentLead.unified_context?.windchasers && (
+                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
                           <div className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
                         )}
 
                         {/* Lead Profile Group */}
                         {(() => {
-                          const windchasersData = currentLead.unified_context?.windchasers || {};
-                          const hasData = Object.keys(windchasersData).length > 0;
+                          const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
+                          const hasData = Object.keys(brandProfileData).length > 0;
                           if (!hasData) return null;
 
                           return (
@@ -1489,29 +1489,29 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 Lead Profile
                               </h4>
                               <div className="flex flex-wrap gap-x-8 gap-y-3">
-                                {windchasersData.user_type && (
+                                {brandProfileData.user_type && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdPerson size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.user_type}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.user_type}</p>
                                     </div>
                                   </div>
                                 )}
-                                {windchasersData.course_interest && (
+                                {brandProfileData.course_interest && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdFlightTakeoff size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.course_interest}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.course_interest}</p>
                                     </div>
                                   </div>
                                 )}
-                                {(windchasersData.plan_to_fly || windchasersData.timeline) && (
+                                {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchedule size={14} />
@@ -1520,7 +1520,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Timeline</p>
                                       <p className="text-xs font-semibold text-gray-900 dark:text-gray-200">
                                         {(() => {
-                                          const t = windchasersData.plan_to_fly || windchasersData.timeline;
+                                          const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
                                           const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
                                           return map[t] || t;
                                         })()}
@@ -1528,14 +1528,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   </div>
                                 )}
-                                {windchasersData.education && (
+                                {brandProfileData.education && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchool size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.education.replace('_', ' ')}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.education.replace('_', ' ')}</p>
                                     </div>
                                   </div>
                                 )}

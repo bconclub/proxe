@@ -142,7 +142,8 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
-  const isWindchasers = brandId === 'windchasers'
+  // Aviation-specific columns only shown for windchasers brand
+  const showAviationColumns = brandId === 'windchasers'
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
   const [calculatingScores, setCalculatingScores] = useState(false)
@@ -212,7 +213,7 @@ export default function LeadsTable({
       })
     }
 
-    if (isWindchasers && courseInterestFilter !== 'all') {
+    if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
         return brandData.course_interest === courseInterestFilter
@@ -316,7 +317,7 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = isWindchasers
+    const headers = showAviationColumns
       ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
       : ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
@@ -361,7 +362,7 @@ export default function LeadsTable({
       const courseInterest = brandData.course_interest || ''
       const timeline = brandData.plan_to_fly || brandData.timeline || ''
       const interest = brandData.pain_point || brandData.course_interest || ''
-      if (isWindchasers) {
+      if (showAviationColumns) {
         return [
           lead.name || '',
           lead.email || '',
@@ -488,7 +489,7 @@ export default function LeadsTable({
           </select>
 
           {/* Brand-specific filters */}
-          {isWindchasers && (
+          {showAviationColumns && (
             <select
               value={userTypeFilter}
               onChange={(e) => setUserTypeFilter(e.target.value)}
@@ -501,7 +502,7 @@ export default function LeadsTable({
             </select>
           )}
 
-          {isWindchasers && (
+          {showAviationColumns && (
             <select
               value={courseInterestFilter}
               onChange={(e) => setCourseInterestFilter(e.target.value)}
@@ -545,12 +546,12 @@ export default function LeadsTable({
               <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 First Touch
               </th>
-              {isWindchasers && (
+              {showAviationColumns && (
                 <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   User Type
                 </th>
               )}
-              {isWindchasers && (
+              {showAviationColumns && (
                 <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Course Interest
                 </th>
@@ -572,7 +573,7 @@ export default function LeadsTable({
           <tbody className="leads-table-tbody bg-white dark:bg-[#0A0A0B] divide-y divide-gray-200 dark:divide-[#1E1E2E]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={isWindchasers ? 10 : 8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={showAviationColumns ? 10 : 8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -614,7 +615,7 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  {isWindchasers && (
+                  {showAviationColumns && (
                     <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
@@ -636,7 +637,7 @@ export default function LeadsTable({
                       })()}
                     </td>
                   )}
-                  {isWindchasers && (
+                  {showAviationColumns && (
                     <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
