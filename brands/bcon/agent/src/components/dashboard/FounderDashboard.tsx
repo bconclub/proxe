@@ -22,7 +22,7 @@ import {
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
-  totalConversations: { count7D: number; count14D: number; count30D: number; trend7D: number }
+  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
   totalLeads: { count: number; fromConversations: number; conversionRate: number }
   responseHealth: { avgSeconds: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
@@ -68,7 +68,7 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   
@@ -494,7 +494,7 @@ export default function FounderDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
             <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setConversationTimeFilter(period)}
@@ -503,9 +503,9 @@ export default function FounderDashboard() {
                       ? 'text-white'
                       : ''
                   }`}
-                  style={conversationTimeFilter === period 
+                  style={conversationTimeFilter === period
                     ? { backgroundColor: '#3B82F6' }
-                    : { 
+                    : {
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         color: 'var(--text-secondary)'
                       }
@@ -530,6 +530,7 @@ export default function FounderDashboard() {
           </div>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? metrics.totalConversations.count30D)}
             {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
             {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
             {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}

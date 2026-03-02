@@ -1267,6 +1267,7 @@ export async function GET(request: NextRequest) {
         leads: hotLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       totalConversations: {
+        total: totalConversationsCount,
         count7D: conversations7D,
         count14D: conversations14D,
         count30D: conversations30D,
