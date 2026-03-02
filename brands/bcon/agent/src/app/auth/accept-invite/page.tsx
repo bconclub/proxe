@@ -18,7 +18,7 @@ function AcceptInviteForm() {
   const token = searchParams.get('token')
 
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'windchasers').toLowerCase()
+  const brandId = (brand.brand || 'bcon').toLowerCase()
   const colors = brand.colors
   const tagline = brandTaglines[brandId] || brand.name
   const logoLetter = brand.name.charAt(0).toUpperCase()

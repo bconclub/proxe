@@ -84,7 +84,7 @@ AVAILABLE BUTTON TYPES:
 };
 
 function getBrandPool(brand?: string) {
-  return brandButtonPools[brand || 'windchasers'] || brandButtonPools['windchasers'];
+  return brandButtonPools[brand || 'bcon'] || brandButtonPools['windchasers'];
 }
 
 /**

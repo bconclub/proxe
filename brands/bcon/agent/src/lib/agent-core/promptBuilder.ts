@@ -30,8 +30,7 @@ function getBrandSystemPrompt(brand: string, context: string, messageCount?: num
     case 'windchasers':
       return getWindchasersSystemPrompt(context, messageCount);
     default:
-      // Default to windchasers for unknown brands (each deployment sets NEXT_PUBLIC_BRAND_ID)
-      return getWindchasersSystemPrompt(context, messageCount);
+      return getBconSystemPrompt(context, messageCount);
   }
 }
 
@@ -53,7 +52,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   } = options;
 
   // Resolve brand: explicit param > env var > default
-  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
   const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext);

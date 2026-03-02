@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Brand-aware env var resolution
-    const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
+    const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
     const supabaseUrlKey = `NEXT_PUBLIC_${bp}_SUPABASE_URL`
     const supabaseAnonKeyName = `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`
 

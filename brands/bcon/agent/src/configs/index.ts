@@ -42,7 +42,7 @@ function detectBrandFromHostname(): string | null {
  * then hostname detection, falls back to windchasers.
  */
 export function getBrandConfig(brand?: string): BrandConfig {
-  const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
+  const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
   return brandConfigs[brandId.toLowerCase()] || windchasersConfig;
 }
 
@@ -50,7 +50,7 @@ export function getBrandConfig(brand?: string): BrandConfig {
  * Get current brand ID from env vars, hostname detection, or fallback.
  */
 export function getCurrentBrandId(): string {
-  return getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
+  return getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
 }
 
 export { proxeConfig, windchasersConfig, bconConfig };

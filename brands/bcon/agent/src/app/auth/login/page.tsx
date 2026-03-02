@@ -24,7 +24,7 @@ export default function LoginPage() {
 
   // Brand config — resolved from env var or hostname detection
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'windchasers').toLowerCase()
+  const brandId = (brand.brand || 'bcon').toLowerCase()
   const colors = brand.colors
   const tagline = brandTaglines[brandId] || brand.name
   const website = brandWebsites[brandId] || '#'

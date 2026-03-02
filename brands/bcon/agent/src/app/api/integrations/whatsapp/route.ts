@@ -4,7 +4,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 
 /** Resolve brand-specific Supabase URL */
 function resolveSupabaseUrl(): string {
-  const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
+  const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
   return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || ''
 }
 
