@@ -286,7 +286,7 @@ export async function GET(
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead by intelligently combining information from multiple communication channels. The summary should be informative and provide a complete picture of the lead's journey and status.
+          const prompt = `Generate a comprehensive, detailed unified summary for this business lead by intelligently combining information from multiple communication channels. The summary should be informative and provide a complete picture of the lead's journey and status.
 
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.
@@ -697,7 +697,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
           windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
         }
 
-        const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead. The summary should be informative and provide a complete picture of the lead's journey and status.
+        const prompt = `Generate a comprehensive, detailed unified summary for this business lead. The summary should be informative and provide a complete picture of the lead's journey and status.
 
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.

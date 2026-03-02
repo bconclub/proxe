@@ -39,11 +39,11 @@ function detectBrandFromHostname(): string | null {
 
 /**
  * Get brand config. Checks explicit brand param first, then env vars,
- * then hostname detection, falls back to windchasers.
+ * then hostname detection, falls back to bcon.
  */
 export function getBrandConfig(brand?: string): BrandConfig {
   const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
-  return brandConfigs[brandId.toLowerCase()] || windchasersConfig;
+  return brandConfigs[brandId.toLowerCase()] || bconConfig;
 }
 
 /**

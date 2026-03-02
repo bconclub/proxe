@@ -371,10 +371,10 @@ export function BookingCalendarWidget({
     const startStr = formatGoogleDate(startDate);
     const endStr = formatGoogleDate(endDate);
 
-    const eventTitle = config?.name ? `${config.name} Consultation` : 'Aviation Consultation';
+    const eventTitle = config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit';
     const title = encodeURIComponent(eventTitle);
     const details = encodeURIComponent(`Consultation Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
-    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)');
+    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)');
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
   };
@@ -404,17 +404,17 @@ export function BookingCalendarWidget({
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Windchasers//Booking Calendar//EN',
+      'PRODID:-//BCON//Booking Calendar//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      `UID:${Date.now()}@windchasers.in`,
+      `UID:${Date.now()}@bconclub.com`,
       `DTSTAMP:${nowStr}`,
       `DTSTART:${startStr}`,
       `DTEND:${endStr}`,
-      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'Aviation Consultation'}`,
+      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit'}`,
       `DESCRIPTION:Consultation Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
-      `LOCATION:${formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)'}`,
+      `LOCATION:${formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)'}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',
