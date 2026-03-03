@@ -276,11 +276,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // 6. Fetch recent conversation history for context
     const conversationHistory = await fetchRecentHistory(leadId, supabase);
 
+    // messageCount = number of USER messages in this conversation
+    // conversationHistory includes the message we just logged above, so count user messages directly
+    const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
+    console.log(`[meta/webhook] lead=${leadId} messageCount=${userMessageCount} historyLen=${conversationHistory.length}`);
+
     // 7. Build AgentInput and generate AI response
     const agentInput: AgentInput = {
       channel: 'whatsapp',
       message: messageText,
-      messageCount: conversationHistory.length + 1,
+      messageCount: userMessageCount,
       sessionId,
       userProfile: {
         name: customerName,
