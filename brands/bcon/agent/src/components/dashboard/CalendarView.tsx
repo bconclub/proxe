@@ -14,6 +14,7 @@ interface Booking {
   phone: string | null
   booking_date: string | null
   booking_time: string | null
+  booking_title?: string | null
   source: string | null
   first_touchpoint?: string | null
   last_touchpoint?: string | null
@@ -456,10 +457,11 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                               const total = hourBookings.length
                               const widthPercent = 100 / total
                               const leftPercent = idx * widthPercent
-                              const callTitle = booking.metadata?.title
+                              const callTopic = booking.booking_title
+                                || booking.metadata?.title
                                 || booking.metadata?.conversation_summary
                                 || booking.metadata?.summary
-                                || 'Call'
+                                || null
                               return (
                                 <div
                                   key={booking.id}
@@ -472,17 +474,19 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                     right: total > 1 ? undefined : '4px',
                                     width: total > 1 ? `calc(${widthPercent}% - 4px)` : undefined,
                                   }}
-                                  title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
+                                  title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${callTopic ? ` · ${callTopic}` : ''}`}
                                 >
-                                  <div className="font-semibold truncate mb-0.5 text-[8px] md:text-[10px]">
+                                  <div className="font-semibold truncate text-[8px] md:text-[10px]">
                                     {booking.booking_time?.substring(0, 5)}
                                   </div>
-                                  <div className="text-[8px] md:text-[9px] opacity-90 truncate italic mb-0.5 hidden md:block">
-                                    {callTitle.length > 20 ? callTitle.substring(0, 20) + '...' : callTitle}
-                                  </div>
                                   <div className="font-medium truncate text-[8px] md:text-[10px]">
-                                    {booking.name || 'Unnamed Customer'}
+                                    {booking.name || 'Unnamed'}
                                   </div>
+                                  {callTopic && (
+                                    <div className="text-[7px] md:text-[9px] opacity-80 truncate">
+                                      {callTopic}
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -539,17 +543,21 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         {format(day, 'd')}
                       </div>
                       <div className="space-y-1">
-                        {dayBookings.slice(0, 3).map((booking) => (
-                          <div
-                            key={booking.id}
-                            onClick={(e) => handleBookingClick(booking, e)}
-                            className="text-xs px-2 py-1 rounded truncate text-white cursor-pointer hover:opacity-90 hover:shadow-md transition-all"
-                            style={{ backgroundColor: 'var(--accent-primary)' }}
-                            title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
-                          >
-                            {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
-                          </div>
-                        ))}
+                        {dayBookings.slice(0, 3).map((booking) => {
+                          const topic = booking.booking_title || booking.metadata?.title || null
+                          return (
+                            <div
+                              key={booking.id}
+                              onClick={(e) => handleBookingClick(booking, e)}
+                              className="text-xs px-2 py-1 rounded text-white cursor-pointer hover:opacity-90 hover:shadow-md transition-all"
+                              style={{ backgroundColor: 'var(--accent-primary)' }}
+                              title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${topic ? ` · ${topic}` : ''}`}
+                            >
+                              <div className="truncate">{booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}</div>
+                              {topic && <div className="truncate opacity-80 text-[10px]">{topic}</div>}
+                            </div>
+                          )
+                        })}
                         {dayBookings.length > 3 && (
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             +{dayBookings.length - 3} more

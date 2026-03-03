@@ -37,10 +37,10 @@ export async function GET(request: NextRequest) {
     // Cache miss - proceed with database queries
     const supabase = await createClient()
     
-    // Get all leads with full data (booking_date/booking_time don't exist in all_leads)
+    // Get all leads with full data including booking columns
     const { data: leads, error: leadsError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
+      .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint, booking_date, booking_time')
       .order('lead_score', { ascending: false })
     
     // Get booking data from all session tables
@@ -270,20 +270,14 @@ export async function GET(request: NextRequest) {
     // Total leads count
     const totalLeadsCount = safeLeads.length
     
-    // Use the unique session-based conversation counts
-    let conversations7D = uniqueConversations7D
-    let conversations14D = uniqueConversations14D
-    let conversations30D = uniqueConversations30D
-    let totalConversationsCount = totalUniqueConversations
+    // PRIMARY: Count unique lead_ids from conversations table (all platforms)
+    // This is the most accurate count since it tracks every real conversation
+    const uniqueLeadIds = new Set<string>()
+    const uniqueLeadIds7D = new Set<string>()
+    const uniqueLeadIds14D = new Set<string>()
+    const uniqueLeadIds30D = new Set<string>()
 
-    // Fallback: If session-based count is 0 but we have messages in conversations table,
-    // count unique lead_ids with messages as conversations
-    if (totalConversationsCount === 0 && messages && messages.length > 0) {
-      const uniqueLeadIds = new Set<string>()
-      const uniqueLeadIds7D = new Set<string>()
-      const uniqueLeadIds14D = new Set<string>()
-      const uniqueLeadIds30D = new Set<string>()
-
+    if (messages && messages.length > 0) {
       messages.forEach((msg: any) => {
         if (!msg.lead_id || msg.sender === 'system') return
         uniqueLeadIds.add(msg.lead_id)
@@ -293,33 +287,25 @@ export async function GET(request: NextRequest) {
         if (msgDate >= fourteenDaysAgo) uniqueLeadIds14D.add(msg.lead_id)
         if (msgDate >= sevenDaysAgo) uniqueLeadIds7D.add(msg.lead_id)
       })
-
-      totalConversationsCount = uniqueLeadIds.size
-      conversations7D = uniqueLeadIds7D.size
-      conversations14D = uniqueLeadIds14D.size
-      conversations30D = uniqueLeadIds30D.size
-
-      console.log('📊 Conversations fallback (from conversations table):', {
-        total: totalConversationsCount,
-        '7D': conversations7D,
-        '14D': conversations14D,
-        '30D': conversations30D,
-      })
     }
+
+    // Use conversations table counts (primary), fall back to session counts if empty
+    let conversations7D = uniqueLeadIds7D.size || uniqueConversations7D
+    let conversations14D = uniqueLeadIds14D.size || uniqueConversations14D
+    let conversations30D = uniqueLeadIds30D.size || uniqueConversations30D
+    let totalConversationsCount = uniqueLeadIds.size || totalUniqueConversations
     
     // Debug logging for conversation counts
-    console.log('📊 Total Conversations Calculation (Session-based):')
-    console.log(`  - Raw web sessions: ${webSessionsForConversations?.length || 0}, with activity: ${totalWebConversations}`)
-    console.log(`  - Raw WhatsApp sessions: ${whatsappSessionsForConversations?.length || 0}, with activity: ${totalWhatsappConversations}`)
-    console.log(`  - Total unique conversations: ${totalUniqueConversations}`)
-    console.log(`  - 7D: ${conversations7D} (Web: ${webConversations7D}, WhatsApp: ${whatsappConversations7D})`)
-    console.log(`  - 14D: ${conversations14D} (Web: ${webConversations14D}, WhatsApp: ${whatsappConversations14D})`)
-    console.log(`  - 30D: ${conversations30D} (Web: ${webConversations30D}, WhatsApp: ${whatsappConversations30D})`)
+    console.log('📊 Total Conversations (primary: conversations table, fallback: sessions):')
+    console.log(`  - Unique lead_ids from conversations table: ${uniqueLeadIds.size}`)
+    console.log(`  - Session-based (web+whatsapp): ${totalUniqueConversations}`)
+    console.log(`  - Final total: ${totalConversationsCount}`)
+    console.log(`  - 7D: ${conversations7D}, 14D: ${conversations14D}, 30D: ${conversations30D}`)
     console.log(`  - Previous 7D: ${previous7DUniqueConversations} (for trend: ${trend7D}%)`)
 
-    // 1. Hot Leads (score >= threshold, default 70)
-    // hotLeadThreshold already defined at the top of the function
-    const hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
+    // 1. Hot Leads — calculated AFTER score computation below (see "DEFERRED: Hot Leads")
+    // Placeholder: hotLeads will be set after scores are calculated
+    let hotLeads: typeof safeLeads = []
 
     // 2. Today's Activity
     const todayMessages = messages?.filter(msg => {
@@ -518,12 +504,9 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // 10. Score Distribution
-    const scoreDistribution = {
-      hot: safeLeads.filter(l => (l.lead_score || 0) >= hotLeadThreshold).length,
-      warm: safeLeads.filter(l => (l.lead_score || 0) >= 40 && (l.lead_score || 0) < 70).length,
-      cold: safeLeads.filter(l => (l.lead_score || 0) < 40).length,
-    }
+    // 10. Score Distribution — computed AFTER score calculation (see below)
+    // Placeholder: will be set after scores are populated via RPC
+    let scoreDistribution = { hot: 0, warm: 0, cold: 0 }
 
     // 11. Recent Activity - Key Business Events Only
     const keyEvents: Array<{
@@ -1033,7 +1016,17 @@ export async function GET(request: NextRequest) {
       name: l.customer_name,
       score: l.lead_score ?? 'null'
     })))
-    
+
+    // DEFERRED: Hot Leads + Score Distribution — now that scores are calculated via RPC
+    hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
+    scoreDistribution = {
+      hot: safeLeads.filter(l => (l.lead_score || 0) >= hotLeadThreshold).length,
+      warm: safeLeads.filter(l => (l.lead_score || 0) >= 40 && (l.lead_score || 0) < 70).length,
+      cold: safeLeads.filter(l => (l.lead_score || 0) < 40).length,
+    }
+    console.log(`📊 Hot Leads (after score calc): ${hotLeads.length} leads with score >= ${hotLeadThreshold}`)
+    console.log(`📊 Score Distribution: hot=${scoreDistribution.hot} warm=${scoreDistribution.warm} cold=${scoreDistribution.cold}`)
+
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
     // ----------------------------------------------------------------------------

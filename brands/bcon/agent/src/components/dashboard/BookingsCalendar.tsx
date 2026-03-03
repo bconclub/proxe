@@ -12,6 +12,7 @@ interface Booking {
   phone: string | null
   booking_date: string | null
   booking_time: string | null
+  booking_title?: string | null
   source: string | null
   first_touchpoint?: string | null
   last_touchpoint?: string | null
@@ -63,6 +64,14 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
   useEffect(() => {
     fetchBookings()
   }, [fetchBookings])
+
+  // Auto-sync with Google Calendar on page load
+  useEffect(() => {
+    if (view === 'calendar' || view === 'full') {
+      handleSyncCalendar()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSyncCalendar = async () => {
     setSyncing(true)
