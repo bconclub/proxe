@@ -40,13 +40,27 @@ export async function GET(req: NextRequest) {
   const from24h = new Date(now.getTime() + 20 * 60 * 60 * 1000); // +20h
   const to24h = new Date(now.getTime() + 28 * 60 * 60 * 1000);   // +28h
 
-  const { data: upcoming24h } = await supabase
+  // Try with reminder tracking columns; fall back without them if columns don't exist
+  let upcoming24h: any[] | null = null;
+  const { data: data24h, error: err24h } = await supabase
     .from('whatsapp_sessions')
     .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title, reminder_24h_sent')
     .not('booking_date', 'is', null)
     .not('booking_time', 'is', null)
     .or('reminder_24h_sent.is.null,reminder_24h_sent.eq.false')
     .not('booking_status', 'eq', 'cancelled');
+
+  if (err24h) {
+    console.warn('[reminders] 24h query failed (columns may not exist), retrying without reminder filter:', err24h.message);
+    const { data: fallback24h } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
+      .not('booking_date', 'is', null)
+      .not('booking_time', 'is', null);
+    upcoming24h = fallback24h;
+  } else {
+    upcoming24h = data24h;
+  }
 
   if (upcoming24h) {
     for (const session of upcoming24h) {
@@ -89,13 +103,26 @@ export async function GET(req: NextRequest) {
   const from1h = new Date(now.getTime() + 30 * 60 * 1000);   // +30min
   const to1h = new Date(now.getTime() + 90 * 60 * 1000);     // +90min
 
-  const { data: upcoming1h } = await supabase
+  let upcoming1h: any[] | null = null;
+  const { data: data1h, error: err1h } = await supabase
     .from('whatsapp_sessions')
     .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title, reminder_1h_sent')
     .not('booking_date', 'is', null)
     .not('booking_time', 'is', null)
     .or('reminder_1h_sent.is.null,reminder_1h_sent.eq.false')
     .not('booking_status', 'eq', 'cancelled');
+
+  if (err1h) {
+    console.warn('[reminders] 1h query failed (columns may not exist), retrying without reminder filter:', err1h.message);
+    const { data: fallback1h } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
+      .not('booking_date', 'is', null)
+      .not('booking_time', 'is', null);
+    upcoming1h = fallback1h;
+  } else {
+    upcoming1h = data1h;
+  }
 
   if (upcoming1h) {
     for (const session of upcoming1h) {
