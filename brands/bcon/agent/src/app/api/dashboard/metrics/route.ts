@@ -28,10 +28,12 @@ export async function GET() {
     // Calculate metrics
     const totalConversations = leads?.length || 0
     const activeConversations =
-      leads?.filter(
-        (lead) =>
-          new Date(lead.last_interaction_at || lead.timestamp) >= last24Hours
-      ).length || 0
+      leads?.filter((lead) => {
+        const ts = lead.last_interaction_at || lead.timestamp
+        if (!ts) return false
+        const d = new Date(ts)
+        return !isNaN(d.getTime()) && d >= last24Hours
+      }).length || 0
 
     // Calculate conversion rate (leads with booking / total leads)
     // Booking data is in metadata.web_data.booking_date
@@ -67,10 +69,10 @@ export async function GET() {
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
       const count =
-        leads?.filter(
-          (lead) =>
-            (lead.last_interaction_at || lead.timestamp).startsWith(dateStr)
-        ).length || 0
+        leads?.filter((lead) => {
+          const ts = lead.last_interaction_at || lead.timestamp
+          return ts && typeof ts === 'string' && ts.startsWith(dateStr)
+        }).length || 0
       conversationsOverTime.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         count,
@@ -111,9 +113,9 @@ export async function GET() {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('Full error:', error)
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to fetch metrics',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        message: errorMessage,
       },
       { status: 500 }
     )
