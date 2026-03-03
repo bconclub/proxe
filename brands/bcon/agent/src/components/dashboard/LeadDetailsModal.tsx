@@ -167,7 +167,7 @@ const STAGE_PROGRESSION = [
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('activity')
+  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -1202,19 +1202,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           {/* TABS */}
           <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
-              onClick={() => setActiveTab('activity')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              role="tab"
-              aria-selected={activeTab === 'activity'}
-              aria-controls="lead-tabpanel-activity"
-              id="lead-tab-activity"
-            >
-              Activity
-            </button>
-            <button
               onClick={() => setActiveTab('summary')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -1226,6 +1213,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               id="lead-tab-summary"
             >
               Summary
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'activity'}
+              aria-controls="lead-tabpanel-activity"
+              id="lead-tab-activity"
+            >
+              Activity
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
