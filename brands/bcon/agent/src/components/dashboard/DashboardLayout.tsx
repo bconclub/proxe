@@ -20,12 +20,8 @@ import {
   MdLightMode,
   MdDarkMode,
   MdChatBubbleOutline,
-  MdHelp,
   MdMonitorHeart,
   MdMoreHoriz,
-  MdKeyboard,
-  MdBugReport,
-  MdFeedback,
   MdTimeline,
 } from 'react-icons/md'
 
@@ -49,21 +45,16 @@ const navigation: NavItem[] = [
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
+  // TOOLS
   { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
+  { name: 'Agents', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
+  { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
   // SYSTEM
-  {
-    name: 'Configure',
-    href: '/dashboard/settings',
-    icon: MdSettings,
-    children: [
-      { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
-      { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
-    ]
-  },
+  { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Events (index 3)
-const DIVIDER_AFTER_INDICES = [3]
+// Divider positions: after Events (index 3), after Knowledge (index 6)
+const DIVIDER_AFTER_INDICES = [3, 6]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -688,25 +679,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <button
                       onClick={() => {
                         setMoreOptionsOpen(false)
-                        window.open('https://docs.goproxe.com', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdHelp size={18} style={{ marginRight: '12px' }} />
-                      Help & Docs
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
                         toggleTheme()
                       }}
                       className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
@@ -754,63 +726,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                       System Status
                     </Link>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        console.log('Keyboard Shortcuts')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdKeyboard size={18} style={{ marginRight: '12px' }} />
-                      Keyboard Shortcuts
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdBugReport size={18} style={{ marginRight: '12px' }} />
-                      Report Issue
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdFeedback size={18} style={{ marginRight: '12px' }} />
-                      Send Feedback
-                    </button>
                   </div>
                 )}
               </div>
@@ -865,25 +780,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <button
                       onClick={() => {
                         setMoreOptionsOpen(false)
-                        window.open('https://docs.goproxe.com', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdHelp size={18} style={{ marginRight: '12px' }} />
-                      Help & Documentation
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
                         toggleTheme()
                       }}
                       className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
@@ -931,66 +827,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                       System Status
                     </Link>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        // TODO: Implement keyboard shortcuts modal
-                        console.log('Keyboard Shortcuts')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdKeyboard size={18} style={{ marginRight: '12px' }} />
-                      Keyboard Shortcuts
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        // TODO: Implement report issue
-                        window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdBugReport size={18} style={{ marginRight: '12px' }} />
-                      Report Issue
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        // TODO: Implement send feedback
-                        window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdFeedback size={18} style={{ marginRight: '12px' }} />
-                      Send Feedback
-                    </button>
                   </div>
                 )}
               </div>
