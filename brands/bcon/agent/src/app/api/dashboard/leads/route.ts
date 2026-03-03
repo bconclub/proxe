@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
 
     let query = supabase
-      .from('unified_leads')
+      .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
 

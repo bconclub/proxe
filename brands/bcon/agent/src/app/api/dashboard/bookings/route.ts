@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
 
     let query = supabase
-      .from('unified_leads')
+      .from('all_leads')
       .select('*')
       .not('booking_date', 'is', null)
       .not('booking_time', 'is', null)
