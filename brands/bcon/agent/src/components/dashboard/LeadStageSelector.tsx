@@ -22,6 +22,7 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual', scoreRange: 'Manual' },
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Manual', scoreRange: 'Manual' },
   { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
+  { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [
@@ -42,6 +43,7 @@ const getStageColor = (stage: LeadStage | null): string => {
     'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
     'In Sequence': '', // Uses inline styles with CSS variables
     'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
   }
   return stage ? colors[stage] : colors['New']
 }

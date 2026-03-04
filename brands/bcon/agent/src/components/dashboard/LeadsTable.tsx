@@ -55,6 +55,7 @@ const getStageColor = (stage: string | null) => {
     'Not Qualified': { bg: 'bg-rose-100 dark:bg-rose-900', text: 'text-rose-800 dark:text-rose-200' },
     'In Sequence': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
     'Cold': { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200' },
+    'R&R': { bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800 dark:text-amber-200' },
   }
   return stageColors[stage || 'New'] || stageColors['New']
 }

@@ -9,6 +9,7 @@ export type LeadStage =
   | 'Not Qualified'
   | 'In Sequence'
   | 'Cold'
+  | 'R&R'
 
 export type HighIntentSubStage = 'proposal' | 'negotiation' | 'on-hold'
 

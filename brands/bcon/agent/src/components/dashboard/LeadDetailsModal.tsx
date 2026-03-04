@@ -788,6 +788,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
       'In Sequence': '', // Will use inline styles with CSS variables
       'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+      'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     }
     return stageColors[stage] || stageColors['New']
   }
@@ -1178,7 +1179,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   role="menu"
                   aria-label="Select lead stage"
                 >
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold'].map((stage) => (
+                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold', 'R&R'].map((stage) => (
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}

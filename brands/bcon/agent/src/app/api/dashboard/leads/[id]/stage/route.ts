@@ -12,7 +12,8 @@ const ALLOWED_STAGES = [
   'Closed Lost',
   'Not Qualified',
   'In Sequence',
-  'Cold'
+  'Cold',
+  'R&R'
 ]
 
 // Sub-stages for High Intent

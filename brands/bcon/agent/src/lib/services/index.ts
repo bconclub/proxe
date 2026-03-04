@@ -75,6 +75,7 @@ export {
   sendWhatsAppTemplate,
   sendBookingConfirmation,
   sendBookingReminder,
+  sendMissedCallMessage,
 } from './whatsappSender';
 
 // Cross-channel context

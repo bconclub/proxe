@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendMissedCallMessage } from '@/lib/services/whatsappSender'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,8 @@ export async function POST(
       'Closed Lost',
       'Not Qualified',
       'In Sequence',
-      'Cold'
+      'Cold',
+      'R&R'
     ]
     if (!allowedStages.includes(new_stage)) {
       return NextResponse.json(
@@ -162,6 +164,41 @@ export async function POST(
             ? `${disqualification_reason}: ${note}`
             : (note || 'Manual override'),
         })
+    }
+
+    // R&R: Auto-send "missed call" WhatsApp message (fire-and-forget)
+    if (new_stage === 'R&R') {
+      const { data: leadDetails } = await supabase
+        .from('all_leads')
+        .select('customer_name, phone, booking_date, booking_time')
+        .eq('id', leadId)
+        .single()
+
+      if (leadDetails?.phone) {
+        const name = leadDetails.customer_name || 'there'
+        const title = 'AI Lead Strategy Call'
+
+        // Format booked time if available (24h to 12h)
+        let bookedTimeDisplay: string | null = null
+        if (leadDetails.booking_date && leadDetails.booking_time) {
+          const [h, m] = leadDetails.booking_time.split(':').map(Number)
+          const period = h >= 12 ? 'PM' : 'AM'
+          const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+          bookedTimeDisplay = `${hour12}:${(m || 0).toString().padStart(2, '0')} ${period}`
+        }
+
+        // Fire-and-forget: don't block the API response
+        sendMissedCallMessage(leadDetails.phone, name, title, bookedTimeDisplay)
+          .then((sent) => {
+            if (sent) console.log(`[override] R&R WhatsApp sent for lead ${leadId}`)
+            else console.warn(`[override] R&R WhatsApp failed for lead ${leadId}`)
+          })
+          .catch((err) => {
+            console.error(`[override] R&R WhatsApp error for lead ${leadId}:`, err)
+          })
+      } else {
+        console.warn(`[override] R&R stage set but no phone for lead ${leadId}`)
+      }
     }
 
     return NextResponse.json({

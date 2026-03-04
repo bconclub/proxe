@@ -183,11 +183,14 @@ export async function sendBookingReminder(
   title: string,
   timeDisplay: string,
   meetLink: string,
-  type: '24h' | '1h',
+  type: '24h' | '1h' | '30m',
 ): Promise<boolean> {
   const templateName = 'booking_reminder';
 
-  const dateTimeText = type === '24h' ? `tomorrow at ${timeDisplay} IST` : `today — starts in 1 hour`;
+  const dateTimeText =
+    type === '24h' ? `tomorrow at ${timeDisplay} IST` :
+    type === '1h'  ? `today, starts in 1 hour` :
+                     `today, starts in 30 minutes`;
 
   const message24h =
     `Hey ${name}! Quick reminder — your ${title} with BCON is tomorrow at ${timeDisplay} IST.\n\n` +
@@ -198,6 +201,11 @@ export async function sendBookingReminder(
     `Hey ${name}! Your ${title} with BCON starts in 1 hour.\n\n` +
     (meetLink ? `📍 ${meetLink}\n\n` : '') +
     `Ready when you are.`;
+
+  const message30m =
+    `Hey ${name}! Your ${title} with BCON starts in 30 minutes!\n\n` +
+    (meetLink ? `📍 Join here: ${meetLink}\n\n` : '') +
+    `See you soon!`;
 
   // Reminders are always outside 24h window — use template
   // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime
@@ -218,7 +226,10 @@ export async function sendBookingReminder(
   }
 
   // If template not yet approved, try text as fallback (might work if recent interaction)
-  const fallbackMessage = type === '24h' ? message24h : message1h;
+  const fallbackMessage =
+    type === '24h' ? message24h :
+    type === '1h'  ? message1h :
+                     message30m;
   const textResult = await sendWhatsAppText(to, fallbackMessage);
   if (textResult.success) {
     console.log(`[whatsappSender] ${type} reminder sent via text fallback to ${to}`);
@@ -226,5 +237,57 @@ export async function sendBookingReminder(
   }
 
   console.error(`[whatsappSender] ${type} reminder failed for ${to}`);
+  return false;
+}
+
+/**
+ * Send a missed call follow-up message (R&R = Rang, No Reply).
+ * Tries free-form text first (within 24h window), falls back to template.
+ *
+ * Template: missed_call_followup
+ *   {{1}} = name, {{2}} = call title, {{3}} = booked time (or fallback text)
+ */
+export async function sendMissedCallMessage(
+  to: string,
+  name: string,
+  title: string,
+  bookedTimeDisplay: string | null,
+): Promise<boolean> {
+  const timeRef = bookedTimeDisplay
+    ? ` at your booked time (${bookedTimeDisplay} IST)`
+    : '';
+
+  const message =
+    `Hey ${name}, we tried calling you${timeRef} but weren't able to connect.\n\n` +
+    `If you'd like to reschedule, just reply here and we'll set up a new time.\n\n` +
+    `- The BCON Team`;
+
+  // Try free-form text first (works if lead messaged within 24h)
+  const textResult = await sendWhatsAppText(to, message);
+
+  if (textResult.success) {
+    console.log('[whatsappSender] Missed call message sent (text) to', to);
+    return true;
+  }
+
+  // Fallback to template (for outside 24h window)
+  console.log('[whatsappSender] Text failed for missed call, trying template fallback...');
+  const templateResult = await sendWhatsAppTemplate(to, 'missed_call_followup', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: name },
+        { type: 'text', text: title },
+        { type: 'text', text: bookedTimeDisplay || 'the scheduled time' },
+      ],
+    },
+  ]);
+
+  if (templateResult.success) {
+    console.log('[whatsappSender] Missed call message sent (template) to', to);
+    return true;
+  }
+
+  console.error('[whatsappSender] Both text and template failed for missed call to', to);
   return false;
 }

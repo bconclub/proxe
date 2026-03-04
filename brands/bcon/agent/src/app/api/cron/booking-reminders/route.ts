@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
-  const results = { reminders_24h: 0, reminders_1h: 0, errors: 0 };
+  const results = { reminders_24h: 0, reminders_1h: 0, reminders_30m: 0, errors: 0 };
 
   // ─── 24-hour reminders ───────────────────────────────────────────────────
   // Find bookings between 20h and 28h from now (covers the 30-min cron window)
@@ -152,6 +152,66 @@ export async function GET(req: NextRequest) {
           .update({ reminder_1h_sent: true })
           .eq('id', session.id);
         results.reminders_1h++;
+      } else {
+        results.errors++;
+      }
+    }
+  }
+
+  // ─── 30-minute reminders ──────────────────────────────────────────────
+  // Find bookings between 15min and 45min from now
+  const from30m = new Date(now.getTime() + 15 * 60 * 1000);   // +15min
+  const to30m = new Date(now.getTime() + 45 * 60 * 1000);     // +45min
+
+  let upcoming30m: any[] | null = null;
+  const { data: data30m, error: err30m } = await supabase
+    .from('whatsapp_sessions')
+    .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title, reminder_30m_sent')
+    .not('booking_date', 'is', null)
+    .not('booking_time', 'is', null)
+    .or('reminder_30m_sent.is.null,reminder_30m_sent.eq.false')
+    .not('booking_status', 'eq', 'cancelled');
+
+  if (err30m) {
+    console.warn('[reminders] 30m query failed (column may not exist), retrying without reminder filter:', err30m.message);
+    const { data: fallback30m } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
+      .not('booking_date', 'is', null)
+      .not('booking_time', 'is', null);
+    upcoming30m = fallback30m;
+  } else {
+    upcoming30m = data30m;
+  }
+
+  if (upcoming30m) {
+    for (const session of upcoming30m) {
+      if (!session.booking_date || !session.booking_time || !session.customer_phone) continue;
+
+      const bookingDateTime = new Date(`${session.booking_date}T${session.booking_time}+05:30`);
+      if (bookingDateTime < from30m || bookingDateTime > to30m) continue;
+
+      const name = session.customer_name || 'there';
+      const title = session.booking_title || 'AI Lead Strategy Call';
+      const meetLink = session.booking_meet_link || '';
+
+      console.log(`[reminders] Sending 30m reminder to ${name} (${session.customer_phone})`);
+
+      const sent = await sendBookingReminder(
+        session.customer_phone,
+        name,
+        title,
+        formatTimeDisplay(session.booking_time),
+        meetLink,
+        '30m',
+      );
+
+      if (sent) {
+        await supabase
+          .from('whatsapp_sessions')
+          .update({ reminder_30m_sent: true })
+          .eq('id', session.id);
+        results.reminders_30m++;
       } else {
         results.errors++;
       }
