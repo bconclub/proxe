@@ -24,7 +24,7 @@
   "crons": [
     {
       "path": "/api/cron/booking-reminders",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
