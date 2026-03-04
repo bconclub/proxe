@@ -132,8 +132,8 @@ function buildUserPrompt(params: {
 
   // Channel-specific formatting instructions
   const formattingInstructions = channel === 'whatsapp'
-    ? 'You are a lead qualification assistant. Use plain text only — NO HTML tags, NO markdown. Use simple line breaks for spacing. Short, punchy sentences. ABSOLUTE MAXIMUM: 2 sentences per response.'
-    : 'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. ABSOLUTE MAXIMUM: 2 sentences per response.';
+    ? 'You are a lead qualification assistant. Use plain text only. NO HTML tags, NO markdown. Use simple line breaks for spacing. Short, punchy sentences. ABSOLUTE MAXIMUM: 2 sentences per response. NEVER use em dashes.'
+    : 'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. ABSOLUTE MAXIMUM: 2 sentences per response. NEVER use em dashes.';
 
   // Inject current date for WhatsApp so Claude can resolve relative dates ("tomorrow", "next Monday")
   const dateContext = channel === 'whatsapp'
@@ -167,8 +167,9 @@ This conversation is happening on WhatsApp. You MUST:
 - Use PLAIN TEXT only. No HTML tags (<br>, <b>, <a>, etc.)
 - No markdown formatting (no **, no ##, no [](), no backticks)
 - Use simple line breaks for paragraph spacing
-- Keep responses SHORT — 1-2 sentences max, mobile screens are small
-- No bullet points with special characters — use simple dashes (-) if needed
+- Keep responses SHORT, 1-2 sentences max, mobile screens are small
+- No bullet points with special characters, use simple dashes (-) if needed
+- NEVER use em dashes or long dashes. Use commas, periods, or rewrite the sentence.
 - Be conversational and friendly, like texting a friend
 - No "click here" links — WhatsApp users can't click embedded HTML
 - If sharing a URL, paste it as plain text on its own line
