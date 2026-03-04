@@ -27,12 +27,13 @@ export async function POST(
 
     const leadId = params.id
     const body = await request.json()
-    const { 
-      new_stage, 
-      activity_type, 
-      note, 
-      duration_minutes, 
-      next_followup_date 
+    const {
+      new_stage,
+      activity_type,
+      note,
+      duration_minutes,
+      next_followup_date,
+      disqualification_reason
     } = body
 
     // Validate required fields
@@ -63,6 +64,7 @@ export async function POST(
       'Booking Made',
       'Converted',
       'Closed Lost',
+      'Not Qualified',
       'In Sequence',
       'Cold'
     ]
@@ -98,13 +100,18 @@ export async function POST(
 
     const oldStage = lead.lead_stage
 
+    // Build activity note with reason prefix
+    const activityNote = disqualification_reason
+      ? `[${disqualification_reason}] ${note}`
+      : note
+
     // Insert activity
     const { data: activity, error: activityError } = await supabase
       .from('activities')
       .insert({
         lead_id: leadId,
         activity_type,
-        note,
+        note: activityNote,
         duration_minutes: duration_minutes || null,
         next_followup_date: roundedFollowupDate,
         created_by: user.id,
@@ -118,13 +125,20 @@ export async function POST(
     }
 
     // Update lead stage and set manual override (both columns for compatibility)
+    const updatePayload: Record<string, any> = {
+      lead_stage: new_stage,
+      stage_override: true,
+      is_manual_override: true,
+    }
+
+    // Store disqualification reason for Not Qualified / Closed Lost
+    if (disqualification_reason && (new_stage === 'Not Qualified' || new_stage === 'Closed Lost')) {
+      updatePayload.disqualification_reason = disqualification_reason
+    }
+
     const { error: updateError } = await supabase
       .from('all_leads')
-      .update({
-        lead_stage: new_stage,
-        stage_override: true,
-        is_manual_override: true,
-      })
+      .update(updatePayload)
       .eq('id', leadId)
 
     if (updateError) {
@@ -144,7 +158,9 @@ export async function POST(
           new_score: lead.lead_score,
           changed_by: user.id,
           is_automatic: false,
-          change_reason: note || 'Manual override',
+          change_reason: disqualification_reason
+            ? `${disqualification_reason}: ${note}`
+            : (note || 'Manual override'),
         })
     }
 

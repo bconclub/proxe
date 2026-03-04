@@ -785,6 +785,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
       'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
       'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
       'In Sequence': '', // Will use inline styles with CSS variables
       'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
     }
@@ -804,6 +805,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     note: string
     duration?: number
     next_followup?: string
+    disqualification_reason?: string
   }) => {
     if (!pendingStageChange) return
 
@@ -817,6 +819,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           note: activity.note,
           duration_minutes: activity.duration,
           next_followup_date: activity.next_followup,
+          disqualification_reason: activity.disqualification_reason,
         }),
       })
 
@@ -1175,7 +1178,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   role="menu"
                   aria-label="Select lead stage"
                 >
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'In Sequence', 'Cold'].map((stage) => (
+                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold'].map((stage) => (
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}

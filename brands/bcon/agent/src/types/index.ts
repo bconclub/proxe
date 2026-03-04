@@ -1,4 +1,4 @@
-export type LeadStage = 
+export type LeadStage =
   | 'New'
   | 'Engaged'
   | 'Qualified'
@@ -6,6 +6,7 @@ export type LeadStage =
   | 'Booking Made'
   | 'Converted'
   | 'Closed Lost'
+  | 'Not Qualified'
   | 'In Sequence'
   | 'Cold'
 
