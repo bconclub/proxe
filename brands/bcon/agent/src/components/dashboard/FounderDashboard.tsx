@@ -23,8 +23,9 @@ import {
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
-  totalLeads: { count: number; fromConversations: number; conversionRate: number }
+  totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
   engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
+  warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
   upcomingBookings: Array<{ id: string; name: string; date: string; time: string; datetime: string }>
@@ -69,7 +70,8 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   
@@ -495,7 +497,7 @@ export default function FounderDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
             <div className="flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+              {(['7D', '14D', '30D'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setConversationTimeFilter(period)}
@@ -531,7 +533,6 @@ export default function FounderDashboard() {
           </div>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? metrics.totalConversations.count30D)}
             {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
             {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
             {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
@@ -577,33 +578,64 @@ export default function FounderDashboard() {
           </div>
         </div>
 
-        {/* Card 2: Engaged Leads - People who showed real interest */}
+        {/* Card 2: Warm Leads - Score 40-69, warming up */}
         <div
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{
-            backgroundColor: 'rgba(34, 197, 94, 0.05)',
-            borderColor: 'rgba(34, 197, 94, 0.2)',
+            backgroundColor: 'rgba(249, 115, 22, 0.05)',
+            borderColor: 'rgba(249, 115, 22, 0.2)',
             justifyContent: 'space-between'
           }}
         >
-          {/* 1. Title */}
+          {/* 1. Title + Filter */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <MdLocalFireDepartment className="text-green-500" size={20} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
+              <MdLocalFireDepartment className="text-orange-500" size={20} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
+            </div>
+            <div className="flex gap-1">
+              {(['7D', '14D', '30D'] as const).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setWarmLeadsFilter(period)}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    warmLeadsFilter === period ? 'text-white' : ''
+                  }`}
+                  style={warmLeadsFilter === period
+                    ? { backgroundColor: '#F97316' }
+                    : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }
+                  }
+                  onMouseEnter={(e) => {
+                    if (warmLeadsFilter !== period) {
+                      e.currentTarget.style.backgroundColor = '#F97316'
+                      e.currentTarget.style.opacity = '0.8'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (warmLeadsFilter !== period) {
+                      e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'
+                      e.currentTarget.style.opacity = '1'
+                    }
+                  }}
+                >
+                  {period}
+                </button>
+              ))}
             </div>
           </div>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {metrics.engagedLeads?.count ?? 0}
+            {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
+            {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
+            {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
           </p>
-          {/* 3. Metric Details - Conversion % */}
+          {/* 3. Metric Details */}
           <div className="flex flex-col gap-1 mb-2">
-            <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
-              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% conversion
+            <p className="text-sm font-medium" style={{ color: '#F97316' }}>
+              Score 40-69
             </p>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              From {metrics.engagedLeads?.total ?? metrics.totalLeads.count} total leads
+              From {metrics.totalLeads.count} total leads
             </p>
           </div>
           {/* 4. Sparkline Graph */}
@@ -612,7 +644,7 @@ export default function FounderDashboard() {
               <div className="w-full mb-2" style={{ height: '40px' }}>
                 <Sparkline
                   data={metrics.trends.leads.data}
-                  color="#22C55E"
+                  color="#F97316"
                   height={40}
                   showGradient={true}
                 />
@@ -622,7 +654,7 @@ export default function FounderDashboard() {
             <button
               onClick={() => router.push('/dashboard/leads')}
               className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#22C55E' }}
+              style={{ color: '#F97316' }}
             >
               View All <MdArrowForward size={14} />
             </button>
@@ -678,12 +710,14 @@ export default function FounderDashboard() {
           </div>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {metrics.totalLeads.count}
+            {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
+            {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
+            {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
           </p>
           {/* 3. Metric Details */}
           <div className="flex flex-col gap-1 mb-2">
             <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>
-              From {metrics.totalConversations.total} conversations
+              {metrics.totalLeads.count} all time
             </p>
           </div>
           {/* 4. Sparkline Graph */}

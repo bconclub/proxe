@@ -267,8 +267,20 @@ export async function GET(request: NextRequest) {
     const totalWhatsappConversations = safeWhatsappSessions.length
     const totalUniqueConversations = totalWebConversations + totalWhatsappConversations
     
-    // Total leads count
+    // Total leads count (all time + time-filtered)
     const totalLeadsCount = safeLeads.length
+    const totalLeads7D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 7 * 24 * 60 * 60 * 1000
+    }).length
+    const totalLeads14D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 14 * 24 * 60 * 60 * 1000
+    }).length
+    const totalLeads30D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000
+    }).length
     
     // PRIMARY: Count unique lead_ids from conversations table (all platforms)
     // This is the most accurate count since it tracks every real conversation
@@ -1043,6 +1055,30 @@ export async function GET(request: NextRequest) {
     const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
     console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
 
+    // WARM LEADS: Leads with score 40-69 (warming up, need attention)
+    // Time-filtered counts for 7D/14D/30D dashboard card
+    const isWarmLead = (lead: any) => {
+      const score = lead.lead_score || 0
+      return score >= 40 && score < 70
+    }
+    const warmLeadsList = safeLeads.filter(isWarmLead)
+    const warmLeads7D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= 7 * 24 * 60 * 60 * 1000
+    })
+    const warmLeads14D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= 14 * 24 * 60 * 60 * 1000
+    })
+    const warmLeads30D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= 30 * 24 * 60 * 60 * 1000
+    })
+    console.log(`📊 Warm Leads: 7D=${warmLeads7D.length} 14D=${warmLeads14D.length} 30D=${warmLeads30D.length} total=${warmLeadsList.length}`)
+
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
     // ----------------------------------------------------------------------------
@@ -1286,6 +1322,9 @@ export async function GET(request: NextRequest) {
       },
       totalLeads: {
         count: totalLeadsCount,
+        count7D: totalLeads7D,
+        count14D: totalLeads14D,
+        count30D: totalLeads30D,
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
       },
@@ -1294,6 +1333,13 @@ export async function GET(request: NextRequest) {
         total: totalLeadsCount,
         engagementRate: engagementRate,
         leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
+      },
+      warmLeads: {
+        count: warmLeadsList.length,
+        count7D: warmLeads7D.length,
+        count14D: warmLeads14D.length,
+        count30D: warmLeads30D.length,
+        leads: warmLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       todayActivity: {
         messages: todayMessages.length,
