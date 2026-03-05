@@ -37,7 +37,7 @@ export default function WidgetPage() {
     <div style={{
       width: '100vw',
       height: '100vh',
-      backgroundColor: '#0F0A06',
+      backgroundColor: '#0A0A0B',
       position: 'fixed',
       top: 0,
       left: 0,

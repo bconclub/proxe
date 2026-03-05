@@ -213,7 +213,7 @@ export default function WebAgentSettingsClient() {
             style={{
               padding: '16px 32px',
               borderBottom: '1px solid var(--border-primary)',
-              backgroundColor: 'rgba(26, 15, 10, 0.8)', // Semi-transparent dark
+              backgroundColor: 'rgba(10, 10, 11, 0.8)', // Semi-transparent dark
               backdropFilter: 'blur(12px)',
               display: 'flex',
               alignItems: 'center',
@@ -262,7 +262,7 @@ export default function WebAgentSettingsClient() {
                   color: showCodePanel ? 'white' : 'var(--text-primary)',
                   border: '1px solid var(--border-primary)',
                   cursor: 'pointer',
-                  boxShadow: showCodePanel ? '0 0 15px rgba(201, 169, 97, 0.4)' : 'none'
+                  boxShadow: showCodePanel ? '0 0 15px rgba(139, 92, 246, 0.4)' : 'none'
                 }}
               >
                 <MdCode size={18} />
