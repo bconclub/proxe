@@ -159,11 +159,10 @@ export async function GET(
         nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
         keyInfo: {
           budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
-          serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+          serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest || lead.unified_context?.bcon?.service_interest,
           painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-          userType: lead.unified_context?.bcon?.user_type || lead.unified_context?.windchasers?.user_type || null,
-          courseInterest: lead.unified_context?.bcon?.service_interest || lead.unified_context?.bcon?.course_interest || lead.unified_context?.windchasers?.course_interest || null,
-          planToFly: lead.unified_context?.bcon?.timeline || lead.unified_context?.windchasers?.plan_to_fly || null,
+          businessType: lead.unified_context?.bcon?.business_type || lead.unified_context?.bcon?.user_type || null,
+          timeline: lead.unified_context?.bcon?.timeline || null,
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
@@ -228,16 +227,14 @@ export async function GET(
         console.error('Error calculating response rate:', error)
       }
 
-      // Extract key info
-      const brandContextData = lead.unified_context?.bcon || lead.unified_context?.windchasers || {}
+      // Extract key info (BCON = AI business solutions)
+      const brandContextData = lead.unified_context?.bcon || {}
       const keyInfo = {
         budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
-        serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+        serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest || brandContextData.service_interest,
         painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-        userType: brandContextData.user_type || null,
-        courseInterest: brandContextData.course_interest || null,
-        planToFly: brandContextData.plan_to_fly || brandContextData.timeline || null,
-        education: brandContextData.education || null,
+        businessType: brandContextData.business_type || brandContextData.user_type || null,
+        timeline: brandContextData.timeline || null,
       }
 
       // Build activities context
@@ -250,63 +247,46 @@ export async function GET(
         })
         .join('\n') || 'No team activities'
 
-      // Build windchasers-specific info
+      // Build lead-specific context
       const brandInfo = []
-      if (keyInfo.userType) {
-        brandInfo.push(`User Type: ${keyInfo.userType}`)
+      if (keyInfo.businessType) {
+        brandInfo.push(`Business Type: ${keyInfo.businessType}`)
       }
-      if (keyInfo.courseInterest) {
-        const courseMap: Record<string, string> = {
-          'pilot': 'DGCA/Flight Training',
-          'helicopter': 'Helicopter Training',
-          'drone': 'Drone Training',
-          'cabin': 'Cabin Crew Training',
-          'DGCA': 'DGCA Training',
-          'Flight': 'Flight Training',
-          'Heli': 'Helicopter Training',
-          'Cabin': 'Cabin Crew Training',
-          'Drone': 'Drone Training'
-        }
-        brandInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+      if (keyInfo.serviceInterest) {
+        brandInfo.push(`Service Interest: ${keyInfo.serviceInterest}`)
       }
-      if (keyInfo.planToFly) {
-        const timelineMap: Record<string, string> = {
-          'asap': 'ASAP',
-          '1-3mo': '1-3 Months',
-          '6+mo': '6+ Months',
-          '1yr+': '1 Year+'
-        }
-        brandInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
-      }
-      if (keyInfo.education) {
-        brandInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+      if (keyInfo.timeline) {
+        brandInfo.push(`Timeline: ${keyInfo.timeline}`)
       }
 
       // Try to generate unified summary using Claude API
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `Generate a useful summary for this business lead by combining information from their communication channels.
+          // Include existing summary if available for context preservation
+          const existingSummary = lead.unified_context?.unified_summary || ''
 
+          const prompt = `Generate a useful summary for this business lead. This is BCON Club — an AI-powered business solutions company.
+
+${existingSummary ? `PREVIOUS SUMMARY (preserve key facts from this, update with new info):\n${existingSummary}\n` : ''}
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.
-- Use markdown **bolding** for critical information like course interest, status, or intent.
-- Intelligently merge information from all channels into a single narrative.
+- Use markdown **bolding** for critical information like service interest, business needs, status, or intent.
 - Summarize the conversation, current status, and next steps.
 
 CRITICAL RULES:
 - BE CONCISE. No fluff. No "This user is...". Just the facts.
 - ONLY state actions explicitly confirmed in messages.
-- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
 - NEVER assume actions that aren't explicitly stated.
 - NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary.
+- NEVER mention "course offerings", "enrollment", or aviation terms — this is a business AI solutions company.
+- If a previous summary exists, preserve its key facts and ADD new information. Do not lose important context.
 
 Lead Information:
 Name: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
-Response Rate: ${responseRate}%
-${brandInfo.length > 0 ? `\nLead-Specific Details:\n${brandInfo.join('\n')}` : ''}
+${brandInfo.length > 0 ? `\nLead Details:\n${brandInfo.join('\n')}` : ''}
 
 Channel Summaries:
 ${webSummary ? `Web Channel:\n${webSummary}\n` : ''}
@@ -567,16 +547,14 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
     // Check for scheduled follow-ups (from unified_context or sequences)
     const nextTouchpoint = lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step
 
-    // Extract key info from unified_context
-    const brandContextData = lead.unified_context?.bcon || lead.unified_context?.windchasers || {}
+    // Extract key info from unified_context (BCON = AI business solutions)
+    const brandContextData = lead.unified_context?.bcon || {}
     const keyInfo = {
       budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
-      serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+      serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest || brandContextData.service_interest,
       painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-      userType: brandContextData.user_type || null,
-      courseInterest: brandContextData.course_interest || null,
-      planToFly: brandContextData.plan_to_fly || brandContextData.timeline || null,
-      education: brandContextData.education || null,
+      businessType: brandContextData.business_type || brandContextData.user_type || null,
+      timeline: brandContextData.timeline || null,
     }
 
     // Determine conversation status
@@ -665,60 +643,43 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
           })
           .join('\n') || 'No team activities'
 
-        // Build comprehensive context for summary
+        // Build lead-specific context
         const brandInfo = []
-        if (keyInfo.userType) {
-          brandInfo.push(`User Type: ${keyInfo.userType}`)
+        if (keyInfo.businessType) {
+          brandInfo.push(`Business Type: ${keyInfo.businessType}`)
         }
-        if (keyInfo.courseInterest) {
-          const courseMap: Record<string, string> = {
-            'pilot': 'DGCA/Flight Training',
-            'helicopter': 'Helicopter Training',
-            'drone': 'Drone Training',
-            'cabin': 'Cabin Crew Training',
-            'DGCA': 'DGCA Training',
-            'Flight': 'Flight Training',
-            'Heli': 'Helicopter Training',
-            'Cabin': 'Cabin Crew Training',
-            'Drone': 'Drone Training'
-          }
-          brandInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+        if (keyInfo.serviceInterest) {
+          brandInfo.push(`Service Interest: ${keyInfo.serviceInterest}`)
         }
-        if (keyInfo.planToFly) {
-          const timelineMap: Record<string, string> = {
-            'asap': 'ASAP',
-            '1-3mo': '1-3 Months',
-            '6+mo': '6+ Months',
-            '1yr+': '1 Year+'
-          }
-          brandInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
-        }
-        if (keyInfo.education) {
-          brandInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+        if (keyInfo.timeline) {
+          brandInfo.push(`Timeline: ${keyInfo.timeline}`)
         }
 
-        const prompt = `Generate a useful summary for this business lead based on their conversation history and available data.
+        // Include existing summary for context preservation
+        const existingSummary = lead.unified_context?.unified_summary || ''
 
+        const prompt = `Generate a useful summary for this business lead based on their conversation history. This is BCON Club — an AI-powered business solutions company.
+
+${existingSummary ? `PREVIOUS SUMMARY (preserve key facts from this, update with new info):\n${existingSummary}\n` : ''}
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.
-- Use markdown **bolding** for critical information like course interest, status, or intent.
+- Use markdown **bolding** for critical information like service interest, business needs, status, or intent.
 - Summarize the conversation, current status, and next steps.
 
 CRITICAL RULES:
 - BE CONCISE. No fluff or filler phrases.
 - ONLY state actions explicitly confirmed in messages.
-- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
 - NEVER assume actions that aren't explicitly stated.
-- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary based on whatever data exists.
+- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary.
+- NEVER mention "course offerings", "enrollment", or aviation terms — this is a business AI solutions company.
+- If a previous summary exists, preserve its key facts and ADD new information. Do not lose important context.
 - If messages exist, summarize the actual conversation content.
-- If no messages exist, describe the lead's current stage and suggest next steps.
 
 Lead Information:
 Name: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
-Response Rate: ${responseRate}%
-${brandInfo.length > 0 ? `\nLead-Specific Details:\n${brandInfo.join('\n')}` : ''}
+${brandInfo.length > 0 ? `\nLead Details:\n${brandInfo.join('\n')}` : ''}
 
 Conversation Messages:
 ${conversationContext || 'No messages recorded yet.'}
@@ -850,33 +811,16 @@ Generate a 2-3 sentence summary focusing on what was discussed in the conversati
     }
     fallbackSummary += `. `
 
-    // Add brand-specific lead info
+    // Add lead-specific info
     const brandDetails = []
-    if (keyInfo.userType) {
-      brandDetails.push(`User Type: ${keyInfo.userType}`)
+    if (keyInfo.businessType) {
+      brandDetails.push(`Business Type: ${keyInfo.businessType}`)
     }
-    if (keyInfo.courseInterest) {
-      const courseMap: Record<string, string> = {
-        'pilot': 'DGCA/Flight Training',
-        'helicopter': 'Helicopter Training',
-        'drone': 'Drone Training',
-        'cabin': 'Cabin Crew Training',
-        'DGCA': 'DGCA Training',
-        'Flight': 'Flight Training',
-        'Heli': 'Helicopter Training',
-        'Cabin': 'Cabin Crew Training',
-        'Drone': 'Drone Training'
-      }
-      brandDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+    if (keyInfo.serviceInterest) {
+      brandDetails.push(`Service Interest: ${keyInfo.serviceInterest}`)
     }
-    if (keyInfo.planToFly) {
-      const timelineMap: Record<string, string> = {
-        'asap': 'ASAP',
-        '1-3mo': '1-3 Months',
-        '6+mo': '6+ Months',
-        '1yr+': '1 Year+'
-      }
-      brandDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+    if (keyInfo.timeline) {
+      brandDetails.push(`Timeline: ${keyInfo.timeline}`)
     }
     if (brandDetails.length > 0) {
       fallbackSummary += `${brandDetails.join(', ')}. `

@@ -167,7 +167,7 @@ const STAGE_PROGRESSION = [
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('activity')
+  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -409,7 +409,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   useEffect(() => {
     if (lead && isOpen) {
       loadFreshLeadData()
-      loadUnifiedSummary()
+      loadUnifiedSummary(true) // Always regenerate fresh summary on open
       loadActivities()
       loadChannelData()
       loadQuickStats()
@@ -558,11 +558,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       } | null
 
       if (messages && Array.isArray(messages) && messages.length > 0) {
-        // Calculate response rate: (agent replies / customer messages) * 100
+        // Calculate response rate: what % of customer messages got a reply (capped at 100%)
         const customerMessages = messages.filter((m: any) => m.sender === 'customer')
         const agentMessages = messages.filter((m: any) => m.sender === 'agent')
         const responseRate = customerMessages.length > 0
-          ? Math.round((agentMessages.length / customerMessages.length) * 100)
+          ? Math.min(100, Math.round((agentMessages.length / customerMessages.length) * 100))
           : 0
 
         // Calculate average response time from metadata.response_time_ms
@@ -785,8 +785,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
       'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
       'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
       'In Sequence': '', // Will use inline styles with CSS variables
       'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+      'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     }
     return stageColors[stage] || stageColors['New']
   }
@@ -804,6 +806,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     note: string
     duration?: number
     next_followup?: string
+    disqualification_reason?: string
   }) => {
     if (!pendingStageChange) return
 
@@ -817,6 +820,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           note: activity.note,
           duration_minutes: activity.duration,
           next_followup_date: activity.next_followup,
+          disqualification_reason: activity.disqualification_reason,
         }),
       })
 
@@ -1175,7 +1179,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   role="menu"
                   aria-label="Select lead stage"
                 >
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'In Sequence', 'Cold'].map((stage) => (
+                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold', 'R&R'].map((stage) => (
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}
@@ -1202,19 +1206,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           {/* TABS */}
           <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
-              onClick={() => setActiveTab('activity')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              role="tab"
-              aria-selected={activeTab === 'activity'}
-              aria-controls="lead-tabpanel-activity"
-              id="lead-tab-activity"
-            >
-              Activity
-            </button>
-            <button
               onClick={() => setActiveTab('summary')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -1226,6 +1217,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               id="lead-tab-summary"
             >
               Summary
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'activity'}
+              aria-controls="lead-tabpanel-activity"
+              id="lead-tab-activity"
+            >
+              Activity
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
@@ -1472,14 +1476,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         )}
 
                         {/* Divider Line */}
-                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && currentLead.unified_context?.windchasers && (
+                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
                           <div className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
                         )}
 
                         {/* Lead Profile Group */}
                         {(() => {
-                          const windchasersData = currentLead.unified_context?.windchasers || {};
-                          const hasData = Object.keys(windchasersData).length > 0;
+                          const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
+                          const hasData = Object.keys(brandProfileData).length > 0;
                           if (!hasData) return null;
 
                           return (
@@ -1489,29 +1493,29 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 Lead Profile
                               </h4>
                               <div className="flex flex-wrap gap-x-8 gap-y-3">
-                                {windchasersData.user_type && (
+                                {brandProfileData.user_type && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdPerson size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.user_type}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.user_type}</p>
                                     </div>
                                   </div>
                                 )}
-                                {windchasersData.course_interest && (
+                                {brandProfileData.course_interest && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdFlightTakeoff size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.course_interest}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.course_interest}</p>
                                     </div>
                                   </div>
                                 )}
-                                {(windchasersData.plan_to_fly || windchasersData.timeline) && (
+                                {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchedule size={14} />
@@ -1520,7 +1524,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Timeline</p>
                                       <p className="text-xs font-semibold text-gray-900 dark:text-gray-200">
                                         {(() => {
-                                          const t = windchasersData.plan_to_fly || windchasersData.timeline;
+                                          const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
                                           const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
                                           return map[t] || t;
                                         })()}
@@ -1528,14 +1532,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   </div>
                                 )}
-                                {windchasersData.education && (
+                                {brandProfileData.education && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchool size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.education.replace('_', ' ')}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.education.replace('_', ' ')}</p>
                                     </div>
                                   </div>
                                 )}

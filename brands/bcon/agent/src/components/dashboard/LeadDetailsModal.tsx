@@ -558,11 +558,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       } | null
 
       if (messages && Array.isArray(messages) && messages.length > 0) {
-        // Calculate response rate: (agent replies / customer messages) * 100
+        // Calculate response rate: what % of customer messages got a reply (capped at 100%)
         const customerMessages = messages.filter((m: any) => m.sender === 'customer')
         const agentMessages = messages.filter((m: any) => m.sender === 'agent')
         const responseRate = customerMessages.length > 0
-          ? Math.round((agentMessages.length / customerMessages.length) * 100)
+          ? Math.min(100, Math.round((agentMessages.length / customerMessages.length) * 100))
           : 0
 
         // Calculate average response time from metadata.response_time_ms
