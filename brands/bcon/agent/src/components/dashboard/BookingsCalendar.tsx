@@ -30,7 +30,9 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     success: boolean
     message: string
     details?: string
+    errorList?: string[]
   } | null>(null)
+  const [showErrors, setShowErrors] = useState(false)
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -92,12 +94,14 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       }
 
       setSyncStatus({
-        success: true,
+        success: !data.errors || data.errors.length === 0,
         message: data.message || 'Calendar synced successfully',
         details: data.errors && data.errors.length > 0
-          ? `${data.created} created, ${data.updated} updated. ${data.errors.length} errors occurred.`
+          ? `${data.created} created, ${data.updated} updated. ${data.errors.length} errors.`
           : `${data.created} created, ${data.updated} updated.`,
+        errorList: data.errors || [],
       })
+      setShowErrors(false)
 
       // Refresh bookings after sync
       setTimeout(() => {
@@ -137,23 +141,61 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
               {syncing ? 'Syncing...' : 'Sync with Google Calendar'}
             </button>
             {syncStatus && (
-              <div
-                className={`
-                  flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
-                  ${syncStatus.success
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                  }
-                `}
-              >
-                {syncStatus.success ? (
-                  <MdCheckCircle size={18} />
-                ) : (
-                  <MdError size={18} />
-                )}
-                <span>{syncStatus.message}</span>
-                {syncStatus.details && (
-                  <span className="text-xs opacity-75">({syncStatus.details})</span>
+              <div className="relative">
+                <div
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
+                    ${syncStatus.success
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                      : syncStatus.errorList && syncStatus.errorList.length > 0
+                        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                    }
+                  `}
+                >
+                  {syncStatus.success ? (
+                    <MdCheckCircle size={18} />
+                  ) : (
+                    <MdError size={18} />
+                  )}
+                  <span>{syncStatus.message}</span>
+                  {syncStatus.details && (
+                    <span className="text-xs opacity-75">({syncStatus.details})</span>
+                  )}
+                  {syncStatus.errorList && syncStatus.errorList.length > 0 && (
+                    <button
+                      onClick={() => setShowErrors(!showErrors)}
+                      className="ml-1 text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
+                    >
+                      {showErrors ? 'Hide' : 'View errors'}
+                    </button>
+                  )}
+                </div>
+                {/* Error details tooltip/dropdown */}
+                {showErrors && syncStatus.errorList && syncStatus.errorList.length > 0 && (
+                  <div className="absolute top-full left-0 mt-1 z-50 w-[420px] max-h-64 overflow-y-auto bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        Sync Errors ({syncStatus.errorList.length})
+                      </span>
+                      <button
+                        onClick={() => setShowErrors(false)}
+                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {syncStatus.errorList.map((err, idx) => (
+                        <div
+                          key={idx}
+                          className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 px-2 py-1.5 rounded"
+                        >
+                          {err}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
