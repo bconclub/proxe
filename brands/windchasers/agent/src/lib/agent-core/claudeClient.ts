@@ -261,7 +261,7 @@ export async function generateResponseWithTools(
   }
 
   console.warn('[ClaudeClient] Tool loop exhausted maxToolRounds');
-  return 'I apologize, I encountered an issue processing your request. Please try again or contact us directly.';
+  return "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
 }
 
 /**

@@ -234,7 +234,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
   const supabase = getServiceClient() || getClient();
   if (!supabase) {
     console.error('[meta/webhook] No Supabase client available');
-    await sendWhatsAppReply(customerPhone, "Sorry, I'm having a technical issue right now. Please try again shortly.");
+    await sendWhatsAppReply(customerPhone, "Hey! Give me just a moment, I'll get the team to reach out to you directly.");
     return;
   }
 
@@ -252,7 +252,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     if (!leadId) {
       console.error('[meta/webhook] Failed to create/update lead');
-      await sendWhatsAppReply(customerPhone, "Sorry, I'm having a technical issue. Please try again shortly.");
+      await sendWhatsAppReply(customerPhone, "Hey! Give me just a moment, I'll get the team to reach out to you directly.");
       return;
     }
 
@@ -344,7 +344,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     if (!result.response) {
       console.error('[meta/webhook] Empty AI response');
-      await sendWhatsAppReply(customerPhone, "Sorry, I couldn't process that. Could you rephrase?");
+      await sendWhatsAppReply(customerPhone, "Hey! Let me connect you with the team, they'll sort this out for you.");
       return;
     }
 
@@ -399,7 +399,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     console.error('[meta/webhook] handleIncomingMessage error:', error);
     await sendWhatsAppReply(
       customerPhone,
-      "Sorry, something went wrong on our end. Please try again in a moment.",
+      "Hey! Let me connect you with the team directly. They'll reach out to you shortly.",
     ).catch(() => {});
   }
 }

@@ -62,25 +62,61 @@ export async function process(
     brand: brandId,
   });
 
-  // 5. Generate response
+  // 5. Detect human handoff requests before AI generation
+  const wantsHuman = detectHumanHandoffRequest(input.message);
+
+  // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
-  if (input.channel === 'whatsapp') {
-    // WhatsApp always gets tool-enabled response (even with existing booking — for rescheduling)
-    const { tools, toolHandlers } = buildBookingTools(input, supabase);
-    rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
-      tools,
-      toolHandlers,
-      maxToolRounds: 5,
-    }, 1024);
-  } else {
-    // All other channels keep existing behavior
-    rawResponse = await generateResponse(systemPrompt, userPrompt);
+  try {
+    if (input.channel === 'whatsapp') {
+      // WhatsApp always gets tool-enabled response (even with existing booking — for rescheduling)
+      const { tools, toolHandlers } = buildBookingTools(input, supabase);
+      rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
+        tools,
+        toolHandlers,
+        maxToolRounds: 5,
+      }, 1024);
+    } else {
+      // All other channels keep existing behavior
+      rawResponse = await generateResponse(systemPrompt, userPrompt);
+    }
+  } catch (firstError: any) {
+    console.error('[Engine] AI generation failed (attempt 1):', firstError?.message || firstError);
+
+    // Retry once with reduced complexity
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      if (input.channel === 'whatsapp') {
+        const { tools, toolHandlers } = buildBookingTools(input, supabase);
+        rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
+          tools,
+          toolHandlers,
+          maxToolRounds: 2, // Reduced rounds for retry
+        }, 768);
+      } else {
+        rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
+      }
+    } catch (retryError: any) {
+      console.error('[Engine] AI generation failed (attempt 2):', retryError?.message || retryError);
+
+      // Flag this lead for human follow-up
+      await flagForHumanFollowup(supabase, input, 'AI generation failed after retry');
+
+      // Return a warm, human-sounding fallback — NEVER expose technical errors
+      rawResponse = "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
+    }
+  }
+
+  // If user explicitly asked for a human, flag for follow-up regardless of AI response
+  if (wantsHuman) {
+    await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
   }
 
   const cleanedResponse = cleanResponse(rawResponse, input.channel);
 
-  // 6. Generate follow-ups (skip for channels that don't support buttons)
+  // 7. Generate follow-ups (skip for channels that don't support buttons)
   let followUps: string[] = [];
   if (input.channel === 'web') {
     followUps = await generateFollowUps({
@@ -231,6 +267,68 @@ async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promis
   }
 
   return null;
+}
+
+// ─── Human Handoff Detection ────────────────────────────────────────────────
+
+const HUMAN_HANDOFF_PATTERNS = [
+  /\btalk\s+to\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
+  /\bspeak\s+(?:to|with)\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
+  /\bconnect\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|someone|agent|representative|rep)\b/i,
+  /\breal\s+(?:human|person)\b/i,
+  /\bnot\s+(?:a\s+)?(?:bot|ai|robot|automated)\b/i,
+  /\bstop\s+(?:the\s+)?(?:bot|ai)\b/i,
+  /\bhuman\s+(?:support|help|assistance|agent)\b/i,
+  /\bactual\s+(?:person|human)\b/i,
+  /\bneed\s+(?:a\s+)?(?:human|person|someone\s+real)\b/i,
+  /\bwant\s+(?:a\s+)?(?:human|person|someone\s+real)\b/i,
+];
+
+function detectHumanHandoffRequest(message: string): boolean {
+  return HUMAN_HANDOFF_PATTERNS.some(pattern => pattern.test(message));
+}
+
+/**
+ * Flag a lead for human follow-up.
+ * Sets needs_human_followup = true on all_leads and logs the reason.
+ */
+async function flagForHumanFollowup(
+  supabase: SupabaseClient,
+  input: AgentInput,
+  reason: string
+): Promise<void> {
+  try {
+    const phone = input.userProfile.phone;
+    if (!phone) return;
+
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+
+    // Fetch the lead
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('id, metadata')
+      .eq('customer_phone_normalized', normalizedPhone)
+      .maybeSingle();
+
+    if (!lead) return;
+
+    // Set flag on all_leads
+    await supabase
+      .from('all_leads')
+      .update({
+        needs_human_followup: true,
+        metadata: {
+          ...(lead.metadata || {}),
+          human_followup_reason: reason,
+          human_followup_at: new Date().toISOString(),
+        },
+      })
+      .eq('id', lead.id);
+
+    console.log(`[Engine] Flagged lead ${lead.id} for human follow-up: ${reason}`);
+  } catch (err) {
+    console.error('[Engine] Failed to flag for human follow-up:', err);
+  }
 }
 
 // ─── WhatsApp Booking Tools ──────────────────────────────────────────────────
