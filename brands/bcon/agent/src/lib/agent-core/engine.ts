@@ -338,6 +338,9 @@ function buildBookingTools(
   supabase: SupabaseClient
 ): { tools: ToolDefinition[]; toolHandlers: Record<string, ToolHandler> } {
 
+  // Track bookings completed in this tool session to prevent re-detection loops
+  const bookingsCompletedThisSession = new Set<string>();
+
   const tools: ToolDefinition[] = [
     {
       name: 'check_availability',
@@ -432,19 +435,18 @@ function buildBookingTools(
     check_availability: async (toolInput: Record<string, any>) => {
       const { date } = toolInput;
 
-      // Validate date is not in the past
-      const requestedDate = new Date(date + 'T00:00:00+05:30');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (requestedDate < today) {
+      // Validate date is not in the past (compare YYYY-MM-DD strings — timezone-safe)
+      const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      if (date < todayIST) {
         return JSON.stringify({
           error: 'The requested date is in the past. Please ask the user for a future date.',
         });
       }
 
-      // No Sunday bookings
-      if (requestedDate.getDay() === 0) {
+      // No Sunday bookings — use Date.UTC to avoid IST/UTC day-of-week mismatch
+      const [year, month, day] = date.split('-').map(Number);
+      const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+      if (dayOfWeek === 0) {
         return JSON.stringify({
           available_slots: [],
           message: 'No slots available on Sundays. Available Monday through Saturday.',
@@ -486,13 +488,25 @@ function buildBookingTools(
         });
       }
 
-      // Check for existing booking
-      const existing = await checkExistingBooking(bookingPhone, bookingEmail || null, supabase);
-      if (existing.exists) {
+      // If we already completed a booking in this session, don't re-book
+      const bookingKey = `${date}|${time}`;
+      if (bookingsCompletedThisSession.has(bookingKey)) {
         return JSON.stringify({
-          success: false,
-          error: `User already has a booking on ${existing.bookingDate} at ${existing.bookingTime}. Inform them about it.`,
+          success: true,
+          already_booked: true,
+          message: `Booking already confirmed for ${bookingName} on ${date} at ${time}. Do NOT call book_consultation again. Confirm to the user and stop.`,
         });
+      }
+
+      // Check for existing booking (only if we haven't booked anything this session)
+      if (bookingsCompletedThisSession.size === 0) {
+        const existing = await checkExistingBooking(bookingPhone, bookingEmail || null, supabase);
+        if (existing.exists) {
+          return JSON.stringify({
+            success: false,
+            error: `User already has a booking on ${existing.bookingDate} at ${existing.bookingTime}. Inform them about it.`,
+          });
+        }
       }
 
       // Create Google Calendar event (now includes Meet link)
@@ -542,25 +556,10 @@ function buildBookingTools(
         });
       }
 
-      // Send WhatsApp confirmation with Meet link (fire-and-forget)
-      if (bookingPhone) {
-        const { sendBookingConfirmation } = await import('@/lib/services/whatsappSender');
-        const bookingDate = new Date(date + 'T00:00:00+05:30');
-        const dateDisplay = bookingDate.toLocaleDateString('en-IN', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          timeZone: 'Asia/Kolkata',
-        });
-        sendBookingConfirmation(
-          bookingPhone,
-          bookingName,
-          bookingTitle,
-          `${dateDisplay} at ${time}`,
-          calendarResult?.meetLink || '',
-        ).catch((err: any) => console.error('[Engine] WhatsApp confirmation failed:', err));
-      }
+      // Mark this booking as completed to prevent re-detection loops
+      bookingsCompletedThisSession.add(bookingKey);
+
+      // NOTE: No separate WhatsApp confirmation — Claude's response IS the only message
 
       return JSON.stringify({
         success: true,
@@ -570,7 +569,7 @@ function buildBookingTools(
         title: bookingTitle,
         google_event_created: !!calendarResult,
         meet_link: calendarResult?.meetLink || null,
-        message: `Booking confirmed for ${bookingName} on ${date} at ${time}.`,
+        message: `Booking confirmed for ${bookingName} on ${date} at ${time}. STOP — do NOT call any more tools. Send ONE confirmation message to the user and end your turn.`,
       });
     },
 

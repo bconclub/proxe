@@ -275,6 +275,24 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
+    // 1c. Content-based dedup: catch retries after server restart or on different serverless instances
+    // (in-memory Set is lost on restart; this catches cross-instance duplicates)
+    const { data: recentDuplicateMsg } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'customer')
+      .eq('content', messageText)
+      .gte('created_at', new Date(Date.now() - 30_000).toISOString())
+      .limit(1)
+      .maybeSingle();
+
+    if (recentDuplicateMsg) {
+      console.log(`[meta/webhook] CONTENT-DEDUP: Identical message from lead ${leadId} within 30s, skipping`);
+      return;
+    }
+
     // 2. Ensure whatsapp session exists and increment message_count
     await ensureSession(sessionId, 'whatsapp', supabase);
     await addUserInput(
