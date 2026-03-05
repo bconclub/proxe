@@ -1009,31 +1009,32 @@ export default function FounderDashboard() {
                     }
                   }
                   
-                  // 3. STAGE CHANGES
-                  if (textLower.includes('entered') && textLower.includes('stage')) {
-                    // "entered [stage]" → MdArrowUpward (purple)
-                    return { 
-                      icon: MdArrowUpward, 
-                      color: 'var(--accent-primary)', // Purple
-                      bgColor: '#8B5CF6', // Purple fallback
-                      opacity: 0.2
+                  // 3. STAGE CHANGES — color-coded by target stage
+                  if (textLower.includes('entered') && textLower.includes('stage') || textLower.includes('moved from') || type === 'stage_change') {
+                    // Determine color based on the NEW stage
+                    const stageColorMap: Record<string, { color: string; icon: any }> = {
+                      'high intent':   { color: '#EF4444', icon: MdTrendingUp },    // Red
+                      'booking made':  { color: '#10B981', icon: MdEvent },          // Green
+                      'converted':     { color: '#10B981', icon: MdTrendingUp },     // Green
+                      'qualified':     { color: '#F97316', icon: MdArrowUpward },    // Orange
+                      'engaged':       { color: '#8B5CF6', icon: MdArrowUpward },    // Purple
+                      'in sequence':   { color: '#3B82F6', icon: MdArrowUpward },    // Blue
+                      'new':           { color: '#6B7280', icon: MdArrowUpward },    // Gray
+                      'lost':          { color: '#EF4444', icon: MdTrendingDown },   // Red
+                      'cold':          { color: '#6B7280', icon: MdTrendingDown },   // Gray
                     }
-                  }
-                  if (textLower.includes('moved from') && textLower.includes('to')) {
-                    // "moved from X to Y" → MdTrendingUp (purple)
-                    return { 
-                      icon: MdTrendingUp, 
-                      color: 'var(--accent-primary)', // Purple
-                      bgColor: '#8B5CF6', // Purple fallback
-                      opacity: 0.2
+                    // Match stage from text
+                    let stageStyle = { color: '#8B5CF6', icon: MdArrowUpward } // purple default
+                    for (const [stage, style] of Object.entries(stageColorMap)) {
+                      if (textLower.includes(stage)) {
+                        stageStyle = style
+                        break
+                      }
                     }
-                  }
-                  if (type === 'stage_change') {
-                    // Generic stage change → MdArrowUpward (purple)
-                    return { 
-                      icon: MdArrowUpward, 
-                      color: 'var(--accent-primary)', // Purple
-                      bgColor: '#8B5CF6', // Purple fallback
+                    return {
+                      icon: stageStyle.icon,
+                      color: stageStyle.color,
+                      bgColor: stageStyle.color,
                       opacity: 0.2
                     }
                   }
@@ -1176,6 +1177,20 @@ export default function FounderDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{activity.content}</p>
+                      {/* Show score badge for stage changes and score events */}
+                      {activity.metadata?.score && (activity.type === 'stage_change' || activity.type === 'new_lead_scored') && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: '#A78BFA' }}>
+                          Score: {activity.metadata.score}
+                        </span>
+                      )}
+                      {activity.type === 'score_change' && activity.metadata?.oldScore != null && activity.metadata?.newScore != null && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{
+                          backgroundColor: activity.metadata.scoreDiff > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: activity.metadata.scoreDiff > 0 ? '#34D399' : '#F87171'
+                        }}>
+                          {activity.metadata.oldScore} → {activity.metadata.newScore} ({activity.metadata.scoreDiff > 0 ? '+' : ''}{activity.metadata.scoreDiff})
+                        </span>
+                      )}
                       <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                         {formatTimeAgo(activity.timestamp)} • {channelLabel}
                       </p>
