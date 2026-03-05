@@ -46,6 +46,8 @@ export interface BookingData {
   sessionType?: string;
   description?: string;
   conversationSummary?: string;
+  title?: string;          // AI-generated call title
+  meetLink?: string;       // Google Meet link
 }
 
 export interface ExistingBooking {
@@ -112,49 +114,52 @@ export async function checkExistingBooking(
   const client = supabase || getClient();
   if (!client || (!phone && !email)) return { exists: false };
 
-  const tableName = getChannelTable('web');
+  // Check both web_sessions and whatsapp_sessions for existing bookings
+  const tables = [getChannelTable('web'), getChannelTable('whatsapp')];
 
   try {
-    let data = null;
+    for (const tableName of tables) {
+      let data = null;
 
-    // Try by phone first
-    if (phone) {
-      const { data: phoneData } = await client
-        .from(tableName)
-        .select('booking_date, booking_time, booking_status, booking_created_at')
-        .eq('customer_phone', phone)
-        .not('booking_date', 'is', null)
-        .not('booking_time', 'is', null)
-        .order('booking_created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Try by phone first
+      if (phone) {
+        const { data: phoneData } = await client
+          .from(tableName)
+          .select('booking_date, booking_time, booking_status, booking_created_at')
+          .eq('customer_phone', phone)
+          .not('booking_date', 'is', null)
+          .not('booking_time', 'is', null)
+          .order('booking_created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (phoneData?.booking_date) data = phoneData;
-    }
+        if (phoneData?.booking_date) data = phoneData;
+      }
 
-    // Fallback to email
-    if (!data && email) {
-      const { data: emailData } = await client
-        .from(tableName)
-        .select('booking_date, booking_time, booking_status, booking_created_at')
-        .eq('customer_email', email)
-        .not('booking_date', 'is', null)
-        .not('booking_time', 'is', null)
-        .order('booking_created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Fallback to email
+      if (!data && email) {
+        const { data: emailData } = await client
+          .from(tableName)
+          .select('booking_date, booking_time, booking_status, booking_created_at')
+          .eq('customer_email', email)
+          .not('booking_date', 'is', null)
+          .not('booking_time', 'is', null)
+          .order('booking_created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (emailData?.booking_date) data = emailData;
-    }
+        if (emailData?.booking_date) data = emailData;
+      }
 
-    if (data?.booking_date) {
-      return {
-        exists: true,
-        bookingDate: data.booking_date,
-        bookingTime: data.booking_time,
-        bookingStatus: data.booking_status,
-        bookingCreatedAt: data.booking_created_at,
-      };
+      if (data?.booking_date) {
+        return {
+          exists: true,
+          bookingDate: data.booking_date,
+          bookingTime: data.booking_time,
+          bookingStatus: data.booking_status,
+          bookingCreatedAt: data.booking_created_at,
+        };
+      }
     }
 
     return { exists: false };
@@ -233,7 +238,11 @@ export async function storeBooking(
     booking_created_at: getISTTimestamp(),
     metadata: mergedMetadata,
     conversation_summary: updatedSummary,
+    ...(booking.meetLink ? { booking_meet_link: booking.meetLink } : {}),
+    ...(booking.title ? { booking_title: booking.title } : {}),
   };
+
+  let sessionData: any = null;
 
   const { data, error } = await client
     .from(tableName)
@@ -242,74 +251,77 @@ export async function storeBooking(
     .select('lead_id, conversation_summary, user_inputs_summary, metadata');
 
   if (error) {
-    console.error('[bookingManager] Failed to store booking', error);
-
-    // Fallback to old sessions table
-    if (error.code === '42P01' || error.code === '42703') {
-      await client
-        .from('sessions')
-        .update({
-          booking_date: booking.date,
-          booking_time: booking.time,
-          google_event_id: booking.googleEventId ?? null,
-          booking_status: booking.status ?? 'Call Booked',
-          booking_created_at: getISTTimestamp(),
-        })
-        .eq('external_session_id', externalSessionId);
-    }
-    return;
+    console.error('[bookingManager] Failed to store booking in session table', error);
+    // Session update failed — but DON'T return early.
+    // We still need to save booking data to all_leads below.
+  } else if (data && data.length > 0) {
+    sessionData = data[0];
   }
 
-  // Sync to all_leads
-  if (data && data.length > 0) {
-    const sessionData = data[0];
-    const leadId = sessionData.lead_id || currentLeadId;
+  // Sync to all_leads — ALWAYS attempt this, even if session update failed.
+  // Resolve lead_id from session data, or from profile update, or by looking up the session.
+  let leadId = sessionData?.lead_id || currentLeadId;
 
-    if (leadId) {
-      const unifiedContext = {
-        [channel]: {
-          conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
-          booking_status: booking.status ?? 'Call Booked',
-          booking_date: booking.date,
-          booking_time: booking.time,
-          user_inputs: sessionData.user_inputs_summary || [],
-          booking_details: {
-            courseInterest: booking.courseInterest || null,
-            sessionType: booking.sessionType || null,
-            description: booking.description || null,
-          },
+  // If we don't have a lead_id yet (session update failed), look it up directly
+  if (!leadId) {
+    const { data: sessionLookup } = await client
+      .from(tableName)
+      .select('lead_id')
+      .eq('external_session_id', externalSessionId)
+      .maybeSingle();
+    leadId = sessionLookup?.lead_id || null;
+  }
+
+  if (leadId) {
+    const unifiedContext = {
+      [channel]: {
+        conversation_summary: cleanSummary(sessionData?.conversation_summary || currentSession?.conversation_summary) || null,
+        booking_status: booking.status ?? 'Call Booked',
+        booking_date: booking.date,
+        booking_time: booking.time,
+        booking_meet_link: booking.meetLink || null,
+        booking_title: booking.title || null,
+        user_inputs: sessionData?.user_inputs_summary || currentSession?.user_inputs_summary || [],
+        booking_details: {
+          courseInterest: booking.courseInterest || null,
+          sessionType: booking.sessionType || null,
+          description: booking.description || null,
         },
-      };
+      },
+    };
 
-      const { data: existingLead } = await client
-        .from('all_leads')
-        .select('unified_context, metadata')
-        .eq('id', leadId)
-        .maybeSingle();
+    const { data: existingLead } = await client
+      .from('all_leads')
+      .select('unified_context, metadata')
+      .eq('id', leadId)
+      .maybeSingle();
 
-      const existingCtx = existingLead?.unified_context || {};
-      const existingLeadMeta = existingLead?.metadata || {};
+    const existingCtx = existingLead?.unified_context || {};
+    const existingLeadMeta = existingLead?.metadata || {};
 
-      const mergedCtx = {
-        ...existingCtx,
-        [channel]: {
-          ...(existingCtx[channel] || {}),
-          ...unifiedContext[channel],
-        },
-      };
+    const mergedCtx = {
+      ...existingCtx,
+      [channel]: {
+        ...(existingCtx[channel] || {}),
+        ...unifiedContext[channel],
+      },
+    };
 
-      await client
-        .from('all_leads')
-        .update({
-          unified_context: mergedCtx,
-          last_touchpoint: channel,
-          last_interaction_at: getISTTimestamp(),
-          metadata: { ...existingLeadMeta, ...mergedMetadata },
-        })
-        .eq('id', leadId);
+    await client
+      .from('all_leads')
+      .update({
+        unified_context: mergedCtx,
+        booking_date: booking.date,
+        booking_time: booking.time,
+        last_touchpoint: channel,
+        last_interaction_at: getISTTimestamp(),
+        metadata: { ...existingLeadMeta, ...mergedMetadata },
+      })
+      .eq('id', leadId);
 
-      console.log('[bookingManager] Updated all_leads with booking info', { leadId });
-    }
+    console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
+  } else {
+    console.error('[bookingManager] Could not find lead_id to save booking — data may be lost', { externalSessionId, channel });
   }
 }
 
@@ -388,8 +400,66 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
       };
     });
   } catch (error) {
-    console.error('[bookingManager] Failed to check availability', error);
-    // Fallback: return all slots as available
+    console.error('[bookingManager] Google Calendar check failed, falling back to Supabase', error);
+    // Fallback: check Supabase for existing bookings on this date
+    return checkAvailabilityFromSupabase(date);
+  }
+}
+
+/**
+ * Fallback: check availability from Supabase bookings when Google Calendar is unavailable
+ */
+async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return AVAILABLE_SLOTS.map(slot => ({
+        time: formatTimeForDisplay(slot),
+        time24: slot,
+        available: true,
+        displayTime: formatTimeForDisplay(slot),
+      }));
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const dateStr = date.split('T')[0];
+
+    // Check all_leads for bookings on this date
+    const { data: bookedLeads } = await supabase
+      .from('all_leads')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+
+    // Check whatsapp_sessions for bookings on this date
+    const { data: bookedSessions } = await supabase
+      .from('whatsapp_sessions')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+
+    // Combine all booked times
+    const bookedTimes = new Set<string>();
+    for (const row of [...(bookedLeads || []), ...(bookedSessions || [])]) {
+      if (row.booking_time) {
+        // Normalize time to HH:MM format
+        const t = String(row.booking_time).substring(0, 5);
+        bookedTimes.add(t);
+      }
+    }
+
+    console.log(`[bookingManager] Supabase fallback: ${bookedTimes.size} booked slots on ${dateStr}:`, Array.from(bookedTimes));
+
+    return AVAILABLE_SLOTS.map(slot => ({
+      time: formatTimeForDisplay(slot),
+      time24: slot,
+      available: !bookedTimes.has(slot),
+      displayTime: formatTimeForDisplay(slot),
+    }));
+  } catch (err) {
+    console.error('[bookingManager] Supabase availability check failed', err);
     return AVAILABLE_SLOTS.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
@@ -414,7 +484,8 @@ export async function createCalendarEvent(booking: {
   courseInterest?: string;
   sessionType?: string;
   conversationSummary?: string;
-}): Promise<{ eventId: string; eventLink: string; hasAttendees: boolean } | null> {
+  title?: string;
+}): Promise<{ eventId: string; eventLink: string; hasAttendees: boolean; meetLink: string | null } | null> {
   try {
     const { google } = await import('googleapis');
     const auth = await getGoogleCalendarAuth();
@@ -448,11 +519,16 @@ export async function createCalendarEvent(booking: {
         ? courseNameMap[booking.courseInterest.toLowerCase()]
         : booking.courseInterest || 'Aviation Course Inquiry';
 
-    // Event title
-    let eventTitle = `${booking.name} - ${courseDisplayName}`;
-    if (booking.sessionType) {
-      const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
-      eventTitle += ` [${label}]`;
+    // Event title — use AI-generated title if provided, otherwise auto-generate
+    let eventTitle: string;
+    if (booking.title) {
+      eventTitle = booking.title;
+    } else {
+      eventTitle = `${booking.name} - ${courseDisplayName}`;
+      if (booking.sessionType) {
+        const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
+        eventTitle += ` [${label}]`;
+      }
     }
 
     // Description — brand-aware
@@ -487,12 +563,18 @@ export async function createCalendarEvent(booking: {
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
+      conferenceData: {
+        createRequest: {
+          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      },
       ...(hasRealEmail ? { attendees: [{ email: booking.email, displayName: booking.name }] } : {}),
       reminders: {
         useDefault: false,
         overrides: [
           { method: 'email', minutes: 24 * 60 },
-          { method: 'popup', minutes: 30 },
+          { method: 'popup', minutes: 60 },
         ],
       },
     };
@@ -510,6 +592,7 @@ export async function createCalendarEvent(booking: {
       createdEvent = await calendar.events.insert({
         calendarId: CALENDAR_ID,
         requestBody: event,
+        conferenceDataVersion: 1,
       });
       hasAttendees = true;
     } catch (calendarError: any) {
@@ -519,6 +602,7 @@ export async function createCalendarEvent(booking: {
         createdEvent = await calendar.events.insert({
           calendarId: CALENDAR_ID,
           requestBody: eventWithoutAttendees,
+          conferenceDataVersion: 1,
         });
         hasAttendees = false;
       } else {
@@ -528,10 +612,16 @@ export async function createCalendarEvent(booking: {
 
     if (!createdEvent?.data?.id) return null;
 
+    // Extract Google Meet link from conference data
+    const meetLink = createdEvent.data.conferenceData?.entryPoints?.find(
+      (ep: any) => ep.entryPointType === 'video'
+    )?.uri || null;
+
     return {
       eventId: createdEvent.data.id,
       eventLink: createdEvent.data.htmlLink || '',
       hasAttendees,
+      meetLink,
     };
   } catch (error) {
     console.error('[bookingManager] Failed to create calendar event', error);

@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
         .from('all_leads')
         .update({
           unified_context: mergedCtx,
+          booking_date: date,
+          booking_time: time,
           last_interaction_at: new Date().toISOString(),
           metadata: {
             ...(existingLead?.metadata || {}),

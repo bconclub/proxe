@@ -311,13 +311,15 @@ export async function storeBooking(
       .from('all_leads')
       .update({
         unified_context: mergedCtx,
+        booking_date: booking.date,
+        booking_time: booking.time,
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
         metadata: { ...existingLeadMeta, ...mergedMetadata },
       })
       .eq('id', leadId);
 
-    console.log('[bookingManager] Updated all_leads with booking info', { leadId });
+    console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
     console.error('[bookingManager] Could not find lead_id to save booking — data may be lost', { externalSessionId, channel });
   }
