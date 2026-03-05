@@ -220,8 +220,9 @@ async function postProcess(
       }
     }
 
-    // 4. Generate and save conversation summary
-    if (assistantResponse) {
+    // 4. Generate and save conversation summary (every 3rd message to save tokens)
+    const shouldSummarize = messageCount % 3 === 0 || messageCount <= 1;
+    if (assistantResponse && shouldSummarize) {
       try {
         const updatedHistory = [
           ...agentInput.conversationHistory,

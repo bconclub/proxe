@@ -75,8 +75,8 @@ export async function process(
       rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
         tools,
         toolHandlers,
-        maxToolRounds: 5,
-      }, 1024);
+        maxToolRounds: 3,
+      }, 512);
     } else {
       // All other channels keep existing behavior
       rawResponse = await generateResponse(systemPrompt, userPrompt);
@@ -94,7 +94,7 @@ export async function process(
           tools,
           toolHandlers,
           maxToolRounds: 2, // Reduced rounds for retry
-        }, 768);
+        }, 512);
       } else {
         rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
       }

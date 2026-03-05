@@ -49,19 +49,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Fetch full conversation thread for this lead
+    // Fetch recent conversation (last 10 messages for scoring — saves tokens on long convos)
     const { data: messages, error: messagesError } = await supabase
       .from('conversations')
       .select('content, sender, created_at, channel')
       .eq('lead_id', lead_id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(10)
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError)
       // Continue with empty messages
     }
 
-    const conversationMessages = messages || []
+    // Reverse to get chronological order + get total count for metrics
+    const conversationMessages = (messages || []).reverse()
+
+    // Also get total message count (cheap COUNT query, no content fetched)
+    const { count: totalMessageCount } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_id', lead_id)
 
     // Fetch activities for this lead
     const { data: activities } = await supabase
@@ -71,9 +79,9 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(10)
 
-    // Calculate activity metrics
+    // Calculate activity metrics (use total count from DB, not just the last 10 fetched)
     const responseCount = conversationMessages.filter(m => m.sender === 'customer').length
-    const totalMessages = conversationMessages.length
+    const totalMessages = totalMessageCount || conversationMessages.length
     const daysSinceStart = lead.created_at 
       ? Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
       : 0
@@ -111,7 +119,7 @@ export async function POST(request: NextRequest) {
 5. Business events (10%): booking made (+50), re-engaged after cold (+20)
 
 Conversation:
-${conversationText.substring(0, 3000)} ${conversationText.length > 3000 ? '...' : ''}
+${conversationText.substring(0, 1500)}
 
 Metrics:
 - Response count: ${responseCount}
@@ -141,7 +149,7 @@ Respond with ONLY a JSON object in this exact format:
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 500,
+            max_tokens: 300,
             messages: [
               {
                 role: 'user',

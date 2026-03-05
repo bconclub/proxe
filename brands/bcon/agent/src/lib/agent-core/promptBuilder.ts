@@ -130,10 +130,10 @@ function buildUserPrompt(params: {
     ? '\n\nGuidance: This is the third user interaction. Encourage them to schedule a call in a single sentence.'
     : '';
 
-  // Channel-specific formatting instructions
+  // Channel-specific formatting (WhatsApp rules are in system prompt + channel instructions)
   const formattingInstructions = channel === 'whatsapp'
-    ? 'You are a lead qualification assistant. Use plain text only. NO HTML tags, NO markdown. Use simple line breaks for spacing. Short, punchy sentences. ABSOLUTE MAXIMUM: 2 sentences per response. NEVER use em dashes.'
-    : 'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. ABSOLUTE MAXIMUM: 2 sentences per response. NEVER use em dashes.';
+    ? 'Plain text only. Max 2 sentences.'
+    : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
   // Inject current date for WhatsApp so Claude can resolve relative dates ("tomorrow", "next Monday")
   const dateContext = channel === 'whatsapp'
@@ -163,41 +163,14 @@ function getChannelInstructions(channel?: Channel): string {
 =================================================================================
 WHATSAPP CHANNEL RULES (MUST FOLLOW)
 =================================================================================
-This conversation is happening on WhatsApp. You MUST:
-- Use PLAIN TEXT only. No HTML tags (<br>, <b>, <a>, etc.)
-- No markdown formatting (no **, no ##, no [](), no backticks)
-- Use simple line breaks for paragraph spacing
-- Keep responses SHORT, 1-2 sentences max, mobile screens are small
-- No bullet points with special characters, use simple dashes (-) if needed
-- NEVER use em dashes or long dashes. Use commas, periods, or rewrite the sentence.
-- Be conversational and friendly, like texting a friend
-- No "click here" links — WhatsApp users can't click embedded HTML
-- If sharing a URL, paste it as plain text on its own line
-=================================================================================
-
-=================================================================================
-BOOKING TOOLS (WHATSAPP ONLY)
-=================================================================================
-You have access to booking tools. Use them when the user wants to schedule a
-consultation call.
-
-BOOKING FLOW:
-1. When user expresses interest in booking (says "book", "schedule", "call"):
-   - Ask which date works for them (suggest "tomorrow" or "this week")
-   - Once they give a date, use check_availability to get open slots
-   - Present the available times as a simple numbered list
-   - Once they pick a time, confirm their name
-   - Use book_consultation to finalize the booking
-
-2. IMPORTANT RULES:
-   - ALWAYS use check_availability BEFORE booking to verify the slot is open
-   - ALWAYS confirm date + time with the user before calling book_consultation
-   - The user phone number is already known from WhatsApp — do NOT ask for it
-   - Email is OPTIONAL — only ask if it comes up naturally, do NOT block on it
-   - If no slots are available, suggest the next day
-   - Convert vague dates: "tomorrow" = today + 1, "next Monday" = next Monday
-   - After successful booking, confirm with date, time, and a friendly message
-   - Keep the booking conversation SHORT — do not over-explain
+This conversation is on WhatsApp. You MUST:
+- PLAIN TEXT only. No HTML, no markdown, no backticks.
+- Simple line breaks for spacing. Dashes (-) for lists.
+- SHORT: 1-2 sentences max. Mobile screens are small.
+- NEVER use em dashes. Use commas or periods instead.
+- Conversational tone, like texting a friend.
+- URLs as plain text on their own line.
+- Booking tool instructions are in the system prompt above.
 =================================================================================`;
   }
 
