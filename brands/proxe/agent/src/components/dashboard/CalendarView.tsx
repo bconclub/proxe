@@ -14,6 +14,7 @@ interface Booking {
   phone: string | null
   booking_date: string | null
   booking_time: string | null
+  booking_title?: string | null
   source: string | null
   first_touchpoint?: string | null
   last_touchpoint?: string | null
@@ -29,15 +30,9 @@ interface CalendarViewProps {
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
 const DAYS_OF_WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
-// Color mapping for sources
-const getSourceColor = (source: string | null) => {
-  const colors: Record<string, string> = {
-    web: 'bg-blue-500',
-    whatsapp: 'bg-green-500',
-    voice: 'bg-violet-500',
-    social: 'bg-orange-500',
-  }
-  return colors[source || 'web'] || 'bg-blue-500'
+// All events use brand accent color
+const getSourceColor = (_source: string | null) => {
+  return '' // Using inline style with var(--accent-primary) instead
 }
 
 export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
@@ -92,15 +87,15 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
   const getBookingStyle = (booking: Booking, hour: number) => {
     if (!booking.booking_time) return {}
     const [hours, minutes = 0] = booking.booking_time.split(':').map(Number)
-    
+
     // Position within the hour slot (0-60 minutes)
     // Each hour slot is 48px tall (40% smaller than 80px), so 1 minute = 48/60 = 0.8px
     const minutesInHour = minutes
     const topOffset = (minutesInHour / 60) * 48 // Position within the hour slot
-    
+
     // Default height: 1 hour (48px), but can be adjusted
     const height = 48 // 1 hour block (40% smaller)
-    
+
     return {
       top: `${topOffset}px`,
       height: `${height}px`,
@@ -152,18 +147,18 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
   const handleViewClientDetails = async () => {
     if (!selectedBooking) return
-    
+
     setIsModalOpen(false)
     setLoadingLead(true)
-    
+
     try {
       // Fetch full lead details from unified_leads
       const response = await fetch(`/api/dashboard/leads?limit=1000`)
       if (!response.ok) throw new Error('Failed to fetch leads')
-      
+
       const data = await response.json()
       const lead = data.leads?.find((l: any) => l.id === selectedBooking.id)
-      
+
       if (lead) {
         // Convert to Lead type expected by LeadDetailsModal
         const modalLead: Lead = {
@@ -459,39 +454,39 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                           >
                             {hourBookings.map((booking, idx) => {
                               const style = getBookingStyle(booking, hour)
-                              // Handle overlapping bookings by offsetting horizontally
-                              const leftOffset = idx * 50 // Offset for overlapping bookings
-                              const callTitle = booking.metadata?.conversation_summary 
-                                || booking.metadata?.title 
-                                || booking.metadata?.summary 
-                                || 'Call'
+                              const total = hourBookings.length
+                              const widthPercent = 100 / total
+                              const leftPercent = idx * widthPercent
+                              const callTopic = booking.booking_title
+                                || booking.metadata?.title
+                                || booking.metadata?.conversation_summary
+                                || booking.metadata?.summary
+                                || null
                               return (
                                 <div
                                   key={booking.id}
                                   onClick={(e) => handleBookingClick(booking, e)}
-                                  className={`
-                                    rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight
-                                    ${getSourceColor(booking.source)}
-                                    text-white cursor-pointer hover:opacity-90 hover:shadow-lg
-                                    z-10 transition-all overflow-hidden
-                                  `}
+                                  className="rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight text-white cursor-pointer hover:opacity-90 hover:shadow-lg z-10 transition-all overflow-hidden"
                                   style={{
                                     ...style,
-                                    left: `${2 + leftOffset}px`,
-                                    right: `${2 + (hourBookings.length > 1 ? leftOffset + 2 : 0)}px`,
-                                    width: hourBookings.length > 1 ? `calc(50% - ${leftOffset}px)` : undefined,
+                                    backgroundColor: 'var(--accent-primary)',
+                                    left: total > 1 ? `${leftPercent}%` : '4px',
+                                    right: total > 1 ? undefined : '4px',
+                                    width: total > 1 ? `calc(${widthPercent}% - 4px)` : undefined,
                                   }}
-                                  title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
+                                  title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${callTopic ? ` · ${callTopic}` : ''}`}
                                 >
-                                  <div className="font-semibold truncate mb-0.5 text-[8px] md:text-[10px]">
-                                    {booking.booking_time}
-                                  </div>
-                                  <div className="text-[8px] md:text-[9px] opacity-90 truncate italic mb-0.5 hidden md:block">
-                                    {callTitle.length > 20 ? callTitle.substring(0, 20) + '...' : callTitle}
+                                  <div className="font-semibold truncate text-[8px] md:text-[10px]">
+                                    {booking.booking_time?.substring(0, 5)}
                                   </div>
                                   <div className="font-medium truncate text-[8px] md:text-[10px]">
-                                    {booking.name || 'Unnamed Customer'}
+                                    {booking.name || 'Unnamed'}
                                   </div>
+                                  {callTopic && (
+                                    <div className="text-[7px] md:text-[9px] opacity-80 truncate">
+                                      {callTopic}
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -548,21 +543,21 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         {format(day, 'd')}
                       </div>
                       <div className="space-y-1">
-                        {dayBookings.slice(0, 3).map((booking) => (
-                          <div
-                            key={booking.id}
-                            onClick={(e) => handleBookingClick(booking, e)}
-                            className={`
-                              text-xs px-2 py-1 rounded truncate
-                              ${getSourceColor(booking.source)}
-                              text-white cursor-pointer hover:opacity-90 hover:shadow-md
-                              transition-all
-                            `}
-                            title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
-                          >
-                            {booking.booking_time} {booking.name || 'Unnamed'}
-                          </div>
-                        ))}
+                        {dayBookings.slice(0, 3).map((booking) => {
+                          const topic = booking.booking_title || booking.metadata?.title || null
+                          return (
+                            <div
+                              key={booking.id}
+                              onClick={(e) => handleBookingClick(booking, e)}
+                              className="text-xs px-2 py-1 rounded text-white cursor-pointer hover:opacity-90 hover:shadow-md transition-all"
+                              style={{ backgroundColor: 'var(--accent-primary)' }}
+                              title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${topic ? ` · ${topic}` : ''}`}
+                            >
+                              <div className="truncate">{booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}</div>
+                              {topic && <div className="truncate opacity-80 text-[10px]">{topic}</div>}
+                            </div>
+                          )
+                        })}
                         {dayBookings.length > 3 && (
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             +{dayBookings.length - 3} more
@@ -578,198 +573,75 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         </div>
       </div>
 
-      {/* Booking Details Modal */}
+      {/* Booking Details Modal — Clean, wider card */}
       {isModalOpen && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-[#333]">
             <div className="p-6">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Booking Details
-                </h3>
+              {/* Header row: Name + Close */}
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {selectedBooking.name || 'Unnamed Lead'}
+                  </h3>
+                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {selectedBooking.email && <span>{selectedBooking.email}</span>}
+                    {selectedBooking.email && selectedBooking.phone && <span>•</span>}
+                    {selectedBooking.phone && <span>{selectedBooking.phone}</span>}
+                  </div>
+                </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
                 >
-                  <MdClose size={24} />
+                  <MdClose size={22} />
                 </button>
               </div>
 
-              {/* Booking Info */}
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-gray-400 mt-0.5">
-                    <MdPerson size={20} />
-                  </span>
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Name</div>
-                    <div className="text-base font-medium text-gray-900 dark:text-white">
-                      {selectedBooking.name || 'Unnamed Lead'}
-                    </div>
-                  </div>
-                </div>
-
-                {selectedBooking.email && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-gray-400 mt-0.5">
-                      <MdEmail size={20} />
-                    </span>
-                    <div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Email</div>
-                      <div className="text-base text-gray-900 dark:text-white">
-                        {selectedBooking.email}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedBooking.phone && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-gray-400 mt-0.5">
-                      <MdPhone size={20} />
-                    </span>
-                    <div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Phone</div>
-                      <div className="text-base text-gray-900 dark:text-white">
-                        {selectedBooking.phone}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                  <span className="text-gray-400 mt-0.5">
-                    <MdCalendarToday size={20} />
-                  </span>
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Date</div>
-                    <div className="text-base text-gray-900 dark:text-white">
-                      {selectedBooking.booking_date && format(new Date(selectedBooking.booking_date), 'MMMM d, yyyy')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <span className="text-gray-400 mt-0.5">
-                    <MdAccessTime size={20} />
-                  </span>
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Time</div>
-                    <div className="text-base text-gray-900 dark:text-white">
-                      {selectedBooking.booking_time}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Course Interest (Windchasers-specific) */}
-                {(() => {
-                  const brandId = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers') : 'windchasers'
-                  const brandData = selectedBooking.unified_context?.[brandId]
-                  const courseInterest = selectedBooking.metadata?.courseInterest || brandData?.course_interest
-                  if (!courseInterest || brandId !== 'windchasers') return null
-                  const courseNameMap: Record<string, string> = {
-                    'pilot': 'Pilot Training',
-                    'helicopter': 'Helicopter Training',
-                    'drone': 'Drone Training',
-                    'cabin': 'Cabin Crew Training',
-                  }
-                  return (
-                    <div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
-                      <div className="text-base text-gray-900 dark:text-white">
-                        {courseNameMap[courseInterest?.toLowerCase()] || courseInterest || '-'}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {/* Session Type */}
-                {(selectedBooking.metadata?.sessionType) && (
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Session Type</div>
-                    <div className="text-base text-gray-900 dark:text-white">
-                      {selectedBooking.metadata.sessionType === 'offline' ? 'Offline / Facility Visit' : 
-                       selectedBooking.metadata.sessionType === 'online' ? 'Online Session' : 
-                       selectedBooking.metadata.sessionType}
-                    </div>
-                  </div>
-                )}
-
-                {/* Conversation Summary */}
-                {(selectedBooking.metadata?.conversationSummary || selectedBooking.metadata?.conversation_summary || selectedBooking.unified_context?.web?.conversation_summary) && (
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Summary</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#262626] p-3 rounded-md max-h-32 overflow-y-auto">
-                      {selectedBooking.metadata?.conversationSummary || 
-                       selectedBooking.metadata?.conversation_summary || 
-                       selectedBooking.unified_context?.web?.conversation_summary || '-'}
-                    </div>
-                  </div>
-                )}
-
-                {/* Description (shorter unified description) */}
-                {selectedBooking.metadata?.description && (
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Details</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#262626] p-3 rounded-md max-h-40 overflow-y-auto whitespace-pre-wrap">
-                      {(() => {
-                        const fullDescription = selectedBooking.metadata.description;
-                        // Extract key details for shorter display
-                        const lines = fullDescription.split('\n');
-                        const keyLines: string[] = [];
-                        let inDetails = false;
-                        
-                        for (const line of lines) {
-                          const trimmed = line.trim();
-                          if (trimmed.includes('Candidate Information:') || trimmed.includes('Course Interest:') || 
-                              trimmed.includes('Session Type:') || trimmed.includes('Booking Details:')) {
-                            inDetails = true;
-                            continue;
-                          }
-                          if (trimmed && inDetails && !trimmed.includes('Windchasers Aviation Academy')) {
-                            keyLines.push(trimmed);
-                          }
-                        }
-                        
-                        // If we found key lines, use them; otherwise use first 300 chars
-                        if (keyLines.length > 0) {
-                          return keyLines.join('\n');
-                        }
-                        return fullDescription.length > 300 ? fullDescription.substring(0, 300) + '...' : fullDescription;
-                      })()}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Source</div>
-                  <span className={`
-                    px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                    ${getSourceColor(selectedBooking.source)}
-                    text-white
-                  `}>
-                    {selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web'}
+              {/* Date & Time row */}
+              <div className="flex items-center gap-6 p-4 rounded-lg mb-4" style={{ backgroundColor: 'var(--bg-tertiary, #262626)' }}>
+                <div className="flex items-center gap-2">
+                  <MdCalendarToday size={18} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-base font-medium text-gray-900 dark:text-white">
+                    {selectedBooking.booking_date && format(new Date(selectedBooking.booking_date), 'EEE, MMM d, yyyy')}
                   </span>
                 </div>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#262626] flex gap-3">
-                <button
-                  onClick={handleViewClientDetails}
-                  className="flex-1 px-4 py-2 text-white rounded-md hover:opacity-90 transition-all text-sm font-medium"
+                <div className="flex items-center gap-2">
+                  <MdAccessTime size={18} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-base font-medium text-gray-900 dark:text-white">
+                    {selectedBooking.booking_time}
+                  </span>
+                </div>
+                <span
+                  className="ml-auto px-2.5 py-0.5 text-[11px] font-semibold rounded-full text-white"
                   style={{ backgroundColor: 'var(--accent-primary)' }}
                 >
-                  View Client Details
-                </button>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 dark:border-[#262626] text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors text-sm"
-                >
-                  Close
-                </button>
+                  {selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web'}
+                </span>
               </div>
+
+              {/* Summary (if available) */}
+              {(() => {
+                const summary = selectedBooking.metadata?.conversationSummary ||
+                  selectedBooking.metadata?.conversation_summary ||
+                  selectedBooking.unified_context?.web?.conversation_summary ||
+                  selectedBooking.unified_context?.whatsapp?.conversation_summary
+                if (!summary) return null
+                return (
+                  <div className="text-sm text-gray-600 dark:text-gray-300 p-3 rounded-lg mb-4 leading-relaxed" style={{ backgroundColor: 'var(--bg-tertiary, #262626)' }}>
+                    {summary}
+                  </div>
+                )
+              })()}
+
+              {/* Action */}
+              <button
+                onClick={handleViewClientDetails}
+                className="w-full px-4 py-2.5 text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+              >
+                View Client Details →
+              </button>
             </div>
           </div>
         </div>
@@ -788,4 +660,3 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
     </div>
   )
 }
-
