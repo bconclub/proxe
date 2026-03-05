@@ -28,7 +28,7 @@ interface FounderMetrics {
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
-  upcomingBookings: Array<{ id: string; name: string; date: string; time: string; datetime: string }>
+  upcomingBookings: Array<{ id: string; name: string; title?: string | null; date: string; time: string; datetime: string }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
   channelPerformance: {
@@ -837,6 +837,11 @@ export default function FounderDashboard() {
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                     {booking.name}
                   </p>
+                  {booking.title && (
+                    <p className="text-xs truncate" style={{ color: 'var(--text-primary)', opacity: 0.7 }}>
+                      {booking.title}
+                    </p>
+                  )}
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {formatCountdown(booking.datetime)}
                   </p>

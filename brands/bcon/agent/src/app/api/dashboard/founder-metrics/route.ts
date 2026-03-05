@@ -462,13 +462,18 @@ export async function GET(request: NextRequest) {
         }
       })
       .slice(0, 10)
-      .map(({ lead, bookingDate, bookingTime }) => ({
-        id: lead.id,
-        name: lead.customer_name || 'Unknown',
-        date: bookingDate,
-        time: bookingTime,
-        datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
-      }))
+      .map(({ lead, bookingDate, bookingTime }) => {
+        const uc = lead.unified_context || {}
+        const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
+        return {
+          id: lead.id,
+          name: lead.customer_name || 'Unknown',
+          title,
+          date: bookingDate,
+          time: bookingTime,
+          datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
+        }
+      })
 
     // 7. Stale Leads (>48h no response)
     const staleLeads = safeLeads.filter(lead => {
