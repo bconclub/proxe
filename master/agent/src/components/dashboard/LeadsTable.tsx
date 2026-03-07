@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, type CSSProperties } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
@@ -120,10 +121,14 @@ export default function LeadsTable({
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
   const showAviationColumns = brandId === 'windchasers'
+  const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
   const [calculatingScores, setCalculatingScores] = useState(false)
   const [scoreTrends, setScoreTrends] = useState<Record<string, { prev: number; diff: number }>>({})
+
+  // Preset filter from URL: ?filter=engaged | warm
+  const presetFilter = searchParams.get('filter') || 'all'
 
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
@@ -142,6 +147,24 @@ export default function LeadsTable({
 
   useEffect(() => {
     let filtered = [...leads]
+
+    // Apply preset filter from URL (?filter=engaged or ?filter=warm)
+    if (presetFilter === 'engaged') {
+      const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+      filtered = filtered.filter((lead) => {
+        if (engagedStages.includes(lead.lead_stage || '')) return true
+        const bookingDate = lead.booking_date ||
+          lead.unified_context?.web?.booking_date ||
+          lead.unified_context?.whatsapp?.booking_date
+        if (bookingDate) return true
+        return false
+      })
+    } else if (presetFilter === 'warm') {
+      filtered = filtered.filter((lead) => {
+        const score = lead.lead_score ?? 0
+        return score >= 40 && score < 70
+      })
+    }
 
     if (dateFilter !== 'all') {
       const now = new Date()
@@ -198,7 +221,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit, presetFilter])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -429,13 +452,22 @@ export default function LeadsTable({
     <div className="leads-table">
       {/* Header row: Title left, filters + actions right */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Leads
+            {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
           </span>
+          {presetFilter !== 'all' && (
+            <Link
+              href="/dashboard/leads"
+              className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-gray-100 dark:hover:bg-[#333]"
+              style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+            >
+              Clear filter
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

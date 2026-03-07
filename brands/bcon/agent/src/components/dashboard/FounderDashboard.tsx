@@ -354,25 +354,6 @@ export default function FounderDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Command Center</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Real-time founder metrics at a glance
-          </p>
-        </div>
-        <button
-          onClick={loadMetrics}
-          className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
-          style={{ backgroundColor: 'var(--accent-primary)' }}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-        >
-          <MdRefresh size={18} />
-          Refresh
-        </button>
-      </div>
 
       {/* AT A GLANCE - Radial Progress Charts with Trends */}
       {metrics.radialMetrics && (
@@ -534,7 +515,7 @@ export default function FounderDashboard() {
               </div>
             )}
             <button
-              onClick={() => router.push('/dashboard/leads')}
+              onClick={() => router.push('/dashboard/leads?filter=engaged')}
               className="text-xs font-medium flex items-center gap-1 hover:underline"
               style={{ color: '#22C55E' }}
             >
@@ -586,7 +567,7 @@ export default function FounderDashboard() {
             )}
             <div className="flex items-center justify-between">
               <button
-                onClick={() => router.push('/dashboard/leads')}
+                onClick={() => router.push('/dashboard/leads?filter=warm')}
                 className="text-xs font-medium flex items-center gap-1 hover:underline"
                 style={{ color: '#F97316' }}
               >
