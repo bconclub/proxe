@@ -28,7 +28,8 @@ interface CalendarViewProps {
   headerRight?: React.ReactNode
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i)
+// Business hours only — 8 AM to 6 PM
+const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 8,9,10,...,18
 const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 function formatHour(hour: number): string {
@@ -71,11 +72,10 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
     }
   }, [])
 
-  // Auto-scroll to 8 AM on mount
+  // Auto-scroll to top on mount (grid already starts at 8 AM)
   useEffect(() => {
     if (scrollRef.current && viewMode === 'week') {
-      const hourHeight = 44
-      scrollRef.current.scrollTop = 8 * hourHeight
+      scrollRef.current.scrollTop = 0
     }
   }, [viewMode])
 
@@ -241,7 +241,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
   const tzLabel = `GMT${tzSign}${String(tzHours).padStart(2, '0')}:${String(tzMins).padStart(2, '0')}`
 
   return (
-    <div className="flex gap-0 h-[calc(100vh-130px)]">
+    <div className="flex gap-0 h-[calc(100vh-64px)]">
       {/* Left Sidebar — Mini Calendar */}
       <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
         {/* Mini calendar month nav */}
@@ -398,7 +398,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                     <div
                       key={hour}
                       className="relative border-b"
-                      style={{ height: '44px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                      style={{ height: '52px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
                     >
                       {hour > 0 && (
                         <span className="absolute -top-[6px] right-1.5 text-[9px] leading-none" style={{ color: 'var(--text-secondary)' }}>
@@ -416,15 +416,15 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       <div
                         key={hour}
                         className="border-b"
-                        style={{ height: '44px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                        style={{ height: '52px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
                       />
                     ))}
                     {/* Booking events overlaid */}
                     {getBookingsForDate(day).map((booking, bIdx) => {
                       if (!booking.booking_time) return null
                       const [h, m] = booking.booking_time.split(':').map(Number)
-                      const top = h * 44 + Math.round((m || 0) * 44 / 60)
-                      const height = 44 // 1-hour block
+                      const top = (h - 8) * 52 + Math.round((m || 0) * 52 / 60)
+                      const height = 52 // 1-hour block
                       const dayBookingsAtHour = getBookingsForTimeSlot(day, h)
                       const total = dayBookingsAtHour.length
                       const idx = dayBookingsAtHour.indexOf(booking)
