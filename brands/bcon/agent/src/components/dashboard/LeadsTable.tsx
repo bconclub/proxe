@@ -555,19 +555,19 @@ export default function LeadsTable({
 
       {/* Table */}
       <div className="overflow-x-auto overflow-y-visible">
-        <table className="min-w-full" style={{ tableLayout: 'fixed' }}>
+        <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '150px' }} />
-            <col style={{ width: '170px' }} />
-            <col style={{ width: '115px' }} />
-            <col style={{ width: '75px' }} />
-            {showAviationColumns && <col style={{ width: '90px' }} />}
-            {showAviationColumns && <col style={{ width: '100px' }} />}
-            <col style={{ width: '55px' }} />
-            <col style={{ width: '90px' }} />
-            <col style={{ width: '95px' }} />
-            <col style={{ width: '80px' }} />
-            <col style={{ width: '115px' }} />
+            <col style={{ width: '13%' }} />  {/* Name */}
+            <col style={{ width: '17%' }} />  {/* Email */}
+            <col style={{ width: '11%' }} />  {/* Phone */}
+            <col style={{ width: '6%' }} />   {/* Source */}
+            {showAviationColumns && <col style={{ width: '7%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            <col style={{ width: '5%' }} />   {/* Score */}
+            <col style={{ width: '9%' }} />   {/* Stage */}
+            <col style={{ width: '9%' }} />   {/* Status */}
+            <col style={{ width: '7%' }} />   {/* Activity */}
+            <col style={{ width: '10%' }} />  {/* Booking */}
           </colgroup>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
