@@ -264,35 +264,32 @@ export default function FounderDashboard() {
     }
   }
 
-  // Traffic light colors for At a Glance metrics
+  // Traffic light colors for At a Glance metrics (B2B warm WhatsApp lead benchmarks)
   const getMetricColor = (metricType: 'avgScore' | 'responseRate' | 'bookingRate' | 'avgResponseTime', value: number): string => {
-    const GREEN = '#10b981' // emerald-500
-    const AMBER = '#f59e0b' // amber-500
-    const RED = '#ef4444'   // red-500
+    const GREEN = '#22c55e'
+    const AMBER = '#f59e0b'
+    const RED = '#ef4444'
 
     switch (metricType) {
       case 'avgScore':
-        // Green: 90-99%, Amber: 50-89%, Red: <50%
-        if (value >= 90) return GREEN
-        if (value >= 50) return AMBER
+        if (value >= 60) return GREEN
+        if (value >= 30) return AMBER
         return RED
 
       case 'responseRate':
-        // Green: 95-100%, Amber: 90-94%, Red: <90%
         if (value >= 95) return GREEN
-        if (value >= 90) return AMBER
+        if (value >= 80) return AMBER
         return RED
 
       case 'bookingRate':
-        // Green: ≥70%, Amber: 50-69%, Red: <50%
-        if (value >= 70) return GREEN
-        if (value >= 50) return AMBER
+        if (value >= 25) return GREEN
+        if (value >= 15) return AMBER
         return RED
 
       case 'avgResponseTime':
-        // Green: ≤5000ms, Amber: 5001-8000ms, Red: >8000ms (values in ms)
-        if (value > 0 && value <= 5000) return GREEN
-        if (value > 5000 && value <= 8000) return AMBER
+        // Lower is better
+        if (value <= 3000) return GREEN
+        if (value <= 8000) return AMBER
         return RED
 
       default:
@@ -390,7 +387,7 @@ export default function FounderDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="flex flex-col items-center">
               <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Score</p>
+              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
             </div>
             <div className="flex flex-col items-center">
               <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={120} />
