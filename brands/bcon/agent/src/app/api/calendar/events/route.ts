@@ -166,7 +166,6 @@ export async function POST(request: NextRequest) {
         dateTime: eventEnd,
         timeZone: TIMEZONE,
       },
-      attendees: email ? [{ email, displayName: name }] : [],
     }
 
     const createdEvent = await calendar.events.insert({
@@ -267,7 +266,6 @@ export async function PUT(request: NextRequest) {
         dateTime: eventEnd,
         timeZone: TIMEZONE,
       },
-      attendees: email ? [{ email, displayName: name || 'Guest' }] : existingEvent.data.attendees || [],
     }
 
     const updatedEvent = await calendar.events.update({

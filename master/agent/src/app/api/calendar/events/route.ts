@@ -151,13 +151,13 @@ export async function POST(request: NextRequest) {
     const endHour = hour + 1
     const eventEnd = `${date}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
-    const eventTitle = `Windchasers Demo - ${name}`
+    const eventTitle = `BCON AI Brand Audit - ${name}`
 
     const eventData = {
       summary: eventTitle,
       description:
         description ||
-        `Windchasers Demo Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `BCON AI Brand Audit Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
@@ -166,7 +166,6 @@ export async function POST(request: NextRequest) {
         dateTime: eventEnd,
         timeZone: TIMEZONE,
       },
-      attendees: email ? [{ email, displayName: name }] : [],
     }
 
     const createdEvent = await calendar.events.insert({
@@ -254,11 +253,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const eventData = {
-      summary: name ? `Windchasers Demo - ${name}` : existingEvent.data.summary,
+      summary: name ? `BCON AI Brand Audit - ${name}` : existingEvent.data.summary,
       description:
         description ||
         existingEvent.data.description ||
-        `Windchasers Demo Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `BCON AI Brand Audit Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
@@ -267,7 +266,6 @@ export async function PUT(request: NextRequest) {
         dateTime: eventEnd,
         timeZone: TIMEZONE,
       },
-      attendees: email ? [{ email, displayName: name || 'Guest' }] : existingEvent.data.attendees || [],
     }
 
     const updatedEvent = await calendar.events.update({

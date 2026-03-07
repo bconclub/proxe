@@ -174,40 +174,53 @@ export async function POST(request: NextRequest) {
         synced: 0,
         created: 0,
         updated: 0,
+        skipped: 0,
         errors: [],
       })
     }
 
-    // Get all events from Google Calendar for the date range
-    const now = new Date()
+    // Get all events from Google Calendar (past 1 month + future 6 months)
+    const pastDate = new Date()
+    pastDate.setMonth(pastDate.getMonth() - 1)
     const futureDate = new Date()
-    futureDate.setMonth(futureDate.getMonth() + 6) // Sync next 6 months
+    futureDate.setMonth(futureDate.getMonth() + 6)
 
     const { data: calendarEvents } = await calendar.events.list({
       calendarId: CALENDAR_ID,
-      timeMin: now.toISOString(),
+      timeMin: pastDate.toISOString(),
       timeMax: futureDate.toISOString(),
       timeZone: TIMEZONE,
       singleEvents: true,
       orderBy: 'startTime',
+      maxResults: 2500,
     })
 
-    const existingEvents = new Map(
-      (calendarEvents?.items || []).map((event) => [
-        event.id,
-        event,
-      ])
+    // Map by event ID for quick lookup
+    const existingEventsById = new Map(
+      (calendarEvents?.items || []).map((event) => [event.id, event])
     )
 
-    // Create a map of bookings by Google Event ID
-    const bookingsByEventId = new Map(
-      bookings
-        .filter((b: any) => b.metadata?.googleEventId)
-        .map((b: any) => [b.metadata.googleEventId, b])
-    )
+    // Build a fingerprint map: "name|date|hour" → event
+    // This prevents creating duplicates when googleEventId is missing from DB
+    const existingEventsByFingerprint = new Map<string, any>()
+    for (const event of calendarEvents?.items || []) {
+      if (!event.summary || !event.start?.dateTime) continue
+      // Extract name from title like "BCON Booking - Savari [WhatsApp]"
+      const nameMatch = event.summary.match(/Booking\s*-\s*(.+?)(?:\s*\[|$)/)
+      const name = nameMatch?.[1]?.trim()?.toLowerCase() || ''
+      const startDT = new Date(event.start.dateTime)
+      const dateStr = startDT.toISOString().split('T')[0]
+      const hourStr = startDT.getHours().toString().padStart(2, '0')
+      const fingerprint = `${name}|${dateStr}|${hourStr}`
+      // Keep the first (oldest) event for each fingerprint
+      if (!existingEventsByFingerprint.has(fingerprint)) {
+        existingEventsByFingerprint.set(fingerprint, event)
+      }
+    }
 
     let created = 0
     let updated = 0
+    let skipped = 0
     let errors: string[] = []
 
     // Sync each booking
@@ -269,15 +282,18 @@ export async function POST(request: NextRequest) {
             dateTime: eventEnd,
             timeZone: TIMEZONE,
           },
-          attendees: booking.email
-            ? [{ email: booking.email, displayName: booking.name || 'Guest' }]
-            : [],
         }
 
-        const googleEventId = booking.metadata?.googleEventId
+        // Check all possible sources for googleEventId
+        const googleEventId =
+          booking.metadata?.googleEventId ||
+          booking.metadata?.google_event_id ||
+          booking.unified_context?.web?.metadata?.googleEventId ||
+          booking.unified_context?.whatsapp?.metadata?.googleEventId ||
+          null
 
-        if (googleEventId && existingEvents.has(googleEventId)) {
-          // Update existing event
+        if (googleEventId && existingEventsById.has(googleEventId)) {
+          // Update existing event that we have a tracked ID for
           try {
             await calendar.events.update({
               calendarId: CALENDAR_ID,
@@ -286,37 +302,56 @@ export async function POST(request: NextRequest) {
             })
             updated++
           } catch (updateError: any) {
-            // If update fails (e.g., event deleted), create new one
             if (updateError.code === 404) {
+              // Event was deleted from calendar — re-create
               const newEvent = await calendar.events.insert({
                 calendarId: CALENDAR_ID,
                 requestBody: eventData,
               })
-
-              // Store google event ID in the session table metadata
               await updateBookingMetadata(supabase, booking, newEvent.data.id)
               created++
             } else {
-              errors.push(`Failed to update booking ${booking.id}: ${updateError.message}`)
+              errors.push(`Update failed for ${booking.name}: ${updateError.message}`)
             }
           }
         } else {
-          // Create new event
-          try {
-            const newEvent = await calendar.events.insert({
-              calendarId: CALENDAR_ID,
-              requestBody: eventData,
-            })
+          // No tracked googleEventId — check if a matching event already exists
+          // by matching name + date + hour (fingerprint dedup)
+          const bookingName = (booking.name || '').toLowerCase().trim()
+          const fingerprint = `${bookingName}|${bookingDate}|${hour.toString().padStart(2, '0')}`
+          const existingMatch = existingEventsByFingerprint.get(fingerprint)
 
-            // Store google event ID in the session table metadata
-            await updateBookingMetadata(supabase, booking, newEvent.data.id)
-            created++
-          } catch (createError: any) {
-            errors.push(`Failed to create event for booking ${booking.id}: ${createError.message}`)
+          if (existingMatch?.id) {
+            // Event already exists on calendar — link it, don't create a duplicate
+            console.log(`[calendar/sync] Linking existing event ${existingMatch.id} to booking ${booking.id} (${booking.name})`)
+            await updateBookingMetadata(supabase, booking, existingMatch.id)
+            // Also update the event details to latest
+            try {
+              await calendar.events.update({
+                calendarId: CALENDAR_ID,
+                eventId: existingMatch.id,
+                requestBody: eventData,
+              })
+            } catch (_) { /* best effort update */ }
+            updated++
+          } else {
+            // Truly new booking — create event
+            try {
+              const newEvent = await calendar.events.insert({
+                calendarId: CALENDAR_ID,
+                requestBody: eventData,
+              })
+              await updateBookingMetadata(supabase, booking, newEvent.data.id)
+              // Add to fingerprint map so subsequent bookings in same batch don't duplicate
+              existingEventsByFingerprint.set(fingerprint, { id: newEvent.data.id })
+              created++
+            } catch (createError: any) {
+              errors.push(`Create failed for ${booking.name}: ${createError.message}`)
+            }
           }
         }
       } catch (error: any) {
-        errors.push(`Error syncing booking ${booking.id}: ${error.message}`)
+        errors.push(`Sync error for ${booking.name || booking.id}: ${error.message}`)
       }
     }
 
@@ -326,6 +361,7 @@ export async function POST(request: NextRequest) {
       synced: bookings.length,
       created,
       updated,
+      skipped,
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error: any) {
@@ -349,7 +385,7 @@ async function updateBookingMetadata(supabase: any, booking: any, googleEventId:
 
   const table = booking.channel === 'whatsapp' ? 'whatsapp_sessions' : 'web_sessions'
 
-  // Try updating the session table metadata
+  // Update session table metadata
   const { error } = await supabase
     .from(table)
     .update({
@@ -362,6 +398,27 @@ async function updateBookingMetadata(supabase: any, booking: any, googleEventId:
     .not('booking_date', 'is', null)
 
   if (error) {
-    console.warn(`Failed to store googleEventId for booking ${booking.id}:`, error)
+    console.warn(`Failed to store googleEventId in session for booking ${booking.id}:`, error)
+  }
+
+  // Also persist googleEventId in all_leads.metadata (more reliable lookup)
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('metadata')
+      .eq('id', booking.id)
+      .maybeSingle()
+
+    await supabase
+      .from('all_leads')
+      .update({
+        metadata: {
+          ...(lead?.metadata || {}),
+          googleEventId,
+        },
+      })
+      .eq('id', booking.id)
+  } catch (e) {
+    console.warn(`Failed to store googleEventId in all_leads for booking ${booking.id}:`, e)
   }
 }

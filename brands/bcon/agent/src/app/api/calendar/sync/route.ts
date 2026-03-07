@@ -282,9 +282,6 @@ export async function POST(request: NextRequest) {
             dateTime: eventEnd,
             timeZone: TIMEZONE,
           },
-          attendees: booking.email
-            ? [{ email: booking.email, displayName: booking.name || 'Guest' }]
-            : [],
         }
 
         // Check all possible sources for googleEventId

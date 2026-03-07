@@ -569,7 +569,7 @@ export async function createCalendarEvent(booking: {
           conferenceSolutionKey: { type: 'hangoutsMeet' },
         },
       },
-      ...(hasRealEmail ? { attendees: [{ email: booking.email, displayName: booking.name }] } : {}),
+      // No attendees — service account lacks Domain-Wide Delegation; customers get details via WhatsApp
       reminders: {
         useDefault: false,
         overrides: [
@@ -585,30 +585,11 @@ export async function createCalendarEvent(booking: {
       event.location = 'Online Session (Video Call)';
     }
 
-    let createdEvent;
-    let hasAttendees = false;
-
-    try {
-      createdEvent = await calendar.events.insert({
-        calendarId: CALENDAR_ID,
-        requestBody: event,
-        conferenceDataVersion: 1,
-      });
-      hasAttendees = true;
-    } catch (calendarError: any) {
-      // Try without attendees (Domain-Wide Delegation not available)
-      if (calendarError.code === 403 && (calendarError.message?.includes('Domain-Wide') || calendarError.message?.includes('attendees'))) {
-        const { attendees, ...eventWithoutAttendees } = event;
-        createdEvent = await calendar.events.insert({
-          calendarId: CALENDAR_ID,
-          requestBody: eventWithoutAttendees,
-          conferenceDataVersion: 1,
-        });
-        hasAttendees = false;
-      } else {
-        throw calendarError;
-      }
-    }
+    const createdEvent = await calendar.events.insert({
+      calendarId: CALENDAR_ID,
+      requestBody: event,
+      conferenceDataVersion: 1,
+    });
 
     if (!createdEvent?.data?.id) return null;
 
@@ -620,7 +601,7 @@ export async function createCalendarEvent(booking: {
     return {
       eventId: createdEvent.data.id,
       eventLink: createdEvent.data.htmlLink || '',
-      hasAttendees,
+      hasAttendees: false,
       meetLink,
     };
   } catch (error) {

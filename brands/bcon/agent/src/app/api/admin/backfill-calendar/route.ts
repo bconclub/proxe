@@ -218,7 +218,6 @@ export async function GET(request: NextRequest) {
             ].join('\n'),
             start: { dateTime: startISO, timeZone: TIMEZONE },
             end: { dateTime: endTimeISO, timeZone: TIMEZONE },
-            attendees: b.email ? [{ email: b.email, displayName: b.name || undefined }] : [],
             conferenceData: {
               createRequest: {
                 requestId: crypto.randomUUID(),

@@ -217,9 +217,6 @@ async function createCalendarEventWithMeet(booking) {
         conferenceSolutionKey: { type: 'hangoutsMeet' },
       },
     },
-    ...(hasRealEmail
-      ? { attendees: [{ email: booking.email, displayName: booking.name }] }
-      : {}),
     reminders: {
       useDefault: false,
       overrides: [
@@ -237,16 +234,7 @@ async function createCalendarEventWithMeet(booking) {
       conferenceDataVersion: 1,
     });
   } catch (err) {
-    // Retry without attendees if Domain-Wide Delegation issue
-    if (err.code === 403 && (err.message?.includes('Domain') || err.message?.includes('attendees'))) {
-      const { attendees, ...eventWithoutAttendees } = event;
-      createdEvent = await calendar.events.insert({
-        calendarId: CALENDAR_ID,
-        requestBody: eventWithoutAttendees,
-        conferenceDataVersion: 1,
-      });
-    } else {
-      throw err;
+    throw err;
     }
   }
 
