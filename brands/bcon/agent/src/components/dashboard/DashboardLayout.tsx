@@ -547,70 +547,66 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
 
-        {/* Footer Section: User, Icon Bar, Version */}
+        {/* Footer Section: User + Menu + Version in one compact strip */}
         <div
           className="dashboard-layout-sidebar-footer flex-shrink-0 border-t flex flex-col"
           style={{
             borderColor: 'var(--border-primary)',
           }}
         >
-          {/* 1. User Section - Center-aligned */}
+
+          {/* Compact footer row: three-dot menu + version */}
           <div
-            className="dashboard-layout-user-section flex items-center justify-center"
+            className="dashboard-layout-footer-row flex items-center"
             style={{
-              padding: '16px',
+              padding: isCollapsed ? '8px' : '8px 12px',
+              justifyContent: isCollapsed ? 'center' : 'space-between',
             }}
           >
-            <div className="dashboard-layout-user-menu relative">
+            {/* Three-dot menu */}
+            <div className="dashboard-layout-more-options relative">
               <button
-                type="button"
-                className="dashboard-layout-user-menu-button flex items-center rounded-md transition-all duration-200"
+                onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
+                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
                 style={{
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  padding: isCollapsed ? '0' : '8px 12px',
-                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  minWidth: '28px',
+                  minHeight: '28px',
+                  color: 'var(--text-secondary)',
+                  backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                 }}
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                title="More Options"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                  if (!moreOptionsOpen) {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
+                  if (!moreOptionsOpen) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
                 }}
               >
-                <div
-                  className="dashboard-layout-user-avatar rounded-full flex items-center justify-center text-white font-medium flex-shrink-0"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    minWidth: '32px',
-                    minHeight: '32px',
-                    backgroundColor: 'var(--accent-primary)',
-                    marginRight: isCollapsed ? '0' : '8px',
-                    fontSize: '14px',
-                    lineHeight: '1',
-                  }}
-                >
-                  U
-                </div>
-                {!isCollapsed && <span className="dashboard-layout-user-label">User</span>}
+                <MdMoreHoriz size={20} />
               </button>
 
-              {userMenuOpen && !isCollapsed && (
+              {moreOptionsOpen && (
                 <div
-                  className="dashboard-layout-user-menu-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
+                  className="dashboard-layout-more-options-dropdown absolute bottom-full left-0 mb-2 rounded-md shadow-lg py-1 z-50"
                   style={{
                     backgroundColor: 'var(--bg-secondary)',
                     border: '1px solid var(--border-primary)',
-                    minWidth: '120px',
+                    minWidth: '180px',
                   }}
-                  onMouseLeave={() => setUserMenuOpen(false)}
+                  onMouseLeave={() => setMoreOptionsOpen(false)}
                 >
                   <button
-                    onClick={handleLogout}
-                    className="dashboard-layout-user-menu-logout-button block w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                    onClick={() => {
+                      setMoreOptionsOpen(false)
+                      toggleTheme()
+                    }}
+                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
                     style={{
                       color: 'var(--text-primary)',
                     }}
@@ -621,256 +617,56 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    Sign out
+                    {isDarkMode ? (
+                      <>
+                        <MdLightMode size={18} style={{ marginRight: '12px' }} />
+                        Light Mode
+                      </>
+                    ) : (
+                      <>
+                        <MdDarkMode size={18} style={{ marginRight: '12px' }} />
+                        Dark Mode
+                      </>
+                    )}
                   </button>
+                  <Link
+                    href="/status"
+                    onClick={() => {
+                      setMoreOptionsOpen(false)
+                      if (isMobile) {
+                        setMobileSidebarOpen(false)
+                      }
+                    }}
+                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                    style={{
+                      color: 'var(--text-primary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
+                    System Status
+                  </Link>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* 2. Three-dot menu — all secondary actions (Help, Theme, Status, etc.) */}
-          {!isCollapsed ? (
+            {/* Version badge inline */}
             <div
-              className="dashboard-layout-icon-bar flex-shrink-0 border-t flex items-center justify-center"
+              className="dashboard-layout-version-badge px-1.5 py-0.5 rounded text-[10px] font-medium"
               style={{
-                borderColor: 'var(--border-primary)',
-                backgroundColor: 'transparent',
-                padding: '12px',
-                gap: '12px',
+                backgroundColor: 'var(--accent-primary)',
+                color: 'white',
               }}
+              title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
+              suppressHydrationWarning
             >
-              <div className="dashboard-layout-more-options relative">
-                <button
-                  onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
-                  className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    minWidth: '24px',
-                    minHeight: '24px',
-                    color: 'var(--text-primary)',
-                    backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
-                  }}
-                  title="More Options"
-                  onMouseEnter={(e) => {
-                    if (!moreOptionsOpen) {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!moreOptionsOpen) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }
-                  }}
-                >
-                  <MdMoreHoriz size={24} />
-                </button>
-
-                {moreOptionsOpen && (
-                  <div
-                    className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
-                    style={{
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-primary)',
-                      minWidth: '180px',
-                    }}
-                    onMouseLeave={() => setMoreOptionsOpen(false)}
-                  >
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        toggleTheme()
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      {isDarkMode ? (
-                        <>
-                          <MdLightMode size={18} style={{ marginRight: '12px' }} />
-                          Light Mode
-                        </>
-                      ) : (
-                        <>
-                          <MdDarkMode size={18} style={{ marginRight: '12px' }} />
-                          Dark Mode
-                        </>
-                      )}
-                    </button>
-                    <Link
-                      href="/status"
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        if (isMobile) {
-                          setMobileSidebarOpen(false)
-                        }
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
-                      System Status
-                    </Link>
-                  </div>
-                )}
-              </div>
+              v{buildVersion}
             </div>
-          ) : (
-            /* When collapsed, show only three-dot menu */
-            <div
-              className="dashboard-layout-icon-bar-collapsed flex-shrink-0 border-t flex items-center justify-center"
-              style={{
-                borderColor: 'var(--border-primary)',
-                backgroundColor: 'transparent',
-                padding: '12px 8px',
-              }}
-            >
-              <div className="dashboard-layout-more-options relative">
-                <button
-                  onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
-                  className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    minWidth: '32px',
-                    minHeight: '32px',
-                    color: 'var(--text-primary)',
-                    backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
-                  }}
-                  title="More Options"
-                  onMouseEnter={(e) => {
-                    if (!moreOptionsOpen) {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!moreOptionsOpen) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }
-                  }}
-                >
-                  <MdMoreHoriz size={20} />
-                </button>
-
-                {moreOptionsOpen && (
-                  <div
-                    className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
-                    style={{
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-primary)',
-                      minWidth: '180px',
-                    }}
-                    onMouseLeave={() => setMoreOptionsOpen(false)}
-                  >
-                    <button
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        toggleTheme()
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      {isDarkMode ? (
-                        <>
-                          <MdLightMode size={18} style={{ marginRight: '12px' }} />
-                          Light Mode
-                        </>
-                      ) : (
-                        <>
-                          <MdDarkMode size={18} style={{ marginRight: '12px' }} />
-                          Dark Mode
-                        </>
-                      )}
-                    </button>
-                    <Link
-                      href="/status"
-                      onClick={() => {
-                        setMoreOptionsOpen(false)
-                        if (isMobile) {
-                          setMobileSidebarOpen(false)
-                        }
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
-                      System Status
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 3. Version Badge - Below Icon Bar */}
-          <div
-            className="dashboard-layout-version-info text-center"
-            style={{
-              padding: '12px 16px',
-            }}
-          >
-            {!isCollapsed ? (
-              <>
-                <div
-                  className="dashboard-layout-version-badge inline-block px-2 py-1 rounded text-xs font-medium mb-1"
-                  style={{
-                    backgroundColor: 'var(--accent-primary)',
-                    color: 'white',
-                  }}
-                >
-                  v{buildVersion}
-                </div>
-                <p
-                  className="dashboard-layout-version-date text-xs mt-1"
-                  style={{ color: 'var(--text-secondary)' }}
-                  suppressHydrationWarning
-                >
-                  Build {buildDate || 'Loading...'}
-                </p>
-              </>
-            ) : (
-              <div
-                className="dashboard-layout-version-badge-collapsed inline-block px-1.5 py-0.5 rounded text-xs font-medium"
-                style={{
-                  backgroundColor: 'var(--accent-primary)',
-                  color: 'white',
-                }}
-                title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
-              >
-                v{buildVersion.split('.').slice(0, 2).join('.')}
-              </div>
-            )}
           </div>
         </div>
       </div>
