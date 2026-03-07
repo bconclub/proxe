@@ -992,11 +992,15 @@ export default function InboxPage() {
                         </div>
                       </div>
 
-                      {conv.brand_name && (
-                        <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
-                          {conv.brand_name}
-                        </p>
-                      )}
+                      {/* Brand + Source line */}
+                      <div className="flex items-center gap-1.5 mt-px">
+                        <img src="/bcon-icon.png" alt="" width={12} height={12} className="rounded-sm flex-shrink-0" style={{ opacity: 0.7 }} />
+                        <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>BCON</span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>
+                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
+                          {conv.channels.includes('web') ? 'bconclub.com' : conv.channels.includes('whatsapp') ? 'WhatsApp' : conv.channels[0] || 'Website'}
+                        </span>
+                      </div>
 
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <p className="text-[11px] truncate opacity-50 flex-1">
