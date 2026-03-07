@@ -25,6 +25,7 @@ interface Booking {
 interface CalendarViewProps {
   bookings: Booking[]
   onDateSelect?: (date: Date) => void
+  headerRight?: React.ReactNode
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -37,7 +38,7 @@ function formatHour(hour: number): string {
   return `${hour - 12} PM`
 }
 
-export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
+export default function CalendarView({ bookings, onDateSelect, headerRight }: CalendarViewProps) {
   const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -186,26 +187,26 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
   const tzLabel = `GMT${tzSign}${String(tzHours).padStart(2, '0')}:${String(tzMins).padStart(2, '0')}`
 
   return (
-    <div className="flex gap-0 h-[calc(100vh-200px)]">
-      {/* Left Sidebar — Mini Calendar (Google Calendar style) */}
-      <div className="hidden lg:flex flex-col w-[220px] flex-shrink-0 p-4 border-r" style={{ borderColor: 'var(--border-primary)' }}>
+    <div className="flex gap-0 h-[calc(100vh-130px)]">
+      {/* Left Sidebar — Mini Calendar */}
+      <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
         {/* Mini calendar month nav */}
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
-            <MdChevronLeft size={18} style={{ color: 'var(--text-secondary)' }} />
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+            <MdChevronLeft size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-            {format(currentDate, 'MMMM yyyy')}
+          <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+            {format(currentDate, 'MMM yyyy')}
           </span>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
-            <MdChevronRight size={18} style={{ color: 'var(--text-secondary)' }} />
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+            <MdChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
 
         {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
+        <div className="grid grid-cols-7">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <div key={i} className="text-[10px] text-center font-medium py-1" style={{ color: 'var(--text-secondary)' }}>{d}</div>
+            <div key={i} className="text-[9px] text-center font-medium py-0.5" style={{ color: 'var(--text-secondary)' }}>{d}</div>
           ))}
         </div>
 
@@ -221,7 +222,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               <button
                 key={idx}
                 onClick={() => handleDateClick(day)}
-                className="relative aspect-square flex items-center justify-center text-[11px] rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"
+                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"
                 style={{
                   color: !isCurrentMonth ? 'var(--text-secondary)' : isSelected ? '#fff' : isToday ? 'var(--accent-primary)' : 'var(--text-primary)',
                   backgroundColor: isSelected ? 'var(--accent-primary)' : isToday ? 'var(--accent-subtle)' : 'transparent',
@@ -231,7 +232,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               >
                 {format(day, 'd')}
                 {hasBookings && !isSelected && (
-                  <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--accent-primary)' }} />
+                  <span className="absolute bottom-0 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--accent-primary)' }} />
                 )}
               </button>
             )
@@ -239,12 +240,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         </div>
 
         {/* View toggle */}
-        <div className="mt-4 pt-4 flex gap-1" style={{ borderTop: '1px solid var(--border-primary)' }}>
+        <div className="mt-3 pt-3 flex gap-1" style={{ borderTop: '1px solid var(--border-primary)' }}>
           {(['week', 'month'] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className="flex-1 py-1.5 text-xs font-medium rounded-md transition-colors capitalize"
+              className="flex-1 py-1 text-[10px] font-medium rounded transition-colors capitalize"
               style={{
                 backgroundColor: viewMode === mode ? 'var(--accent-primary)' : 'transparent',
                 color: viewMode === mode ? '#fff' : 'var(--text-secondary)',
@@ -258,33 +259,31 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
       {/* Main Calendar */}
       <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-        {/* Top bar — Google Calendar style */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+        {/* Top bar */}
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <button
             onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()) }}
-            className="px-4 py-1.5 text-sm font-medium border rounded-md hover:shadow-sm transition-shadow"
+            className="px-3 py-1 text-xs font-medium border rounded hover:shadow-sm transition-shadow"
             style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
           >
             Today
           </button>
-          <button onClick={() => navigateDate('prev')} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
-            <MdChevronLeft size={22} style={{ color: 'var(--text-secondary)' }} />
+          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
+            <MdChevronLeft size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <button onClick={() => navigateDate('next')} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
-            <MdChevronRight size={22} style={{ color: 'var(--text-secondary)' }} />
+          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
+            <MdChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <h2 className="text-lg font-medium ml-2" style={{ color: 'var(--text-primary)' }}>
-            {viewMode === 'week'
-              ? format(currentDate, 'MMMM yyyy')
-              : format(currentDate, 'MMMM yyyy')}
+          <h2 className="text-sm font-medium ml-1" style={{ color: 'var(--text-primary)' }}>
+            {format(currentDate, 'MMMM yyyy')}
           </h2>
           {/* Mobile view toggle */}
-          <div className="lg:hidden ml-auto flex gap-1">
+          <div className="lg:hidden flex gap-1">
             {(['week', 'month'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className="px-3 py-1 text-xs font-medium rounded capitalize"
+                className="px-2 py-0.5 text-[10px] font-medium rounded capitalize"
                 style={{
                   backgroundColor: viewMode === mode ? 'var(--accent-primary)' : 'transparent',
                   color: viewMode === mode ? '#fff' : 'var(--text-secondary)',
@@ -294,6 +293,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
               </button>
             ))}
           </div>
+          {/* Right side — sync button etc. */}
+          {headerRight && <div className="ml-auto">{headerRight}</div>}
         </div>
 
         {viewMode === 'week' ? (
@@ -302,8 +303,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             {/* Day header row — fixed */}
             <div className="flex border-b" style={{ borderColor: 'var(--border-primary)' }}>
               {/* Timezone label in corner */}
-              <div className="w-[52px] flex-shrink-0 flex items-end justify-center pb-1">
-                <span className="text-[9px]" style={{ color: 'var(--text-secondary)' }}>{tzLabel}</span>
+              <div className="w-[48px] flex-shrink-0 flex items-end justify-center pb-0.5">
+                <span className="text-[8px]" style={{ color: 'var(--text-secondary)' }}>{tzLabel}</span>
               </div>
               {/* Day columns */}
               {weekDays.map((day, i) => {
@@ -311,20 +312,20 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 return (
                   <div
                     key={i}
-                    className="flex-1 text-center py-2 border-l"
+                    className="flex-1 text-center py-1 border-l"
                     style={{ borderColor: 'var(--border-primary)' }}
                   >
-                    <div className="text-[11px] font-medium" style={{ color: isToday ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                    <div className="text-[10px] font-medium" style={{ color: isToday ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
                       {DAY_LABELS[i]}
                     </div>
                     <div
-                      className="text-[26px] font-normal leading-tight mx-auto mt-0.5 flex items-center justify-center"
+                      className="text-lg font-normal leading-tight mx-auto flex items-center justify-center"
                       style={{
                         color: isToday ? '#fff' : 'var(--text-primary)',
                         backgroundColor: isToday ? 'var(--accent-primary)' : 'transparent',
                         borderRadius: '50%',
-                        width: '40px',
-                        height: '40px',
+                        width: '30px',
+                        height: '30px',
                       }}
                     >
                       {format(day, 'd')}
@@ -338,7 +339,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="flex relative">
                 {/* Time labels */}
-                <div className="w-[52px] flex-shrink-0">
+                <div className="w-[48px] flex-shrink-0">
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
@@ -346,7 +347,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                       style={{ height: '44px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
                     >
                       {hour > 0 && (
-                        <span className="absolute -top-[6px] right-2 text-[10px] leading-none" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="absolute -top-[6px] right-1.5 text-[9px] leading-none" style={{ color: 'var(--text-secondary)' }}>
                           {formatHour(hour)}
                         </span>
                       )}
@@ -406,11 +407,11 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           </div>
         ) : (
           /* ===== MONTH VIEW ===== */
-          <div className="flex-1 flex flex-col overflow-hidden p-4">
-            <div className="flex-1 grid grid-cols-7 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-primary)', gridTemplateRows: `auto repeat(${Math.ceil(calendarDays.length / 7)}, 1fr)` }}>
+          <div className="flex-1 flex flex-col overflow-hidden p-2">
+            <div className="flex-1 grid grid-cols-7 overflow-hidden rounded border" style={{ borderColor: 'var(--border-primary)', gridTemplateRows: `auto repeat(${Math.ceil(calendarDays.length / 7)}, 1fr)` }}>
               {/* Day headers */}
               {DAY_LABELS.map((day) => (
-                <div key={day} className="text-center text-xs font-medium py-1.5" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                <div key={day} className="text-center text-[10px] font-medium py-1" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
                   {day}
                 </div>
               ))}
@@ -469,10 +470,10 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-5">
-              <div className="flex items-start justify-between mb-4">
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {selectedBooking.name || 'Unnamed Lead'}
                   </h3>
                   <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>

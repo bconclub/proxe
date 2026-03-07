@@ -82,12 +82,18 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     try {
       const response = await fetch('/api/calendar/sync', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       })
 
-      const data = await response.json()
+      // Safely parse response — read as text first to avoid JSON.parse crash
+      const text = await response.text()
+      let data: any
+      try {
+        data = JSON.parse(text)
+      } catch {
+        console.error('Calendar sync returned non-JSON:', text.substring(0, 200))
+        throw new Error('Calendar sync failed — unexpected server response')
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to sync calendar')
@@ -95,7 +101,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
 
       setSyncStatus({
         success: !data.errors || data.errors.length === 0,
-        message: data.message || 'Calendar synced successfully',
+        message: data.message || 'Synced',
         details: data.errors && data.errors.length > 0
           ? `${data.created} created, ${data.updated} updated. ${data.errors.length} errors.`
           : `${data.created} created, ${data.updated} updated.`,
@@ -104,9 +110,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       setShowErrors(false)
 
       // Refresh bookings after sync
-      setTimeout(() => {
-        fetchBookings()
-      }, 2000)
+      setTimeout(() => { fetchBookings() }, 2000)
     } catch (error: any) {
       setSyncStatus({
         success: false,
@@ -119,91 +123,59 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
 
   // Calendar view
   if (view === 'calendar' || view === 'full') {
-    return (
-      <div className="space-y-4">
-        {/* Sync Button */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSyncCalendar}
-              disabled={syncing}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-                transition-colors
-                ${syncing
-                  ? 'bg-gray-400 cursor-not-allowed text-white'
-                  : 'text-white hover:opacity-90'
-                }
-              `}
-              style={!syncing ? { backgroundColor: 'var(--accent-primary)' } : undefined}
+    const syncBar = (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSyncCalendar}
+          disabled={syncing}
+          className={`
+            flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors
+            ${syncing ? 'bg-gray-400 cursor-not-allowed text-white' : 'text-white hover:opacity-90'}
+          `}
+          style={!syncing ? { backgroundColor: 'var(--accent-primary)' } : undefined}
+        >
+          <MdSync className={syncing ? 'animate-spin' : ''} size={14} />
+          {syncing ? 'Syncing...' : 'Sync Google Calendar'}
+        </button>
+        {syncStatus && (
+          <div className="relative">
+            <div
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] ${
+                syncStatus.success
+                  ? 'bg-green-500/10 text-green-500'
+                  : syncStatus.errorList && syncStatus.errorList.length > 0
+                    ? 'bg-amber-500/10 text-amber-500'
+                    : 'bg-red-500/10 text-red-500'
+              }`}
             >
-              <MdSync className={syncing ? 'animate-spin' : ''} size={18} />
-              {syncing ? 'Syncing...' : 'Sync with Google Calendar'}
-            </button>
-            {syncStatus && (
-              <div className="relative">
-                <div
-                  className={`
-                    flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
-                    ${syncStatus.success
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                      : syncStatus.errorList && syncStatus.errorList.length > 0
-                        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
-                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                    }
-                  `}
-                >
-                  {syncStatus.success ? (
-                    <MdCheckCircle size={18} />
-                  ) : (
-                    <MdError size={18} />
-                  )}
-                  <span>{syncStatus.message}</span>
-                  {syncStatus.details && (
-                    <span className="text-xs opacity-75">({syncStatus.details})</span>
-                  )}
-                  {syncStatus.errorList && syncStatus.errorList.length > 0 && (
-                    <button
-                      onClick={() => setShowErrors(!showErrors)}
-                      className="ml-1 text-xs underline opacity-75 hover:opacity-100 cursor-pointer"
-                    >
-                      {showErrors ? 'Hide' : 'View errors'}
-                    </button>
-                  )}
+              {syncStatus.success ? <MdCheckCircle size={14} /> : <MdError size={14} />}
+              <span>{syncStatus.message}</span>
+              {syncStatus.details && <span className="opacity-75">({syncStatus.details})</span>}
+              {syncStatus.errorList && syncStatus.errorList.length > 0 && (
+                <button onClick={() => setShowErrors(!showErrors)} className="ml-0.5 underline opacity-75 hover:opacity-100 cursor-pointer">
+                  {showErrors ? 'Hide' : 'Errors'}
+                </button>
+              )}
+            </div>
+            {showErrors && syncStatus.errorList && syncStatus.errorList.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 z-50 w-[360px] max-h-48 overflow-y-auto border rounded-lg shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Sync Errors ({syncStatus.errorList.length})</span>
+                  <button onClick={() => setShowErrors(false)} className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>✕</button>
                 </div>
-                {/* Error details tooltip/dropdown */}
-                {showErrors && syncStatus.errorList && syncStatus.errorList.length > 0 && (
-                  <div className="absolute top-full left-0 mt-1 z-50 w-[420px] max-h-64 overflow-y-auto bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                        Sync Errors ({syncStatus.errorList.length})
-                      </span>
-                      <button
-                        onClick={() => setShowErrors(false)}
-                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="space-y-1.5">
-                      {syncStatus.errorList.map((err, idx) => (
-                        <div
-                          key={idx}
-                          className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 px-2 py-1.5 rounded"
-                        >
-                          {err}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-1">
+                  {syncStatus.errorList.map((err, idx) => (
+                    <div key={idx} className="text-[10px] bg-red-500/10 text-red-500 px-2 py-1 rounded">{err}</div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        </div>
-        <CalendarView bookings={bookings} />
+        )}
       </div>
     )
+
+    return <CalendarView bookings={bookings} headerRight={syncBar} />
   }
 
   // Upcoming list view
