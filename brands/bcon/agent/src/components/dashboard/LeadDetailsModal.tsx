@@ -77,6 +77,53 @@ function renderMarkdown(text: string) {
   });
 }
 
+/** Parse structured summary (LABEL: content) into compact formatted blocks */
+function renderSummary(text: string) {
+  if (!text) return null;
+
+  const labelIcons: Record<string, string> = {
+    'BUSINESS': '🏢',
+    'PROBLEM': '⚡',
+    'DISCUSSION': '💬',
+    'BOOKING': '📅',
+    'STATUS': '📊',
+    'RED FLAGS': '🚩',
+    'NEXT STEP': '→',
+  };
+
+  // Try to split on known labels
+  const labelPattern = /\b(BUSINESS|PROBLEM|DISCUSSION|BOOKING|STATUS|RED FLAGS|NEXT STEP)\s*:\s*/g;
+  const matches = [...text.matchAll(labelPattern)];
+
+  if (matches.length < 2) {
+    // Not a structured summary — render as plain markdown
+    return <span>{renderMarkdown(text)}</span>;
+  }
+
+  const sections: { label: string; content: string }[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const label = matches[i][1];
+    const start = matches[i].index! + matches[i][0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    const content = text.slice(start, end).trim();
+    if (content) sections.push({ label, content });
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {sections.map((s, i) => (
+        <div key={i} className="flex gap-1.5 text-xs leading-snug">
+          <span className="flex-shrink-0 w-4 text-center">{labelIcons[s.label] || '•'}</span>
+          <div>
+            <span className="font-semibold text-gray-900 dark:text-white">{s.label}</span>
+            <span className="text-gray-600 dark:text-gray-400"> {s.content}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
 
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
@@ -1390,36 +1437,36 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     aria-labelledby="lead-tab-summary"
                     className="lead-tabpanel-summary space-y-4"
                   >
-                    <article className="lead-summary-card p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                      <h3 className="lead-summary-title text-sm font-semibold mb-3 flex items-center justify-between text-gray-900 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <MdAutoAwesome size={16} className="text-blue-500" aria-hidden="true" />
-                          Unified Summary
+                    <article className="lead-summary-card p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                      <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-gray-900 dark:text-white">
+                        <div className="flex items-center gap-1.5">
+                          <MdAutoAwesome size={14} className="text-blue-500" aria-hidden="true" />
+                          Summary
                         </div>
                         <button
                           onClick={() => loadUnifiedSummary(true)}
                           disabled={loadingSummary}
-                          className="p-1 px-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition-colors flex items-center gap-1.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-0.5 px-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition-colors flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Regenerate summary"
                         >
-                          <MdRefresh size={14} className={loadingSummary ? 'animate-spin' : ''} />
+                          <MdRefresh size={12} className={loadingSummary ? 'animate-spin' : ''} />
                           <span>{loadingSummary ? 'REGENERATING...' : 'REFRESH'}</span>
                         </button>
                       </h3>
                       {loadingSummary && !unifiedSummary ? (
-                        <div className="lead-summary-loading-state text-sm text-gray-500 dark:text-gray-400 py-2" aria-live="polite">
+                        <div className="lead-summary-loading-state text-xs text-gray-500 dark:text-gray-400 py-1" aria-live="polite">
                           <div className="animate-pulse flex items-center gap-2">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                            Loading initial summary...
+                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                            Loading summary...
                           </div>
                         </div>
                       ) : (
                         <div className={`lead-summary-content transition-opacity ${loadingSummary ? 'opacity-60' : 'opacity-100'}`}>
-                          <p className="lead-summary-text text-sm leading-relaxed mb-3 text-gray-700 dark:text-gray-300">
-                            {unifiedSummary ? renderMarkdown(unifiedSummary) : 'No summary available. Click Refresh to generate one.'}
-                          </p>
+                          <div className="lead-summary-text mb-2">
+                            {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-gray-500">No summary available. Click Refresh to generate one.</p>}
+                          </div>
                           {summaryAttribution && (
-                            <footer className="lead-summary-attribution text-xs pt-3 border-t border-blue-200 dark:border-blue-800 text-gray-500 dark:text-gray-400">
+                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-gray-400 dark:text-gray-500">
                               {summaryAttribution}
                             </footer>
                           )}
