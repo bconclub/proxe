@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-// In-memory cache for metrics (30 seconds TTL)
+// In-memory cache for metrics (5 minutes TTL)
 interface CachedMetrics {
   data: any
   timestamp: number
@@ -11,7 +11,7 @@ interface CachedMetrics {
 }
 
 let metricsCache: CachedMetrics | null = null
-const CACHE_TTL = 30000 // 30 seconds in milliseconds
+const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,47 +29,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(metricsCache.data, {
         headers: {
           'X-Cache': 'HIT',
-          'Cache-Control': 'private, max-age=30',
+          'Cache-Control': 'private, max-age=300',
         },
       })
     }
 
     // Cache miss - proceed with database queries
     const supabase = await createClient()
-    
-    // Get all leads with full data including booking columns
-    const { data: leads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint, booking_date, booking_time')
-      .order('lead_score', { ascending: false })
-    
-    // Get booking data from all session tables
-    const { data: whatsappSessions } = await supabase
-      .from('whatsapp_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    const { data: webSessions } = await supabase
-      .from('web_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    // Get session data for conversation counting (with message_count and created_at)
-    // Primary: sessions with message_count >= 1
-    // Fallback: also count sessions that have last_message_at set (activity happened but count wasn't tracked)
-    const { data: webSessionsForConversations } = await supabase
-      .from('web_sessions')
-      .select('id, created_at, message_count, last_message_at, conversation_summary')
 
-    const { data: whatsappSessionsForConversations } = await supabase
-      .from('whatsapp_sessions')
-      .select('id, created_at, message_count, last_message_at, conversation_summary')
-    
-    const { data: voiceSessions } = await supabase
-      .from('voice_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    const { data: socialSessions } = await supabase
-      .from('social_sessions')
-      .select('lead_id, booking_date, booking_time')
+    // ============================================================================
+    // PERFORMANCE: All queries run in parallel via Promise.all
+    // Each table is queried ONCE with only the columns needed
+    // ============================================================================
+    const [
+      { data: leads, error: leadsError },
+      { data: webSessions },
+      { data: whatsappSessions },
+      { data: voiceSessions },
+      { data: socialSessions },
+      { data: conversationsData, error: conversationsError },
+      { data: stageChanges },
+    ] = await Promise.all([
+      // 1. all_leads - core lead data
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint, booking_date, booking_time')
+        .order('lead_score', { ascending: false }),
+      // 2. web_sessions - ONE query for bookings + conversation counting + booking events
+      supabase
+        .from('web_sessions')
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
+      // 3. whatsapp_sessions - ONE query for bookings + conversation counting + booking events
+      supabase
+        .from('whatsapp_sessions')
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
+      // 4. voice_sessions - booking data only
+      supabase
+        .from('voice_sessions')
+        .select('lead_id, booking_date, booking_time'),
+      // 5. social_sessions - booking data only
+      supabase
+        .from('social_sessions')
+        .select('lead_id, booking_date, booking_time'),
+      // 6. conversations - messages for response time + activity (ONE query)
+      supabase
+        .from('conversations')
+        .select('lead_id, sender, created_at, metadata, channel')
+        .order('created_at', { ascending: true }),
+      // 7. lead_stage_changes - recent stage transitions
+      supabase
+        .from('lead_stage_changes')
+        .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ])
     
     // Create a map of lead_id -> booking data from all channels
     const sessionBookings: Record<string, { date: string | null; time: string | null }> = {}
@@ -100,32 +113,15 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
-    
+
     // Ensure leads is an array
     const safeLeads = leads || []
 
-    // Get messages for response time calculation
-    // Try conversations first, fallback to messages
+    // Use conversations data from Promise.all (already fetched above)
     let messages: any[] = []
-    const { data: conversationsData, error: conversationsError } = await supabase
-      .from('conversations')
-      .select('lead_id, sender, created_at, metadata, channel')
-      .order('created_at', { ascending: true })
-    
     if (conversationsError) {
-      console.warn('Error fetching conversations, trying messages table:', conversationsError)
-      // Fallback to messages table if conversations doesn't exist
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('lead_id, sender, created_at, metadata, channel')
-        .order('created_at', { ascending: true })
-      
-      if (messagesError) {
-        console.warn('Error fetching messages:', messagesError)
-        messages = []
-      } else {
-        messages = messagesData || []
-      }
+      console.warn('Error fetching conversations:', conversationsError)
+      messages = []
     } else {
       messages = conversationsData || []
     }
@@ -224,8 +220,8 @@ export async function GET(request: NextRequest) {
         !!session.conversation_summary
       )
     }
-    const safeWebSessions = (webSessionsForConversations || []).filter(hasActivity)
-    const safeWhatsappSessions = (whatsappSessionsForConversations || []).filter(hasActivity)
+    const safeWebSessions = (webSessions || []).filter(hasActivity)
+    const safeWhatsappSessions = (whatsappSessions || []).filter(hasActivity)
     
     // Helper function to count unique sessions within a date range
     const countSessionsInRange = (sessions: any[], startDate: Date, endDate?: Date) => {
@@ -341,15 +337,14 @@ export async function GET(request: NextRequest) {
     let avgResponseTimeMs = 0
 
     try {
-      // Strategy 1: Use pre-calculated input_to_output_gap_ms
-      const { data: conversationsForResponse, error: convError } = await supabase
-        .from('conversations')
-        .select('metadata')
-        .in('channel', ['web', 'whatsapp'])
-        .eq('sender', 'agent')
-        .not('metadata->input_to_output_gap_ms', 'is', null)
+      // Strategy 1: Use pre-calculated input_to_output_gap_ms from conversations (already fetched)
+      const conversationsForResponse = messages.filter((msg: any) =>
+        (msg.channel === 'web' || msg.channel === 'whatsapp') &&
+        msg.sender === 'agent' &&
+        msg.metadata?.input_to_output_gap_ms != null
+      )
 
-      if (!convError && conversationsForResponse && conversationsForResponse.length > 0) {
+      if (conversationsForResponse.length > 0) {
         let totalGapMs = 0
         let validCount = 0
 
@@ -408,9 +403,6 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      if (convError) {
-        console.warn('Error fetching conversations for response time:', convError)
-      }
     } catch (error) {
       console.warn('Error calculating avg response time:', error)
     }
@@ -537,13 +529,7 @@ export async function GET(request: NextRequest) {
       metadata?: any
     }> = []
 
-    // Get stage changes from lead_stage_changes
-    const { data: stageChanges } = await supabase
-      .from('lead_stage_changes')
-      .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
-      .order('created_at', { ascending: false })
-      .limit(50)
-
+    // Stage changes already fetched in Promise.all above
     stageChanges?.forEach((change: any) => {
       const lead = safeLeads.find(l => l.id === change.lead_id)
       if (lead && change.old_stage !== change.new_stage) {
@@ -562,13 +548,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get booking events from web_sessions and whatsapp_sessions
-    const { data: webBookingSessions } = await supabase
-      .from('web_sessions')
-      .select('lead_id, booking_date, booking_time, booking_status, booking_created_at, customer_name')
-      .not('booking_date', 'is', null)
-      .order('booking_created_at', { ascending: false })
-      .limit(20)
+    // Get booking events from web_sessions (already fetched in Promise.all, filter here)
+    const webBookingSessions = (webSessions || [])
+      .filter((s: any) => s.booking_date != null)
+      .sort((a: any, b: any) => new Date(b.booking_created_at || 0).getTime() - new Date(a.booking_created_at || 0).getTime())
+      .slice(0, 20)
 
     webBookingSessions?.forEach((session: any) => {
       const lead = safeLeads.find(l => l.id === session.lead_id)
@@ -589,12 +573,11 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    const { data: whatsappBookingSessions } = await supabase
-      .from('whatsapp_sessions')
-      .select('lead_id, booking_date, booking_time, booking_status, booking_created_at, customer_name')
-      .not('booking_date', 'is', null)
-      .order('booking_created_at', { ascending: false })
-      .limit(20)
+    // Get booking events from whatsapp_sessions (already fetched in Promise.all, filter here)
+    const whatsappBookingSessions = (whatsappSessions || [])
+      .filter((s: any) => s.booking_date != null)
+      .sort((a: any, b: any) => new Date(b.booking_created_at || 0).getTime() - new Date(a.booking_created_at || 0).getTime())
+      .slice(0, 20)
 
     whatsappBookingSessions?.forEach((session: any) => {
       const lead = safeLeads.find(l => l.id === session.lead_id)
@@ -989,32 +972,40 @@ export async function GET(request: NextRequest) {
     // This ensures scores are always available, especially when there's only one lead
     let totalScore = 0
     let leadsWithScores = 0
-    
-    for (const lead of safeLeads) {
-      let score = lead.lead_score
-      
-      // If score is null/undefined, try to calculate it using database function
-      if (score === null || score === undefined) {
-        try {
-          const { data: calculatedScore, error: scoreError } = await supabase.rpc('calculate_lead_score', {
-            lead_uuid: lead.id
-          })
-          
-          if (!scoreError && calculatedScore !== null && calculatedScore !== undefined) {
-            score = typeof calculatedScore === 'number' ? calculatedScore : parseFloat(calculatedScore)
-            // Update the lead's score in memory for later use
-            lead.lead_score = score
-          } else {
-            // If calculation fails, default to 0
-            score = 0
-          }
-        } catch (error) {
-          console.warn(`Failed to calculate score for lead ${lead.id}:`, error)
-          score = 0
+
+    // Batch-calculate scores for leads with null scores (parallel RPC calls)
+    const leadsNeedingScores = safeLeads.filter(
+      (lead) => lead.lead_score === null || lead.lead_score === undefined
+    )
+
+    if (leadsNeedingScores.length > 0) {
+      const scoreResults = await Promise.all(
+        leadsNeedingScores.map((lead) =>
+          supabase
+            .rpc('calculate_lead_score', { lead_uuid: lead.id })
+            .then(({ data, error }) => ({
+              leadId: lead.id,
+              score: !error && data != null ? (typeof data === 'number' ? data : parseFloat(data)) : 0,
+            }))
+            .catch(() => ({ leadId: lead.id, score: 0 }))
+        )
+      )
+
+      // Apply calculated scores back to leads in memory
+      const scoreMap = new Map(scoreResults.map((r) => [r.leadId, r.score]))
+      leadsNeedingScores.forEach((lead) => {
+        const calculated = scoreMap.get(lead.id)
+        if (calculated !== undefined && !isNaN(calculated)) {
+          lead.lead_score = calculated
+        } else {
+          lead.lead_score = 0
         }
-      }
-      
-      totalScore += score || 0
+      })
+    }
+
+    // Now compute totals (all leads have scores)
+    for (const lead of safeLeads) {
+      totalScore += lead.lead_score || 0
       leadsWithScores++
     }
     
@@ -1427,7 +1418,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(responseData, {
       headers: {
         'X-Cache': 'MISS',
-        'Cache-Control': 'private, max-age=30',
+        'Cache-Control': 'private, max-age=300',
       },
     })
   } catch (error) {
