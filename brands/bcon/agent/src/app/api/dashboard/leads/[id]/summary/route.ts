@@ -259,48 +259,68 @@ export async function GET(
         brandInfo.push(`Timeline: ${keyInfo.timeline}`)
       }
 
+      // Fetch full conversation history for richer summary
+      let allConversationMessages: any[] = []
+      try {
+        const { data: convData } = await supabase
+          .from('conversations')
+          .select('content, sender, created_at, channel')
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: true })
+          .limit(80)
+
+        if (convData) allConversationMessages = convData
+      } catch (err) {
+        console.error('Error fetching conversation for summary:', err)
+      }
+
+      const fullConversationContext = allConversationMessages
+        .map(m => `${m.sender === 'customer' ? 'Customer' : 'PROXe'} (${m.channel}): ${m.content}`)
+        .join('\n')
+
+      // Extract profile data from unified_context
+      const waProfile = lead.unified_context?.whatsapp?.profile || {}
+      const webProfile = lead.unified_context?.web?.profile || {}
+      const profileInfo: string[] = []
+      if (waProfile.company || webProfile.company) profileInfo.push(`Company: ${waProfile.company || webProfile.company}`)
+      if (waProfile.business_type || webProfile.business_type) profileInfo.push(`Business: ${waProfile.business_type || webProfile.business_type}`)
+      if (waProfile.city || webProfile.city) profileInfo.push(`City: ${waProfile.city || webProfile.city}`)
+      if (waProfile.notes || webProfile.notes) profileInfo.push(`Notes: ${waProfile.notes || webProfile.notes}`)
+
       // Try to generate unified summary using Claude API
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          // Include existing summary if available for context preservation
-          const existingSummary = lead.unified_context?.unified_summary || ''
+          const prompt = `You are summarizing a sales conversation for the BCON team. Read the FULL conversation below and generate a brief but complete summary.
 
-          const prompt = `Generate a useful summary for this business lead. This is BCON Club — an AI-powered business solutions company.
+REQUIRED SECTIONS (include all that apply):
+1. **BUSINESS**: What does this lead's business do? (from what THEY said in conversation)
+2. **PROBLEM**: What challenges or pain points did they mention?
+3. **DISCUSSION**: What solutions or services were discussed?
+4. **BOOKING**: Was a call booked? Date/time? Did it succeed or fail?
+5. **STATUS**: Are they engaged, cold, frustrated, or lost?
+6. **RED FLAGS**: Did they ask for a human? Get upset? Go silent? Hit errors?
+7. **NEXT STEP**: What should the team do next?
 
-${existingSummary ? `PREVIOUS SUMMARY (preserve key facts from this, update with new info):\n${existingSummary}\n` : ''}
-FORMAT REQUIREMENTS:
-- Write exactly 2-3 concise, punchy sentences.
-- Use markdown **bolding** for critical information like service interest, business needs, status, or intent.
-- Summarize the conversation, current status, and next steps.
+RULES:
+- 3-5 sentences max. Be specific with actual details from the conversation.
+- Use markdown **bolding** for key info (business name, booking date, red flags).
+- DO NOT use generic phrases like "high intent", "shows interest", "50% response rate".
+- DO NOT describe stats. Describe what ACTUALLY HAPPENED.
 
-CRITICAL RULES:
-- BE CONCISE. No fluff. No "This user is...". Just the facts.
-- ONLY state actions explicitly confirmed in messages.
-- NEVER assume actions that aren't explicitly stated.
-- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary.
-- NEVER mention "course offerings", "enrollment", or aviation terms — this is a business AI solutions company.
-- If a previous summary exists, preserve its key facts and ADD new information. Do not lose important context.
+BAD: "Lead shows high intent with 50% response rate. Inactive for 2 days."
+GOOD: "**Wasi** runs **Design Lyf Realty & Interiors** in Bangalore — interior design focus. Getting Meta ad leads but quality is poor. Tried to book **Monday 3pm** but booking tool looped. Got frustrated and asked for a human. **Needs manual outreach** — call him directly."
 
-Lead Information:
-Name: ${lead.customer_name || 'Customer'}
-Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
-Days Inactive: ${daysInactive}
-${brandInfo.length > 0 ? `\nLead Details:\n${brandInfo.join('\n')}` : ''}
+Lead: ${lead.customer_name || 'Customer'}
+Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
+${profileInfo.length > 0 ? 'Extracted Profile: ' + profileInfo.join(' | ') : ''}
 
-Channel Summaries:
-${webSummary ? `Web Channel:\n${webSummary}\n` : ''}
-${whatsappSummary ? `WhatsApp Channel:\n${whatsappSummary}\n` : ''}
+${fullConversationContext ? `FULL CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}
 
 Recent Activities:
 ${activitiesContext}
 
-${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
-${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
-${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
-${lead.unified_context?.next_touchpoint ? `Next Touchpoint: ${lead.unified_context.next_touchpoint}` : ''}
-
-Generate a 2-3 sentence summary focusing on what was discussed, the lead's current status, and recommended next steps.`
+Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
 
           // Add timeout to prevent hanging
           const controller = new AbortController()
@@ -591,8 +611,9 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
       bookingTime: bookingTime,
     }
 
-    // Fetch last 10 conversation messages
-    const last10Messages = allMessages.slice(-10).map(m => ({
+    // Build full conversation context (all messages, not just last 10)
+    // Include up to 80 messages to capture early context about who they are
+    const conversationMessages = allMessages.slice(-80).map(m => ({
       sender: m.sender === 'customer' ? 'Customer' : 'PROXe',
       content: m.content,
       timestamp: m.created_at,
@@ -627,15 +648,14 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
     const apiKey = process.env.CLAUDE_API_KEY
     if (apiKey) {
       try {
-        // Build conversation context
-        const conversationContext = last10Messages
-          .map(m => `[${m.timestamp}] ${m.sender} (${m.channel}): ${m.content}`)
+        // Build full conversation context
+        const conversationContext = conversationMessages
+          .map(m => `${m.sender} (${m.channel}): ${m.content}`)
           .join('\n')
 
         // Build activities context
         const activitiesContext = recentActivities
           ?.map(a => {
-            // dashboard_users is an array from the relation query, get first element
             const creator = Array.isArray(a.dashboard_users)
               ? a.dashboard_users[0]
               : a.dashboard_users
@@ -643,59 +663,46 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
           })
           .join('\n') || 'No team activities'
 
-        // Build lead-specific context
-        const brandInfo = []
-        if (keyInfo.businessType) {
-          brandInfo.push(`Business Type: ${keyInfo.businessType}`)
-        }
-        if (keyInfo.serviceInterest) {
-          brandInfo.push(`Service Interest: ${keyInfo.serviceInterest}`)
-        }
-        if (keyInfo.timeline) {
-          brandInfo.push(`Timeline: ${keyInfo.timeline}`)
-        }
+        // Extract profile data from unified_context
+        const waProfile = lead.unified_context?.whatsapp?.profile || {}
+        const webProfile = lead.unified_context?.web?.profile || {}
+        const profileInfo = []
+        if (waProfile.company || webProfile.company) profileInfo.push(`Company: ${waProfile.company || webProfile.company}`)
+        if (waProfile.business_type || webProfile.business_type) profileInfo.push(`Business: ${waProfile.business_type || webProfile.business_type}`)
+        if (waProfile.city || webProfile.city) profileInfo.push(`City: ${waProfile.city || webProfile.city}`)
+        if (waProfile.notes || webProfile.notes) profileInfo.push(`Notes: ${waProfile.notes || webProfile.notes}`)
 
-        // Include existing summary for context preservation
-        const existingSummary = lead.unified_context?.unified_summary || ''
+        const prompt = `You are summarizing a sales conversation for the BCON team. Read the FULL conversation below and generate a brief but complete summary.
 
-        const prompt = `Generate a useful summary for this business lead based on their conversation history. This is BCON Club — an AI-powered business solutions company.
+REQUIRED SECTIONS (include all that apply):
+1. **BUSINESS**: What does this lead's business do? (from what THEY said in conversation, not form data)
+2. **PROBLEM**: What challenges or pain points did they mention?
+3. **DISCUSSION**: What solutions or services were discussed?
+4. **BOOKING**: Was a call booked? Date/time? Did it succeed or fail? Any booking errors?
+5. **STATUS**: Are they engaged, cold, frustrated, or lost?
+6. **RED FLAGS**: Did they ask for a human? Get upset? Go silent? Hit errors?
+7. **NEXT STEP**: What should the team do next?
 
-${existingSummary ? `PREVIOUS SUMMARY (preserve key facts from this, update with new info):\n${existingSummary}\n` : ''}
-FORMAT REQUIREMENTS:
-- Write exactly 2-3 concise, punchy sentences.
-- Use markdown **bolding** for critical information like service interest, business needs, status, or intent.
-- Summarize the conversation, current status, and next steps.
+RULES:
+- 3-5 sentences max. Be specific with actual details from the conversation.
+- Use markdown **bolding** for key info (business name, booking date, red flags).
+- DO NOT use generic phrases like "high intent", "shows interest", "50% response rate".
+- DO NOT describe stats. Describe what ACTUALLY HAPPENED in the conversation.
 
-CRITICAL RULES:
-- BE CONCISE. No fluff or filler phrases.
-- ONLY state actions explicitly confirmed in messages.
-- NEVER assume actions that aren't explicitly stated.
-- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary.
-- NEVER mention "course offerings", "enrollment", or aviation terms — this is a business AI solutions company.
-- If a previous summary exists, preserve its key facts and ADD new information. Do not lose important context.
-- If messages exist, summarize the actual conversation content.
+BAD: "Lead shows high intent with 50% response rate. Inactive for 2 days. Re-engage with follow-up."
+GOOD: "**Wasi** runs **Design Lyf Realty & Interiors** in Bangalore — interior design focus. Getting Meta ad leads but quality is poor. Tried to book **Monday 3pm** but booking tool looped. Got frustrated and asked for a human. **Needs manual outreach** — call him directly."
 
-Lead Information:
-Name: ${summaryData.leadName}
-Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
-Days Inactive: ${daysInactive}
-${brandInfo.length > 0 ? `\nLead Details:\n${brandInfo.join('\n')}` : ''}
+Lead: ${summaryData.leadName}
+Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
+${profileInfo.length > 0 ? 'Extracted Profile: ' + profileInfo.join(' | ') : ''}
 
-Conversation Messages:
-${conversationContext || 'No messages recorded yet.'}
+FULL CONVERSATION (${conversationMessages.length} messages):
+${conversationContext || 'No messages yet'}
 
-Recent Activities:
+Recent Team Activities:
 ${activitiesContext}
 
-${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 200)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : ''}
-
-Conversation Status: ${conversationStatus}
-${summaryData.nextTouchpoint ? `Next Touchpoint: ${summaryData.nextTouchpoint}` : ''}
-${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
-${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
-${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
-
-Generate a 2-3 sentence summary focusing on what was discussed in the conversation, the lead's current status, and recommended next steps.`
+Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
 
         // Add timeout to prevent hanging
         const controller = new AbortController()
