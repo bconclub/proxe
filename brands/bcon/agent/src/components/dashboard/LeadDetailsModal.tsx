@@ -1134,11 +1134,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   )}
                   <button
                     onClick={() => setShowAdminNoteInput(!showAdminNoteInput)}
-                    className="lead-admin-note-toggle ml-auto w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-blue-500 transition-colors"
+                    className={`lead-admin-note-toggle w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                      showAdminNoteInput
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                    }`}
                     title="Add admin note"
                     aria-label="Add admin note"
                   >
-                    {showAdminNoteInput ? <MdClose size={14} /> : <MdAdd size={14} />}
+                    {showAdminNoteInput ? <MdClose size={12} /> : <MdAdd size={14} />}
                   </button>
                 </div>
 
