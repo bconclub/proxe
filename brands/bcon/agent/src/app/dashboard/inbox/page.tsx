@@ -1005,17 +1005,18 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className={`px-3 py-2.5 cursor-pointer transition-all relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                  className={`cursor-pointer transition-all duration-200 border-b relative ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
                   style={{
                     borderColor: 'var(--border-primary)',
-                    background: isSelected ? 'var(--accent-subtle)' : 'transparent'
+                    background: isSelected ? 'var(--accent-subtle)' : 'transparent',
                   }}
                 >
                   {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'var(--accent-primary)' }} />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
                   )}
 
-                  <div className="flex items-center gap-2.5">
+                  {/* Compact row — always visible */}
+                  <div className={`flex items-center gap-2.5 px-3 ${isSelected ? 'pt-3 pb-1.5' : 'py-2.5'}`}>
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                       style={{
@@ -1045,26 +1046,146 @@ export default function InboxPage() {
                         </div>
                       </div>
 
-                      {conv.brand_name && (
-                        <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
-                          {conv.brand_name}
-                        </p>
+                      {/* When NOT selected: brand + last message preview */}
+                      {!isSelected && (
+                        <>
+                          {conv.brand_name && (
+                            <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
+                              {conv.brand_name}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-[11px] truncate opacity-50 flex-1">
+                              {conv.last_message}
+                            </p>
+                            {conv.booking_status && (
+                              <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
+                                style={{
+                                  background: 'rgba(34, 197, 94, 0.15)',
+                                  color: '#22c55e',
+                                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                                }}>
+                                <MdEventAvailable size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} /> EVENT
+                              </span>
+                            )}
+                          </div>
+                        </>
                       )}
+                    </div>
+                  </div>
 
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <p className="text-[11px] truncate opacity-50 flex-1">
-                          {conv.last_message}
-                        </p>
-                        {conv.booking_status && (
-                          <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
-                            style={{
-                              background: 'rgba(34, 197, 94, 0.15)',
-                              color: '#22c55e',
-                              border: '1px solid rgba(34, 197, 94, 0.3)',
-                            }}>
-                            <MdEventAvailable size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} /> EVENT
-                          </span>
+                  {/* Expanded info — only when selected */}
+                  <div
+                    className="grid transition-[grid-template-rows] duration-200 ease-out"
+                    style={{ gridTemplateRows: isSelected ? '1fr' : '0fr' }}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="px-3 pb-3 pl-[52px] space-y-1.5">
+                        {/* Brand · City */}
+                        {(conv.brand_name || conv.city) && (
+                          <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                            {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
+                          </div>
                         )}
+
+                        {/* Score · Label · Stage */}
+                        {(conv.lead_score != null || conv.lead_stage) && (
+                          <div className="flex items-center gap-0 text-[11px] flex-wrap">
+                            {(() => {
+                              const items: JSX.Element[] = [];
+                              const dot = <span className="mx-1" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>;
+                              if (conv.lead_score != null) {
+                                const color = conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444';
+                                const label = conv.lead_score >= 70 ? 'Hot' : conv.lead_score >= 40 ? 'Warm' : conv.lead_score >= 20 ? 'Cool' : 'Cold';
+                                items.push(<span key="score" className="font-bold" style={{ color }}>{conv.lead_score}</span>);
+                                items.push(<React.Fragment key="d1">{dot}</React.Fragment>);
+                                items.push(<span key="label" className="font-medium" style={{ color }}>{label}</span>);
+                              }
+                              if (conv.lead_stage) {
+                                if (items.length > 0) items.push(<React.Fragment key="d2">{dot}</React.Fragment>);
+                                items.push(<span key="stage" style={{ color: 'var(--text-secondary)' }}>{conv.lead_stage}</span>);
+                              }
+                              return items;
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Booking date */}
+                        {conv.booking_date && (
+                          <div className="text-[11px] flex items-center gap-1" style={{ color: '#22c55e' }}>
+                            <MdEventAvailable size={11} />
+                            {new Date(conv.booking_date).toLocaleDateString('en-IN', {
+                              weekday: 'short', day: 'numeric', month: 'short'
+                            })}{conv.booking_time ? `, ${conv.booking_time}` : ''}
+                          </div>
+                        )}
+
+                        {/* Phone & Email */}
+                        {(conv.lead_phone || conv.lead_email) && (
+                          <div className="flex items-center gap-0 text-[11px] flex-wrap">
+                            {conv.lead_phone && (
+                              <a href={`tel:${conv.lead_phone}`} className="hover:underline" style={{ color: 'var(--text-secondary)' }} onClick={(e) => e.stopPropagation()}>
+                                {conv.lead_phone}
+                              </a>
+                            )}
+                            {conv.lead_phone && conv.lead_email && (
+                              <span className="mx-1.5" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>
+                            )}
+                            {conv.lead_email && (
+                              <a href={`mailto:${conv.lead_email}`} className="hover:underline truncate" style={{ color: 'var(--text-secondary)' }} onClick={(e) => e.stopPropagation()}>
+                                {conv.lead_email}
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Next action */}
+                        {conv.next_touchpoint && (
+                          <div className="text-[10px] italic" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                            Next: {conv.next_touchpoint}
+                          </div>
+                        )}
+
+                        {/* Channel tabs + Actions */}
+                        <div className="flex items-center gap-1.5 pt-1.5 mt-0.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                          {conv.channels.map((ch) => (
+                            <button
+                              key={ch}
+                              onClick={(e) => { e.stopPropagation(); setSelectedChannel(ch); }}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
+                              style={{
+                                background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                                color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
+                              }}
+                            >
+                              <ChannelIcon channel={ch} size={10} active={true} />
+                              {ch}
+                            </button>
+                          ))}
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); summarizeConversation(); }}
+                              disabled={summaryLoading || messages.length === 0}
+                              className="p-1 rounded transition-colors"
+                              style={{
+                                background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                                color: showSummary ? 'white' : 'var(--text-secondary)',
+                                opacity: messages.length === 0 ? 0.5 : 1
+                              }}
+                              title="AI Summary"
+                            >
+                              <MdAutoAwesome size={12} className={summaryLoading ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openLeadModal(selectedLeadId!); }}
+                              className="p-1 rounded transition-colors"
+                              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                              title="Open full lead details"
+                            >
+                              <MdOpenInNew size={12} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1086,153 +1207,6 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Expanded Info Bar Header */}
-            <div
-              className="flex-shrink-0 border-b"
-              style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}
-            >
-              {/* Row 1 — Identity + Channel tabs + Actions */}
-              <div className="flex items-center gap-2 px-4 pt-2.5 pb-1">
-                <h2
-                  className="text-sm font-bold cursor-pointer hover:underline truncate"
-                  style={{ color: 'var(--text-primary)' }}
-                  onClick={() => openLeadModal(selectedLeadId!)}
-                  title="Click to view lead details"
-                >
-                  {selectedConversation?.lead_name || 'Unknown'}
-                </h2>
-                {selectedConversation?.brand_name && (
-                  <>
-                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>|</span>
-                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                      {selectedConversation.brand_name}
-                    </span>
-                  </>
-                )}
-                {selectedConversation?.city && (
-                  <>
-                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>|</span>
-                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                      {selectedConversation.city}
-                    </span>
-                  </>
-                )}
-
-                {/* Channel tabs */}
-                <div className="flex items-center gap-1 ml-3">
-                  {selectedConversation?.channels.map((ch) => (
-                    <button
-                      key={ch}
-                      onClick={() => setSelectedChannel(ch)}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
-                      style={{
-                        background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                        color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
-                      }}
-                    >
-                      <ChannelIcon channel={ch} size={10} active={true} />
-                      {ch}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Right actions */}
-                <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
-                  <button
-                    onClick={summarizeConversation}
-                    disabled={summaryLoading || messages.length === 0}
-                    className="p-1.5 rounded transition-colors"
-                    style={{
-                      background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: showSummary ? 'white' : 'var(--text-secondary)',
-                      opacity: messages.length === 0 ? 0.5 : 1
-                    }}
-                    title="AI Summary"
-                  >
-                    <MdAutoAwesome size={14} className={summaryLoading ? 'animate-spin' : ''} />
-                  </button>
-                  <button
-                    onClick={() => openLeadModal(selectedLeadId!)}
-                    className="p-1.5 rounded transition-colors"
-                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                    title="Open full lead details"
-                  >
-                    <MdOpenInNew size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Row 2 — Plain inline status text separated by dots */}
-              <div className="flex items-center gap-0 px-4 pb-2 flex-wrap text-[11px]">
-                {(() => {
-                  const items: JSX.Element[] = [];
-                  const dot = <span className="mx-1.5" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>;
-                  const sc = selectedConversation;
-                  if (!sc) return null;
-
-                  // Score number (colored)
-                  if (sc.lead_score != null) {
-                    const color = sc.lead_score >= 70 ? '#22c55e' : sc.lead_score >= 40 ? '#f59e0b' : sc.lead_score >= 20 ? '#3b82f6' : '#ef4444';
-                    const label = sc.lead_score >= 70 ? 'Hot' : sc.lead_score >= 40 ? 'Warm' : sc.lead_score >= 20 ? 'Cool' : 'Cold';
-                    items.push(<span key="score" className="font-bold" style={{ color }}>{sc.lead_score}</span>);
-                    items.push(<React.Fragment key="d1">{dot}</React.Fragment>);
-                    items.push(<span key="label" className="font-medium" style={{ color }}>{label}</span>);
-                  }
-
-                  // Stage (muted)
-                  if (sc.lead_stage) {
-                    if (items.length > 0) items.push(<React.Fragment key="d2">{dot}</React.Fragment>);
-                    items.push(<span key="stage" style={{ color: 'var(--text-secondary)' }}>{sc.lead_stage}</span>);
-                  }
-
-                  // Booking date (green) — only if exists, skip entirely if no booking
-                  if (sc.booking_date) {
-                    if (items.length > 0) items.push(<React.Fragment key="d3">{dot}</React.Fragment>);
-                    const dateStr = new Date(sc.booking_date).toLocaleDateString('en-IN', {
-                      weekday: 'short', day: 'numeric', month: 'short'
-                    });
-                    items.push(
-                      <span key="booking" style={{ color: '#22c55e' }}>
-                        {dateStr}{sc.booking_time ? `, ${sc.booking_time}` : ''}
-                      </span>
-                    );
-                  }
-
-                  // Phone (muted, clickable)
-                  if (sc.lead_phone) {
-                    if (items.length > 0) items.push(<React.Fragment key="d4">{dot}</React.Fragment>);
-                    items.push(
-                      <a key="phone" href={`tel:${sc.lead_phone}`} className="hover:underline" style={{ color: 'var(--text-secondary)' }}>
-                        {sc.lead_phone}
-                      </a>
-                    );
-                  }
-
-                  // Email (muted, clickable)
-                  if (sc.lead_email) {
-                    if (items.length > 0) items.push(<React.Fragment key="d5">{dot}</React.Fragment>);
-                    items.push(
-                      <a key="email" href={`mailto:${sc.lead_email}`} className="hover:underline truncate max-w-[200px] inline-block align-bottom" style={{ color: 'var(--text-secondary)' }}>
-                        {sc.lead_email}
-                      </a>
-                    );
-                  }
-
-                  // Next action (italic, at end)
-                  if (sc.next_touchpoint) {
-                    if (items.length > 0) items.push(<React.Fragment key="d6">{dot}</React.Fragment>);
-                    items.push(
-                      <span key="next" className="italic" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                        {sc.next_touchpoint}
-                      </span>
-                    );
-                  }
-
-                  return items;
-                })()}
-              </div>
-            </div>
-
             {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
