@@ -8,6 +8,7 @@ import {
   MdSend,
   MdSearch,
   MdAutoAwesome,
+  MdEvent,
   MdEventAvailable,
   MdOpenInNew,
 } from 'react-icons/md'
@@ -1064,20 +1065,28 @@ export default function InboxPage() {
                           </div>
                         )}
 
-                        {/* Line 3: Stage · Booking */}
+                        {/* Line 3: Stage · Booking (blue, icon, same format as leads modal) */}
                         {(conv.lead_stage || conv.booking_date) && (
-                          <div className="text-xs truncate" style={{ color: '#9ca3af' }}>
-                            {(() => {
-                              const parts: string[] = [];
-                              if (conv.lead_stage) parts.push(conv.lead_stage);
-                              if (conv.booking_date) {
-                                const d = new Date(conv.booking_date).toLocaleDateString('en-IN', {
-                                  weekday: 'short', day: 'numeric', month: 'short'
-                                });
-                                parts.push(d + (conv.booking_time ? `, ${conv.booking_time}` : ''));
-                              }
-                              return parts.join(' · ');
-                            })()}
+                          <div className="text-xs truncate flex items-center gap-1">
+                            {conv.lead_stage && (
+                              <span style={{ color: '#9ca3af' }}>{conv.lead_stage}</span>
+                            )}
+                            {conv.lead_stage && conv.booking_date && (
+                              <span style={{ color: '#9ca3af', opacity: 0.4 }}>·</span>
+                            )}
+                            {conv.booking_date && (
+                              <span className="inline-flex items-center gap-0.5" style={{ color: '#60a5fa' }}>
+                                <MdEvent size={11} />
+                                {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                {conv.booking_time && (() => {
+                                  const tp = conv.booking_time.toString().split(':');
+                                  if (tp.length < 2) return `, ${conv.booking_time}`;
+                                  const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                                  if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
+                                  return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                                })()}
+                              </span>
+                            )}
                           </div>
                         )}
 
