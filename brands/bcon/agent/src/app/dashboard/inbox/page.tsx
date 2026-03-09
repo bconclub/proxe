@@ -1049,7 +1049,7 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
                     <div className="px-3 py-2 pl-4">
-                      {/* Line 1: Score Ring + Name + Timestamp */}
+                      {/* Line 1: Score Ring + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
                         <ScoreRing score={conv.lead_score} size={28} />
                         <span className="text-sm font-semibold truncate flex-1" style={{ color: 'white' }}>
@@ -1058,6 +1058,14 @@ export default function InboxPage() {
                         <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
                           {timeAgo(conv.last_message_at)}
                         </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openLeadModal(conv.lead_id); }}
+                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80"
+                          style={{ color: 'var(--text-secondary)' }}
+                          title="Open lead details"
+                        >
+                          <MdOpenInNew size={13} />
+                        </button>
                       </div>
 
                       {/* Line 2: Brand · City */}
