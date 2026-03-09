@@ -28,6 +28,21 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[^0-9]/g, '');
 }
 
+/** Extract the dynamic suffix from a template URL parameter.
+ *  e.g. "https://meet.google.com/abc-defg-hij" → "abc-defg-hij"
+ *  e.g. "https://calendar.google.com/calendar/event?eid=XYZ" → "XYZ"
+ *  Falls back to the full string if no known pattern matches. */
+function extractUrlSuffix(url: string): string {
+  // Google Meet: extract code after /
+  const meetMatch = url.match(/meet\.google\.com\/(.+)/);
+  if (meetMatch) return meetMatch[1];
+  // Google Calendar: extract eid param
+  const calMatch = url.match(/[?&]eid=([^&]+)/);
+  if (calMatch) return calMatch[1];
+  // Fallback: return as-is
+  return url;
+}
+
 /**
  * Send a free-form text message via Meta Cloud API.
  * Only works within the 24-hour customer-initiated window.
@@ -164,12 +179,13 @@ export async function sendBookingConfirmation(
     },
   ];
   // Add URL button parameter if meet link is provided
+  // booking_confirmation button 0 = "Add to Calendar" (URL: calendar.google.com/...?eid={{1}})
   if (meetLink) {
     templateComponents.push({
       type: 'button',
       sub_type: 'url',
       index: 0,
-      parameters: [{ type: 'text', text: meetLink }],
+      parameters: [{ type: 'text', text: extractUrlSuffix(meetLink) }],
     });
   }
   const templateResult = await sendWhatsAppTemplate(to, 'booking_confirmation', templateComponents);
@@ -231,12 +247,13 @@ export async function sendBookingReminder(
       ],
     },
   ];
+  // booking_reminder button 0 = "Join Meeting" (URL: meet.google.com/{{1}})
   if (meetLink) {
     reminderComponents.push({
       type: 'button',
       sub_type: 'url',
       index: 0,
-      parameters: [{ type: 'text', text: meetLink }],
+      parameters: [{ type: 'text', text: extractUrlSuffix(meetLink) }],
     });
   }
   const result = await sendWhatsAppTemplate(to, templateName, reminderComponents);
