@@ -1082,7 +1082,7 @@ export default function InboxPage() {
                 );
               }
 
-              // ── UNSELECTED (compact) ──
+              // ── UNSELECTED (compact, scannable) ──
               return (
                 <div
                   key={conv.lead_id}
@@ -1099,10 +1099,9 @@ export default function InboxPage() {
                     borderColor: 'var(--border-primary)',
                   }}
                 >
-                  <div className="px-3 py-2">
-                    {/* Line 1: Score Ring + Name + Timestamp */}
-                    <div className="flex items-center gap-2">
-                      <ScoreRing score={conv.lead_score} size={22} />
+                  <div className="px-3 py-2.5">
+                    {/* Line 1: Name + Timestamp */}
+                    <div className="flex items-center">
                       <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
@@ -1110,12 +1109,22 @@ export default function InboxPage() {
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
-                    {/* Line 2: Last message preview */}
-                    {conv.last_message && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: '#6b7280', paddingLeft: '30px' }}>
-                        {conv.last_message}
+                    {/* Line 2: Last message preview + EVENT badge */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-[11px] truncate flex-1" style={{ color: '#6b7280' }}>
+                        {conv.last_message || '\u00A0'}
                       </p>
-                    )}
+                      {conv.booking_status && (
+                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            color: '#22c55e',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                          }}>
+                          EVENT
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
