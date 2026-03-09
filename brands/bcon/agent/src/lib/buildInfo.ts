@@ -1,8 +1,7 @@
-// Build information - uses generated version file from prebuild script
-import { APP_VERSION, BUILD_TIMESTAMP } from './generated-version'
+// Build information - updated at build time
+// This file can be updated by CI/CD during deployment
 
-export const BUILD_TIME = BUILD_TIMESTAMP
-export const VERSION = APP_VERSION
+export const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString()
 
 // Format date in a deterministic way that doesn't change between server and client
 // Converts UTC to IST (GMT+5:30)
