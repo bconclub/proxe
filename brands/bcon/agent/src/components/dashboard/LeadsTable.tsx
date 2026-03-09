@@ -51,17 +51,17 @@ const getStatusColor = (status: string | null) => {
 
 const getStageColor = (stage: string | null) => {
   const stageColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New': { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300' },
-    'Engaged': { bg: 'bg-cyan-100 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-300' },
-    'Qualified': { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300' },
-    'High Intent': { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-300' },
-    'Booking Made': { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300' },
-    'Converted': { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300' },
-    'Closed Lost': { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300' },
-    'Not Qualified': { bg: 'bg-rose-100 dark:bg-rose-900/40', text: 'text-rose-700 dark:text-rose-300' },
-    'In Sequence': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
-    'Cold': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-300' },
-    'R&R': { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300' },
+    'New': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
+    'Engaged': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
+    'Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7' } },
+    'High Intent': { bg: '', text: '', style: { backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316' } },
+    'Booking Made': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
+    'Converted': { bg: '', text: '', style: { backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981' } },
+    'Closed Lost': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
+    'Not Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(244,63,94,0.15)', color: '#f43f5e' } },
+    'In Sequence': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' } },
+    'Cold': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#6b7280' } },
+    'R&R': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
   }
   return stageColors[stage || 'New'] || stageColors['New']
 }
@@ -624,40 +624,36 @@ export default function LeadsTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-visible">
+      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '11%' }} />  {/* Name */}
-            <col style={{ width: '11%' }} />  {/* Brand */}
-            <col style={{ width: '15%' }} />  {/* Email */}
-            <col style={{ width: '10%' }} />  {/* Phone */}
+            <col style={{ width: '24%' }} />  {/* Lead */}
+            <col style={{ width: '18%' }} />  {/* Contact */}
             <col style={{ width: '6%' }} />   {/* Source */}
+            <col style={{ width: '7%' }} />   {/* Score */}
+            <col style={{ width: '12%' }} />  {/* Stage */}
+            <col style={{ width: '9%' }} />   {/* Temp */}
+            <col style={{ width: '8%' }} />   {/* Active */}
+            <col style={{ width: '14%' }} />  {/* Booking */}
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
-            <col style={{ width: '5%' }} />   {/* Score */}
-            <col style={{ width: '8%' }} />   {/* Stage */}
-            <col style={{ width: '8%' }} />   {/* Status */}
-            <col style={{ width: '6%' }} />   {/* Activity */}
-            <col style={{ width: '9%' }} />   {/* Booking */}
           </colgroup>
-          <thead>
+          <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
-                'Name',
-                'Brand',
-                'Email',
-                'Phone',
+                'Lead',
+                'Contact',
                 'Source',
-                ...(showAviationColumns ? ['Type', 'Course'] : []),
                 'Score',
                 'Stage',
-                'Status',
-                'Activity',
+                'Temp',
+                'Active',
                 'Booking',
+                ...(showAviationColumns ? ['Type', 'Course'] : []),
               ].map((h) => (
                 <th
                   key={h}
-                  className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider"
+                  className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {h}
@@ -669,7 +665,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 13 : 11}
+                  colSpan={showAviationColumns ? 10 : 8}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -683,182 +679,174 @@ export default function LeadsTable({
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 const displayStage = stage || 'New'
                 const stageColor = getStageColor(displayStage)
-                const statusColor = getStatusColor(lead.status)
                 const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
+                const uc = lead.unified_context || {}
+                const resolvedName =
+                  uc?.whatsapp?.profile?.full_name ||
+                  uc?.web?.profile?.full_name ||
+                  lead.name || ''
+                const brandName =
+                  uc?.web?.what_is_your_brand_name ||
+                  uc?.whatsapp?.what_is_your_brand_name ||
+                  uc?.whatsapp?.profile?.company ||
+                  uc?.web?.profile?.company || ''
+                const city =
+                  uc?.whatsapp?.profile?.city ||
+                  uc?.web?.profile?.city || ''
+
+                // If no name, use email as primary identifier
+                const displayName = resolvedName || lead.email || lead.phone || '-'
+                const isEmailAsName = !resolvedName && !!lead.email
+
                 const bookingDate = lead.booking_date ||
-                  lead.unified_context?.web?.booking_date ||
-                  lead.unified_context?.web?.booking?.date ||
-                  lead.unified_context?.whatsapp?.booking_date ||
-                  lead.unified_context?.whatsapp?.booking?.date ||
-                  lead.unified_context?.voice?.booking_date ||
-                  lead.unified_context?.voice?.booking?.date ||
-                  lead.unified_context?.social?.booking_date ||
-                  lead.unified_context?.social?.booking?.date
+                  uc?.web?.booking_date || uc?.web?.booking?.date ||
+                  uc?.whatsapp?.booking_date || uc?.whatsapp?.booking?.date ||
+                  uc?.voice?.booking_date || uc?.voice?.booking?.date ||
+                  uc?.social?.booking_date || uc?.social?.booking?.date
                 const bookingTime = lead.booking_time ||
-                  lead.unified_context?.web?.booking_time ||
-                  lead.unified_context?.web?.booking?.time ||
-                  lead.unified_context?.whatsapp?.booking_time ||
-                  lead.unified_context?.whatsapp?.booking?.time ||
-                  lead.unified_context?.voice?.booking_time ||
-                  lead.unified_context?.voice?.booking?.time ||
-                  lead.unified_context?.social?.booking_time ||
-                  lead.unified_context?.social?.booking?.time
+                  uc?.web?.booking_time || uc?.web?.booking?.time ||
+                  uc?.whatsapp?.booking_time || uc?.whatsapp?.booking?.time ||
+                  uc?.voice?.booking_time || uc?.voice?.booking?.time ||
+                  uc?.social?.booking_time || uc?.social?.booking?.time
 
                 const sourceConfig: Record<string, { label: string; color: string }> = {
                   web: { label: 'Web', color: '#3B82F6' },
                   whatsapp: { label: 'WA', color: '#22C55E' },
                   voice: { label: 'Voice', color: '#8B5CF6' },
                   social: { label: 'Social', color: '#EC4899' },
-                  unknown: { label: 'Other', color: '#6B7280' },
+                  unknown: { label: '-', color: '#6B7280' },
                 }
                 const srcCfg = sourceConfig[source] || sourceConfig.unknown
+
+                // Temperature from score
+                const tempLabel = score != null ? (score >= 70 ? 'Hot' : score >= 40 ? 'Warm' : score >= 20 ? 'Cool' : 'Cold') : null
+                const tempColor = score != null ? (score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : score >= 20 ? '#3b82f6' : '#ef4444') : null
+                const tempBg = score != null ? (score >= 70 ? 'rgba(34,197,94,0.12)' : score >= 40 ? 'rgba(245,158,11,0.12)' : score >= 20 ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)') : null
+
+                // Score pill colors
+                const scorePillBg = score != null ? (score >= 70 ? 'rgba(34,197,94,0.15)' : score >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)') : null
+                const scorePillColor = score != null ? (score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444') : null
 
                 return (
                   <tr
                     key={lead.id}
                     className="cursor-pointer transition-colors"
-                    style={{ borderBottom: '1px solid var(--border-primary)' }}
+                    style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
                     onClick={() => handleRowClick(lead)}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    {/* Name — prefer profile full_name over customer_name */}
-                    <td className="px-3 py-2 truncate">
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {lead.unified_context?.whatsapp?.profile?.full_name ||
-                         lead.unified_context?.web?.profile?.full_name ||
-                         lead.name || '-'}
-                      </span>
+                    {/* LEAD — 2 lines: Name + Brand · City */}
+                    <td className="px-3 py-2">
+                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                        {displayName}
+                      </div>
+                      {(brandName || city) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+                          {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                        </div>
+                      )}
                     </td>
 
-                    {/* Brand */}
-                    <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={
-                      lead.unified_context?.web?.what_is_your_brand_name ||
-                      lead.unified_context?.whatsapp?.what_is_your_brand_name ||
-                      lead.unified_context?.whatsapp?.profile?.company ||
-                      lead.unified_context?.web?.profile?.company || ''
-                    }>
-                      {lead.unified_context?.web?.what_is_your_brand_name ||
-                       lead.unified_context?.whatsapp?.what_is_your_brand_name ||
-                       lead.unified_context?.whatsapp?.profile?.company ||
-                       lead.unified_context?.web?.profile?.company || '-'}
+                    {/* CONTACT — 2 lines: Phone + Email */}
+                    <td className="px-3 py-2">
+                      {lead.phone && (
+                        <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
+                          {lead.phone}
+                        </a>
+                      )}
+                      {lead.email && !isEmailAsName && (
+                        <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
+                          {lead.email}
+                        </a>
+                      )}
                     </td>
 
-                    {/* Email */}
-                    <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={lead.email || '-'}>
-                      {lead.email || '-'}
-                    </td>
-
-                    {/* Phone */}
-                    <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {lead.phone || '-'}
-                    </td>
-
-                    {/* Source */}
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    {/* SOURCE — small badge */}
+                    <td className="px-3 py-2">
                       <span
-                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase"
-                        style={{
-                          backgroundColor: `${srcCfg.color}15`,
-                          color: srcCfg.color,
-                        }}
+                        className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                        style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
                       >
                         {srcCfg.label}
                       </span>
                     </td>
 
-                    {/* Aviation: User Type */}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {(() => {
-                          const brandData = lead.unified_context?.[brandId] || {}
-                          return brandData.user_type || '-'
-                        })()}
-                      </td>
-                    )}
-
-                    {/* Aviation: Course */}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {(() => {
-                          const brandData = lead.unified_context?.[brandId] || {}
-                          return brandData.course_interest || '-'
-                        })()}
-                      </td>
-                    )}
-
-                    {/* Score */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className="text-sm font-semibold tabular-nums"
-                        style={{ color: getScoreColor(score) }}
-                      >
-                        {score !== null && score !== undefined ? score : '-'}
-                      </span>
+                    {/* SCORE — colored pill */}
+                    <td className="px-3 py-2 text-center">
+                      {score != null ? (
+                        <span
+                          className="inline-block px-2 py-0.5 rounded-full text-xs font-bold tabular-nums"
+                          style={{ backgroundColor: scorePillBg!, color: scorePillColor! }}
+                        >
+                          {score}
+                        </span>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}></span>
+                      )}
                     </td>
 
-                    {/* Stage */}
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    {/* STAGE — badge */}
+                    <td className="px-3 py-2">
                       <span
-                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${stageColor.bg} ${stageColor.text}`}
-                        style={stageColor.style}
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                        style={stageColor.style || {}}
                       >
                         {displayStage}
                       </span>
                     </td>
 
-                    {/* Status — fall back to stage if no status */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {lead.status ? (
+                    {/* TEMP — Hot/Warm/Cool/Cold */}
+                    <td className="px-3 py-2">
+                      {tempLabel ? (
                         <span
-                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusColor.bg} ${statusColor.text}`}
-                          style={statusColor.style}
+                          className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                          style={{ backgroundColor: tempBg!, color: tempColor! }}
                         >
-                          {lead.status}
+                          {tempLabel}
                         </span>
-                      ) : displayStage && displayStage !== 'New' ? (
-                        <span
-                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${stageColor.bg} ${stageColor.text}`}
-                          style={stageColor.style}
-                        >
-                          {displayStage}
-                        </span>
-                      ) : (
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>-</span>
-                      )}
+                      ) : null}
                     </td>
 
-                    {/* Last Activity */}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                    {/* ACTIVE */}
+                    <td className="px-3 py-2 text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* Booking */}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {bookingDate || bookingTime ? (
+                    {/* BOOKING — green if booked, empty if not */}
+                    <td className="px-3 py-2 text-xs">
+                      {bookingDate ? (
                         <Link
                           href="/dashboard/bookings"
                           className="hover:underline"
-                          style={{ color: 'var(--accent-primary)' }}
+                          style={{ color: '#22c55e' }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {bookingDate ? formatDateTime(bookingDate).split(',')[0] : ''}
-                          {bookingDate && bookingTime ? ', ' : ''}
+                          {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           {bookingTime ? (() => {
-                            const timeParts = bookingTime.toString().split(':')
-                            if (timeParts.length < 2) return bookingTime.toString()
-                            const hours = parseInt(timeParts[0], 10)
-                            const minutes = parseInt(timeParts[1], 10)
-                            if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString()
-                            const period = hours >= 12 ? 'PM' : 'AM'
-                            const hours12 = hours % 12 || 12
-                            return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+                            const tp = bookingTime.toString().split(':');
+                            if (tp.length < 2) return `, ${bookingTime}`;
+                            const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                            if (isNaN(h) || isNaN(m)) return `, ${bookingTime}`;
+                            return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
                           })() : ''}
                         </Link>
-                      ) : '-'}
+                      ) : null}
                     </td>
+
+                    {/* Aviation columns */}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {lead.unified_context?.[brandId]?.user_type || ''}
+                      </td>
+                    )}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {lead.unified_context?.[brandId]?.course_interest || ''}
+                      </td>
+                    )}
                   </tr>
                 )
               })
