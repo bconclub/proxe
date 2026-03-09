@@ -87,12 +87,44 @@ export async function GET() {
       } catch (e) { /* continue */ }
     }
 
+    // Try: query businesses owned by this system user → get WABA
+    if (!wabaId) {
+      try {
+        const bizRes = await fetch(
+          `${GRAPH_API_BASE}/me/businesses?fields=id,name,owned_whatsapp_business_accounts{id,name}`,
+          { headers: { Authorization: `Bearer ${creds.accessToken}` } }
+        )
+        const bizData = await bizRes.json()
+        debugInfo.businesses = bizData?.data
+        // Find first WABA from any business
+        for (const biz of (bizData?.data || [])) {
+          const wabas = biz.owned_whatsapp_business_accounts?.data
+          if (wabas?.length > 0) {
+            wabaId = wabas[0].id
+            debugInfo.wabaIdSource = `business:${biz.name}`
+            break
+          }
+        }
+      } catch (e) { /* continue */ }
+    }
+
+    // Try: direct WABA query using app-scoped token
+    if (!wabaId) {
+      try {
+        const appRes = await fetch(
+          `${GRAPH_API_BASE}/app/subscriptions`,
+          { headers: { Authorization: `Bearer ${creds.accessToken}` } }
+        )
+        debugInfo.appSubscriptions = await appRes.json()
+      } catch (e) { /* continue */ }
+    }
+
     if (!wabaId) {
       return NextResponse.json({
-        error: 'Could not determine WABA ID. Set META_WHATSAPP_WABA_ID env var on Vercel.',
+        error: 'Could not auto-discover WABA ID. Set META_WHATSAPP_WABA_ID env var on Vercel.',
         phoneInfo: phoneData,
         debugInfo,
-        hint: 'Check debugInfo.debugToken.granular_scopes for WABA IDs, or find it at: Meta Business Suite > WhatsApp > Settings',
+        hint: 'Check debugInfo.businesses for WABA IDs, or find it at: Meta Business Suite > WhatsApp > Settings',
       }, { status: 400 })
     }
 
