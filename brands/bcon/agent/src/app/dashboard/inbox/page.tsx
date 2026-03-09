@@ -1024,7 +1024,7 @@ export default function InboxPage() {
                 : null;
 
               if (isSelected) {
-                // ── SELECTED CARD ──
+                // ── SELECTED CARD (minimal) ──
                 return (
                   <div
                     key={conv.lead_id}
@@ -1044,7 +1044,7 @@ export default function InboxPage() {
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
-                    <div className="px-3 py-3 pl-4">
+                    <div className="px-3 py-2 pl-4">
                       {/* Line 1: Score Ring + Name + Timestamp */}
                       <div className="flex items-center gap-2.5">
                         <ScoreRing score={conv.lead_score} size={28} />
@@ -1056,93 +1056,27 @@ export default function InboxPage() {
                         </span>
                       </div>
 
-                      {/* Lines 2-4 — indented past ring */}
-                      <div className="mt-1.5 space-y-0.5" style={{ paddingLeft: '38px' }}>
-                        {/* Line 2: Brand · City */}
-                        {(conv.brand_name || conv.city) && (
-                          <div className="text-xs truncate" style={{ color: '#9ca3af' }}>
-                            {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-
-                        {/* Line 3: Stage · Booking (blue, icon, same format as leads modal) */}
-                        {(conv.lead_stage || conv.booking_date) && (
-                          <div className="text-xs truncate flex items-center gap-1">
-                            {conv.lead_stage && (
-                              <span style={{ color: '#9ca3af' }}>{conv.lead_stage}</span>
-                            )}
-                            {conv.lead_stage && conv.booking_date && (
-                              <span style={{ color: '#9ca3af', opacity: 0.4 }}>·</span>
-                            )}
-                            {conv.booking_date && (
-                              <span className="inline-flex items-center gap-0.5" style={{ color: '#60a5fa' }}>
-                                <MdEvent size={11} />
-                                {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                {conv.booking_time && (() => {
-                                  const tp = conv.booking_time.toString().split(':');
-                                  if (tp.length < 2) return `, ${conv.booking_time}`;
-                                  const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
-                                  if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
-                                  return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                                })()}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Line 4: Phone · Email */}
-                        {(conv.lead_phone || conv.lead_email) && (
-                          <div className="text-xs truncate" style={{ color: '#9ca3af' }}>
-                            {(() => {
-                              const parts: string[] = [];
-                              if (conv.lead_phone) parts.push(conv.lead_phone);
-                              if (conv.lead_email) parts.push(conv.lead_email);
-                              return parts.join(' · ');
-                            })()}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Channel tabs + Actions */}
-                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t" style={{ borderColor: 'var(--border-primary)', paddingLeft: '38px' }}>
-                        {conv.channels.map((ch) => (
-                          <button
-                            key={ch}
-                            onClick={(e) => { e.stopPropagation(); setSelectedChannel(ch); }}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
-                            style={{
-                              background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                              color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
-                            }}
-                          >
-                            <ChannelIcon channel={ch} size={10} active={true} />
-                            {ch}
-                          </button>
-                        ))}
-                        <div className="flex items-center gap-1 ml-auto">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); summarizeConversation(); }}
-                            disabled={summaryLoading || messages.length === 0}
-                            className="p-1 rounded transition-colors"
-                            style={{
-                              background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                              color: showSummary ? 'white' : 'var(--text-secondary)',
-                              opacity: messages.length === 0 ? 0.5 : 1
-                            }}
-                            title="AI Summary"
-                          >
-                            <MdAutoAwesome size={12} className={summaryLoading ? 'animate-spin' : ''} />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openLeadModal(selectedLeadId!); }}
-                            className="p-1 rounded transition-colors"
-                            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                            title="Open full lead details"
-                          >
-                            <MdOpenInNew size={12} />
-                          </button>
+                      {/* Line 2: Brand · City */}
+                      {(conv.brand_name || conv.city) && (
+                        <div className="text-xs truncate mt-1" style={{ color: '#9ca3af', paddingLeft: '38px' }}>
+                          {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
                         </div>
-                      </div>
+                      )}
+
+                      {/* Line 3: Booking (only if exists) */}
+                      {conv.booking_date && (
+                        <div className="text-xs truncate flex items-center gap-0.5 mt-0.5" style={{ color: '#22c55e', paddingLeft: '38px' }}>
+                          <MdEvent size={11} />
+                          {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {conv.booking_time && (() => {
+                            const tp = conv.booking_time.toString().split(':');
+                            if (tp.length < 2) return `, ${conv.booking_time}`;
+                            const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                            if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
+                            return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1165,57 +1099,23 @@ export default function InboxPage() {
                     borderColor: 'var(--border-primary)',
                   }}
                 >
-                  <div className="flex items-center gap-2.5 px-3 py-2.5">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      {initials}
+                  <div className="px-3 py-2">
+                    {/* Line 1: Score Ring + Name + Timestamp */}
+                    <div className="flex items-center gap-2">
+                      <ScoreRing score={conv.lead_score} size={22} />
+                      <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                        {conv.lead_name || conv.lead_phone || 'Unknown'}
+                      </span>
+                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: '#6b7280' }}>
+                        {timeAgo(conv.last_message_at)}
+                      </span>
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          {conv.lead_name || conv.lead_phone || 'Unknown'}
-                        </span>
-                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                          <div className="flex items-center gap-0.5">
-                            {conv.channels.map((ch) => (
-                              <div key={ch} className="opacity-70">
-                                <ChannelIcon channel={ch} size={10} active={true} />
-                              </div>
-                            ))}
-                          </div>
-                          <span className="text-[9px] opacity-50 whitespace-nowrap">
-                            {timeAgo(conv.last_message_at)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {conv.brand_name && (
-                        <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
-                          {conv.brand_name}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <p className="text-[11px] truncate opacity-50 flex-1">
-                          {conv.last_message}
-                        </p>
-                        {conv.booking_status && (
-                          <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
-                            style={{
-                              background: 'rgba(34, 197, 94, 0.15)',
-                              color: '#22c55e',
-                              border: '1px solid rgba(34, 197, 94, 0.3)',
-                            }}>
-                            <MdEventAvailable size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} /> EVENT
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    {/* Line 2: Last message preview */}
+                    {conv.last_message && (
+                      <p className="text-[11px] truncate mt-0.5" style={{ color: '#6b7280', paddingLeft: '30px' }}>
+                        {conv.last_message}
+                      </p>
+                    )}
                   </div>
                 </div>
               )
