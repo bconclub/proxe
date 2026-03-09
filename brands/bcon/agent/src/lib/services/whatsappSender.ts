@@ -80,6 +80,8 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   components: Array<{
     type: 'body' | 'header' | 'button';
+    sub_type?: 'url' | 'quick_reply';
+    index?: number;
     parameters: Array<{ type: 'text'; text: string }>;
   }>,
   languageCode: string = 'en',
@@ -149,9 +151,9 @@ export async function sendBookingConfirmation(
   }
 
   // If text failed (likely 24h window), try template
-  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime
+  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime + URL button for meet link
   console.log('[whatsappSender] Text failed, trying template fallback...');
-  const templateResult = await sendWhatsAppTemplate(to, 'booking_confirmation', [
+  const templateComponents: Array<any> = [
     {
       type: 'body',
       parameters: [
@@ -160,7 +162,17 @@ export async function sendBookingConfirmation(
         { type: 'text', text: dateTimeDisplay },
       ],
     },
-  ]);
+  ];
+  // Add URL button parameter if meet link is provided
+  if (meetLink) {
+    templateComponents.push({
+      type: 'button',
+      sub_type: 'url',
+      index: 0,
+      parameters: [{ type: 'text', text: meetLink }],
+    });
+  }
+  const templateResult = await sendWhatsAppTemplate(to, 'booking_confirmation', templateComponents);
 
   if (templateResult.success) {
     console.log('[whatsappSender] Booking confirmation sent (template)');
@@ -208,8 +220,8 @@ export async function sendBookingReminder(
     `See you soon!`;
 
   // Reminders are always outside 24h window — use template
-  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime
-  const result = await sendWhatsAppTemplate(to, templateName, [
+  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime + URL button for meet link
+  const reminderComponents: Array<any> = [
     {
       type: 'body',
       parameters: [
@@ -218,7 +230,16 @@ export async function sendBookingReminder(
         { type: 'text', text: dateTimeText },
       ],
     },
-  ]);
+  ];
+  if (meetLink) {
+    reminderComponents.push({
+      type: 'button',
+      sub_type: 'url',
+      index: 0,
+      parameters: [{ type: 'text', text: meetLink }],
+    });
+  }
+  const result = await sendWhatsAppTemplate(to, templateName, reminderComponents);
 
   if (result.success) {
     console.log(`[whatsappSender] ${type} reminder sent to ${to}`);

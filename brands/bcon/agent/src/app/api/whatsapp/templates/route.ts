@@ -143,13 +143,15 @@ export async function GET() {
 }
 
 /**
- * POST — Send a test template message
+ * POST — Send a template message
  *
  * Body: {
  *   to: "919353253817",           // Phone with country code
  *   templateName: "hello_world",  // Template name (must be approved)
  *   languageCode: "en_US",        // Language code
- *   bodyParams: ["John"]          // Optional body parameter values
+ *   bodyParams: ["John"],         // Optional body parameter values
+ *   buttonParams: [{ index: 0, type: "url", text: "https://..." }],  // Optional button params
+ *   components: [...]             // Or pass full components array directly
  * }
  */
 export async function POST(request: NextRequest) {
@@ -168,6 +170,8 @@ export async function POST(request: NextRequest) {
       templateName = 'hello_world',
       languageCode = 'en_US',
       bodyParams = [],
+      buttonParams = [],
+      components: rawComponents,
     } = body
 
     if (!to) {
@@ -177,13 +181,26 @@ export async function POST(request: NextRequest) {
     // Normalize phone: strip non-digits
     const phone = to.replace(/[^0-9]/g, '')
 
-    // Build components (only add body params if provided)
-    const components: any[] = []
-    if (bodyParams.length > 0) {
-      components.push({
-        type: 'body',
-        parameters: bodyParams.map((p: string) => ({ type: 'text', text: p })),
-      })
+    // Build components: use raw components if provided, otherwise build from params
+    let components: any[] = []
+    if (rawComponents && Array.isArray(rawComponents)) {
+      components = rawComponents
+    } else {
+      if (bodyParams.length > 0) {
+        components.push({
+          type: 'body',
+          parameters: bodyParams.map((p: string) => ({ type: 'text', text: p })),
+        })
+      }
+      // Add button parameters
+      for (const btn of buttonParams) {
+        components.push({
+          type: 'button',
+          sub_type: btn.type || 'url',
+          index: btn.index ?? 0,
+          parameters: [{ type: 'text', text: btn.text }],
+        })
+      }
     }
 
     const payload = {
