@@ -20,7 +20,8 @@ import {
   MdOutlineInsights,
   MdTrendingUp,
   MdTrendingDown,
-  MdRemove
+  MdRemove,
+  MdSearch,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -67,9 +68,9 @@ const getStageColor = (stage: string | null) => {
 
 const getScoreColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined) return 'var(--text-secondary)'
-  if (score >= 90) return '#22C55E'
-  if (score >= 70) return '#F97316'
-  return 'var(--text-secondary)'
+  if (score >= 70) return '#22C55E'
+  if (score >= 40) return '#F59E0B'
+  return '#EF4444'
 }
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -135,6 +136,8 @@ export default function LeadsTable({
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 50)
@@ -216,12 +219,40 @@ export default function LeadsTable({
       })
     }
 
+    // Score filter
+    if (scoreFilter !== 'all') {
+      const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
+      filtered = filtered.filter((lead) => (lead.lead_score ?? 0) >= minScore)
+    }
+
+    // Search filter (client-side, across name, brand, email, phone)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter((lead) => {
+        const uc = lead.unified_context || {}
+        const name = (
+          uc?.whatsapp?.profile?.full_name ||
+          uc?.web?.profile?.full_name ||
+          lead.name || ''
+        ).toLowerCase()
+        const brand = (
+          uc?.web?.what_is_your_brand_name ||
+          uc?.whatsapp?.what_is_your_brand_name ||
+          uc?.whatsapp?.profile?.company ||
+          uc?.web?.profile?.company || ''
+        ).toLowerCase()
+        const email = (lead.email || '').toLowerCase()
+        const phone = (lead.phone || '').toLowerCase()
+        return name.includes(q) || brand.includes(q) || email.includes(q) || phone.includes(q)
+      })
+    }
+
     if (limit) {
       filtered = filtered.slice(0, limit)
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit, presetFilter])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -471,6 +502,22 @@ export default function LeadsTable({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Search bar */}
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md border"
+            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
+          >
+            <MdSearch size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs w-[120px]"
+              style={{ color: 'var(--text-primary)' }}
+            />
+          </div>
+
           {!hideFilters && (
             <>
               <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className={filterClass} style={filterStyle}>
@@ -496,6 +543,29 @@ export default function LeadsTable({
                   <option key={status} value={status}>{status}</option>
                 ))}
               </select>
+
+              {/* Score quick filters */}
+              <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: 'var(--border-primary)' }}>
+                {[
+                  { value: 'all', label: 'All' },
+                  { value: '50', label: '50+' },
+                  { value: '70', label: '70+' },
+                  { value: 'hot', label: 'Hot' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setScoreFilter(opt.value)}
+                    className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                    style={{
+                      backgroundColor: scoreFilter === opt.value ? 'var(--accent-primary)' : 'var(--bg-primary)',
+                      color: scoreFilter === opt.value ? 'white' : 'var(--text-secondary)',
+                      borderRight: '1px solid var(--border-primary)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
 
               {showAviationColumns && (
                 <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
@@ -654,19 +724,25 @@ export default function LeadsTable({
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    {/* Name */}
+                    {/* Name — prefer profile full_name over customer_name */}
                     <td className="px-3 py-2 truncate">
                       <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {lead.name || '-'}
+                        {lead.unified_context?.whatsapp?.profile?.full_name ||
+                         lead.unified_context?.web?.profile?.full_name ||
+                         lead.name || '-'}
                       </span>
                     </td>
 
                     {/* Brand */}
                     <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={
+                      lead.unified_context?.web?.what_is_your_brand_name ||
+                      lead.unified_context?.whatsapp?.what_is_your_brand_name ||
                       lead.unified_context?.whatsapp?.profile?.company ||
                       lead.unified_context?.web?.profile?.company || ''
                     }>
-                      {lead.unified_context?.whatsapp?.profile?.company ||
+                      {lead.unified_context?.web?.what_is_your_brand_name ||
+                       lead.unified_context?.whatsapp?.what_is_your_brand_name ||
+                       lead.unified_context?.whatsapp?.profile?.company ||
                        lead.unified_context?.web?.profile?.company || '-'}
                     </td>
 
@@ -733,7 +809,7 @@ export default function LeadsTable({
                       </span>
                     </td>
 
-                    {/* Status */}
+                    {/* Status — fall back to stage if no status */}
                     <td className="px-3 py-2 whitespace-nowrap">
                       {lead.status ? (
                         <span
@@ -741,6 +817,13 @@ export default function LeadsTable({
                           style={statusColor.style}
                         >
                           {lead.status}
+                        </span>
+                      ) : displayStage && displayStage !== 'New' ? (
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${stageColor.bg} ${stageColor.text}`}
+                          style={stageColor.style}
+                        >
+                          {displayStage}
                         </span>
                       ) : (
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>-</span>
