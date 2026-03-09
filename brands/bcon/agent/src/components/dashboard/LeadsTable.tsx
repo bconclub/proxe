@@ -164,7 +164,7 @@ export default function LeadsTable({
       })
     } else if (presetFilter === 'warm') {
       filtered = filtered.filter((lead) => {
-        const score = lead.lead_score ?? 0
+        const score = calculatedScores[lead.id] !== undefined ? calculatedScores[lead.id] : (lead.lead_score ?? 0)
         return score >= 40 && score < 70
       })
     }
@@ -219,10 +219,13 @@ export default function LeadsTable({
       })
     }
 
-    // Score filter
+    // Score filter (use calculated scores when available, fallback to DB score)
     if (scoreFilter !== 'all') {
       const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
-      filtered = filtered.filter((lead) => (lead.lead_score ?? 0) >= minScore)
+      filtered = filtered.filter((lead) => {
+        const score = calculatedScores[lead.id] !== undefined ? calculatedScores[lead.id] : (lead.lead_score ?? 0)
+        return score >= minScore
+      })
     }
 
     // Search filter (client-side, across name, brand, email, phone)
@@ -252,7 +255,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -289,15 +292,14 @@ export default function LeadsTable({
   }, [filteredLeads])
 
   useEffect(() => {
-    if (filteredLeads.length === 0) return
+    if (leads.length === 0) return
 
     setCalculatingScores(true)
     const calculateScores = async () => {
       const scores: Record<string, number> = {}
-      const leadsToCalculate = filteredLeads.slice(0, 50)
 
       await Promise.all(
-        leadsToCalculate.map(async (lead) => {
+        leads.map(async (lead) => {
           try {
             const result = await calculateLeadScore(lead as Lead)
             scores[lead.id] = result.score
@@ -313,7 +315,7 @@ export default function LeadsTable({
     }
 
     calculateScores()
-  }, [filteredLeads])
+  }, [leads])
 
   const handleRowClick = (lead: ExtendedLead) => {
     const modalLead: Lead = {
