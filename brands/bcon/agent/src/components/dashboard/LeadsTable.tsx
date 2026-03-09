@@ -481,9 +481,10 @@ export default function LeadsTable({
 
   return (
     <div className="leads-table flex flex-col flex-1 overflow-hidden">
-      {/* Header row: Title left, filters + actions right */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
-        <div className="flex items-center gap-2">
+      {/* Header row: LEFT = title + count + score filters, RIGHT = search + dropdowns + actions */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+        {/* LEFT: Title + count + score filters */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
           </h2>
@@ -499,9 +500,33 @@ export default function LeadsTable({
               Clear filter
             </Link>
           )}
+
+          {/* Score quick filters */}
+          <div className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            {[
+              { value: 'all', label: 'All' },
+              { value: '50', label: '50+' },
+              { value: '70', label: '70+' },
+              { value: 'hot', label: 'Hot' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setScoreFilter(opt.value)}
+                className="px-2 py-0.5 text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: scoreFilter === opt.value ? 'var(--accent-primary)' : 'var(--bg-primary)',
+                  color: scoreFilter === opt.value ? 'white' : 'var(--text-secondary)',
+                  borderRight: '1px solid var(--border-primary)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* RIGHT: Search + filters + actions */}
+        <div className="flex items-center gap-2">
           {/* Search bar */}
           <div
             className="flex items-center gap-1.5 px-2 py-1 rounded-md border"
@@ -543,29 +568,6 @@ export default function LeadsTable({
                   <option key={status} value={status}>{status}</option>
                 ))}
               </select>
-
-              {/* Score quick filters */}
-              <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: 'var(--border-primary)' }}>
-                {[
-                  { value: 'all', label: 'All' },
-                  { value: '50', label: '50+' },
-                  { value: '70', label: '70+' },
-                  { value: 'hot', label: 'Hot' },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setScoreFilter(opt.value)}
-                    className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors"
-                    style={{
-                      backgroundColor: scoreFilter === opt.value ? 'var(--accent-primary)' : 'var(--bg-primary)',
-                      color: scoreFilter === opt.value ? 'white' : 'var(--text-secondary)',
-                      borderRight: '1px solid var(--border-primary)',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
 
               {showAviationColumns && (
                 <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
