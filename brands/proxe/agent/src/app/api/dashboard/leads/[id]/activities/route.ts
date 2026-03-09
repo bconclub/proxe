@@ -77,7 +77,7 @@ export async function GET(
 
     // 2. Team actions: logged activities (from activities table)
     const { data: teamActivities, error: teamError } = await supabase
-      .from('activities')
+      .from('lead_activities')
       .select(`
         id,
         activity_type,
@@ -86,6 +86,7 @@ export async function GET(
         next_followup_date,
         created_at,
         created_by,
+        ai_analysis,
         dashboard_users:created_by (
           id,
           name,
@@ -113,6 +114,7 @@ export async function GET(
           icon: activity.activity_type,
           color: '#3B82F6', // Blue
           user_id: activity.created_by,
+          ai_analysis: activity.ai_analysis || null,
         })
       }
     }

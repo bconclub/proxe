@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch activities for this lead
     const { data: activities } = await supabase
-      .from('activities')
+      .from('lead_activities')
       .select('activity_type, created_at')
       .eq('lead_id', lead_id)
       .order('created_at', { ascending: false })

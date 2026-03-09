@@ -84,7 +84,7 @@ export async function GET(
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
-        .from('activities')
+        .from('lead_activities')
         .select(`
           activity_type,
           note,
@@ -193,7 +193,7 @@ export async function GET(
       const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
-        .from('activities')
+        .from('lead_activities')
         .select(`
           activity_type,
           note,
@@ -601,7 +601,7 @@ Generate a 2-3 sentence summary focusing on what was discussed, the lead's curre
 
     // Fetch recent activities
     const { data: recentActivities } = await supabase
-      .from('activities')
+      .from('lead_activities')
       .select(`
         activity_type,
         note,

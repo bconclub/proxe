@@ -17,6 +17,7 @@ interface PromptOptions {
   bookingAlreadyScheduled?: boolean;
   messageCount?: number;
   crossChannelContext?: string;
+  teamNotesContext?: string;
   brand?: string;
 }
 
@@ -48,6 +49,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     bookingAlreadyScheduled,
     messageCount,
     crossChannelContext,
+    teamNotesContext,
     brand,
   } = options;
 
@@ -55,7 +57,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
-  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext);
+  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, teamNotesContext);
 
   // Build the user prompt with context
   const userPrompt = buildUserPrompt({
@@ -79,7 +81,8 @@ function buildSystemPrompt(
   knowledgeBase?: string,
   messageCount?: number,
   channel?: Channel,
-  crossChannelContext?: string
+  crossChannelContext?: string,
+  teamNotesContext?: string
 ): string {
   const nameLine = userName
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
@@ -93,7 +96,12 @@ function buildSystemPrompt(
     ? `\n\n=================================================================================\nCROSS-CHANNEL CONTEXT\n=================================================================================\n${crossChannelContext}`
     : '';
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote;
+  // Team notes context (insights from sales team about this lead)
+  const teamNotesNote = teamNotesContext
+    ? `\n\n=================================================================================\nTEAM NOTES FOR THIS CUSTOMER\n=================================================================================\nThe sales team has logged the following observations about this customer. Use this context to tailor your responses — be aware of their concerns, preferences, and history:\n${teamNotesContext}`
+    : '';
+
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote + teamNotesNote;
 }
 
 /**

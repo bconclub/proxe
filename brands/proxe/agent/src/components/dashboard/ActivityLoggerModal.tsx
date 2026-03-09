@@ -1,16 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { MdClose, MdPhone, MdEvent, MdMessage, MdNote } from 'react-icons/md'
+import { useState, useEffect } from 'react'
+import { MdClose, MdMic, MdMicOff } from 'react-icons/md'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 
 interface ActivityLoggerModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (activity: {
-    activity_type: 'call' | 'meeting' | 'message' | 'note'
+    activity_type: 'note'
     note: string
-    duration?: number
-    next_followup?: string
   }) => Promise<void>
   leadName?: string
   stageChange?: {
@@ -19,13 +18,6 @@ interface ActivityLoggerModalProps {
   }
 }
 
-const ACTIVITY_TYPES = [
-  { value: 'call' as const, label: 'Call', icon: MdPhone, color: '#3B82F6' },
-  { value: 'meeting' as const, label: 'Meeting', icon: MdEvent, color: typeof window !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim() || 'var(--accent-primary)' : 'var(--accent-primary)' },
-  { value: 'message' as const, label: 'Message', icon: MdMessage, color: '#22C55E' },
-  { value: 'note' as const, label: 'Note', icon: MdNote, color: '#F97316' },
-]
-
 export default function ActivityLoggerModal({
   isOpen,
   onClose,
@@ -33,38 +25,29 @@ export default function ActivityLoggerModal({
   leadName,
   stageChange
 }: ActivityLoggerModalProps) {
-  const [activityType, setActivityType] = useState<'call' | 'meeting' | 'message' | 'note'>('call')
   const [note, setNote] = useState('')
-  const [duration, setDuration] = useState('')
-  const [nextFollowupDate, setNextFollowupDate] = useState('')
-  const [nextFollowupTime, setNextFollowupTime] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Generate time options in 30-minute intervals
-  const generateTimeOptions = () => {
-    const options = []
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-        const displayTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
-        options.push({ value: timeString, label: displayTime })
-      }
-    }
-    return options
-  }
+  // Voice input
+  const { isListening, isSupported, transcript, error: speechError, startListening, stopListening, resetTranscript } = useSpeechRecognition()
 
-  const timeOptions = generateTimeOptions()
+  // Append transcript to note
+  useEffect(() => {
+    if (transcript) {
+      setNote(prev => {
+        const separator = prev && !prev.endsWith(' ') ? ' ' : ''
+        return prev + separator + transcript
+      })
+      resetTranscript()
+    }
+  }, [transcript, resetTranscript])
 
   if (!isOpen) return null
 
   const handleSave = async () => {
     if (!note.trim()) {
-      setError('Note is required')
+      setError('Please add a note')
       return
     }
 
@@ -72,33 +55,17 @@ export default function ActivityLoggerModal({
     setIsSaving(true)
 
     try {
-      // Combine date and time for next_followup
-      let nextFollowupDateTime: string | undefined = undefined
-      if (nextFollowupDate && nextFollowupTime) {
-        const dateTime = new Date(`${nextFollowupDate}T${nextFollowupTime}`)
-        nextFollowupDateTime = dateTime.toISOString()
-      } else if (nextFollowupDate) {
-        // If only date is provided, use start of day
-        const dateTime = new Date(`${nextFollowupDate}T00:00`)
-        nextFollowupDateTime = dateTime.toISOString()
-      }
+      if (isListening) stopListening()
 
       await onSave({
-        activity_type: activityType,
+        activity_type: 'note',
         note: note.trim(),
-        duration: duration ? parseInt(duration, 10) : undefined,
-        next_followup: nextFollowupDateTime,
       })
-      
-      // Reset form
+
       setNote('')
-      setDuration('')
-      setNextFollowupDate('')
-      setNextFollowupTime('')
-      setActivityType('call')
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save activity')
+      setError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setIsSaving(false)
     }
@@ -106,10 +73,8 @@ export default function ActivityLoggerModal({
 
   const handleClose = () => {
     if (!isSaving) {
+      if (isListening) stopListening()
       setNote('')
-      setDuration('')
-      setNextFollowupDate('')
-      setNextFollowupTime('')
       setError(null)
       onClose()
     }
@@ -118,26 +83,26 @@ export default function ActivityLoggerModal({
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50" 
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50"
         onClick={handleClose}
       />
-      
-      {/* Modal */}
+
+      {/* Modal - compact */}
       <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-        <div 
-          className="relative w-full max-w-md bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50"
+        <div
+          className="relative w-full max-w-sm bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl z-50"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#262626]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-[#262626]">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Log Activity
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {stageChange ? 'Log Activity' : 'Add Note'}
               </h2>
               {stageChange && (
-                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  Stage changed: {stageChange.oldStage || 'None'} → {stageChange.newStage}
+                <p className="text-xs mt-0.5 text-gray-500 dark:text-gray-400">
+                  {stageChange.oldStage || 'None'} → {stageChange.newStage}
                 </p>
               )}
             </div>
@@ -146,146 +111,89 @@ export default function ActivityLoggerModal({
               disabled={isSaving}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
             >
-              <MdClose size={24} />
+              <MdClose size={20} />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-4">
-            {/* Activity Type Selection */}
-            <div>
-              <label className="block text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
-                Activity Type <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {ACTIVITY_TYPES.map((type) => {
-                  const Icon = type.icon
-                  const isSelected = activityType === type.value
-                  return (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() => setActivityType(type.value)}
-                      disabled={isSaving}
-                      className={`
-                        flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all
-                        ${isSelected
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                      `}
-                    >
-                      <Icon 
-                        size={20} 
-                        style={{ color: isSelected ? type.color : 'var(--text-secondary)' }}
-                      />
-                      <span 
-                        className="text-sm font-medium"
-                        style={{ color: isSelected ? type.color : 'var(--text-primary)' }}
-                      >
-                        {type.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Note (Required) */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                Note <span className="text-red-500">*</span>
-              </label>
+          {/* Content - just a text area with mic */}
+          <div className="px-5 py-4 space-y-3">
+            <div className="relative">
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 disabled={isSaving}
-                rows={4}
-                placeholder="Enter activity details..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                rows={3}
+                autoFocus
+                placeholder={isListening ? 'Listening... speak now' : 'What happened? (type or use mic)'}
+                className={`w-full px-3 py-2 pr-12 border rounded-lg bg-white dark:bg-[#262626] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50 resize-none text-sm ${
+                  isListening
+                    ? 'border-red-400 focus:ring-red-400'
+                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                }`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleSave()
+                  }
+                }}
               />
+              {isSupported && (
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={isSaving}
+                  className={`absolute bottom-2 right-2 p-1.5 rounded-full transition-all disabled:opacity-50 ${
+                    isListening
+                      ? 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title={isListening ? 'Stop recording' : 'Voice input'}
+                >
+                  {isListening ? (
+                    <MdMic size={18} className="text-red-500 animate-pulse" />
+                  ) : (
+                    <MdMicOff size={18} className="text-gray-400" />
+                  )}
+                </button>
+              )}
             </div>
 
-            {/* Duration (Optional) */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                Duration (minutes) <span className="text-xs text-gray-400">Optional</span>
-              </label>
-              <input
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                disabled={isSaving}
-                min="0"
-                placeholder="e.g., 15"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
-            </div>
+            {isListening && (
+              <p className="text-xs text-red-500 animate-pulse flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
+                Listening...
+              </p>
+            )}
+            {speechError && (
+              <p className="text-xs text-amber-500">{speechError}</p>
+            )}
 
-            {/* Next Follow-up (Optional) */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                Next Follow-up <span className="text-xs text-gray-400">Optional</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Date</label>
-                  <input
-                    type="date"
-                    value={nextFollowupDate}
-                    onChange={(e) => setNextFollowupDate(e.target.value)}
-                    disabled={isSaving}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Time</label>
-                  <select
-                    value={nextFollowupTime}
-                    onChange={(e) => setNextFollowupTime(e.target.value)}
-                    disabled={isSaving || !nextFollowupDate}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    <option value="">Select time</option>
-                    {timeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Error Message */}
+            {/* Error */}
             {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
+              <p className="text-xs text-red-500">{error}</p>
             )}
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-2 pt-1">
               <button
                 onClick={handleClose}
                 disabled={isSaving}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving || !note.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? 'Saving...' : 'Save Activity'}
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
+            <p className="text-[10px] text-gray-400 text-center">Ctrl+Enter to save</p>
           </div>
         </div>
       </div>
     </>
   )
 }
-

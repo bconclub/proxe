@@ -167,9 +167,11 @@ const STAGE_PROGRESSION = [
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'notes' | 'breakdown' | 'interaction'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false)
+  const [aiAnalyzing, setAiAnalyzing] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below')
   const [pendingStageChange, setPendingStageChange] = useState<{
@@ -802,11 +804,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   }
 
   const handleActivitySave = async (activity: {
-    activity_type: 'call' | 'meeting' | 'message' | 'note'
+    activity_type: 'note'
     note: string
-    duration?: number
-    next_followup?: string
-    disqualification_reason?: string
   }) => {
     if (!pendingStageChange) return
 
@@ -818,9 +817,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           new_stage: pendingStageChange.newStage,
           activity_type: activity.activity_type,
           note: activity.note,
-          duration_minutes: activity.duration,
-          next_followup_date: activity.next_followup,
-          disqualification_reason: activity.disqualification_reason,
         }),
       })
 
@@ -861,9 +857,60 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       await calculateAndSetScore() // Recalculate score after stage update
       loadUnifiedSummary()
       loadActivities()
+
+      // Delayed refresh for AI analysis results (runs async on backend)
+      setAiAnalyzing(true)
+      setTimeout(async () => {
+        await loadFreshLeadData()
+        await calculateAndSetScore()
+        await loadActivities()
+        setAiAnalyzing(false)
+      }, 3500)
     } catch (err) {
       console.error('Error updating stage:', err)
       alert(err instanceof Error ? err.message : 'Failed to update stage')
+    }
+  }
+
+  // Standalone note save (no stage change required - AI determines stage)
+  const handleAddNoteSave = async (activity: {
+    activity_type: 'note'
+    note: string
+  }) => {
+    if (!lead) return
+    const leadStage = freshLeadData?.lead_stage || lead.lead_stage || 'New'
+
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          new_stage: leadStage, // Keep current stage - AI will change if needed
+          activity_type: activity.activity_type,
+          note: activity.note,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save note')
+      }
+
+      setShowAddNoteModal(false)
+      await loadActivities()
+      loadUnifiedSummary(true)
+
+      // Delayed refresh for AI analysis results
+      setAiAnalyzing(true)
+      setTimeout(async () => {
+        await loadFreshLeadData()
+        await calculateAndSetScore()
+        await loadActivities()
+        setAiAnalyzing(false)
+      }, 3500)
+    } catch (err) {
+      console.error('Error saving note:', err)
+      throw err // Re-throw so ActivityLoggerModal shows the error
     }
   }
 
@@ -989,6 +1036,21 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     <MdEdit size={12} className="text-gray-500 dark:text-gray-400" />
                   </button>
+                  <button
+                    onClick={() => setShowAddNoteModal(true)}
+                    className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"
+                    title="Add a note about this lead"
+                    aria-label="Add note"
+                  >
+                    <MdNote size={12} />
+                    Add Note
+                  </button>
+                  {aiAnalyzing && (
+                    <span className="ml-1 text-[10px] text-purple-500 dark:text-purple-400 animate-pulse flex items-center gap-1">
+                      <MdPsychology size={12} />
+                      AI analyzing...
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1232,6 +1294,23 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               Activity
             </button>
             <button
+              onClick={() => setActiveTab('notes')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-notes px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'notes'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'notes'}
+              aria-controls="lead-tabpanel-notes"
+              id="lead-tab-notes"
+            >
+              Notes {activities.filter(a => a.type === 'team').length > 0 && (
+                <span className="ml-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
+                  {activities.filter(a => a.type === 'team').length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('breakdown')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -1261,7 +1340,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
           {/* TAB CONTENT - Scrollable */}
           <main className="lead-modal-content lead-details-modal-tab-content overflow-y-auto flex-1 min-h-0">
-            {/* Activity Tab - 70% width with improved message display */}
+            {/* Activity Tab - PROXe + Customer messages only (team notes in Notes tab) */}
             {activeTab === 'activity' && (
               <section
                 id="lead-tabpanel-activity"
@@ -1274,108 +1353,184 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="lead-activity-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
                     <div className="animate-pulse">Loading activities...</div>
                   </div>
-                ) : activities.length === 0 ? (
-                  <div className="lead-activity-empty text-sm text-center py-8 text-gray-500 dark:text-gray-400">
-                    No activities yet
-                  </div>
-                ) : (
-                  <ol className="lead-activity-list space-y-4" aria-label="Lead activity timeline">
-                    {activities.map((activity, index) => {
-                      const getActivityIcon = () => {
-                        if (activity.type === 'proxe') {
-                          return <MdSmartToy size={18} />
-                        } else if (activity.type === 'customer') {
-                          return <MdPerson size={18} />
-                        } else if (activity.type === 'team') {
-                          switch (activity.icon) {
-                            case 'call': return <MdCall size={18} />
-                            case 'meeting': return <MdEvent size={18} />
-                            case 'message': return <MdMessage size={18} />
-                            case 'note': return <MdNote size={18} />
-                            default: return <MdHistory size={18} />
+                ) : (() => {
+                  const timelineActivities = activities.filter(a => a.type !== 'team')
+                  return timelineActivities.length === 0 ? (
+                    <div className="lead-activity-empty text-sm text-center py-8 text-gray-500 dark:text-gray-400">
+                      No messages yet
+                    </div>
+                  ) : (
+                    <ol className="lead-activity-list space-y-4" aria-label="Lead activity timeline">
+                      {timelineActivities.map((activity, index) => {
+                        const getActivityIcon = () => {
+                          if (activity.type === 'proxe') {
+                            return <MdSmartToy size={18} />
+                          } else if (activity.type === 'customer') {
+                            return <MdPerson size={18} />
+                          } else {
+                            return activity.icon === 'booking' ? <MdEvent size={18} /> : <MdMessage size={18} />
                           }
-                        } else {
-                          return activity.icon === 'booking' ? <MdEvent size={18} /> : <MdMessage size={18} />
                         }
-                      }
-                      const color = activity.color || '#6B7280'
-                      const Icon = getActivityIcon()
-                      const isCustomer = activity.type === 'customer'
-                      const isProxe = activity.type === 'proxe'
+                        const color = activity.color || '#6B7280'
+                        const Icon = getActivityIcon()
+                        const isCustomer = activity.type === 'customer'
+                        const isProxe = activity.type === 'proxe'
 
-                      return (
-                        <li key={activity.id} className={`lead-activity-item flex gap-3 ${isCustomer ? 'flex-row-reverse' : ''}`}>
-                          <div className="lead-activity-timeline flex flex-col items-center flex-shrink-0">
-                            <div
-                              className="lead-activity-icon w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-transform hover:scale-105"
-                              style={{ backgroundColor: color }}
-                              aria-hidden="true"
-                            >
-                              {Icon}
-                            </div>
-                            {index < activities.length - 1 && (
+                        return (
+                          <li key={activity.id} className={`lead-activity-item flex gap-3 ${isCustomer ? 'flex-row-reverse' : ''}`}>
+                            <div className="lead-activity-timeline flex flex-col items-center flex-shrink-0">
                               <div
-                                className="lead-activity-connector w-0.5 flex-1 mt-2"
-                                style={{ backgroundColor: color, opacity: 0.3 }}
+                                className="lead-activity-icon w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-transform hover:scale-105"
+                                style={{ backgroundColor: color }}
                                 aria-hidden="true"
-                              />
-                            )}
-                          </div>
-                          <article className={`lead-activity-content flex-1 pb-2 min-w-0 ${isCustomer ? 'text-right' : 'text-left'}`}>
-                            {/* Message bubble for customer/PROXe messages */}
-                            {activity.content && (isCustomer || isProxe) ? (
-                              <div
-                                className={`lead-activity-message rounded-2xl px-4 py-3 mb-2 shadow-sm ${isCustomer
-                                  ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30'
-                                  : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30'
-                                  }`}
-                                style={{
-                                  maxWidth: '85%',
-                                  marginLeft: isCustomer ? 'auto' : '0',
-                                  marginRight: isCustomer ? '0' : 'auto'
-                                }}
                               >
-                                <p className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
+                                {Icon}
+                              </div>
+                              {index < timelineActivities.length - 1 && (
+                                <div
+                                  className="lead-activity-connector w-0.5 flex-1 mt-2"
+                                  style={{ backgroundColor: color, opacity: 0.3 }}
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </div>
+                            <article className={`lead-activity-content flex-1 pb-2 min-w-0 ${isCustomer ? 'text-right' : 'text-left'}`}>
+                              {activity.content && (isCustomer || isProxe) ? (
+                                <div
+                                  className={`lead-activity-message rounded-2xl px-4 py-3 mb-2 shadow-sm ${isCustomer
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30'
+                                    : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30'
+                                    }`}
+                                  style={{
+                                    maxWidth: '85%',
+                                    marginLeft: isCustomer ? 'auto' : '0',
+                                    marginRight: isCustomer ? '0' : 'auto'
+                                  }}
+                                >
+                                  <p className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
+                                    {renderMarkdown(activity.content)}
+                                  </p>
+                                </div>
+                              ) : activity.content ? (
+                                <p className="lead-activity-text text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
                                   {renderMarkdown(activity.content)}
                                 </p>
-                              </div>
-                            ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
-                                {renderMarkdown(activity.content)}
-                              </p>
-                            ) : null}
+                              ) : null}
 
-                            <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
-                              <div className={`lead-activity-meta flex items-center gap-2 flex-1 min-w-0 ${isCustomer ? 'flex-row-reverse' : ''}`}>
-                                <h4 className="lead-activity-action text-sm font-semibold text-gray-900 dark:text-white">
-                                  {activity.action || 'Activity'}
-                                </h4>
-                                {activity.channel && (
-                                  <span
-                                    className="lead-activity-channel text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex-shrink-0"
-                                    style={{
-                                      backgroundColor: `${color}15`,
-                                      color: color
-                                    }}
-                                    aria-label={`Channel: ${activity.channel}`}
-                                  >
-                                    {activity.channel}
+                              <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
+                                <div className={`lead-activity-meta flex items-center gap-2 flex-1 min-w-0 ${isCustomer ? 'flex-row-reverse' : ''}`}>
+                                  <h4 className="lead-activity-action text-sm font-semibold text-gray-900 dark:text-white">
+                                    {activity.action || 'Activity'}
+                                  </h4>
+                                  {activity.channel && (
+                                    <span
+                                      className="lead-activity-channel text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex-shrink-0"
+                                      style={{
+                                        backgroundColor: `${color}15`,
+                                        color: color
+                                      }}
+                                    >
+                                      {activity.channel}
+                                    </span>
+                                  )}
+                                </div>
+                                <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-gray-400 dark:text-gray-500 flex-shrink-0" dateTime={activity.timestamp}>
+                                  {formatDateTimeIST(activity.timestamp)}
+                                </time>
+                              </div>
+                              <p className="lead-activity-actor text-xs mt-0.5 font-medium" style={{ color }}>
+                                {activity.actor || 'Unknown'}
+                              </p>
+                            </article>
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  )
+                })()}
+              </section>
+            )}
+
+            {/* Notes Tab - Team notes only */}
+            {activeTab === 'notes' && (
+              <section
+                id="lead-tabpanel-notes"
+                role="tabpanel"
+                aria-labelledby="lead-tab-notes"
+                className="lead-tabpanel-notes px-4 pt-4 pb-2"
+              >
+                {loadingActivities ? (
+                  <div className="text-sm text-center py-8 text-gray-500 dark:text-gray-400 animate-pulse">
+                    Loading notes...
+                  </div>
+                ) : (() => {
+                  const teamNotes = activities.filter(a => a.type === 'team')
+                  return teamNotes.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MdNote size={32} className="text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No notes yet</p>
+                      <button
+                        onClick={() => setShowAddNoteModal(true)}
+                        className="mt-3 px-4 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                      >
+                        Add your first note
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Add Note button at top */}
+                      <div className="flex justify-end mb-2">
+                        <button
+                          onClick={() => setShowAddNoteModal(true)}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center gap-1"
+                        >
+                          <MdNote size={14} /> Add Note
+                        </button>
+                      </div>
+                      {teamNotes.map((activity) => (
+                        <article
+                          key={activity.id}
+                          className="p-4 rounded-lg border border-gray-200 dark:border-[#2A2A2A] bg-white dark:bg-[#1E1E1E] hover:border-gray-300 dark:hover:border-[#333] transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                                {activity.actor}
+                              </span>
+                            </div>
+                            <time className="text-[10px] text-gray-400 dark:text-gray-500">
+                              {formatDateTimeIST(activity.timestamp)}
+                            </time>
+                          </div>
+                          <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
+                            {renderMarkdown(activity.content)}
+                          </p>
+                          {/* AI analysis badge */}
+                          {activity.ai_analysis && (
+                            <div className="mt-2 flex items-start gap-1.5 p-2 rounded-md bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/20">
+                              <MdPsychology size={14} className="text-purple-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                                  {activity.ai_analysis.reasoning}
+                                </p>
+                                {activity.ai_analysis.score_delta !== 0 && (
+                                  <span className={`text-[10px] font-bold ${activity.ai_analysis.score_delta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                    Score: {activity.ai_analysis.score_delta > 0 ? '+' : ''}{activity.ai_analysis.score_delta}
+                                  </span>
+                                )}
+                                {activity.ai_analysis.suggested_stage && activity.ai_analysis.suggested_stage !== activity.ai_analysis.applied_stage && (
+                                  <span className="text-[10px] text-purple-500 ml-2">
+                                    → {activity.ai_analysis.suggested_stage}
                                   </span>
                                 )}
                               </div>
-                              <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-gray-400 dark:text-gray-500 flex-shrink-0" dateTime={activity.timestamp}>
-                                {formatDateTimeIST(activity.timestamp)}
-                              </time>
                             </div>
-                            <p className="lead-activity-actor text-xs mt-0.5 font-medium" style={{ color }}>
-                              {activity.actor || 'Unknown'}
-                            </p>
-                          </article>
-                        </li>
-                      )
-                    })}
-                  </ol>
-                )}
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  )
+                })()}
               </section>
             )}
 
@@ -1965,7 +2120,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         </dialog>
       </div>
 
-      {/* Activity Logger Modal */}
+      {/* Activity Logger Modal - Stage Change */}
       {showActivityModal && pendingStageChange && (
         <ActivityLoggerModal
           isOpen={showActivityModal}
@@ -1979,6 +2134,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             oldStage: pendingStageChange.oldStage,
             newStage: pendingStageChange.newStage
           }}
+        />
+      )}
+
+      {/* Add Note Modal - Standalone */}
+      {showAddNoteModal && (
+        <ActivityLoggerModal
+          isOpen={showAddNoteModal}
+          onClose={() => setShowAddNoteModal(false)}
+          onSave={handleAddNoteSave}
+          leadName={currentLead.name || 'Lead'}
         />
       )}
     </>

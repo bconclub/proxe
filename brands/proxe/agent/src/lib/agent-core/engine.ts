@@ -44,7 +44,26 @@ export async function process(
   // 3. Check for existing booking
   const existingBookingMessage = await checkBooking(supabase, input);
 
-  // 4. Build prompt (brand-aware)
+  // 4. Fetch team notes context (if lead exists)
+  let teamNotesContext: string | undefined;
+  if (input.userProfile.phone || input.userProfile.email) {
+    try {
+      const identifier = input.userProfile.phone || input.userProfile.email;
+      const field = input.userProfile.phone ? 'phone' : 'email';
+      const { data: leadData } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq(field, identifier)
+        .single();
+      if (leadData?.unified_context?.team_notes_summary) {
+        teamNotesContext = leadData.unified_context.team_notes_summary;
+      }
+    } catch {
+      // Non-critical — continue without team notes
+    }
+  }
+
+  // 5. Build prompt (brand-aware)
   // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
     ? `[EXISTING BOOKING INFO: ${existingBookingMessage} — If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly — if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
@@ -59,10 +78,11 @@ export async function process(
     message: finalMessage,
     bookingAlreadyScheduled: !!existingBookingMessage,
     messageCount: input.messageCount,
+    teamNotesContext,
     brand: brandId,
   });
 
-  // 5. Detect human handoff requests before AI generation
+  // 6. Detect human handoff requests before AI generation
   const wantsHuman = detectHumanHandoffRequest(input.message);
 
   // 6. Generate response (with retry + graceful fallback)
@@ -166,7 +186,26 @@ export async function* processStream(
     // 3. Check for existing booking
     const existingBookingMessage = await checkBooking(supabase, input);
 
-    // 4. Build prompt (brand-aware)
+    // 4. Fetch team notes context
+    let streamTeamNotesContext: string | undefined;
+    if (input.userProfile.phone || input.userProfile.email) {
+      try {
+        const identifier = input.userProfile.phone || input.userProfile.email;
+        const field = input.userProfile.phone ? 'phone' : 'email';
+        const { data: leadData } = await supabase
+          .from('all_leads')
+          .select('unified_context')
+          .eq(field, identifier)
+          .single();
+        if (leadData?.unified_context?.team_notes_summary) {
+          streamTeamNotesContext = leadData.unified_context.team_notes_summary;
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
+    // 5. Build prompt (brand-aware)
     const finalMessage = existingBookingMessage
       ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
       : input.message;
@@ -180,6 +219,7 @@ export async function* processStream(
       message: finalMessage,
       bookingAlreadyScheduled: !!existingBookingMessage,
       messageCount: input.messageCount,
+      teamNotesContext: streamTeamNotesContext,
       brand: brandId,
     });
 
