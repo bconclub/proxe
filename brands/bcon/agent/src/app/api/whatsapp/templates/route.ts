@@ -16,10 +16,11 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`
 function getCredentials() {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN
+  const wabaId = process.env.META_WHATSAPP_WABA_ID
   if (!phoneNumberId || !accessToken) {
     return null
   }
-  return { phoneNumberId, accessToken }
+  return { phoneNumberId, accessToken, wabaId }
 }
 
 /**
@@ -35,32 +36,63 @@ export async function GET() {
       )
     }
 
-    // Step 1: Get WABA ID from phone number ID
+    // Step 1: Get phone info
     const phoneRes = await fetch(
       `${GRAPH_API_BASE}/${creds.phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating`,
       { headers: { Authorization: `Bearer ${creds.accessToken}` } }
     )
     const phoneData = await phoneRes.json()
 
-    // Step 2: Get WABA ID (the parent business account)
-    const wabaRes = await fetch(
-      `${GRAPH_API_BASE}/${creds.phoneNumberId}/whatsapp_business_account`,
-      { headers: { Authorization: `Bearer ${creds.accessToken}` } }
-    )
+    // Step 2: Resolve WABA ID — env var > edge lookup > debug_token
+    let wabaId: string | null = creds.wabaId || null
+    const debugInfo: Record<string, any> = {}
 
-    let wabaId: string | null = null
-    if (wabaRes.ok) {
-      const wabaData = await wabaRes.json()
-      wabaId = wabaData.id
+    if (!wabaId) {
+      // Try edge endpoint
+      try {
+        const wabaRes = await fetch(
+          `${GRAPH_API_BASE}/${creds.phoneNumberId}?fields=whatsapp_business_account`,
+          { headers: { Authorization: `Bearer ${creds.accessToken}` } }
+        )
+        const wabaData = await wabaRes.json()
+        debugInfo.phoneFieldsResponse = wabaData
+        if (wabaData.whatsapp_business_account?.id) {
+          wabaId = wabaData.whatsapp_business_account.id
+        }
+      } catch (e) { /* continue */ }
     }
 
     if (!wabaId) {
-      // Try alternative: get from phone number's owner_business_info
-      // Or just use a known WABA ID from env
+      // Try debug_token to find WABA from token's granted scopes
+      try {
+        const debugRes = await fetch(
+          `${GRAPH_API_BASE}/debug_token?input_token=${creds.accessToken}`,
+          { headers: { Authorization: `Bearer ${creds.accessToken}` } }
+        )
+        const debugData = await debugRes.json()
+        debugInfo.debugToken = debugData?.data ? {
+          app_id: debugData.data.app_id,
+          type: debugData.data.type,
+          scopes: debugData.data.scopes,
+          granular_scopes: debugData.data.granular_scopes,
+        } : debugData
+        // Look for WABA ID in granular scopes
+        const wabaScope = debugData?.data?.granular_scopes?.find(
+          (s: any) => s.scope === 'whatsapp_business_messaging' || s.scope === 'whatsapp_business_management'
+        )
+        if (wabaScope?.target_ids?.length > 0) {
+          wabaId = wabaScope.target_ids[0]
+          debugInfo.wabaIdSource = 'debug_token.granular_scopes'
+        }
+      } catch (e) { /* continue */ }
+    }
+
+    if (!wabaId) {
       return NextResponse.json({
-        error: 'Could not determine WABA ID. Set META_WHATSAPP_WABA_ID env var.',
+        error: 'Could not determine WABA ID. Set META_WHATSAPP_WABA_ID env var on Vercel.',
         phoneInfo: phoneData,
-        hint: 'You can find your WABA ID at: Meta Business Suite > WhatsApp > Settings > Phone numbers',
+        debugInfo,
+        hint: 'Check debugInfo.debugToken.granular_scopes for WABA IDs, or find it at: Meta Business Suite > WhatsApp > Settings',
       }, { status: 400 })
     }
 
