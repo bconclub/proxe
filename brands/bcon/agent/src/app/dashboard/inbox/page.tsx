@@ -1137,137 +1137,123 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Row 2 — Contact */}
-              <div className="flex items-center gap-3 px-4 pb-1">
+              {/* Row 2 — Visual status chips */}
+              <div className="flex items-center gap-1.5 px-4 pb-2 flex-wrap">
+                {/* Score chip — colored circle + label */}
+                {selectedConversation?.lead_score != null && (() => {
+                  const s = selectedConversation.lead_score;
+                  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
+                  const bg = s >= 70 ? 'rgba(34,197,94,0.12)' : s >= 40 ? 'rgba(245,158,11,0.12)' : s >= 20 ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)';
+                  const label = s >= 70 ? 'Hot' : s >= 40 ? 'Warm' : s >= 20 ? 'Cool' : 'Cold';
+                  return (
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+                      style={{ background: bg, border: `1px solid ${color}25` }}
+                    >
+                      <span
+                        className="flex items-center justify-center rounded-full text-[9px] font-bold leading-none"
+                        style={{
+                          width: 20, height: 20,
+                          background: color,
+                          color: '#fff',
+                        }}
+                      >
+                        {s}
+                      </span>
+                      <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Stage chip */}
+                {selectedConversation?.lead_stage && (() => {
+                  const stage = selectedConversation.lead_stage;
+                  const stageColor =
+                    stage === 'Booking Made' || stage === 'Converted' ? '#22c55e'
+                    : stage === 'High Intent' ? '#f59e0b'
+                    : stage === 'Qualified' ? '#f59e0b'
+                    : stage === 'Engaged' ? '#06b6d4'
+                    : stage === 'Closed Lost' || stage === 'Cold' ? '#ef4444'
+                    : stage === 'R&R' ? '#f59e0b'
+                    : '#3b82f6';
+                  return (
+                    <span
+                      className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                      style={{
+                        background: `${stageColor}18`,
+                        color: stageColor,
+                        border: `1px solid ${stageColor}25`,
+                      }}
+                    >
+                      {stage}
+                    </span>
+                  );
+                })()}
+
+                {/* Booking chip */}
+                {selectedConversation?.booking_date ? (
+                  <span
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                    style={{
+                      background: 'rgba(34,197,94,0.12)',
+                      color: '#22c55e',
+                      border: '1px solid rgba(34,197,94,0.15)',
+                    }}
+                  >
+                    <MdEventAvailable size={11} />
+                    {new Date(selectedConversation.booking_date).toLocaleDateString('en-IN', {
+                      weekday: 'short', month: 'short', day: 'numeric'
+                    })}
+                    {selectedConversation.booking_time && `, ${selectedConversation.booking_time}`}
+                  </span>
+                ) : (
+                  <span
+                    className="text-[10px] px-2.5 py-1 rounded-full"
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-primary)',
+                    }}
+                  >
+                    No booking
+                  </span>
+                )}
+
+                {/* Contact chips — phone + email */}
                 {selectedConversation?.lead_phone && (
                   <a
                     href={`tel:${selectedConversation.lead_phone}`}
-                    className="text-[11px] hover:underline"
-                    style={{ color: 'var(--text-secondary)' }}
+                    className="text-[10px] px-2 py-1 rounded-full hover:brightness-125 transition-all"
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-primary)',
+                    }}
                   >
-                    {selectedConversation.lead_phone}
+                    📞 {selectedConversation.lead_phone}
                   </a>
                 )}
                 {selectedConversation?.lead_email && (
-                  <>
-                    {selectedConversation?.lead_phone && (
-                      <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
-                    )}
-                    <a
-                      href={`mailto:${selectedConversation.lead_email}`}
-                      className="text-[11px] hover:underline truncate"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      {selectedConversation.lead_email}
-                    </a>
-                  </>
-                )}
-              </div>
-
-              {/* Row 3 — Status bar */}
-              <div className="flex items-center gap-3 px-4 pb-1 flex-wrap">
-                {/* Score + warmth badge */}
-                {selectedConversation?.lead_score != null && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>Score:</span>
-                    <span
-                      className="text-[11px] font-bold"
-                      style={{
-                        color: selectedConversation.lead_score >= 90
-                          ? '#22C55E'
-                          : selectedConversation.lead_score >= 70
-                            ? '#F97316'
-                            : selectedConversation.lead_score >= 40
-                              ? '#3B82F6'
-                              : 'var(--text-secondary)'
-                      }}
-                    >
-                      {selectedConversation.lead_score}
-                    </span>
-                    <span
-                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-                      style={{
-                        background: selectedConversation.lead_score >= 90
-                          ? 'rgba(34, 197, 94, 0.15)'
-                          : selectedConversation.lead_score >= 70
-                            ? 'rgba(249, 115, 22, 0.15)'
-                            : selectedConversation.lead_score >= 40
-                              ? 'rgba(59, 130, 246, 0.15)'
-                              : 'rgba(107, 114, 128, 0.15)',
-                        color: selectedConversation.lead_score >= 90
-                          ? '#22C55E'
-                          : selectedConversation.lead_score >= 70
-                            ? '#F97316'
-                            : selectedConversation.lead_score >= 40
-                              ? '#3B82F6'
-                              : 'var(--text-secondary)'
-                      }}
-                    >
-                      {selectedConversation.lead_score >= 90 ? 'Hot' : selectedConversation.lead_score >= 70 ? 'Warm' : selectedConversation.lead_score >= 40 ? 'Cool' : 'Cold'}
-                    </span>
-                  </div>
+                  <a
+                    href={`mailto:${selectedConversation.lead_email}`}
+                    className="text-[10px] px-2 py-1 rounded-full hover:brightness-125 transition-all truncate max-w-[200px]"
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-primary)',
+                    }}
+                  >
+                    ✉ {selectedConversation.lead_email}
+                  </a>
                 )}
 
-                {/* Stage */}
-                {selectedConversation?.lead_stage && (
-                  <>
-                    <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Stage:</span>
-                      <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{
-                          background:
-                            selectedConversation.lead_stage === 'Booking Made' || selectedConversation.lead_stage === 'Converted'
-                              ? 'rgba(34, 197, 94, 0.15)'
-                              : selectedConversation.lead_stage === 'High Intent' || selectedConversation.lead_stage === 'Qualified'
-                                ? 'rgba(249, 115, 22, 0.15)'
-                                : selectedConversation.lead_stage === 'Closed Lost' || selectedConversation.lead_stage === 'Cold'
-                                  ? 'rgba(239, 68, 68, 0.15)'
-                                  : 'rgba(59, 130, 246, 0.15)',
-                          color:
-                            selectedConversation.lead_stage === 'Booking Made' || selectedConversation.lead_stage === 'Converted'
-                              ? '#22C55E'
-                              : selectedConversation.lead_stage === 'High Intent' || selectedConversation.lead_stage === 'Qualified'
-                                ? '#F97316'
-                                : selectedConversation.lead_stage === 'Closed Lost' || selectedConversation.lead_stage === 'Cold'
-                                  ? '#EF4444'
-                                  : '#3B82F6'
-                        }}
-                      >
-                        {selectedConversation.lead_stage}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {/* Booking */}
-                <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
-                <div className="flex items-center gap-1">
-                  {selectedConversation?.booking_date ? (
-                    <>
-                      <MdEventAvailable size={12} style={{ color: '#22C55E' }} />
-                      <span className="text-[11px] font-medium" style={{ color: '#22C55E' }}>
-                        {new Date(selectedConversation.booking_date).toLocaleDateString('en-IN', {
-                          weekday: 'short', month: 'short', day: 'numeric'
-                        })}
-                        {selectedConversation.booking_time && `, ${selectedConversation.booking_time}`}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>No booking</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 4 — Next action (only if available) */}
-              {selectedConversation?.next_touchpoint && (
-                <div className="px-4 pb-2">
-                  <span className="text-[10px] italic" style={{ color: 'var(--text-secondary)' }}>
-                    {selectedConversation.next_touchpoint}
+                {/* Next action — inline italic at end of chips */}
+                {selectedConversation?.next_touchpoint && (
+                  <span className="text-[10px] italic ml-1" style={{ color: 'var(--text-secondary)' }}>
+                    → {selectedConversation.next_touchpoint}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* AI Summary Panel - compact */}
