@@ -118,11 +118,11 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hey! I'm BCON's AI advisor. I help businesses plug in AI that actually works. What can I help with?",
-  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
+  bcon: "Hey! I'm BCON's AI. Tell me about your business and I'll show you how AI can help.",
+  proxe: "Hey! I'm BCON's AI. Tell me about your business and I'll show you how AI can help.",
 };
 function getWelcomeMessage(brand: string): string {
-  return welcomeMessages[brand] || welcomeMessages['proxe'];
+  return welcomeMessages[brand] || welcomeMessages['bcon'];
 }
 
 // Helper function to clean metadata strings from conversation summary
