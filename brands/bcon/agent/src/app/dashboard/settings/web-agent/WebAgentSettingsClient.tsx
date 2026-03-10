@@ -72,8 +72,8 @@ export default function WebAgentSettingsClient() {
       }}>
         {/* LEFT — Configuration */}
         <div style={{
-          flex: '1 1 55%',
-          minWidth: 0,
+          flex: '0 0 40%',
+          maxWidth: '40%',
           borderRight: '1px solid var(--border-primary)',
           backgroundColor: 'var(--bg-primary)',
           display: 'flex',
@@ -182,41 +182,61 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
 
-        {/* RIGHT — Widget preview at actual deployed size */}
+        {/* RIGHT — Simulated webpage with live widget */}
         <div style={{
-          flex: '1 1 45%',
+          flex: '1 1 60%',
           minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.04) 0%, transparent 70%)',
           position: 'relative',
+          backgroundColor: '#1a1a2e',
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
         }}>
-          {/* Widget at actual size */}
+          {/* Faint simulated page header */}
           <div style={{
-            width: '380px',
-            height: '550px',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(139, 92, 246, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            flexShrink: 0,
+            height: '48px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 20px',
+            gap: '12px',
           }}>
-            <iframe
-              ref={iframeRef}
-              src="/widget"
-              style={{
-                width: '380px',
-                height: '550px',
-                border: 'none',
-                display: 'block',
-              }}
-              title="Widget Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-              allow="microphone; camera"
-            />
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <div style={{
+              flex: 1,
+              maxWidth: '280px',
+              height: '24px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              marginLeft: '8px',
+            }} />
           </div>
+          {/* Faint simulated page content blocks */}
+          <div style={{ padding: '32px 28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ width: '60%', height: '14px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+            <div style={{ width: '85%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
+            <div style={{ width: '75%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
+            <div style={{ width: '40%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
+          </div>
+          {/* Widget iframe — fills the whole panel, widget positions itself bottom-right */}
+          <iframe
+            ref={iframeRef}
+            src="/widget"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: 'transparent',
+            }}
+            title="Widget Preview"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            allow="microphone; camera"
+          />
         </div>
       </div>
     </DashboardLayout>
