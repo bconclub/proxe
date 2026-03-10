@@ -20,8 +20,11 @@ export async function GET() {
 
   var iframe = document.createElement('iframe');
   iframe.id = 'wc-chat-widget';
-  // Same-origin: widget is now served from this dashboard app
-  iframe.src = window.location.protocol + '//' + window.location.host + '/widget/bubble';
+  // Resolve base URL from the script's own src so it works on external sites
+  var scriptEl = document.currentScript || document.querySelector('script[src*="embed.js"]');
+  var scriptSrc = scriptEl ? scriptEl.src : '';
+  var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
+  iframe.src = baseUrl + '/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
   // Start with small iframe just for bubble button (77px + padding)
