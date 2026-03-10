@@ -700,19 +700,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div
-        className="dashboard-layout-main-content flex flex-col min-h-screen transition-all duration-300 ease-in-out"
+        className="dashboard-layout-main-content flex flex-col transition-all duration-300 ease-in-out"
         style={{
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
-          minHeight: '100vh',
+          height: '100vh',
           width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
+          overflow: 'hidden',
         }}
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
 
         {/* Page content */}
-        <main className="dashboard-layout-main-content-wrapper flex-1" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
+        <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
           <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
             <div className="dashboard-layout-main-content-inner max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               {children}
