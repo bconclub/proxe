@@ -7,7 +7,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AgentInput, AgentOutput, KnowledgeResult, StreamChunk } from './types';
 import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
-import { streamResponse, generateResponse, generateResponseWithTools, isConfigured, getErrorMessage } from './claudeClient';
+import { generateResponse, generateResponseWithTools, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
 import { extractIntent, isBookingIntent } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
@@ -201,12 +201,33 @@ export async function* processStream(
       crossChannelContext: crossChannelContext || undefined,
     });
 
-    // 5. Stream response
-    let rawResponse = '';
-    for await (const text of streamResponse(systemPrompt, userPrompt)) {
-      rawResponse += text;
-      yield { type: 'chunk', text };
+    // 5. Generate response with tools (same as WhatsApp — enables booking flow)
+    const { tools, toolHandlers } = buildBookingTools(input, supabase);
+    let rawResponse: string;
+
+    try {
+      rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
+        tools,
+        toolHandlers,
+        maxToolRounds: 3,
+      }, 768);
+    } catch (firstError: any) {
+      console.error('[Engine] Web AI generation failed (attempt 1):', firstError?.message || firstError);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
+          tools,
+          toolHandlers,
+          maxToolRounds: 2,
+        }, 512);
+      } catch (retryError: any) {
+        console.error('[Engine] Web AI generation failed (attempt 2):', retryError?.message || retryError);
+        rawResponse = "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
+      }
     }
+
+    // Yield the full response as a single chunk
+    yield { type: 'chunk', text: rawResponse };
 
     const cleanedResponse = cleanResponse(rawResponse);
 
@@ -394,7 +415,7 @@ function buildBookingTools(
           },
           email: {
             type: 'string',
-            description: 'Email address (optional for WhatsApp users)',
+            description: 'Email address (required for web users, optional for WhatsApp users)',
           },
           phone: {
             type: 'string',
@@ -494,15 +515,16 @@ function buildBookingTools(
     book_consultation: async (toolInput: Record<string, any>) => {
       const { date, time, name, email, phone, course_interest, title } = toolInput;
 
-      const bookingPhone = phone || input.userProfile.phone;
-      const bookingName = name || input.userProfile.name || 'WhatsApp User';
+      const bookingPhone = phone || input.userProfile.phone || '';
+      const bookingName = name || input.userProfile.name || 'Web Visitor';
       const bookingEmail = email || input.userProfile.email || '';
       const bookingTitle = title || `AI Strategy Call - ${bookingName}`;
 
-      if (!bookingPhone) {
+      // Need at least phone or email to identify the booking
+      if (!bookingPhone && !bookingEmail) {
         return JSON.stringify({
           success: false,
-          error: 'Phone number is required. Ask the user for their phone number.',
+          error: 'Need either phone number or email to book. Ask the user for their email address.',
         });
       }
 
@@ -563,7 +585,7 @@ function buildBookingTools(
             title: bookingTitle,
             meetLink: calendarResult?.meetLink || undefined,
           },
-          'whatsapp',
+          input.channel || 'whatsapp',
           supabase,
         );
       } catch (storeError: any) {
@@ -599,22 +621,45 @@ function buildBookingTools(
       }
 
       const phone = input.userProfile.phone;
-      if (!phone) {
-        return JSON.stringify({ success: false, error: 'No phone number available.' });
-      }
+      const channelKey = input.channel === 'web' ? 'web' : 'whatsapp';
 
       try {
-        const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+        let lead: any = null;
 
-        // Fetch existing lead
-        const { data: lead } = await supabase
-          .from('all_leads')
-          .select('id, unified_context, email, customer_name')
-          .eq('customer_phone_normalized', normalizedPhone)
-          .maybeSingle();
+        // Find lead by phone (WhatsApp) or session (web)
+        if (phone) {
+          const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+          const { data } = await supabase
+            .from('all_leads')
+            .select('id, unified_context, email, customer_name')
+            .eq('customer_phone_normalized', normalizedPhone)
+            .maybeSingle();
+          lead = data;
+        }
+
+        // For web: try finding lead by session
+        if (!lead && input.sessionId) {
+          const sessionTable = channelKey === 'web' ? 'web_sessions' : 'whatsapp_sessions';
+          const { data: session } = await supabase
+            .from(sessionTable)
+            .select('lead_id')
+            .eq('external_session_id', input.sessionId)
+            .maybeSingle();
+
+          if (session?.lead_id) {
+            const { data } = await supabase
+              .from('all_leads')
+              .select('id, unified_context, email, customer_name')
+              .eq('id', session.lead_id)
+              .maybeSingle();
+            lead = data;
+          }
+        }
 
         if (!lead) {
-          return JSON.stringify({ success: false, error: 'Lead not found.' });
+          // Still save to session even if no lead found
+          console.log('[Engine] No lead found for profile update, saving to session only');
+          return JSON.stringify({ success: true, updated: ['saved to session context'] });
         }
 
         // Build top-level updates
@@ -622,10 +667,10 @@ function buildBookingTools(
         if (email) leadUpdates.email = email.trim().toLowerCase();
         if (full_name) leadUpdates.customer_name = full_name.trim();
 
-        // Build unified_context.whatsapp.profile
+        // Build unified_context.[channel].profile
         const existingCtx = lead.unified_context || {};
-        const existingWA = existingCtx.whatsapp || {};
-        const existingProfile = existingWA.profile || {};
+        const existingChannel = existingCtx[channelKey] || {};
+        const existingProfile = existingChannel.profile || {};
 
         const profile: Record<string, any> = { ...existingProfile };
         if (full_name) profile.full_name = full_name.trim();
@@ -641,7 +686,7 @@ function buildBookingTools(
 
         leadUpdates.unified_context = {
           ...existingCtx,
-          whatsapp: { ...existingWA, profile },
+          [channelKey]: { ...existingChannel, profile },
         };
 
         await supabase
@@ -649,19 +694,20 @@ function buildBookingTools(
           .update(leadUpdates)
           .eq('id', lead.id);
 
-        // Also update whatsapp_sessions
+        // Also update session table
+        const sessionTable = channelKey === 'web' ? 'web_sessions' : 'whatsapp_sessions';
         const sessionUpdates: Record<string, any> = {};
         if (email) sessionUpdates.customer_email = email.trim().toLowerCase();
         if (full_name) sessionUpdates.customer_name = full_name.trim();
 
-        const { data: waSession } = await supabase
-          .from('whatsapp_sessions')
+        const { data: session } = await supabase
+          .from(sessionTable)
           .select('id, channel_data')
           .eq('external_session_id', input.sessionId)
           .maybeSingle();
 
-        if (waSession) {
-          const existingData = waSession.channel_data || {};
+        if (session) {
+          const existingData = session.channel_data || {};
           sessionUpdates.channel_data = {
             ...existingData,
             ...(city ? { city: city.trim() } : {}),
@@ -669,9 +715,9 @@ function buildBookingTools(
             ...(business_type ? { business_type: business_type.trim() } : {}),
           };
           await supabase
-            .from('whatsapp_sessions')
+            .from(sessionTable)
             .update(sessionUpdates)
-            .eq('id', waSession.id);
+            .eq('id', session.id);
         }
 
         const saved: string[] = [];

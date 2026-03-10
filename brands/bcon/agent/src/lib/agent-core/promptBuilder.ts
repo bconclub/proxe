@@ -135,8 +135,8 @@ function buildUserPrompt(params: {
     ? 'Plain text only. Max 2 sentences.'
     : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
-  // Inject current date for WhatsApp so Claude can resolve relative dates ("tomorrow", "next Monday")
-  const dateContext = channel === 'whatsapp'
+  // Inject current date so Claude can resolve relative dates ("tomorrow", "next Monday")
+  const dateContext = (channel === 'whatsapp' || channel === 'web')
     ? `Today's date: ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })})`
     : '';
 
@@ -181,7 +181,26 @@ IMPORTANT: This conversation is on a voice channel. Keep responses very brief,
 natural-sounding, and easy to speak aloud. Avoid any formatting, lists, or URLs.`;
   }
 
-  // Web channel — default (HTML formatting is fine)
+  // Web channel
+  if (channel === 'web') {
+    return `
+
+=================================================================================
+WEB CHAT RULES (MUST FOLLOW)
+=================================================================================
+This conversation is on the web chat widget. You MUST:
+- Responses can be 2-4 sentences (slightly longer than WhatsApp).
+- You can use **bold** for emphasis sparingly.
+- Collect name and email early in conversation — web visitors don't have phone numbers by default.
+- Ask "What's your name?" naturally in the first few messages.
+- Ask "What's the best email to reach you?" before booking.
+- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.
+- Same booking flow: check_availability → book_consultation.
+- After booking: "You're booked! Check your email for the calendar invite."
+- You have the same booking tools as WhatsApp — use them the same way.
+=================================================================================`;
+  }
+
   return '';
 }
 

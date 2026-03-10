@@ -44,7 +44,7 @@ AVAILABLE BUTTON TYPES:
     defaultFallback: 'Book a Strategy Call',
     costButtons: ['Get a Proposal', 'See Pricing', 'Book Strategy Call'],
     interestButtons: ['Book Strategy Call', 'See Case Studies', 'Start a Project'],
-    genericButtons: ['Book a Strategy Call', 'Explore AI Solutions', 'See Our Work', 'Get a Proposal', 'How It Works'],
+    genericButtons: ['Book a Strategy Call', 'Get a Proposal', 'See Case Studies'],
     bookingAware: ['See Case Studies', 'How It Works', 'Get a Proposal'],
     claudeContext: `BCON AI business solutions chatbot.
 BCON helps businesses understand and implement AI solutions:
@@ -247,17 +247,21 @@ async function generateContextualButton(
   messageCount: number,
   pool: ReturnType<typeof getBrandPool>
 ): Promise<string | null> {
-  const systemPrompt = `You create one short, direct follow-up call-to-action button label for ${pool.claudeContext}
+  const systemPrompt = `Based on what was just discussed, create one follow-up button that moves the conversation forward. Context: ${pool.claudeContext}
 
-BUTTON GENERATION RULES:
-- First user message (messageCount = 1): Generate 1 button most relevant to their question
-- Subsequent messages: Generate 1 button for the next logical step
-- 3-7 words. Title case. No emojis.
-- Be contextual - match the conversation flow
-- NEVER repeat what was just explained
-- NEVER suggest something they already understood
+BUTTON RULES:
+- 3-6 words. Title case. No emojis.
+- Be SPECIFIC to the conversation — never generic like "Learn More" or "Explore Solutions" or "Get Started".
+- Match what they actually talked about.
+- NEVER repeat what was just explained.
 
-TONE: Direct, professional. No sales-y language.
+EXAMPLES:
+- After discussing Meta ads: "Fix My Meta Ad Leads"
+- After discussing pricing: "See Pricing Options"
+- After qualifying: "Book a Quick Call"
+- After discussing enrollment: "Fill My Empty Seats"
+- After discussing AI chatbots: "Build My Chatbot"
+- After discussing marketing: "Automate My Marketing"
 
 If no relevant follow-up is appropriate, respond with only: SKIP
 Output ONLY the button label text. No quotes. No explanation.`;
