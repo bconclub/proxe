@@ -45,7 +45,7 @@ export default function WidgetPage() {
       padding: 0,
       overflow: 'hidden'
     }}>
-      <ChatWidget widgetStyle="bubble" autoOpen />
+      <ChatWidget widgetStyle="bubble" autoOpen inline />
     </div>
   )
 }

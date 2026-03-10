@@ -70,29 +70,29 @@ export default function WebAgentSettingsClient() {
         display: 'flex',
         overflow: 'hidden',
       }}>
-        {/* Left Sidebar — controls */}
+        {/* LEFT — Configuration */}
         <div style={{
-          width: '280px',
-          flexShrink: 0,
+          flex: '1 1 55%',
+          minWidth: 0,
           borderRight: '1px solid var(--border-primary)',
           backgroundColor: 'var(--bg-primary)',
           display: 'flex',
           flexDirection: 'column',
-          padding: '20px 16px',
-          gap: '16px',
+          padding: '28px 32px',
+          gap: '20px',
           overflowY: 'auto',
         }}>
           {/* Title */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <h1 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
                 Web Agent
               </h1>
               <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '3px',
-                padding: '1px 6px',
+                padding: '2px 8px',
                 borderRadius: '10px',
                 fontSize: '9px',
                 fontWeight: 'bold',
@@ -115,26 +115,25 @@ export default function WebAgentSettingsClient() {
 
           {/* Embed Code Section */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <MdCode size={14} style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <MdCode size={16} style={{ color: 'var(--accent-primary)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Installation Code
               </span>
             </div>
             <div
-              className="rounded-lg overflow-x-auto text-[10px] font-mono relative"
+              className="rounded-lg overflow-x-auto text-xs font-mono relative"
               style={{
                 backgroundColor: 'var(--bg-secondary)',
                 border: '1px solid var(--border-primary)',
                 color: 'var(--accent-primary)',
-                padding: '10px',
-                paddingRight: '36px',
+                padding: '14px 44px 14px 14px',
               }}
             >
               <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{embedCode}</code>
               <button
                 onClick={handleCopyCode}
-                className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded transition-all"
+                className="absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded transition-all"
                 style={{
                   backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
                   color: copySuccess ? 'white' : 'var(--text-primary)',
@@ -142,7 +141,7 @@ export default function WebAgentSettingsClient() {
                 }}
                 title="Copy to clipboard"
               >
-                {copySuccess ? <MdCheckCircle size={12} /> : <MdContentCopy size={12} />}
+                {copySuccess ? <MdCheckCircle size={14} /> : <MdContentCopy size={14} />}
               </button>
             </div>
 
@@ -154,7 +153,7 @@ export default function WebAgentSettingsClient() {
               }}
             >
               <MdInfoOutline size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '1px' }} />
-              <p className="text-[10px]" style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                 Add before the closing <code style={{ color: 'var(--accent-primary)' }}>&lt;/body&gt;</code> tag on your website.
               </p>
             </div>
@@ -164,11 +163,11 @@ export default function WebAgentSettingsClient() {
           <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
 
           {/* Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div>
             <button
               onClick={handleResetWidget}
               disabled={isResetting}
-              className="w-full px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2"
+              className="px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2"
               style={{
                 backgroundColor: 'var(--bg-tertiary)',
                 color: 'var(--text-primary)',
@@ -183,21 +182,41 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
 
-        {/* Right — Full-bleed widget preview (behaves like a real page) */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <iframe
-            ref={iframeRef}
-            src="/widget"
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              display: 'block',
-            }}
-            title="Widget Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-            allow="microphone; camera"
-          />
+        {/* RIGHT — Widget preview at actual deployed size */}
+        <div style={{
+          flex: '1 1 45%',
+          minWidth: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.04) 0%, transparent 70%)',
+          position: 'relative',
+        }}>
+          {/* Widget at actual size */}
+          <div style={{
+            width: '380px',
+            height: '550px',
+            borderRadius: '24px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4), 0 0 40px rgba(139, 92, 246, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            flexShrink: 0,
+          }}>
+            <iframe
+              ref={iframeRef}
+              src="/widget"
+              style={{
+                width: '380px',
+                height: '550px',
+                border: 'none',
+                display: 'block',
+              }}
+              title="Widget Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              allow="microphone; camera"
+            />
+          </div>
         </div>
       </div>
     </DashboardLayout>

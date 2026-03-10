@@ -39,6 +39,8 @@ interface ChatWidgetProps {
   apiUrl?: string;
   widgetStyle?: 'searchbar' | 'bubble';
   autoOpen?: boolean;
+  /** Render chat inline (no fixed positioning) — used for dashboard preview */
+  inline?: boolean;
 }
 
 // PROXE Logo component (white icon version)
@@ -133,7 +135,7 @@ const cleanSummary = (summary: string | null | undefined): string => {
     .trim();
 };
 
-export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false }: ChatWidgetProps) {
+export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false, inline = false }: ChatWidgetProps) {
   const brand = getCurrentBrandId();
   const config = getBrandConfig(brand);
   const { openModal: openDeployModal, setOnFormSubmit } = useDeployModal();
@@ -1185,6 +1187,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
+
+    // Inline mode: fill parent container, no fixed positioning
+    if (inline) {
+      el.style.setProperty('position', 'relative', 'important');
+      el.style.setProperty('top', 'auto', 'important');
+      el.style.setProperty('left', 'auto', 'important');
+      el.style.setProperty('right', 'auto', 'important');
+      el.style.setProperty('bottom', 'auto', 'important');
+      el.style.setProperty('width', '100%', 'important');
+      el.style.setProperty('height', '100%', 'important');
+      el.style.setProperty('max-width', '100%', 'important');
+      el.style.setProperty('max-height', '100%', 'important');
+      el.style.setProperty('transform', 'none', 'important');
+      el.style.setProperty('border-radius', '0', 'important');
+      return;
+    }
+
     // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
     const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
 
@@ -2589,6 +2608,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
   );
 
   if (!isOpen) {
+    // Inline preview: nothing to show when closed (autoOpen handles opening)
+    if (inline) return null;
+
     // Bubble widget style or docked bubble mode
     if (widgetStyle === 'bubble' || isDockedBubble) {
       return (
@@ -2611,11 +2633,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
 
   return (
     <>
-    {/* Only show searchbar if widgetStyle is not 'bubble' */}
-    {widgetStyle !== 'bubble' && searchbar}
-    <div 
+    {/* Only show searchbar if widgetStyle is not 'bubble' and not inline */}
+    {widgetStyle !== 'bubble' && !inline && searchbar}
+    <div
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${inline ? '' : widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${!inline && widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${!inline && widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${!inline && widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
@@ -3248,7 +3270,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
       </div>
       </div>
     </div>
-    {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
+    {!inline && (isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
