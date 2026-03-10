@@ -314,7 +314,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
       {/* Main Calendar */}
       <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
         {/* Top bar */}
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+        <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <button
             onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()) }}
             className="px-3 py-1 text-xs font-medium border rounded hover:shadow-sm transition-shadow"

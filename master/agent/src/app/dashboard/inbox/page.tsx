@@ -124,17 +124,16 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
 
-  // Debug: Log when conversations state changes
+  // Auto-select first conversation when loaded (if none selected via URL)
   useEffect(() => {
-    console.log('Conversations state changed:', {
-      count: conversations.length,
-      conversations: conversations.map(c => ({
-        id: c.lead_id,
-        name: c.lead_name,
-        message: c.last_message?.substring(0, 30)
-      }))
-    })
-  }, [conversations])
+    if (conversations.length > 0 && !selectedLeadId && !searchParams.get('lead')) {
+      const first = conversations[0]
+      setSelectedLeadId(first.lead_id)
+      if (first.channels && first.channels.length > 0) {
+        setSelectedChannel(first.channels[0])
+      }
+    }
+  }, [conversations, selectedLeadId, searchParams])
 
   // Set default channel when conversation is selected
   useEffect(() => {

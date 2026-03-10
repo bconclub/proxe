@@ -554,7 +554,7 @@ export default function LeadsTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-visible">
+      <div className="overflow-x-auto overflow-y-visible pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '11%' }} />  {/* Name */}

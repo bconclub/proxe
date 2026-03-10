@@ -1091,7 +1091,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Page content */}
         <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
           <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
-            <div className="dashboard-layout-main-content-inner max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
               {children}
             </div>
           </div>

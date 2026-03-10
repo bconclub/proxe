@@ -259,7 +259,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
       {/* Main Calendar */}
       <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
         {/* Top bar — Google Calendar style */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+        <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <button
             onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()) }}
             className="px-4 py-1.5 text-sm font-medium border rounded-md hover:shadow-sm transition-shadow"
