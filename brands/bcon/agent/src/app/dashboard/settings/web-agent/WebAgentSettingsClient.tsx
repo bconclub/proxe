@@ -64,8 +64,8 @@ export default function WebAgentSettingsClient() {
     <DashboardLayout>
       <div style={{
         width: 'calc(100% + 64px)',
-        height: 'calc(100vh - 48px)',
-        margin: '-24px -32px',
+        height: 'calc(100vh - 72px)',
+        margin: '0 -32px -24px',
         padding: 0,
         display: 'flex',
         overflow: 'hidden',
