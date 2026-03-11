@@ -40,7 +40,7 @@ AVAILABLE BUTTON TYPES:
     exploreKeywords: ['explore training options', 'explore training'],
   },
   bcon: {
-    firstMessage: ['Explore AI Solutions', 'Book a Strategy Call', 'See Our Work', 'How It Works', 'Learn More'],
+    firstMessage: ['Tell me about BCON', 'I need help growing my business', 'Book a call'],
     defaultFallback: 'Book a Strategy Call',
     costButtons: ['Get a Proposal', 'See Pricing', 'Book Strategy Call'],
     interestButtons: ['Book Strategy Call', 'See Case Studies', 'Start a Project'],
