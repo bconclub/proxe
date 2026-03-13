@@ -49,6 +49,13 @@ export async function generateSummary(
 6. RED FLAGS: Did they ask for a human? Get upset? Hit any errors?
 7. NEXT STEP: What should the team do next?
 
+FORM FIELD INTERPRETATION — get these right:
+- VOLUME means how many leads they WANT to handle, NOT how many they currently get. "Upto 100" = wants to scale to 100 leads.
+- URGENCY means how ready they are to start, NOT how urgent their problem is.
+- "No, I am setting up" for AI SYSTEMS = they have no AI yet, they are exploring.
+- WEBSITE "Yes, I have" = they have a website. "No" = they don't.
+Do NOT misrepresent these fields. "Upto 100 leads" does NOT mean "handles 100 leads."
+
 Keep it to 3-5 sentences max. Be specific — use actual details from the conversation, not generic phrases like "high intent" or "shows interest".
 
 BAD: "Lead shows high intent with 50% response rate. Re-engage with follow-up."
