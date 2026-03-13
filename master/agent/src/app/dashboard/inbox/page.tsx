@@ -8,6 +8,7 @@ import {
   MdSend,
   MdSearch,
   MdAutoAwesome,
+  MdEvent,
   MdEventAvailable,
   MdOpenInNew,
 } from 'react-icons/md'
@@ -36,6 +37,29 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 };
 
 const ALL_CHANNELS = ['web', 'whatsapp'];
+
+// Score Ring — circular progress indicator with score inside
+const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
+  const s = score ?? 0;
+  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
+  const r = (size / 2) - 2.5;
+  const circumference = 2 * Math.PI * r;
+  const dashLen = (s / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="2.5"
+        strokeDasharray={`${dashLen} ${circumference}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dasharray 0.3s ease' }}
+      />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
+        fill="white" fontSize="10" fontWeight="bold">{s}</text>
+    </svg>
+  );
+};
 
 // Types
 interface Conversation {
@@ -179,17 +203,16 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
 
-  // Debug: Log when conversations state changes
+  // Auto-select first conversation when loaded (if none selected via URL)
   useEffect(() => {
-    console.log('Conversations state changed:', {
-      count: conversations.length,
-      conversations: conversations.map(c => ({
-        id: c.lead_id,
-        name: c.lead_name,
-        message: c.last_message?.substring(0, 30)
-      }))
-    })
-  }, [conversations])
+    if (conversations.length > 0 && !selectedLeadId && !searchParams.get('lead')) {
+      const first = conversations[0]
+      setSelectedLeadId(first.lead_id)
+      if (first.channels && first.channels.length > 0) {
+        setSelectedChannel(first.channels[0])
+      }
+    }
+  }, [conversations, selectedLeadId, searchParams])
 
   // Set default channel when conversation is selected
   useEffect(() => {
@@ -344,6 +367,8 @@ export default function InboxPage() {
               fbUc?.web?.what_is_your_brand_name ||
               fbUc?.whatsapp?.what_is_your_brand_name ||
               fbUc?.bcon?.brand_name ||
+              fbUc?.whatsapp?.profile?.company ||
+              fbUc?.web?.profile?.company ||
               null;
 
             return {
@@ -500,6 +525,8 @@ export default function InboxPage() {
           uc?.bcon?.brand_name ||
           uc?.web?.brand_name ||
           uc?.whatsapp?.brand_name ||
+          uc?.whatsapp?.profile?.company ||
+          uc?.web?.profile?.company ||
           null;
 
         // Extract city from unified_context profile
@@ -918,7 +945,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 flex relative overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)' }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -927,7 +954,7 @@ export default function InboxPage() {
 
       {/* Left Panel - Conversations List */}
       <div
-        className="w-[320px] flex flex-col border-r flex-shrink-0"
+        className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
           borderColor: 'var(--border-primary)'
@@ -994,6 +1021,88 @@ export default function InboxPage() {
               const isSelected = selectedLeadId === conv.lead_id;
               const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
+              // Temperature helpers
+              const scoreColor = conv.lead_score != null
+                ? (conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444')
+                : null;
+
+              if (isSelected) {
+                // ── SELECTED CARD (minimal) ──
+                return (
+                  <div
+                    key={conv.lead_id}
+                    onClick={() => {
+                      setSelectedLeadId(conv.lead_id);
+                      if (conv.channels && conv.channels.length > 0) {
+                        setSelectedChannel(conv.channels[0]);
+                      } else {
+                        setSelectedChannel('');
+                      }
+                    }}
+                    className="cursor-pointer border-b relative"
+                    style={{
+                      borderColor: 'var(--border-primary)',
+                      background: 'var(--accent-subtle)',
+                    }}
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
+
+                    <div className="px-3 py-2 pl-4">
+                      {/* Line 1: Score Ring + Name + Timestamp + Open */}
+                      <div className="flex items-center gap-2.5">
+                        <ScoreRing score={conv.lead_score} size={28} />
+                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'white' }}>
+                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                        </span>
+                        <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+                          {timeAgo(conv.last_message_at)}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openLeadModal(conv.lead_id); }}
+                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80"
+                          style={{ color: 'var(--text-secondary)' }}
+                          title="Open lead details"
+                        >
+                          <MdOpenInNew size={13} />
+                        </button>
+                      </div>
+
+                      {/* Line 2: Brand · Location · Source */}
+                      <div className="text-xs truncate mt-1 flex items-center gap-1" style={{ color: '#9ca3af', paddingLeft: '38px' }}>
+                        {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
+                        {(conv.brand_name || conv.city) && conv.channels.length > 0 && (
+                          <span className="mx-0.5" style={{ opacity: 0.4 }}>·</span>
+                        )}
+                        <span className="inline-flex items-center gap-0.5">
+                          {conv.channels.map((ch) => (
+                            <ChannelIcon key={ch} channel={ch} size={10} active={true} />
+                          ))}
+                        </span>
+                      </div>
+
+                      {/* Line 3: Event pill (highlighted, only if booking exists) */}
+                      {conv.booking_date && (
+                        <div className="mt-1.5" style={{ paddingLeft: '38px' }}>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            <MdEvent size={11} />
+                            {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {conv.booking_time && (() => {
+                              const tp = conv.booking_time.toString().split(':');
+                              if (tp.length < 2) return `, ${conv.booking_time}`;
+                              const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                              if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
+                              return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // ── UNSELECTED (compact, scannable) ──
               return (
                 <div
                   key={conv.lead_id}
@@ -1005,188 +1114,35 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className={`cursor-pointer transition-all duration-200 border-b relative ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-gray-50 dark:hover:bg-white/5"
                   style={{
                     borderColor: 'var(--border-primary)',
-                    background: isSelected ? 'var(--accent-subtle)' : 'transparent',
                   }}
                 >
-                  {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
-                  )}
-
-                  {/* Compact row — always visible */}
-                  <div className={`flex items-center gap-2.5 px-3 ${isSelected ? 'pt-3 pb-1.5' : 'py-2.5'}`}>
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                      style={{
-                        background: isSelected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                        color: isSelected ? 'white' : 'var(--text-secondary)',
-                      }}
-                    >
-                      {initials}
+                  <div className="px-3 py-2.5">
+                    {/* Line 1: Name + Timestamp */}
+                    <div className="flex items-center">
+                      <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                        {conv.lead_name || conv.lead_phone || 'Unknown'}
+                      </span>
+                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: '#6b7280' }}>
+                        {timeAgo(conv.last_message_at)}
+                      </span>
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-semibold truncate" style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                    {/* Line 2: Last message preview + EVENT badge */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-[11px] truncate flex-1" style={{ color: '#6b7280' }}>
+                        {conv.last_message || '\u00A0'}
+                      </p>
+                      {conv.booking_status && (
+                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
+                          style={{
+                            background: 'rgba(96, 165, 250, 0.15)',
+                            color: '#60a5fa',
+                          }}>
+                          EVENT
                         </span>
-                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                          <div className="flex items-center gap-0.5">
-                            {conv.channels.map((ch) => (
-                              <div key={ch} className="opacity-70">
-                                <ChannelIcon channel={ch} size={10} active={true} />
-                              </div>
-                            ))}
-                          </div>
-                          <span className="text-[9px] opacity-50 whitespace-nowrap">
-                            {timeAgo(conv.last_message_at)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* When NOT selected: brand + last message preview */}
-                      {!isSelected && (
-                        <>
-                          {conv.brand_name && (
-                            <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
-                              {conv.brand_name}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-[11px] truncate opacity-50 flex-1">
-                              {conv.last_message}
-                            </p>
-                            {conv.booking_status && (
-                              <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
-                                style={{
-                                  background: 'rgba(34, 197, 94, 0.15)',
-                                  color: '#22c55e',
-                                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                                }}>
-                                <MdEventAvailable size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} /> EVENT
-                              </span>
-                            )}
-                          </div>
-                        </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Expanded info — only when selected */}
-                  <div
-                    className="grid transition-[grid-template-rows] duration-200 ease-out"
-                    style={{ gridTemplateRows: isSelected ? '1fr' : '0fr' }}
-                  >
-                    <div className="overflow-hidden">
-                      <div className="px-3 pb-3 pl-[52px] space-y-1.5">
-                        {/* Brand · City */}
-                        {(conv.brand_name || conv.city) && (
-                          <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                            {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-
-                        {/* Score · Label · Stage */}
-                        {(conv.lead_score != null || conv.lead_stage) && (
-                          <div className="flex items-center gap-0 text-[11px] flex-wrap">
-                            {(() => {
-                              const items: JSX.Element[] = [];
-                              const dot = <span className="mx-1" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>;
-                              if (conv.lead_score != null) {
-                                const color = conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444';
-                                const label = conv.lead_score >= 70 ? 'Hot' : conv.lead_score >= 40 ? 'Warm' : conv.lead_score >= 20 ? 'Cool' : 'Cold';
-                                items.push(<span key="score" className="font-bold" style={{ color }}>{conv.lead_score}</span>);
-                                items.push(<React.Fragment key="d1">{dot}</React.Fragment>);
-                                items.push(<span key="label" className="font-medium" style={{ color }}>{label}</span>);
-                              }
-                              if (conv.lead_stage) {
-                                if (items.length > 0) items.push(<React.Fragment key="d2">{dot}</React.Fragment>);
-                                items.push(<span key="stage" style={{ color: 'var(--text-secondary)' }}>{conv.lead_stage}</span>);
-                              }
-                              return items;
-                            })()}
-                          </div>
-                        )}
-
-                        {/* Booking date */}
-                        {conv.booking_date && (
-                          <div className="text-[11px] flex items-center gap-1" style={{ color: '#22c55e' }}>
-                            <MdEventAvailable size={11} />
-                            {new Date(conv.booking_date).toLocaleDateString('en-IN', {
-                              weekday: 'short', day: 'numeric', month: 'short'
-                            })}{conv.booking_time ? `, ${conv.booking_time}` : ''}
-                          </div>
-                        )}
-
-                        {/* Phone & Email */}
-                        {(conv.lead_phone || conv.lead_email) && (
-                          <div className="flex items-center gap-0 text-[11px] flex-wrap">
-                            {conv.lead_phone && (
-                              <a href={`tel:${conv.lead_phone}`} className="hover:underline" style={{ color: 'var(--text-secondary)' }} onClick={(e) => e.stopPropagation()}>
-                                {conv.lead_phone}
-                              </a>
-                            )}
-                            {conv.lead_phone && conv.lead_email && (
-                              <span className="mx-1.5" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>
-                            )}
-                            {conv.lead_email && (
-                              <a href={`mailto:${conv.lead_email}`} className="hover:underline truncate" style={{ color: 'var(--text-secondary)' }} onClick={(e) => e.stopPropagation()}>
-                                {conv.lead_email}
-                              </a>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Next action */}
-                        {conv.next_touchpoint && (
-                          <div className="text-[10px] italic" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                            Next: {conv.next_touchpoint}
-                          </div>
-                        )}
-
-                        {/* Channel tabs + Actions */}
-                        <div className="flex items-center gap-1.5 pt-1.5 mt-0.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                          {conv.channels.map((ch) => (
-                            <button
-                              key={ch}
-                              onClick={(e) => { e.stopPropagation(); setSelectedChannel(ch); }}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
-                              style={{
-                                background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                                color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
-                              }}
-                            >
-                              <ChannelIcon channel={ch} size={10} active={true} />
-                              {ch}
-                            </button>
-                          ))}
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); summarizeConversation(); }}
-                              disabled={summaryLoading || messages.length === 0}
-                              className="p-1 rounded transition-colors"
-                              style={{
-                                background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                                color: showSummary ? 'white' : 'var(--text-secondary)',
-                                opacity: messages.length === 0 ? 0.5 : 1
-                              }}
-                              title="AI Summary"
-                            >
-                              <MdAutoAwesome size={12} className={summaryLoading ? 'animate-spin' : ''} />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openLeadModal(selectedLeadId!); }}
-                              className="p-1 rounded transition-colors"
-                              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                              title="Open full lead details"
-                            >
-                              <MdOpenInNew size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1197,7 +1153,7 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
