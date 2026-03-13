@@ -47,7 +47,7 @@ const navigation: NavItem[] = [
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   // TOOLS
   { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
-  { name: 'Agents', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
+  { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
   // SYSTEM
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
