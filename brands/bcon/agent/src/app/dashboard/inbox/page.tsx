@@ -11,6 +11,11 @@ import {
   MdEvent,
   MdEventAvailable,
   MdOpenInNew,
+  MdPhone,
+  MdEmail,
+  MdLocationOn,
+  MdBusiness,
+  MdNotes,
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -181,6 +186,7 @@ export default function InboxPage() {
   const [replyText, setReplyText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [leadDetails, setLeadDetails] = useState<any>(null)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -235,6 +241,24 @@ export default function InboxPage() {
   useEffect(() => {
     setConversationSummary(null)
     setShowSummary(false)
+  }, [selectedLeadId])
+
+  // Fetch lead details for right panel
+  useEffect(() => {
+    if (!selectedLeadId) { setLeadDetails(null); return }
+    async function fetchLeadDetails() {
+      try {
+        const { data, error } = await supabase
+          .from('all_leads')
+          .select('id, lead_id, customer_name, email, phone, lead_score, lead_stage, sub_stage, booking_date, booking_time, unified_context, status, first_touchpoint, last_touchpoint, created_at, admin_notes')
+          .eq('lead_id', selectedLeadId)
+          .single()
+        if (error) { console.error('Error fetching lead details:', error); setLeadDetails(null); return }
+        setLeadDetails(data)
+      } catch (err) { console.error('Error fetching lead details:', err); setLeadDetails(null) }
+    }
+    fetchLeadDetails()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
   // Fetch messages when conversation selected or channel changes
@@ -1364,6 +1388,167 @@ export default function InboxPage() {
           </>
         )}
       </div>
+
+      {/* Right Panel - Lead Details Sidebar */}
+      {selectedLeadId && leadDetails && (
+        <div
+          className="hidden lg:flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+        >
+          {/* Lead Card */}
+          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold"
+                style={{ background: 'var(--accent-primary)', color: 'white' }}
+              >
+                {(leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {leadDetails.customer_name || 'Unknown'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {leadDetails.phone && (
+                <div className="flex items-center gap-2">
+                  <MdPhone size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
+                </div>
+              )}
+              {leadDetails.email && (
+                <div className="flex items-center gap-2">
+                  <MdEmail size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
+                </div>
+              )}
+              {(() => {
+                const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+                const city = ctx.city || ctx.location
+                const brand = ctx.brand || ctx.brand_name || ctx.company
+                const businessType = ctx.type || ctx.business_type
+                return (
+                  <>
+                    {city && (
+                      <div className="flex items-center gap-2">
+                        <MdLocationOn size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{city}</span>
+                      </div>
+                    )}
+                    {brand && (
+                      <div className="flex items-center gap-2">
+                        <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{brand}</span>
+                      </div>
+                    )}
+                    {businessType && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] pl-5 truncate" style={{ color: 'var(--text-muted)' }}>{businessType}</span>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* Score + Stage */}
+          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
+            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="flex items-center gap-2">
+                {leadDetails.lead_score != null && (
+                  <span className="text-lg font-bold" style={{
+                    color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444'
+                  }}>
+                    {leadDetails.lead_score}
+                  </span>
+                )}
+                {leadDetails.lead_stage && (() => {
+                  const stageColors: Record<string, { bg: string; text: string }> = {
+                    'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
+                    'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
+                    'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
+                    'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' },
+                    'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af' },
+                  }
+                  const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' }
+                  return (
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: sc.bg, color: sc.text }}>
+                      {leadDetails.lead_stage}
+                    </span>
+                  )
+                })()}
+              </div>
+              {leadDetails.sub_stage && (
+                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{leadDetails.sub_stage}</p>
+              )}
+            </div>
+          )}
+
+          {/* Upcoming Booking */}
+          {(() => {
+            const bd = leadDetails.booking_date
+              || leadDetails.unified_context?.web?.booking_date
+              || leadDetails.unified_context?.whatsapp?.booking_date
+            const bt = leadDetails.booking_time
+              || leadDetails.unified_context?.web?.booking_time
+              || leadDetails.unified_context?.whatsapp?.booking_time
+            const ml = leadDetails.unified_context?.web?.booking_meet_link
+              || leadDetails.unified_context?.whatsapp?.booking_meet_link
+            if (!bd) return null
+            return (
+              <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Upcoming Booking</p>
+                <div className="flex items-center gap-1.5">
+                  <MdEvent size={14} style={{ color: '#22c55e' }} />
+                  <span className="text-xs font-medium" style={{ color: '#22c55e' }}>
+                    {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {bt && (() => {
+                      const tp = bt.toString().split(':')
+                      if (tp.length < 2) return `, ${bt}`
+                      const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                      if (isNaN(h) || isNaN(m)) return `, ${bt}`
+                      return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                    })()}
+                  </span>
+                </div>
+                {ml && (
+                  <a href={ml} target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] mt-1 inline-block hover:underline" style={{ color: '#60a5fa' }}>
+                    Join Meet →
+                  </a>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Admin Notes */}
+          {leadDetails.admin_notes && (
+            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                <MdNotes size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                Notes
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {leadDetails.admin_notes}
+              </p>
+            </div>
+          )}
+
+          {/* View Full Details */}
+          <div className="p-3">
+            <button
+              onClick={() => openLeadModal(selectedLeadId)}
+              className="w-full text-[11px] font-medium py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+            >
+              <MdOpenInNew size={12} /> View Full Details
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Lead Details Modal */}
       {selectedLead && (
