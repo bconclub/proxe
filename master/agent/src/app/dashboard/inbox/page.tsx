@@ -16,6 +16,13 @@ import {
   MdLocationOn,
   MdBusiness,
   MdNotes,
+  MdLanguage,
+  MdSpeed,
+  MdGroup,
+  MdCalendarMonth,
+  MdPersonAdd,
+  MdReply,
+  MdSmartToy,
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -1405,169 +1412,276 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
+          className="hidden lg:flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
           {!leadDetails ? (
             <div className="p-4 text-center">
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
             </div>
-          ) : (
-          <>
-          {/* Lead Card */}
-          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
-              >
-                {(leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                  {leadDetails.customer_name || 'Unknown'}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              {leadDetails.phone && (
-                <div className="flex items-center gap-2">
-                  <MdPhone size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
-                </div>
-              )}
-              {leadDetails.email && (
-                <div className="flex items-center gap-2">
-                  <MdEmail size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
-                </div>
-              )}
-              {(() => {
-                const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-                const city = ctx.city || ctx.location
-                const brand = ctx.brand || ctx.brand_name || ctx.company
-                const businessType = ctx.type || ctx.business_type
-                return (
-                  <>
-                    {city && (
-                      <div className="flex items-center gap-2">
-                        <MdLocationOn size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{city}</span>
-                      </div>
-                    )}
-                    {brand && (
-                      <div className="flex items-center gap-2">
-                        <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{brand}</span>
-                      </div>
-                    )}
-                    {businessType && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] pl-5 truncate" style={{ color: 'var(--text-muted)' }}>{businessType}</span>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
+          ) : (() => {
+            // Extract unified_context fields once
+            const uc = leadDetails.unified_context || {}
+            const webCtx = uc.web || {}
+            const waCtx = uc.whatsapp || {}
+            const bconCtx = uc.bcon || {}
+            const profileCtx = waCtx.profile || webCtx.profile || {}
 
-          {/* Score + Stage */}
-          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
-            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <div className="flex items-center gap-2">
-                {leadDetails.lead_score != null && (
-                  <span className="text-lg font-bold" style={{
-                    color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444'
-                  }}>
-                    {leadDetails.lead_score}
+            const resolvedName = profileCtx.full_name || leadDetails.customer_name || 'Unknown'
+            const brandName = webCtx.what_is_your_brand_name || waCtx.what_is_your_brand_name || bconCtx.brand_name || webCtx.brand_name || waCtx.brand_name || profileCtx.company || null
+            const city = profileCtx.city || bconCtx.city || bconCtx.location || null
+            const initials = resolvedName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+
+            // Stage color mapping
+            const stageColors: Record<string, { bg: string; text: string; ring: string }> = {
+              'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e', ring: '#22c55e' },
+              'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa', ring: '#60a5fa' },
+              'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b', ring: '#f59e0b' },
+              'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7', ring: '#a855f7' },
+              'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af', ring: '#9ca3af' },
+            }
+            const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--accent-primary)', ring: 'var(--accent-primary)' }
+
+            // Channels from conversation
+            const conv = conversations.find(c => c.lead_id === selectedLeadId)
+            const channels = conv?.channels || []
+
+            // Business snapshot fields
+            const businessType = bconCtx.type || bconCtx.business_type || webCtx.choose_your_business_type || waCtx.choose_your_business_type || null
+            const urgency = bconCtx.urgency || webCtx.how_fast_do_you_want_to_start || waCtx.how_fast_do_you_want_to_start || null
+            const volume = bconCtx.volume || webCtx.how_many_leads_can_you_handle_per_day || waCtx.how_many_leads_can_you_handle_per_day || null
+            const hasWebsite = bconCtx.has_website ?? webCtx.do_you_have_a_website ?? waCtx.do_you_have_a_website ?? null
+            const hasAI = bconCtx.has_ai ?? webCtx.are_you_currently_using_any_ai_systems ?? waCtx.are_you_currently_using_any_ai_systems ?? null
+
+            // Booking data
+            const bd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
+            const bt = leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time
+            const ml = webCtx.booking_meet_link || waCtx.booking_meet_link
+            const bookingTitle = webCtx.booking_title || waCtx.booking_title || 'Discovery Call'
+
+            // Phone for action links (clean to digits)
+            const rawPhone = leadDetails.phone || ''
+            const cleanPhone = rawPhone.replace(/[^0-9]/g, '')
+
+            return (
+            <>
+            {/* Section 1 -- Lead Identity */}
+            <div className="p-4 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold mb-2"
+                style={{ background: sc.bg, color: sc.text, border: `2px solid ${sc.ring}` }}
+              >
+                {initials}
+              </div>
+              <p className="text-base font-bold truncate w-full" style={{ color: 'var(--text-primary)' }}>
+                {resolvedName}
+              </p>
+              {brandName && (
+                <p className="text-xs truncate w-full mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  {brandName}
+                </p>
+              )}
+              <div className="flex items-center gap-2 mt-1.5">
+                {city && (
+                  <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    <MdLocationOn size={12} /> {city}
                   </span>
                 )}
-                {leadDetails.lead_stage && (() => {
-                  const stageColors: Record<string, { bg: string; text: string }> = {
-                    'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
-                    'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-                    'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
-                    'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' },
-                    'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af' },
-                  }
-                  const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' }
-                  return (
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: sc.bg, color: sc.text }}>
-                      {leadDetails.lead_stage}
-                    </span>
-                  )
-                })()}
-              </div>
-              {leadDetails.sub_stage && (
-                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{leadDetails.sub_stage}</p>
-              )}
-            </div>
-          )}
-
-          {/* Upcoming Booking */}
-          {(() => {
-            const bd = leadDetails.booking_date
-              || leadDetails.unified_context?.web?.booking_date
-              || leadDetails.unified_context?.whatsapp?.booking_date
-            const bt = leadDetails.booking_time
-              || leadDetails.unified_context?.web?.booking_time
-              || leadDetails.unified_context?.whatsapp?.booking_time
-            const ml = leadDetails.unified_context?.web?.booking_meet_link
-              || leadDetails.unified_context?.whatsapp?.booking_meet_link
-            if (!bd) return null
-            return (
-              <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Upcoming Booking</p>
-                <div className="flex items-center gap-1.5">
-                  <MdEvent size={14} style={{ color: '#22c55e' }} />
-                  <span className="text-xs font-medium" style={{ color: '#22c55e' }}>
-                    {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    {bt && (() => {
-                      const tp = bt.toString().split(':')
-                      if (tp.length < 2) return `, ${bt}`
-                      const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
-                      if (isNaN(h) || isNaN(m)) return `, ${bt}`
-                      return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                    })()}
+                {channels.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    {channels.map((ch) => (
+                      <ChannelIcon key={ch} channel={ch} size={14} active={true} />
+                    ))}
                   </span>
-                </div>
-                {ml && (
-                  <a href={ml} target="_blank" rel="noopener noreferrer"
-                    className="text-[10px] mt-1 inline-block hover:underline" style={{ color: '#60a5fa' }}>
-                    Join Meet →
+                )}
+              </div>
+            </div>
+
+            {/* Section 2 -- Score + Stage */}
+            <div className="px-4 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-primary)' }}>
+              <ScoreRing score={leadDetails.lead_score} size={44} />
+              <div className="flex-1 min-w-0">
+                {leadDetails.lead_stage && (
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block"
+                    style={{ background: sc.bg, color: sc.text }}>
+                    {leadDetails.lead_stage}
+                  </span>
+                )}
+                {leadDetails.last_interaction_at && (
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Last active: {timeAgo(leadDetails.last_interaction_at)}
+                  </p>
+                )}
+                {leadDetails.sub_stage && (
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{leadDetails.sub_stage}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Section 3 -- Quick Actions */}
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                {cleanPhone && (
+                  <a href={`tel:+${cleanPhone}`}
+                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
+                    style={{ background: 'rgba(34,197,94,0.15)' }}
+                    title="Call">
+                    <MdPhone size={18} style={{ color: '#22c55e' }} />
+                  </a>
+                )}
+                {cleanPhone && (
+                  <a href={`https://wa.me/${cleanPhone}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
+                    style={{ background: 'rgba(37,211,102,0.15)' }}
+                    title="WhatsApp">
+                    <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={18} height={18}
+                      style={{ filter: 'invert(1) brightness(2)' }} />
+                  </a>
+                )}
+                {leadDetails.email && (
+                  <a href={`mailto:${leadDetails.email}`}
+                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
+                    style={{ background: 'rgba(96,165,250,0.15)' }}
+                    title="Email">
+                    <MdEmail size={18} style={{ color: '#60a5fa' }} />
                   </a>
                 )}
               </div>
+              {/* Quick action pills */}
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                  onClick={() => { if (cleanPhone) window.open(`https://wa.me/${cleanPhone}`, '_blank') }}
+                >
+                  <MdReply size={11} /> Follow-up
+                </button>
+                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                  onClick={() => openLeadModal(selectedLeadId)}
+                >
+                  <MdCalendarMonth size={11} /> Book Call
+                </button>
+                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                >
+                  <MdPersonAdd size={11} /> Assign
+                </button>
+              </div>
+            </div>
+
+            {/* Section 3b -- Contact Info */}
+            <div className="px-4 py-3 border-b space-y-1.5" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Contact</p>
+              {leadDetails.phone && (
+                <a href={`tel:${leadDetails.phone}`} className="flex items-center gap-2 hover:opacity-80">
+                  <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
+                </a>
+              )}
+              {leadDetails.email && (
+                <a href={`mailto:${leadDetails.email}`} className="flex items-center gap-2 hover:opacity-80">
+                  <MdEmail size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
+                </a>
+              )}
+            </div>
+
+            {/* Section 4 -- Business Snapshot */}
+            {(businessType || urgency || volume || hasWebsite !== null || hasAI !== null) && (
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {businessType && (
+                    <div className="flex items-center gap-1.5">
+                      <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{businessType}</span>
+                    </div>
+                  )}
+                  {urgency && (
+                    <div className="flex items-center gap-1.5">
+                      <MdSpeed size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{urgency}</span>
+                    </div>
+                  )}
+                  {volume && (
+                    <div className="flex items-center gap-1.5">
+                      <MdGroup size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{volume}</span>
+                    </div>
+                  )}
+                  {hasWebsite !== null && (
+                    <div className="flex items-center gap-1.5">
+                      <MdLanguage size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Website: {String(hasWebsite).toLowerCase() === 'yes' || hasWebsite === true ? 'Yes' : 'No'}</span>
+                    </div>
+                  )}
+                  {hasAI !== null && (
+                    <div className="flex items-center gap-1.5">
+                      <MdSmartToy size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>AI: {String(hasAI).toLowerCase() === 'yes' || hasAI === true ? 'Yes' : 'No'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Section 5 -- Upcoming Events */}
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
+              {bd ? (
+                <div className="rounded-lg p-2.5 border" style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.2)' }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MdEventAvailable size={16} style={{ color: '#22c55e' }} />
+                    <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
+                      {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {bt && (() => {
+                        const tp = bt.toString().split(':')
+                        if (tp.length < 2) return `, ${bt}`
+                        const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                        if (isNaN(h) || isNaN(m)) return `, ${bt}`
+                        return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                      })()}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{bookingTitle}</p>
+                  {ml && (
+                    <a href={ml} target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] mt-1.5 inline-flex items-center gap-1 hover:underline" style={{ color: '#60a5fa' }}>
+                      <MdOpenInNew size={10} /> Join Meet
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
+              )}
+            </div>
+
+            {/* Admin Notes (if any) */}
+            {leadDetails.admin_notes && (
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <MdNotes size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                  Notes
+                </p>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {leadDetails.admin_notes}
+                </p>
+              </div>
+            )}
+
+            {/* Section 6 -- View Full Details Button */}
+            <div className="p-4 mt-auto">
+              <button
+                onClick={() => openLeadModal(selectedLeadId)}
+                className="w-full text-sm font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 hover:opacity-90"
+                style={{ background: 'var(--accent-primary)', color: 'white' }}
+              >
+                <MdOpenInNew size={16} /> View Full Details
+              </button>
+            </div>
+            </>
             )
           })()}
-
-          {/* Admin Notes */}
-          {leadDetails.admin_notes && (
-            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                <MdNotes size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                Notes
-              </p>
-              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {leadDetails.admin_notes}
-              </p>
-            </div>
-          )}
-
-          {/* View Full Details */}
-          <div className="p-3">
-            <button
-              onClick={() => openLeadModal(selectedLeadId)}
-              className="w-full text-[11px] font-medium py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-            >
-              <MdOpenInNew size={12} /> View Full Details
-            </button>
-          </div>
-          </>
-          )}
         </div>
       )}
 
