@@ -22,7 +22,7 @@ wss.on('connection', (ws, req) => {
       if (msg.event === 'start') {
         callUUID = msg.start?.callId || msg.callId || 'unknown';
         console.log(`Call started: ${callUUID}`);
-        await speakToVobiz(ws, "Hello! Welcome to BCON Club. How can I help you today?", 'en-IN');
+        await speakToVobiz(ws, "Hello! Welcome to BCON Club. How can I help you today?", 'hi-IN');
       }
       if (msg.event === 'media' && msg.media?.payload) {
         audioBuffer.push(Buffer.from(msg.media.payload, 'base64'));
@@ -100,6 +100,7 @@ async function sarvamTTS(text, language = 'en-IN') {
     'ml-IN': 'anushka',
   };
   try {
+    console.log('TTS request:', { text, language, speaker: speakerMap[language] || 'anushka' })
     const response = await axios.post(
       'https://api.sarvam.ai/text-to-speech',
       {
