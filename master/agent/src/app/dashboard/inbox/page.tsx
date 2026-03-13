@@ -248,14 +248,27 @@ export default function InboxPage() {
     if (!selectedLeadId) { setLeadDetails(null); return }
     async function fetchLeadDetails() {
       try {
+        console.log('[RIGHT PANEL] Fetching lead details for:', selectedLeadId)
         const { data, error } = await supabase
           .from('all_leads')
-          .select('id, lead_id, customer_name, email, phone, lead_score, lead_stage, sub_stage, booking_date, booking_time, unified_context, status, first_touchpoint, last_touchpoint, created_at, admin_notes')
+          .select('*')
           .eq('id', selectedLeadId)
-          .single()
-        if (error) { console.error('Error fetching lead details:', error); setLeadDetails(null); return }
+          .maybeSingle()
+        console.log('[RIGHT PANEL] Result:', data ? 'found' : 'null', error ? `Error: ${error.message}` : 'no error')
+        if (error || !data) {
+          // Try lead_id as fallback
+          console.log('[RIGHT PANEL] Trying lead_id fallback...')
+          const { data: data2, error: error2 } = await supabase
+            .from('all_leads')
+            .select('*')
+            .eq('lead_id', selectedLeadId)
+            .maybeSingle()
+          console.log('[RIGHT PANEL] Fallback result:', data2 ? 'found' : 'null', error2 ? `Error: ${error2.message}` : 'no error')
+          setLeadDetails(data2 || null)
+          return
+        }
         setLeadDetails(data)
-      } catch (err) { console.error('Error fetching lead details:', err); setLeadDetails(null) }
+      } catch (err) { console.error('[RIGHT PANEL] Exception:', err); setLeadDetails(null) }
     }
     fetchLeadDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
