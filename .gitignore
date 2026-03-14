@@ -31,6 +31,11 @@ nul
 # local env files
 .env*.local
 .env
+.env.vercel
+
+# temp debug/test scripts
+debug-*.mjs
+test-*.mjs
 
 # vercel
 .vercel
