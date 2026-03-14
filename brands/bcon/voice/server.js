@@ -108,20 +108,26 @@ wss.on('connection', (ws, req) => {
 
 async function sarvamSTT(audioBuffer) {
   try {
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('file', audioBuffer, {
+      filename: 'audio.wav',
+      contentType: 'audio/x-wav',
+    });
+    form.append('model', 'saaras:v2');
+    form.append('language_code', 'unknown');
+
     const response = await axios.post(
       'https://api.sarvam.ai/speech-to-text',
-      {
-        model: 'saaras:v2',
-        audio: audioBuffer.toString('base64'),
-        language_code: 'unknown',
-      },
+      form,
       {
         headers: {
           'api-subscription-key': process.env.SARVAM_API_KEY,
-          'Content-Type': 'application/json',
+          ...form.getHeaders(),
         },
       }
     );
+    console.log('STT response:', JSON.stringify(response.data).substring(0, 200));
     return {
       transcript: response.data?.transcript || '',
       language: response.data?.language_code || 'hi-IN',
@@ -134,15 +140,12 @@ async function sarvamSTT(audioBuffer) {
 
 async function sarvamTTS(text, language = 'hi-IN') {
   const speakerMap = {
-    'hi-IN': 'anushka',
-    'en-IN': 'anushka',
-    'ta-IN': 'anushka',
-    'te-IN': 'anushka',
-    'kn-IN': 'anushka',
-    'ml-IN': 'anushka',
+    'hi-IN': 'anushka', 'en-IN': 'anushka',
+    'ta-IN': 'anushka', 'te-IN': 'anushka',
+    'kn-IN': 'anushka', 'ml-IN': 'anushka',
   };
   const speaker = speakerMap[language] || 'anushka';
-  console.log('TTS request:', { text, language, speaker });
+  console.log('TTS request:', { text: text.substring(0, 50), language, speaker });
   try {
     const response = await axios.post(
       'https://api.sarvam.ai/text-to-speech',
@@ -151,6 +154,7 @@ async function sarvamTTS(text, language = 'hi-IN') {
         target_language_code: language,
         speaker: speaker,
         model: 'bulbul:v2',
+        enable_preprocessing: true,
         encoding: 'mulaw',
         sample_rate: 8000,
       },
@@ -161,8 +165,9 @@ async function sarvamTTS(text, language = 'hi-IN') {
         },
       }
     );
+    console.log('TTS response keys:', Object.keys(response.data || {}));
     const audio = response.data?.audios?.[0] || null;
-    console.log('TTS success, audio length:', audio?.length || 0);
+    console.log('TTS audio length:', audio?.length || 0);
     return audio;
   } catch (err) {
     console.error('TTS error:', err.response?.data || err.message);
@@ -173,17 +178,16 @@ async function sarvamTTS(text, language = 'hi-IN') {
 async function speakToVobiz(ws, text, language = 'hi-IN') {
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
-    ws.send(JSON.stringify({
-      event: 'playAudio',
+    const msg = {
+      event: 'media',
       streamId: ws.streamId,
-      media: {
-        track: 'outbound',
-        payload: audio
-      }
-    }));
-    console.log('Audio sent to Vobiz, streamId:', ws.streamId);
+      media: { payload: audio }
+    };
+    console.log('Sending to Vobiz:', JSON.stringify(msg).substring(0, 100));
+    ws.send(JSON.stringify(msg));
+    console.log('Audio sent to Vobiz');
   } else {
-    console.log('Audio not sent - audio null or ws closed');
+    console.log('Audio not sent - audio null or ws closed, readyState:', ws.readyState);
   }
 }
 
