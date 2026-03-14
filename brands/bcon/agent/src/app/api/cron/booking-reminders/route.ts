@@ -113,24 +113,35 @@ export async function GET(req: NextRequest) {
     .or('reminder_1h_sent.is.null,reminder_1h_sent.eq.false')
     .not('booking_status', 'eq', 'cancelled');
 
+  cronLog.push(`1h query: ${data1h?.length || 0} results, err=${err1h?.message || 'none'}`);
   if (err1h) {
-    console.warn('[reminders] 1h query failed (columns may not exist), retrying without reminder filter:', err1h.message);
+    console.warn('[reminders] 1h query failed:', err1h.message);
     const { data: fallback1h } = await supabase
       .from('whatsapp_sessions')
       .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
       .not('booking_date', 'is', null)
       .not('booking_time', 'is', null);
     upcoming1h = fallback1h;
+    cronLog.push(`1h fallback: ${fallback1h?.length || 0} results`);
   } else {
     upcoming1h = data1h;
   }
+
+  // Check if test session is in the 1h results
+  const testIn1h = upcoming1h?.find((s: any) => s.customer_phone === '919353253817' || s.customer_phone === '+919353253817');
+  cronLog.push(`1h test session found: ${!!testIn1h}, phone=${testIn1h?.customer_phone || 'N/A'}, date=${testIn1h?.booking_date || 'N/A'}, time=${testIn1h?.booking_time || 'N/A'}`);
 
   if (upcoming1h) {
     for (const session of upcoming1h) {
       if (!session.booking_date || !session.booking_time || !session.customer_phone) continue;
 
       const bookingDateTime = new Date(`${session.booking_date}T${session.booking_time}+05:30`);
-      if (bookingDateTime < from1h || bookingDateTime > to1h) continue;
+      if (bookingDateTime < from1h || bookingDateTime > to1h) {
+        if (session.customer_phone === '919353253817' || session.customer_phone === '+919353253817') {
+          cronLog.push(`1h SKIP test session: booking=${bookingDateTime.toISOString()} window=${from1h.toISOString()}-${to1h.toISOString()}`);
+        }
+        continue;
+      }
 
       const name = session.customer_name || 'there';
       const title = session.booking_title || 'AI Lead Strategy Call';
