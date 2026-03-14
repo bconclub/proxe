@@ -251,6 +251,35 @@ export async function GET(req: NextRequest) {
       from30m: from30m.toISOString(),
       to30m: to30m.toISOString(),
     };
+    // Check our specific test session
+    const { data: testSession, error: testErr } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, customer_name, customer_phone, booking_date, booking_time, booking_status, reminder_24h_sent, reminder_1h_sent')
+      .eq('id', '2b6f56d7-69f3-453b-9f86-6e32b66c0796')
+      .maybeSingle();
+    debugInfo.testSession = testSession || testErr?.message || 'not found';
+    // Count total sessions matching 1h query
+    const { data: all1h, error: all1hErr } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, customer_name, customer_phone, booking_date, booking_time, booking_status')
+      .not('booking_date', 'is', null)
+      .not('booking_time', 'is', null)
+      .or('reminder_1h_sent.is.null,reminder_1h_sent.eq.false')
+      .not('booking_status', 'eq', 'cancelled');
+    debugInfo.total1hMatches = all1h?.length || 0;
+    debugInfo.all1hErr = all1hErr?.message || null;
+    // Check which are in window
+    const inWindow = (all1h || []).filter(s => {
+      const dt = new Date(`${s.booking_date}T${s.booking_time}+05:30`);
+      return dt >= from1h && dt <= to1h;
+    });
+    debugInfo.inWindowCount = inWindow.length;
+    debugInfo.inWindowSessions = inWindow.map(s => ({
+      name: s.customer_name,
+      phone: s.customer_phone,
+      date: s.booking_date,
+      time: s.booking_time,
+    }));
   }
 
   return NextResponse.json({
