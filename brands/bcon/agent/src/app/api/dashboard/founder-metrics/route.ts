@@ -248,14 +248,30 @@ export async function GET(request: NextRequest) {
     const whatsappConversations30D = countSessionsInRange(safeWhatsappSessions, thirtyDaysAgo)
     const uniqueConversations30D = webConversations30D + whatsappConversations30D
     
-    // Previous 7 days (for trend calculation)
+    // Previous periods (for trend calculations)
     const webConversationsPrevious7D = countSessionsInRange(safeWebSessions, previous7DaysStart, sevenDaysAgo)
     const whatsappConversationsPrevious7D = countSessionsInRange(safeWhatsappSessions, previous7DaysStart, sevenDaysAgo)
     const previous7DUniqueConversations = webConversationsPrevious7D + whatsappConversationsPrevious7D
-    
-    // Calculate trend (percentage change from previous 7 days)
-    const trend7D = previous7DUniqueConversations > 0 
+
+    const previous14DaysStart = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
+    const webConversationsPrevious14D = countSessionsInRange(safeWebSessions, previous14DaysStart, fourteenDaysAgo)
+    const whatsappConversationsPrevious14D = countSessionsInRange(safeWhatsappSessions, previous14DaysStart, fourteenDaysAgo)
+    const previous14DUniqueConversations = webConversationsPrevious14D + whatsappConversationsPrevious14D
+
+    const previous30DaysStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+    const webConversationsPrevious30D = countSessionsInRange(safeWebSessions, previous30DaysStart, thirtyDaysAgo)
+    const whatsappConversationsPrevious30D = countSessionsInRange(safeWhatsappSessions, previous30DaysStart, thirtyDaysAgo)
+    const previous30DUniqueConversations = webConversationsPrevious30D + whatsappConversationsPrevious30D
+
+    // Calculate trends (percentage change from previous equivalent period)
+    const trend7D = previous7DUniqueConversations > 0
       ? Math.round(((uniqueConversations7D - previous7DUniqueConversations) / previous7DUniqueConversations) * 100)
+      : 0
+    const trend14D = previous14DUniqueConversations > 0
+      ? Math.round(((uniqueConversations14D - previous14DUniqueConversations) / previous14DUniqueConversations) * 100)
+      : 0
+    const trend30D = previous30DUniqueConversations > 0
+      ? Math.round(((uniqueConversations30D - previous30DUniqueConversations) / previous30DUniqueConversations) * 100)
       : 0
     
     // Total unique conversations (all time) = all sessions with message_count >= 1
@@ -1315,6 +1331,8 @@ export async function GET(request: NextRequest) {
         count14D: conversations14D,
         count30D: conversations30D,
         trend7D: trend7D,
+        trend14D: trend14D,
+        trend30D: trend30D,
       },
       totalLeads: {
         count: totalLeadsCount,

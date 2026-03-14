@@ -22,7 +22,7 @@ import {
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
-  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
+  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
   totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
   engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
@@ -70,9 +70,9 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('30D')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
+  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
   const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   
   // Hot Leads threshold with localStorage persistence
@@ -411,21 +411,27 @@ export default function FounderDashboard() {
             </p>
             {/* Right: Details */}
             <div className="flex-1 min-w-0">
-              {metrics.totalConversations.trend7D !== 0 && (
-                <div className="flex items-center gap-1">
-                  {metrics.totalConversations.trend7D > 0 ? (
-                    <>
-                      <MdTrendingUp className="text-green-600" size={16} />
-                      <span className="text-sm text-green-600 font-medium">↑ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  ) : (
-                    <>
-                      <MdTrendingDown className="text-red-600" size={16} />
-                      <span className="text-sm text-red-600 font-medium">↓ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const trend = conversationTimeFilter === '7D' ? metrics.totalConversations.trend7D
+                  : conversationTimeFilter === '14D' ? metrics.totalConversations.trend14D
+                  : metrics.totalConversations.trend30D
+                if (trend === 0) return null
+                return (
+                  <div className="flex items-center gap-1">
+                    {trend > 0 ? (
+                      <>
+                        <MdTrendingUp className="text-green-600" size={16} />
+                        <span className="text-sm text-green-600 font-medium">↑ {Math.abs(trend)}%</span>
+                      </>
+                    ) : (
+                      <>
+                        <MdTrendingDown className="text-red-600" size={16} />
+                        <span className="text-sm text-red-600 font-medium">↓ {Math.abs(trend)}%</span>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
               <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
                 {metrics.totalConversations.total} all time
               </p>
