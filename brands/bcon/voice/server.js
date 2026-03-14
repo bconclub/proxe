@@ -37,15 +37,21 @@ wss.on('connection', (ws, req) => {
 
       if (msg.event === 'start') {
         callUUID = msg.start?.callId || msg.callId || 'unknown';
+        const streamId = msg.start?.streamId || null;
+        ws.streamId = streamId;
         console.log(`Call started: ${callUUID}`);
 
         // Send cached greeting instantly
         if (greetingAudio && ws.readyState === 1) {
           ws.send(JSON.stringify({
             event: 'playAudio',
-            media: { payload: greetingAudio }
+            streamId: ws.streamId,
+            media: {
+              track: 'outbound',
+              payload: greetingAudio
+            }
           }));
-          console.log('Greeting sent instantly from cache');
+          console.log('Greeting sent instantly from cache, streamId:', ws.streamId);
         } else {
           console.log('No cached greeting, generating...');
           await speakToVobiz(ws, "Hello! Welcome to BCON Club. How can I help you today?", 'hi-IN');
@@ -169,9 +175,13 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
   if (audio && ws.readyState === 1) {
     ws.send(JSON.stringify({
       event: 'playAudio',
-      media: { payload: audio }
+      streamId: ws.streamId,
+      media: {
+        track: 'outbound',
+        payload: audio
+      }
     }));
-    console.log('Audio sent to Vobiz');
+    console.log('Audio sent to Vobiz, streamId:', ws.streamId);
   } else {
     console.log('Audio not sent - audio null or ws closed');
   }
