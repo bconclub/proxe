@@ -248,14 +248,13 @@ export async function sendBookingReminder(
     },
   ];
   // booking_reminder button 0 = "Join Meeting" (URL: meet.google.com/{{1}})
-  if (meetLink) {
-    reminderComponents.push({
-      type: 'button',
-      sub_type: 'url',
-      index: 0,
-      parameters: [{ type: 'text', text: extractUrlSuffix(meetLink) }],
-    });
-  }
+  // Always include button param — Meta requires it even if no real link
+  reminderComponents.push({
+    type: 'button',
+    sub_type: 'url',
+    index: 0,
+    parameters: [{ type: 'text', text: meetLink ? extractUrlSuffix(meetLink) : 'bconclub.com' }],
+  });
   const result = await sendWhatsAppTemplate(to, templateName, reminderComponents);
 
   if (result.success) {

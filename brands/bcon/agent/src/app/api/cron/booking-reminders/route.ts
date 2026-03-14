@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const results = { reminders_24h: 0, reminders_1h: 0, reminders_30m: 0, errors: 0 };
+  const cronLog: string[] = [];
 
   // ─── 24-hour reminders ───────────────────────────────────────────────────
   // Find bookings between 20h and 28h from now (covers the 30-min cron window)
@@ -163,33 +164,34 @@ export async function GET(req: NextRequest) {
   const from30m = new Date(now.getTime() + 15 * 60 * 1000);   // +15min
   const to30m = new Date(now.getTime() + 45 * 60 * 1000);     // +45min
 
+  // Skip reminder_30m_sent column (doesn't exist yet) — just query all active bookings
   let upcoming30m: any[] | null = null;
   const { data: data30m, error: err30m } = await supabase
     .from('whatsapp_sessions')
-    .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title, reminder_30m_sent')
+    .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
     .not('booking_date', 'is', null)
     .not('booking_time', 'is', null)
-    .or('reminder_30m_sent.is.null,reminder_30m_sent.eq.false')
     .not('booking_status', 'eq', 'cancelled');
 
+  cronLog.push(`30m query: ${data30m?.length || 0} results, err=${err30m?.message || 'none'}`);
+
   if (err30m) {
-    console.warn('[reminders] 30m query failed (column may not exist), retrying without reminder filter:', err30m.message);
-    const { data: fallback30m } = await supabase
-      .from('whatsapp_sessions')
-      .select('id, lead_id, customer_name, customer_phone, booking_date, booking_time, booking_meet_link, booking_title')
-      .not('booking_date', 'is', null)
-      .not('booking_time', 'is', null);
-    upcoming30m = fallback30m;
-  } else {
-    upcoming30m = data30m;
+    console.warn('[reminders] 30m query failed:', err30m.message);
   }
+  upcoming30m = data30m;
 
   if (upcoming30m) {
     for (const session of upcoming30m) {
       if (!session.booking_date || !session.booking_time || !session.customer_phone) continue;
 
       const bookingDateTime = new Date(`${session.booking_date}T${session.booking_time}+05:30`);
-      if (bookingDateTime < from30m || bookingDateTime > to30m) continue;
+      if (bookingDateTime < from30m || bookingDateTime > to30m) {
+        // Log near-misses for the test session
+        if (session.customer_phone === '919353253817' || session.customer_phone === '+919353253817') {
+          cronLog.push(`30m SKIP test session: booking=${bookingDateTime.toISOString()} window=${from30m.toISOString()}-${to30m.toISOString()}`);
+        }
+        continue;
+      }
 
       const name = session.customer_name || 'there';
       const title = session.booking_title || 'AI Lead Strategy Call';
@@ -286,6 +288,7 @@ export async function GET(req: NextRequest) {
     success: true,
     ...results,
     timestamp: now.toISOString(),
+    cronLog,
     ...(debug ? { debug: debugInfo } : {}),
   });
 }
