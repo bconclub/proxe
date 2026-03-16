@@ -33,7 +33,7 @@ function stripWavHeader(base64Audio) {
 // Break raw audio buffer into 320-byte chunks (20ms at 8kHz 16-bit mono)
 function prepareAudioChunks(base64Audio) {
   const rawBuffer = stripWavHeader(base64Audio);
-  const CHUNK_SIZE = 320; // 20ms at 8kHz, 16-bit = 320 bytes
+  const CHUNK_SIZE = 4800; // 300ms at 8kHz, 16-bit mono
   const chunks = [];
   for (let i = 0; i < rawBuffer.length; i += CHUNK_SIZE) {
     const chunk = rawBuffer.slice(i, i + CHUNK_SIZE);
@@ -57,10 +57,6 @@ async function sendChunkedAudio(ws, chunks) {
         payload: chunks[i]
       }
     }));
-    // Pace at 20ms per chunk to match real-time playback
-    if (i < chunks.length - 1) {
-      await new Promise(r => setTimeout(r, 20));
-    }
   }
   console.log('Sent', chunks.length, 'audio chunks to Vobiz');
 }
