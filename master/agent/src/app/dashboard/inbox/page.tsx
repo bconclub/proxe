@@ -989,7 +989,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="flex-1 flex relative overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex relative overflow-hidden" style={{ background: 'var(--bg-primary)', height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'row' }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -1001,7 +1001,8 @@ export default function InboxPage() {
         className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
-          borderColor: 'var(--border-primary)'
+          borderColor: 'var(--border-primary)',
+          height: '100%',
         }}
       >
         {/* Search + Filters - flush at top */}
@@ -1197,7 +1198,7 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)', height: '100%' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -1210,7 +1211,7 @@ export default function InboxPage() {
             {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
-                className="mx-3 mt-2 mb-1 p-3 rounded-lg border"
+                className="mx-3 mt-2 mb-1 p-3 rounded-lg border flex-shrink-0"
                 style={{
                   background: 'var(--bg-tertiary)',
                   borderColor: 'var(--accent-primary)',
@@ -1354,7 +1355,7 @@ export default function InboxPage() {
             </div>
 
             {/* Message Input - compact */}
-            <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
@@ -1413,7 +1414,7 @@ export default function InboxPage() {
       {selectedLeadId && (
         <div
           className="hidden lg:flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
-          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', height: '100%' }}
         >
           {!leadDetails ? (
             <div className="p-4 text-center">
