@@ -43,12 +43,19 @@ wss.on('connection', (ws, req) => {
 
         // Send cached greeting instantly
         if (greetingAudio && ws.readyState === 1) {
+          // Strip WAV header if present (Sarvam wraps in WAV, Vobiz needs raw bytes)
+          let greetingPayload = greetingAudio;
+          if (greetingAudio && greetingAudio.startsWith('UklGR')) {
+            const buf = Buffer.from(greetingAudio, 'base64');
+            greetingPayload = buf.slice(44).toString('base64');
+            console.log('Stripped WAV header from greeting, raw payload length:', greetingPayload.length);
+          }
           ws.send(JSON.stringify({
             event: 'playAudio',
             media: {
-              contentType: 'audio/x-l16',
+              contentType: 'audio/x-mulaw',
               sampleRate: 8000,
-              payload: greetingAudio
+              payload: greetingPayload
             }
           }));
           console.log('Greeting sent instantly from cache, streamId:', ws.streamId);
@@ -196,7 +203,7 @@ async function sarvamTTS(text, language = 'hi-IN') {
         speaker: speaker,
         model: 'bulbul:v2',
         enable_preprocessing: true,
-        encoding: 'pcm',
+        encoding: 'mulaw',
         sample_rate: 8000,
       },
       {
@@ -219,12 +226,19 @@ async function sarvamTTS(text, language = 'hi-IN') {
 async function speakToVobiz(ws, text, language = 'hi-IN') {
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
+    // Strip WAV header if present (Sarvam wraps in WAV, Vobiz needs raw bytes)
+    let rawPayload = audio;
+    if (audio && audio.startsWith('UklGR')) {
+      const buf = Buffer.from(audio, 'base64');
+      rawPayload = buf.slice(44).toString('base64');
+      console.log('Stripped WAV header, raw payload length:', rawPayload.length);
+    }
     const msg = {
       event: 'playAudio',
       media: {
-        contentType: 'audio/x-l16',
+        contentType: 'audio/x-mulaw',
         sampleRate: 8000,
-        payload: audio
+        payload: rawPayload
       }
     };
     console.log('Sending to Vobiz:', JSON.stringify(msg).substring(0, 100));
