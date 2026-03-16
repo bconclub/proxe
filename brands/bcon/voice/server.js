@@ -179,9 +179,9 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
     const msg = {
-      event: 'media',
+      event: 'playAudio',
       streamId: ws.streamId,
-      media: { payload: audio }
+      media: { track: 'outbound', payload: audio }
     };
     console.log('Sending to Vobiz:', JSON.stringify(msg).substring(0, 100));
     ws.send(JSON.stringify(msg));
