@@ -205,9 +205,8 @@ async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promis
   if (!input.userProfile.email && !input.userProfile.phone) return null;
 
   try {
-    // Check for existing booking in web_sessions or all_leads
+    // Check for existing booking in all_leads (info-only, does NOT block new bookings)
     const phone = input.userProfile.phone;
-    const email = input.userProfile.email;
 
     if (phone) {
       const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
@@ -222,7 +221,8 @@ async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promis
         const formattedDate = date.toLocaleDateString('en-US', {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
-        return `You already have a booking scheduled for ${formattedDate} at ${data.unified_context.web.booking_time}.`;
+        // Info-only: let Claude know about the existing booking but do NOT block
+        return `[INFO: User has an earlier booking on ${formattedDate} at ${data.unified_context.web.booking_time}. Do NOT block a new booking — proceed with the user's request. Mention the existing booking only after confirming the new one.]`;
       }
     }
   } catch (error) {
@@ -348,13 +348,16 @@ function buildBookingTools(
         });
       }
 
-      // Check for existing booking
-      const existing = await checkExistingBooking(bookingPhone, bookingEmail || null, supabase);
-      if (existing.exists) {
-        return JSON.stringify({
-          success: false,
-          error: `User already has a booking on ${existing.bookingDate} at ${existing.bookingTime}. Inform them about it.`,
-        });
+      // Check for existing booking (info-only, does not block new bookings)
+      let existingBookingNote = '';
+      try {
+        const existing = await checkExistingBooking(bookingPhone, bookingEmail || null, supabase);
+        if (existing.exists) {
+          existingBookingNote = `Note: user also has an earlier booking on ${existing.bookingDate} at ${existing.bookingTime}.`;
+          console.log('[Engine] Existing booking found, proceeding with new booking anyway:', existingBookingNote);
+        }
+      } catch (checkErr) {
+        console.error('[Engine] Error checking existing booking (non-blocking):', checkErr);
       }
 
       // Create Google Calendar event
@@ -407,7 +410,7 @@ function buildBookingTools(
         time,
         name: bookingName,
         google_event_created: !!calendarResult,
-        message: `Booking confirmed for ${bookingName} on ${date} at ${time}.`,
+        message: `Booking confirmed for ${bookingName} on ${date} at ${time}.${existingBookingNote ? ' ' + existingBookingNote : ''}`,
       });
     },
   };
