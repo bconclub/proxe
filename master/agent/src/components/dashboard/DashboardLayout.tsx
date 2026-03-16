@@ -23,6 +23,8 @@ import {
   MdMonitorHeart,
   MdMoreHoriz,
   MdTimeline,
+  MdChecklist,
+  MdViewKanban,
 } from 'react-icons/md'
 
 interface DashboardLayoutProps {
@@ -45,6 +47,8 @@ const navigation: NavItem[] = [
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
+  { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
+  { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // TOOLS
   { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
@@ -53,8 +57,8 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Events (index 3), after Knowledge (index 6)
-const DIVIDER_AFTER_INDICES = [3, 6]
+// Divider positions: after Pipeline (index 5), after Knowledge (index 8)
+const DIVIDER_AFTER_INDICES = [5, 8]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()

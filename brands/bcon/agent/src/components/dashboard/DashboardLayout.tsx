@@ -23,6 +23,8 @@ import {
   MdMonitorHeart,
   MdMoreHoriz,
   MdTimeline,
+  MdChecklist,
+  MdViewKanban,
 } from 'react-icons/md'
 
 interface DashboardLayoutProps {
@@ -45,6 +47,8 @@ const navigation: NavItem[] = [
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
+  { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
+  { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // TOOLS
   { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
@@ -53,8 +57,8 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Events (index 3), after Knowledge (index 6)
-const DIVIDER_AFTER_INDICES = [3, 6]
+// Divider positions: after Pipeline (index 5), after Knowledge (index 8)
+const DIVIDER_AFTER_INDICES = [5, 8]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -321,10 +325,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {!isCollapsed && (
             <>
-              <div className="dashboard-layout-sidebar-logo flex items-center gap-2.5">
-                <img src="/bcon-icon.png" alt="BCON" className="w-7 h-7 rounded-md object-contain flex-shrink-0" />
-                <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>bconclub.com</span>
-              </div>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -716,9 +717,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <PageTransitionLoader />
 
         {/* Page content */}
-        <main className="dashboard-layout-main-content-wrapper flex-1 flex flex-col overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
-          <div className="dashboard-layout-main-content-container flex-1 flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)' }}>
-            <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8 w-full flex-1 flex flex-col min-h-0">
+        <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
+          <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
               {children}
             </div>
           </div>
