@@ -25,6 +25,10 @@ async function preloadGreeting() {
 function stripWavHeader(base64Audio) {
   if (base64Audio && base64Audio.startsWith('UklGR')) {
     const buf = Buffer.from(base64Audio, 'base64');
+    const actualSampleRate = buf.readUInt32LE(24);
+    const bitsPerSample = buf.readUInt16LE(34);
+    const numChannels = buf.readUInt16LE(22);
+    console.log('WAV actual sample rate:', actualSampleRate, 'bits:', bitsPerSample, 'channels:', numChannels);
     return buf.slice(44);
   }
   return Buffer.from(base64Audio, 'base64');
@@ -53,7 +57,7 @@ async function sendChunkedAudio(ws, chunks) {
       event: 'playAudio',
       media: {
         contentType: 'audio/x-l16',
-        sampleRate: 8000,
+        sampleRate: 22050,
         payload: chunks[i]
       }
     }));
