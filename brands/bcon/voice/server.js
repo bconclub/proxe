@@ -14,7 +14,7 @@ let greetingAudio = null;
 
 async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
-  greetingAudio = await sarvamTTS("Hello! Welcome to BCON Club. How can I help you today?", 'hi-IN');
+  greetingAudio = await sarvamTTS("Hello! Welcome to BCON Club. How can I help you today?", 'en-IN');
   console.log('Greeting audio ready, length:', greetingAudio?.length || 0);
 }
 
@@ -53,8 +53,8 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({
             event: 'playAudio',
             media: {
-              contentType: 'audio/x-mulaw',
-              sampleRate: 8000,
+              contentType: 'audio/x-l16',
+              sampleRate: 16000,
               payload: greetingPayload
             }
           }));
@@ -203,7 +203,7 @@ async function sarvamTTS(text, language = 'hi-IN') {
         speaker: speaker,
         model: 'bulbul:v2',
         enable_preprocessing: true,
-        encoding: 'mulaw',
+        encoding: 'pcm',
         sample_rate: 8000,
       },
       {
@@ -236,8 +236,8 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
     const msg = {
       event: 'playAudio',
       media: {
-        contentType: 'audio/x-mulaw',
-        sampleRate: 8000,
+        contentType: 'audio/x-l16',
+        sampleRate: 16000,
         payload: rawPayload
       }
     };
