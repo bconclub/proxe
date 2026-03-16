@@ -60,7 +60,12 @@ wss.on('connection', (ws, req) => {
 
       if (msg.event === 'media' && msg.media?.payload) {
         const chunk = Buffer.from(msg.media.payload, 'base64');
-        const isSilence = chunk.every(b => b === 0xFF || b === 0x7F || b === 0xFE);
+        const energy = chunk.reduce((sum, b) => {
+          const distFrom7F = Math.abs(b - 0x7F);
+          const distFromFF = Math.abs(b - 0xFF);
+          return sum + Math.min(distFrom7F, distFromFF);
+        }, 0) / chunk.length;
+        const isSilence = energy < 5;
 
         if (!isSilence) {
           audioBuffer.push(chunk);
