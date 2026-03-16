@@ -53,7 +53,7 @@ async function sendChunkedAudio(ws, chunks) {
       event: 'playAudio',
       media: {
         contentType: 'audio/x-l16',
-        sampleRate: 8000,
+        sampleRate: 16000,
         payload: chunks[i]
       }
     }));
@@ -229,7 +229,7 @@ async function sarvamTTS(text, language = 'en-IN') {
         model: 'bulbul:v2',
         enable_preprocessing: true,
         encoding: 'pcm',
-        sample_rate: 8000,
+        sample_rate: 16000,
       },
       {
         headers: {
