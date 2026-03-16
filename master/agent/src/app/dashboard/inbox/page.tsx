@@ -995,7 +995,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="inbox-layout-root" style={{ display: 'flex', flexDirection: 'row', overflow: 'hidden', background: 'var(--bg-primary)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -1463,10 +1463,13 @@ export default function InboxPage() {
             const hasWebsite = bconCtx.has_website ?? webCtx.do_you_have_a_website ?? waCtx.do_you_have_a_website ?? null
             const hasAI = bconCtx.has_ai ?? webCtx.are_you_currently_using_any_ai_systems ?? waCtx.are_you_currently_using_any_ai_systems ?? null
 
-            // Booking data
-            const bd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
-            const bt = leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time
-            const ml = webCtx.booking_meet_link || waCtx.booking_meet_link
+            // Booking data — only show if date is today or in the future
+            const rawBd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
+            const today = new Date().toISOString().split('T')[0]
+            const isUpcoming = rawBd && rawBd >= today
+            const bd = isUpcoming ? rawBd : null
+            const bt = isUpcoming ? (leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time) : null
+            const ml = isUpcoming ? (webCtx.booking_meet_link || waCtx.booking_meet_link) : null
             const bookingTitle = webCtx.booking_title || waCtx.booking_title || 'Discovery Call'
 
             // Phone for action links (clean to digits)

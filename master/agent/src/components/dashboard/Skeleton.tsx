@@ -149,7 +149,7 @@ export function OverviewSkeleton() {
 
 export function ConversationsSkeleton() {
   return (
-    <div style={{ display: 'flex', overflow: 'hidden', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
       {/* Left - conversation list */}
       <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <SkeletonBlock width="100%" height="32px" />

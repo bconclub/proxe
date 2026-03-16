@@ -229,12 +229,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [freshLeadData, setFreshLeadData] = useState<Lead | null>(null)
   const [calculatedScore, setCalculatedScore] = useState<CalculatedScore | null>(null)
 
-  // Calculate and set unified score (using shared utility)
+  // Recalculate score via API (persists to DB so list and modal always match)
   const calculateAndSetScore = async () => {
     if (!lead) return
-    const leadData = freshLeadData || lead
-    const result = await calculateLeadScoreUtil(leadData as ScoreLead)
-    setCalculatedScore(result)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${lead.id}/score`, { method: 'POST' })
+      const data = await res.json()
+      if (data.lead?.lead_score != null) {
+        setCalculatedScore({ score: data.lead.lead_score } as CalculatedScore)
+      }
+    } catch (err) {
+      console.error('Error recalculating score:', err)
+      // Fallback to client-side calculation
+      const leadData = freshLeadData || lead
+      const result = await calculateLeadScoreUtil(leadData as ScoreLead)
+      setCalculatedScore(result)
+    }
   }
 
   // Fetch fresh lead data from database when modal opens
