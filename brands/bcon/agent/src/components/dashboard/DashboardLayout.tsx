@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
-import AIChatBubble from '@/components/dashboard/AIChatBubble'
 import { getBuildDate } from '@/lib/buildInfo'
 import {
   MdInbox,
@@ -725,9 +724,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </div>
         </main>
-
-        {/* AI Chat Bubble */}
-        <AIChatBubble />
       </div>
     </div>
   )
