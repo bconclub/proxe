@@ -37,7 +37,6 @@ const STAGES: Stage[] = [
   { id: 'qualified',      dbValues: ['Qualified'],                     label: 'Qualified',     bg: '#485693', text: '#F1EFE8', sub: '#B4B2A9' },
   { id: 'high_intent',    dbValues: ['High Intent'],                   label: 'High Intent',   bg: '#534AB7', text: '#EEEDFE', sub: '#CECBF6' },
   { id: 'booking_made',   dbValues: ['Booking Made'],                  label: 'Booking Made',  bg: '#1D9E75', text: '#E1F5EE', sub: '#9FE1CB' },
-  { id: 'call_done',      dbValues: ['Call Done', 'Call/Demo Done'],   label: 'Call Done',     bg: '#0F6E56', text: '#E1F5EE', sub: '#5DCAA5' },
   { id: 'won',            dbValues: ['Converted', 'Closed Won'],      label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#C0DD97' },
   { id: 'lost',           dbValues: ['Closed Lost', 'Cold'],          label: 'Lost',          bg: '#993C1D', text: '#FAECE7', sub: '#F5C4B3' },
 ]
@@ -86,7 +85,6 @@ function getNextAction(stageId: string, lead: Lead): string {
     case 'qualified': return 'Schedule a call or send pricing info'
     case 'high_intent': return 'Book a meeting or send proposal'
     case 'booking_made': return 'Confirm meeting or send reminder'
-    case 'call_done': return 'Send follow-up or share proposal'
     case 'won': return 'Onboard and nurture relationship'
     case 'lost': return 'Re-engage or archive'
     default: return 'Review lead'
@@ -110,7 +108,6 @@ const STAGE_TO_DB: Record<string, string> = {
   qualified: 'Qualified',
   high_intent: 'High Intent',
   booking_made: 'Booking Made',
-  call_done: 'Converted',  // API doesn't have Call Done, use closest
   won: 'Converted',
   lost: 'Closed Lost',
 }

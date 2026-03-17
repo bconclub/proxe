@@ -1481,13 +1481,18 @@ export default function InboxPage() {
               )}
               {leadDetails.lead_stage && (() => {
                 const stageColors: Record<string, { bg: string; text: string }> = {
-                  'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
-                  'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-                  'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
-                  'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' },
-                  'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af' },
+                  'New':          { bg: '#3266ad', text: '#E6F1FB' },
+                  'Engaged':      { bg: '#3d5fa0', text: '#E6F1FB' },
+                  'Qualified':    { bg: '#485693', text: '#F1EFE8' },
+                  'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
+                  'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
+                  'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
+                  'Converted':    { bg: '#639922', text: '#EAF3DE' },
+                  'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
+                  'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
+                  'Cold':         { bg: '#993C1D', text: '#FAECE7' },
                 }
-                const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' }
+                const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
                 return (
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
                     style={{ background: sc.bg, color: sc.text }}>
