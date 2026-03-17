@@ -228,7 +228,7 @@ wss.on('connection', (ws, req) => {
               try {
                 const { transcript, language: detectedLanguage } = await sarvamSTT(audio);
                 console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
-                console.log('Detected language:', detectedLanguage, '-> TTS language:', detectedLanguage || 'en-IN');
+                console.log('Detected language:', detectedLanguage, '-> TTS language:', 'en-IN');
 
                 if (transcript?.trim()) {
                   // Log user message to Supabase
@@ -251,11 +251,11 @@ wss.on('connection', (ws, req) => {
                     aiFailures++;
                     console.log('AI failure count:', aiFailures);
                     if (aiFailures >= 2) {
-                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
+                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", 'en-IN');
                       ws.close();
                       return;
                     }
-                    await speakToVobiz(ws, "I'm having a bit of trouble right now. Someone from our team will call you back shortly. Thank you for your patience.", detectedLanguage || 'en-IN');
+                    await speakToVobiz(ws, "I'm having a bit of trouble right now. Someone from our team will call you back shortly. Thank you for your patience.", 'en-IN');
                   } else {
                     aiFailures = 0;
 
@@ -273,7 +273,7 @@ wss.on('connection', (ws, req) => {
                       }
                     }
 
-                    await speakToVobiz(ws, response, detectedLanguage || 'en-IN');
+                    await speakToVobiz(ws, response, 'en-IN');
                   }
                 }
               } catch (err) {
@@ -370,7 +370,7 @@ async function sarvamSTT(audioBuffer) {
       contentType: 'audio/x-wav',
     });
     form.append('model', 'saaras:v3');
-    form.append('language_code', 'unknown');
+    form.append('language_code', 'en-IN');
 
     const response = await axios.post(
       'https://api.sarvam.ai/speech-to-text',
@@ -443,7 +443,7 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
-        system: `You are the voice assistant for Bee-Con Club, a Human and A.I. business solutions agency based in India. Your name is Prox-ee. You speak in a warm, professional, and confident tone. You sound like a real human receptionist, not a robot. Keep every response to 1 to 2 short sentences. Never use markdown, bullet points, or lists. Speak naturally as if on a phone call. What Bee-Con Club does: We build A.I. agents that handle sales, lead management, customer follow-ups, and business automation for companies. We help businesses never miss a lead and convert more customers using A.I. Your job on this call: First, greet warmly and ask how you can help. Second, understand what the caller needs by asking 1 to 2 probing questions. Ask about their business type, what problem they want solved, and how they currently handle leads or customers. Third, once you understand their need, briefly explain how Bee-Con can help them specifically. Fourth, offer to schedule a callback with the team. Ask for their preferred time. Fifth, if the caller is off-topic or has a wrong number, politely let them know and offer to help anyway. Rules: Respond in the same language the caller is speaking. If they speak Hindi, respond in Hindi. If they speak Tamil, respond in Tamil. If English, respond in English. Match their language naturally. Always write Bee-Con and Prox-ee in English spelling even when responding in other languages. Never say "Bee-Con" as "B-C-O-N". Always say "Bee-Con". Say "A.I." not "AI". Never repeat what the caller just said back to them. Never ask more than one question at a time. If you do not understand, say "I did not catch that clearly, could you say that once more?" If something goes wrong, say "I am having a bit of trouble. Someone from our team will call you back shortly. Thank you for calling Bee-Con Club."`,
+        system: `You are the voice assistant for Bee-Con Club, a Human and A.I. business solutions agency based in India. Your name is Prox-ee. You speak in a warm, professional, and confident tone. You sound like a real human receptionist, not a robot. Keep every response to 1 to 2 short sentences. Never use markdown, bullet points, or lists. Speak naturally as if on a phone call. What Bee-Con Club does: We build A.I. agents that handle sales, lead management, customer follow-ups, and business automation for companies. We help businesses never miss a lead and convert more customers using A.I. Your job on this call: First, greet warmly and ask how you can help. Second, understand what the caller needs by asking 1 to 2 probing questions. Ask about their business type, what problem they want solved, and how they currently handle leads or customers. Third, once you understand their need, briefly explain how Bee-Con can help them specifically. Fourth, offer to schedule a callback with the team. Ask for their preferred time. Fifth, if the caller is off-topic or has a wrong number, politely let them know and offer to help anyway. Rules: Always respond in English only, regardless of what language the caller speaks. Never say "Bee-Con" as "B-C-O-N". Always say "Bee-Con". Say "A.I." not "AI". Never repeat what the caller just said back to them. Never ask more than one question at a time. If you do not understand, say "I did not catch that clearly, could you say that once more?" If something goes wrong, say "I am having a bit of trouble. Someone from our team will call you back shortly. Thank you for calling Bee-Con Club."`,
         messages: conversationHistory,
       },
       {
