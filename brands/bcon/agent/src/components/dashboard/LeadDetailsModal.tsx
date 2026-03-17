@@ -238,12 +238,21 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showAdminNotes, setShowAdminNotes] = useState(false)
   const recognitionRef = useRef<any>(null)
 
-  // Calculate and set unified score (using shared utility)
+  // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
     if (!lead) return
     const leadData = freshLeadData || lead
     const result = await calculateLeadScoreUtil(leadData as ScoreLead)
     setCalculatedScore(result)
+
+    // Persist recalculated score to DB so list and modal always match
+    if (result && typeof result.score === 'number') {
+      try {
+        await fetch(`/api/dashboard/leads/${lead.id}/score`, { method: 'POST' })
+      } catch (err) {
+        console.error('Failed to persist recalculated score:', err)
+      }
+    }
   }
 
   // Fetch fresh lead data from database when modal opens

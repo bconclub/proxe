@@ -717,7 +717,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <PageTransitionLoader />
 
         {/* Page content */}
-        <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
           <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
             <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
               {children}

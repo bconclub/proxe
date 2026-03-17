@@ -984,7 +984,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="flex-1 flex relative overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 flex overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)', position: 'absolute', inset: 0 }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -1119,11 +1119,15 @@ export default function InboxPage() {
                         </span>
                       </div>
 
-                      {/* Line 3: Event pill (highlighted, only if booking exists) */}
-                      {conv.booking_date && (
+                      {/* Line 3: Event pill (highlighted for upcoming, muted for past) */}
+                      {conv.booking_date && (() => {
+                        const isPast = conv.booking_date < new Date().toISOString().split('T')[0]
+                        return (
                         <div className="mt-1.5" style={{ paddingLeft: '38px' }}>
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
-                            style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            style={isPast
+                              ? { background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: '1px solid var(--border-primary)', opacity: 0.6 }
+                              : { background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
                             <MdEvent size={11} />
                             {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             {conv.booking_time && (() => {
@@ -1135,7 +1139,8 @@ export default function InboxPage() {
                             })()}
                           </span>
                         </div>
-                      )}
+                        )
+                      })()}
                     </div>
                   </div>
                 );
@@ -1585,10 +1590,13 @@ export default function InboxPage() {
               || leadDetails.unified_context?.whatsapp?.booking_time
             const ml = leadDetails.unified_context?.web?.booking_meet_link
               || leadDetails.unified_context?.whatsapp?.booking_meet_link
+            // Filter: only show if booking date is today or in the future
+            const today = new Date().toISOString().split('T')[0]
+            const isUpcoming = bd && bd >= today
             return (
               <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                 <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
-                {bd ? (
+                {isUpcoming ? (
                   <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid #22c55e' }}>
                     <div className="flex items-center gap-1.5">
                       <MdEvent size={14} style={{ color: '#22c55e' }} />
@@ -1613,6 +1621,15 @@ export default function InboxPage() {
                         Join Meeting →
                       </a>
                     )}
+                  </div>
+                ) : bd ? (
+                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid var(--text-muted)', opacity: 0.6 }}>
+                    <div className="flex items-center gap-1.5">
+                      <MdEvent size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} (past)
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
