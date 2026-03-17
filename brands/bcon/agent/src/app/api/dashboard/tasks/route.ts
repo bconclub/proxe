@@ -94,8 +94,9 @@ export async function GET(request: NextRequest) {
       (t) => (t.status === 'failed' || t.status === 'failed_24h_window') && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
     const pendingCount = (pendingResult.data || []).filter((t) => t.status === 'pending').length
+    const queuedCount = (pendingResult.data || []).filter((t) => t.status === 'queued').length
     // "Firing Next Hour" = pending tasks with scheduled_at in the next 1 hour
-    const queuedCount = (pendingResult.data || []).filter(
+    const firingNextHour = (pendingResult.data || []).filter(
       (t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) <= oneHourFromNow
     ).length
     const successRate = completedToday + failedToday > 0
@@ -109,6 +110,7 @@ export async function GET(request: NextRequest) {
         failedToday,
         pendingCount,
         queuedCount,
+        firingNextHour,
         successRate,
       },
     })

@@ -11,6 +11,7 @@ import {
   MdWhatsapp,
   MdPhoneInTalk,
   MdLanguage,
+  MdHourglassEmpty,
 } from 'react-icons/md'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
@@ -38,6 +39,7 @@ interface Stats {
   failedToday: number
   pendingCount: number
   queuedCount: number
+  firingNextHour: number
   successRate: number
 }
 
@@ -78,18 +80,36 @@ function channelIcon(metadata: Record<string, unknown>) {
   return <MdWhatsapp size={13} style={{ opacity: 0.5 }} />
 }
 
-function statusPill(status: string) {
+/** Parse raw error JSON into a short human-readable message */
+function cleanErrorMessage(raw: string | null): string {
+  if (!raw) return 'Unknown error'
+  if (raw.includes('132001') || raw.includes('template name')) return 'Template not found — needs setup in Meta'
+  if (raw.includes('131047') || raw.includes('Re-engagement')) return '24h window expired'
+  if (raw.includes('24h_window')) return '24h window expired'
+  if (raw.includes('No phone')) return 'No phone number on lead'
+  if (raw.startsWith('Skipped')) return raw
+  if (raw.length > 60) return raw.substring(0, 57) + '...'
+  return raw
+}
+
+function statusPill(status: string, errorMessage?: string | null) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
     completed: { bg: 'rgba(34,197,94,0.12)', color: '#22c55e', label: 'Completed' },
     failed: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Failed' },
     failed_24h_window: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Window Expired' },
     pending: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Pending' },
-    queued: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
+    queued: { bg: 'rgba(168,85,247,0.12)', color: '#a855f7', label: 'Awaiting Approval' },
     in_queue: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
   }
   const s = styles[status] || styles.pending
+  const tooltip = (status === 'failed' || status === 'failed_24h_window') && errorMessage
+    ? cleanErrorMessage(errorMessage)
+    : undefined
   return (
-    <span style={{ background: s.bg, color: s.color, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
+    <span
+      title={tooltip}
+      style={{ background: s.bg, color: s.color, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, cursor: tooltip ? 'help' : undefined }}
+    >
       {s.label}
     </span>
   )
@@ -207,6 +227,49 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string | null }) {
   )
 }
 
+// --- Queue Task Card (shared between both sections) ---
+
+function QueueTaskCard({ task }: { task: AgentTask }) {
+  const isQueued = task.status === 'queued'
+  return (
+    <div
+      style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        opacity: isQueued ? 0.7 : 1,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+          {channelIcon(task.metadata)}
+          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.lead_name || 'Unknown lead'}
+          </span>
+          {task.lead_phone && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>({task.lead_phone})</span>
+          )}
+        </div>
+        {typeBadge(task.task_type)}
+      </div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {task.task_description}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {isQueued ? (
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#a855f7', background: 'rgba(168,85,247,0.12)', padding: '1px 8px', borderRadius: 4 }}>
+            Awaiting Approval
+          </span>
+        ) : (
+          <CountdownTimer scheduledAt={task.scheduled_at} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // --- Stat Card ---
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
@@ -214,7 +277,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
     <div
       style={{
         flex: '1 1 0',
-        minWidth: 140,
+        minWidth: 120,
         background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 8,
@@ -231,7 +294,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<AgentTask[]>([])
-  const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, successRate: 100 })
+  const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, firingNextHour: 0, successRate: 100 })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterTab>('all')
 
@@ -258,8 +321,12 @@ export default function TasksPage() {
     .filter((t) => (t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window') && matchesFilter(t, filter))
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
-  const upcomingTasks = tasks
-    .filter((t) => t.status === 'pending' || t.status === 'in_queue' || t.status === 'queued')
+  const firingSoonTasks = tasks
+    .filter((t) => t.status === 'pending')
+    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
+
+  const awaitingApprovalTasks = tasks
+    .filter((t) => t.status === 'queued')
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
   const hourlyData = buildHourlyChart(tasks)
@@ -274,7 +341,6 @@ export default function TasksPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Pulse animation for countdown */}
       <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
       <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
@@ -283,7 +349,8 @@ export default function TasksPage() {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <StatCard label="Completed Today" value={stats.completedToday} color="#22c55e" />
         <StatCard label="Pending" value={stats.pendingCount} color="#f59e0b" />
-        <StatCard label="Firing Next Hour" value={stats.queuedCount} color="#9ca3af" />
+        <StatCard label="Queued" value={stats.queuedCount} color="#a855f7" />
+        <StatCard label="Firing Next Hour" value={stats.firingNextHour} color="#9ca3af" />
         <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
       </div>
 
@@ -359,75 +426,66 @@ export default function TasksPage() {
                         </span>
                       )}
                     </div>
-                    {(task.status === 'failed' || task.status === 'failed_24h_window') && task.error_message && (
-                      <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>
-                        {task.error_message}
-                      </div>
-                    )}
                   </div>
-                  <div style={{ flexShrink: 0 }}>{statusPill(task.status)}</div>
+                  <div style={{ flexShrink: 0 }}>{statusPill(task.status, task.error_message)}</div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Right — Upcoming Queue */}
+        {/* Right — Queue */}
         <div style={{ flex: '2 1 280px', minWidth: 0 }}>
+          {/* Firing Soon */}
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-            Upcoming Queue
+            Firing Soon
           </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 500,
+              maxHeight: 280,
+              overflow: 'auto',
+              marginBottom: 16,
+            }}
+          >
+            {firingSoonTasks.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 6 }}>
+                <MdCheckCircle size={24} style={{ color: 'rgba(34,197,94,0.4)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No pending tasks</span>
+              </div>
+            ) : (
+              firingSoonTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
+            )}
+          </div>
+
+          {/* Awaiting Approval */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#a855f7', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+            <MdHourglassEmpty size={16} />
+            Awaiting Approval
+            {awaitingApprovalTasks.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                ({awaitingApprovalTasks.length})
+              </span>
+            )}
+          </div>
+          <div
+            style={{
+              background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+              border: '1px solid rgba(168,85,247,0.15)',
+              borderRadius: 8,
+              maxHeight: 280,
               overflow: 'auto',
             }}
           >
-            {upcomingTasks.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
-                <MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No tasks in queue</span>
+            {awaitingApprovalTasks.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 6 }}>
+                <MdCheckCircle size={24} style={{ color: 'rgba(168,85,247,0.3)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing queued</span>
               </div>
             ) : (
-              upcomingTasks.map((task) => (
-                <div
-                  key={task.id}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  {/* Row 1: Lead name + type badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                      {channelIcon(task.metadata)}
-                      <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {task.lead_name || 'Unknown lead'}
-                      </span>
-                      {task.lead_phone && (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                          ({task.lead_phone})
-                        </span>
-                      )}
-                    </div>
-                    {typeBadge(task.task_type)}
-                  </div>
-                  {/* Row 2: Description preview */}
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {task.task_description}
-                  </div>
-                  {/* Row 3: Countdown */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <CountdownTimer scheduledAt={task.scheduled_at} />
-                  </div>
-                </div>
-              ))
+              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
             )}
           </div>
         </div>
