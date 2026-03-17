@@ -23,6 +23,8 @@ import {
   MdPersonAdd,
   MdReply,
   MdSmartToy,
+  MdTimeline,
+  MdHistory,
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -195,6 +197,9 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [leadChannels, setLeadChannels] = useState<string[]>([])
+  const [journeyEvents, setJourneyEvents] = useState<any[]>([])
+  const [journeyLoading, setJourneyLoading] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -279,6 +284,86 @@ export default function InboxPage() {
       } catch (err) { console.error('[RIGHT PANEL] Exception:', err); setLeadDetails(null) }
     }
     fetchLeadDetails()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLeadId])
+
+  // Fetch distinct channels + journey timeline for selected lead
+  useEffect(() => {
+    if (!selectedLeadId) { setLeadChannels([]); setJourneyEvents([]); return }
+    async function fetchJourney() {
+      setJourneyLoading(true)
+      try {
+        // Distinct channels
+        const { data: chanData } = await supabase
+          .from('conversations')
+          .select('channel')
+          .eq('lead_id', selectedLeadId)
+        const distinctChannels = [...new Set((chanData || []).map((r: any) => r.channel).filter(Boolean))]
+        setLeadChannels(distinctChannels)
+
+        // Journey: conversations (first + key messages per channel)
+        const { data: allMsgs } = await supabase
+          .from('conversations')
+          .select('channel, sender, content, created_at, metadata')
+          .eq('lead_id', selectedLeadId)
+          .order('created_at', { ascending: true })
+          .limit(500)
+
+        const events: any[] = []
+
+        // Group by channel and pick first message per channel
+        const seenChannels = new Set<string>()
+        for (const msg of (allMsgs || [])) {
+          if (!seenChannels.has(msg.channel)) {
+            seenChannels.add(msg.channel)
+            events.push({
+              type: 'first_contact',
+              channel: msg.channel,
+              date: msg.created_at,
+              summary: msg.sender === 'customer'
+                ? (msg.content?.substring(0, 80) + (msg.content?.length > 80 ? '...' : ''))
+                : 'Agent initiated',
+            })
+          }
+          // Booking confirmations from task worker
+          if (msg.metadata?.task_type === 'post_booking_confirmation') {
+            events.push({
+              type: 'booking',
+              channel: msg.channel,
+              date: msg.created_at,
+              summary: `Booking confirmed: ${msg.metadata?.booking_date || ''} ${msg.metadata?.booking_time || ''}`.trim(),
+            })
+          }
+        }
+
+        // Voice sessions
+        const { data: voiceSessions } = await supabase
+          .from('voice_sessions')
+          .select('call_duration_seconds, created_at, call_status, conversation_summary')
+          .eq('lead_id', selectedLeadId)
+          .order('created_at', { ascending: true })
+
+        for (const vs of (voiceSessions || [])) {
+          const dur = vs.call_duration_seconds
+          const durStr = dur ? `${Math.floor(dur / 60)}m ${dur % 60}s` : ''
+          events.push({
+            type: 'voice_call',
+            channel: 'voice',
+            date: vs.created_at,
+            summary: `Voice call${durStr ? ` - ${durStr}` : ''}${vs.conversation_summary ? `, ${vs.conversation_summary.substring(0, 60)}` : ''}`,
+          })
+        }
+
+        // Sort chronologically
+        events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        setJourneyEvents(events)
+      } catch (err) {
+        console.error('[Journey] Error:', err)
+      } finally {
+        setJourneyLoading(false)
+      }
+    }
+    fetchJourney()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
@@ -1464,9 +1549,9 @@ export default function InboxPage() {
             }
             const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--accent-primary)', ring: 'var(--accent-primary)' }
 
-            // Channels from conversation
+            // Channels from distinct query (all channels lead has ever used)
             const conv = conversations.find(c => c.lead_id === selectedLeadId)
-            const channels = conv?.channels || []
+            const channels = leadChannels.length > 0 ? leadChannels : (conv?.channels || [])
 
             // Business snapshot fields
             const businessType = bconCtx.type || bconCtx.business_type || webCtx.choose_your_business_type || waCtx.choose_your_business_type || null
@@ -1475,14 +1560,24 @@ export default function InboxPage() {
             const hasWebsite = bconCtx.has_website ?? webCtx.do_you_have_a_website ?? waCtx.do_you_have_a_website ?? null
             const hasAI = bconCtx.has_ai ?? webCtx.are_you_currently_using_any_ai_systems ?? waCtx.are_you_currently_using_any_ai_systems ?? null
 
-            // Booking data — only show if date is today or in the future
+            // Booking data — separate upcoming vs past
             const rawBd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
+            const rawBt = leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time
             const today = new Date().toISOString().split('T')[0]
             const isUpcoming = rawBd && rawBd >= today
+            const isPast = rawBd && rawBd < today
             const bd = isUpcoming ? rawBd : null
-            const bt = isUpcoming ? (leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time) : null
+            const bt = isUpcoming ? rawBt : null
+            const pastBd = isPast ? rawBd : null
+            const pastBt = isPast ? rawBt : null
             const ml = isUpcoming ? (webCtx.booking_meet_link || waCtx.booking_meet_link) : null
             const bookingTitle = webCtx.booking_title || waCtx.booking_title || 'Discovery Call'
+
+            // Pipeline stats
+            const firstTouchpoint = leadDetails.first_touchpoint || null
+            const createdAt = leadDetails.created_at || leadDetails.timestamp || null
+            const totalInteractions = messages.length
+            const daysInPipeline = createdAt ? Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))) : null
 
             // Phone for action links (clean to digits)
             const rawPhone = leadDetails.phone || ''
@@ -1682,7 +1777,7 @@ export default function InboxPage() {
               </div>
             )}
 
-            {/* Section 5 -- Upcoming Events */}
+            {/* Section 5 -- Events (Upcoming + Past) */}
             <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
               <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
               {bd ? (
@@ -1710,6 +1805,96 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
+              )}
+              {pastBd && (
+                <>
+                  <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>Past Events</p>
+                  <div className="rounded-lg p-2 border" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)', opacity: 0.6 }}>
+                    <div className="flex items-center gap-2">
+                      <MdEvent size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(pastBd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        {pastBt && (() => {
+                          const tp = pastBt.toString().split(':')
+                          if (tp.length < 2) return `, ${pastBt}`
+                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                          if (isNaN(h) || isNaN(m)) return `, ${pastBt}`
+                          return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                        })()}
+                        {' — '}{bookingTitle}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Section 5b -- Pipeline Stats */}
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Pipeline</p>
+              <div className="grid grid-cols-3 gap-2">
+                {firstTouchpoint && (
+                  <div className="text-center">
+                    <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>First Touch</p>
+                    <p className="text-[11px] font-semibold capitalize" style={{ color: 'var(--text-secondary)' }}>{firstTouchpoint}</p>
+                    {createdAt && <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{new Date(createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>}
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>Messages</p>
+                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{totalInteractions}</p>
+                </div>
+                {daysInPipeline && (
+                  <div className="text-center">
+                    <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>Days</p>
+                    <p className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{daysInPipeline}d</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 5c -- Customer Journey Timeline */}
+            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                <MdTimeline size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                Journey
+              </p>
+              {journeyLoading ? (
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Loading...</p>
+              ) : journeyEvents.length === 0 ? (
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No activity yet</p>
+              ) : (
+                <div style={{ maxHeight: 200, overflowY: 'auto', scrollbarWidth: 'thin' }}>
+                  {journeyEvents.map((evt, i) => (
+                    <div key={i} className="flex gap-2" style={{ paddingBottom: 8, position: 'relative' }}>
+                      {/* Timeline line */}
+                      {i < journeyEvents.length - 1 && (
+                        <div style={{ position: 'absolute', left: 7, top: 16, bottom: 0, width: 1, background: 'rgba(255,255,255,0.08)' }} />
+                      )}
+                      {/* Channel icon dot */}
+                      <div className="flex-shrink-0 mt-0.5" style={{ width: 16, display: 'flex', justifyContent: 'center' }}>
+                        <ChannelIcon channel={evt.channel} size={10} active={true} />
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(evt.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </span>
+                          <span className="text-[8px] uppercase px-1 py-px rounded" style={{
+                            color: evt.type === 'booking' ? '#22c55e' : evt.type === 'voice_call' ? '#a855f7' : 'var(--text-muted)',
+                            background: evt.type === 'booking' ? 'rgba(34,197,94,0.15)' : evt.type === 'voice_call' ? 'rgba(168,85,247,0.15)' : 'var(--bg-tertiary)',
+                          }}>
+                            {evt.channel === 'whatsapp' ? 'WA' : evt.channel === 'voice' ? 'Voice' : evt.channel === 'web' ? 'Web' : evt.channel}
+                          </span>
+                        </div>
+                        <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                          {evt.summary}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
