@@ -409,8 +409,8 @@ async function executeSendMessage(task, waPhone, message) {
   if (within24h) {
     await sendWhatsApp(waPhone, message);
   } else {
-    await sendWhatsAppTemplate(waPhone, task.lead_name || 'there');
-    message = `[Template] Re-engagement sent to ${task.lead_name}`;
+    const templateUsed = await sendWhatsAppTemplate(waPhone, task);
+    message = `[Template: ${templateUsed}] Sent to ${task.lead_name}`;
   }
 
   // Log to conversations
@@ -485,8 +485,50 @@ async function sendWhatsApp(phone, message) {
 
 // ============================================
 // WHATSAPP SEND — Template (outside 24h window)
+// Routes to the correct template per task type.
 // ============================================
-async function sendWhatsAppTemplate(phone, leadName) {
+async function sendWhatsAppTemplate(phone, task) {
+  const leadName = task.lead_name || 'there';
+  const taskType = task.task_type || '';
+
+  // Pick template + parameters based on task type
+  let templateName;
+  let components;
+
+  if (taskType.includes('booking_reminder') || taskType === 'reminder_24h' || taskType === 'reminder_1h' || taskType === 'reminder_30m') {
+    templateName = 'bcon_booking_reminder';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+          { type: 'text', text: task.metadata?.booking_time || 'your scheduled time' },
+        ]
+      }
+    ];
+  } else if (taskType === 're_engage') {
+    templateName = 'bcon_reengagement';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+        ]
+      }
+    ];
+  } else {
+    // follow_up_24h, nudge_waiting, push_to_book, and any other type
+    templateName = 'bcon_followup';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+        ]
+      }
+    ];
+  }
+
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 
   const res = await fetch(url, {
@@ -501,26 +543,20 @@ async function sendWhatsAppTemplate(phone, leadName) {
       to: phone,
       type: 'template',
       template: {
-        name: WA_TEMPLATE_NAME,
+        name: templateName,
         language: { code: 'en' },
-        components: [
-          {
-            type: 'body',
-            parameters: [
-              { type: 'text', text: leadName || 'there' }
-            ]
-          }
-        ]
+        components,
       }
     })
   });
 
   if (!res.ok) {
     const errBody = await res.text();
-    throw new Error(`WhatsApp Template API error: ${res.status} ${errBody}`);
+    throw new Error(`WhatsApp Template API error (${templateName}): ${res.status} ${errBody}`);
   }
 
-  console.log(`[WhatsApp] Template sent to ${phone} (${WA_TEMPLATE_NAME})`);
+  console.log(`[WhatsApp] Template sent to ${phone} (${templateName})`);
+  return templateName;
 }
 
 // ============================================
