@@ -204,7 +204,7 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        // Send cached greeting instantly
+        // Send cached greeting instantly — context loads in background after
         if (greetingAudioChunks && ws.readyState === 1) {
           isSpeaking = true;
           await sendChunkedAudio(ws, greetingAudioChunks);
@@ -213,6 +213,16 @@ wss.on('connection', (ws, req) => {
         } else {
           console.log('No cached greeting, generating...');
           await speakToVobiz(ws, "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
+        }
+
+        // Load lead context in background (non-blocking, ready before first real response)
+        if (ws.leadId) {
+          loadLeadContext(ws.leadId).then(ctx => {
+            ws.leadContext = ctx;
+            console.log('Lead context loaded:', ctx.name, 'stage:', ctx.stage);
+          }).catch(err => {
+            console.error('Lead context fetch failed (continuing without):', err.message);
+          });
         }
       }
 
@@ -253,7 +263,7 @@ wss.on('connection', (ws, req) => {
                 }
 
                 if (transcript?.trim()) {
-                  const response = await getAIResponse(transcript, conversationHistory, detectedLanguage);
+                  const response = await getAIResponse(transcript, conversationHistory, detectedLanguage, ws.leadContext);
                   console.log(`AI Response: "${response}"`);
 
                   // Log both messages to Supabase
@@ -462,16 +472,81 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
 
 const SYSTEM_PROMPT = `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: English only. Max 10 to 12 words per response unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?" If someone asks if you can speak another language, say: Right now I only speak English, but I can still help you out. What do you need?`;
 
-async function getAIResponse(transcript, conversationHistory, detectedLanguage) {
+async function loadLeadContext(leadId) {
+  const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [] };
+
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('customer_name, email, phone, first_touchpoint, last_touchpoint, lead_stage, lead_score, unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (lead) {
+      ctx.name = lead.customer_name || null;
+      ctx.stage = lead.lead_stage || null;
+      ctx.score = lead.lead_score || null;
+      // Collect unique channels from touchpoints and unified_context keys
+      const touchpoints = new Set([lead.first_touchpoint, lead.last_touchpoint].filter(Boolean));
+      if (lead.unified_context) {
+        Object.keys(lead.unified_context).forEach(k => touchpoints.add(k));
+      }
+      ctx.channels = Array.from(touchpoints);
+    }
+  } catch (err) {
+    console.error('Lead context query error:', err.message);
+  }
+
+  try {
+    const { data: messages } = await supabase
+      .from('conversations')
+      .select('sender, content, channel, created_at')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messages && messages.length > 0) {
+      ctx.previousMessages = messages.reverse().map(m => ({
+        sender: m.sender,
+        content: (m.content || '').substring(0, 100),
+        channel: m.channel
+      }));
+    }
+  } catch (err) {
+    console.error('Lead messages query error:', err.message);
+  }
+
+  return ctx;
+}
+
+async function getAIResponse(transcript, conversationHistory, detectedLanguage, leadContext) {
   try {
     conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
+
+    // Build dynamic system prompt with lead context
+    let dynamicPrompt = SYSTEM_PROMPT;
+    if (leadContext) {
+      if (leadContext.name && leadContext.name !== 'Unknown') {
+        dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
+      }
+      if (leadContext.previousMessages && leadContext.previousMessages.length > 0) {
+        const recent = leadContext.previousMessages.slice(-5).map(m => `${m.sender}: ${m.content}`).join(' | ');
+        dynamicPrompt += ` This is a returning caller. Previous conversation summary: ${recent}. Reference past interactions naturally if relevant, like "Last time we talked about X".`;
+      }
+      if (leadContext.stage) {
+        dynamicPrompt += ` This lead is currently at stage: ${leadContext.stage}. Adjust your approach accordingly.`;
+      }
+      if (leadContext.channels && leadContext.channels.length > 1) {
+        dynamicPrompt += ` This person has also contacted us via ${leadContext.channels.join(', ')}. They are an active lead.`;
+      }
+    }
 
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 80,
-        system: SYSTEM_PROMPT,
+        system: dynamicPrompt,
         messages: conversationHistory,
       },
       {
