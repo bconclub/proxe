@@ -466,7 +466,6 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 80,
-        stream: true,
         system: SYSTEM_PROMPT,
         messages: conversationHistory,
       },
@@ -477,64 +476,15 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
           'Content-Type': 'application/json',
         },
         timeout: 3000,
-        responseType: 'stream',
       }
     );
 
-    // Stream tokens and return on first sentence boundary
-    let buffer = '';
-    let fullText = '';
-
-    const firstSentence = await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        response.data.destroy();
-        resolve(buffer.trim() || null);
-      }, 3000);
-
-      response.data.on('data', (chunk) => {
-        const lines = chunk.toString().split('\n');
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          try {
-            const event = JSON.parse(jsonStr);
-            if (event.type === 'content_block_delta' && event.delta?.text) {
-              buffer += event.delta.text;
-              fullText += event.delta.text;
-              // Check for sentence boundary: . ? ! followed by space+capital letter
-              // Skip abbreviations like A.I. U.S. (period after single uppercase letter)
-              // Only split once buffer has 40+ characters to avoid premature cuts
-              const sentenceMatch = buffer.length >= 40 && buffer.match(/^(.*?(?<![A-Z])[.?!])\s+(?=[A-Z])/);
-              if (sentenceMatch) {
-                clearTimeout(timeout);
-                response.data.destroy();
-                resolve(sentenceMatch[1].trim());
-                return;
-              }
-            }
-          } catch (e) {
-            // Skip unparseable lines
-          }
-        }
-      });
-
-      response.data.on('end', () => {
-        clearTimeout(timeout);
-        resolve(buffer.trim() || null);
-      });
-
-      response.data.on('error', (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-    });
-
-    if (firstSentence) {
-      conversationHistory.push({ role: 'assistant', content: firstSentence });
+    const aiText = response.data?.content?.[0]?.text?.trim() || null;
+    if (aiText) {
+      conversationHistory.push({ role: 'assistant', content: aiText });
     }
-    console.log('Streaming got first sentence:', firstSentence, '| full buffer:', fullText.substring(0, 80));
-    return firstSentence;
+    console.log('AI response:', aiText);
+    return aiText;
   } catch (err) {
     console.error('Claude error:', err.response?.status, JSON.stringify(err.response?.data || err.message));
     return null;
