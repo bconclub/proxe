@@ -3,6 +3,9 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const http = require('http');
 const axios = require('axios');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const app = express();
 app.use(express.json());
@@ -86,6 +89,13 @@ async function sendChunkedAudio(ws, chunks) {
   console.log('Sent', chunks.length, 'audio chunks to Vobiz');
 }
 
+function normalizePhone(phone) {
+  if (!phone) return null;
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  cleaned = cleaned.replace(/^\+91/, '').replace(/^91(?=\d{10}$)/, '');
+  return cleaned;
+}
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -99,6 +109,7 @@ wss.on('connection', (ws, req) => {
   let isSpeaking = false;
   let aiFailures = 0;
   let conversationHistory = [];
+  let callStartTime = null;
 
   ws.on('message', async (data) => {
     try {
@@ -106,10 +117,75 @@ wss.on('connection', (ws, req) => {
 
       if (msg.event === 'start') {
         callUUID = msg.start?.callId || msg.callId || 'unknown';
+        callStartTime = new Date();
         const streamId = msg.start?.streamId || null;
         ws.streamId = streamId;
         console.log(`Call started: ${callUUID}, streamId: ${streamId}`);
         console.log('Media format:', JSON.stringify(msg.start?.mediaFormat));
+        console.log('Vobiz start event keys:', JSON.stringify(msg.start));
+
+        // Create lead and voice session in Supabase
+        try {
+          const callerPhone = msg.start?.from || msg.start?.callerNumber || msg.start?.caller || null;
+          const normalizedPhone = normalizePhone(callerPhone);
+          console.log('Caller phone:', callerPhone, '-> normalized:', normalizedPhone);
+
+          if (normalizedPhone) {
+            // Upsert lead
+            const { data: existingLead } = await supabase
+              .from('all_leads')
+              .select('id, first_touchpoint')
+              .eq('customer_phone_normalized', normalizedPhone)
+              .eq('brand', 'bcon')
+              .maybeSingle();
+
+            let leadId;
+            if (existingLead) {
+              leadId = existingLead.id;
+              await supabase
+                .from('all_leads')
+                .update({ last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() })
+                .eq('id', leadId);
+              console.log('Updated existing lead:', leadId);
+            } else {
+              const { data: newLead } = await supabase
+                .from('all_leads')
+                .insert({
+                  phone: callerPhone,
+                  customer_phone_normalized: normalizedPhone,
+                  brand: 'bcon',
+                  first_touchpoint: 'voice',
+                  last_touchpoint: 'voice',
+                  last_interaction_at: new Date().toISOString(),
+                })
+                .select('id')
+                .single();
+              leadId = newLead?.id;
+              console.log('Created new lead:', leadId);
+            }
+
+            ws.leadId = leadId;
+
+            // Create voice session
+            if (leadId) {
+              const { error: sessErr } = await supabase
+                .from('voice_sessions')
+                .insert({
+                  lead_id: leadId,
+                  external_session_id: callUUID,
+                  customer_phone: callerPhone,
+                  customer_phone_normalized: normalizedPhone,
+                  call_status: 'in-progress',
+                  call_direction: 'inbound',
+                  brand: 'bcon',
+                });
+              if (sessErr) console.error('Voice session insert error:', sessErr.message);
+              else console.log('Voice session created for call:', callUUID);
+            }
+          }
+        } catch (dbErr) {
+          console.error('Supabase start error:', dbErr.message);
+        }
 
         // Send cached greeting instantly
         if (greetingAudioChunks && ws.readyState === 1) {
@@ -144,7 +220,7 @@ wss.on('connection', (ws, req) => {
         if (!isProcessing && audioBuffer.length > 0 && !silenceTimer) {
           silenceTimer = setTimeout(async () => {
             silenceTimer = null;
-            if (audioBuffer.length > 20) {
+            if (audioBuffer.length > 10) {
               isProcessing = true;
               const audio = Buffer.concat(audioBuffer);
               audioBuffer = [];
@@ -152,8 +228,23 @@ wss.on('connection', (ws, req) => {
               try {
                 const { transcript, language: detectedLanguage } = await sarvamSTT(audio);
                 console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
+                console.log('Detected language:', detectedLanguage, '-> TTS language:', detectedLanguage || 'en-IN');
 
                 if (transcript?.trim()) {
+                  // Log user message to Supabase
+                  if (ws.leadId) {
+                    try {
+                      await supabase.from('conversations').insert({
+                        lead_id: ws.leadId,
+                        channel: 'voice',
+                        sender: 'customer',
+                        content: transcript,
+                      });
+                    } catch (dbErr) {
+                      console.error('Supabase user msg error:', dbErr.message);
+                    }
+                  }
+
                   const response = await getAIResponse(transcript, conversationHistory, detectedLanguage);
                   console.log(`AI Response: "${response}"`);
                   if (response === null) {
@@ -167,6 +258,21 @@ wss.on('connection', (ws, req) => {
                     await speakToVobiz(ws, "I'm having a bit of trouble right now. Someone from our team will call you back shortly. Thank you for your patience.", detectedLanguage || 'en-IN');
                   } else {
                     aiFailures = 0;
+
+                    // Log assistant message to Supabase
+                    if (ws.leadId) {
+                      try {
+                        await supabase.from('conversations').insert({
+                          lead_id: ws.leadId,
+                          channel: 'voice',
+                          sender: 'agent',
+                          content: response,
+                        });
+                      } catch (dbErr) {
+                        console.error('Supabase agent msg error:', dbErr.message);
+                      }
+                    }
+
                     await speakToVobiz(ws, response, detectedLanguage || 'en-IN');
                   }
                 }
@@ -176,13 +282,28 @@ wss.on('connection', (ws, req) => {
                 isProcessing = false;
               }
             }
-          }, 1500);
+          }, 800);
         }
       }
 
       if (msg.event === 'stop') {
         console.log(`Call ended: ${callUUID}`);
         clearTimeout(silenceTimer);
+
+        // Update voice session with duration
+        if (callUUID && callStartTime) {
+          try {
+            const durationSecs = Math.round((Date.now() - callStartTime.getTime()) / 1000);
+            await supabase
+              .from('voice_sessions')
+              .update({ call_status: 'completed', call_duration_seconds: durationSecs, updated_at: new Date().toISOString() })
+              .eq('external_session_id', callUUID);
+            console.log(`Voice session ended: ${callUUID}, duration: ${durationSecs}s`);
+          } catch (dbErr) {
+            console.error('Supabase stop error:', dbErr.message);
+          }
+        }
+
         ws.close();
       }
 
@@ -191,9 +312,23 @@ wss.on('connection', (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', async () => {
     clearTimeout(silenceTimer);
     console.log(`Disconnected: ${callUUID}`);
+
+    // Fallback: update voice session if stop event was missed
+    if (callUUID && callStartTime) {
+      try {
+        const durationSecs = Math.round((Date.now() - callStartTime.getTime()) / 1000);
+        await supabase
+          .from('voice_sessions')
+          .update({ call_status: 'completed', call_duration_seconds: durationSecs, updated_at: new Date().toISOString() })
+          .eq('external_session_id', callUUID)
+          .eq('call_status', 'in-progress');
+      } catch (dbErr) {
+        console.error('Supabase close error:', dbErr.message);
+      }
+    }
   });
 });
 
