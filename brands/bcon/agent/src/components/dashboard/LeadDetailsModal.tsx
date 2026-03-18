@@ -468,6 +468,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   const loadUnifiedSummary = async (refresh = false) => {
     if (!lead) return
+    setUnifiedSummary('')
+    setSummaryAttribution('')
+    setSummaryData(null)
     setLoadingSummary(true)
     try {
       console.log('Loading unified summary for lead:', lead.id, { refresh })
