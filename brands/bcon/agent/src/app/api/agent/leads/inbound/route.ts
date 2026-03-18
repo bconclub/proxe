@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic'
  * Creates or updates a lead and schedules a first_outreach task.
  *
  * Auth: x-api-key header must match INBOUND_API_KEY env var.
- * Body: { name, phone, email?, source, campaign?, notes?, brand? }
+ * Body: { name, phone, email?, source, campaign?, notes?, brand?,
+ *         city?, brand_name?, urgency?, custom_fields? }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, phone, email, source, campaign, notes, brand } = body
+    const { name, phone, email, source, campaign, notes, brand, city, brand_name, urgency, custom_fields } = body
 
     if (!phone) {
       return NextResponse.json({ error: 'phone is required' }, { status: 400 })
@@ -45,10 +46,17 @@ export async function POST(request: NextRequest) {
     let leadId: string
     let isNew = false
 
+    // Build inbound context fields
+    const inboundContext: Record<string, any> = {}
+    if (city) inboundContext.city = city.trim()
+    if (brand_name) inboundContext.company = brand_name.trim()
+    if (urgency) inboundContext.urgency = urgency.trim()
+    if (custom_fields && typeof custom_fields === 'object') inboundContext.form_data = custom_fields
+
     // Check for existing lead
     const { data: existing } = await supabase
       .from('all_leads')
-      .select('id, customer_name')
+      .select('id, customer_name, unified_context')
       .eq('customer_phone_normalized', normalizedPhone)
       .maybeSingle()
 
@@ -60,6 +68,12 @@ export async function POST(request: NextRequest) {
       }
       if (email) updates.email = email.trim().toLowerCase()
       if (name && !existing.customer_name) updates.customer_name = name.trim()
+
+      // Merge inbound context into unified_context
+      if (Object.keys(inboundContext).length > 0) {
+        const existingCtx = existing.unified_context || {}
+        updates.unified_context = { ...existingCtx, ...inboundContext }
+      }
 
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
       leadId = existing.id
@@ -77,6 +91,7 @@ export async function POST(request: NextRequest) {
           last_touchpoint: leadSource,
           last_interaction_at: now,
           lead_stage: 'New',
+          ...(Object.keys(inboundContext).length > 0 ? { unified_context: inboundContext } : {}),
         })
         .select('id')
         .single()
@@ -118,6 +133,10 @@ export async function POST(request: NextRequest) {
         campaign: campaign || null,
         notes: notes || null,
         inbound: true,
+        city: city?.trim() || null,
+        brand_name: brand_name?.trim() || null,
+        urgency: urgency?.trim() || null,
+        custom_fields: custom_fields || null,
       },
       created_at: now,
     })
