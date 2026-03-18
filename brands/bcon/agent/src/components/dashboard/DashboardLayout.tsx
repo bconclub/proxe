@@ -19,6 +19,7 @@ import {
   MdMenu,
   MdLightMode,
   MdDarkMode,
+  MdPalette,
   MdChatBubbleOutline,
   MdMonitorHeart,
   MdMoreHoriz,
@@ -26,6 +27,7 @@ import {
   MdChecklist,
   MdViewKanban,
 } from 'react-icons/md'
+import { useTheme, type ThemeMode } from './ThemeProvider'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -69,7 +71,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(true)
+  const { theme, setTheme } = useTheme()
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
@@ -142,43 +144,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsCheckingAuth(false)
   }, [])
 
-  // Load collapsed state and theme from localStorage
+  // Load collapsed state from localStorage (theme is handled by ThemeProvider)
   useEffect(() => {
     try {
-      // Set theme immediately to prevent white screen
-      if (typeof document !== 'undefined') {
-        const savedTheme = localStorage.getItem('theme')
-        if (savedTheme) {
-          if (savedTheme === 'dark') {
-            document.documentElement.classList.add('dark')
-            document.documentElement.classList.remove('light')
-            setIsDarkMode(true)
-          } else {
-            document.documentElement.classList.add('light')
-            document.documentElement.classList.remove('dark')
-            setIsDarkMode(false)
-          }
-        } else {
-          // Default to dark mode
-          document.documentElement.classList.add('dark')
-          document.documentElement.classList.remove('light')
-          setIsDarkMode(true)
-        }
-      }
-
       const savedState = localStorage.getItem('sidebar-collapsed')
       if (savedState !== null) {
         setIsCollapsed(savedState === 'true')
       }
-      // Note: Don't set default collapsed state here - let auto-hide handle it after initial render
     } catch (error) {
       console.error('Error loading preferences:', error)
-      // Fallback to dark mode
-      if (typeof document !== 'undefined') {
-        document.documentElement.classList.add('dark')
-        document.documentElement.classList.remove('light')
-        setIsDarkMode(true)
-      }
     }
   }, [])
 
@@ -237,18 +211,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // No-op — sidebar stays open/closed via manual toggle only
   }
 
-  const toggleTheme = () => {
-    const newMode = !isDarkMode
-    setIsDarkMode(newMode)
-    localStorage.setItem('theme', newMode ? 'dark' : 'light')
-
-    if (newMode) {
-      document.documentElement.classList.add('dark')
-      document.documentElement.classList.remove('light')
-    } else {
-      document.documentElement.classList.add('light')
-      document.documentElement.classList.remove('dark')
-    }
+  const cycleTheme = () => {
+    const order: ThemeMode[] = ['bw-dark', 'bw-light', 'brand']
+    const idx = order.indexOf(theme)
+    setTheme(order[(idx + 1) % order.length])
   }
 
   // AUTHENTICATION DISABLED - Logout function disabled
@@ -619,7 +585,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <button
                     onClick={() => {
                       setMoreOptionsOpen(false)
-                      toggleTheme()
+                      cycleTheme()
                     }}
                     className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
                     style={{
@@ -632,15 +598,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    {isDarkMode ? (
-                      <>
-                        <MdLightMode size={18} style={{ marginRight: '12px' }} />
-                        Light Mode
-                      </>
-                    ) : (
+                    {theme === 'bw-dark' && (
                       <>
                         <MdDarkMode size={18} style={{ marginRight: '12px' }} />
-                        Dark Mode
+                        Dark
+                      </>
+                    )}
+                    {theme === 'bw-light' && (
+                      <>
+                        <MdLightMode size={18} style={{ marginRight: '12px' }} />
+                        Light
+                      </>
+                    )}
+                    {theme === 'brand' && (
+                      <>
+                        <MdPalette size={18} style={{ marginRight: '12px' }} />
+                        Brand
                       </>
                     )}
                   </button>

@@ -1,60 +1,102 @@
 'use client';
 
-import { useEffect } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
+
+export type ThemeMode = 'brand' | 'bw-dark' | 'bw-light';
+
+interface ThemeContextValue {
+  theme: ThemeMode;
+  setTheme: (mode: ThemeMode) => void;
+}
+
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: 'bw-dark',
+  setTheme: () => {},
+});
+
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
+const STORAGE_KEY = 'proxe-theme';
 
 export default function ThemeProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  useEffect(() => {
+  const [theme, setThemeState] = useState<ThemeMode>('bw-dark');
+
+  const applyTheme = useCallback((mode: ThemeMode) => {
+    const html = document.documentElement;
     const brandId = getCurrentBrandId();
     const config = getBrandConfig(brandId);
-    const color = config.colors.primary;
 
-    // Accent colors apply to both themes
-    document.documentElement.style.setProperty('--accent-primary', color);
-    document.documentElement.style.setProperty('--accent-light', color);
-    document.documentElement.style.setProperty('--accent-subtle', `${color}20`);
+    // Clear previous data-theme and dark/light classes
+    html.removeAttribute('data-theme');
+    html.classList.remove('dark', 'light');
 
-    // Apply theme-aware bg/border based on current mode
-    function applyThemeColors() {
-      const isDark = document.documentElement.classList.contains('dark');
-      if (isDark) {
-        document.documentElement.style.setProperty('--bg-primary', config.colors.primaryDark);
-        document.documentElement.style.setProperty('--bg-secondary', config.colors.primaryDark);
-        document.documentElement.style.setProperty('--border-primary', config.colors.borderColor);
-        document.documentElement.style.setProperty('--text-primary', '#ffffff');
-        document.documentElement.style.setProperty('--text-secondary', '#999999');
-        document.documentElement.style.setProperty('--bg-hover', '#1A1A1A');
-        document.documentElement.style.setProperty('--bg-tertiary', 'rgba(255, 255, 255, 0.02)');
-      } else {
-        // Light mode — explicitly set light values
-        document.documentElement.style.setProperty('--bg-primary', '#f6f6f6');
-        document.documentElement.style.setProperty('--bg-secondary', '#ffffff');
-        document.documentElement.style.setProperty('--border-primary', '#d0d0d0');
-        document.documentElement.style.setProperty('--text-primary', '#1a1a1a');
-        document.documentElement.style.setProperty('--text-secondary', '#666666');
-        document.documentElement.style.setProperty('--bg-hover', '#ececec');
-        document.documentElement.style.setProperty('--bg-tertiary', 'rgba(0, 0, 0, 0.02)');
-      }
+    if (mode === 'bw-dark') {
+      html.setAttribute('data-theme', 'bw-dark');
+      html.classList.add('dark');
+      html.style.setProperty('--accent-primary', '#ffffff');
+      html.style.setProperty('--accent-light', '#ffffff');
+      html.style.setProperty('--accent-subtle', 'rgba(255,255,255,0.1)');
+      html.style.setProperty('--bg-primary', '#000000');
+      html.style.setProperty('--bg-secondary', '#111111');
+      html.style.setProperty('--bg-tertiary', '#1a1a1a');
+      html.style.setProperty('--bg-hover', 'rgba(255,255,255,0.06)');
+      html.style.setProperty('--border-primary', 'rgba(255,255,255,0.1)');
+      html.style.setProperty('--text-primary', '#ffffff');
+      html.style.setProperty('--text-secondary', 'rgba(255,255,255,0.6)');
+    } else if (mode === 'bw-light') {
+      html.setAttribute('data-theme', 'bw-light');
+      html.classList.add('light');
+      html.style.setProperty('--accent-primary', '#000000');
+      html.style.setProperty('--accent-light', '#000000');
+      html.style.setProperty('--accent-subtle', 'rgba(0,0,0,0.08)');
+      html.style.setProperty('--bg-primary', '#ffffff');
+      html.style.setProperty('--bg-secondary', '#fafafa');
+      html.style.setProperty('--bg-tertiary', '#f2f2f2');
+      html.style.setProperty('--bg-hover', 'rgba(0,0,0,0.04)');
+      html.style.setProperty('--border-primary', 'rgba(0,0,0,0.1)');
+      html.style.setProperty('--text-primary', '#000000');
+      html.style.setProperty('--text-secondary', 'rgba(0,0,0,0.6)');
+    } else {
+      // 'brand' mode — original behavior
+      const color = config.colors.primary;
+      html.setAttribute('data-theme', `${brandId}-electric`);
+      html.classList.add('dark');
+      html.style.setProperty('--accent-primary', color);
+      html.style.setProperty('--accent-light', color);
+      html.style.setProperty('--accent-subtle', `${color}20`);
+      html.style.setProperty('--bg-primary', config.colors.primaryDark);
+      html.style.setProperty('--bg-secondary', config.colors.primaryDark);
+      html.style.setProperty('--bg-tertiary', 'rgba(255, 255, 255, 0.02)');
+      html.style.setProperty('--bg-hover', '#1A1A1A');
+      html.style.setProperty('--border-primary', config.colors.borderColor);
+      html.style.setProperty('--text-primary', '#ffffff');
+      html.style.setProperty('--text-secondary', '#999999');
     }
-
-    applyThemeColors();
-
-    // Watch for class changes on <html> to detect theme toggle
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.attributeName === 'class') {
-          applyThemeColors();
-        }
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true });
-
-    return () => observer.disconnect();
   }, []);
 
-  return <>{children}</>;
+  const setTheme = useCallback((mode: ThemeMode) => {
+    setThemeState(mode);
+    localStorage.setItem(STORAGE_KEY, mode);
+    applyTheme(mode);
+  }, [applyTheme]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+    const mode = saved && ['brand', 'bw-dark', 'bw-light'].includes(saved) ? saved : 'bw-dark';
+    setThemeState(mode);
+    applyTheme(mode);
+  }, [applyTheme]);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
