@@ -770,8 +770,12 @@ async function pollTelegramApprovals() {
 
   let updates;
   try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=0&limit=50&allowed_updates=["callback_query"]`;
-    const res = await fetch(url);
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offset, timeout: 0, limit: 50, allowed_updates: ['callback_query'] }),
+    });
     if (!res.ok) {
       console.error(`[TelegramPoll] getUpdates failed: ${res.status}`);
       return;
