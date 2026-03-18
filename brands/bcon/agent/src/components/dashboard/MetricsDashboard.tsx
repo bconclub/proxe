@@ -99,7 +99,7 @@ export default function MetricsDashboard({ detailed = false }: MetricsDashboardP
                     Avg Response Time
                   </dt>
                   <dd className="text-lg font-medium text-gray-900 dark:text-white">
-                    {metrics.avgResponseTime}m
+                    {metrics.avgResponseTime > 0 ? `${metrics.avgResponseTime}m` : 'No data'}
                   </dd>
                 </dl>
               </div>
