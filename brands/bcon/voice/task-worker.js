@@ -829,40 +829,25 @@ async function sendWhatsAppTemplate(phone, task) {
 
 // ============================================
 // HELPER: Create task if not already exists
-// Dedup: pending (any age) + completed (last 7 days only)
+// Dedup: ANY task with same task_type + lead_id in last 7 days (regardless of status)
 // ============================================
 async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata, initialStatus }) {
   const status = initialStatus || 'pending';
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Check for existing pending/queued task (any age)
-  let activeQuery = supabase
+  // Check for ANY existing task with same type + lead in last 7 days (regardless of status)
+  let dedupQuery = supabase
     .from('agent_tasks')
     .select('id')
     .eq('task_type', taskType)
-    .in('status', ['pending', 'queued'])
+    .gte('created_at', sevenDaysAgo)
     .limit(1);
 
-  if (leadId) activeQuery = activeQuery.eq('lead_id', leadId);
-  else activeQuery = activeQuery.eq('lead_phone', leadPhone);
+  if (leadId) dedupQuery = dedupQuery.eq('lead_id', leadId);
+  else dedupQuery = dedupQuery.eq('lead_phone', leadPhone);
 
-  const { data: activeExists } = await activeQuery;
-  if (activeExists && activeExists.length > 0) return;
-
-  // Check for recently completed task (last 7 days only)
-  let completedQuery = supabase
-    .from('agent_tasks')
-    .select('id')
-    .eq('task_type', taskType)
-    .eq('status', 'completed')
-    .gte('completed_at', sevenDaysAgo)
-    .limit(1);
-
-  if (leadId) completedQuery = completedQuery.eq('lead_id', leadId);
-  else completedQuery = completedQuery.eq('lead_phone', leadPhone);
-
-  const { data: recentCompleted } = await completedQuery;
-  if (recentCompleted && recentCompleted.length > 0) return;
+  const { data: existingTask } = await dedupQuery;
+  if (existingTask && existingTask.length > 0) return;
 
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: taskType,

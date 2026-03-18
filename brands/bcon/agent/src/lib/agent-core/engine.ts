@@ -613,13 +613,15 @@ function buildBookingTools(
       try {
         const bookingDT = parseBookingDateTime(date, time);
         if (bookingDT) {
-          const taskPhone = (bookingPhone || '').replace(/\D/g, '').slice(-10);
+          const lookupPhone = (bookingPhone || '').replace(/\D/g, '').slice(-10);
           const { data: taskLead } = await supabase
             .from('all_leads')
-            .select('id')
-            .eq('customer_phone_normalized', taskPhone)
+            .select('id, customer_phone_normalized')
+            .eq('customer_phone_normalized', lookupPhone)
             .maybeSingle();
           const taskLeadId = taskLead?.id || null;
+          // Always use the phone from the lead record, never from session/input
+          const taskPhone = taskLead?.customer_phone_normalized || lookupPhone;
 
           const reminders = [
             { type: 'booking_reminder_24h', offset: -24 * 60 * 60 * 1000, desc: 'Booking reminder: 24 hours before call' },
@@ -634,7 +636,7 @@ function buildBookingTools(
                 task_type: r.type,
                 task_description: `${r.desc} for ${bookingName}`,
                 lead_id: taskLeadId,
-                lead_phone: bookingPhone,
+                lead_phone: taskPhone,
                 lead_name: bookingName,
                 scheduled_at: scheduledTime.toISOString(),
                 status: 'pending',
@@ -840,7 +842,9 @@ function parseBookingDateTime(date: string, time: string): Date | null {
 }
 
 /**
- * Create a flow task in agent_tasks with dedup (pending + completed within 7 days)
+ * Create a flow task in agent_tasks with dedup.
+ * Checks for ANY existing task with same task_type + lead_id in the last 7 days,
+ * regardless of status (pending, completed, failed, queued, etc.).
  */
 async function createFlowTask(
   supabase: SupabaseClient,
@@ -856,28 +860,16 @@ async function createFlowTask(
 ): Promise<void> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Check for existing pending task (any age)
-  const { data: pendingExists } = await supabase
+  // Check for ANY existing task with same type + lead in last 7 days (regardless of status)
+  const { data: existingTask } = await supabase
     .from('agent_tasks')
     .select('id')
     .eq('task_type', params.taskType)
     .eq('lead_id', params.leadId)
-    .eq('status', 'pending')
+    .gte('created_at', sevenDaysAgo)
     .limit(1);
 
-  if (pendingExists && pendingExists.length > 0) return;
-
-  // Check for recently completed task (last 7 days)
-  const { data: recentCompleted } = await supabase
-    .from('agent_tasks')
-    .select('id')
-    .eq('task_type', params.taskType)
-    .eq('lead_id', params.leadId)
-    .eq('status', 'completed')
-    .gte('completed_at', sevenDaysAgo)
-    .limit(1);
-
-  if (recentCompleted && recentCompleted.length > 0) return;
+  if (existingTask && existingTask.length > 0) return;
 
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: params.taskType,
@@ -927,9 +919,8 @@ async function scheduleFlowTasks(
 
   const leadId = lead.id;
   const leadName = lead.customer_name || input.userProfile.name || 'Lead';
-  // Always use the actual input phone — it's the ground truth from the conversation.
-  // lead.customer_phone_normalized can diverge if the lead record was merged/overwritten.
-  const leadPhone = normalizedPhone;
+  // Always use the phone from the lead record — never from session metadata or input
+  const leadPhone = lead.customer_phone_normalized || normalizedPhone;
 
   // Flow A: If AI response ends with a question, schedule a nudge
   if (aiResponse.includes('?')) {
