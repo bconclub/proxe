@@ -43,7 +43,7 @@ interface Stats {
   successRate: number
 }
 
-type FilterTab = 'all' | 'reminders' | 'nudges' | 'follow_ups' | 'other'
+type FilterTab = 'all' | 'reminders' | 'nudges' | 'follow_ups' | 'other' | 'completed' | 'failed'
 
 // --- Type badge colors ---
 
@@ -149,6 +149,8 @@ function formatDate(dateStr: string | null): string {
 
 function matchesFilter(task: AgentTask, filter: FilterTab): boolean {
   if (filter === 'all') return true
+  if (filter === 'completed') return task.status === 'completed'
+  if (filter === 'failed') return task.status === 'failed' || task.status === 'failed_24h_window'
   if (filter === 'reminders') return task.task_type.includes('reminder') || task.task_type.includes('booking_reminder')
   if (filter === 'nudges') return task.task_type.includes('nudge') || task.task_type.includes('push_to_book')
   if (filter === 'follow_ups') return task.task_type.includes('follow') || task.task_type.includes('re_engage') || task.task_type.includes('post_booking')
@@ -360,7 +362,7 @@ export default function TasksPage() {
         <div style={{ flex: '3 1 400px', minWidth: 0 }}>
           {/* Filter Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {(['all', 'reminders', 'nudges', 'follow_ups', 'other'] as FilterTab[]).map((tab) => (
+            {(['all', 'reminders', 'nudges', 'follow_ups', 'other', 'completed', 'failed'] as FilterTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
