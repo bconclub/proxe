@@ -287,6 +287,10 @@ async function executeTask(task) {
   const waPhone = phone.length === 10 ? `91${phone}` : phone;
 
   switch (task.task_type) {
+    // ── Inbound lead outreach ──
+    case 'first_outreach':
+      return await executeFirstOutreach(task, waPhone);
+
     // ── Flow tasks (created by engine.ts) ──
     case 'nudge_waiting':
       return await executeNudgeWaiting(task, waPhone);
@@ -419,6 +423,40 @@ async function executeHumanCallback(task, waPhone) {
 
   return await executeSendMessage(task, waPhone,
     `Hey ${task.lead_name}, following up as promised. Got a few minutes to chat?`);
+}
+
+/**
+ * First outreach: new inbound lead from Facebook/Google/website/form.
+ * Send intro message, then schedule a nudge 2 hours later.
+ */
+async function executeFirstOutreach(task, waPhone) {
+  const result = await executeSendMessage(task, waPhone,
+    `Hey ${task.lead_name}, thanks for reaching out! We help businesses grow faster with smarter systems. What's the biggest challenge in your business right now?`);
+
+  // Schedule nudge_waiting 2 hours later
+  const { error } = await supabase.from('agent_tasks').insert({
+    task_type: 'nudge_waiting',
+    task_description: `Nudge: waiting for reply after first outreach to ${task.lead_name}`,
+    lead_id: task.lead_id || null,
+    lead_phone: task.lead_phone,
+    lead_name: task.lead_name,
+    status: 'pending',
+    scheduled_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    metadata: {
+      source: task.metadata?.source || 'inbound',
+      campaign: task.metadata?.campaign || null,
+      sequence: 'first_outreach',
+      step: 1,
+      total_steps: 4,
+      last_question: 'What\'s the biggest challenge in your business right now?',
+      prev_task_id: task.id,
+    },
+    created_at: new Date().toISOString(),
+  });
+  if (error) console.error(`[FirstOutreach] Failed to create nudge:`, error.message);
+  else console.log(`[FirstOutreach] Nudge scheduled for ${task.lead_name} in 2h`);
+
+  return result;
 }
 
 /**
@@ -682,7 +720,7 @@ async function sendWhatsAppTemplate(phone, task) {
         ]
       }
     ];
-  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
+  } else if (taskType === 'first_outreach' || taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
     templateName = 'bcon_proxe_followup';
     components = [
       {
