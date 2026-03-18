@@ -664,19 +664,35 @@ async function executePushToBook(task, waPhone) {
 
 /**
  * Send a message via Telegram Bot API.
+ * Optional reply_markup for inline keyboards.
  */
-async function sendTelegram(chatId, text) {
+async function sendTelegram(chatId, text, replyMarkup) {
   if (!TELEGRAM_BOT_TOKEN) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const payload = { chat_id: chatId, text, parse_mode: 'HTML' };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const errBody = await res.text();
     throw new Error(`Telegram API error: ${res.status} ${errBody}`);
   }
+}
+
+/**
+ * Acknowledge a Telegram callback query (removes the "loading" spinner on the button).
+ */
+async function answerCallbackQuery(callbackQueryId, text) {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+  }).catch(() => {});
 }
 
 /**
@@ -701,11 +717,15 @@ async function approvalGate(task, waPhone, message, isTemplate) {
       `Lead: ${task.lead_name} (${phone10})\n` +
       `Type: ${task.task_type}\n` +
       `Scheduled: ${scheduledAt}\n\n` +
-      `Message that will be sent:\n<i>${escapeHtml(msgPreview)}</i>\n\n` +
-      `/approve_${task.id}\n` +
-      `/reject_${task.id}`;
+      `Message that will be sent:\n<i>${escapeHtml(msgPreview)}</i>`;
+    const keyboard = {
+      inline_keyboard: [[
+        { text: 'Approve', callback_data: `approve_${task.id}` },
+        { text: 'Reject', callback_data: `reject_${task.id}` },
+      ]],
+    };
     try {
-      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body, keyboard);
       console.log(`[TelegramGate] Approval request sent for ${task.task_type} → ${task.lead_name}`);
     } catch (err) {
       console.error(`[TelegramGate] Failed to send approval request:`, err.message);
@@ -734,8 +754,8 @@ function escapeHtml(text) {
 }
 
 /**
- * Poll Telegram for /approve_{id} and /reject_{id} replies.
- * Uses getUpdates with offset to only fetch new messages since last check.
+ * Poll Telegram for inline keyboard button presses (callback_query updates).
+ * Uses getUpdates with offset to only fetch new updates since last check.
  * Persists offset to a file so it survives process restarts.
  */
 async function pollTelegramApprovals() {
@@ -750,7 +770,7 @@ async function pollTelegramApprovals() {
 
   let updates;
   try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=0&limit=50`;
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=0&limit=50&allowed_updates=["callback_query"]`;
     const res = await fetch(url);
     if (!res.ok) {
       console.error(`[TelegramPoll] getUpdates failed: ${res.status}`);
@@ -771,19 +791,24 @@ async function pollTelegramApprovals() {
   for (const update of updates) {
     if (update.update_id >= maxUpdateId) maxUpdateId = update.update_id + 1;
 
-    const text = update.message?.text || '';
-    const chatId = String(update.message?.chat?.id || '');
+    const callback = update.callback_query;
+    if (!callback) continue;
 
-    // Only process commands from the admin chat
+    const chatId = String(callback.message?.chat?.id || '');
+    const callbackData = callback.data || '';
+
+    // Only process button presses from the admin chat
     if (chatId !== String(TELEGRAM_ADMIN_CHAT_ID)) continue;
 
-    const approveMatch = text.match(/^\/approve_([a-f0-9-]+)/i);
-    const rejectMatch = text.match(/^\/reject_([a-f0-9-]+)/i);
+    const approveMatch = callbackData.match(/^approve_([a-f0-9-]+)/i);
+    const rejectMatch = callbackData.match(/^reject_([a-f0-9-]+)/i);
 
     if (approveMatch) {
+      await answerCallbackQuery(callback.id, 'Approving...');
       await handleTelegramApprove(approveMatch[1], chatId);
       processed++;
     } else if (rejectMatch) {
+      await answerCallbackQuery(callback.id, 'Rejecting...');
       await handleTelegramReject(rejectMatch[1], chatId);
       processed++;
     }
