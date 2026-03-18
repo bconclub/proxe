@@ -80,7 +80,25 @@ export async function GET(request: NextRequest) {
 
     console.log(`[tasks/route] Found ${pendingResult.data?.length || 0} pending, ${historyResult.data?.length || 0} history tasks`)
 
-    const tasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
+    const allTasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
+
+    // Enrich tasks with sequence info for frontend display
+    const SEQUENCE_LABELS: Record<string, string> = {
+      post_call: 'Post Call Sequence',
+      no_response: 'No Response Sequence',
+    }
+    const tasks = allTasks.map((t: any) => {
+      const seq = t.metadata?.sequence
+      const step = t.metadata?.step
+      const totalSteps = t.metadata?.total_steps || 4
+      if (seq && step != null) {
+        return {
+          ...t,
+          sequence_label: `Step ${step} of ${totalSteps} — ${SEQUENCE_LABELS[seq] || seq}`,
+        }
+      }
+      return t
+    })
 
     // Stats
     const todayStart = new Date()
@@ -88,13 +106,13 @@ export async function GET(request: NextRequest) {
     const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
 
     const completedToday = (historyResult.data || []).filter(
-      (t) => t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= todayStart
+      (t: any) => t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
     const failedToday = (historyResult.data || []).filter(
-      (t) => (t.status === 'failed' || t.status === 'failed_24h_window') && t.completed_at && new Date(t.completed_at) >= todayStart
+      (t: any) => (t.status === 'failed' || t.status === 'failed_24h_window') && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
-    const pendingCount = (pendingResult.data || []).filter((t) => t.status === 'pending').length
-    const queuedCount = (pendingResult.data || []).filter((t) => t.status === 'queued').length
+    const pendingCount = (pendingResult.data || []).filter((t: any) => t.status === 'pending').length
+    const queuedCount = (pendingResult.data || []).filter((t: any) => t.status === 'queued').length
     // "Firing Next Hour" = pending tasks with scheduled_at in the next 1 hour
     const firingNextHour = (pendingResult.data || []).filter(
       (t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) <= oneHourFromNow

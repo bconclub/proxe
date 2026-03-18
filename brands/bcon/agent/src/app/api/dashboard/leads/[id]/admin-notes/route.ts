@@ -139,6 +139,7 @@ export async function POST(
     const actions: string[] = []
     const leadPhone = lead.customer_phone_normalized || lead.phone?.replace(/\D/g, '').slice(-10) || null
     const leadName = lead.customer_name || 'Lead'
+    const now = new Date()
 
     // 5a. Callback / follow-up intent → create agent_tasks
     if (hasCallbackIntent(lowerNote)) {
@@ -155,7 +156,7 @@ export async function POST(
             status: 'pending',
             scheduled_at: scheduledAt.toISOString(),
             metadata: { source: 'admin_note' },
-            created_at: new Date().toISOString(),
+            created_at: now.toISOString(),
           })
         if (taskError) {
           console.error('[AdminNote] Failed to create callback task:', taskError.message)
@@ -165,8 +166,76 @@ export async function POST(
       }
     }
 
-    // 5b. "not interested" / "lost" / "dead lead" → Closed Lost
-    if (/not\s*interested|lost|dead\s*lead/.test(lowerNote)) {
+    // 5b. "spoke to" / "just called" / "had a call" → completed call, post-call followup
+    if (/spoke\s*to|just\s*called|had\s*a\s*call/.test(lowerNote)) {
+      await supabase
+        .from('all_leads')
+        .update({ last_touchpoint: 'voice', last_interaction_at: now.toISOString() })
+        .eq('id', leadId)
+      const { error: taskError } = await supabase
+        .from('agent_tasks')
+        .insert({
+          task_type: 'post_call_followup',
+          task_description: `Post-call follow-up: ${trimmedNote}`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+          metadata: { source: 'admin_note', sequence: 'post_call', step: 0 },
+          created_at: now.toISOString(),
+        })
+      if (!taskError) actions.push('post_call_followup_created')
+      else console.error('[AdminNote] Failed to create post_call_followup:', taskError.message)
+    }
+
+    // 5c. Name extraction: "it's [name]" / "name is [name]" / "his/her name is [name]"
+    const nameMatch = lowerNote.match(/(?:it'?s|(?:his|her|their)?\s*name\s*is)\s+([a-z][a-z\s]{1,30})/i)
+    if (nameMatch) {
+      const extractedName = trimmedNote.substring(
+        trimmedNote.toLowerCase().indexOf(nameMatch[1].toLowerCase()),
+        trimmedNote.toLowerCase().indexOf(nameMatch[1].toLowerCase()) + nameMatch[1].length
+      ).trim().replace(/\b\w/g, c => c.toUpperCase())
+      if (extractedName.length >= 2) {
+        await supabase
+          .from('all_leads')
+          .update({ customer_name: extractedName })
+          .eq('id', leadId)
+        actions.push(`name_updated:${extractedName}`)
+      }
+    }
+
+    // 5d. "not responding" / "not replying" / "no response" → follow-up sequence
+    if (/not\s*respond|not\s*reply|no\s*response/.test(lowerNote)) {
+      const sequenceSteps = [
+        { type: 'follow_up_day1', offsetMs: 24 * 60 * 60 * 1000, step: 1 },
+        { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000, step: 2 },
+        { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000, step: 3 },
+        { type: 're_engage', offsetMs: 7 * 24 * 60 * 60 * 1000, step: 4 },
+      ]
+      for (const s of sequenceSteps) {
+        await supabase.from('agent_tasks').insert({
+          task_type: s.type,
+          task_description: `Sequence step ${s.step}/4: ${s.type} for ${leadName}`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
+          metadata: { source: 'admin_note', sequence: 'no_response', step: s.step, total_steps: 4 },
+          created_at: now.toISOString(),
+        })
+      }
+      // Set lead stage to In Sequence
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: 'In Sequence' })
+        .eq('id', leadId)
+      actions.push('sequence_created:no_response:4_steps')
+    }
+
+    // 5e. "not interested" / "lost" / "dead lead" → Closed Lost
+    if (/not\s*interested|dead\s*lead/.test(lowerNote)) {
       await supabase
         .from('all_leads')
         .update({ lead_stage: 'Closed Lost', stage_override: true })
@@ -174,7 +243,7 @@ export async function POST(
       actions.push('stage_updated:Closed Lost')
     }
 
-    // 5c. "converted" / "signed" / "closed won" / "deal done" → Converted
+    // 5f. "converted" / "signed" / "closed won" / "deal done" → Converted
     if (/converted|signed|closed\s*won|deal\s*done/.test(lowerNote)) {
       await supabase
         .from('all_leads')

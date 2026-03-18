@@ -301,6 +301,8 @@ async function executeTask(task) {
         `${task.lead_name}, your call starts in 30 minutes. Talk soon!`);
     case 'post_booking_followup':
       return await executePostBookingFollowup(task, waPhone);
+    case 'post_call_followup':
+      return await executePostBookingFollowup(task, waPhone);
     case 'push_to_book':
       return await executePushToBook(task, waPhone);
 
@@ -329,7 +331,20 @@ async function executeTask(task) {
     case 'follow_up_24h':
       return await executeSendMessage(task, waPhone,
         `Hey ${task.lead_name}! Just checking in — did you get a chance to think about what we discussed? Happy to answer any questions about setting up AI for your business.`);
+    case 'follow_up_day1':
+      return await executeSequenceStep(task, waPhone,
+        `${task.lead_name}, following up on our call. Let me know if you have any questions.`);
+    case 'follow_up_day3':
+      return await executeSequenceStep(task, waPhone,
+        `${task.lead_name}, just checking in. Would love to help get things moving for your business.`);
+    case 'follow_up_day5':
+      return await executeSequenceStep(task, waPhone,
+        `${task.lead_name}, haven't heard back. Still interested in growing your business faster? Last chance to grab that free Brand Audit.`);
     case 're_engage':
+      if (task.metadata?.sequence) {
+        return await executeSequenceStep(task, waPhone,
+          `${task.lead_name}, looks like the timing might not be right. No worries. Whenever you're ready, just reply here and we'll pick it up.`);
+      }
       return await executeSendMessage(task, waPhone,
         `Hi ${task.lead_name}! It's been a while since we connected. We've been building some exciting AI solutions for businesses like yours. Would love to catch up — what's a good time this week?`);
     case 'post_booking_confirmation':
@@ -408,10 +423,108 @@ async function executeHumanCallback(task, waPhone) {
 
 /**
  * Post-booking follow-up: check if booking happened and send check-in.
+ * Also starts post_call sequence if from admin note.
  */
 async function executePostBookingFollowup(task, waPhone) {
-  return await executeSendMessage(task, waPhone,
+  const result = await executeSendMessage(task, waPhone,
     `Hey ${task.lead_name}! How did the call go? Anything else you need from us?`);
+  // If this is a post_call sequence step 0, schedule next step
+  if (task.metadata?.sequence === 'post_call') {
+    await scheduleNextSequenceStep(task, 'follow_up_day1', 1, 24 * 60 * 60 * 1000, 'post_call');
+  }
+  return result;
+}
+
+/**
+ * Execute a sequence step: check if lead responded → cancel remaining if yes, send if no.
+ */
+async function executeSequenceStep(task, waPhone, message) {
+  const sequence = task.metadata?.sequence;
+  const step = task.metadata?.step || 0;
+
+  // Smart check: did the lead respond since the sequence started?
+  if (task.lead_id) {
+    const { data: recentMsg } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .eq('sender', 'customer')
+      .gt('created_at', task.created_at)
+      .limit(1);
+
+    if (recentMsg && recentMsg.length > 0) {
+      // Lead responded — cancel all remaining sequence tasks
+      if (sequence) await cancelSequenceTasks(task.lead_id, sequence);
+      return { skipped: true, reason: `Lead responded — cancelled ${sequence} sequence` };
+    }
+  }
+
+  // Send the message
+  const result = await executeSendMessage(task, waPhone, message);
+
+  // Schedule next step based on current task type
+  if (task.task_type === 'follow_up_day1') {
+    await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence);
+  } else if (task.task_type === 'follow_up_day3') {
+    await scheduleNextSequenceStep(task, 'follow_up_day5', 3, 2 * 24 * 60 * 60 * 1000, sequence);
+  } else if (task.task_type === 'follow_up_day5') {
+    // Escalate: mark lead as Cold
+    if (task.lead_id) {
+      await supabase.from('all_leads').update({ lead_stage: 'Cold' }).eq('id', task.lead_id);
+      console.log(`[Sequence] Lead ${task.lead_name} marked as Cold`);
+    }
+    await scheduleNextSequenceStep(task, 're_engage', 4, 2 * 24 * 60 * 60 * 1000, sequence);
+  } else if (task.task_type === 're_engage' && step === 4) {
+    // Final step — mark as Closed Lost
+    if (task.lead_id) {
+      await supabase.from('all_leads').update({ lead_stage: 'Closed Lost', stage_override: true }).eq('id', task.lead_id);
+      console.log(`[Sequence] Lead ${task.lead_name} marked as Closed Lost — sequence complete`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Schedule the next step in a sequence.
+ */
+async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, sequence) {
+  const { error } = await supabase.from('agent_tasks').insert({
+    task_type: nextType,
+    task_description: `Sequence step ${nextStep}/4: ${nextType} for ${task.lead_name}`,
+    lead_id: task.lead_id || null,
+    lead_phone: task.lead_phone,
+    lead_name: task.lead_name,
+    status: 'pending',
+    scheduled_at: new Date(Date.now() + delayMs).toISOString(),
+    metadata: { ...task.metadata, sequence: sequence || 'post_call', step: nextStep, total_steps: 4, prev_task_id: task.id },
+    created_at: new Date().toISOString(),
+  });
+  if (error) console.error(`[Sequence] Failed to create ${nextType}:`, error.message);
+  else console.log(`[Sequence] Created ${nextType} (step ${nextStep}) for ${task.lead_name}`);
+}
+
+/**
+ * Cancel all pending sequence tasks for a lead.
+ */
+async function cancelSequenceTasks(leadId, sequence) {
+  const { data: tasks, error } = await supabase
+    .from('agent_tasks')
+    .select('id, task_type')
+    .eq('lead_id', leadId)
+    .eq('status', 'pending')
+    .filter('metadata->>sequence', 'eq', sequence);
+
+  if (error || !tasks || tasks.length === 0) return;
+
+  for (const t of tasks) {
+    await supabase.from('agent_tasks').update({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+      error_message: 'Lead responded — sequence cancelled',
+    }).eq('id', t.id);
+  }
+  console.log(`[Sequence] Cancelled ${tasks.length} remaining ${sequence} tasks for lead ${leadId}`);
 }
 
 /**
@@ -560,6 +673,16 @@ async function sendWhatsAppTemplate(phone, task) {
       }
     ];
   } else if (taskType === 'human_callback') {
+    templateName = 'bcon_proxe_followup';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+        ]
+      }
+    ];
+  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
     templateName = 'bcon_proxe_followup';
     components = [
       {
