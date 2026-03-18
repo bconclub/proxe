@@ -303,10 +303,11 @@ async function executeTask(task) {
     case 'booking_reminder_30m':
       return await executeSendMessage(task, waPhone,
         `${task.lead_name}, your call starts in 30 minutes. Talk soon!`);
-    case 'post_booking_followup':
-      return await executePostBookingFollowup(task, waPhone);
     case 'post_call_followup':
       return await executePostBookingFollowup(task, waPhone);
+    case 'missed_call_followup':
+      return await executeSendMessage(task, waPhone,
+        `Hey ${task.lead_name}! We tried reaching you for your scheduled call but couldn't connect. No worries — when's a good time to reschedule?`);
     case 'push_to_book':
       return await executePushToBook(task, waPhone);
 
@@ -749,7 +750,7 @@ async function sendWhatsAppTemplate(phone, task) {
         ]
       }
     ];
-  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
+  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup' || taskType === 'missed_call_followup') {
     templateName = 'bcon_proxe_followup';
     components = [
       {

@@ -189,6 +189,59 @@ export async function POST(
       else console.error('[AdminNote] Failed to create post_call_followup:', taskError.message)
     }
 
+    // 5b2. "no show" / "didnt show" / "didn't show" / "no answer" / "didnt pick up" / "didn't pick up"
+    //      → missed call followup (immediate) + follow-up sequence (day 1, 3, 5, 7)
+    if (/no\s*show|didn'?t\s*show|no\s*answer|didn'?t\s*pick\s*up/.test(lowerNote)) {
+      // Cancel any remaining booking reminder tasks for this lead
+      await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString() })
+        .eq('lead_id', leadId)
+        .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+        .in('status', ['pending', 'queued'])
+
+      // Create immediate missed_call_followup
+      const { error: missedErr } = await supabase.from('agent_tasks').insert({
+        task_type: 'missed_call_followup',
+        task_description: `Missed call follow-up: ${trimmedNote}`,
+        lead_id: leadId,
+        lead_phone: leadPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: now.toISOString(),
+        metadata: { source: 'admin_note', sequence: 'no_show', step: 0 },
+        created_at: now.toISOString(),
+      })
+      if (!missedErr) actions.push('missed_call_followup_created')
+      else console.error('[AdminNote] Failed to create missed_call_followup:', missedErr.message)
+
+      // Schedule follow-up sequence (day 1, 3, 5, 7)
+      const noShowSequence = [
+        { type: 'follow_up_day1', offsetMs: 1 * 24 * 60 * 60 * 1000, step: 1 },
+        { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000, step: 2 },
+        { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000, step: 3 },
+        { type: 're_engage', offsetMs: 7 * 24 * 60 * 60 * 1000, step: 4 },
+      ]
+      for (const s of noShowSequence) {
+        await supabase.from('agent_tasks').insert({
+          task_type: s.type,
+          task_description: `Sequence step ${s.step}/4: ${s.type} for ${leadName} (no-show)`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
+          metadata: { source: 'admin_note', sequence: 'no_show', step: s.step, total_steps: 4 },
+          created_at: now.toISOString(),
+        })
+      }
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: 'In Sequence' })
+        .eq('id', leadId)
+      actions.push('sequence_created:no_show:4_steps')
+    }
+
     // 5c. Name extraction: "it's [name]" / "name is [name]" / "his/her name is [name]"
     const nameMatch = lowerNote.match(/(?:it'?s|(?:his|her|their)?\s*name\s*is)\s+([a-z][a-z\s]{1,30})/i)
     if (nameMatch) {
