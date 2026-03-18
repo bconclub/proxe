@@ -969,6 +969,23 @@ export default function InboxPage() {
     })
   }
 
+  function formatDateSeparator(timestamp: string) {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 86400000)
+    const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+    if (msgDate.getTime() === today.getTime()) return 'Today'
+    if (msgDate.getTime() === yesterday.getTime()) return 'Yesterday'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  function getDateKey(timestamp: string) {
+    const d = new Date(timestamp)
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  }
+
   // Filter conversations by search
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true
@@ -1253,9 +1270,23 @@ export default function InboxPage() {
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>No messages yet</div>
               ) : (
                 messages.map((msg, msgIdx) => {
+                  // Date separator between messages from different days
+                  const showDateSeparator = msgIdx === 0 ||
+                    getDateKey(msg.created_at) !== getDateKey(messages[msgIdx - 1].created_at);
+
                   // Check if this is a form data message (first customer message with form fields)
                   const isCustomer = msg.sender === 'customer';
                   const formData = isCustomer ? parseFormFields(msg.content) : null;
+
+                  const dateSeparator = showDateSeparator ? (
+                    <div className="flex items-center gap-3 my-2" key={`date-${msg.id}`}>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                      <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateSeparator(msg.created_at)}
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                    </div>
+                  ) : null;
 
                   if (formData) {
                     // Render as compact form data card
@@ -1268,7 +1299,9 @@ export default function InboxPage() {
                     const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
 
                     return (
-                      <div key={msg.id} className="flex justify-start">
+                      <React.Fragment key={msg.id}>
+                      {dateSeparator}
+                      <div className="flex justify-start">
                         <div
                           className="max-w-[90%] rounded-lg px-3 py-2 border"
                           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
@@ -1310,13 +1343,15 @@ export default function InboxPage() {
                           )}
                         </div>
                       </div>
+                      </React.Fragment>
                     );
                   }
 
                   // Regular message bubble
                   return (
+                    <React.Fragment key={msg.id}>
+                    {dateSeparator}
                     <div
-                      key={msg.id}
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
@@ -1348,6 +1383,7 @@ export default function InboxPage() {
                         </div>
                       </div>
                     </div>
+                    </React.Fragment>
                   );
                 })
               )}

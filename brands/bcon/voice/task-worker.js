@@ -229,6 +229,23 @@ async function processPendingTasks() {
 
   for (const task of tasks) {
     try {
+      // Quiet hours: 9 PM – 9 AM IST — reschedule to 9 AM IST next morning
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const hourIST = nowIST.getHours();
+      if (hourIST >= 21 || hourIST < 9) {
+        const nextMorning = new Date(nowIST);
+        if (hourIST >= 21) nextMorning.setDate(nextMorning.getDate() + 1);
+        nextMorning.setHours(9, 0, 0, 0);
+        // Convert back to UTC for storage
+        const offsetMs = nextMorning.getTime() - new Date().getTime() + (new Date().getTime() - nowIST.getTime());
+        const scheduledUtc = new Date(Date.now() + (nextMorning.getTime() - nowIST.getTime()));
+        await supabase.from('agent_tasks').update({
+          scheduled_at: scheduledUtc.toISOString(),
+        }).eq('id', task.id);
+        console.log(`[ProcessTasks] Quiet hours — rescheduled to 9 AM IST: ${task.task_type} for ${task.lead_name}`);
+        continue;
+      }
+
       const result = await executeTask(task);
 
       // If task was skipped (e.g. lead already responded), mark completed with note
