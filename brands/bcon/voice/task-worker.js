@@ -8,19 +8,28 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const WA_TOKEN = process.env.META_WHATSAPP_ACCESS_TOKEN;
 const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
-const ADMIN_NOTIFY_PHONE = process.env.ADMIN_NOTIFY_PHONE || null;
-const APPROVAL_MODE = process.env.APPROVAL_MODE || 'notify'; // 'notify' or 'approve'
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
+const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
+const APPROVAL_MODE = process.env.APPROVAL_MODE || 'approve'; // 'notify' or 'approve'
+
+// File to persist Telegram getUpdates offset across runs
+const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
 
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
 
   try {
+    // Process any Telegram approve/reject replies before processing new tasks
+    await pollTelegramApprovals();
+
     await createBookingReminderTasks();
     await createFollowUpTasks();
     await createColdLeadTasks();
@@ -463,8 +472,8 @@ async function executeHumanCallback(task, waPhone) {
  * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
-  // Admin approval gate — check before sending template to lead
-  const gateResult = await notifyAdmin(task, waPhone, `[First outreach template to ${task.lead_name}]`, true);
+  // Telegram approval gate — check before sending template to lead
+  const gateResult = await approvalGate(task, waPhone, `[First outreach template to ${task.lead_name}]`, true);
   if (gateResult?.awaiting_approval) return gateResult;
 
   // Always send template directly — new leads have no 24h window
@@ -650,54 +659,269 @@ async function executePushToBook(task, waPhone) {
 }
 
 // ============================================
-// MESSAGE SENDING (with 24h window check + admin approval gate)
+// TELEGRAM APPROVAL GATE
 // ============================================
 
 /**
- * Send admin notification about a task firing.
- * In 'notify' mode: sends heads-up, then message goes to lead normally.
- * In 'approve' mode: sends preview only, message is held until approved.
+ * Send a message via Telegram Bot API.
  */
-async function notifyAdmin(task, waPhone, message, isTemplate) {
-  if (!ADMIN_NOTIFY_PHONE) return null;
+async function sendTelegram(chatId, text) {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Telegram API error: ${res.status} ${errBody}`);
+  }
+}
+
+/**
+ * Telegram approval gate — runs before any message is sent to a lead.
+ *
+ * 'approve' mode: sends preview to Telegram, blocks the send, returns awaiting_approval.
+ * 'notify' mode: sends heads-up to Telegram, lets the send proceed.
+ * If Telegram is not configured, lets the send proceed silently.
+ */
+async function approvalGate(task, waPhone, message, isTemplate) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return null;
 
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-  const msgPreview = isTemplate
-    ? `[Template to ${task.lead_name}]`
-    : message;
+  const msgPreview = isTemplate ? `[Template to ${task.lead_name}]` : message;
+  const scheduledAt = task.scheduled_at
+    ? new Date(task.scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+    : 'now';
 
   if (APPROVAL_MODE === 'approve') {
-    const body = `PROXE NEEDS APPROVAL\nLead: ${task.lead_name} (${phone10})\nType: ${task.task_type}\nMessage: ${msgPreview}\nReply YES to approve`;
+    const body =
+      `<b>PROXE APPROVAL NEEDED</b>\n\n` +
+      `Lead: ${task.lead_name} (${phone10})\n` +
+      `Type: ${task.task_type}\n` +
+      `Scheduled: ${scheduledAt}\n\n` +
+      `Message that will be sent:\n<i>${escapeHtml(msgPreview)}</i>\n\n` +
+      `/approve_${task.id}\n` +
+      `/reject_${task.id}`;
     try {
-      await sendWhatsApp(ADMIN_NOTIFY_PHONE, body);
-      console.log(`[AdminGate] Approval request sent for ${task.task_type} → ${task.lead_name}`);
+      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+      console.log(`[TelegramGate] Approval request sent for ${task.task_type} → ${task.lead_name}`);
     } catch (err) {
-      console.error(`[AdminGate] Failed to send approval request:`, err.message);
+      console.error(`[TelegramGate] Failed to send approval request:`, err.message);
     }
     return { awaiting_approval: true, message_preview: msgPreview };
   }
 
-  // 'notify' mode — send heads-up, don't block
-  const body = `PROXE TASK FIRING\nLead: ${task.lead_name} (${phone10})\nType: ${task.task_type}\nMessage: ${msgPreview}\nStatus: SENT`;
+  // 'notify' mode — send heads-up to Telegram, don't block
+  const body =
+    `<b>PROXE TASK FIRING</b>\n\n` +
+    `Lead: ${task.lead_name} (${phone10})\n` +
+    `Type: ${task.task_type}\n` +
+    `Scheduled: ${scheduledAt}\n\n` +
+    `Message:\n<i>${escapeHtml(msgPreview)}</i>\n\n` +
+    `Status: SENT`;
   try {
-    await sendWhatsApp(ADMIN_NOTIFY_PHONE, body);
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
   } catch (err) {
-    // Don't block the actual send if admin notify fails
-    console.error(`[AdminGate] Failed to notify admin:`, err.message);
+    console.error(`[TelegramGate] Failed to notify:`, err.message);
   }
   return null;
 }
 
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Poll Telegram for /approve_{id} and /reject_{id} replies.
+ * Uses getUpdates with offset to only fetch new messages since last check.
+ * Persists offset to a file so it survives process restarts.
+ */
+async function pollTelegramApprovals() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  let offset = 0;
+  try {
+    if (fs.existsSync(TELEGRAM_OFFSET_FILE)) {
+      offset = parseInt(fs.readFileSync(TELEGRAM_OFFSET_FILE, 'utf8').trim(), 10) || 0;
+    }
+  } catch (_) {}
+
+  let updates;
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=0&limit=50`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`[TelegramPoll] getUpdates failed: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+    updates = data.result || [];
+  } catch (err) {
+    console.error(`[TelegramPoll] Error fetching updates:`, err.message);
+    return;
+  }
+
+  if (updates.length === 0) return;
+
+  let maxUpdateId = offset;
+  let processed = 0;
+
+  for (const update of updates) {
+    if (update.update_id >= maxUpdateId) maxUpdateId = update.update_id + 1;
+
+    const text = update.message?.text || '';
+    const chatId = String(update.message?.chat?.id || '');
+
+    // Only process commands from the admin chat
+    if (chatId !== String(TELEGRAM_ADMIN_CHAT_ID)) continue;
+
+    const approveMatch = text.match(/^\/approve_([a-f0-9-]+)/i);
+    const rejectMatch = text.match(/^\/reject_([a-f0-9-]+)/i);
+
+    if (approveMatch) {
+      await handleTelegramApprove(approveMatch[1], chatId);
+      processed++;
+    } else if (rejectMatch) {
+      await handleTelegramReject(rejectMatch[1], chatId);
+      processed++;
+    }
+  }
+
+  // Persist offset
+  try {
+    fs.writeFileSync(TELEGRAM_OFFSET_FILE, String(maxUpdateId));
+  } catch (err) {
+    console.error(`[TelegramPoll] Failed to save offset:`, err.message);
+  }
+
+  if (processed > 0) {
+    console.log(`[TelegramPoll] Processed ${processed} approval commands`);
+  }
+}
+
+/**
+ * Handle /approve_{task_id}: fetch task, send the WhatsApp message, mark completed.
+ */
+async function handleTelegramApprove(taskId, chatId) {
+  const { data: task, error } = await supabase
+    .from('agent_tasks')
+    .select('*')
+    .eq('id', taskId)
+    .maybeSingle();
+
+  if (error || !task) {
+    await sendTelegram(chatId, `Task ${taskId} not found.`).catch(() => {});
+    return;
+  }
+
+  if (task.status !== 'awaiting_approval') {
+    await sendTelegram(chatId, `Task already ${task.status}.`).catch(() => {});
+    return;
+  }
+
+  try {
+    // Re-resolve phone (same logic as executeTask)
+    let phone = task.lead_phone?.replace(/\D/g, '');
+    if (task.lead_id) {
+      const { data: freshLead } = await supabase
+        .from('all_leads')
+        .select('customer_phone_normalized')
+        .eq('id', task.lead_id)
+        .maybeSingle();
+      if (freshLead?.customer_phone_normalized) {
+        phone = freshLead.customer_phone_normalized.replace(/\D/g, '');
+      }
+    }
+    if (!phone) throw new Error('No phone number');
+    const waPhone = phone.length === 10 ? `91${phone}` : phone;
+
+    // Send the actual WhatsApp message (stored in error_message as message_preview)
+    const message = task.error_message || `Hey ${task.lead_name}, following up!`;
+    const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
+
+    if (within24h) {
+      await sendWhatsApp(waPhone, message);
+    } else {
+      await sendWhatsAppTemplate(waPhone, task);
+    }
+
+    // Log to conversations
+    if (task.lead_id) {
+      await supabase.from('conversations').insert({
+        lead_id: task.lead_id,
+        channel: 'whatsapp',
+        sender: 'agent',
+        content: message,
+        message_type: 'text',
+        metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, approved_via: 'telegram' },
+      });
+    }
+
+    await supabase.from('agent_tasks').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      error_message: null,
+    }).eq('id', taskId);
+
+    await sendTelegram(chatId, `Approved. Sent to ${task.lead_name}.`).catch(() => {});
+    console.log(`[TelegramApprove] Sent ${task.task_type} to ${task.lead_name}`);
+  } catch (err) {
+    await supabase.from('agent_tasks').update({
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      error_message: err.message,
+    }).eq('id', taskId);
+    await sendTelegram(chatId, `Approved but send failed: ${err.message}`).catch(() => {});
+    console.error(`[TelegramApprove] Send failed for ${task.lead_name}:`, err.message);
+  }
+}
+
+/**
+ * Handle /reject_{task_id}: cancel the task.
+ */
+async function handleTelegramReject(taskId, chatId) {
+  const { data: task, error } = await supabase
+    .from('agent_tasks')
+    .select('id, status, lead_name, task_type')
+    .eq('id', taskId)
+    .maybeSingle();
+
+  if (error || !task) {
+    await sendTelegram(chatId, `Task ${taskId} not found.`).catch(() => {});
+    return;
+  }
+
+  if (task.status !== 'awaiting_approval') {
+    await sendTelegram(chatId, `Task already ${task.status}.`).catch(() => {});
+    return;
+  }
+
+  await supabase.from('agent_tasks').update({
+    status: 'cancelled',
+    completed_at: new Date().toISOString(),
+    error_message: 'Rejected via Telegram',
+  }).eq('id', taskId);
+
+  await sendTelegram(chatId, `Rejected. ${task.task_type} for ${task.lead_name} cancelled.`).catch(() => {});
+  console.log(`[TelegramReject] Cancelled ${task.task_type} for ${task.lead_name}`);
+}
+
+// ============================================
+// MESSAGE SENDING (with 24h window check + approval gate)
+// ============================================
+
 /**
  * Send a message via WhatsApp. Checks 24h window first.
  * Falls back to template message if outside window.
- * Runs through admin approval gate before sending.
+ * Runs through Telegram approval gate before sending.
  */
 async function executeSendMessage(task, waPhone, message) {
   const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
 
-  // Admin approval gate — check before sending anything to the lead
-  const gateResult = await notifyAdmin(task, waPhone, message, !within24h);
+  // Telegram approval gate — check before sending anything to the lead
+  const gateResult = await approvalGate(task, waPhone, message, !within24h);
   if (gateResult?.awaiting_approval) return gateResult;
 
   if (within24h) {
