@@ -238,6 +238,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showAdminNotes, setShowAdminNotes] = useState(false)
   const recognitionRef = useRef<any>(null)
 
+  // Log a Call state
+  const [showLogCallForm, setShowLogCallForm] = useState(false)
+  const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
+  const [logCallNotes, setLogCallNotes] = useState('')
+  const [savingLogCall, setSavingLogCall] = useState(false)
+
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
     if (!lead) return
@@ -855,6 +861,31 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  const handleLogCall = async () => {
+    if (!lead) return
+    setSavingLogCall(true)
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome: logCallOutcome, notes: logCallNotes.trim() || undefined }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to log call')
+      }
+      setShowLogCallForm(false)
+      setLogCallOutcome('Connected')
+      setLogCallNotes('')
+      loadActivities()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error logging call:', err)
+    } finally {
+      setSavingLogCall(false)
+    }
+  }
+
   const toggleVoiceDictation = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Voice dictation is not supported in this browser.')
@@ -1152,7 +1183,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
                   )}
                   <button
-                    onClick={() => setShowAdminNoteInput(!showAdminNoteInput)}
+                    onClick={() => { setShowLogCallForm(!showLogCallForm); if (showAdminNoteInput) setShowAdminNoteInput(false) }}
+                    className={`lead-log-call-toggle w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                      showLogCallForm
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                    }`}
+                    title="Log a call"
+                    aria-label="Log a call"
+                  >
+                    {showLogCallForm ? <MdClose size={12} /> : <MdCall size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { setShowAdminNoteInput(!showAdminNoteInput); if (showLogCallForm) setShowLogCallForm(false) }}
                     className={`lead-admin-note-toggle w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
                       showAdminNoteInput
                         ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
@@ -1197,6 +1240,42 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       disabled={!adminNoteText.trim() || savingAdminNote}
                       className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
                       title="Save note"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Log a Call form */}
+                {showLogCallForm && (
+                  <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                    <select
+                      value={logCallOutcome}
+                      onChange={(e) => setLogCallOutcome(e.target.value)}
+                      className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-gray-900 dark:text-white outline-none"
+                      disabled={savingLogCall}
+                    >
+                      <option value="Connected">Connected</option>
+                      <option value="No Answer">No Answer</option>
+                      <option value="Busy">Busy</option>
+                      <option value="Voicemail">Voicemail</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={logCallNotes}
+                      onChange={(e) => setLogCallNotes(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleLogCall()
+                      }}
+                      placeholder="Notes (optional)..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                      disabled={savingLogCall}
+                    />
+                    <button
+                      onClick={handleLogCall}
+                      disabled={savingLogCall}
+                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors"
+                      title="Save call log"
                     >
                       <MdCheck size={12} />
                     </button>
