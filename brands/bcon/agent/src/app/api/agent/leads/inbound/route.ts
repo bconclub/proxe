@@ -90,8 +90,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
 
-    const validSources = ['facebook', 'google', 'website', 'form', 'manual']
-    const leadSource = validSources.includes(source) ? source : 'manual'
+    // Map inbound source to an allowed touchpoint value
+    // Constraint: web, whatsapp, voice, social, facebook, google, pabbly, manual, form
+    const sourceToTouchpoint: Record<string, string> = {
+      facebook: 'facebook',
+      'facebook forms': 'facebook',
+      'facebook form': 'facebook',
+      fb: 'facebook',
+      google: 'google',
+      'google ads': 'google',
+      website: 'web',
+      web: 'web',
+      form: 'form',
+      manual: 'manual',
+      pabbly: 'pabbly',
+      whatsapp: 'whatsapp',
+      voice: 'voice',
+      social: 'social',
+    }
+    const normalizedSource = (source || '').toString().trim().toLowerCase()
+    const leadSource = sourceToTouchpoint[normalizedSource] || 'manual'
     const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND || 'bcon'
 
     const supabase = getServiceClient() || getClient()
