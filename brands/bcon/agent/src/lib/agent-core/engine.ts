@@ -924,15 +924,20 @@ async function scheduleFlowTasks(
 
   // Flow A: If AI response ends with a question, schedule a nudge
   if (aiResponse.includes('?')) {
+    // Extract the last question from the AI response (last sentence containing '?')
+    const sentences = aiResponse.split(/(?<=[.!?])\s+/);
+    const lastQuestion = sentences.filter(s => s.includes('?')).pop() || aiResponse;
+    const lastQuestionTrimmed = lastQuestion.substring(0, 200);
+
     await createFlowTask(supabase, {
       taskType: 'nudge_waiting',
       leadId,
       leadPhone,
       leadName,
       scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-      taskDescription: `Nudge: waiting for reply on ${input.channel} - "${aiResponse.substring(0, 80)}..."`,
+      taskDescription: `Nudge: waiting for reply on ${input.channel} - "${lastQuestion.substring(0, 80)}..."`,
       metadata: {
-        last_question: aiResponse.substring(0, 200),
+        last_question: lastQuestionTrimmed,
         channel: input.channel,
         session_id: input.sessionId,
         created_by: 'engine',

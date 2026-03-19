@@ -473,7 +473,7 @@ async function executeHumanCallback(task, waPhone) {
  */
 async function executeFirstOutreach(task, waPhone) {
   // Telegram approval gate - check before sending template to lead
-  const gateResult = await approvalGate(task, waPhone, `[First outreach template to ${task.lead_name}]`, true);
+  const gateResult = await approvalGate(task, waPhone, null, true);
   if (gateResult?.awaiting_approval) return gateResult;
 
   // Always send template directly - new leads have no 24h window
@@ -696,6 +696,42 @@ async function answerCallbackQuery(callbackQueryId, text) {
 }
 
 /**
+ * Build a human-readable template preview showing template name and parameters.
+ */
+function getTemplatePreview(task) {
+  const leadName = task.lead_name || 'there';
+  const taskType = task.task_type || '';
+
+  if (taskType.includes('booking_reminder') || taskType === 'reminder_24h' || taskType === 'reminder_1h' || taskType === 'reminder_30m') {
+    return {
+      name: 'bcon_booking_reminder',
+      params: [
+        { label: 'Name', value: leadName },
+        { label: 'Time', value: task.metadata?.booking_time || 'your scheduled time' },
+      ],
+    };
+  } else if (taskType === 're_engage') {
+    return { name: 'bcon_reengagement', params: [{ label: 'Name', value: leadName }] };
+  } else if (taskType === 'human_callback') {
+    return { name: 'bcon_proxe_followup', params: [{ label: 'Name', value: leadName }] };
+  } else if (taskType === 'first_outreach') {
+    return { name: 'bcon_proxe_first_outreach', params: [{ label: 'Name', value: leadName }] };
+  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup' || taskType === 'missed_call_followup') {
+    return { name: 'bcon_proxe_followup', params: [{ label: 'Name', value: leadName }] };
+  } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book') {
+    return {
+      name: 'bcon_proxe_followup_engaged',
+      params: [
+        { label: 'Name', value: leadName },
+        { label: 'Service', value: task.metadata?.service || task.metadata?.business_type || 'consultation' },
+      ],
+    };
+  } else {
+    return { name: 'bcon_followup', params: [{ label: 'Name', value: leadName }] };
+  }
+}
+
+/**
  * Telegram approval gate - runs before any message is sent to a lead.
  *
  * 'approve' mode: sends preview to Telegram, blocks the send, returns awaiting_approval.
@@ -706,7 +742,13 @@ async function approvalGate(task, waPhone, message, isTemplate) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return null;
 
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-  const msgPreview = isTemplate ? `[Template to ${task.lead_name}]` : message;
+  let msgPreview;
+  if (isTemplate) {
+    const tplInfo = getTemplatePreview(task);
+    msgPreview = `Template: ${tplInfo.name}\n${tplInfo.params.map(p => `${p.label}: ${p.value}`).join('\n')}`;
+  } else {
+    msgPreview = message;
+  }
   const scheduledAt = task.scheduled_at
     ? new Date(task.scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
     : 'now';
