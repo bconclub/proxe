@@ -696,38 +696,89 @@ async function answerCallbackQuery(callbackQueryId, text) {
 }
 
 /**
+ * Resolve service_interest and pain_point from lead record / task metadata.
+ */
+function resolveLeadContext(task, lead) {
+  const ctx = lead?.unified_context || {};
+  const formData = ctx.form_data || ctx.whatsapp?.profile || ctx.web?.profile || {};
+  const serviceInterest =
+    formData.business_type || formData.service ||
+    task.metadata?.service_interest || task.metadata?.business_type ||
+    task.metadata?.campaign || 'business growth';
+  const painPoint =
+    task.metadata?.pain_point || formData.pain_point || serviceInterest;
+  return { serviceInterest, painPoint };
+}
+
+/**
+ * Determine if a lead is "engaged" (3+ responses) or "noengage".
+ */
+function isEngaged(lead) {
+  return (lead?.response_count || 0) >= 3;
+}
+
+/**
  * Build a human-readable template preview showing template name and parameters.
  */
-function getTemplatePreview(task) {
+function getTemplatePreview(task, lead) {
   const leadName = task.lead_name || 'there';
   const taskType = task.task_type || '';
+  const { serviceInterest, painPoint } = resolveLeadContext(task, lead);
+  const bookingTime = task.metadata?.booking_time || 'your scheduled time';
+  const engaged = isEngaged(lead);
 
-  if (taskType.includes('booking_reminder') || taskType === 'reminder_24h' || taskType === 'reminder_1h' || taskType === 'reminder_30m') {
+  if (taskType === 'booking_reminder_24h' || taskType === 'reminder_24h') {
     return {
-      name: 'bcon_booking_reminder',
+      name: 'bcon_proxe_booking_reminder_24h',
       params: [
         { label: 'Name', value: leadName },
-        { label: 'Time', value: task.metadata?.booking_time || 'your scheduled time' },
+        { label: 'Time', value: bookingTime },
+        { label: 'Service', value: serviceInterest },
+      ],
+    };
+  } else if (taskType === 'booking_reminder_30m' || taskType === 'reminder_30m' || taskType === 'booking_reminder_1h' || taskType === 'reminder_1h') {
+    return {
+      name: 'bcon_proxe_booking_reminder_30m',
+      params: [
+        { label: 'Name', value: leadName },
+        { label: 'Service', value: serviceInterest },
+        { label: 'Time', value: bookingTime },
       ],
     };
   } else if (taskType === 're_engage') {
-    return { name: 'bcon_reengagement', params: [{ label: 'Name', value: leadName }] };
-  } else if (taskType === 'human_callback') {
-    return { name: 'bcon_proxe_followup', params: [{ label: 'Name', value: leadName }] };
+    if (engaged) {
+      return {
+        name: 'bcon_proxe_reengagement_engaged',
+        params: [
+          { label: 'Name', value: leadName },
+          { label: 'Pain Point', value: painPoint },
+        ],
+      };
+    }
+    return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', value: leadName }] };
   } else if (taskType === 'first_outreach') {
     return { name: 'bcon_proxe_first_outreach', params: [{ label: 'Name', value: leadName }] };
-  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup' || taskType === 'missed_call_followup') {
-    return { name: 'bcon_proxe_followup', params: [{ label: 'Name', value: leadName }] };
-  } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book') {
+  } else if (taskType === 'post_call_followup') {
+    return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', value: leadName }] };
+  } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {
+    if (engaged) {
+      return {
+        name: 'bcon_proxe_followup_engaged',
+        params: [
+          { label: 'Name', value: leadName },
+          { label: 'Service', value: serviceInterest },
+        ],
+      };
+    }
     return {
-      name: 'bcon_proxe_followup_engaged',
+      name: 'bcon_proxe_followup_noengage',
       params: [
         { label: 'Name', value: leadName },
-        { label: 'Service', value: task.metadata?.service || task.metadata?.business_type || 'consultation' },
+        { label: 'Service', value: serviceInterest },
       ],
     };
   } else {
-    return { name: 'bcon_followup', params: [{ label: 'Name', value: leadName }] };
+    return { name: 'bcon_proxe_rnr', params: [{ label: 'Name', value: leadName }] };
   }
 }
 
@@ -744,7 +795,15 @@ async function approvalGate(task, waPhone, message, isTemplate) {
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
   let msgPreview;
   if (isTemplate) {
-    const tplInfo = getTemplatePreview(task);
+    // Fetch lead record for context-aware template preview
+    let lead = null;
+    if (task.lead_id) {
+      const { data } = await supabase.from('all_leads')
+        .select('id, response_count, unified_context')
+        .eq('id', task.lead_id).maybeSingle();
+      lead = data;
+    }
+    const tplInfo = getTemplatePreview(task, lead);
     msgPreview = `Template: ${tplInfo.name}\n${tplInfo.params.map(p => `${p.label}: ${p.value}`).join('\n')}`;
   } else {
     msgPreview = message;
@@ -1077,76 +1136,25 @@ async function sendWhatsApp(phone, message) {
 // Routes to the correct template per task type.
 // ============================================
 async function sendWhatsAppTemplate(phone, task) {
-  const leadName = task.lead_name || 'there';
-  const taskType = task.task_type || '';
-
-  // Pick template + parameters based on task type
-  let templateName;
-  let components;
-
-  if (taskType.includes('booking_reminder') || taskType === 'reminder_24h' || taskType === 'reminder_1h' || taskType === 'reminder_30m') {
-    templateName = 'bcon_booking_reminder';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-          { type: 'text', text: task.metadata?.booking_time || 'your scheduled time' },
-        ]
-      }
-    ];
-  } else if (taskType === 're_engage') {
-    templateName = 'bcon_reengagement';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-        ]
-      }
-    ];
-  } else if (taskType === 'human_callback') {
-    templateName = 'bcon_proxe_followup';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-        ]
-      }
-    ];
-  } else if (taskType === 'first_outreach') {
-    templateName = 'bcon_proxe_first_outreach';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-        ]
-      }
-    ];
-  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup' || taskType === 'missed_call_followup') {
-    templateName = 'bcon_proxe_followup';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-        ]
-      }
-    ];
-  } else {
-    // follow_up_24h, nudge_waiting, push_to_book, and any other type
-    templateName = 'bcon_followup';
-    components = [
-      {
-        type: 'body',
-        parameters: [
-          { type: 'text', text: leadName },
-        ]
-      }
-    ];
+  // Fetch lead record for context-aware template selection
+  let lead = null;
+  if (task.lead_id) {
+    const { data } = await supabase.from('all_leads')
+      .select('id, response_count, unified_context')
+      .eq('id', task.lead_id).maybeSingle();
+    lead = data;
   }
+
+  const tplInfo = getTemplatePreview(task, lead);
+  const templateName = tplInfo.name;
+
+  // Build components from the resolved params
+  const components = [
+    {
+      type: 'body',
+      parameters: tplInfo.params.map(p => ({ type: 'text', text: p.value })),
+    }
+  ];
 
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 

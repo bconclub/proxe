@@ -323,8 +323,13 @@ export default function TasksPage() {
     .filter((t) => (t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window') && matchesFilter(t, filter))
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
-  const firingSoonTasks = tasks
-    .filter((t) => t.status === 'pending')
+  const thirtyMinsFromNow = Date.now() + 30 * 60 * 1000
+  const upNextTasks = tasks
+    .filter((t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at).getTime() <= thirtyMinsFromNow)
+    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
+
+  const upcomingTasks = tasks
+    .filter((t) => t.status === 'pending' && (!t.scheduled_at || new Date(t.scheduled_at).getTime() > thirtyMinsFromNow))
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
   const awaitingApprovalTasks = tasks
@@ -438,9 +443,14 @@ export default function TasksPage() {
 
         {/* Right - Queue */}
         <div style={{ flex: '2 1 280px', minWidth: 0 }}>
-          {/* Firing Soon */}
+          {/* Up Next (within 30 minutes) */}
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-            Firing Soon
+            Up Next
+            {upNextTasks.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                ({upNextTasks.length})
+              </span>
+            )}
           </div>
           <div
             style={{
@@ -452,15 +462,40 @@ export default function TasksPage() {
               marginBottom: 16,
             }}
           >
-            {firingSoonTasks.length === 0 ? (
+            {upNextTasks.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 6 }}>
                 <MdCheckCircle size={24} style={{ color: 'rgba(34,197,94,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No pending tasks</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing firing soon</span>
               </div>
             ) : (
-              firingSoonTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
+              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
             )}
           </div>
+
+          {/* Upcoming (beyond 30 minutes) */}
+          {upcomingTasks.length > 0 && (
+            <>
+              <div style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: 13, marginBottom: 12 }}>
+                Upcoming
+                <span style={{ fontSize: 12, fontWeight: 500, marginLeft: 6 }}>
+                  ({upcomingTasks.length})
+                </span>
+              </div>
+              <div
+                style={{
+                  background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 8,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                  marginBottom: 16,
+                  opacity: 0.7,
+                }}
+              >
+                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)}
+              </div>
+            </>
+          )}
 
           {/* Awaiting Approval */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#a855f7', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>

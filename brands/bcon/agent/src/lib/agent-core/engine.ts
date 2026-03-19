@@ -664,6 +664,7 @@ function buildBookingTools(
             'follow_up_day1',
             'follow_up_day3',
             'follow_up_day5',
+            're_engage',
           ];
           const cancelStatuses = ['pending', 'queued', 'awaiting_approval'];
           const cancelUpdate = { status: 'cancelled', completed_at: new Date().toISOString() };
