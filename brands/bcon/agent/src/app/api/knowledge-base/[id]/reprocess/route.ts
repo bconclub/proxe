@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-// POST /api/knowledge-base/[id]/reprocess — Reprocess a pending/error item
+// POST /api/knowledge-base/[id]/reprocess - Reprocess a pending/error item
 // For items that were uploaded before content extraction was available
 export async function POST(
   request: NextRequest,
@@ -95,7 +95,7 @@ export async function POST(
       return NextResponse.json({ data: updated, message: 'Reprocessed successfully' })
     }
 
-    // Item has no content — cannot reprocess without the original file
+    // Item has no content - cannot reprocess without the original file
     const { data: updated } = await supabase
       .from('knowledge_base')
       .update({
@@ -107,7 +107,7 @@ export async function POST(
       .single()
 
     return NextResponse.json(
-      { data: updated, message: 'Cannot reprocess — no content stored. Please re-upload.' },
+      { data: updated, message: 'Cannot reprocess - no content stored. Please re-upload.' },
       { status: 422 }
     )
   } catch (error) {

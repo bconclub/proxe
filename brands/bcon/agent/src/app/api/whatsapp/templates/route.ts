@@ -1,6 +1,6 @@
 /**
- * GET /api/whatsapp/templates — List all WhatsApp message templates from Meta
- * POST /api/whatsapp/templates — Send a test template message
+ * GET /api/whatsapp/templates - List all WhatsApp message templates from Meta
+ * POST /api/whatsapp/templates - Send a test template message
  *
  * Uses env vars: META_WHATSAPP_ACCESS_TOKEN, META_WHATSAPP_PHONE_NUMBER_ID
  * The WABA ID is fetched automatically from the phone number ID.
@@ -24,7 +24,7 @@ function getCredentials() {
 }
 
 /**
- * GET — List all templates from Meta Business Account
+ * GET - List all templates from Meta Business Account
  */
 export async function GET() {
   try {
@@ -43,7 +43,7 @@ export async function GET() {
     )
     const phoneData = await phoneRes.json()
 
-    // Step 2: Resolve WABA ID — env var > edge lookup > debug_token
+    // Step 2: Resolve WABA ID - env var > edge lookup > debug_token
     let wabaId: string | null = creds.wabaId || null
     const debugInfo: Record<string, any> = {}
 
@@ -175,7 +175,7 @@ export async function GET() {
 }
 
 /**
- * POST — Send a template message
+ * POST - Send a template message
  *
  * Body: {
  *   to: "919353253817",           // Phone with country code

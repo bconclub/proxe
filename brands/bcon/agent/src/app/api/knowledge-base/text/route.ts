@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { chunkText } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
 
-// POST /api/knowledge-base/text — Add manual text entry
+// POST /api/knowledge-base/text - Add manual text entry
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

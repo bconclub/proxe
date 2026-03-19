@@ -276,6 +276,15 @@
   --button-active: rgba(255, 255, 255, 0.8);
   --text-button: #000000;
 
+  /* Dashboard layout vars */
+  --accent-primary: #ffffff;
+  --accent-subtle: rgba(255, 255, 255, 0.08);
+  --bg-secondary: #111111;
+  --bg-tertiary: #1a1a1a;
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --bg-avatar: #333333;
+
   --blur-sm: blur(8px);
   --blur-md: blur(12px);
   --blur-lg: blur(16px);
@@ -338,6 +347,15 @@
   --button-hover: rgba(0, 0, 0, 0.85);
   --button-active: rgba(0, 0, 0, 0.7);
   --text-button: #ffffff;
+
+  /* Dashboard layout vars */
+  --accent-primary: #000000;
+  --accent-subtle: rgba(0, 0, 0, 0.06);
+  --bg-secondary: #f2f2f2;
+  --bg-tertiary: #e8e8e8;
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --bg-avatar: #cccccc;
 
   --blur-sm: blur(8px);
   --blur-md: blur(12px);

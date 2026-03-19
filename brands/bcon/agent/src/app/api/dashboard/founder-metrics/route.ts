@@ -327,7 +327,7 @@ export async function GET(request: NextRequest) {
     console.log(`  - 7D: ${conversations7D}, 14D: ${conversations14D}, 30D: ${conversations30D}`)
     console.log(`  - Previous 7D: ${previous7DUniqueConversations} (for trend: ${trend7D}%)`)
 
-    // 1. Hot Leads — calculated AFTER score computation below (see "DEFERRED: Hot Leads")
+    // 1. Hot Leads - calculated AFTER score computation below (see "DEFERRED: Hot Leads")
     // Placeholder: hotLeads will be set after scores are calculated
     let hotLeads: typeof safeLeads = []
 
@@ -524,7 +524,7 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // 10. Score Distribution — computed AFTER score calculation (see below)
+    // 10. Score Distribution - computed AFTER score calculation (see below)
     // Placeholder: will be set after scores are populated via RPC
     let scoreDistribution = { hot: 0, warm: 0, cold: 0 }
 
@@ -552,7 +552,7 @@ export async function GET(request: NextRequest) {
           timestamp: change.created_at,
           content: change.old_stage
             ? `${lead.customer_name || 'Unknown'} entered ${change.new_stage} stage (from ${change.old_stage})`
-            : `${lead.customer_name || 'Unknown'} scored ${change.new_score || 0} — entered ${change.new_stage} stage`,
+            : `${lead.customer_name || 'Unknown'} scored ${change.new_score || 0} - entered ${change.new_stage} stage`,
           channel: lead.first_touchpoint || lead.last_touchpoint || 'web',
           metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.new_score },
         })
@@ -1036,7 +1036,7 @@ export async function GET(request: NextRequest) {
       score: l.lead_score ?? 'null'
     })))
 
-    // DEFERRED: Hot Leads + Score Distribution — now that scores are calculated via RPC
+    // DEFERRED: Hot Leads + Score Distribution - now that scores are calculated via RPC
     hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
     scoreDistribution = {
       hot: safeLeads.filter(l => (l.lead_score || 0) >= hotLeadThreshold).length,

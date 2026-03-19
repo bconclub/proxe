@@ -304,10 +304,10 @@ Sentence 3: What happened (booked/pending/lost) and what to do next.
 If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
 
 Example:
-Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
+Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website - discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet - follow up to lock in a slot.
 
 Another example:
-Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
+Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated - asked for a human. Call him directly to recover.
 
 Keep it under 50 words. Be specific. No fluff.
 
@@ -675,10 +675,10 @@ Sentence 3: What happened (booked/pending/lost) and what to do next.
 If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
 
 Example:
-Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
+Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website - discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet - follow up to lock in a slot.
 
 Another example:
-Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
+Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated - asked for a human. Call him directly to recover.
 
 Keep it under 50 words. Be specific. No fluff.
 

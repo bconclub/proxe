@@ -15,7 +15,7 @@ export async function GET() {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     // }
 
-    // Get all leads (use all_leads — every WhatsApp conversation = a lead)
+    // Get all leads (use all_leads - every WhatsApp conversation = a lead)
     const { data: leads, error: leadsError } = await supabase
       .from('all_leads')
       .select('*')

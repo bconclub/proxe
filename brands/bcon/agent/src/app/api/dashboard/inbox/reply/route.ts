@@ -3,8 +3,8 @@
  *
  * Sends a reply from the dashboard inbox to a customer.
  * Supports two modes:
- *   1. "generate" — AI generates a response using the agent engine, returns it for review
- *   2. "send"     — Sends a message (manual or AI-generated) to the customer via their channel
+ *   1. "generate" - AI generates a response using the agent engine, returns it for review
+ *   2. "send"     - Sends a message (manual or AI-generated) to the customer via their channel
  *
  * For WhatsApp: Uses Meta Cloud API (must be within 24h of last customer message).
  * For Web: Logs the message to the conversations table (customer sees it on next poll/reconnect).

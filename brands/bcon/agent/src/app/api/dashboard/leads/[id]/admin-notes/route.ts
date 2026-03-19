@@ -65,7 +65,7 @@ function hasCallbackIntent(noteText: string): boolean {
 
 /**
  * POST /api/dashboard/leads/[id]/admin-notes
- * Add an admin note to a lead — dual-writes to unified_context.admin_notes[] and activities table.
+ * Add an admin note to a lead - dual-writes to unified_context.admin_notes[] and activities table.
  * Parses note text for actionable intent (callbacks, stage changes) via keyword matching.
  */
 export async function POST(

@@ -1,15 +1,15 @@
 /**
  * Meta Cloud API WhatsApp Webhook
- * GET  /api/agent/whatsapp/meta — Webhook verification (hub.challenge)
- * POST /api/agent/whatsapp/meta — Incoming messages from Meta
+ * GET  /api/agent/whatsapp/meta - Webhook verification (hub.challenge)
+ * POST /api/agent/whatsapp/meta - Incoming messages from Meta
  *
  * Bridges Meta's webhook format into the PROXe unified agent engine.
  * Each brand deployment has its own Meta app, phone number, and env vars.
  *
  * Required env vars:
- *   META_WHATSAPP_VERIFY_TOKEN      — custom string set in Meta Developer Console
- *   META_WHATSAPP_ACCESS_TOKEN      — permanent Graph API token
- *   META_WHATSAPP_PHONE_NUMBER_ID   — WhatsApp Business phone number ID
+ *   META_WHATSAPP_VERIFY_TOKEN      - custom string set in Meta Developer Console
+ *   META_WHATSAPP_ACCESS_TOKEN      - permanent Graph API token
+ *   META_WHATSAPP_PHONE_NUMBER_ID   - WhatsApp Business phone number ID
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -110,7 +110,7 @@ async function markAsRead(messageId: string): Promise<void> {
   }).catch((err) => console.error('[meta/webhook] markAsRead failed:', err));
 }
 
-// ─── GET — Webhook Verification ───────────────────────────────────────────────
+// ─── GET - Webhook Verification ───────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -129,10 +129,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 });
 }
 
-// ─── POST — Incoming Messages ─────────────────────────────────────────────────
+// ─── POST - Incoming Messages ─────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  // Always respond 200 quickly — Meta retries on non-2xx
+  // Always respond 200 quickly - Meta retries on non-2xx
   // We process the message synchronously here since Meta gives us ~30s
   try {
     const body = await request.json();

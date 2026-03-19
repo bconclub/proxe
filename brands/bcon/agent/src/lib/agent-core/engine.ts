@@ -657,26 +657,46 @@ function buildBookingTools(
             }
           }
 
-          // Cancel any pending/queued nurture tasks - lead already booked
+          // Cancel any pending/queued/awaiting_approval nurture tasks - lead already booked
+          const nurtureTypesToCancel = [
+            'push_to_book',
+            'nudge_waiting',
+            'follow_up_day1',
+            'follow_up_day3',
+            'follow_up_day5',
+          ];
+          const cancelStatuses = ['pending', 'queued', 'awaiting_approval'];
+          const cancelUpdate = { status: 'cancelled', completed_at: new Date().toISOString() };
+
+          // Cancel by lead_id
           if (taskLeadId) {
-            const nurureTypesToCancel = [
-              'push_to_book',
-              'nudge_waiting',
-              'follow_up_day1',
-              'follow_up_day3',
-              'follow_up_day5',
-            ];
             const { error: cancelErr, count: cancelledCount } = await supabase
               .from('agent_tasks')
-              .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+              .update(cancelUpdate)
               .eq('lead_id', taskLeadId)
-              .in('task_type', nurureTypesToCancel)
-              .in('status', ['pending', 'queued']);
+              .in('task_type', nurtureTypesToCancel)
+              .in('status', cancelStatuses);
 
             if (cancelErr) {
-              console.error('[Engine] Failed to cancel nurture tasks:', cancelErr.message);
+              console.error('[Engine] Failed to cancel nurture tasks by lead_id:', cancelErr.message);
             } else if (cancelledCount) {
-              console.log(`[Engine] Cancelled ${cancelledCount} nurture tasks for ${bookingName} (lead booked)`);
+              console.log(`[Engine] Cancelled ${cancelledCount} nurture tasks for ${bookingName} by lead_id (lead booked)`);
+            }
+          }
+
+          // Also cancel by lead_phone as fallback (tasks may have been created with phone but no lead_id)
+          if (taskPhone) {
+            const { error: cancelErr2, count: cancelledCount2 } = await supabase
+              .from('agent_tasks')
+              .update(cancelUpdate)
+              .eq('lead_phone', taskPhone)
+              .in('task_type', nurtureTypesToCancel)
+              .in('status', cancelStatuses);
+
+            if (cancelErr2) {
+              console.error('[Engine] Failed to cancel nurture tasks by phone:', cancelErr2.message);
+            } else if (cancelledCount2) {
+              console.log(`[Engine] Cancelled ${cancelledCount2} nurture tasks for ${bookingName} by phone (lead booked)`);
             }
           }
         }

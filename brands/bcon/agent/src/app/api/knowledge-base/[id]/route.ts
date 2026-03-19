@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
-// GET /api/knowledge-base/[id] — Get single item
+// GET /api/knowledge-base/[id] - Get single item
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -46,7 +46,7 @@ export async function GET(
   }
 }
 
-// DELETE /api/knowledge-base/[id] — Delete item
+// DELETE /api/knowledge-base/[id] - Delete item
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
