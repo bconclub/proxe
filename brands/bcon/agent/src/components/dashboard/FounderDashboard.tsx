@@ -422,7 +422,7 @@ export default function FounderDashboard() {
             <div className="flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setConversationTimeFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-white' : ''}`}
+                  className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={conversationTimeFilter === period ? { backgroundColor: '#3B82F6' } : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }}
                 >{period}</button>
               ))}
@@ -494,7 +494,7 @@ export default function FounderDashboard() {
             <div className="flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setWarmLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-white' : ''}`}
+                  className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={warmLeadsFilter === period ? { backgroundColor: '#F97316' } : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }}
                 >{period}</button>
               ))}
@@ -536,8 +536,8 @@ export default function FounderDashboard() {
             <div className="flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-white' : ''}`}
-                  style={leadsFilter === period ? { backgroundColor: 'var(--accent-primary)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}
+                  className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={leadsFilter === period ? { backgroundColor: 'var(--button-bg)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}
                 >{period}</button>
               ))}
             </div>
@@ -686,8 +686,8 @@ export default function FounderDashboard() {
                       {formatTimeAgo(lead.lastContact)}
                     </span>
                     <button 
-                    className="px-3 py-1.5 text-white text-xs rounded-lg transition-colors flex-shrink-0"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    className="px-3 py-1.5 text-[var(--text-button)] text-xs rounded-lg transition-colors flex-shrink-0"
+                    style={{ backgroundColor: 'var(--button-bg)' }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                     onClick={(e) => {
