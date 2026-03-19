@@ -19,6 +19,7 @@ import {
   checkExistingBooking,
 } from '@/lib/services/bookingManager';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { crawlBusiness } from '@/lib/services/businessCrawler';
 
 /**
  * Process a message and return a complete response (for WhatsApp, voice, etc.)
@@ -58,6 +59,20 @@ export async function process(
     crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
   }
 
+  // Fetch form data from unified_context if available
+  let formData: Record<string, any> | null = null;
+  if (input.userProfile.phone) {
+    try {
+      const normalizedPhone = input.userProfile.phone.replace(/\D/g, '').slice(-10);
+      const { data: leadCtx } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .maybeSingle();
+      formData = leadCtx?.unified_context?.form_data || null;
+    } catch { /* non-critical */ }
+  }
+
   const { systemPrompt, userPrompt } = buildPrompt({
     channel: input.channel,
     userName: input.userProfile.name,
@@ -69,6 +84,7 @@ export async function process(
     messageCount: input.messageCount,
     brand: brandId,
     crossChannelContext: crossChannelContext || undefined,
+    formData,
   });
 
   // 5. Detect human handoff requests before AI generation
@@ -193,6 +209,20 @@ export async function* processStream(
       crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
     }
 
+    // Fetch form data from unified_context if available
+    let formData: Record<string, any> | null = null;
+    if (input.userProfile.phone) {
+      try {
+        const normalizedPhone = input.userProfile.phone.replace(/\D/g, '').slice(-10);
+        const { data: leadCtx } = await supabase
+          .from('all_leads')
+          .select('unified_context')
+          .eq('customer_phone_normalized', normalizedPhone)
+          .maybeSingle();
+        formData = leadCtx?.unified_context?.form_data || null;
+      } catch { /* non-critical */ }
+    }
+
     const { systemPrompt, userPrompt } = buildPrompt({
       channel: input.channel,
       userName: input.userProfile.name,
@@ -204,6 +234,7 @@ export async function* processStream(
       messageCount: input.messageCount,
       brand: brandId,
       crossChannelContext: crossChannelContext || undefined,
+      formData,
     });
 
     // 5. Generate response with tools (same as WhatsApp - enables booking flow)
@@ -446,7 +477,7 @@ function buildBookingTools(
     },
     {
       name: 'update_lead_profile',
-      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, or business type. Can be called multiple times as new details emerge. Only include fields explicitly shared - never guess.',
+      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, or website URL. Can be called multiple times as new details emerge. Only include fields explicitly shared - never guess.',
       input_schema: {
         type: 'object',
         properties: {
@@ -469,6 +500,10 @@ function buildBookingTools(
           business_type: {
             type: 'string',
             description: 'What kind of business they run (e.g. "doorstep car wash")',
+          },
+          website_url: {
+            type: 'string',
+            description: 'User\'s website URL if shared (e.g. "https://door2shine.com" or "door2shine.com")',
           },
           notes: {
             type: 'string',
@@ -720,9 +755,9 @@ function buildBookingTools(
     },
 
     update_lead_profile: async (toolInput: Record<string, any>) => {
-      const { full_name, email, city, company, business_type, notes } = toolInput;
+      const { full_name, email, city, company, business_type, website_url, notes } = toolInput;
 
-      if (!full_name && !email && !city && !company && !business_type && !notes) {
+      if (!full_name && !email && !city && !company && !business_type && !website_url && !notes) {
         return JSON.stringify({ success: false, error: 'No profile data provided.' });
       }
 
@@ -790,8 +825,16 @@ function buildBookingTools(
             : notes.trim();
         }
 
+        // Save website_url at top level of unified_context (shared across channels)
+        const updatedCtx = { ...existingCtx };
+        if (website_url) {
+          let url = website_url.trim();
+          if (url && !url.startsWith('http')) url = `https://${url}`;
+          updatedCtx.website_url = url;
+        }
+
         leadUpdates.unified_context = {
-          ...existingCtx,
+          ...updatedCtx,
           [channelKey]: { ...existingChannel, profile },
         };
 
@@ -832,6 +875,7 @@ function buildBookingTools(
         if (city) saved.push(`city: ${city}`);
         if (company) saved.push(`company: ${company}`);
         if (business_type) saved.push(`type: ${business_type}`);
+        if (website_url) saved.push(`website: ${website_url}`);
         if (notes) saved.push(`notes: ${notes}`);
 
         console.log(`[Engine] Lead profile updated: ${saved.join(', ')}`);
@@ -963,6 +1007,13 @@ async function scheduleFlowTasks(
         session_id: input.sessionId,
         created_by: 'engine',
       },
+    });
+  }
+
+  // Business crawl: trigger on 3rd message (first real engagement)
+  if (input.messageCount === 3) {
+    crawlBusiness(leadId, supabase).catch(err => {
+      console.error('[Engine] Business crawl failed:', err?.message);
     });
   }
 

@@ -18,6 +18,7 @@ interface PromptOptions {
   messageCount?: number;
   crossChannelContext?: string;
   brand?: string;
+  formData?: Record<string, any> | null;
 }
 
 /**
@@ -49,13 +50,14 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     messageCount,
     crossChannelContext,
     brand,
+    formData,
   } = options;
 
   // Resolve brand: explicit param > env var > default
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
-  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext);
+  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
 
   // Build the user prompt with context
   const userPrompt = buildUserPrompt({
@@ -79,7 +81,8 @@ function buildSystemPrompt(
   knowledgeBase?: string,
   messageCount?: number,
   channel?: Channel,
-  crossChannelContext?: string
+  crossChannelContext?: string,
+  formData?: Record<string, any> | null,
 ): string {
   const nameLine = userName
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
@@ -93,7 +96,23 @@ function buildSystemPrompt(
     ? `\n\n=================================================================================\nCROSS-CHANNEL CONTEXT\n=================================================================================\n${crossChannelContext}`
     : '';
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote;
+  // Form data context - tell the AI what the lead already answered
+  let formDataNote = '';
+  if (formData && Object.keys(formData).length > 0) {
+    const lines: string[] = [];
+    if (formData.brand_name) lines.push(`Brand/Company: ${formData.brand_name}`);
+    if (formData.has_website === true) lines.push('Has website: Yes');
+    else if (formData.has_website === false) lines.push('Has website: No (still setting up)');
+    if (formData.monthly_leads) lines.push(`Monthly leads they can handle: ${formData.monthly_leads}`);
+    if (formData.urgency) lines.push(`Setup urgency: ${formData.urgency.replace(/_/g, ' ')}`);
+    if (formData.has_ai_systems === true) lines.push('Already has AI systems running');
+    else if (formData.has_ai_systems === false) lines.push('No AI systems yet (opportunity)');
+    if (lines.length > 0) {
+      formDataNote = `\n\n=================================================================================\nFORM DATA (lead filled this out before chatting)\n=================================================================================\n${lines.join('\n')}\n\nUse this to personalize your conversation. Do NOT ask questions they already answered in the form. Do NOT repeat this data back verbatim - weave it naturally into conversation.`;
+    }
+  }
+
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote + formDataNote;
 }
 
 /**

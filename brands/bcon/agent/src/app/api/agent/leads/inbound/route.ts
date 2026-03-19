@@ -121,12 +121,42 @@ export async function POST(request: NextRequest) {
     let leadId: string
     let isNew = false
 
+    // Parse Pabbly form fields into structured data
+    const parsePabblyBool = (val: any): boolean | null => {
+      if (val == null) return null
+      const s = String(val).toLowerCase().trim()
+      if (s.includes('yes') || s === 'true' || s === '1') return true
+      if (s.includes('no') || s === 'false' || s === '0') return false
+      return null
+    }
+
+    const cf = custom_fields || {}
+    const formData: Record<string, any> = {}
+    // "Do You Have Your Website Ready"
+    const hasWebsiteRaw = cf['Do You Have Your Website Ready'] ?? cf['has_website'] ?? cf['website_ready']
+    if (hasWebsiteRaw != null) formData.has_website = parsePabblyBool(hasWebsiteRaw)
+    // "How Many Leads Can You Handle A Month"
+    const monthlyLeadsRaw = cf['How Many Leads Can You Handle A Month'] ?? cf['monthly_leads'] ?? cf['leads_per_month']
+    if (monthlyLeadsRaw != null) formData.monthly_leads = String(monthlyLeadsRaw).trim()
+    // "How Fast Do You Want This Set Up"
+    const urgencyRaw = cf['How Fast Do You Want This Set Up'] ?? cf['setup_urgency'] ?? urgency
+    if (urgencyRaw != null) formData.urgency = String(urgencyRaw).trim().toLowerCase().replace(/\s+/g, '_')
+    // "Do You Have Any AI Systems Running"
+    const hasAiRaw = cf['Do You Have Any AI Systems Running'] ?? cf['has_ai_systems'] ?? cf['ai_systems']
+    if (hasAiRaw != null) formData.has_ai_systems = parsePabblyBool(hasAiRaw)
+    // Brand name
+    if (brand_name) formData.brand_name = brand_name.trim()
+
     // Build inbound context fields
     const inboundContext: Record<string, any> = {}
     if (city) inboundContext.city = city.trim()
     if (brand_name) inboundContext.company = brand_name.trim()
-    if (urgency) inboundContext.urgency = urgency.trim()
-    if (custom_fields && typeof custom_fields === 'object') inboundContext.form_data = custom_fields
+    if (urgency) inboundContext.urgency = (urgencyRaw ? String(urgencyRaw).trim().toLowerCase().replace(/\s+/g, '_') : urgency?.trim())
+    if (Object.keys(formData).length > 0) inboundContext.form_data = formData
+    if (custom_fields && typeof custom_fields === 'object') {
+      // Store raw custom_fields separately for reference
+      inboundContext.raw_form_fields = custom_fields
+    }
 
     // Check for existing lead
     const { data: existing } = await supabase
