@@ -429,6 +429,8 @@ export default function InboxPage() {
               booking_date: lead.booking_date ?? null,
               booking_time: lead.booking_time ?? null,
               next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
+              form_data: fbUc?.form_data || null,
+              first_touchpoint: lead.first_touchpoint || null,
             }
           })
 
@@ -1273,7 +1275,45 @@ export default function InboxPage() {
               ) : messages.length === 0 ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>No messages yet</div>
               ) : (
-                messages.map((msg, msgIdx) => {
+                <>
+                {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
+                {selectedConversation?.form_data && !parseFormFields(messages[0]?.content) && (() => {
+                  const fd = selectedConversation.form_data!
+                  const formFields: { label: string; value: string }[] = []
+                  if (fd.brand_name) formFields.push({ label: 'Brand', value: fd.brand_name })
+                  if (fd.has_website === true) formFields.push({ label: 'Website', value: 'Yes' })
+                  else if (fd.has_website === false) formFields.push({ label: 'Website', value: 'No' })
+                  if (fd.monthly_leads) formFields.push({ label: 'Volume', value: fd.monthly_leads })
+                  if (fd.urgency) formFields.push({ label: 'Urgency', value: fd.urgency.replace(/_/g, ' ') })
+                  if (fd.has_ai_systems === true) formFields.push({ label: 'AI Systems', value: 'Yes' })
+                  else if (fd.has_ai_systems === false) formFields.push({ label: 'AI Systems', value: 'No' })
+                  if (formFields.length === 0) return null
+                  return (
+                    <div className="flex justify-start mb-2">
+                      <div className="max-w-[90%] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                              {selectedConversation?.lead_name || 'Lead'}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
+                              Meta Form Submission
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {formFields.map((f, i) => (
+                            <div key={i} className="flex items-baseline gap-1">
+                              <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{f.label}:</span>
+                              <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+                {messages.map((msg, msgIdx) => {
                   // Date separator between messages from different days
                   const showDateSeparator = msgIdx === 0 ||
                     getDateKey(msg.created_at) !== getDateKey(messages[msgIdx - 1].created_at);
@@ -1390,6 +1430,8 @@ export default function InboxPage() {
                     </React.Fragment>
                   );
                 })
+                }
+                </>
               )}
             </div>
 
