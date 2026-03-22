@@ -19,9 +19,387 @@ const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
 const APPROVAL_MODE = process.env.APPROVAL_MODE || 'approve'; // 'notify' or 'approve'
+const VOBIZ_OUTBOUND_API_URL = process.env.VOBIZ_OUTBOUND_API_URL || null;
+const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
 
 // File to persist Telegram getUpdates offset across runs
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
+
+// ============================================
+// ESCALATION CHAIN - Multi-channel fallback
+// ============================================
+// Step 1: WhatsApp free-form (within 24h)
+// Step 2: WhatsApp template (outside 24h)
+// Step 3: Voice call (outbound via Vobiz) - after 48h no response
+// Step 4: WhatsApp missed call template (if voice no-answer)
+// Step 5: WhatsApp different messaging angle (final attempt)
+const ESCALATION_LEVELS = {
+  WA_FREEFORM: 1,
+  WA_TEMPLATE: 2,
+  VOICE_CALL: 3,
+  WA_MISSED_CALL: 4,
+  WA_DIFFERENT_ANGLE: 5,
+};
+
+/**
+ * Record a channel attempt in escalation state.
+ * Returns updated channels_tried array and current_escalation_level.
+ */
+function recordChannelAttempt(taskMetadata, channel, result) {
+  const channelsTried = [...(taskMetadata?.channels_tried || [])];
+  channelsTried.push({
+    channel,
+    attempted_at: new Date().toISOString(),
+    result, // 'sent', 'read', 'delivered', 'failed', 'no_answer', 'not_delivered'
+  });
+  const currentLevel = (taskMetadata?.current_escalation_level || 1) + 1;
+  return { channels_tried: channelsTried, current_escalation_level: Math.min(currentLevel, 5) };
+}
+
+/**
+ * Select the best channel for reaching a lead.
+ * Reads channel_performance, channels_tried, read/delivery status.
+ * Returns { channel: 'whatsapp'|'voice', reason: string }
+ */
+async function selectBestChannel(leadId, taskMetadata) {
+  const channelsTried = taskMetadata?.channels_tried || [];
+  const escalationLevel = taskMetadata?.current_escalation_level || 1;
+
+  // Fetch lead data: channel_performance, response_patterns, last_read_at
+  let channelPerf = null;
+  let lastReadAt = null;
+  let responsePatterns = null;
+  if (leadId) {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (lead?.unified_context) {
+      channelPerf = lead.unified_context.channel_performance || null;
+      lastReadAt = lead.unified_context.last_read_at || null;
+      responsePatterns = lead.unified_context.response_patterns || null;
+    }
+  }
+
+  // Check last WhatsApp message delivery/read status
+  let lastWaStatus = null;
+  if (leadId) {
+    const { data: lastMsg } = await supabase
+      .from('conversations')
+      .select('read_at, delivered_at, metadata')
+      .eq('lead_id', leadId)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'agent')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastMsg) {
+      const readAt = lastMsg.read_at || lastMsg.metadata?.read_at;
+      const deliveredAt = lastMsg.delivered_at || lastMsg.metadata?.delivered_at;
+      if (readAt) lastWaStatus = 'read';
+      else if (deliveredAt) lastWaStatus = 'delivered';
+      else lastWaStatus = 'not_delivered';
+    }
+  }
+
+  // Rule 1: If WA messages are being read (last_read_at recent), stay on WhatsApp
+  if (lastReadAt) {
+    const hoursSinceRead = (Date.now() - new Date(lastReadAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceRead < 48) {
+      return { channel: 'whatsapp', reason: `WhatsApp messages being read (last read ${Math.round(hoursSinceRead)}h ago)` };
+    }
+  }
+
+  // Rule 2: If messages are not being delivered, escalate to voice
+  if (lastWaStatus === 'not_delivered') {
+    const waAttempts = channelsTried.filter(c => c.channel === 'whatsapp').length;
+    if (waAttempts >= 2) {
+      return { channel: 'voice', reason: `WhatsApp not delivered after ${waAttempts} attempts, escalating to voice` };
+    }
+  }
+
+  // Rule 3: If escalation level >= 3, try voice
+  if (escalationLevel >= ESCALATION_LEVELS.VOICE_CALL) {
+    // Check if voice was already tried
+    const voiceTried = channelsTried.some(c => c.channel === 'voice');
+    if (!voiceTried) {
+      return { channel: 'voice', reason: `Escalation level ${escalationLevel}, trying voice call` };
+    }
+  }
+
+  // Rule 4: Check which channel historically gets best responses
+  if (channelPerf) {
+    const waPerf = channelPerf.whatsapp || {};
+    const voicePerf = channelPerf.voice || {};
+    const waResponseRate = waPerf.messages_sent > 0
+      ? (waPerf.responses_received || 0) / waPerf.messages_sent
+      : 0;
+    const voiceResponseRate = voicePerf.messages_sent > 0
+      ? (voicePerf.responses_received || 0) / voicePerf.messages_sent
+      : 0;
+
+    if (voiceResponseRate > waResponseRate && voiceResponseRate > 0.3) {
+      return { channel: 'voice', reason: `Voice has better response rate (${Math.round(voiceResponseRate * 100)}% vs ${Math.round(waResponseRate * 100)}% WA)` };
+    }
+  }
+
+  // Default: WhatsApp
+  return { channel: 'whatsapp', reason: 'Default channel (WhatsApp)' };
+}
+
+/**
+ * Update channel_performance metrics for a lead after an interaction.
+ * Tracks per-channel: messages_sent, messages_read, responses_received,
+ * avg_response_time, last_successful_contact
+ */
+async function updateChannelPerformance(leadId, channel, event, responseTimeSec) {
+  if (!leadId) return;
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (!lead) return;
+
+    const ctx = lead.unified_context || {};
+    const perf = ctx.channel_performance || {};
+    const ch = perf[channel] || {
+      messages_sent: 0,
+      messages_read: 0,
+      responses_received: 0,
+      avg_response_time: null,
+      last_successful_contact: null,
+    };
+
+    if (event === 'sent') {
+      ch.messages_sent = (ch.messages_sent || 0) + 1;
+    } else if (event === 'read') {
+      ch.messages_read = (ch.messages_read || 0) + 1;
+    } else if (event === 'response') {
+      ch.responses_received = (ch.responses_received || 0) + 1;
+      ch.last_successful_contact = new Date().toISOString();
+      if (responseTimeSec != null && responseTimeSec > 0) {
+        const prevAvg = ch.avg_response_time || responseTimeSec;
+        const prevCount = Math.max((ch.responses_received || 1) - 1, 1);
+        ch.avg_response_time = Math.round((prevAvg * prevCount + responseTimeSec) / (prevCount + 1));
+      }
+    }
+
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...ctx,
+          channel_performance: { ...perf, [channel]: ch },
+        },
+      })
+      .eq('id', leadId);
+  } catch (err) {
+    console.error(`[ChannelPerf] Failed to update ${channel}/${event} for ${leadId}:`, err.message);
+  }
+}
+
+/**
+ * Attempt an outbound voice call via Vobiz API.
+ * Returns { success, call_id, duration, status } or throws on failure.
+ */
+async function attemptOutboundVoiceCall(phone, leadName) {
+  if (!VOBIZ_OUTBOUND_API_URL || !VOBIZ_OUTBOUND_API_KEY) {
+    return { success: false, reason: 'Vobiz outbound not configured' };
+  }
+
+  const waPhone = phone.length === 10 ? `91${phone}` : phone;
+  try {
+    const res = await fetch(VOBIZ_OUTBOUND_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${VOBIZ_OUTBOUND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone: waPhone,
+        caller_name: 'BCON Club',
+        lead_name: leadName,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      return { success: false, reason: `Vobiz API error: ${res.status} ${errBody}` };
+    }
+
+    const data = await res.json();
+    return {
+      success: true,
+      call_id: data.call_id || data.id || null,
+      status: data.status || 'initiated',
+    };
+  } catch (err) {
+    return { success: false, reason: `Vobiz call failed: ${err.message}` };
+  }
+}
+
+/**
+ * Execute a try_voice_call task.
+ * 1. Attempt outbound call via Vobiz
+ * 2. If Vobiz unavailable/fails, create dashboard notification
+ * 3. If no answer, create missed_call_followup task
+ */
+async function executeVoiceCall(task, waPhone) {
+  // Check if lead responded since task was created
+  if (task.lead_id) {
+    const { data: recentMsg } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .eq('sender', 'customer')
+      .gt('created_at', task.created_at)
+      .limit(1);
+
+    if (recentMsg && recentMsg.length > 0) {
+      return { skipped: true, reason: 'Lead responded before voice call' };
+    }
+  }
+
+  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+  const callResult = await attemptOutboundVoiceCall(phone10, task.lead_name);
+
+  // Track channel attempt
+  const escalation = recordChannelAttempt(task.metadata, 'voice', callResult.success ? 'sent' : 'failed');
+
+  if (!callResult.success) {
+    // Vobiz unavailable or failed → create dashboard notification for manual call
+    const timingReason = `Voice call failed: ${callResult.reason}. Flagged for manual call.`;
+
+    // Notify via Telegram
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID) {
+      const body =
+        `<b>📞 MANUAL CALL NEEDED</b>\n\n` +
+        `Lead: ${task.lead_name} (${phone10})\n` +
+        `Reason: ${callResult.reason}\n` +
+        `WhatsApp messages not getting through.\n\n` +
+        `Please call this lead manually and log the result.`;
+      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body).catch(() => {});
+    }
+
+    // Flag on the lead record
+    if (task.lead_id) {
+      const { data: lead } = await supabase
+        .from('all_leads')
+        .select('metadata, unified_context')
+        .eq('id', task.lead_id)
+        .maybeSingle();
+
+      if (lead) {
+        await supabase
+          .from('all_leads')
+          .update({
+            needs_human_followup: true,
+            metadata: {
+              ...(lead.metadata || {}),
+              needs_manual_call: true,
+              manual_call_reason: callResult.reason,
+              manual_call_flagged_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', task.lead_id);
+      }
+    }
+
+    // Log to conversations
+    if (task.lead_id) {
+      await supabase.from('conversations').insert({
+        lead_id: task.lead_id,
+        channel: 'voice',
+        sender: 'system',
+        content: `[Voice call failed] ${callResult.reason}. Flagged for manual call.`,
+        message_type: 'system',
+        metadata: {
+          task_type: 'try_voice_call',
+          task_id: task.id,
+          call_result: callResult,
+          timing_reason: timingReason,
+          ...escalation,
+        },
+      });
+    }
+
+    await updateChannelPerformance(task.lead_id, 'voice', 'sent', null);
+
+    // Update task metadata with escalation state
+    await supabase.from('agent_tasks').update({
+      metadata: { ...task.metadata, ...escalation, timing_reason: timingReason, call_result: callResult },
+    }).eq('id', task.id);
+
+    console.log(`[VoiceCall] ${timingReason} for ${task.lead_name}`);
+    return null;
+  }
+
+  // Call succeeded (initiated)
+  const timingReason = `Voice call initiated (call_id: ${callResult.call_id})`;
+
+  // Log to conversations
+  if (task.lead_id) {
+    await supabase.from('conversations').insert({
+      lead_id: task.lead_id,
+      channel: 'voice',
+      sender: 'agent',
+      content: `[Outbound voice call] Called ${task.lead_name}`,
+      message_type: 'voice',
+      metadata: {
+        task_type: 'try_voice_call',
+        task_id: task.id,
+        call_id: callResult.call_id,
+        call_status: callResult.status,
+        timing_reason: timingReason,
+        ...escalation,
+      },
+    });
+  }
+
+  await updateChannelPerformance(task.lead_id, 'voice', 'sent', null);
+
+  // Update task metadata
+  await supabase.from('agent_tasks').update({
+    metadata: { ...task.metadata, ...escalation, timing_reason: timingReason, call_result: callResult },
+  }).eq('id', task.id);
+
+  // Schedule missed_call_followup in case of no answer (30 min later)
+  // The voice server webhook should cancel this if the call connects
+  await supabase.from('agent_tasks').insert({
+    task_type: 'missed_call_followup',
+    task_description: `Missed call follow-up for ${task.lead_name} after voice attempt`,
+    lead_id: task.lead_id || null,
+    lead_phone: phone10,
+    lead_name: task.lead_name,
+    status: 'pending',
+    scheduled_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    metadata: {
+      source: 'voice_escalation',
+      prev_task_id: task.id,
+      call_id: callResult.call_id,
+      ...escalation,
+      timing_reason: 'Scheduled 30min after voice call attempt in case of no answer',
+    },
+    created_at: new Date().toISOString(),
+  });
+
+  // Notify via Telegram
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID) {
+    const body =
+      `<b>📞 VOICE CALL INITIATED</b>\n\n` +
+      `Lead: ${task.lead_name} (${phone10})\n` +
+      `Call ID: ${callResult.call_id}\n` +
+      `Reason: WhatsApp escalation\n\n` +
+      `Missed call follow-up queued for 30min.`;
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body).catch(() => {});
+  }
+
+  console.log(`[VoiceCall] ${timingReason} for ${task.lead_name}`);
+  return null;
+}
 
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
@@ -400,6 +778,9 @@ async function executeTask(task) {
     case 'human_callback':
       return await executeHumanCallback(task, waPhone);
 
+    case 'try_voice_call':
+      return await executeVoiceCall(task, waPhone);
+
     default:
       throw new Error(`Unknown task type: ${task.task_type}`);
   }
@@ -714,10 +1095,77 @@ async function executeSequenceStep(task, waPhone, message) {
     }
   }
 
-  // Send the message
-  const result = await executeSendMessage(task, waPhone, message);
+  // ── Escalation-aware channel selection ──
+  const channelChoice = await selectBestChannel(task.lead_id, task.metadata);
+  let result;
 
-  // Schedule next step based on current task type - pass resolved phone so child tasks get the correct number
+  if (channelChoice.channel === 'voice') {
+    // Escalate to voice call instead of WhatsApp
+    const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+    const escalation = recordChannelAttempt(task.metadata, 'voice', 'attempting');
+    const timingReason = `Escalated to voice: ${channelChoice.reason}`;
+
+    await supabase.from('agent_tasks').update({
+      metadata: { ...task.metadata, ...escalation, timing_reason: timingReason },
+    }).eq('id', task.id);
+
+    // Create a try_voice_call task immediately
+    await supabase.from('agent_tasks').insert({
+      task_type: 'try_voice_call',
+      task_description: `Voice escalation from ${task.task_type} for ${task.lead_name}`,
+      lead_id: task.lead_id || null,
+      lead_phone: phone10,
+      lead_name: task.lead_name,
+      status: 'pending',
+      scheduled_at: new Date().toISOString(),
+      metadata: {
+        source: 'sequence_escalation',
+        sequence,
+        step,
+        prev_task_id: task.id,
+        ...escalation,
+        timing_reason: timingReason,
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    console.log(`[Sequence] ${timingReason} for ${task.lead_name}`);
+    result = null;
+  } else {
+    // ── WhatsApp path: check if we need a different angle ──
+    const escalationLevel = task.metadata?.current_escalation_level || 1;
+    const channelsTried = task.metadata?.channels_tried || [];
+    const voiceWasTried = channelsTried.some(c => c.channel === 'voice');
+
+    // follow_up_day5 after voice didn't connect → different messaging angle
+    if (task.task_type === 'follow_up_day5' && voiceWasTried) {
+      message = `${task.lead_name}, I know we've been trying to connect. I get it, busy schedules! Here's the thing - we've helped businesses like yours save 15+ hours/week with AI. When you have 2 minutes, just reply "yes" and I'll send over a quick case study.`;
+      const escalation = recordChannelAttempt(task.metadata, 'whatsapp', 'sent');
+      await supabase.from('agent_tasks').update({
+        metadata: { ...task.metadata, ...escalation, timing_reason: 'Different angle after voice attempt failed' },
+      }).eq('id', task.id);
+    }
+
+    // re_engage (final step) → use the channel that historically got best response
+    if (task.task_type === 're_engage' && step === 4) {
+      // selectBestChannel already picked the best, and we're here so it's WhatsApp
+      const escalation = recordChannelAttempt(task.metadata, 'whatsapp', 'sent');
+      await supabase.from('agent_tasks').update({
+        metadata: { ...task.metadata, ...escalation, timing_reason: `Final re-engage via best channel: ${channelChoice.reason}` },
+      }).eq('id', task.id);
+    }
+
+    // Track the WhatsApp attempt
+    const escalation = recordChannelAttempt(task.metadata, 'whatsapp', 'sent');
+
+    // Send the message via WhatsApp
+    result = await executeSendMessage(task, waPhone, message);
+
+    // Update channel performance
+    await updateChannelPerformance(task.lead_id, 'whatsapp', 'sent', null);
+  }
+
+  // Schedule next step based on current task type
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
   if (task.task_type === 'follow_up_day1') {
     await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
@@ -1358,6 +1806,9 @@ async function executeSendMessage(task, waPhone, message) {
     }).then(({ error }) => {
       if (error) console.error('[executeTask] Conversation log error:', error.message);
     });
+
+    // Track channel performance
+    updateChannelPerformance(task.lead_id, 'whatsapp', 'sent', null).catch(() => {});
   }
 
   return null;
