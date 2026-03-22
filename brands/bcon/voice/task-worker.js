@@ -1152,6 +1152,13 @@ async function findUnansweredQuestions() {
       if (!lastMsg || lastMsg.sender !== 'customer') continue;
       if (!lastMsg.content || !lastMsg.content.includes('?')) continue;
 
+      // Filter out Meta form auto-generated greetings (not real questions)
+      const content = lastMsg.content;
+      if (/^(hello|hi)!\s+i\s+filled/i.test(content) ||
+          /filled\s+(in|out)\s+your\s+form/i.test(content)) {
+        continue;
+      }
+
       // Check no pending tasks exist for this lead
       const { data: pendingTasks } = await supabase
         .from('agent_tasks')
@@ -1918,19 +1925,23 @@ async function processPendingTasks() {
 
       // If task was skipped (e.g. lead already responded), mark completed with note
       if (result && result.skipped) {
+        const completedAction = result.reason || 'Skipped - condition no longer applies';
         await supabase.from('agent_tasks').update({
           status: 'completed',
           completed_at: new Date().toISOString(),
-          error_message: result.reason || 'Skipped - condition no longer applies',
+          error_message: completedAction,
+          metadata: { ...task.metadata, completed_action: completedAction },
         }).eq('id', task.id);
-        console.log(`[ProcessTasks] Skipped: ${task.task_type} for ${task.lead_name} - ${result.reason}`);
+        console.log(`[ProcessTasks] Skipped: ${task.task_type} for ${task.lead_name} - ${completedAction}`);
         continue;
       }
 
+      const completedAction = `Sent ${task.task_type.replace(/_/g, ' ')} to ${task.lead_name}`;
       await supabase.from('agent_tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        error_message: null
+        error_message: null,
+        metadata: { ...task.metadata, completed_action: completedAction },
       }).eq('id', task.id);
       console.log(`[ProcessTasks] Completed: ${task.task_type} for ${task.lead_name}`);
       await notifyTaskResult(task, true);

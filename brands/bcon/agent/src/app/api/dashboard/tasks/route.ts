@@ -119,6 +119,9 @@ export async function GET(request: NextRequest) {
       if (t.metadata?.confidence_score != null) {
         enriched.confidence_score = t.metadata.confidence_score
       }
+      if (t.metadata?.completed_action) {
+        enriched.completed_action = t.metadata.completed_action
+      }
 
       return enriched
     })
