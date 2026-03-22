@@ -1835,14 +1835,57 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     {calculatedScore ? (
                       <div className="space-y-4">
-                        {/* Score headline */}
+                        {/* Score headline + Temperature badge */}
                         <div>
                           <div className="flex items-baseline gap-2">
                             <span className="text-3xl font-extrabold text-[var(--text-primary)]">{calculatedScore.score}/100</span>
                             <span className="text-sm font-bold" style={{ color: healthColor.text }}>{healthColor.label}</span>
+                            {(() => {
+                              const temp = currentLead.unified_context?.lead_temperature
+                              if (!temp) return null
+                              const tempConfig: Record<string, { color: string; bg: string; label: string }> = {
+                                hot:  { color: '#DC2626', bg: 'rgba(220,38,38,0.12)', label: 'HOT' },
+                                warm: { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'WARM' },
+                                cool: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'COOL' },
+                                cold: { color: '#6B7280', bg: 'rgba(107,114,128,0.12)', label: 'COLD' },
+                              }
+                              const cfg = tempConfig[temp] || tempConfig.warm
+                              return (
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                                  style={{ color: cfg.color, backgroundColor: cfg.bg }}
+                                >
+                                  {temp === 'hot' ? '🔥' : temp === 'warm' ? '🟠' : temp === 'cool' ? '🔵' : '⚪'} {cfg.label}
+                                </span>
+                              )
+                            })()}
                           </div>
                           <p className="text-xs text-[var(--text-muted)] mt-1">Based on conversation activity and intent signals</p>
                         </div>
+
+                        {/* Temperature History Timeline */}
+                        {currentLead.unified_context?.temperature_history?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Temperature History</p>
+                            <div className="flex items-center gap-0.5 overflow-x-auto pb-1">
+                              {(currentLead.unified_context.temperature_history as Array<{temperature: string; timestamp: string; reason: string}>).slice(-15).map((entry: {temperature: string; timestamp: string; reason: string}, i: number) => {
+                                const dotColor = entry.temperature === 'hot' ? '#DC2626' : entry.temperature === 'warm' ? '#F97316' : entry.temperature === 'cool' ? '#3B82F6' : '#6B7280'
+                                const time = new Date(entry.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                return (
+                                  <div key={i} className="flex flex-col items-center group relative" title={`${entry.temperature}: ${entry.reason}\n${time}`}>
+                                    <div
+                                      className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer transition-transform group-hover:scale-150"
+                                      style={{ backgroundColor: dotColor }}
+                                    />
+                                    {i < (currentLead.unified_context.temperature_history as Array<any>).slice(-15).length - 1 && (
+                                      <div className="w-3 h-px bg-[var(--border-secondary)]" />
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Signals list */}
                         <div className="space-y-1.5">

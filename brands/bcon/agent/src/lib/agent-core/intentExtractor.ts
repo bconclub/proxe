@@ -137,6 +137,62 @@ export function extractPainPoint(message: string): PainPointMatch | null {
   return best;
 }
 
+// ─── Objection Detection (keyword-based, zero token cost) ───────────────────
+
+interface DetectedObjection {
+  type: 'price' | 'timing' | 'trust' | 'authority' | 'need';
+}
+
+const OBJECTION_PATTERNS: { pattern: RegExp; type: DetectedObjection['type'] }[] = [
+  // Price objection
+  { pattern: /\btoo\s+expensive\b/i, type: 'price' },
+  { pattern: /\bcan'?t\s+afford\b/i, type: 'price' },
+  { pattern: /\bout\s+of\s+(?:my\s+)?budget\b/i, type: 'price' },
+  { pattern: /\btoo\s+much\b/i, type: 'price' },
+  { pattern: /\bcost(?:s|ly)?\s+(?:too|a\s+lot)\b/i, type: 'price' },
+
+  // Timing objection
+  { pattern: /\bnot\s+(?:right\s+)?now\b/i, type: 'timing' },
+  { pattern: /\bnot\s+the\s+right\s+time\b/i, type: 'timing' },
+  { pattern: /\bmaybe\s+later\b/i, type: 'timing' },
+  { pattern: /\bbusy\s+right\s+now\b/i, type: 'timing' },
+  { pattern: /\bnext\s+(?:month|quarter|year)\b/i, type: 'timing' },
+
+  // Trust objection
+  { pattern: /\bnot\s+sure\s+about\s+this\b/i, type: 'trust' },
+  { pattern: /\bseems?\s+too\s+good\b/i, type: 'trust' },
+  { pattern: /\bhow\s+do\s+I\s+know\b/i, type: 'trust' },
+  { pattern: /\bany\s+proof\b/i, type: 'trust' },
+  { pattern: /\bany\s+(?:case\s+stud|testimonial|review|result)/i, type: 'trust' },
+  { pattern: /\bis\s+this\s+(?:legit|real|genuine)\b/i, type: 'trust' },
+
+  // Authority objection
+  { pattern: /\bneed\s+to\s+(?:ask|check\s+with|talk\s+to)\s+my\b/i, type: 'authority' },
+  { pattern: /\bnot\s+my\s+decision\b/i, type: 'authority' },
+  { pattern: /\bhave\s+to\s+check\s+with\b/i, type: 'authority' },
+  { pattern: /\bmy\s+(?:partner|boss|manager|team)\s+(?:needs?\s+to|has\s+to|should)\b/i, type: 'authority' },
+
+  // Need objection
+  { pattern: /\bdon'?t\s+need\s+this\b/i, type: 'need' },
+  { pattern: /\bwe'?re\s+fine\b/i, type: 'need' },
+  { pattern: /\balready\s+have\s+(?:something|a\s+solution|a\s+tool|a\s+system)\b/i, type: 'need' },
+  { pattern: /\bnot\s+(?:looking|searching)\s+for\b/i, type: 'need' },
+  { pattern: /\bdon'?t\s+(?:see\s+the\s+)?need\b/i, type: 'need' },
+];
+
+/**
+ * Detect objections in a customer message using keyword matching.
+ * Returns null if no objection detected.
+ */
+export function detectObjection(message: string): DetectedObjection | null {
+  for (const { pattern, type } of OBJECTION_PATTERNS) {
+    if (pattern.test(message)) {
+      return { type };
+    }
+  }
+  return null;
+}
+
 /**
  * Check if a message contains booking-related keywords
  */

@@ -9,7 +9,7 @@ import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
 import { generateResponse, generateResponseWithTools, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
-import { extractIntent, isBookingIntent, extractPainPoint } from './intentExtractor';
+import { extractIntent, isBookingIntent, extractPainPoint, detectObjection } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
 import { generateSummary } from './summarizer';
 import {
@@ -955,6 +955,128 @@ async function createFlowTask(
   }
 }
 
+// ─── Lead Temperature Evaluation (keyword-based, zero token cost) ────────────
+
+const HOT_PATTERNS = [
+  /\bhow\s+much\b/i, /\bcost\b/i, /\bpricing\b/i, /\bbudget\b/i, /\brate\b/i, /\bprice\b/i,
+  /\basap\b/i, /\bimmediately\b/i, /\bthis\s+week\b/i, /\burgent\b/i, /\bright\s+now\b/i,
+  /\blet'?s\s+do\s+it\b/i, /\bsign\s+me\s+up\b/i, /\bready\s+to\s+start\b/i, /\bwhen\s+can\s+we\s+begin\b/i,
+  /\bother\s+options\b/i, /\bcomparing\b/i, /\balternative\b/i,
+  /\bmy\s+partner\b/i, /\bmy\s+boss\b/i, /\bwe\s+decided\b/i,
+];
+
+const WARM_PATTERNS = [
+  /\bhow\s+does\s+it\s+work\b/i, /\bwhat\s+do\s+you\s+offer\b/i, /\btell\s+me\s+more\b/i,
+  /\bteam\s+(?:of|size)\b/i, /\brevenue\b/i, /\bclients?\b/i, /\bemployees?\b/i,
+];
+
+const COOL_PATTERNS = [
+  /^(?:ok|hmm|sure|maybe|ya|yea|k|okay)\.?$/i,
+  /\bi'?ll\s+think\s+about\s+it\b/i, /\bnot\s+sure\b/i, /\bmaybe\s+later\b/i, /\blater\b/i,
+];
+
+const COLD_PATTERNS = [
+  /\bnot\s+interested\b/i, /\bstop\b/i, /\bdon'?t\s+contact\b/i,
+  /\bunsubscribe\b/i, /\bremove\s+me\b/i, /\bno\s+thanks\b/i, /\bleave\s+me\s+alone\b/i,
+];
+
+/**
+ * Evaluate lead temperature from a customer message + context.
+ * Returns { temperature, reason } based on keyword matching.
+ */
+function evaluateLeadTemperature(
+  message: string,
+  messageCount: number,
+  lastResponseTimeSec: number | null,
+): { temperature: 'hot' | 'warm' | 'cool' | 'cold'; reason: string } {
+  const msg = message.trim();
+
+  // Check cold first (opt-outs take priority)
+  for (const p of COLD_PATTERNS) {
+    if (p.test(msg)) return { temperature: 'cold', reason: `Opt-out signal: "${msg.substring(0, 40)}"` };
+  }
+
+  // Check hot signals
+  for (const p of HOT_PATTERNS) {
+    if (p.test(msg)) return { temperature: 'hot', reason: `Buying/urgency signal: "${msg.substring(0, 40)}"` };
+  }
+
+  // Check cool signals (short vague answers)
+  for (const p of COOL_PATTERNS) {
+    if (p.test(msg)) return { temperature: 'cool', reason: `Vague/short reply: "${msg.substring(0, 40)}"` };
+  }
+
+  // Slow reply (over 1 hour) → cool
+  if (lastResponseTimeSec !== null && lastResponseTimeSec > 3600) {
+    return { temperature: 'cool', reason: `Slow reply (${Math.round(lastResponseTimeSec / 60)} min)` };
+  }
+
+  // Check warm signals
+  for (const p of WARM_PATTERNS) {
+    if (p.test(msg)) return { temperature: 'warm', reason: `Feature/detail question: "${msg.substring(0, 40)}"` };
+  }
+
+  // Multiple messages in session → warm
+  if (messageCount >= 3) {
+    return { temperature: 'warm', reason: `Active engagement (${messageCount} messages)` };
+  }
+
+  // Fast reply (under 5 minutes) → warm
+  if (lastResponseTimeSec !== null && lastResponseTimeSec < 300) {
+    return { temperature: 'warm', reason: `Fast reply (${Math.round(lastResponseTimeSec / 60)} min)` };
+  }
+
+  return { temperature: 'warm', reason: 'Default - active conversation' };
+}
+
+/**
+ * Update lead temperature and history in unified_context.
+ */
+async function updateLeadTemperature(
+  supabase: SupabaseClient,
+  leadId: string,
+  message: string,
+  messageCount: number,
+  existingContext: Record<string, any>,
+): Promise<void> {
+  try {
+    // Get last response time for this lead
+    const lastResponseTimes = existingContext.response_patterns?.last_5_response_times || [];
+    const lastResponseTimeSec = lastResponseTimes.length > 0 ? lastResponseTimes[lastResponseTimes.length - 1] : null;
+
+    const { temperature, reason } = evaluateLeadTemperature(message, messageCount, lastResponseTimeSec);
+
+    // Build temperature history (keep last 20 entries)
+    const history = [...(existingContext.temperature_history || [])];
+    history.push({ temperature, timestamp: new Date().toISOString(), reason });
+    const trimmedHistory = history.slice(-20);
+
+    // Detect objections
+    const objection = detectObjection(message);
+    let objections = existingContext.objections || [];
+    if (objection) {
+      objections = [...objections, { type: objection.type, message: message.substring(0, 100), timestamp: new Date().toISOString() }];
+      objections = objections.slice(-10);
+    }
+
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...existingContext,
+          lead_temperature: temperature,
+          temperature_history: trimmedHistory,
+          objections,
+        },
+      })
+      .eq('id', leadId);
+
+    console.log(`[Engine] Temperature for ${leadId}: ${temperature} (${reason})${objection ? `, objection: ${objection.type}` : ''}`);
+  } catch (err: any) {
+    console.error('[Engine] Failed to update lead temperature:', err?.message);
+  }
+}
+
 /**
  * Calculate and store response patterns for a lead.
  * Looks at all customer messages and the preceding agent messages to compute:
@@ -1098,6 +1220,16 @@ async function scheduleFlowTasks(
   // ── Response Pattern Tracking ──────────────────────────────────────────────
   await updateResponsePatterns(supabase, leadId, lead.unified_context || {});
 
+  // ── Lead Temperature + Objection Detection ─────────────────────────────────
+  // Re-fetch context since updateResponsePatterns may have changed it
+  const { data: freshLead } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .maybeSingle();
+  const freshCtx = freshLead?.unified_context || lead.unified_context || {};
+  await updateLeadTemperature(supabase, leadId, input.message, input.messageCount, freshCtx);
+
   // Pain point extraction from customer message
   const painMatch = extractPainPoint(input.message);
   if (painMatch) {
@@ -1130,19 +1262,28 @@ async function scheduleFlowTasks(
     const lastQuestion = sentences.filter(s => s.includes('?')).pop() || aiResponse;
     const lastQuestionTrimmed = lastQuestion.substring(0, 200);
 
+    // Temperature-adjusted nudge timer: hot=1h, warm=2h, cool=3h
+    const temperature = freshCtx.lead_temperature || 'warm';
+    const tempMult = temperature === 'hot' ? 0.5 : temperature === 'cool' ? 1.5 : 1.0;
+    const nudgeDelayMs = Math.round(2 * 60 * 60 * 1000 * tempMult);
+    const nudgeTimingReason = temperature !== 'warm'
+      ? `${temperature} lead: nudge in ${Math.round(nudgeDelayMs / (60 * 60 * 1000))}h (adjusted from 2h)`
+      : 'Initial 2h nudge timer, will adjust based on read receipts';
+
     await createFlowTask(supabase, {
       taskType: 'nudge_waiting',
       leadId,
       leadPhone,
       leadName,
-      scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      scheduledAt: new Date(Date.now() + nudgeDelayMs).toISOString(),
       taskDescription: `Nudge: waiting for reply on ${input.channel} - "${lastQuestion.substring(0, 80)}..."`,
       metadata: {
         last_question: lastQuestionTrimmed,
         channel: input.channel,
         session_id: input.sessionId,
         created_by: 'engine',
-        timing_reason: 'Initial 2h nudge timer, will adjust based on read receipts',
+        lead_temperature: temperature,
+        timing_reason: nudgeTimingReason,
       },
     });
   }
@@ -1155,7 +1296,9 @@ async function scheduleFlowTasks(
   }
 
   // Flow D: 5+ messages but no booking - nudge toward booking
-  if (input.messageCount >= 5) {
+  // Cool leads: don't push to book, just nurture. Cold leads: skip entirely.
+  const temperature = freshCtx.lead_temperature || 'warm';
+  if (input.messageCount >= 5 && temperature !== 'cool' && temperature !== 'cold') {
     const sessionTable = input.channel === 'web' ? 'web_sessions' : 'whatsapp_sessions';
     const { data: session } = await supabase
       .from(sessionTable)
@@ -1165,18 +1308,23 @@ async function scheduleFlowTasks(
 
     const hasBooking = session?.booking_status && session.booking_status !== 'none';
     if (!hasBooking) {
+      // Temperature-adjusted push-to-book: hot=2h, warm=4h
+      const ptbMult = temperature === 'hot' ? 0.5 : 1.0;
+      const ptbDelayMs = Math.round(4 * 60 * 60 * 1000 * ptbMult);
       await createFlowTask(supabase, {
         taskType: 'push_to_book',
         leadId,
         leadPhone,
         leadName,
-        scheduledAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        scheduledAt: new Date(Date.now() + ptbDelayMs).toISOString(),
         taskDescription: `Lead engaged (${input.messageCount} msgs on ${input.channel}) but no booking yet`,
         metadata: {
           message_count: input.messageCount,
           channel: input.channel,
           session_id: input.sessionId,
           created_by: 'engine',
+          lead_temperature: temperature,
+          timing_reason: `${temperature} lead: push-to-book in ${Math.round(ptbDelayMs / (60 * 60 * 1000))}h`,
         },
       });
     }

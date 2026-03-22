@@ -26,6 +26,97 @@ const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
 
 // ============================================
+// LEAD TEMPERATURE - Timing Multipliers
+// ============================================
+const TEMPERATURE_MULTIPLIERS = {
+  hot:  0.5,  // 50% shorter timers
+  warm: 1.0,  // normal
+  cool: 1.5,  // 50% longer timers
+  cold: null,  // stop sequences, re-engage only
+};
+
+// Sequence day gaps per temperature (day1/day3/day5 pattern)
+const TEMPERATURE_SEQUENCE_DAYS = {
+  hot:  [1, 2, 3],   // day 1/2/3
+  warm: [1, 3, 5],   // standard
+  cool: [2, 5, 8],   // stretched
+  cold: null,
+};
+
+/**
+ * Fetch lead temperature and objections from unified_context.
+ */
+async function getLeadTemperatureData(leadId) {
+  if (!leadId) return { temperature: 'warm', objections: [], channelPerf: null };
+  const { data: lead } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .maybeSingle();
+  const ctx = lead?.unified_context || {};
+  return {
+    temperature: ctx.lead_temperature || 'warm',
+    objections: ctx.objections || [],
+    channelPerf: ctx.channel_performance || null,
+  };
+}
+
+/**
+ * Apply temperature multiplier to a delay.
+ */
+function applyTemperatureDelay(delayMs, temperature) {
+  const mult = TEMPERATURE_MULTIPLIERS[temperature];
+  if (mult === null) return delayMs; // cold leads handled separately
+  return Math.round(delayMs * mult);
+}
+
+/**
+ * Get objection-aware message for follow-up.
+ * Checks objections and avoids repeating the same angle.
+ * Returns { message, message_angle } or null if no objection-specific angle needed.
+ */
+function getObjectionAwareMessage(leadName, objections, usedAngles) {
+  if (!objections || objections.length === 0) return null;
+
+  // Find most recent objection whose angle hasn't been used yet
+  const angleMap = {
+    price: {
+      angle: 'value',
+      message: `${leadName}, the businesses using this are seeing 3x return in the first month. It's not a cost, it's an investment that pays for itself. Want me to break down the numbers for your business?`,
+    },
+    timing: {
+      angle: 'timing',
+      message: `No rush ${leadName}. When the time is right, we'll be here. Just know that every week without this, you're leaving leads on the table. Whenever you're ready.`,
+    },
+    trust: {
+      angle: 'proof',
+      message: `${leadName}, totally get the hesitation. Here's what a business similar to yours achieved: 2x more leads in 30 days, all automated. Happy to show you a live demo anytime.`,
+    },
+    authority: {
+      angle: 'authority',
+      message: `${leadName}, that makes sense. Happy to hop on a quick call with your team so everyone's on the same page. When works for a 15-min group chat?`,
+    },
+    need: {
+      angle: 'need',
+      message: `${leadName}, fair enough! Quick question though - are you currently tracking how many leads you're missing after hours? Most businesses we talk to don't realize the gap until they see the data. Want a free audit?`,
+    },
+  };
+
+  const used = new Set(usedAngles || []);
+
+  // Try from most recent objection backward
+  for (let i = objections.length - 1; i >= 0; i--) {
+    const obj = objections[i];
+    const mapped = angleMap[obj.type];
+    if (mapped && !used.has(mapped.angle)) {
+      return { message: mapped.message, message_angle: mapped.angle };
+    }
+  }
+
+  return null; // All angles already used
+}
+
+// ============================================
 // ESCALATION CHAIN - Multi-channel fallback
 // ============================================
 // Step 1: WhatsApp free-form (within 24h)
@@ -614,10 +705,54 @@ async function processPendingTasks() {
     return;
   }
 
-  console.log(`[ProcessTasks] Processing ${tasks.length} tasks`);
+  // Sort tasks by lead temperature: hot first, then warm, cool, cold
+  const tempOrder = { hot: 0, warm: 1, cool: 2, cold: 3 };
+  const sortedTasks = [...tasks];
+  // Fetch temperatures for all leads in batch
+  const leadIds = [...new Set(tasks.filter(t => t.lead_id).map(t => t.lead_id))];
+  const tempCache = {};
+  if (leadIds.length > 0) {
+    const { data: leads } = await supabase
+      .from('all_leads')
+      .select('id, unified_context')
+      .in('id', leadIds);
+    for (const l of (leads || [])) {
+      tempCache[l.id] = l.unified_context?.lead_temperature || 'warm';
+    }
+  }
+  sortedTasks.sort((a, b) => {
+    const ta = tempCache[a.lead_id] || 'warm';
+    const tb = tempCache[b.lead_id] || 'warm';
+    return (tempOrder[ta] || 1) - (tempOrder[tb] || 1);
+  });
 
-  for (const task of tasks) {
+  console.log(`[ProcessTasks] Processing ${sortedTasks.length} tasks (sorted by temperature)`);
+
+  for (const task of sortedTasks) {
     try {
+      // ── Cold lead handling: stop all sequences, only allow re_engage ──
+      const leadTemp = tempCache[task.lead_id] || 'warm';
+      if (leadTemp === 'cold' && task.metadata?.sequence && task.task_type !== 're_engage') {
+        await supabase.from('agent_tasks').update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: 'Lead is cold - sequence stopped',
+        }).eq('id', task.id);
+        // Cancel all other pending sequence tasks for this cold lead
+        if (task.lead_id && task.metadata?.sequence) {
+          await supabase.from('agent_tasks').update({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+            error_message: 'Lead is cold - all sequences cancelled',
+          })
+          .eq('lead_id', task.lead_id)
+          .eq('status', 'pending')
+          .neq('task_type', 're_engage');
+        }
+        console.log(`[ProcessTasks] Cold lead - cancelled ${task.task_type} for ${task.lead_name}`);
+        continue;
+      }
+
       // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hourIST = nowIST.getHours();
@@ -1155,6 +1290,22 @@ async function executeSequenceStep(task, waPhone, message) {
       }).eq('id', task.id);
     }
 
+    // ── Objection-aware messaging ──
+    if (task.lead_id) {
+      const { objections } = await getLeadTemperatureData(task.lead_id);
+      const usedAngles = task.metadata?.used_angles || [];
+      const objectionMsg = getObjectionAwareMessage(task.lead_name, objections, usedAngles);
+      if (objectionMsg) {
+        message = objectionMsg.message;
+        // Track the angle so we don't repeat it
+        const updatedAngles = [...usedAngles, objectionMsg.message_angle];
+        await supabase.from('agent_tasks').update({
+          metadata: { ...task.metadata, message_angle: objectionMsg.message_angle, used_angles: updatedAngles },
+        }).eq('id', task.id);
+        console.log(`[Sequence] Objection-aware message for ${task.lead_name}: angle=${objectionMsg.message_angle}`);
+      }
+    }
+
     // Track the WhatsApp attempt
     const escalation = recordChannelAttempt(task.metadata, 'whatsapp', 'sent');
 
@@ -1196,9 +1347,10 @@ async function executeSequenceStep(task, waPhone, message) {
 async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, sequence, resolvedPhone) {
   const phone = resolvedPhone || task.lead_phone;
 
-  // Fetch lead's response patterns and last message read status
+  // Fetch lead's response patterns, temperature, and last message read status
   let responsePatterns = null;
   let lastMsgReadStatus = null;
+  let leadTemperature = 'warm';
   if (task.lead_id) {
     const { data: lead } = await supabase
       .from('all_leads')
@@ -1206,6 +1358,7 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
       .eq('id', task.lead_id)
       .maybeSingle();
     responsePatterns = lead?.unified_context?.response_patterns || null;
+    leadTemperature = lead?.unified_context?.lead_temperature || 'warm';
 
     // Check if the last agent message was read
     const { data: lastMsg } = await supabase
@@ -1226,9 +1379,14 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
     }
   }
 
-  // Adjust gap based on read receipts
-  let adjustedDelay = delayMs;
+  // Apply temperature multiplier to base delay
+  let adjustedDelay = applyTemperatureDelay(delayMs, leadTemperature);
   let timingReason = '';
+  if (leadTemperature !== 'warm') {
+    timingReason = `Temperature ${leadTemperature}: delay ${leadTemperature === 'hot' ? 'halved' : 'extended'} to ${Math.round(adjustedDelay / (60 * 60 * 1000))}h`;
+  }
+
+  // Further adjust gap based on read receipts
 
   if (lastMsgReadStatus === 'read') {
     // Reading but not replying → shorten gap (interested but needs more nudges)
