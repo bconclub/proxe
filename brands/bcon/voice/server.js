@@ -255,19 +255,25 @@ wss.on('connection', (ws, req) => {
         aiFailures++;
         console.log('AI failure count:', aiFailures);
         if (aiFailures >= 2) {
+          isSpeaking = true;
           await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
+          isSpeaking = false;
           const totalMs = Date.now() - pipelineStart;
           console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (fallback)`);
           ws.close();
           return;
         }
+        isSpeaking = true;
         await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
+        isSpeaking = false;
         const totalMs = Date.now() - pipelineStart;
         console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (AI fail)`);
       } else {
         aiFailures = 0;
+        isSpeaking = true;
         const ttsStart = Date.now();
         await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
+        isSpeaking = false;
         const ttsSendMs = Date.now() - ttsStart;
         const totalMs = Date.now() - pipelineStart;
         console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${ttsSendMs}ms, Total: ${totalMs}ms`);
@@ -625,11 +631,9 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
     const chunks = prepareAudioChunks(audio);
     const resampleMs = Date.now() - resampleStart;
     console.log(`[TIMING] Resample + chunk: ${resampleMs}ms (${chunks.length} chunks)`);
-    isSpeaking = true;
     const firstChunkTime = Date.now();
     await sendChunkedAudio(ws, chunks);
     console.log(`[TIMING] First audio chunk sent at: +${firstChunkTime - ttsCallStart}ms after TTS request`);
-    isSpeaking = false;
   } else {
     console.log('Audio not sent - null or ws closed');
   }
