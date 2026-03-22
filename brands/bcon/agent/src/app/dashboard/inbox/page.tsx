@@ -171,6 +171,27 @@ function getFormFieldLabel(key: string): string {
   return key.length > 15 ? key.substring(0, 15) + '…' : key;
 }
 
+/** Format a time gap in ms to a human-readable short string */
+function formatGap(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  if (hrs < 24) return remainMins > 0 ? `${hrs}h ${remainMins}m` : `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
+
+/** Color for gap: green < 5min, yellow 5-30min, red > 30min */
+function gapColor(ms: number): string {
+  const mins = ms / 60000;
+  if (mins < 5) return '#22c55e';
+  if (mins <= 30) return '#f59e0b';
+  return '#ef4444';
+}
+
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -1342,9 +1363,18 @@ export default function InboxPage() {
                     });
                     const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
 
+                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(messages[msgIdx - 1].created_at).getTime() : 0;
+
                     return (
                       <React.Fragment key={msg.id}>
                       {dateSeparator}
+                      {msgIdx > 0 && formGapMs > 60000 && !showDateSeparator && (
+                        <div className="flex justify-center my-0.5">
+                          <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(formGapMs), background: 'rgba(255,255,255,0.03)' }}>
+                            {formatGap(formGapMs)} gap
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-start">
                         <div
                           className="max-w-[90%] rounded-lg px-3 py-2 border"
@@ -1392,9 +1422,18 @@ export default function InboxPage() {
                   }
 
                   // Regular message bubble
+                  const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(messages[msgIdx - 1].created_at).getTime() : 0;
+
                   return (
                     <React.Fragment key={msg.id}>
                     {dateSeparator}
+                    {msgIdx > 0 && gapMs > 60000 && !showDateSeparator && (
+                      <div className="flex justify-center my-0.5">
+                        <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(gapMs), background: 'rgba(255,255,255,0.03)' }}>
+                          {formatGap(gapMs)} gap
+                        </span>
+                      </div>
+                    )}
                     <div
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
