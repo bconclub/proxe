@@ -18,12 +18,187 @@ const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
-const APPROVAL_MODE = process.env.APPROVAL_MODE || 'approve'; // 'notify' or 'approve'
 const VOBIZ_OUTBOUND_API_URL = process.env.VOBIZ_OUTBOUND_API_URL || null;
 const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
 
 // File to persist Telegram getUpdates offset across runs
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
+// File to persist approval mode override (Telegram /lockdown, /smart, /approve commands)
+const APPROVAL_MODE_FILE = path.join(__dirname, '.approval_mode');
+// File to persist approval statistics
+const APPROVAL_STATS_FILE = path.join(__dirname, '.approval_stats.json');
+
+/**
+ * Get current approval mode. Priority: file override > env var > default 'approve'.
+ * Valid modes: 'approve', 'smart', 'notify', 'lockdown'
+ */
+function getApprovalMode() {
+  try {
+    if (fs.existsSync(APPROVAL_MODE_FILE)) {
+      const mode = fs.readFileSync(APPROVAL_MODE_FILE, 'utf8').trim();
+      if (['approve', 'smart', 'notify', 'lockdown'].includes(mode)) return mode;
+    }
+  } catch (_) {}
+  return process.env.APPROVAL_MODE || 'approve';
+}
+
+function setApprovalMode(mode) {
+  try {
+    fs.writeFileSync(APPROVAL_MODE_FILE, mode);
+  } catch (err) {
+    console.error('[ApprovalMode] Failed to write mode file:', err.message);
+  }
+}
+
+// ============================================
+// APPROVAL STATS - Track approve/reject rates
+// ============================================
+
+function loadApprovalStats() {
+  try {
+    if (fs.existsSync(APPROVAL_STATS_FILE)) {
+      return JSON.parse(fs.readFileSync(APPROVAL_STATS_FILE, 'utf8'));
+    }
+  } catch (_) {}
+  return { overall: { total_sent: 0, approved: 0, rejected: 0 }, per_task_type: {} };
+}
+
+function saveApprovalStats(stats) {
+  try {
+    fs.writeFileSync(APPROVAL_STATS_FILE, JSON.stringify(stats, null, 2));
+  } catch (err) {
+    console.error('[ApprovalStats] Failed to save:', err.message);
+  }
+}
+
+function recordApprovalDecision(taskType, decision) {
+  const stats = loadApprovalStats();
+
+  // Overall
+  stats.overall.total_sent = (stats.overall.total_sent || 0) + 1;
+  if (decision === 'approved') stats.overall.approved = (stats.overall.approved || 0) + 1;
+  if (decision === 'rejected') stats.overall.rejected = (stats.overall.rejected || 0) + 1;
+
+  // Per task type
+  if (!stats.per_task_type[taskType]) {
+    stats.per_task_type[taskType] = { total_sent: 0, approved: 0, rejected: 0 };
+  }
+  const tt = stats.per_task_type[taskType];
+  tt.total_sent = (tt.total_sent || 0) + 1;
+  if (decision === 'approved') tt.approved = (tt.approved || 0) + 1;
+  if (decision === 'rejected') tt.rejected = (tt.rejected || 0) + 1;
+
+  // Check if task type crosses 95% approval after 10+ decisions
+  const totalDecisions = tt.approved + tt.rejected;
+  if (totalDecisions >= 10) {
+    const rate = Math.round((tt.approved / totalDecisions) * 100);
+    tt.approval_rate = rate;
+    if (rate >= 95) {
+      console.log(`[AutoLearn] ${taskType} approval rate ${rate}% (${tt.approved}/${totalDecisions}). Ready for auto-approve.`);
+    }
+  }
+
+  // Also record auto-sent tasks
+  if (decision === 'auto_sent') {
+    stats.overall.auto_sent = (stats.overall.auto_sent || 0) + 1;
+    tt.auto_sent = (tt.auto_sent || 0) + 1;
+  }
+
+  saveApprovalStats(stats);
+}
+
+// ============================================
+// CONFIDENCE SCORING
+// ============================================
+
+// Routine task types that are almost always approved
+const ROUTINE_TASK_TYPES = new Set([
+  'booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m',
+  'reminder_24h', 'reminder_1h', 'reminder_30m',
+  'nudge_waiting', 'post_booking_confirmation',
+]);
+
+/**
+ * Calculate confidence score (0-100) for a task.
+ * Higher = safer to auto-approve.
+ */
+async function calculateConfidence(task, lead) {
+  let score = 50; // base
+  const reasons = [];
+
+  const temperature = lead?.unified_context?.lead_temperature || 'warm';
+  const objections = lead?.unified_context?.objections || [];
+
+  // 1. Historical approval rate for this task type
+  const stats = loadApprovalStats();
+  const tt = stats.per_task_type[task.task_type];
+  const historicalApprovals = tt?.approved || 0;
+  const historicalRejections = tt?.rejected || 0;
+  const totalDecisions = historicalApprovals + historicalRejections;
+
+  if (historicalApprovals >= 10) {
+    score += 30;
+    reasons.push(`${task.task_type} approved ${historicalApprovals}+ times`);
+  } else if (historicalApprovals >= 5) {
+    score += 15;
+    reasons.push(`${task.task_type} approved ${historicalApprovals} times`);
+  } else {
+    score -= 15;
+    reasons.push(`${task.task_type} only approved ${historicalApprovals} times`);
+  }
+
+  // Penalize if rejection rate > 10%
+  if (totalDecisions >= 5 && historicalRejections / totalDecisions > 0.1) {
+    score -= 20;
+    reasons.push(`${task.task_type} rejection rate ${Math.round(historicalRejections / totalDecisions * 100)}%`);
+  }
+
+  // 2. Lead temperature
+  if (temperature === 'hot') { score += 15; reasons.push('hot lead'); }
+  else if (temperature === 'warm') { score += 10; reasons.push('warm lead'); }
+  else if (temperature === 'cool') { score -= 5; reasons.push('cool lead'); }
+  else if (temperature === 'cold') { score -= 20; reasons.push('cold lead'); }
+
+  // 3. Routine tasks are safe
+  if (ROUTINE_TASK_TYPES.has(task.task_type)) {
+    score += 15;
+    reasons.push('routine task type');
+  }
+
+  // 4. Template messages are safer than free-form
+  if (task.metadata?.template || !(await isWithin24hWindowForConfidence(task.lead_id))) {
+    score += 5;
+    reasons.push('template message');
+  }
+
+  // 5. Penalty for risky scenarios
+  if (task.task_type === 'first_outreach') { score -= 15; reasons.push('first outreach to new lead'); }
+  if (task.task_type === 're_engage') { score -= 10; reasons.push('re-engagement after silence'); }
+  if (task.task_type === 'try_voice_call') { score -= 15; reasons.push('voice call attempt'); }
+  if (objections.length > 0) { score -= 10; reasons.push(`lead has ${objections.length} objection(s)`); }
+
+  // Clamp 0-100
+  score = Math.max(0, Math.min(100, score));
+
+  return { score, reasons };
+}
+
+/**
+ * Lightweight 24h check for confidence scoring (avoid duplicate DB call when possible)
+ */
+async function isWithin24hWindowForConfidence(leadId) {
+  if (!leadId) return true;
+  const { data } = await supabase
+    .from('conversations')
+    .select('created_at')
+    .eq('lead_id', leadId)
+    .eq('sender', 'customer')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return false;
+  return (Date.now() - new Date(data.created_at).getTime()) < 24 * 60 * 60 * 1000;
+}
 
 // ============================================
 // LEAD TEMPERATURE - Timing Multipliers
@@ -2073,24 +2248,39 @@ function getTemplatePreview(task, lead) {
 /**
  * Telegram approval gate - runs before any message is sent to a lead.
  *
- * 'approve' mode: sends preview to Telegram, blocks the send, returns awaiting_approval.
- * 'notify' mode: sends heads-up to Telegram, lets the send proceed.
+ * Modes:
+ * 'lockdown': ALL tasks require approval, nothing auto-sends (emergency brake)
+ * 'approve':  everything goes to Telegram for approval (original behavior)
+ * 'smart':    confidence 80+ auto-sends (notified with AUTO-SENT tag), <80 requires approval
+ * 'notify':   everything auto-sends, all notified on Telegram
+ *
  * If Telegram is not configured, lets the send proceed silently.
  */
 async function approvalGate(task, waPhone, message, isTemplate) {
+  const mode = getApprovalMode();
+
+  // Calculate confidence score
+  let lead = null;
+  if (task.lead_id) {
+    const { data } = await supabase.from('all_leads')
+      .select('id, response_count, unified_context')
+      .eq('id', task.lead_id).maybeSingle();
+    lead = data;
+  }
+  const { score: confidence, reasons: confidenceReasons } = await calculateConfidence(task, lead);
+
+  // Store confidence on the task
+  await supabase.from('agent_tasks').update({
+    metadata: { ...task.metadata, confidence_score: confidence, confidence_reasons: confidenceReasons },
+  }).eq('id', task.id);
+
+  console.log(`[Confidence] ${task.task_type} for ${task.lead_name}: ${confidence}/100 [${confidenceReasons.join(', ')}]`);
+
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return null;
 
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
   let msgPreview;
   if (isTemplate) {
-    // Fetch lead record for context-aware template preview
-    let lead = null;
-    if (task.lead_id) {
-      const { data } = await supabase.from('all_leads')
-        .select('id, response_count, unified_context')
-        .eq('id', task.lead_id).maybeSingle();
-      lead = data;
-    }
     const tplInfo = getTemplatePreview(task, lead);
     msgPreview = `Template: ${tplInfo.name}\n${tplInfo.params.map(p => `${p.label}: ${p.value}`).join('\n')}`;
   } else {
@@ -2100,13 +2290,18 @@ async function approvalGate(task, waPhone, message, isTemplate) {
     ? new Date(task.scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
     : 'now';
 
-  if (APPROVAL_MODE === 'approve') {
+  const confidenceTag = `Confidence: ${confidence}/100`;
+
+  // ── LOCKDOWN: everything requires approval ──
+  if (mode === 'lockdown' || mode === 'approve') {
+    const modeLabel = mode === 'lockdown' ? '🔒 LOCKDOWN' : 'APPROVAL NEEDED';
     const body =
-      `<b>PROXE APPROVAL NEEDED</b>\n\n` +
+      `<b>PROXE ${modeLabel}</b>\n\n` +
       `Lead: ${task.lead_name} (${phone10})\n` +
       `Type: ${task.task_type}\n` +
+      `${confidenceTag}\n` +
       `Scheduled: ${scheduledAt}\n\n` +
-      `Message that will be sent:\n<i>${escapeHtml(msgPreview)}</i>`;
+      `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
     const keyboard = {
       inline_keyboard: [[
         { text: 'Approve', callback_data: `approve_${task.id}` },
@@ -2115,18 +2310,64 @@ async function approvalGate(task, waPhone, message, isTemplate) {
     };
     try {
       await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body, keyboard);
-      console.log(`[TelegramGate] Approval request sent for ${task.task_type} → ${task.lead_name}`);
+      console.log(`[TelegramGate] ${mode} approval request for ${task.task_type} → ${task.lead_name} (confidence: ${confidence})`);
     } catch (err) {
       console.error(`[TelegramGate] Failed to send approval request:`, err.message);
     }
     return { awaiting_approval: true, message_preview: msgPreview };
   }
 
-  // 'notify' mode - send heads-up to Telegram, don't block
+  // ── SMART: auto-approve high confidence, manual for low ──
+  if (mode === 'smart') {
+    if (confidence >= 80) {
+      // Auto-send, notify on Telegram with AUTO-SENT tag
+      recordApprovalDecision(task.task_type, 'auto_sent');
+      const body =
+        `<b>✅ PROXE AUTO-SENT</b>\n\n` +
+        `Lead: ${task.lead_name} (${phone10})\n` +
+        `Type: ${task.task_type}\n` +
+        `${confidenceTag}\n` +
+        `Scheduled: ${scheduledAt}\n\n` +
+        `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
+      try {
+        await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+      } catch (err) {
+        console.error(`[TelegramGate] Failed to notify auto-send:`, err.message);
+      }
+      console.log(`[TelegramGate] AUTO-SENT ${task.task_type} for ${task.lead_name} (confidence: ${confidence})`);
+      return null; // proceed with send
+    }
+
+    // Low confidence → require approval
+    const body =
+      `<b>PROXE APPROVAL NEEDED</b> (smart mode)\n\n` +
+      `Lead: ${task.lead_name} (${phone10})\n` +
+      `Type: ${task.task_type}\n` +
+      `${confidenceTag} ⚠️ Below auto-approve threshold\n` +
+      `Scheduled: ${scheduledAt}\n\n` +
+      `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
+    const keyboard = {
+      inline_keyboard: [[
+        { text: 'Approve', callback_data: `approve_${task.id}` },
+        { text: 'Reject', callback_data: `reject_${task.id}` },
+      ]],
+    };
+    try {
+      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body, keyboard);
+      console.log(`[TelegramGate] Smart mode: needs approval for ${task.task_type} → ${task.lead_name} (confidence: ${confidence})`);
+    } catch (err) {
+      console.error(`[TelegramGate] Failed to send smart approval request:`, err.message);
+    }
+    return { awaiting_approval: true, message_preview: msgPreview };
+  }
+
+  // ── NOTIFY: everything auto-sends, all notified on Telegram ──
+  recordApprovalDecision(task.task_type, 'auto_sent');
   const body =
     `<b>PROXE TASK FIRING</b>\n\n` +
     `Lead: ${task.lead_name} (${phone10})\n` +
     `Type: ${task.task_type}\n` +
+    `${confidenceTag}\n` +
     `Scheduled: ${scheduledAt}\n\n` +
     `Message:\n<i>${escapeHtml(msgPreview)}</i>\n\n` +
     `Status: SENT`;
@@ -2163,7 +2404,7 @@ async function pollTelegramApprovals() {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offset, timeout: 0, limit: 50, allowed_updates: ['callback_query'] }),
+      body: JSON.stringify({ offset, timeout: 0, limit: 50, allowed_updates: ['callback_query', 'message'] }),
     });
     if (!res.ok) {
       console.error(`[TelegramPoll] getUpdates failed: ${res.status}`);
@@ -2204,6 +2445,59 @@ async function pollTelegramApprovals() {
       await answerCallbackQuery(callback.id, 'Rejecting...');
       await handleTelegramReject(rejectMatch[1], chatId);
       processed++;
+    }
+
+    // Handle text commands: /lockdown, /smart, /approve, /notify, /status
+    const textMsg = update.message;
+    if (textMsg && String(textMsg.chat?.id) === String(TELEGRAM_ADMIN_CHAT_ID)) {
+      const text = (textMsg.text || '').trim().toLowerCase();
+      const cmdChatId = String(textMsg.chat.id);
+
+      if (text === '/lockdown') {
+        setApprovalMode('lockdown');
+        await sendTelegram(cmdChatId, '🔒 <b>LOCKDOWN activated.</b>\nAll tasks now require manual approval. Nothing auto-sends.').catch(() => {});
+        console.log('[TelegramCmd] Switched to LOCKDOWN mode');
+        processed++;
+      } else if (text === '/smart') {
+        setApprovalMode('smart');
+        await sendTelegram(cmdChatId, '🧠 <b>SMART mode activated.</b>\nConfidence 80+ auto-sends. Below 80 needs approval.').catch(() => {});
+        console.log('[TelegramCmd] Switched to SMART mode');
+        processed++;
+      } else if (text === '/approve') {
+        setApprovalMode('approve');
+        await sendTelegram(cmdChatId, '✋ <b>APPROVE mode activated.</b>\nAll tasks require manual approval.').catch(() => {});
+        console.log('[TelegramCmd] Switched to APPROVE mode');
+        processed++;
+      } else if (text === '/notify') {
+        setApprovalMode('notify');
+        await sendTelegram(cmdChatId, '📢 <b>NOTIFY mode activated.</b>\nAll tasks auto-send. You get notifications only.').catch(() => {});
+        console.log('[TelegramCmd] Switched to NOTIFY mode');
+        processed++;
+      } else if (text === '/status') {
+        const currentMode = getApprovalMode();
+        const stats = loadApprovalStats();
+        const totalDecisions = (stats.overall.approved || 0) + (stats.overall.rejected || 0);
+        const autoSent = stats.overall.auto_sent || 0;
+        const total = totalDecisions + autoSent;
+        const autonomy = total > 0 ? Math.round((autoSent / total) * 100) : 0;
+
+        let statusBody = `<b>PROXe Status</b>\n\nMode: <b>${currentMode.toUpperCase()}</b>\nAutonomy: <b>${autonomy}%</b> (${autoSent}/${total} auto-sent)\n\n`;
+        statusBody += `Overall: ${stats.overall.approved || 0} approved, ${stats.overall.rejected || 0} rejected, ${autoSent} auto-sent\n\n`;
+
+        const types = Object.entries(stats.per_task_type || {});
+        if (types.length > 0) {
+          statusBody += '<b>Per task type:</b>\n';
+          for (const [tt, data] of types) {
+            const d = data;
+            const dec = (d.approved || 0) + (d.rejected || 0);
+            const rate = dec > 0 ? Math.round((d.approved / dec) * 100) : 0;
+            statusBody += `• ${tt}: ${rate}% approval (${d.approved || 0}/${dec}), ${d.auto_sent || 0} auto\n`;
+          }
+        }
+
+        await sendTelegram(cmdChatId, statusBody).catch(() => {});
+        processed++;
+      }
     }
   }
 
@@ -2283,6 +2577,7 @@ async function handleTelegramApprove(taskId, chatId) {
       error_message: null,
     }).eq('id', taskId);
 
+    recordApprovalDecision(task.task_type, 'approved');
     await sendTelegram(chatId, `Approved. Sent to ${task.lead_name}.`).catch(() => {});
     console.log(`[TelegramApprove] Sent ${task.task_type} to ${task.lead_name}`);
   } catch (err) {
@@ -2322,6 +2617,7 @@ async function handleTelegramReject(taskId, chatId) {
     error_message: 'Rejected via Telegram',
   }).eq('id', taskId);
 
+  recordApprovalDecision(task.task_type, 'rejected');
   await sendTelegram(chatId, `Rejected. ${task.task_type} for ${task.lead_name} cancelled.`).catch(() => {});
   console.log(`[TelegramReject] Cancelled ${task.task_type} for ${task.lead_name}`);
 }

@@ -116,6 +116,9 @@ export async function GET(request: NextRequest) {
       if (t.metadata?.timing_reason) {
         enriched.timing_reason = t.metadata.timing_reason
       }
+      if (t.metadata?.confidence_score != null) {
+        enriched.confidence_score = t.metadata.confidence_score
+      }
 
       return enriched
     })
@@ -141,6 +144,27 @@ export async function GET(request: NextRequest) {
       ? Math.round((completedToday / (completedToday + failedToday)) * 100)
       : 100
 
+    // Autonomy stats: calculate from task metadata
+    const autoSentCount = allTasks.filter((t: any) =>
+      t.status === 'completed' && t.metadata?.confidence_score >= 80
+    ).length
+    const manualApprovedCount = allTasks.filter((t: any) =>
+      t.status === 'completed' && t.metadata?.approved_via === 'telegram'
+    ).length
+    const manualRejectedCount = allTasks.filter((t: any) =>
+      t.status === 'cancelled' && t.error_message === 'Rejected via Telegram'
+    ).length
+    const totalDecisions = autoSentCount + manualApprovedCount + manualRejectedCount
+    const autonomyLevel = totalDecisions > 0 ? Math.round((autoSentCount / totalDecisions) * 100) : 0
+
+    // Confidence distribution of pending tasks
+    const pendingWithConfidence = (pendingResult.data || []).filter((t: any) => t.metadata?.confidence_score != null)
+    const confidenceDistribution = {
+      high: pendingWithConfidence.filter((t: any) => t.metadata.confidence_score >= 80).length,
+      medium: pendingWithConfidence.filter((t: any) => t.metadata.confidence_score >= 50 && t.metadata.confidence_score < 80).length,
+      low: pendingWithConfidence.filter((t: any) => t.metadata.confidence_score < 50).length,
+    }
+
     return NextResponse.json({
       tasks,
       stats: {
@@ -150,6 +174,14 @@ export async function GET(request: NextRequest) {
         queuedCount,
         firingNextHour,
         successRate,
+        autonomy: {
+          autonomy_level: autonomyLevel,
+          total_decisions: totalDecisions,
+          auto_sent: autoSentCount,
+          manual_approved: manualApprovedCount,
+          manual_rejected: manualRejectedCount,
+          confidence_distribution: confidenceDistribution,
+        },
       },
     })
   } catch (error) {
