@@ -1076,12 +1076,537 @@ async function pollTelegramCommands() {
   if (processed > 0) console.log(`[TelegramCmd] Processed ${processed} commands`);
 }
 
+// ============================================
+// PROACTIVE INTELLIGENCE - Morning Briefing, Predictions, Unanswered Qs
+// ============================================
+
+const MORNING_BRIEFING_FILE = path.join(__dirname, '.last_morning_briefing');
+const UNANSWERED_CHECK_FILE = path.join(__dirname, '.last_unanswered_check');
+
+/**
+ * Find leads whose last conversation message is an unanswered customer question.
+ * Creates urgent follow-up tasks for each.
+ */
+async function findUnansweredQuestions() {
+  try {
+    // Leads with last message from customer containing '?' and no reply for 4+ hours
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+
+    const { data: leads } = await supabase
+      .from('all_leads')
+      .select('id, customer_name, customer_phone_normalized, last_interaction_at')
+      .in('brand', ['bcon', 'default'])
+      .not('customer_phone_normalized', 'is', null)
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
+      .lt('last_interaction_at', fourHoursAgo);
+
+    if (!leads || leads.length === 0) return [];
+
+    const unanswered = [];
+
+    for (const lead of leads) {
+      // Get last message for this lead
+      const { data: lastMsg } = await supabase
+        .from('conversations')
+        .select('sender, content, created_at')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!lastMsg || lastMsg.sender !== 'customer') continue;
+      if (!lastMsg.content || !lastMsg.content.includes('?')) continue;
+
+      // Check no pending tasks exist for this lead
+      const { data: pendingTasks } = await supabase
+        .from('agent_tasks')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('status', 'pending')
+        .limit(1);
+
+      if (pendingTasks && pendingTasks.length > 0) continue;
+
+      unanswered.push({
+        leadId: lead.id,
+        name: lead.customer_name || 'Unknown',
+        phone: lead.customer_phone_normalized,
+        question: lastMsg.content.substring(0, 80),
+        askedAt: lastMsg.created_at,
+      });
+
+      // Create urgent follow-up task
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: existingTask } = await supabase
+        .from('agent_tasks')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('task_type', 'nudge_waiting')
+        .gte('created_at', sevenDaysAgo)
+        .limit(1);
+
+      if (!existingTask || existingTask.length === 0) {
+        await supabase.from('agent_tasks').insert({
+          task_type: 'nudge_waiting',
+          task_description: `Urgent: unanswered question from ${lead.customer_name || 'lead'} - "${lastMsg.content.substring(0, 60)}..."`,
+          lead_id: lead.id,
+          lead_phone: lead.customer_phone_normalized,
+          lead_name: lead.customer_name || 'Lead',
+          status: 'pending',
+          scheduled_at: new Date().toISOString(),
+          metadata: {
+            source: 'unanswered_question',
+            question: lastMsg.content.substring(0, 200),
+            asked_at: lastMsg.created_at,
+            timing_reason: 'Unanswered customer question detected',
+            created_by: 'proactive_intelligence',
+          },
+          created_at: new Date().toISOString(),
+        });
+        console.log(`[Proactive] Created urgent task for unanswered question from ${lead.customer_name}`);
+      }
+    }
+
+    return unanswered;
+  } catch (err) {
+    console.error('[Proactive] findUnansweredQuestions error:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Predict lead behavior from temperature_history and response_patterns.
+ * Returns prediction object for task scheduling adjustments.
+ */
+function predictLeadBehavior(lead) {
+  const ctx = lead.unified_context || {};
+  const tempHistory = ctx.temperature_history || [];
+  const patterns = ctx.response_patterns || {};
+  const lastReadAt = ctx.last_read_at;
+  const temperature = ctx.lead_temperature || 'warm';
+
+  const prediction = {
+    likelyToBook: false,
+    likelyToChurn: false,
+    bestHour: null,
+    reengagementOpportunity: false,
+    reason: [],
+  };
+
+  // Analyze temperature trend (last 3 entries)
+  if (tempHistory.length >= 3) {
+    const recent = tempHistory.slice(-3);
+    const tempValues = { hot: 4, warm: 3, cool: 2, cold: 1 };
+    const trend = (tempValues[recent[2]?.temperature] || 0) - (tempValues[recent[0]?.temperature] || 0);
+
+    if (trend > 0) {
+      prediction.likelyToBook = true;
+      prediction.reason.push('temperature trending up');
+    }
+    if (trend < 0) {
+      prediction.likelyToChurn = true;
+      prediction.reason.push('temperature trending down');
+    }
+  }
+
+  // Response times getting faster = more engaged
+  const last5 = patterns.last_5_response_times || [];
+  if (last5.length >= 3) {
+    const recentAvg = last5.slice(-2).reduce((a, b) => a + b, 0) / 2;
+    const olderAvg = last5.slice(0, -2).reduce((a, b) => a + b, 0) / Math.max(last5.length - 2, 1);
+    if (recentAvg < olderAvg * 0.7) {
+      prediction.likelyToBook = true;
+      prediction.reason.push('response times getting faster');
+    }
+    if (recentAvg > olderAvg * 1.5) {
+      prediction.likelyToChurn = true;
+      prediction.reason.push('response times slowing down');
+    }
+  }
+
+  // Best hour to reach: most common active hour
+  const activeHours = patterns.active_hours || [];
+  if (activeHours.length > 0) {
+    prediction.bestHour = activeHours[Math.floor(activeHours.length / 2)]; // median
+  }
+
+  // Re-engagement opportunity: cold lead that just read a message
+  if ((temperature === 'cold' || temperature === 'cool') && lastReadAt) {
+    const hoursSinceRead = (Date.now() - new Date(lastReadAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceRead < 24) {
+      prediction.reengagementOpportunity = true;
+      prediction.reason.push('cold/cool lead read message within 24h');
+    }
+  }
+
+  return prediction;
+}
+
+/**
+ * Morning briefing: analyze all leads, create proactive tasks, send Telegram summary.
+ * Runs at 8:30 AM IST.
+ */
+async function morningBriefing() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const hourIST = nowIST.getHours();
+  const minIST = nowIST.getMinutes();
+
+  // Only run at 8:30-8:35 AM IST
+  if (hourIST !== 8 || minIST < 30 || minIST > 35) return;
+
+  const todayStr = nowIST.toISOString().split('T')[0];
+  try {
+    if (fs.existsSync(MORNING_BRIEFING_FILE)) {
+      if (fs.readFileSync(MORNING_BRIEFING_FILE, 'utf8').trim() === todayStr) return;
+    }
+  } catch (_) {}
+
+  console.log('[MorningBriefing] Starting...');
+
+  try {
+    const priorityActions = [];
+    const followUpActions = [];
+    const warmingUp = [];
+    const goingCold = [];
+    let tasksCreated = 0;
+
+    // Fetch all active leads
+    const { data: leads } = await supabase
+      .from('all_leads')
+      .select('id, customer_name, customer_phone_normalized, lead_score, lead_stage, last_interaction_at, unified_context')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
+      .not('customer_phone_normalized', 'is', null);
+
+    if (!leads || leads.length === 0) {
+      fs.writeFileSync(MORNING_BRIEFING_FILE, todayStr);
+      return;
+    }
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    for (const lead of leads) {
+      const ctx = lead.unified_context || {};
+      const temp = ctx.lead_temperature || 'warm';
+      const score = lead.lead_score || 0;
+      const lastInteraction = lead.last_interaction_at ? new Date(lead.last_interaction_at) : null;
+      const name = lead.customer_name || 'Unknown';
+      const phone = lead.customer_phone_normalized;
+
+      // Run prediction
+      const prediction = predictLeadBehavior(lead);
+
+      // Check for existing pending tasks
+      const { data: pendingTasks } = await supabase
+        .from('agent_tasks')
+        .select('id, task_type')
+        .eq('lead_id', lead.id)
+        .eq('status', 'pending')
+        .limit(5);
+      const hasPendingTasks = pendingTasks && pendingTasks.length > 0;
+      const hasPendingBookPush = pendingTasks?.some(t => t.task_type === 'push_to_book');
+
+      // Check for booking
+      const { data: bookingTasks } = await supabase
+        .from('agent_tasks')
+        .select('id, scheduled_at, metadata')
+        .eq('lead_id', lead.id)
+        .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h'])
+        .eq('status', 'pending')
+        .limit(1);
+      const hasBooking = bookingTasks && bookingTasks.length > 0;
+
+      // Determine best schedule hour for this lead
+      const scheduleHour = prediction.bestHour || 10; // default 10 AM IST
+      const scheduledIST = new Date(nowIST);
+      scheduledIST.setHours(scheduleHour, 0, 0, 0);
+      if (scheduledIST <= nowIST) scheduledIST.setHours(scheduledIST.getHours() + 2);
+      const scheduleOffset = scheduledIST.getTime() - nowIST.getTime();
+      const scheduledAt = new Date(Date.now() + scheduleOffset).toISOString();
+      const timeStr = scheduledIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      // ── High-score leads with no tasks and no booking ──
+      if (score >= 70 && !hasPendingTasks && !hasBooking && !hasPendingBookPush) {
+        await supabase.from('agent_tasks').insert({
+          task_type: 'push_to_book',
+          task_description: `Morning briefing: push high-score lead ${name} to book`,
+          lead_id: lead.id, lead_phone: phone, lead_name: name,
+          status: 'pending', scheduled_at: scheduledAt,
+          metadata: { source: 'morning_briefing', lead_score: score, lead_temperature: temp, timing_reason: `Score ${score}, ${temp} — pushing to book at ${timeStr}`, created_by: 'proactive_intelligence' },
+          created_at: new Date().toISOString(),
+        });
+        priorityActions.push(`${name} (score ${score}, ${temp}) - pushing to book at ${timeStr}`);
+        tasksCreated++;
+      }
+
+      // ── Booking tomorrow: verify reminders exist ──
+      if (hasBooking) {
+        const bookingTime = bookingTasks[0].metadata?.booking_time || '?';
+        priorityActions.push(`${name} has booking tomorrow at ${bookingTime} - reminders set`);
+      }
+
+      // ── Not contacted in 3+ days but warm ──
+      if (lastInteraction && lastInteraction < threeDaysAgo && (temp === 'warm' || temp === 'hot') && !hasPendingTasks) {
+        const daysSince = Math.floor((Date.now() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24));
+        await supabase.from('agent_tasks').insert({
+          task_type: 'follow_up_day1',
+          task_description: `Morning briefing: ${name} not contacted in ${daysSince} days`,
+          lead_id: lead.id, lead_phone: phone, lead_name: name,
+          status: 'pending', scheduled_at: scheduledAt,
+          metadata: { source: 'morning_briefing', days_since_contact: daysSince, lead_temperature: temp, timing_reason: `${daysSince} days since contact, ${temp} lead — follow-up at ${timeStr}`, created_by: 'proactive_intelligence' },
+          created_at: new Date().toISOString(),
+        });
+        followUpActions.push(`${name} hasn't heard from us in ${daysSince} days - reaching out at ${timeStr}`);
+        tasksCreated++;
+      }
+
+      // ── Re-engagement opportunity: cold lead read recent message ──
+      if (prediction.reengagementOpportunity && !hasPendingTasks) {
+        await supabase.from('agent_tasks').insert({
+          task_type: 'follow_up_day1',
+          task_description: `Morning briefing: ${name} (cold) read recent message — re-engage`,
+          lead_id: lead.id, lead_phone: phone, lead_name: name,
+          status: 'pending', scheduled_at: scheduledAt,
+          metadata: { source: 'morning_briefing', prediction: 'reengagement_opportunity', lead_temperature: temp, timing_reason: `Cold lead read message recently — nudging at ${timeStr}`, created_by: 'proactive_intelligence' },
+          created_at: new Date().toISOString(),
+        });
+        warmingUp.push(`${name} read our last message yesterday - nudging at ${timeStr}`);
+        tasksCreated++;
+      }
+
+      // ── Temperature trend: warming up ──
+      if (prediction.likelyToBook && !prediction.reengagementOpportunity) {
+        warmingUp.push(`${name} — ${prediction.reason.join(', ')}`);
+      }
+
+      // ── Going cold: no engagement 7+ days ──
+      if (lastInteraction && lastInteraction < sevenDaysAgo && temp !== 'cold') {
+        goingCold.push(name);
+      }
+
+      // ── Went warm→cool in last 24h ──
+      const tempHistory = ctx.temperature_history || [];
+      if (tempHistory.length >= 2) {
+        const last = tempHistory[tempHistory.length - 1];
+        const prev = tempHistory[tempHistory.length - 2];
+        if (last.temperature === 'cool' && prev.temperature === 'warm' && new Date(last.timestamp) > oneDayAgo) {
+          goingCold.push(`${name} (warm→cool in 24h)`);
+        }
+      }
+    }
+
+    // Find unanswered questions
+    const unanswered = await findUnansweredQuestions();
+    for (const u of unanswered) {
+      followUpActions.push(`${u.name} asked "${u.question}" — fixing now`);
+      tasksCreated++;
+    }
+
+    // Count total tasks for today
+    const todayStart = new Date(nowIST); todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const { data: allTodayTasks } = await supabase
+      .from('agent_tasks')
+      .select('id')
+      .eq('status', 'pending')
+      .gte('scheduled_at', todayStart.toISOString())
+      .lt('scheduled_at', tomorrowStart.toISOString());
+
+    // Build Telegram message
+    let body = `<b>Good morning. Here's what I'm planning today:</b>\n\n`;
+
+    if (priorityActions.length > 0) {
+      body += `<b>Priority:</b>\n${priorityActions.map(a => `• ${a}`).join('\n')}\n\n`;
+    }
+    if (followUpActions.length > 0) {
+      body += `<b>Follow-ups:</b>\n${followUpActions.map(a => `• ${a}`).join('\n')}\n\n`;
+    }
+    if (warmingUp.length > 0) {
+      body += `<b>Warming up:</b>\n${warmingUp.map(a => `• ${a}`).join('\n')}\n\n`;
+    }
+    if (goingCold.length > 0) {
+      body += `<b>Going cold:</b>\n${goingCold.slice(0, 8).map(a => `• ${a}`).join('\n')}\n\n`;
+    }
+
+    body += `Total tasks today: ${(allTodayTasks || []).length} (${tasksCreated} created just now)`;
+
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+    fs.writeFileSync(MORNING_BRIEFING_FILE, todayStr);
+    console.log(`[MorningBriefing] Sent. Created ${tasksCreated} tasks.`);
+  } catch (err) {
+    console.error('[MorningBriefing] Failed:', err.message);
+  }
+}
+
+/**
+ * Run unanswered question check every 4 hours (not just morning briefing).
+ */
+async function checkUnansweredQuestions() {
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const hourIST = nowIST.getHours();
+
+  // Run at 8, 12, 16, 20 IST hours
+  if (![8, 12, 16, 20].includes(hourIST)) return;
+
+  const checkKey = `${nowIST.toISOString().split('T')[0]}-${hourIST}`;
+  try {
+    if (fs.existsSync(UNANSWERED_CHECK_FILE)) {
+      if (fs.readFileSync(UNANSWERED_CHECK_FILE, 'utf8').trim() === checkKey) return;
+    }
+  } catch (_) {}
+
+  const unanswered = await findUnansweredQuestions();
+  if (unanswered.length > 0) {
+    console.log(`[Proactive] Found ${unanswered.length} unanswered questions`);
+  }
+
+  try { fs.writeFileSync(UNANSWERED_CHECK_FILE, checkKey); } catch (_) {}
+}
+
+/**
+ * Weekly intelligence report — Sunday 9 AM IST.
+ */
+async function sendWeeklyReport() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  if (nowIST.getDay() !== 0 || nowIST.getHours() !== 9 || nowIST.getMinutes() > 5) return;
+
+  const todayStr = nowIST.toISOString().split('T')[0];
+  try {
+    if (fs.existsSync(WEEKLY_REPORT_FILE)) {
+      if (fs.readFileSync(WEEKLY_REPORT_FILE, 'utf8').trim() === todayStr) return;
+    }
+  } catch (_) {}
+
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Task stats
+    const { data: weekTasks } = await supabase
+      .from('agent_tasks')
+      .select('status, task_type, lead_id, metadata, completed_at')
+      .gte('created_at', weekAgo);
+
+    const executed = (weekTasks || []).filter(t => t.status === 'completed' || t.status === 'failed').length;
+    const successful = (weekTasks || []).filter(t => t.status === 'completed').length;
+    const successRate = executed > 0 ? Math.round((successful / executed) * 100) : 0;
+
+    // Leads contacted and responded
+    const contactedIds = [...new Set((weekTasks || []).filter(t => t.lead_id && t.status === 'completed').map(t => t.lead_id))];
+    const { data: weekResponses } = await supabase.from('conversations').select('lead_id').eq('sender', 'customer').gte('created_at', weekAgo);
+    const respondedIds = [...new Set((weekResponses || []).map(r => r.lead_id))];
+
+    // Bookings
+    const bookings = (weekTasks || []).filter(t => t.task_type === 'post_booking_confirmation' && t.status === 'completed').length;
+
+    // Best day for responses (day of week with most customer messages)
+    const dayBuckets = {};
+    for (const r of (weekResponses || [])) {
+      // We don't have created_at in the select, so approximate from the query range
+    }
+    // Use completed tasks for day analysis
+    const completedByDay = {};
+    for (const t of (weekTasks || []).filter(t => t.status === 'completed' && t.completed_at)) {
+      const day = new Date(t.completed_at).toLocaleDateString('en-US', { weekday: 'long' });
+      completedByDay[day] = (completedByDay[day] || 0) + 1;
+    }
+    const bestDay = Object.entries(completedByDay).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+    // Most effective channel (from metadata)
+    const channelCounts = {};
+    for (const t of (weekTasks || []).filter(t => t.status === 'completed')) {
+      const ch = t.metadata?.channel || 'whatsapp';
+      channelCounts[ch] = (channelCounts[ch] || 0) + 1;
+    }
+    const bestChannel = Object.entries(channelCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'whatsapp';
+
+    // Most effective angle
+    const angleCounts = {};
+    for (const t of (weekTasks || []).filter(t => t.status === 'completed' && t.metadata?.message_angle)) {
+      const angle = t.metadata.message_angle;
+      angleCounts[angle] = (angleCounts[angle] || 0) + 1;
+    }
+    const bestAngle = Object.entries(angleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+    // Temperature shifts
+    const { data: allLeads } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")');
+
+    let warmedUp = 0, wentCold = 0;
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    for (const l of (allLeads || [])) {
+      const history = l.unified_context?.temperature_history || [];
+      const weekEntries = history.filter(h => new Date(h.timestamp) > oneWeekAgo);
+      if (weekEntries.length >= 2) {
+        const first = weekEntries[0].temperature;
+        const last = weekEntries[weekEntries.length - 1].temperature;
+        const tempVal = { hot: 4, warm: 3, cool: 2, cold: 1 };
+        if ((tempVal[last] || 0) > (tempVal[first] || 0)) warmedUp++;
+        if ((tempVal[last] || 0) < (tempVal[first] || 0)) wentCold++;
+      }
+    }
+
+    // Hot leads needing attention
+    const { data: hotUnattended } = await supabase
+      .from('all_leads')
+      .select('id')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
+      .gte('lead_score', 70);
+    const hotCount = (hotUnattended || []).length;
+
+    // Not contacted in 7+ days
+    const { data: staleLeads } = await supabase
+      .from('all_leads')
+      .select('id')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
+      .lt('last_interaction_at', weekAgo);
+    const staleCount = (staleLeads || []).length;
+
+    const body =
+      `<b>PROXe Weekly Intelligence</b>\n\n` +
+      `<b>Performance:</b>\n` +
+      `• ${executed} tasks executed, ${successRate}% success\n` +
+      `• ${contactedIds.length} leads contacted, ${respondedIds.length} responded\n` +
+      `• ${bookings} bookings created\n\n` +
+      `<b>Patterns:</b>\n` +
+      `• Best day for activity: ${bestDay}\n` +
+      `• Most effective channel: ${bestChannel}\n` +
+      `• Most effective angle: ${bestAngle}\n\n` +
+      `<b>Temperature shifts:</b>\n` +
+      `• ${warmedUp} leads warmed up\n` +
+      `• ${wentCold} leads went cold\n\n` +
+      `<b>Recommendations:</b>\n` +
+      `${hotCount > 0 ? `• ${hotCount} hot leads need immediate attention\n` : ''}` +
+      `${staleCount > 0 ? `• ${staleCount} leads haven't been contacted in 7+ days\n` : ''}` +
+      `• Best channel: increase ${bestChannel} usage`;
+
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+    fs.writeFileSync(WEEKLY_REPORT_FILE, todayStr);
+    console.log('[WeeklyReport] Sent');
+  } catch (err) {
+    console.error('[WeeklyReport] Failed:', err.message);
+  }
+}
+
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
 
   try {
     await pollTelegramCommands();
+    await morningBriefing();
     await sendDailyReport();
+    await sendWeeklyReport();
+    await checkUnansweredQuestions();
 
     await createBookingReminderTasks();
     await createFollowUpTasks();
