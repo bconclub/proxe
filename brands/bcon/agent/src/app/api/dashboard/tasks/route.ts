@@ -82,22 +82,42 @@ export async function GET(request: NextRequest) {
 
     const allTasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
 
-    // Enrich tasks with sequence info for frontend display
+    // Enrich tasks with sequence info, temperature, and angle for frontend display
     const SEQUENCE_LABELS: Record<string, string> = {
       post_call: 'Post Call Sequence',
       no_response: 'No Response Sequence',
+      dynamic: 'Dynamic Sequence',
+      first_outreach: 'First Outreach Sequence',
     }
     const tasks = allTasks.map((t: any) => {
       const seq = t.metadata?.sequence
       const step = t.metadata?.step
       const totalSteps = t.metadata?.total_steps || 4
+      const enriched: any = { ...t }
+
+      // Sequence label
       if (seq && step != null) {
-        return {
-          ...t,
-          sequence_label: `Step ${step} of ${totalSteps} - ${SEQUENCE_LABELS[seq] || seq}`,
-        }
+        enriched.sequence_label = `Step ${step} of ${totalSteps} - ${SEQUENCE_LABELS[seq] || seq}`
       }
-      return t
+
+      // Dashboard visibility: surface key decision data from metadata
+      if (t.metadata?.next_action_reason) {
+        enriched.next_action_reason = t.metadata.next_action_reason
+      }
+      if (t.metadata?.lead_temperature) {
+        enriched.lead_temperature = t.metadata.lead_temperature
+      }
+      if (t.metadata?.message_angle) {
+        enriched.message_angle = t.metadata.message_angle
+      }
+      if (t.metadata?.sequence_progress) {
+        enriched.sequence_progress = t.metadata.sequence_progress
+      }
+      if (t.metadata?.timing_reason) {
+        enriched.timing_reason = t.metadata.timing_reason
+      }
+
+      return enriched
     })
 
     // Stats

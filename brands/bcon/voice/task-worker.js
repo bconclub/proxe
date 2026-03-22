@@ -117,6 +117,341 @@ function getObjectionAwareMessage(leadName, objections, usedAngles) {
 }
 
 // ============================================
+// DYNAMIC NEXT-ACTION ENGINE
+// Replaces fixed day 1/3/5 sequences with behavior-based decisions
+// ============================================
+
+// Angle rotation order by temperature (never repeat same angle twice in a row)
+const ANGLE_ROTATION = {
+  hot:  ['direct_ask', 'urgency', 'value', 'direct_ask'],
+  warm: ['value', 'social_proof', 'direct_ask', 'value'],
+  cool: ['value', 'social_proof', 'timing', 'value'],
+  cold: ['value'],
+};
+
+// Message templates per angle
+const ANGLE_MESSAGES = {
+  value: (name, painPoint) =>
+    painPoint
+      ? `${name}, businesses dealing with "${painPoint}" are seeing 3x results after plugging in AI. Want me to show you how it maps to yours?`
+      : `${name}, the businesses using our AI system are saving 15+ hours/week and getting 2x more leads. Want me to break down what that'd look like for you?`,
+  urgency: (name) =>
+    `${name}, we've got a few spots open for our AI Brand Audit this week. It's free and shows exactly where AI fits your business. Want me to lock one in?`,
+  social_proof: (name, painPoint) =>
+    painPoint
+      ? `${name}, a business with the same challenge ("${painPoint}") just automated their entire follow-up. 2x more leads in 30 days. Happy to show you a live demo.`
+      : `${name}, we just helped a business automate their sales follow-up. 2x more conversions. Happy to show you how it works.`,
+  timing: (name) =>
+    `No rush ${name}. When the timing's right, we'll be here. Just know every week without this, you're leaving leads on the table. Whenever you're ready, just reply here.`,
+  direct_ask: (name) =>
+    `${name}, want to book a quick 15-min call? We'll map out exactly where AI plugs into your business. When works this week?`,
+};
+
+/**
+ * Get the next message angle, avoiding repeating the last used angle.
+ * Returns the angle string from the rotation.
+ */
+function getNextAngle(temperature, anglesUsed) {
+  const rotation = ANGLE_ROTATION[temperature] || ANGLE_ROTATION.warm;
+  const lastAngle = anglesUsed?.length > 0 ? anglesUsed[anglesUsed.length - 1] : null;
+
+  // Find the next angle in rotation that isn't the same as last
+  for (const angle of rotation) {
+    if (angle !== lastAngle) return angle;
+  }
+  return rotation[0]; // fallback
+}
+
+/**
+ * Build a message from an angle template.
+ */
+function buildAngleMessage(leadName, angle, painPoint) {
+  const builder = ANGLE_MESSAGES[angle] || ANGLE_MESSAGES.value;
+  return builder(leadName, painPoint);
+}
+
+/**
+ * calculateNextAction - Dynamic next-action engine.
+ * Reads all lead context and decides what to do next.
+ *
+ * Returns: { action, channel, scheduledAt, messageAngle, reason, message }
+ */
+async function calculateNextAction(leadId, taskMetadata) {
+  // Fetch full lead context in one query
+  const { data: lead } = await supabase
+    .from('all_leads')
+    .select('id, customer_name, customer_phone_normalized, unified_context, last_interaction_at, lead_stage')
+    .eq('id', leadId)
+    .maybeSingle();
+
+  if (!lead) return { action: 'stop', reason: 'Lead not found' };
+
+  const ctx = lead.unified_context || {};
+  const temperature = ctx.lead_temperature || 'warm';
+  const responsePatterns = ctx.response_patterns || {};
+  const channelPerf = ctx.channel_performance || {};
+  const objections = ctx.objections || [];
+  const painPoint = ctx.pain_point || null;
+  const lastReadAt = ctx.last_read_at || null;
+  const anglesUsed = taskMetadata?.angles_used || [];
+  const channelsTried = taskMetadata?.channels_tried || [];
+  const step = (taskMetadata?.step || 0) + 1;
+  const sequence = taskMetadata?.sequence || 'dynamic';
+  const leadName = lead.customer_name || 'there';
+
+  // Hours since last interaction
+  const hoursSinceInteraction = lead.last_interaction_at
+    ? (Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60)
+    : 999;
+
+  // Check if booking exists
+  const { data: bookingTasks } = await supabase
+    .from('agent_tasks')
+    .select('id')
+    .eq('lead_id', leadId)
+    .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+    .in('status', ['pending', 'completed'])
+    .limit(1);
+  const hasBooking = bookingTasks && bookingTasks.length > 0;
+
+  // Count follow-ups already sent in this sequence
+  const { data: sentTasks } = await supabase
+    .from('agent_tasks')
+    .select('id')
+    .eq('lead_id', leadId)
+    .eq('status', 'completed')
+    .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'nudge_waiting', 'push_to_book'])
+    .filter('metadata->>sequence', 'eq', sequence);
+  const followUpCount = sentTasks?.length || 0;
+
+  // Check last WA message read/delivery status
+  let lastWaStatus = null;
+  const { data: lastMsg } = await supabase
+    .from('conversations')
+    .select('read_at, delivered_at, metadata')
+    .eq('lead_id', leadId)
+    .eq('channel', 'whatsapp')
+    .eq('sender', 'agent')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastMsg) {
+    if (lastMsg.read_at || lastMsg.metadata?.read_at) lastWaStatus = 'read';
+    else if (lastMsg.delivered_at || lastMsg.metadata?.delivered_at) lastWaStatus = 'delivered';
+    else lastWaStatus = 'not_delivered';
+  }
+
+  // ── COLD temperature ──
+  if (temperature === 'cold') {
+    // Check if cold but reading recent messages (warming back up)
+    if (lastReadAt && (Date.now() - new Date(lastReadAt).getTime()) < 48 * 60 * 60 * 1000) {
+      // Treat as cool, not cold
+      const angle = getNextAngle('cool', anglesUsed);
+      const gapMs = 3 * 24 * 60 * 60 * 1000; // 3 days
+      const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
+      return {
+        action: 'follow_up',
+        channel: 'whatsapp',
+        scheduledAt,
+        messageAngle: angle,
+        message: buildAngleMessage(leadName, angle, painPoint),
+        reason: `Cold lead but read recent message (warming up) — treating as cool, ${angle} angle, 3-day gap`,
+      };
+    }
+
+    // Explicit "not interested" objection → stop completely
+    const hasNotInterested = objections.some(o => o.type === 'need');
+    if (hasNotInterested) {
+      return { action: 'stop', reason: 'Cold lead with explicit not-interested objection — sequence done' };
+    }
+
+    // Natural cold → monthly re-engage only
+    const scheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    return {
+      action: 'reengagement',
+      channel: 'whatsapp',
+      scheduledAt,
+      messageAngle: 'value',
+      message: buildAngleMessage(leadName, 'value', painPoint),
+      reason: 'Cold lead — monthly re-engage only',
+    };
+  }
+
+  // ── HOT temperature ──
+  if (temperature === 'hot') {
+    if (hasBooking) {
+      return { action: 'stop', reason: 'Hot lead with existing booking — reminders handle it' };
+    }
+
+    if (followUpCount < 3) {
+      const gapMs = 1 * 60 * 60 * 1000; // 1 hour
+      // Channel: whichever they respond fastest on
+      const waAvg = channelPerf.whatsapp?.avg_response_time || 9999;
+      const voiceAvg = channelPerf.voice?.avg_response_time || 9999;
+      const channel = voiceAvg < waAvg && channelPerf.voice?.responses_received > 0 ? 'voice' : 'whatsapp';
+      const angle = getNextAngle('hot', anglesUsed);
+      const scheduledAt = new Date(Date.now() + gapMs);
+      return {
+        action: followUpCount === 0 ? 'push_to_book' : 'follow_up',
+        channel,
+        scheduledAt,
+        messageAngle: angle,
+        message: buildAngleMessage(leadName, angle, painPoint),
+        reason: `Hot lead, ${followUpCount}/3 follow-ups sent, ${angle} angle, 1h gap, via ${channel}`,
+      };
+    }
+
+    // 3+ follow-ups sent, still no booking → back off
+    const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return {
+      action: 'follow_up',
+      channel: 'whatsapp',
+      scheduledAt,
+      messageAngle: 'value',
+      message: buildAngleMessage(leadName, 'value', painPoint),
+      reason: 'Hot lead but 3+ follow-ups sent — daily check-in',
+    };
+  }
+
+  // ── WARM temperature ──
+  if (temperature === 'warm') {
+    const gapMs = 24 * 60 * 60 * 1000; // 1 day
+
+    // If objection exists and not yet addressed with matching angle
+    if (objections.length > 0) {
+      const objAngleMap = { price: 'value', trust: 'social_proof', timing: 'timing', authority: 'direct_ask', need: 'social_proof' };
+      for (let i = objections.length - 1; i >= 0; i--) {
+        const matchAngle = objAngleMap[objections[i].type];
+        if (matchAngle && !anglesUsed.includes(matchAngle)) {
+          const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
+          const channel = lastWaStatus === 'not_delivered' ? 'voice' : 'whatsapp';
+          return {
+            action: 'follow_up',
+            channel,
+            scheduledAt,
+            messageAngle: matchAngle,
+            message: buildAngleMessage(leadName, matchAngle, painPoint),
+            reason: `Warm lead, objection "${objections[i].type}" → ${matchAngle} angle, 1-day gap`,
+          };
+        }
+      }
+    }
+
+    // Read but no reply → nudge with value angle
+    if (lastWaStatus === 'read') {
+      const angle = getNextAngle('warm', anglesUsed);
+      const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
+      return {
+        action: 'nudge',
+        channel: 'whatsapp',
+        scheduledAt,
+        messageAngle: angle,
+        message: buildAngleMessage(leadName, angle, painPoint),
+        reason: `Warm lead, read but no reply, ${angle} angle`,
+      };
+    }
+
+    // Not read → switch channel after 3 same-channel attempts
+    if (lastWaStatus === 'not_delivered' || lastWaStatus === 'delivered') {
+      const waAttempts = channelsTried.filter(c => c.channel === 'whatsapp').length;
+      if (waAttempts >= 3) {
+        const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
+        return {
+          action: 'voice_call',
+          channel: 'voice',
+          scheduledAt,
+          messageAngle: 'direct_ask',
+          reason: `Warm lead, ${waAttempts} WhatsApp attempts unread — escalating to voice`,
+        };
+      }
+    }
+
+    // Default warm follow-up
+    const angle = getNextAngle('warm', anglesUsed);
+    const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
+    return {
+      action: 'follow_up',
+      channel: 'whatsapp',
+      scheduledAt,
+      messageAngle: angle,
+      message: buildAngleMessage(leadName, angle, painPoint),
+      reason: `Warm lead, standard 1-day follow-up, ${angle} angle`,
+    };
+  }
+
+  // ── COOL temperature ──
+  // (temperature === 'cool' or default)
+  const coolGapMs = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+  // Timing objection → 2 weeks out
+  const hasTimingObjection = objections.some(o => o.type === 'timing');
+  if (hasTimingObjection && !anglesUsed.includes('timing')) {
+    const scheduledAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    return {
+      action: 'follow_up',
+      channel: 'whatsapp',
+      scheduledAt,
+      messageAngle: 'timing',
+      message: buildAngleMessage(leadName, 'timing', painPoint),
+      reason: 'Cool lead with timing objection — scheduled 2 weeks out',
+    };
+  }
+
+  // After 2 unanswered attempts → back off to weekly
+  const unansweredWa = channelsTried.filter(c => c.channel === 'whatsapp' && c.result !== 'read').length;
+  if (unansweredWa >= 2) {
+    const weeklyGap = 7 * 24 * 60 * 60 * 1000;
+    const angle = getNextAngle('cool', anglesUsed);
+    const scheduledAt = getScheduledAtForActiveHour(weeklyGap, responsePatterns);
+    return {
+      action: 'follow_up',
+      channel: 'whatsapp',
+      scheduledAt,
+      messageAngle: angle,
+      message: buildAngleMessage(leadName, angle, painPoint),
+      reason: `Cool lead, ${unansweredWa} unanswered — backed off to weekly, ${angle} angle`,
+    };
+  }
+
+  // Default cool follow-up (never urgency or direct_ask)
+  const angle = getNextAngle('cool', anglesUsed);
+  const scheduledAt = getScheduledAtForActiveHour(coolGapMs, responsePatterns);
+  return {
+    action: 'follow_up',
+    channel: 'whatsapp',
+    scheduledAt,
+    messageAngle: angle,
+    message: buildAngleMessage(leadName, angle, painPoint),
+    reason: `Cool lead, 3-day gap, ${angle} angle (nurture only)`,
+  };
+}
+
+/**
+ * Helper: calculate a scheduled time, snapped to lead's active hours.
+ */
+function getScheduledAtForActiveHour(delayMs, responsePatterns) {
+  let scheduledAt = new Date(Date.now() + delayMs);
+  const activeHours = responsePatterns?.active_hours;
+  const preferredPart = responsePatterns?.preferred_day_parts;
+
+  if (preferredPart || activeHours?.length) {
+    let targetHour = 10;
+    if (preferredPart === 'evening') targetHour = 18;
+    else if (preferredPart === 'morning') targetHour = 9;
+    else if (preferredPart === 'afternoon') targetHour = 14;
+
+    const scheduledIST = new Date(scheduledAt.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    scheduledIST.setHours(targetHour, 0, 0, 0);
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (scheduledIST <= nowIST) scheduledIST.setDate(scheduledIST.getDate() + 1);
+    const offsetMs = scheduledIST.getTime() - nowIST.getTime();
+    scheduledAt = new Date(Date.now() + offsetMs);
+  }
+
+  return scheduledAt;
+}
+
+// ============================================
 // ESCALATION CHAIN - Multi-channel fallback
 // ============================================
 // Step 1: WhatsApp free-form (within 24h)
@@ -1290,17 +1625,20 @@ async function executeSequenceStep(task, waPhone, message) {
       }).eq('id', task.id);
     }
 
-    // ── Objection-aware messaging ──
-    if (task.lead_id) {
+    // ── Dynamic message: use pre-calculated message from calculateNextAction if available ──
+    if (task.metadata?.dynamic_message) {
+      message = task.metadata.dynamic_message;
+      console.log(`[Sequence] Using dynamic message for ${task.lead_name}: angle=${task.metadata?.message_angle}`);
+    } else if (task.lead_id) {
+      // Fallback: objection-aware messaging for legacy tasks without dynamic_message
       const { objections } = await getLeadTemperatureData(task.lead_id);
-      const usedAngles = task.metadata?.used_angles || [];
+      const usedAngles = task.metadata?.angles_used || task.metadata?.used_angles || [];
       const objectionMsg = getObjectionAwareMessage(task.lead_name, objections, usedAngles);
       if (objectionMsg) {
         message = objectionMsg.message;
-        // Track the angle so we don't repeat it
         const updatedAngles = [...usedAngles, objectionMsg.message_angle];
         await supabase.from('agent_tasks').update({
-          metadata: { ...task.metadata, message_angle: objectionMsg.message_angle, used_angles: updatedAngles },
+          metadata: { ...task.metadata, message_angle: objectionMsg.message_angle, angles_used: updatedAngles },
         }).eq('id', task.id);
         console.log(`[Sequence] Objection-aware message for ${task.lead_name}: angle=${objectionMsg.message_angle}`);
       }
@@ -1316,24 +1654,86 @@ async function executeSequenceStep(task, waPhone, message) {
     await updateChannelPerformance(task.lead_id, 'whatsapp', 'sent', null);
   }
 
-  // Schedule next step based on current task type
-  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-  if (task.task_type === 'follow_up_day1') {
-    await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
-  } else if (task.task_type === 'follow_up_day3') {
-    await scheduleNextSequenceStep(task, 'follow_up_day5', 3, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
-  } else if (task.task_type === 'follow_up_day5') {
-    // Escalate: mark lead as Cold
-    if (task.lead_id) {
-      await supabase.from('all_leads').update({ lead_stage: 'Cold' }).eq('id', task.lead_id);
-      console.log(`[Sequence] Lead ${task.lead_name} marked as Cold`);
-    }
-    await scheduleNextSequenceStep(task, 're_engage', 4, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
-  } else if (task.task_type === 're_engage' && step === 4) {
-    // Final step - mark as Closed Lost
-    if (task.lead_id) {
-      await supabase.from('all_leads').update({ lead_stage: 'Closed Lost', stage_override: true }).eq('id', task.lead_id);
-      console.log(`[Sequence] Lead ${task.lead_name} marked as Closed Lost - sequence complete`);
+  // ── Dynamic next-action: calculate what to do next based on lead behavior ──
+  if (task.lead_id) {
+    const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+    const currentAngles = [...(task.metadata?.angles_used || [])];
+    // Add the angle we just used (if any) to the tracking
+    if (task.metadata?.message_angle) currentAngles.push(task.metadata.message_angle);
+
+    const nextAction = await calculateNextAction(task.lead_id, {
+      ...task.metadata,
+      angles_used: currentAngles,
+      step: step,
+    });
+
+    if (nextAction.action === 'stop') {
+      // Sequence complete — no more tasks
+      if (nextAction.reason.includes('not-interested')) {
+        await supabase.from('all_leads').update({ lead_stage: 'Closed Lost', stage_override: true }).eq('id', task.lead_id);
+      }
+      console.log(`[Sequence] Stop for ${task.lead_name}: ${nextAction.reason}`);
+    } else if (nextAction.action === 'voice_call') {
+      // Escalate to voice
+      await supabase.from('agent_tasks').insert({
+        task_type: 'try_voice_call',
+        task_description: `Dynamic voice escalation for ${task.lead_name}`,
+        lead_id: task.lead_id,
+        lead_phone: phone10,
+        lead_name: task.lead_name,
+        status: 'pending',
+        scheduled_at: nextAction.scheduledAt.toISOString(),
+        metadata: {
+          ...task.metadata,
+          sequence: sequence || 'dynamic',
+          step: step + 1,
+          message_angle: nextAction.messageAngle,
+          angles_used: currentAngles,
+          next_action_reason: nextAction.reason,
+          timing_reason: nextAction.reason,
+          lead_temperature: (await getLeadTemperatureData(task.lead_id)).temperature,
+          sequence_progress: `Step ${step + 1}, Angle: ${nextAction.messageAngle}, Channel: voice`,
+        },
+        created_at: new Date().toISOString(),
+      });
+      console.log(`[Sequence] Dynamic → voice_call for ${task.lead_name}: ${nextAction.reason}`);
+    } else {
+      // Create next WhatsApp follow-up/nudge/push_to_book/reengagement
+      const taskTypeMap = {
+        nudge: 'nudge_waiting',
+        follow_up: 'follow_up_day1', // generic follow-up
+        push_to_book: 'push_to_book',
+        reengagement: 're_engage',
+      };
+      const nextType = taskTypeMap[nextAction.action] || 'follow_up_day1';
+      const tempData = await getLeadTemperatureData(task.lead_id);
+
+      await supabase.from('agent_tasks').insert({
+        task_type: nextType,
+        task_description: `Dynamic: ${nextAction.action} for ${task.lead_name} (${nextAction.messageAngle})`,
+        lead_id: task.lead_id,
+        lead_phone: phone10,
+        lead_name: task.lead_name,
+        status: 'pending',
+        scheduled_at: nextAction.scheduledAt.toISOString(),
+        metadata: {
+          ...task.metadata,
+          sequence: sequence || 'dynamic',
+          step: step + 1,
+          message_angle: nextAction.messageAngle,
+          angles_used: [...currentAngles, nextAction.messageAngle],
+          dynamic_message: nextAction.message || null,
+          next_action_reason: nextAction.reason,
+          timing_reason: nextAction.reason,
+          lead_temperature: tempData.temperature,
+          sequence_progress: `Step ${step + 1}, Angle: ${nextAction.messageAngle}, Temperature: ${tempData.temperature}`,
+          prev_task_id: task.id,
+          channels_tried: task.metadata?.channels_tried || [],
+          current_escalation_level: task.metadata?.current_escalation_level || 1,
+        },
+        created_at: new Date().toISOString(),
+      });
+      console.log(`[Sequence] Dynamic → ${nextType} for ${task.lead_name} at ${nextAction.scheduledAt.toISOString()} [${nextAction.reason}]`);
     }
   }
 
