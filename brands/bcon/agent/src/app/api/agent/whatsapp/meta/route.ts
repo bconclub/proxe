@@ -212,6 +212,61 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ─── Channel Performance Tracking ─────────────────────────────────────────────
+
+async function updateChannelPerformance(
+  supabase: any,
+  leadId: string,
+  channel: string,
+  event: 'sent' | 'read' | 'response',
+  responseTimeSec?: number,
+): Promise<void> {
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (!lead) return;
+
+    const ctx = lead.unified_context || {};
+    const perf = ctx.channel_performance || {};
+    const ch = perf[channel] || {
+      messages_sent: 0,
+      messages_read: 0,
+      responses_received: 0,
+      avg_response_time: null,
+      last_successful_contact: null,
+    };
+
+    if (event === 'sent') {
+      ch.messages_sent = (ch.messages_sent || 0) + 1;
+    } else if (event === 'read') {
+      ch.messages_read = (ch.messages_read || 0) + 1;
+    } else if (event === 'response') {
+      ch.responses_received = (ch.responses_received || 0) + 1;
+      ch.last_successful_contact = new Date().toISOString();
+      if (responseTimeSec != null && responseTimeSec > 0) {
+        const prevAvg = ch.avg_response_time || responseTimeSec;
+        const prevCount = Math.max((ch.responses_received || 1) - 1, 1);
+        ch.avg_response_time = Math.round((prevAvg * prevCount + responseTimeSec) / (prevCount + 1));
+      }
+    }
+
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...ctx,
+          channel_performance: { ...perf, [channel]: ch },
+        },
+      })
+      .eq('id', leadId);
+  } catch (err) {
+    console.error(`[meta/channelPerf] Failed to update ${channel}/${event} for ${leadId}:`, err);
+  }
+}
+
 // ─── Read Receipt / Delivery Status Handling ──────────────────────────────────
 
 async function handleStatusUpdates(statuses: any[]): Promise<void> {
@@ -274,6 +329,11 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
               })
               .eq('id', msg.lead_id);
           }
+        }
+
+        // Track channel performance: message was read
+        if (msg.lead_id) {
+          updateChannelPerformance(supabase, msg.lead_id, 'whatsapp', 'read');
         }
 
         console.log(`[meta/status] READ receipt: msg ${msg.id} read at ${statusTime}`);
@@ -405,6 +465,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       supabase,
     );
 
+    // Track channel performance: customer responded on WhatsApp
+    updateChannelPerformance(supabase, leadId, 'whatsapp', 'response').catch(() => {});
+
     // 4. Fetch cross-channel context
     const customerContext = await fetchCustomerContext(customerPhone, customerName, supabase);
 
@@ -455,6 +518,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const waReplyId = await sendWhatsAppReply(customerPhone, result.response);
     if (!waReplyId) {
       console.error('[meta/webhook] Failed to send reply to', customerPhone);
+    } else {
+      // Track channel performance: agent message sent on WhatsApp
+      updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
     }
 
     // 9. Log AI response (with response time + WA message ID for read receipt tracking)

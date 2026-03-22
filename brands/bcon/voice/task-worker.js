@@ -1328,6 +1328,9 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
       total_steps: 4,
       prev_task_id: task.id,
       timing_reason: timingReason || undefined,
+      // Propagate escalation state to child tasks
+      channels_tried: task.metadata?.channels_tried || [],
+      current_escalation_level: task.metadata?.current_escalation_level || 1,
     },
     created_at: new Date().toISOString(),
   });
