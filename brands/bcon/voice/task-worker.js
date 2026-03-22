@@ -23,182 +23,8 @@ const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
 
 // File to persist Telegram getUpdates offset across runs
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
-// File to persist approval mode override (Telegram /lockdown, /smart, /approve commands)
-const APPROVAL_MODE_FILE = path.join(__dirname, '.approval_mode');
-// File to persist approval statistics
-const APPROVAL_STATS_FILE = path.join(__dirname, '.approval_stats.json');
-
-/**
- * Get current approval mode. Priority: file override > env var > default 'approve'.
- * Valid modes: 'approve', 'smart', 'notify', 'lockdown'
- */
-function getApprovalMode() {
-  try {
-    if (fs.existsSync(APPROVAL_MODE_FILE)) {
-      const mode = fs.readFileSync(APPROVAL_MODE_FILE, 'utf8').trim();
-      if (['approve', 'smart', 'notify', 'lockdown'].includes(mode)) return mode;
-    }
-  } catch (_) {}
-  return process.env.APPROVAL_MODE || 'approve';
-}
-
-function setApprovalMode(mode) {
-  try {
-    fs.writeFileSync(APPROVAL_MODE_FILE, mode);
-  } catch (err) {
-    console.error('[ApprovalMode] Failed to write mode file:', err.message);
-  }
-}
-
-// ============================================
-// APPROVAL STATS - Track approve/reject rates
-// ============================================
-
-function loadApprovalStats() {
-  try {
-    if (fs.existsSync(APPROVAL_STATS_FILE)) {
-      return JSON.parse(fs.readFileSync(APPROVAL_STATS_FILE, 'utf8'));
-    }
-  } catch (_) {}
-  return { overall: { total_sent: 0, approved: 0, rejected: 0 }, per_task_type: {} };
-}
-
-function saveApprovalStats(stats) {
-  try {
-    fs.writeFileSync(APPROVAL_STATS_FILE, JSON.stringify(stats, null, 2));
-  } catch (err) {
-    console.error('[ApprovalStats] Failed to save:', err.message);
-  }
-}
-
-function recordApprovalDecision(taskType, decision) {
-  const stats = loadApprovalStats();
-
-  // Overall
-  stats.overall.total_sent = (stats.overall.total_sent || 0) + 1;
-  if (decision === 'approved') stats.overall.approved = (stats.overall.approved || 0) + 1;
-  if (decision === 'rejected') stats.overall.rejected = (stats.overall.rejected || 0) + 1;
-
-  // Per task type
-  if (!stats.per_task_type[taskType]) {
-    stats.per_task_type[taskType] = { total_sent: 0, approved: 0, rejected: 0 };
-  }
-  const tt = stats.per_task_type[taskType];
-  tt.total_sent = (tt.total_sent || 0) + 1;
-  if (decision === 'approved') tt.approved = (tt.approved || 0) + 1;
-  if (decision === 'rejected') tt.rejected = (tt.rejected || 0) + 1;
-
-  // Check if task type crosses 95% approval after 10+ decisions
-  const totalDecisions = tt.approved + tt.rejected;
-  if (totalDecisions >= 10) {
-    const rate = Math.round((tt.approved / totalDecisions) * 100);
-    tt.approval_rate = rate;
-    if (rate >= 95) {
-      console.log(`[AutoLearn] ${taskType} approval rate ${rate}% (${tt.approved}/${totalDecisions}). Ready for auto-approve.`);
-    }
-  }
-
-  // Also record auto-sent tasks
-  if (decision === 'auto_sent') {
-    stats.overall.auto_sent = (stats.overall.auto_sent || 0) + 1;
-    tt.auto_sent = (tt.auto_sent || 0) + 1;
-  }
-
-  saveApprovalStats(stats);
-}
-
-// ============================================
-// CONFIDENCE SCORING
-// ============================================
-
-// Routine task types that are almost always approved
-const ROUTINE_TASK_TYPES = new Set([
-  'booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m',
-  'reminder_24h', 'reminder_1h', 'reminder_30m',
-  'nudge_waiting', 'post_booking_confirmation',
-]);
-
-/**
- * Calculate confidence score (0-100) for a task.
- * Higher = safer to auto-approve.
- */
-async function calculateConfidence(task, lead) {
-  let score = 50; // base
-  const reasons = [];
-
-  const temperature = lead?.unified_context?.lead_temperature || 'warm';
-  const objections = lead?.unified_context?.objections || [];
-
-  // 1. Historical approval rate for this task type
-  const stats = loadApprovalStats();
-  const tt = stats.per_task_type[task.task_type];
-  const historicalApprovals = tt?.approved || 0;
-  const historicalRejections = tt?.rejected || 0;
-  const totalDecisions = historicalApprovals + historicalRejections;
-
-  if (historicalApprovals >= 10) {
-    score += 30;
-    reasons.push(`${task.task_type} approved ${historicalApprovals}+ times`);
-  } else if (historicalApprovals >= 5) {
-    score += 15;
-    reasons.push(`${task.task_type} approved ${historicalApprovals} times`);
-  } else {
-    score -= 15;
-    reasons.push(`${task.task_type} only approved ${historicalApprovals} times`);
-  }
-
-  // Penalize if rejection rate > 10%
-  if (totalDecisions >= 5 && historicalRejections / totalDecisions > 0.1) {
-    score -= 20;
-    reasons.push(`${task.task_type} rejection rate ${Math.round(historicalRejections / totalDecisions * 100)}%`);
-  }
-
-  // 2. Lead temperature
-  if (temperature === 'hot') { score += 15; reasons.push('hot lead'); }
-  else if (temperature === 'warm') { score += 10; reasons.push('warm lead'); }
-  else if (temperature === 'cool') { score -= 5; reasons.push('cool lead'); }
-  else if (temperature === 'cold') { score -= 20; reasons.push('cold lead'); }
-
-  // 3. Routine tasks are safe
-  if (ROUTINE_TASK_TYPES.has(task.task_type)) {
-    score += 15;
-    reasons.push('routine task type');
-  }
-
-  // 4. Template messages are safer than free-form
-  if (task.metadata?.template || !(await isWithin24hWindowForConfidence(task.lead_id))) {
-    score += 5;
-    reasons.push('template message');
-  }
-
-  // 5. Penalty for risky scenarios
-  if (task.task_type === 'first_outreach') { score -= 15; reasons.push('first outreach to new lead'); }
-  if (task.task_type === 're_engage') { score -= 10; reasons.push('re-engagement after silence'); }
-  if (task.task_type === 'try_voice_call') { score -= 15; reasons.push('voice call attempt'); }
-  if (objections.length > 0) { score -= 10; reasons.push(`lead has ${objections.length} objection(s)`); }
-
-  // Clamp 0-100
-  score = Math.max(0, Math.min(100, score));
-
-  return { score, reasons };
-}
-
-/**
- * Lightweight 24h check for confidence scoring (avoid duplicate DB call when possible)
- */
-async function isWithin24hWindowForConfidence(leadId) {
-  if (!leadId) return true;
-  const { data } = await supabase
-    .from('conversations')
-    .select('created_at')
-    .eq('lead_id', leadId)
-    .eq('sender', 'customer')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!data) return false;
-  return (Date.now() - new Date(data.created_at).getTime()) < 24 * 60 * 60 * 1000;
-}
+const DAILY_REPORT_FILE = path.join(__dirname, '.last_daily_report');
+const WEEKLY_REPORT_FILE = path.join(__dirname, '.last_weekly_report');
 
 // ============================================
 // LEAD TEMPERATURE - Timing Multipliers
@@ -1002,12 +828,260 @@ async function executeVoiceCall(task, waPhone) {
   return null;
 }
 
+// ============================================
+// DAILY REPORT
+// ============================================
+
+async function sendDailyReport() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const hourIST = nowIST.getHours();
+  const minIST = nowIST.getMinutes();
+
+  // Only run at 9:00-9:05 AM IST
+  if (hourIST !== 9 || minIST > 5) return;
+
+  // Check if already sent today
+  const todayStr = nowIST.toISOString().split('T')[0];
+  try {
+    if (fs.existsSync(DAILY_REPORT_FILE)) {
+      const lastSent = fs.readFileSync(DAILY_REPORT_FILE, 'utf8').trim();
+      if (lastSent === todayStr) return;
+    }
+  } catch (_) {}
+
+  try {
+    const yesterdayStart = new Date(nowIST);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    yesterdayStart.setHours(0, 0, 0, 0);
+    const todayStart = new Date(nowIST);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Yesterday's task stats
+    const { data: yesterdayTasks } = await supabase
+      .from('agent_tasks')
+      .select('status, task_type, lead_name, lead_id')
+      .gte('created_at', yesterdayStart.toISOString())
+      .lt('created_at', todayStart.toISOString());
+
+    const executed = (yesterdayTasks || []).filter(t => t.status === 'completed' || t.status === 'failed').length;
+    const successful = (yesterdayTasks || []).filter(t => t.status === 'completed').length;
+    const failed = (yesterdayTasks || []).filter(t => t.status === 'failed' || t.status === 'failed_24h_window').length;
+
+    // Unique leads contacted
+    const leadIds = [...new Set((yesterdayTasks || []).filter(t => t.lead_id && t.status === 'completed').map(t => t.lead_id))];
+
+    // Responses received yesterday
+    const { data: responses } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('sender', 'customer')
+      .gte('created_at', yesterdayStart.toISOString())
+      .lt('created_at', todayStart.toISOString());
+
+    // Today's upcoming tasks
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const { data: todayTasks } = await supabase
+      .from('agent_tasks')
+      .select('task_type, lead_name, scheduled_at')
+      .eq('status', 'pending')
+      .gte('scheduled_at', todayStart.toISOString())
+      .lt('scheduled_at', tomorrowStart.toISOString())
+      .order('scheduled_at', { ascending: true })
+      .limit(8);
+
+    const upNextLines = (todayTasks || []).slice(0, 5).map(t => {
+      const time = t.scheduled_at ? new Date(t.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '?';
+      return `• ${time}: ${t.task_type.replace(/_/g, ' ')} for ${t.lead_name || 'Unknown'}`;
+    }).join('\n');
+
+    // Hot leads
+    const { data: hotLeads } = await supabase
+      .from('all_leads')
+      .select('customer_name, lead_score')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
+      .order('lead_score', { ascending: false })
+      .limit(5);
+
+    const hotLines = (hotLeads || [])
+      .filter(l => l.lead_score && l.lead_score >= 60)
+      .map(l => `• ${l.customer_name || 'Unknown'} (${l.lead_score})`)
+      .join('\n');
+
+    // Going cold
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: coldLeads } = await supabase
+      .from('all_leads')
+      .select('customer_name')
+      .in('brand', ['bcon', 'default'])
+      .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
+      .lt('last_interaction_at', threeDaysAgo)
+      .limit(5);
+    const coldLines = (coldLeads || []).map(l => `• ${l.customer_name || 'Unknown'}`).join('\n');
+
+    const dateStr = nowIST.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const body =
+      `<b>PROXe Daily Report - ${dateStr}</b>\n\n` +
+      `Tasks executed: ${executed}\n` +
+      `Successful: ${successful}\n` +
+      `Failed: ${failed}\n\n` +
+      `Leads contacted: ${leadIds.length}\n` +
+      `Responses received: ${(responses || []).length}\n\n` +
+      `<b>Up next today:</b>\n${upNextLines || '(none scheduled)'}\n\n` +
+      `<b>Hot leads:</b>\n${hotLines || '(none)'}\n\n` +
+      `<b>Going cold:</b>\n${coldLines || '(none)'}`;
+
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+    fs.writeFileSync(DAILY_REPORT_FILE, todayStr);
+    console.log('[DailyReport] Sent');
+  } catch (err) {
+    console.error('[DailyReport] Failed:', err.message);
+  }
+}
+
+// ============================================
+// TELEGRAM COMMANDS
+// ============================================
+
+async function pollTelegramCommands() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  let offset = 0;
+  try {
+    if (fs.existsSync(TELEGRAM_OFFSET_FILE)) {
+      offset = parseInt(fs.readFileSync(TELEGRAM_OFFSET_FILE, 'utf8').trim(), 10) || 0;
+    }
+  } catch (_) {}
+
+  let updates;
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offset, timeout: 0, limit: 50, allowed_updates: ['message'] }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    updates = data.result || [];
+  } catch (err) {
+    console.error('[TelegramCmd] Error fetching updates:', err.message);
+    return;
+  }
+
+  if (updates.length === 0) return;
+
+  let maxUpdateId = offset;
+  let processed = 0;
+
+  for (const update of updates) {
+    if (update.update_id >= maxUpdateId) maxUpdateId = update.update_id + 1;
+
+    const msg = update.message;
+    if (!msg || String(msg.chat?.id) !== String(TELEGRAM_ADMIN_CHAT_ID)) continue;
+
+    const text = (msg.text || '').trim().toLowerCase();
+    const chatId = String(msg.chat.id);
+
+    if (text === '/status') {
+      const { data: pending } = await supabase.from('agent_tasks').select('id').eq('status', 'pending');
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const { data: completed } = await supabase.from('agent_tasks').select('id').eq('status', 'completed').gte('completed_at', todayStart.toISOString());
+      const { data: activeLeads } = await supabase.from('all_leads').select('id').in('brand', ['bcon', 'default']).not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")');
+
+      await sendTelegram(chatId,
+        `<b>PROXe Status</b>\n\n` +
+        `Pending tasks: ${(pending || []).length}\n` +
+        `Completed today: ${(completed || []).length}\n` +
+        `Active leads: ${(activeLeads || []).length}\n` +
+        `Mode: ${getApprovalMode().toUpperCase()}`
+      ).catch(() => {});
+      processed++;
+    } else if (text === '/hot') {
+      const { data: leads } = await supabase
+        .from('all_leads')
+        .select('customer_name, customer_phone_normalized, lead_score, unified_context')
+        .in('brand', ['bcon', 'default'])
+        .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
+        .order('lead_score', { ascending: false })
+        .limit(5);
+
+      const lines = (leads || []).map(l => {
+        const temp = l.unified_context?.lead_temperature || '?';
+        const phone = l.customer_phone_normalized || '?';
+        return `• ${l.customer_name || 'Unknown'} (${phone}) - Score: ${l.lead_score || 0}, Temp: ${temp}`;
+      }).join('\n');
+
+      await sendTelegram(chatId, `<b>Top 5 Leads</b>\n\n${lines || 'No active leads'}`).catch(() => {});
+      processed++;
+    } else if (text === '/next') {
+      const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const { data: tasks } = await supabase
+        .from('agent_tasks')
+        .select('task_type, lead_name, scheduled_at')
+        .eq('status', 'pending')
+        .lte('scheduled_at', oneHourFromNow)
+        .order('scheduled_at', { ascending: true })
+        .limit(10);
+
+      const lines = (tasks || []).map(t => {
+        const time = t.scheduled_at ? new Date(t.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '?';
+        return `• ${time}: ${t.task_type.replace(/_/g, ' ')} → ${t.lead_name || 'Unknown'}`;
+      }).join('\n');
+
+      await sendTelegram(chatId, `<b>Firing Next Hour</b>\n\n${lines || 'Nothing scheduled'}`).catch(() => {});
+      processed++;
+    } else if (text === '/stop') {
+      const { data: pending } = await supabase.from('agent_tasks').select('id').eq('status', 'pending');
+      const count = (pending || []).length;
+      if (count > 0) {
+        await supabase.from('agent_tasks').update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: 'Cancelled via /stop command',
+        }).eq('status', 'pending');
+      }
+      await sendTelegram(chatId, `🛑 <b>ALL STOP</b>\n\nCancelled ${count} pending tasks.`).catch(() => {});
+      console.log(`[TelegramCmd] /stop: cancelled ${count} pending tasks`);
+      processed++;
+    } else if (text === '/lockdown') {
+      setApprovalMode('lockdown');
+      await sendTelegram(chatId, '🔒 <b>LOCKDOWN activated.</b>').catch(() => {});
+      processed++;
+    } else if (text === '/smart') {
+      setApprovalMode('smart');
+      await sendTelegram(chatId, '🧠 <b>SMART mode activated.</b>').catch(() => {});
+      processed++;
+    } else if (text === '/approve') {
+      setApprovalMode('approve');
+      await sendTelegram(chatId, '✋ <b>APPROVE mode activated.</b>').catch(() => {});
+      processed++;
+    } else if (text === '/notify') {
+      setApprovalMode('notify');
+      await sendTelegram(chatId, '📢 <b>NOTIFY mode activated.</b>').catch(() => {});
+      processed++;
+    }
+  }
+
+  // Persist offset
+  try {
+    fs.writeFileSync(TELEGRAM_OFFSET_FILE, String(maxUpdateId));
+  } catch (err) {
+    console.error('[TelegramCmd] Failed to save offset:', err.message);
+  }
+
+  if (processed > 0) console.log(`[TelegramCmd] Processed ${processed} commands`);
+}
+
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
 
   try {
-    // Process any Telegram approve/reject replies before processing new tasks
-    await pollTelegramApprovals();
+    await pollTelegramCommands();
+    await sendDailyReport();
 
     await createBookingReminderTasks();
     await createFollowUpTasks();
@@ -1017,10 +1091,9 @@ async function main() {
     const { data: taskCounts } = await supabase
       .from('agent_tasks')
       .select('status')
-      .in('status', ['pending', 'queued']);
-    const pendingCount = (taskCounts || []).filter(t => t.status === 'pending').length;
-    const queuedCount = (taskCounts || []).filter(t => t.status === 'queued').length;
-    console.log(`[TaskWorker] Tasks: ${pendingCount} pending (will fire), ${queuedCount} queued (needs approval)`);
+      .eq('status', 'pending');
+    const pendingCount = (taskCounts || []).length;
+    console.log(`[TaskWorker] Tasks: ${pendingCount} pending`);
 
     await processPendingTasks();
     console.log(`[TaskWorker] Run complete`);
@@ -1147,7 +1220,7 @@ async function createFollowUpTasks() {
           leadName: lead.customer_name || 'Lead',
           scheduledAt,
           metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score },
-          initialStatus: 'queued',
+          initialStatus: 'pending',
         });
       }
     } catch (err) {
@@ -1188,7 +1261,7 @@ async function createColdLeadTasks() {
           lead_stage: lead.lead_stage,
           days_inactive: Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
         },
-        initialStatus: 'queued',
+        initialStatus: 'pending',
       });
     } catch (err) {
       console.error(`[ColdLead] Error for lead ${lead.id}:`, err.message);
@@ -1294,22 +1367,13 @@ async function processPendingTasks() {
         continue;
       }
 
-      // If approval mode blocked the send, park the task
-      if (result && result.awaiting_approval) {
-        await supabase.from('agent_tasks').update({
-          status: 'awaiting_approval',
-          error_message: result.message_preview || null,
-        }).eq('id', task.id);
-        console.log(`[ProcessTasks] Awaiting approval: ${task.task_type} for ${task.lead_name}`);
-        continue;
-      }
-
       await supabase.from('agent_tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         error_message: null
       }).eq('id', task.id);
       console.log(`[ProcessTasks] Completed: ${task.task_type} for ${task.lead_name}`);
+      await notifyTaskResult(task, true);
     } catch (err) {
       const status = err.is24hWindow ? 'failed_24h_window' : 'failed';
       await supabase.from('agent_tasks').update({
@@ -1318,6 +1382,7 @@ async function processPendingTasks() {
         error_message: err.message
       }).eq('id', task.id);
       console.error(`[ProcessTasks] Failed: ${task.task_type} for ${task.lead_name}: ${err.message}`);
+      await notifyTaskResult(task, false, err.message);
     }
   }
 }
@@ -1648,10 +1713,6 @@ async function executeHumanCallback(task, waPhone) {
  * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
-  // Telegram approval gate - check before sending template to lead
-  const gateResult = await approvalGate(task, waPhone, null, true);
-  if (gateResult?.awaiting_approval) return gateResult;
-
   // Always send template directly - new leads have no 24h window
   const templateName = 'bcon_proxe_first_outreach';
   await sendWhatsAppTemplate(waPhone, {
@@ -2142,17 +2203,24 @@ async function sendTelegram(chatId, text, replyMarkup) {
   }
 }
 
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
- * Acknowledge a Telegram callback query (removes the "loading" spinner on the button).
+ * Send a one-line Telegram notification after task execution.
  */
-async function answerCallbackQuery(callbackQueryId, text) {
-  if (!TELEGRAM_BOT_TOKEN) return;
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
-  }).catch(() => {});
+async function notifyTaskResult(task, success, errorMsg) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+  const phone10 = (task.lead_phone || '').replace(/\D/g, '').slice(-10);
+  const channel = task.metadata?.channel || 'whatsapp';
+  const msg = success
+    ? `Sent ${task.task_type} to ${task.lead_name} (${phone10}) via ${channel}`
+    : `Failed ${task.task_type} for ${task.lead_name}: ${errorMsg || 'unknown'}`;
+  try {
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, msg);
+  } catch (_) {}
 }
 
 /**
@@ -2245,385 +2313,8 @@ function getTemplatePreview(task, lead) {
   }
 }
 
-/**
- * Telegram approval gate - runs before any message is sent to a lead.
- *
- * Modes:
- * 'lockdown': ALL tasks require approval, nothing auto-sends (emergency brake)
- * 'approve':  everything goes to Telegram for approval (original behavior)
- * 'smart':    confidence 80+ auto-sends (notified with AUTO-SENT tag), <80 requires approval
- * 'notify':   everything auto-sends, all notified on Telegram
- *
- * If Telegram is not configured, lets the send proceed silently.
- */
-async function approvalGate(task, waPhone, message, isTemplate) {
-  const mode = getApprovalMode();
-
-  // Calculate confidence score
-  let lead = null;
-  if (task.lead_id) {
-    const { data } = await supabase.from('all_leads')
-      .select('id, response_count, unified_context')
-      .eq('id', task.lead_id).maybeSingle();
-    lead = data;
-  }
-  const { score: confidence, reasons: confidenceReasons } = await calculateConfidence(task, lead);
-
-  // Store confidence on the task
-  await supabase.from('agent_tasks').update({
-    metadata: { ...task.metadata, confidence_score: confidence, confidence_reasons: confidenceReasons },
-  }).eq('id', task.id);
-
-  console.log(`[Confidence] ${task.task_type} for ${task.lead_name}: ${confidence}/100 [${confidenceReasons.join(', ')}]`);
-
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return null;
-
-  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-  let msgPreview;
-  if (isTemplate) {
-    const tplInfo = getTemplatePreview(task, lead);
-    msgPreview = `Template: ${tplInfo.name}\n${tplInfo.params.map(p => `${p.label}: ${p.value}`).join('\n')}`;
-  } else {
-    msgPreview = message;
-  }
-  const scheduledAt = task.scheduled_at
-    ? new Date(task.scheduled_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-    : 'now';
-
-  const confidenceTag = `Confidence: ${confidence}/100`;
-
-  // ── LOCKDOWN: everything requires approval ──
-  if (mode === 'lockdown' || mode === 'approve') {
-    const modeLabel = mode === 'lockdown' ? '🔒 LOCKDOWN' : 'APPROVAL NEEDED';
-    const body =
-      `<b>PROXE ${modeLabel}</b>\n\n` +
-      `Lead: ${task.lead_name} (${phone10})\n` +
-      `Type: ${task.task_type}\n` +
-      `${confidenceTag}\n` +
-      `Scheduled: ${scheduledAt}\n\n` +
-      `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
-    const keyboard = {
-      inline_keyboard: [[
-        { text: 'Approve', callback_data: `approve_${task.id}` },
-        { text: 'Reject', callback_data: `reject_${task.id}` },
-      ]],
-    };
-    try {
-      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body, keyboard);
-      console.log(`[TelegramGate] ${mode} approval request for ${task.task_type} → ${task.lead_name} (confidence: ${confidence})`);
-    } catch (err) {
-      console.error(`[TelegramGate] Failed to send approval request:`, err.message);
-    }
-    return { awaiting_approval: true, message_preview: msgPreview };
-  }
-
-  // ── SMART: auto-approve high confidence, manual for low ──
-  if (mode === 'smart') {
-    if (confidence >= 80) {
-      // Auto-send, notify on Telegram with AUTO-SENT tag
-      recordApprovalDecision(task.task_type, 'auto_sent');
-      const body =
-        `<b>✅ PROXE AUTO-SENT</b>\n\n` +
-        `Lead: ${task.lead_name} (${phone10})\n` +
-        `Type: ${task.task_type}\n` +
-        `${confidenceTag}\n` +
-        `Scheduled: ${scheduledAt}\n\n` +
-        `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
-      try {
-        await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
-      } catch (err) {
-        console.error(`[TelegramGate] Failed to notify auto-send:`, err.message);
-      }
-      console.log(`[TelegramGate] AUTO-SENT ${task.task_type} for ${task.lead_name} (confidence: ${confidence})`);
-      return null; // proceed with send
-    }
-
-    // Low confidence → require approval
-    const body =
-      `<b>PROXE APPROVAL NEEDED</b> (smart mode)\n\n` +
-      `Lead: ${task.lead_name} (${phone10})\n` +
-      `Type: ${task.task_type}\n` +
-      `${confidenceTag} ⚠️ Below auto-approve threshold\n` +
-      `Scheduled: ${scheduledAt}\n\n` +
-      `Message:\n<i>${escapeHtml(msgPreview)}</i>`;
-    const keyboard = {
-      inline_keyboard: [[
-        { text: 'Approve', callback_data: `approve_${task.id}` },
-        { text: 'Reject', callback_data: `reject_${task.id}` },
-      ]],
-    };
-    try {
-      await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body, keyboard);
-      console.log(`[TelegramGate] Smart mode: needs approval for ${task.task_type} → ${task.lead_name} (confidence: ${confidence})`);
-    } catch (err) {
-      console.error(`[TelegramGate] Failed to send smart approval request:`, err.message);
-    }
-    return { awaiting_approval: true, message_preview: msgPreview };
-  }
-
-  // ── NOTIFY: everything auto-sends, all notified on Telegram ──
-  recordApprovalDecision(task.task_type, 'auto_sent');
-  const body =
-    `<b>PROXE TASK FIRING</b>\n\n` +
-    `Lead: ${task.lead_name} (${phone10})\n` +
-    `Type: ${task.task_type}\n` +
-    `${confidenceTag}\n` +
-    `Scheduled: ${scheduledAt}\n\n` +
-    `Message:\n<i>${escapeHtml(msgPreview)}</i>\n\n` +
-    `Status: SENT`;
-  try {
-    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
-  } catch (err) {
-    console.error(`[TelegramGate] Failed to notify:`, err.message);
-  }
-  return null;
-}
-
-function escapeHtml(text) {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/**
- * Poll Telegram for inline keyboard button presses (callback_query updates).
- * Uses getUpdates with offset to only fetch new updates since last check.
- * Persists offset to a file so it survives process restarts.
- */
-async function pollTelegramApprovals() {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
-
-  let offset = 0;
-  try {
-    if (fs.existsSync(TELEGRAM_OFFSET_FILE)) {
-      offset = parseInt(fs.readFileSync(TELEGRAM_OFFSET_FILE, 'utf8').trim(), 10) || 0;
-    }
-  } catch (_) {}
-
-  let updates;
-  try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offset, timeout: 0, limit: 50, allowed_updates: ['callback_query', 'message'] }),
-    });
-    if (!res.ok) {
-      console.error(`[TelegramPoll] getUpdates failed: ${res.status}`);
-      return;
-    }
-    const data = await res.json();
-    updates = data.result || [];
-  } catch (err) {
-    console.error(`[TelegramPoll] Error fetching updates:`, err.message);
-    return;
-  }
-
-  if (updates.length === 0) return;
-
-  let maxUpdateId = offset;
-  let processed = 0;
-
-  for (const update of updates) {
-    if (update.update_id >= maxUpdateId) maxUpdateId = update.update_id + 1;
-
-    const callback = update.callback_query;
-    if (!callback) continue;
-
-    const chatId = String(callback.message?.chat?.id || '');
-    const callbackData = callback.data || '';
-
-    // Only process button presses from the admin chat
-    if (chatId !== String(TELEGRAM_ADMIN_CHAT_ID)) continue;
-
-    const approveMatch = callbackData.match(/^approve_([a-f0-9-]+)/i);
-    const rejectMatch = callbackData.match(/^reject_([a-f0-9-]+)/i);
-
-    if (approveMatch) {
-      await answerCallbackQuery(callback.id, 'Approving...');
-      await handleTelegramApprove(approveMatch[1], chatId);
-      processed++;
-    } else if (rejectMatch) {
-      await answerCallbackQuery(callback.id, 'Rejecting...');
-      await handleTelegramReject(rejectMatch[1], chatId);
-      processed++;
-    }
-
-    // Handle text commands: /lockdown, /smart, /approve, /notify, /status
-    const textMsg = update.message;
-    if (textMsg && String(textMsg.chat?.id) === String(TELEGRAM_ADMIN_CHAT_ID)) {
-      const text = (textMsg.text || '').trim().toLowerCase();
-      const cmdChatId = String(textMsg.chat.id);
-
-      if (text === '/lockdown') {
-        setApprovalMode('lockdown');
-        await sendTelegram(cmdChatId, '🔒 <b>LOCKDOWN activated.</b>\nAll tasks now require manual approval. Nothing auto-sends.').catch(() => {});
-        console.log('[TelegramCmd] Switched to LOCKDOWN mode');
-        processed++;
-      } else if (text === '/smart') {
-        setApprovalMode('smart');
-        await sendTelegram(cmdChatId, '🧠 <b>SMART mode activated.</b>\nConfidence 80+ auto-sends. Below 80 needs approval.').catch(() => {});
-        console.log('[TelegramCmd] Switched to SMART mode');
-        processed++;
-      } else if (text === '/approve') {
-        setApprovalMode('approve');
-        await sendTelegram(cmdChatId, '✋ <b>APPROVE mode activated.</b>\nAll tasks require manual approval.').catch(() => {});
-        console.log('[TelegramCmd] Switched to APPROVE mode');
-        processed++;
-      } else if (text === '/notify') {
-        setApprovalMode('notify');
-        await sendTelegram(cmdChatId, '📢 <b>NOTIFY mode activated.</b>\nAll tasks auto-send. You get notifications only.').catch(() => {});
-        console.log('[TelegramCmd] Switched to NOTIFY mode');
-        processed++;
-      } else if (text === '/status') {
-        const currentMode = getApprovalMode();
-        const stats = loadApprovalStats();
-        const totalDecisions = (stats.overall.approved || 0) + (stats.overall.rejected || 0);
-        const autoSent = stats.overall.auto_sent || 0;
-        const total = totalDecisions + autoSent;
-        const autonomy = total > 0 ? Math.round((autoSent / total) * 100) : 0;
-
-        let statusBody = `<b>PROXe Status</b>\n\nMode: <b>${currentMode.toUpperCase()}</b>\nAutonomy: <b>${autonomy}%</b> (${autoSent}/${total} auto-sent)\n\n`;
-        statusBody += `Overall: ${stats.overall.approved || 0} approved, ${stats.overall.rejected || 0} rejected, ${autoSent} auto-sent\n\n`;
-
-        const types = Object.entries(stats.per_task_type || {});
-        if (types.length > 0) {
-          statusBody += '<b>Per task type:</b>\n';
-          for (const [tt, data] of types) {
-            const d = data;
-            const dec = (d.approved || 0) + (d.rejected || 0);
-            const rate = dec > 0 ? Math.round((d.approved / dec) * 100) : 0;
-            statusBody += `• ${tt}: ${rate}% approval (${d.approved || 0}/${dec}), ${d.auto_sent || 0} auto\n`;
-          }
-        }
-
-        await sendTelegram(cmdChatId, statusBody).catch(() => {});
-        processed++;
-      }
-    }
-  }
-
-  // Persist offset
-  try {
-    fs.writeFileSync(TELEGRAM_OFFSET_FILE, String(maxUpdateId));
-  } catch (err) {
-    console.error(`[TelegramPoll] Failed to save offset:`, err.message);
-  }
-
-  if (processed > 0) {
-    console.log(`[TelegramPoll] Processed ${processed} approval commands`);
-  }
-}
-
-/**
- * Handle /approve_{task_id}: fetch task, send the WhatsApp message, mark completed.
- */
-async function handleTelegramApprove(taskId, chatId) {
-  const { data: task, error } = await supabase
-    .from('agent_tasks')
-    .select('*')
-    .eq('id', taskId)
-    .maybeSingle();
-
-  if (error || !task) {
-    await sendTelegram(chatId, `Task ${taskId} not found.`).catch(() => {});
-    return;
-  }
-
-  if (task.status !== 'awaiting_approval') {
-    await sendTelegram(chatId, `Task already ${task.status}.`).catch(() => {});
-    return;
-  }
-
-  try {
-    // Re-resolve phone (same logic as executeTask)
-    let phone = task.lead_phone?.replace(/\D/g, '');
-    if (task.lead_id) {
-      const { data: freshLead } = await supabase
-        .from('all_leads')
-        .select('customer_phone_normalized')
-        .eq('id', task.lead_id)
-        .maybeSingle();
-      if (freshLead?.customer_phone_normalized) {
-        phone = freshLead.customer_phone_normalized.replace(/\D/g, '');
-      }
-    }
-    if (!phone) throw new Error('No phone number');
-    const waPhone = phone.length === 10 ? `91${phone}` : phone;
-
-    // Send the actual WhatsApp message (stored in error_message as message_preview)
-    const message = task.error_message || `Hey ${task.lead_name}, following up!`;
-    const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
-
-    if (within24h) {
-      await sendWhatsApp(waPhone, message);
-    } else {
-      await sendWhatsAppTemplate(waPhone, task);
-    }
-
-    // Log to conversations
-    if (task.lead_id) {
-      await supabase.from('conversations').insert({
-        lead_id: task.lead_id,
-        channel: 'whatsapp',
-        sender: 'agent',
-        content: message,
-        message_type: 'text',
-        metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, approved_via: 'telegram' },
-      });
-    }
-
-    await supabase.from('agent_tasks').update({
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-      error_message: null,
-    }).eq('id', taskId);
-
-    recordApprovalDecision(task.task_type, 'approved');
-    await sendTelegram(chatId, `Approved. Sent to ${task.lead_name}.`).catch(() => {});
-    console.log(`[TelegramApprove] Sent ${task.task_type} to ${task.lead_name}`);
-  } catch (err) {
-    await supabase.from('agent_tasks').update({
-      status: 'failed',
-      completed_at: new Date().toISOString(),
-      error_message: err.message,
-    }).eq('id', taskId);
-    await sendTelegram(chatId, `Approved but send failed: ${err.message}`).catch(() => {});
-    console.error(`[TelegramApprove] Send failed for ${task.lead_name}:`, err.message);
-  }
-}
-
-/**
- * Handle /reject_{task_id}: cancel the task.
- */
-async function handleTelegramReject(taskId, chatId) {
-  const { data: task, error } = await supabase
-    .from('agent_tasks')
-    .select('id, status, lead_name, task_type')
-    .eq('id', taskId)
-    .maybeSingle();
-
-  if (error || !task) {
-    await sendTelegram(chatId, `Task ${taskId} not found.`).catch(() => {});
-    return;
-  }
-
-  if (task.status !== 'awaiting_approval') {
-    await sendTelegram(chatId, `Task already ${task.status}.`).catch(() => {});
-    return;
-  }
-
-  await supabase.from('agent_tasks').update({
-    status: 'cancelled',
-    completed_at: new Date().toISOString(),
-    error_message: 'Rejected via Telegram',
-  }).eq('id', taskId);
-
-  recordApprovalDecision(task.task_type, 'rejected');
-  await sendTelegram(chatId, `Rejected. ${task.task_type} for ${task.lead_name} cancelled.`).catch(() => {});
-  console.log(`[TelegramReject] Cancelled ${task.task_type} for ${task.lead_name}`);
-}
-
 // ============================================
-// MESSAGE SENDING (with 24h window check + approval gate)
+// MESSAGE SENDING (with 24h window check)
 // ============================================
 
 /**
@@ -2633,10 +2324,6 @@ async function handleTelegramReject(taskId, chatId) {
  */
 async function executeSendMessage(task, waPhone, message) {
   const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
-
-  // Telegram approval gate - check before sending anything to the lead
-  const gateResult = await approvalGate(task, waPhone, message, !within24h);
-  if (gateResult?.awaiting_approval) return gateResult;
 
   let waMessageId = null;
   if (within24h) {

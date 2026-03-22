@@ -231,8 +231,17 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string | null }) {
 
 // --- Queue Task Card (shared between both sections) ---
 
-function QueueTaskCard({ task }: { task: AgentTask }) {
+function QueueTaskCard({ task, onAction }: { task: AgentTask; onAction?: (taskId: string, action: string, scheduledAt?: string) => void }) {
   const isQueued = task.status === 'queued'
+  const isPending = task.status === 'pending'
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [rescheduleTime, setRescheduleTime] = useState('')
+
+  const btnStyle = (bg: string, color: string): React.CSSProperties => ({
+    fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
+    border: 'none', cursor: 'pointer', background: bg, color,
+  })
+
   return (
     <div
       style={{
@@ -259,15 +268,50 @@ function QueueTaskCard({ task }: { task: AgentTask }) {
       <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {task.task_description}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        {isQueued ? (
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#a855f7', background: 'rgba(168,85,247,0.12)', padding: '1px 8px', borderRadius: 4 }}>
-            Awaiting Approval
-          </span>
-        ) : (
-          <CountdownTimer scheduledAt={task.scheduled_at} />
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Action buttons for pending/queued tasks */}
+        {(isPending || isQueued) && onAction ? (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button style={btnStyle('rgba(34,197,94,0.15)', '#22c55e')} onClick={() => onAction(task.id, 'send_now')}>
+              Send Now
+            </button>
+            <button style={btnStyle('rgba(59,130,246,0.15)', '#3b82f6')} onClick={() => setShowReschedule(!showReschedule)}>
+              Reschedule
+            </button>
+            <button style={btnStyle('rgba(239,68,68,0.15)', '#ef4444')} onClick={() => onAction(task.id, 'cancel')}>
+              Cancel
+            </button>
+          </div>
+        ) : <div />}
+        <div>
+          {isQueued ? (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#a855f7', background: 'rgba(168,85,247,0.12)', padding: '1px 8px', borderRadius: 4 }}>
+              Awaiting Approval
+            </span>
+          ) : (
+            <CountdownTimer scheduledAt={task.scheduled_at} />
+          )}
+        </div>
       </div>
+      {showReschedule && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', paddingTop: 4 }}>
+          <input
+            type="datetime-local"
+            value={rescheduleTime}
+            onChange={(e) => setRescheduleTime(e.target.value)}
+            style={{
+              fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)',
+              background: 'var(--bg-secondary)', color: 'var(--text-primary)', flex: 1,
+            }}
+          />
+          <button
+            style={btnStyle('rgba(59,130,246,0.25)', '#3b82f6')}
+            onClick={() => { if (rescheduleTime && onAction) { onAction(task.id, 'reschedule', new Date(rescheduleTime).toISOString()); setShowReschedule(false); } }}
+          >
+            Confirm
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -312,6 +356,24 @@ export default function TasksPage() {
       setLoading(false)
     }
   }, [])
+
+  const handleTaskAction = useCallback(async (taskId: string, action: string, scheduledAt?: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/tasks/${taskId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, scheduled_at: scheduledAt }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        fetchTasks() // refresh
+      } else {
+        console.error('Task action failed:', data.error)
+      }
+    } catch (err) {
+      console.error('Task action error:', err)
+    }
+  }, [fetchTasks])
 
   useEffect(() => {
     fetchTasks()
@@ -468,7 +530,7 @@ export default function TasksPage() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing firing soon</span>
               </div>
             ) : (
-              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
+              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)
             )}
           </div>
 
@@ -492,7 +554,7 @@ export default function TasksPage() {
                   opacity: 0.7,
                 }}
               >
-                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)}
+                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)}
               </div>
             </>
           )}
@@ -522,7 +584,7 @@ export default function TasksPage() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing queued</span>
               </div>
             ) : (
-              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} />)
+              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)
             )}
           </div>
         </div>
