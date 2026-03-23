@@ -25,6 +25,33 @@ const TEST_MODE = process.env.TEST_MODE === 'true';
 if (TEST_MODE) console.log('[TEST] TEST_MODE enabled — all timers compressed');
 
 // ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Format a time string to "H:MM AM/PM" (e.g. "3:00 PM").
+ * Handles inputs like "3:00 PM", "15:00", "3pm", raw ISO, etc.
+ */
+function formatTimeTo12h(raw) {
+  if (!raw) return 'your scheduled time';
+  const s = raw.trim();
+  // Already in "H:MM AM/PM" format
+  if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(s)) return s.toUpperCase().replace(/(AM|PM)/, ' $1').replace(/\s+/g, ' ');
+  // 24h format "HH:MM"
+  const m24 = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (m24) {
+    let h = parseInt(m24[1], 10);
+    const min = m24[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    return `${h}:${min} ${ampm}`;
+  }
+  // Fallback: return as-is if unrecognised
+  return s;
+}
+
+// ============================================
 // TEST MODE - Timer Compression
 // ============================================
 // Maps production durations to compressed test durations.
@@ -242,7 +269,7 @@ async function calculateNextAction(leadId, taskMetadata) {
     .from('agent_tasks')
     .select('id')
     .eq('lead_id', leadId)
-    .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+    .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
     .in('status', ['pending', 'completed'])
     .limit(1);
   const hasBooking = bookingTasks && bookingTasks.length > 0;
@@ -1357,7 +1384,7 @@ async function morningBriefing() {
         .from('agent_tasks')
         .select('id, scheduled_at, metadata')
         .eq('lead_id', lead.id)
-        .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h'])
+        .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
         .eq('status', 'pending')
         .limit(1);
       const hasBooking = bookingTasks && bookingTasks.length > 0;
@@ -1994,15 +2021,15 @@ async function executeTask(task) {
     // ── Flow tasks (created by engine.ts) ──
     case 'nudge_waiting':
       return await executeNudgeWaiting(task, waPhone);
-    case 'booking_reminder_24h':
+    case 'booking_reminder_24h': {
+      const rawTime24 = task.metadata?.booking_time || '';
+      const fmt24 = formatTimeTo12h(rawTime24);
       return await executeSendMessage(task, waPhone,
-        `Hey ${task.lead_name}! Just a reminder, you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to it!`);
-    case 'booking_reminder_1h':
-      return await executeSendMessage(task, waPhone,
-        `Just a heads up ${task.lead_name}, your call is in about an hour at ${task.metadata?.booking_time}. Talk soon!`);
+        `${task.lead_name}, your call with the BCON Team is tomorrow at ${fmt24}. See you there.`);
+    }
     case 'booking_reminder_30m':
       return await executeSendMessage(task, waPhone,
-        `${task.lead_name}, your call starts in 30 minutes. Talk soon!`);
+        `${task.lead_name}, 30 minutes out. See you in a bit.`);
     case 'post_call_followup':
       return await executePostBookingFollowup(task, waPhone);
     case 'missed_call_followup':
@@ -2737,7 +2764,7 @@ async function executePushToBook(task, waPhone) {
       .from('agent_tasks')
       .select('id')
       .eq('lead_id', task.lead_id)
-      .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+      .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
       .gt('created_at', task.created_at)
       .limit(1);
 
@@ -2839,7 +2866,7 @@ function getTemplatePreview(task, lead) {
         { label: 'Service', value: serviceInterest },
       ],
     };
-  } else if (taskType === 'booking_reminder_30m' || taskType === 'reminder_30m' || taskType === 'booking_reminder_1h' || taskType === 'reminder_1h') {
+  } else if (taskType === 'booking_reminder_30m' || taskType === 'reminder_30m') {
     return {
       name: 'bcon_proxe_booking_reminder_30m',
       params: [

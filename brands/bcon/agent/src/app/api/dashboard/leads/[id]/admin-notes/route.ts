@@ -197,7 +197,7 @@ export async function POST(
         .from('agent_tasks')
         .update({ status: 'cancelled', completed_at: now.toISOString() })
         .eq('lead_id', leadId)
-        .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+        .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
         .in('status', ['pending', 'queued'])
 
       // Create immediate missed_call_followup

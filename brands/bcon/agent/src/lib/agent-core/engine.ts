@@ -660,7 +660,6 @@ function buildBookingTools(
 
           const reminders = [
             { type: 'booking_reminder_24h', offset: -24 * 60 * 60 * 1000, desc: 'Booking reminder: 24 hours before call' },
-            { type: 'booking_reminder_1h', offset: -1 * 60 * 60 * 1000, desc: 'Booking reminder: 1 hour before call' },
             { type: 'booking_reminder_30m', offset: -30 * 60 * 1000, desc: 'Booking reminder: 30 minutes before call' },
           ];
 
