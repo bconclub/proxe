@@ -8,12 +8,11 @@ import {
   MdDescription,
   MdCheckCircle,
   MdScheduleSend,
+  MdSchedule,
   MdWhatsapp,
   MdPhoneInTalk,
   MdLanguage,
-  MdHourglassEmpty,
 } from 'react-icons/md'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useRouter } from 'next/navigation'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -44,8 +43,6 @@ interface Stats {
   firingNextHour: number
   successRate: number
 }
-
-type FilterTab = 'all' | 'reminders' | 'nudges' | 'follow_ups' | 'other' | 'completed' | 'failed'
 
 // --- Type badge colors ---
 
@@ -190,38 +187,10 @@ function getContextLine(task: AgentTask): string | null {
   return null
 }
 
-function matchesFilter(task: AgentTask, filter: FilterTab): boolean {
-  if (filter === 'all') return true
-  if (filter === 'completed') return task.status === 'completed'
-  if (filter === 'failed') return task.status === 'failed' || task.status === 'failed_24h_window'
-  if (filter === 'reminders') return task.task_type.includes('reminder') || task.task_type.includes('booking_reminder')
-  if (filter === 'nudges') return task.task_type.includes('nudge') || task.task_type.includes('push_to_book')
-  if (filter === 'follow_ups') return task.task_type.includes('follow') || task.task_type.includes('re_engage') || task.task_type.includes('post_booking')
-  return (
-    !task.task_type.includes('reminder') &&
-    !task.task_type.includes('nudge') &&
-    !task.task_type.includes('follow') &&
-    !task.task_type.includes('re_engage') &&
-    !task.task_type.includes('push_to_book') &&
-    !task.task_type.includes('post_booking')
-  )
-}
-
-function buildHourlyChart(tasks: AgentTask[]): { hour: string; count: number }[] {
-  const now = new Date()
-  const hours: { hour: string; count: number }[] = []
-  for (let i = 23; i >= 0; i--) {
-    const h = new Date(now.getTime() - i * 60 * 60 * 1000)
-    const label = h.toLocaleTimeString('en-IN', { hour: '2-digit', hour12: true })
-    const start = new Date(h)
-    start.setMinutes(0, 0, 0)
-    const end = new Date(start.getTime() + 60 * 60 * 1000)
-    const count = tasks.filter(
-      (t) => t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= start && new Date(t.completed_at) < end
-    ).length
-    hours.push({ hour: label, count })
-  }
-  return hours
+function isWithin24Hours(scheduledAt: string | null): boolean {
+  if (!scheduledAt) return false
+  const diff = new Date(scheduledAt).getTime() - Date.now()
+  return diff > 0 && diff <= 24 * 60 * 60 * 1000
 }
 
 // --- Live Countdown Timer ---
@@ -272,7 +241,7 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string | null }) {
   )
 }
 
-// --- Queue Task Card (shared between both sections) ---
+// --- Queue Task Card (shared between Next 24h and Upcoming columns) ---
 
 function QueueTaskCard({ task, onAction, onLeadClick }: { task: AgentTask; onAction?: (taskId: string, action: string, scheduledAt?: string) => void; onLeadClick?: (task: AgentTask) => void }) {
   const isQueued = task.status === 'queued'
@@ -395,7 +364,6 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, firingNextHour: 0, successRate: 100 })
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterTab>('all')
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
 
@@ -421,7 +389,7 @@ export default function TasksPage() {
       })
       const data = await res.json()
       if (data.success) {
-        fetchTasks() // refresh
+        fetchTasks()
       } else {
         console.error('Task action failed:', data.error)
       }
@@ -432,7 +400,6 @@ export default function TasksPage() {
 
   const handleLeadClick = useCallback(async (task: AgentTask) => {
     if (task.lead_id) {
-      // Fetch lead details and open modal
       try {
         const res = await fetch(`/api/dashboard/leads/${task.lead_id}`)
         if (res.ok) {
@@ -461,7 +428,6 @@ export default function TasksPage() {
         console.error('Failed to fetch lead:', err)
       }
     } else if (task.lead_phone) {
-      // No lead_id — navigate to inbox filtered by phone
       router.push(`/dashboard/inbox?phone=${encodeURIComponent(task.lead_phone)}`)
     }
   }, [router])
@@ -487,24 +453,20 @@ export default function TasksPage() {
     return () => clearInterval(interval)
   }, [fetchTasks])
 
-  const timelineTasks = tasks
-    .filter((t) => (t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window') && matchesFilter(t, filter))
+  // Column 1: Completed / Failed / Failed 24h window
+  const completedTasks = tasks
+    .filter((t) => t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window')
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
-  const thirtyMinsFromNow = Date.now() + 30 * 60 * 1000
-  const upNextTasks = tasks
-    .filter((t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at).getTime() <= thirtyMinsFromNow)
+  // Column 2: Next 24 hours (pending within 24h) + queued (regardless of time)
+  const next24hTasks = tasks
+    .filter((t) => (t.status === 'pending' && isWithin24Hours(t.scheduled_at)) || t.status === 'queued')
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
+  // Column 3: Upcoming (pending tasks beyond 24h)
   const upcomingTasks = tasks
-    .filter((t) => t.status === 'pending' && (!t.scheduled_at || new Date(t.scheduled_at).getTime() > thirtyMinsFromNow))
+    .filter((t) => t.status === 'pending' && !isWithin24Hours(t.scheduled_at))
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
-
-  const awaitingApprovalTasks = tasks
-    .filter((t) => t.status === 'queued')
-    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
-
-  const hourlyData = buildHourlyChart(tasks)
 
   if (loading) {
     return (
@@ -515,7 +477,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
       <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
       <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
@@ -529,49 +491,29 @@ export default function TasksPage() {
         <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
       </div>
 
-      {/* Main Area */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {/* Left - Activity Timeline */}
-        <div style={{ flex: '3 1 400px', minWidth: 0 }}>
-          {/* Filter Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {(['all', 'reminders', 'nudges', 'follow_ups', 'other', 'completed', 'failed'] as FilterTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: filter === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  color: filter === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {tab === 'follow_ups' ? 'Follow-ups' : tab}
-              </button>
-            ))}
-          </div>
+      {/* 3-Column Layout */}
+      <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-          {/* Timeline */}
+        {/* Column 1 — Completed */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+            Completed
+          </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 500,
+              flex: 1,
               overflow: 'auto',
             }}
           >
-            {timelineTasks.length === 0 ? (
+            {completedTasks.length === 0 ? (
               <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>
-                No tasks to show
+                No completed tasks
               </div>
             ) : (
-              timelineTasks.map((task) => (
+              completedTasks.map((task) => (
                 <div
                   key={task.id}
                   style={{
@@ -613,129 +555,56 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Right - Queue */}
-        <div style={{ flex: '2 1 280px', minWidth: 0 }}>
-          {/* Up Next (within 30 minutes) */}
+        {/* Column 2 — Next 24 Hours */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-            Up Next
-            {upNextTasks.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginLeft: 6 }}>
-                ({upNextTasks.length})
-              </span>
-            )}
+            Next 24 Hours
           </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 280,
+              flex: 1,
               overflow: 'auto',
-              marginBottom: 16,
             }}
           >
-            {upNextTasks.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 6 }}>
-                <MdCheckCircle size={24} style={{ color: 'rgba(34,197,94,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing firing soon</span>
+            {next24hTasks.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
+                <MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No tasks in the next 24 hours</span>
               </div>
             ) : (
-              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
+              next24hTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
             )}
           </div>
+        </div>
 
-          {/* Upcoming (beyond 30 minutes) */}
-          {upcomingTasks.length > 0 && (
-            <>
-              <div style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: 13, marginBottom: 12 }}>
-                Upcoming
-                <span style={{ fontSize: 12, fontWeight: 500, marginLeft: 6 }}>
-                  ({upcomingTasks.length})
-                </span>
-              </div>
-              <div
-                style={{
-                  background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 8,
-                  maxHeight: 200,
-                  overflow: 'auto',
-                  marginBottom: 16,
-                  opacity: 0.7,
-                }}
-              >
-                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)}
-              </div>
-            </>
-          )}
-
-          {/* Awaiting Approval */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#a855f7', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-            <MdHourglassEmpty size={16} />
-            Awaiting Approval
-            {awaitingApprovalTasks.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
-                ({awaitingApprovalTasks.length})
-              </span>
-            )}
+        {/* Column 3 — Upcoming */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+            Upcoming
           </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-              border: '1px solid rgba(168,85,247,0.15)',
+              border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 280,
+              flex: 1,
               overflow: 'auto',
             }}
           >
-            {awaitingApprovalTasks.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 6 }}>
-                <MdCheckCircle size={24} style={{ color: 'rgba(168,85,247,0.3)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing queued</span>
+            {upcomingTasks.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
+                <MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No upcoming tasks</span>
               </div>
             ) : (
-              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
+              upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onLeadClick={handleLeadClick} />)
             )}
           </div>
         </div>
-      </div>
 
-      {/* Task Rate Chart */}
-      <div
-        style={{
-          background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8,
-          padding: '16px 20px',
-        }}
-      >
-        <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 12 }}>Tasks Completed (Last 24h)</div>
-        <ResponsiveContainer width="100%" height={120}>
-          <BarChart data={hourlyData}>
-            <XAxis
-              dataKey="hour"
-              tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
-              axisLine={false}
-              tickLine={false}
-              interval={3}
-            />
-            <YAxis hide allowDecimals={false} />
-            <Tooltip
-              contentStyle={{
-                background: '#1a1a1a',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6,
-                fontSize: 12,
-                color: '#fff',
-              }}
-            />
-            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={16}>
-              {hourlyData.map((_, i) => (
-                <Cell key={i} fill="rgba(255,255,255,0.2)" />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
       </div>
 
       {selectedLead && (
