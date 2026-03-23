@@ -2879,18 +2879,18 @@ function getTemplatePreview(task, lead) {
     return {
       name: 'bcon_proxe_booking_reminder_24h',
       params: [
-        { label: 'Name', value: leadName },
-        { label: 'Time', value: bookingTime },
-        { label: 'Service', value: serviceInterest },
+        { label: 'Name', parameter_name: 'customer_name', value: leadName },
+        { label: 'Time', parameter_name: 'booking_time', value: bookingTime },
+        { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
       ],
     };
   } else if (taskType === 'booking_reminder_30m' || taskType === 'reminder_30m') {
     return {
       name: 'bcon_proxe_booking_reminder_30m',
       params: [
-        { label: 'Name', value: leadName },
-        { label: 'Service', value: serviceInterest },
-        { label: 'Time', value: bookingTime },
+        { label: 'Name', parameter_name: 'customer_name', value: leadName },
+        { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+        { label: 'Time', parameter_name: 'booking_time', value: bookingTime },
       ],
     };
   } else if (taskType === 're_engage') {
@@ -2898,34 +2898,34 @@ function getTemplatePreview(task, lead) {
       return {
         name: 'bcon_proxe_reengagement_engaged',
         params: [
-          { label: 'Name', value: leadName },
-          { label: 'Pain Point', value: painPoint },
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
         ],
       };
     }
-    return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', value: leadName }] };
+    return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'first_outreach') {
-    return { name: 'bcon_proxe_first_outreach', params: [{ label: 'Name', value: leadName }] };
+    return { name: 'bcon_proxe_first_outreach', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'post_call_followup') {
-    return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', value: leadName }] };
+    return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {
     if (engaged) {
       return {
         name: 'bcon_proxe_followup_engaged',
         params: [
-          { label: 'Name', value: leadName },
-          { label: 'Service', value: serviceInterest },
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
         ],
       };
     }
     return {
       name: 'bcon_proxe_followup_noengage',
       params: [
-        { label: 'Name', value: leadName },
+        { label: 'Name', parameter_name: 'customer_name', value: leadName },
       ],
     };
   } else {
-    return { name: 'bcon_proxe_rnr', params: [{ label: 'Name', value: leadName }] };
+    return { name: 'bcon_proxe_rnr', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   }
 }
 
@@ -3056,16 +3056,16 @@ async function sendWhatsAppTemplate(phone, task) {
   }
 
   // Build components from the resolved params (with null/empty safety)
+  // Meta Cloud API requires parameter_name for templates with named variables
   const components = [
     {
       type: 'body',
       parameters: resolvedParams.map(p => {
         const val = p.value;
-        if (!val || (typeof val === 'string' && val.trim() === '')) {
-          console.warn(`[WhatsApp] Template "${templateName}" param "${p.label}" is empty for lead ${task.lead_id}, using fallback "there"`);
-          return { type: 'text', text: 'there' };
-        }
-        return { type: 'text', text: val };
+        const text = (!val || (typeof val === 'string' && val.trim() === ''))
+          ? (() => { console.warn(`[WhatsApp] Template "${templateName}" param "${p.label}" is empty for lead ${task.lead_id}, using fallback "there"`); return 'there'; })()
+          : val;
+        return { type: 'text', parameter_name: p.parameter_name, text };
       }),
     }
   ];
