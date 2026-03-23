@@ -600,7 +600,7 @@ export default function TasksPage() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No upcoming tasks</span>
               </div>
             ) : (
-              upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onLeadClick={handleLeadClick} />)
+              upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
             )}
           </div>
         </div>

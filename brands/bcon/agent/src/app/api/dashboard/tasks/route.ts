@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get('to')
     const leadId = searchParams.get('lead_id')
 
+    // Deprecated task types — no longer created, filter out any remaining
+    const DEPRECATED_TYPES = ['post_booking_followup', 'booking_reminder_1h']
+
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
       if (leadId) query = query.eq('lead_id', leadId)
       if (from) query = query.gte('created_at', from)
       if (to) query = query.lte('created_at', to)
+      for (const dt of DEPRECATED_TYPES) query = query.neq('task_type', dt)
 
       const { data, error } = await query.limit(200)
       if (error) {
@@ -55,6 +59,7 @@ export async function GET(request: NextRequest) {
 
     if (type) pendingQuery = pendingQuery.eq('task_type', type)
     if (leadId) pendingQuery = pendingQuery.eq('lead_id', leadId)
+    for (const dt of DEPRECATED_TYPES) pendingQuery = pendingQuery.neq('task_type', dt)
 
     // Query 2: completed/failed tasks with date filter
     let historyQuery = supabase
@@ -67,6 +72,7 @@ export async function GET(request: NextRequest) {
     if (to) historyQuery = historyQuery.lte('created_at', to)
     if (type) historyQuery = historyQuery.eq('task_type', type)
     if (leadId) historyQuery = historyQuery.eq('lead_id', leadId)
+    for (const dt of DEPRECATED_TYPES) historyQuery = historyQuery.neq('task_type', dt)
 
     const [pendingResult, historyResult] = await Promise.all([
       pendingQuery.limit(100),
