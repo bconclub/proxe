@@ -1458,14 +1458,14 @@ export default function InboxPage() {
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className="max-w-[80%] rounded-xl px-3 py-2 shadow-sm border"
+                        className="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border"
                         style={{
                           background: isCustomer
-                            ? 'var(--bg-secondary, rgba(255,255,255,0.06))'
-                            : 'var(--accent-subtle, rgba(99,102,241,0.10))',
+                            ? 'rgba(255,255,255,0.08)'
+                            : 'rgba(99,102,241,0.15)',
                           borderColor: isCustomer
-                            ? 'var(--border-primary, rgba(255,255,255,0.10))'
-                            : 'var(--accent-primary, rgba(99,102,241,0.25))',
+                            ? 'rgba(255,255,255,0.12)'
+                            : 'rgba(99,102,241,0.30)',
                           borderWidth: '1px',
                         }}
                       >
@@ -1478,7 +1478,7 @@ export default function InboxPage() {
                             >
                               {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
                             </span>
-                            <span className="text-[8px] px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                            <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
                               {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
                             </span>
                           </div>
