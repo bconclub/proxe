@@ -2848,6 +2848,24 @@ function isEngaged(lead) {
 }
 
 /**
+ * Expected body parameter count per Meta template.
+ * If a template is registered with fewer variables than we try to send,
+ * Meta rejects with "Parameter name is missing or empty".
+ * Keep this in sync with what's approved in Meta Business Manager.
+ */
+const TEMPLATE_PARAM_COUNT = {
+  'bcon_proxe_booking_reminder_24h': 3,  // name, time, service
+  'bcon_proxe_booking_reminder_30m': 3,  // name, service, time
+  'bcon_proxe_reengagement_engaged': 2,  // name, pain_point
+  'bcon_proxe_reengagement_noengage': 1, // name
+  'bcon_proxe_first_outreach': 1,        // name
+  'bcon_proxe_post_call_followup': 1,    // name
+  'bcon_proxe_followup_engaged': 2,      // name, service
+  'bcon_proxe_followup_noengage': 1,     // name only (Meta template has 1 variable)
+  'bcon_proxe_rnr': 1,                   // name
+};
+
+/**
  * Build a human-readable template preview showing template name and parameters.
  */
 function getTemplatePreview(task, lead) {
@@ -2904,7 +2922,6 @@ function getTemplatePreview(task, lead) {
       name: 'bcon_proxe_followup_noengage',
       params: [
         { label: 'Name', value: leadName },
-        { label: 'Service', value: serviceInterest },
       ],
     };
   } else {
@@ -3030,11 +3047,19 @@ async function sendWhatsAppTemplate(phone, task) {
   const tplInfo = getTemplatePreview(task, lead);
   const templateName = tplInfo.name;
 
+  // Enforce expected parameter count - truncate to what Meta template expects
+  const expectedCount = TEMPLATE_PARAM_COUNT[templateName];
+  let resolvedParams = tplInfo.params;
+  if (expectedCount != null && resolvedParams.length > expectedCount) {
+    console.warn(`[WhatsApp] Template "${templateName}" has ${resolvedParams.length} params but Meta expects ${expectedCount}, truncating`);
+    resolvedParams = resolvedParams.slice(0, expectedCount);
+  }
+
   // Build components from the resolved params (with null/empty safety)
   const components = [
     {
       type: 'body',
-      parameters: tplInfo.params.map(p => {
+      parameters: resolvedParams.map(p => {
         const val = p.value;
         if (!val || (typeof val === 'string' && val.trim() === '')) {
           console.warn(`[WhatsApp] Template "${templateName}" param "${p.label}" is empty for lead ${task.lead_id}, using fallback "there"`);
