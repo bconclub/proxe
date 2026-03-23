@@ -2824,7 +2824,7 @@ function isEngaged(lead) {
  * Build a human-readable template preview showing template name and parameters.
  */
 function getTemplatePreview(task, lead) {
-  const leadName = task.lead_name || 'there';
+  const leadName = (task.lead_name && task.lead_name.trim()) || 'there';
   const taskType = task.task_type || '';
   const { serviceInterest, painPoint } = resolveLeadContext(task, lead);
   const bookingTime = task.metadata?.booking_time || 'your scheduled time';
@@ -3003,11 +3003,18 @@ async function sendWhatsAppTemplate(phone, task) {
   const tplInfo = getTemplatePreview(task, lead);
   const templateName = tplInfo.name;
 
-  // Build components from the resolved params
+  // Build components from the resolved params (with null/empty safety)
   const components = [
     {
       type: 'body',
-      parameters: tplInfo.params.map(p => ({ type: 'text', text: p.value })),
+      parameters: tplInfo.params.map(p => {
+        const val = p.value;
+        if (!val || (typeof val === 'string' && val.trim() === '')) {
+          console.warn(`[WhatsApp] Template "${templateName}" param "${p.label}" is empty for lead ${task.lead_id}, using fallback "there"`);
+          return { type: 'text', text: 'there' };
+        }
+        return { type: 'text', text: val };
+      }),
     }
   ];
 
