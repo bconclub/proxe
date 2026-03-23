@@ -1216,8 +1216,8 @@ export default function InboxPage() {
                       {conv.booking_status && (
                         <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                           style={{
-                            background: 'var(--accent-subtle)',
-                            color: 'var(--accent-primary)',
+                            background: '#22c55e',
+                            color: '#fff',
                           }}>
                           EVENT
                         </span>
