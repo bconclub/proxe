@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendWhatsAppText } from '@/lib/services/whatsappSender'
 
 export const dynamic = 'force-dynamic'
 
@@ -305,7 +306,213 @@ export async function POST(
       actions.push('stage_updated:Converted')
     }
 
-    // 6. If any action was taken, invalidate cached unified_summary
+    // 5g. MEETING/TIME REQUESTED → send WhatsApp + nudge_waiting in 2h
+    if (/asked?\s*for\s*(?:a?\s*)?meet|asked?\s*for\s*(?:a?\s*)?time|wants?\s*a?\s*call|wants?\s*to\s*meet|send\s*(?:them|him|her)?\s*time|get\s*a?\s*time|asked?\s*for\s*google\s*meet|schedule\s*a?\s*call/.test(lowerNote)) {
+      if (leadPhone) {
+        const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`
+        const sendResult = await sendWhatsAppText(leadPhone, msg)
+        if (sendResult.success) {
+          actions.push('whatsapp_sent:meeting_request')
+          // Log the sent message to conversations
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: msg,
+            message_type: 'text',
+            metadata: { source: 'admin_note', note: trimmedNote },
+          })
+        } else {
+          actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`)
+        }
+      }
+      // Create nudge_waiting task in 2 hours
+      await supabase.from('agent_tasks').insert({
+        task_type: 'nudge_waiting',
+        task_description: `Nudge: asked for meeting time, no response yet (${leadName})`,
+        lead_id: leadId,
+        lead_phone: leadPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        metadata: { source: 'admin_note', trigger: 'meeting_request' },
+        created_at: now.toISOString(),
+      })
+      actions.push('nudge_waiting_created:2h')
+    }
+
+    // 5h. NOT POTENTIAL → cancel ALL tasks, set Cold, re_engage in 90 days
+    if (/not\s*potential|not\s*a\s*fit|too\s*small|no\s*budget|waste\s*of\s*time|low\s*priority/.test(lowerNote)) {
+      // Cancel ALL pending/queued/awaiting_approval tasks
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: admin note "${trimmedNote.substring(0, 50)}"` })
+        .eq('lead_id', leadId)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const cancelCount = cancelledTasks?.length || 0
+
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: 'Cold', stage_override: true })
+        .eq('id', leadId)
+
+      // Create quarterly re_engage (90 days)
+      await supabase.from('agent_tasks').insert({
+        task_type: 're_engage',
+        task_description: `Quarterly check-in for ${leadName} (marked not potential)`,
+        lead_id: leadId,
+        lead_phone: leadPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        metadata: { source: 'admin_note', trigger: 'not_potential', quarterly: true },
+        created_at: now.toISOString(),
+      })
+      actions.push(`not_potential:cancelled_${cancelCount}_tasks,stage_Cold,re_engage_90d`)
+    }
+
+    // 5i. LOW POTENTIAL → cancel tasks, set Cold, re_engage in 30 days
+    if (/maybe\s*later|check\s*back\s*later|not\s*now\s*but\s*maybe|low\s*potential|follow\s*up\s*later/.test(lowerNote)) {
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: admin note "${trimmedNote.substring(0, 50)}"` })
+        .eq('lead_id', leadId)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const cancelCount = cancelledTasks?.length || 0
+
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: 'Cold', stage_override: true })
+        .eq('id', leadId)
+
+      // Create monthly re_engage (30 days)
+      await supabase.from('agent_tasks').insert({
+        task_type: 're_engage',
+        task_description: `Monthly check-in for ${leadName} (low potential)`,
+        lead_id: leadId,
+        lead_phone: leadPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        metadata: { source: 'admin_note', trigger: 'low_potential', monthly: true },
+        created_at: now.toISOString(),
+      })
+      actions.push(`low_potential:cancelled_${cancelCount}_tasks,stage_Cold,re_engage_30d`)
+    }
+
+    // 5j. HIGH POTENTIAL → hot temperature, shorten timers, push_to_book or prep
+    if (/hot\s*lead|very\s*interested|wants?\s*to\s*start|ready\s*to\s*go|priority|close\s*this\s*week/.test(lowerNote)) {
+      // Set temperature to hot in unified_context
+      const { data: freshCtx } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .single()
+      if (freshCtx) {
+        await supabase
+          .from('all_leads')
+          .update({ unified_context: { ...(freshCtx.unified_context || {}), lead_temperature: 'hot' } })
+          .eq('id', leadId)
+      }
+
+      // Check for existing booking
+      const { data: bookingTasks } = await supabase
+        .from('agent_tasks')
+        .select('id')
+        .eq('lead_id', leadId)
+        .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
+        .in('status', ['pending', 'completed'])
+        .limit(1)
+      const hasBooking = bookingTasks && bookingTasks.length > 0
+
+      if (hasBooking) {
+        // Create prep task for the team
+        await supabase.from('agent_tasks').insert({
+          task_type: 'human_callback',
+          task_description: `PREP: High-potential lead ${leadName} has a booking. Review before call.`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+          metadata: { source: 'admin_note', trigger: 'high_potential', prep: true },
+          created_at: now.toISOString(),
+        })
+        actions.push('high_potential:temp_hot,prep_task_created')
+      } else {
+        // Create push_to_book in 1 hour
+        await supabase.from('agent_tasks').insert({
+          task_type: 'push_to_book',
+          task_description: `Push to book: high-potential lead ${leadName}`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+          metadata: { source: 'admin_note', trigger: 'high_potential' },
+          created_at: now.toISOString(),
+        })
+        actions.push('high_potential:temp_hot,push_to_book_1h')
+      }
+    }
+
+    // 5k. PRICING DISCUSSION → send WhatsApp with call CTA
+    if (/asked?\s*about\s*pricing|wants?\s*pricing|send\s*pricing|quote\s*needed/.test(lowerNote)) {
+      if (leadPhone) {
+        const msg = `${leadName}, thanks for your interest. Let's hop on a quick call so we can walk you through what works best for your business. When's good?`
+        const sendResult = await sendWhatsAppText(leadPhone, msg)
+        if (sendResult.success) {
+          actions.push('whatsapp_sent:pricing_response')
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: msg,
+            message_type: 'text',
+            metadata: { source: 'admin_note', note: trimmedNote },
+          })
+        } else {
+          actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`)
+        }
+      }
+    }
+
+    // 5l. SEND MESSAGE → "send:" / "message:" / "tell them" → send exact text
+    const sendMatch = trimmedNote.match(/^(?:send\s*:|message\s*:|tell\s*them\s*)(.*)/i)
+    if (sendMatch) {
+      const directMessage = sendMatch[1].trim()
+      if (directMessage && leadPhone) {
+        const sendResult = await sendWhatsAppText(leadPhone, directMessage)
+        if (sendResult.success) {
+          actions.push('whatsapp_sent:direct_message')
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: directMessage,
+            message_type: 'text',
+            metadata: { source: 'admin_note', direct_send: true },
+          })
+        } else {
+          actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`)
+        }
+      }
+    }
+
+    // 6. Log action summary to activity feed
+    if (actions.length > 0) {
+      const actionSummary = `PROXe: Note detected '${trimmedNote.substring(0, 40)}${trimmedNote.length > 40 ? '...' : ''}' → ${actions.join(', ')}`
+      await supabase.from('activities').insert({
+        lead_id: leadId,
+        activity_type: 'automation',
+        note: actionSummary,
+        created_by: 'PROXe AI',
+      })
+    }
+
+    // 7. If any action was taken, invalidate cached unified_summary
     if (actions.length > 0) {
       const { data: freshLead } = await supabase
         .from('all_leads')
