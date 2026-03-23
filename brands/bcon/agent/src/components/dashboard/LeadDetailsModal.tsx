@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -251,6 +251,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
+
+  // Send Message state
+  const [showSendMessageForm, setShowSendMessageForm] = useState(false)
+  const [sendMessageText, setSendMessageText] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+
+  // "+" action dropdown
+  const [showActionDropdown, setShowActionDropdown] = useState(false)
 
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
@@ -895,6 +903,41 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  const handleSendMessage = async () => {
+    if (!sendMessageText.trim() || !lead) return
+    setSendingMessage(true)
+    try {
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          channel: 'whatsapp',
+          action: 'send',
+          message: sendMessageText.trim(),
+        }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to send message')
+      }
+      setSendMessageText('')
+      setShowSendMessageForm(false)
+      loadActivities()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error sending message:', err)
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  const closeAllActionForms = () => {
+    setShowLogCallForm(false)
+    setShowAdminNoteInput(false)
+    setShowSendMessageForm(false)
+  }
+
   const toggleVoiceDictation = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Voice dictation is not supported in this browser.')
@@ -1026,10 +1069,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         lastDate: channelData.meta_forms.lastDate || currentLead.created_at || currentLead.timestamp,
       })
     }
-    if (channelData.web.count > 0) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
-    if (channelData.whatsapp.count > 0) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
-    if (channelData.voice.count > 0) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
-    if (channelData.social.count > 0) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
+    const lt = currentLead.last_touchpoint
+    const uc = currentLead.unified_context || {}
+    const hasChannel = (ch: string) =>
+      channelData[ch as keyof typeof channelData]?.count > 0 ||
+      ft === ch || lt === ch ||
+      leadSources.includes(ch) ||
+      !!(uc[ch])
+    const alreadyAdded = channels.map(c => c.key)
+    if (hasChannel('web') && !alreadyAdded.includes('web')) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
+    if (hasChannel('whatsapp') && !alreadyAdded.includes('whatsapp')) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
+    if (hasChannel('voice') && !alreadyAdded.includes('voice')) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
+    if (hasChannel('social') && !alreadyAdded.includes('social')) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
 
     // If lead_sources array exists, sort by that order; otherwise sort by firstDate
     if (leadSources.length > 0) {
@@ -1219,30 +1270,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   ) : (
                     <p className="lead-journey-empty text-xs text-[var(--text-muted)]">No channels yet</p>
                   )}
-                  <button
-                    onClick={() => { setShowLogCallForm(!showLogCallForm); if (showAdminNoteInput) setShowAdminNoteInput(false) }}
-                    className={`lead-log-call-toggle w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
-                      showLogCallForm
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                    }`}
-                    title="Log a call"
-                    aria-label="Log a call"
-                  >
-                    {showLogCallForm ? <MdClose size={12} /> : <MdCall size={14} />}
-                  </button>
-                  <button
-                    onClick={() => { setShowAdminNoteInput(!showAdminNoteInput); if (showLogCallForm) setShowLogCallForm(false) }}
-                    className={`lead-admin-note-toggle w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
-                      showAdminNoteInput
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-                    }`}
-                    title="Add admin note"
-                    aria-label="Add admin note"
-                  >
-                    {showAdminNoteInput ? <MdClose size={12} /> : <MdAdd size={14} />}
-                  </button>
                 </div>
 
                 {/* Inline admin note input */}
@@ -1313,6 +1340,33 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       disabled={savingLogCall}
                       className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors"
                       title="Save call log"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Send Message form */}
+                {showSendMessageForm && (
+                  <div className="lead-send-message-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <FaWhatsapp className="text-green-500 flex-shrink-0" size={14} />
+                    <input
+                      type="text"
+                      value={sendMessageText}
+                      onChange={(e) => setSendMessageText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && sendMessageText.trim()) handleSendMessage()
+                      }}
+                      placeholder="Type a WhatsApp message..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+                      autoFocus
+                      disabled={sendingMessage}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!sendMessageText.trim() || sendingMessage}
+                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors"
+                      title="Send message"
                     >
                       <MdCheck size={12} />
                     </button>
@@ -1416,16 +1470,43 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </section>
             </section>
 
-            {/* Close Button - Absolute positioned top right */}
-            <button
-              onClick={onClose}
-              className="lead-modal-close-button absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label="Close lead details modal"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Action "+" Button - Absolute positioned top right */}
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={() => setShowActionDropdown(!showActionDropdown)}
+                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors"
+                aria-label="Quick actions"
+                aria-expanded={showActionDropdown}
+                aria-haspopup="true"
+              >
+                <MdAdd size={22} />
+              </button>
+              {showActionDropdown && (
+                <>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setShowActionDropdown(false)} aria-hidden="true" />
+                  <div className="absolute right-0 top-11 z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 w-44">
+                    <button
+                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowLogCallForm(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
+                    >
+                      <MdCall size={16} className="text-green-500" /> Log a Call
+                    </button>
+                    <button
+                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowAdminNoteInput(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
+                    >
+                      <MdNote size={16} className="text-blue-500" /> Add a Note
+                    </button>
+                    <button
+                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowSendMessageForm(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
+                    >
+                      <FaWhatsapp size={16} className="text-green-500" /> Send Message
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Stage Dropdown */}
             {showStageDropdown && stageButtonRef.current && (
