@@ -5,6 +5,7 @@ import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
 import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights } from 'react-icons/md'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
@@ -1582,187 +1583,57 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     {calculatedScore ? (
                       <>
-                        {/* Featured Health Overview - Redesigned to be less "blocky" */}
-                        <article className="lead-health-assessment-card p-5 rounded-xl bg-gradient-to-br from-gray-50 to-white dark:from-[#1E1E1E] dark:to-[#1A1A1A] border border-gray-100 dark:border-gray-800 shadow-sm">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="space-y-1">
-                              <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                                <MdInfo size={14} className="text-blue-500" />
-                                Lead Health Assessment
-                              </h3>
-                              <div className="flex items-baseline gap-2">
-                                <p className="text-5xl font-extrabold text-gray-900 dark:text-white leading-none">
-                                  {calculatedScore.score}<span className="text-2xl text-gray-400 dark:text-gray-600">/100</span>
-                                </p>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full`} style={{ backgroundColor: `${healthColor.bg}20`, color: healthColor.text }}>
-                                  {healthColor.label}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
-                                This score reflects the lead's overall quality based on behavioral data, channel engagement, and explicit intent signals.
-                              </p>
-                            </div>
-
-                            {/* Refined Radial */}
-                            <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-800/50">
-                              <div className="relative w-16 h-16" aria-hidden="true">
-                                <svg className="transform -rotate-90 w-16 h-16" viewBox="0 0 100 100">
-                                  <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10" fill="none" className="text-gray-200 dark:text-gray-700" />
-                                  <circle
-                                    cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10" fill="none"
-                                    strokeDasharray={`${2 * Math.PI * 42}`}
-                                    strokeDashoffset={`${2 * Math.PI * 42 * (1 - calculatedScore.score / 100)}`}
-                                    style={{ color: healthColor.bg }}
-                                    className="transition-all duration-700"
-                                    strokeLinecap="round"
-                                  />
-                                </svg>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="text-sm font-bold text-gray-900 dark:text-white">{calculatedScore.score}%</span>
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                  <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ready for Conversion</span>
-                                </div>
-                                {calculatedScore.score >= 70 ? (
-                                  <p className="text-xs font-semibold text-green-600 dark:text-green-500 flex items-center gap-1">
-                                    <MdCheckCircle size={12} /> High Priority Action
-                                  </p>
-                                ) : (
-                                  <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                                    <MdSchedule size={12} /> Needs Nuturing
-                                  </p>
-                                )}
-                              </div>
-                            </div>
+                        {/* Score Header */}
+                        <div className="space-y-1">
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-5xl font-extrabold leading-none" style={{ color: 'var(--text-primary)' }}>
+                              {calculatedScore.score}<span className="text-2xl" style={{ color: 'var(--text-muted)' }}>/100</span>
+                            </p>
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${healthColor.bg}20`, color: healthColor.text }}>
+                              {healthColor.label}
+                            </span>
                           </div>
-                        </article>
-
-                        {/* Weighted Breakdown Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* Card 1 - AI ANALYSIS (60%) */}
-                          <article className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 bg-white dark:bg-[#1A1A1A] hover:shadow-md transition-shadow">
-                            <header className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <MdPsychology size={20} className="text-blue-500" />
-                                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">AI Analysis</h3>
-                              </div>
-                              <span className="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-md">60% Weight</span>
-                            </header>
-
-                            <div className="text-2xl font-black text-gray-900 dark:text-white mb-4">
-                              {calculatedScore.breakdown.ai}<span className="text-sm text-gray-400">/60</span>
-                            </div>
-
-                            <div className="space-y-3">
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] uppercase font-bold text-gray-500">
-                                  <span>Intent Level</span>
-                                  <span>{calculatedScore.breakdown.details.intentScore}%</span>
-                                </div>
-                                <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${calculatedScore.breakdown.details.intentScore}%` }}></div>
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] uppercase font-bold text-gray-500">
-                                  <span>Buying Signals</span>
-                                  <span>{calculatedScore.breakdown.details.buyingScore}%</span>
-                                </div>
-                                <div className="h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${calculatedScore.breakdown.details.buyingScore}%` }}></div>
-                                </div>
-                              </div>
-                              <div className="pt-2 flex flex-wrap gap-2">
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${calculatedScore.breakdown.details.sentimentScore >= 50 ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}`}>
-                                  SENTIMENT: {calculatedScore.breakdown.details.sentimentScore > 50 ? 'POSITIVE' : 'NEUTRAL'}
-                                </span>
-                              </div>
-                            </div>
-                          </article>
-
-                          {/* Card 2 - ACTIVITY (30%) */}
-                          <article className="p-4 rounded-xl border border-green-100 dark:border-green-900/30 bg-white dark:bg-[#1A1A1A] hover:shadow-md transition-shadow">
-                            <header className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <MdFlashOn size={20} className="text-green-500" />
-                                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Active Engagement</h3>
-                              </div>
-                              <span className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-900/40 px-2 py-0.5 rounded-md">30% Weight</span>
-                            </header>
-
-                            <div className="text-2xl font-black text-gray-900 dark:text-white mb-4">
-                              {calculatedScore.breakdown.activity}<span className="text-sm text-gray-400">/30</span>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
-                                  <p className="text-[9px] text-gray-400 font-bold uppercase">Messages</p>
-                                  <p className="text-sm font-black text-gray-700 dark:text-gray-300">{calculatedScore.breakdown.details.msgCount}</p>
-                                </div>
-                                <div className="bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
-                                  <p className="text-[9px] text-gray-400 font-bold uppercase">Response</p>
-                                  <p className="text-sm font-black text-gray-700 dark:text-gray-300">{calculatedScore.breakdown.details.responseRate}%</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase">
-                                <span>Recency</span>
-                                <span className={calculatedScore.breakdown.details.daysInactive <= 3 ? 'text-green-600' : 'text-orange-500'}>
-                                  {calculatedScore.breakdown.details.daysInactive}D Inactive
-                                </span>
-                              </div>
-                            </div>
-                          </article>
-
-                          {/* Card 3 - BUSINESS SIGNALS (10%) */}
-                          <article className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 bg-white dark:bg-[#1A1A1A] hover:shadow-md transition-shadow">
-                            <header className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <MdBarChart size={20} className="text-purple-500" />
-                                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">Business Logic</h3>
-                              </div>
-                              <span className="text-xs font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 px-2 py-0.5 rounded-md">10% Weight</span>
-                            </header>
-
-                            <div className="text-2xl font-black text-gray-900 dark:text-white mb-4">
-                              {calculatedScore.breakdown.business}<span className="text-sm text-gray-400">/10</span>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Booking Recorded</span>
-                                {calculatedScore.breakdown.details.hasBooking ? <MdCheck className="text-green-500" /> : <MdClose className="text-red-400" />}
-                              </div>
-                              <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Direct Contact Info</span>
-                                {calculatedScore.breakdown.details.hasContact ? <MdCheck className="text-green-500" /> : <MdClose className="text-red-400" />}
-                              </div>
-                              <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Channel Synergy</span>
-                                {calculatedScore.breakdown.details.multiChannel ? <MdCheck className="text-green-500" /> : <MdClose className="text-red-400" />}
-                              </div>
-                            </div>
-                          </article>
+                          <p className="text-sm max-w-md" style={{ color: 'var(--text-muted)' }}>
+                            This score reflects the lead&#39;s overall quality based on behavioral data, channel engagement, and explicit intent signals.
+                          </p>
                         </div>
 
-                        {/* Logic Explanation Footer */}
-                        <div className="p-4 bg-blue-50/30 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
-                          <h4 className="flex items-center gap-2 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">
-                            <MdHelpOutline size={14} />
-                            How the Score is Calculated
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                              <strong className="text-blue-600 dark:text-blue-400">AI Deep Lens:</strong> Claude analyzes conversation text for keywords indicating urgency, pricing inquiries, and specific buying intent phrases.
+                        {/* Radar Chart */}
+                        <div style={{ width: '100%', height: 300 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart data={[
+                              { axis: 'Intent', value: calculatedScore.breakdown.details.intentScore },
+                              { axis: 'Buying Signals', value: calculatedScore.breakdown.details.buyingScore },
+                              { axis: 'Sentiment', value: calculatedScore.breakdown.details.sentimentScore },
+                              { axis: 'Activity', value: Math.round(calculatedScore.breakdown.activity / 30 * 100) },
+                              { axis: 'Response Rate', value: calculatedScore.breakdown.details.responseRate },
+                              { axis: 'Recency', value: Math.max(0, 100 - calculatedScore.breakdown.details.daysInactive * 10) },
+                            ]}>
+                              <PolarGrid stroke="var(--border-primary)" />
+                              <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                              <Radar dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* Compact Stat Cards */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>AI Analysis</p>
+                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
+                              {calculatedScore.breakdown.ai}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/60</span>
                             </p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                              <strong className="text-green-600 dark:text-green-400">Engagement Velocity:</strong> Measures the volume of messages and the interaction recency. Leads lose 1% health for every idle day beyond 48 hours.
+                          </div>
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Active Engagement</p>
+                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
+                              {calculatedScore.breakdown.activity}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/30</span>
                             </p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                              <strong className="text-purple-600 dark:text-purple-400">Lifecycle Events:</strong> Significant points are awarded for explicit milestones like booking a slot or providing direct email/phone contact.
+                          </div>
+                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Business Logic</p>
+                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
+                              {calculatedScore.breakdown.business}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/10</span>
                             </p>
                           </div>
                         </div>
