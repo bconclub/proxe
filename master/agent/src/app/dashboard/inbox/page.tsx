@@ -1417,19 +1417,28 @@ export default function InboxPage() {
                   }
 
                   // Regular message bubble
+                  const templateName = msg.metadata?.template || null;
+                  const isTemplate = !isCustomer && !!templateName;
+
                   return (
                     <div
                       key={msg.id}
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm border ${isCustomer
-                          ? 'bg-white dark:bg-[#1A1A2E] border-gray-200 dark:border-[#1E1E2E]'
+                        className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isCustomer
+                          ? 'bg-white dark:bg-[#1A1A2E] border border-gray-200 dark:border-[#1E1E2E]'
                           : ''}`}
                         style={{
                           background: !isCustomer ? 'var(--accent-subtle)' : undefined,
-                          borderColor: !isCustomer ? 'var(--accent-primary)' : undefined,
-                          borderWidth: '1px'
+                          borderColor: !isCustomer && !isTemplate ? 'var(--accent-primary)' : undefined,
+                          borderWidth: !isCustomer ? '1px' : undefined,
+                          ...(isTemplate ? {
+                            borderLeft: '3px solid var(--template-accent, #E8912D)',
+                            borderTop: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
+                            borderRight: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
+                            borderBottom: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
+                          } : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
@@ -1452,6 +1461,19 @@ export default function InboxPage() {
                         <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                           {renderMarkdown(msg.content)}
                         </div>
+                        {isTemplate && (
+                          <div className="mt-1.5 flex items-center gap-1">
+                            <span
+                              className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{
+                                color: 'var(--template-accent, #E8912D)',
+                                background: 'var(--template-badge-bg, rgba(232, 145, 45, 0.1))',
+                              }}
+                            >
+                              {templateName.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} Template
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
