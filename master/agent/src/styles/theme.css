@@ -218,3 +218,59 @@
   --blur-lg: blur(16px);
   --blur-xl: blur(24px);
 }
+
+/* BW Dark Theme — monochrome, no accent color */
+[data-theme="bw-dark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.09);
+  --border-primary: rgba(255, 255, 255, 0.09);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-tertiary: rgba(255, 255, 255, 0.4);
+  --text-muted: rgba(255, 255, 255, 0.25);
+  --text-button: #000000;
+  --button-bg: #ffffff;
+  --button-hover: rgba(255, 255, 255, 0.9);
+  --accent-primary: #ffffff;
+  --accent-subtle: rgba(255, 255, 255, 0.08);
+  --dark-bg: #000000;
+  --dark-card: #0a0a0a;
+  --dark-surface: #111111;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --primary-color: #ffffff;
+  --bubble-user-bg: rgba(255, 255, 255, 0.08);
+  --bubble-ai-bg: rgba(255, 255, 255, 0.03);
+}
+
+/* BW Light Theme — monochrome inverted */
+[data-theme="bw-light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f2f2f2;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+  --border-primary: rgba(0, 0, 0, 0.09);
+  --border-medium: rgba(0, 0, 0, 0.12);
+  --text-primary: #000000;
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --text-tertiary: rgba(0, 0, 0, 0.4);
+  --text-muted: rgba(0, 0, 0, 0.25);
+  --text-button: #ffffff;
+  --button-bg: #000000;
+  --button-hover: rgba(0, 0, 0, 0.85);
+  --accent-primary: #000000;
+  --accent-subtle: rgba(0, 0, 0, 0.06);
+  --dark-bg: #ffffff;
+  --dark-card: #fafafa;
+  --dark-surface: #f2f2f2;
+  --glass-bg: rgba(0, 0, 0, 0.02);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --primary-color: #000000;
+  --bubble-user-bg: rgba(0, 0, 0, 0.06);
+  --bubble-ai-bg: rgba(0, 0, 0, 0.02);
+}

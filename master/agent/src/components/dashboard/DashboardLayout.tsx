@@ -305,12 +305,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
           }`}
         style={{
           width: sidebarWidth,
-          backgroundColor: 'var(--bg-secondary)',
+          backgroundColor: 'var(--bg-primary)',
           borderRight: '1px solid var(--border-primary)',
+          transition: 'width 200ms cubic-bezier(0.2,0,0,1), transform 200ms cubic-bezier(0.2,0,0,1)',
         }}
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
@@ -319,7 +320,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div
           className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
           style={{
-            padding: isCollapsed ? '12px' : '12px 14px',
+            padding: isCollapsed ? '10px' : '10px 12px',
             justifyContent: isCollapsed ? 'center' : 'space-between',
           }}
         >
@@ -400,43 +401,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemIsActive = pathname === navItem.href
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
 
-                // Premium Item Style
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
-                  fontWeight: itemIsActive ? 700 : 500,
-                  color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
+                  fontWeight: itemIsActive ? 600 : 400,
+                  color: itemIsActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  backgroundColor: itemIsActive ? 'var(--bg-hover)' : 'transparent',
+                  borderLeft: itemIsActive && !isCollapsed ? '2px solid var(--text-primary)' : '2px solid transparent',
                   margin: isCollapsed ? '2px 6px' : '1px 4px',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   padding: isCollapsed ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'background 100ms ease',
                   position: 'relative',
                   overflow: 'hidden',
                 }
 
-                // Sub-active indicator glow
-                const activeGlow = itemIsActive && !isCollapsed ? (
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
-                    style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 10px var(--accent-primary)' }}
-                  />
-                ) : null;
-
                 const content = (
                   <>
-                    {activeGlow}
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
                         marginRight: isCollapsed ? '0' : '10px',
                         display: 'flex',
                         alignItems: 'center',
-                        color: itemIsActive ? 'var(--accent-primary)' : 'inherit',
-                        transform: itemIsActive ? 'scale(1.1)' : 'scale(1)',
-                        transition: 'transform 0.3s ease'
+                        color: 'inherit',
                       }}
                     >
                       <navItem.icon size={16} />
@@ -542,12 +532,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <React.Fragment key={item.name}>
                   {needsDivider && !isCollapsed && (
                     <div
-                      className="dashboard-layout-nav-divider"
+                      className="dashboard-layout-nav-group-label"
                       style={{
                         borderTop: '1px solid var(--border-primary)',
-                        margin: '6px 12px',
+                        margin: '8px 12px 4px',
+                        paddingTop: '8px',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: 'var(--text-muted)',
                       }}
-                    />
+                    >
+                      {index === 4 ? 'Operations' : index === 7 ? 'System' : ''}
+                    </div>
                   )}
 
                   {renderNavItem(item)}
@@ -672,10 +670,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* Version badge inline */}
             <div
-              className="dashboard-layout-version-badge px-1 py-px rounded text-[9px] font-medium"
+              className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
               style={{
-                backgroundColor: 'var(--accent-primary)',
-                color: 'white',
+                backgroundColor: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border-primary)',
               }}
               title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
               suppressHydrationWarning
@@ -704,13 +703,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div
-        className="dashboard-layout-main-content flex flex-col transition-all duration-300 ease-in-out"
+        className="dashboard-layout-main-content flex flex-col"
         style={{
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
           height: '100vh',
           width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
           overflow: 'hidden',
+          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1), width 200ms cubic-bezier(0.2,0,0,1)',
         }}
       >
         {/* Page Transition Loader */}

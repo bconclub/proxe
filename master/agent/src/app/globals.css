@@ -44,6 +44,7 @@
 }
 
 body {
+  font-family: 'Geist', 'GeistMono', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: rgb(var(--foreground-rgb));
   background: var(--bg-primary);
 }
@@ -76,22 +77,22 @@ body:not(.dark) {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--accent-primary);
+  background: var(--border-medium);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-light);
+  background: var(--text-muted);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--accent-primary) var(--bg-secondary);
+  scrollbar-color: var(--border-medium) transparent;
 }
 
 /* Channel icons - adapt to theme */
@@ -624,4 +625,9 @@ body:not(.dark) .channel-icon {
   /* Tab panel container */
 }
 
-
+/* Dashboard Card Base Style */
+.dashboard-card {
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
