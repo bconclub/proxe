@@ -18,8 +18,10 @@ const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
-const VOBIZ_OUTBOUND_API_URL = process.env.VOBIZ_OUTBOUND_API_URL || null;
-const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
+const VOBIZ_AUTH_ID = process.env.VOBIZ_AUTH_ID || null;
+const VOBIZ_AUTH_TOKEN = process.env.VOBIZ_AUTH_TOKEN || null;
+const VOBIZ_FROM_NUMBER = process.env.VOBIZ_FROM_NUMBER || '918046733388';
+const VOBIZ_ANSWER_URL = process.env.VOBIZ_ANSWER_URL || 'https://proxe.bconclub.com/api/agent/voice/answer';
 
 // ============================================
 // HELPERS
@@ -661,22 +663,26 @@ async function updateChannelPerformance(leadId, channel, event, responseTimeSec)
  * Returns { success, call_id, duration, status } or throws on failure.
  */
 async function attemptOutboundVoiceCall(phone, leadName) {
-  if (!VOBIZ_OUTBOUND_API_URL || !VOBIZ_OUTBOUND_API_KEY) {
-    return { success: false, reason: 'Vobiz outbound not configured' };
+  if (!VOBIZ_AUTH_ID || !VOBIZ_AUTH_TOKEN) {
+    return { success: false, reason: 'Vobiz outbound not configured (missing VOBIZ_AUTH_ID / VOBIZ_AUTH_TOKEN)' };
   }
 
-  const waPhone = phone.length === 10 ? `91${phone}` : phone;
+  const toPhone = phone.length === 10 ? `91${phone}` : phone;
+  const url = `https://api.vobiz.ai/api/v1/Account/${VOBIZ_AUTH_ID}/Call/`;
+
   try {
-    const res = await fetch(VOBIZ_OUTBOUND_API_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${VOBIZ_OUTBOUND_API_KEY}`,
+        'X-Auth-ID': VOBIZ_AUTH_ID,
+        'X-Auth-Token': VOBIZ_AUTH_TOKEN,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        phone: waPhone,
+        from: VOBIZ_FROM_NUMBER,
+        to: toPhone,
+        answer_url: VOBIZ_ANSWER_URL,
         caller_name: 'BCON Club',
-        lead_name: leadName,
       }),
     });
 
@@ -686,10 +692,11 @@ async function attemptOutboundVoiceCall(phone, leadName) {
     }
 
     const data = await res.json();
+    console.log(`[VoiceCall] Outbound call initiated to ${toPhone}, call_uuid: ${data.call_uuid}`);
     return {
       success: true,
-      call_id: data.call_id || data.id || null,
-      status: data.status || 'initiated',
+      call_id: data.call_uuid || null,
+      status: data.message || 'initiated',
     };
   } catch (err) {
     return { success: false, reason: `Vobiz call failed: ${err.message}` };
