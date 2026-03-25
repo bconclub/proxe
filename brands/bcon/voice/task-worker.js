@@ -2807,14 +2807,14 @@ function resolveLeadContext(task, lead) {
 
   // 3. Final fallback
   if (!serviceInterest) {
-    serviceInterest = 'growing your business';
+    serviceInterest = 'Human X AI solutions';
   }
 
   const painPoint =
     ctx.pain_point ||
     task.metadata?.pain_point ||
     serviceInterest ||
-    'growing your business';
+    'Human X AI solutions';
   return { serviceInterest, painPoint };
 }
 
