@@ -193,7 +193,7 @@ wss.on('connection', (ws, req) => {
           message_type: 'text',
           metadata: { language: detectedLanguage, call_uuid: callUUID, stt_provider: useSarvamFallback ? 'sarvam' : 'deepgram' },
           created_at: new Date().toISOString(),
-        }).catch(dbErr => console.error('Supabase customer msg error:', dbErr.message));
+        }).then(null, dbErr => console.error('Supabase customer msg error:', dbErr.message));
       }
 
       const claudeStart = Date.now();
@@ -213,7 +213,7 @@ wss.on('connection', (ws, req) => {
           message_type: 'text',
           metadata: { call_uuid: callUUID },
           created_at: new Date().toISOString(),
-        }).catch(dbErr => console.error('Supabase agent msg error:', dbErr.message));
+        }).then(null, dbErr => console.error('Supabase agent msg error:', dbErr.message));
       }
 
       const safeResponse = (response && response !== 'null' && response.trim()) ? response : null;
