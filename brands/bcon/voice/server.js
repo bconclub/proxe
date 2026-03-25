@@ -604,8 +604,8 @@ async function sarvamTTS(text, language = 'en-IN') {
       {
         inputs: [text],
         target_language_code: language,
-        speaker: 'shubh',
-        model: 'bulbul:v1',
+        speaker: 'maitreyi',
+        model: 'bulbul:v2',
         encoding: 'pcm',
         sample_rate: 16000,
       },
@@ -622,24 +622,46 @@ async function sarvamTTS(text, language = 'en-IN') {
     return audio;
   } catch (err) {
     const ttsMs = Date.now() - ttsStart;
-    console.error(`TTS error (${ttsMs}ms):`, err.response?.data || err.message);
+    console.error(`[TTS ERROR] (${ttsMs}ms) Status: ${err.response?.status}`);
+    if (err.response?.data) {
+      console.error('Full Sarvam API error response:', JSON.stringify(err.response.data, null, 2));
+    } else {
+      console.error('Error message:', err.message);
+    }
     return null;
   }
 }
 
 async function speakToVobiz(ws, text, language = 'en-IN') {
   const ttsCallStart = Date.now();
+  // Ensure we don't try to process null or empty text
+  if (!text || !text.trim()) {
+    console.log('[Speak] Empty text received, skipping TTS');
+    return;
+  }
+
   const audio = await sarvamTTS(text, language);
-  if (audio && ws.readyState === 1) {
+  
+  if (audio && audio !== 'null' && ws.readyState === 1) {
     const resampleStart = Date.now();
     const chunks = prepareAudioChunks(audio);
     const resampleMs = Date.now() - resampleStart;
     console.log(`[TIMING] Resample + chunk: ${resampleMs}ms (${chunks.length} chunks)`);
-    const firstChunkTime = Date.now();
-    await sendChunkedAudio(ws, chunks);
-    console.log(`[TIMING] First audio chunk sent at: +${firstChunkTime - ttsCallStart}ms after TTS request`);
+    
+    if (chunks.length > 0) {
+      const firstChunkTime = Date.now();
+      await sendChunkedAudio(ws, chunks);
+      console.log(`[TIMING] First audio chunk sent at: +${firstChunkTime - ttsCallStart}ms after TTS request`);
+    } else {
+      console.log('[Speak] No audio chunks generated from TTS response');
+    }
   } else {
-    console.log('Audio not sent - null or ws closed');
+    // Graceful handling of null audio or closed connection
+    if (ws.readyState !== 1) {
+      console.log('[Speak] WebSocket closed, audio not sent');
+    } else if (!audio || audio === 'null') {
+      console.warn('[Speak] TTS failed to generate audio (null response)');
+    }
   }
 }
 
