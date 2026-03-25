@@ -614,17 +614,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '180px',
                   }}
                 >
-                  <button
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      toggleTheme()
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--text-primary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                   <Link
                     href="/status"
                     onClick={() => {
