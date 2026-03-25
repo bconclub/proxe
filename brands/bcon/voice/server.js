@@ -564,7 +564,7 @@ async function elevenLabsTTS(text) {
   const ttsStart = Date.now();
   try {
     const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream?output_format=pcm_16000`,
       {
         method: 'POST',
         headers: {
@@ -574,7 +574,6 @@ async function elevenLabsTTS(text) {
         body: JSON.stringify({
           text,
           model_id: 'eleven_flash_v2_5',
-          output_format: 'pcm_16000',
           voice_settings: { stability: 0.4, similarity_boost: 0.75 },
         }),
       }
