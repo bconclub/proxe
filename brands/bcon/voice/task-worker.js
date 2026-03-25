@@ -1451,23 +1451,32 @@ async function morningBriefing() {
       .gte('scheduled_at', todayStart.toISOString())
       .lt('scheduled_at', tomorrowStart.toISOString());
 
-    // Build Telegram message
+    // Build Telegram message (must stay under 4096 chars — target 4000 to be safe)
+    const MAX_MSG_LEN = 4000;
+    const MAX_ITEMS_PER_SECTION = 10;
+
+    function buildSection(title, items) {
+      if (items.length === 0) return '';
+      const shown = items.slice(0, MAX_ITEMS_PER_SECTION);
+      const overflow = items.length - shown.length;
+      let section = `<b>${title}:</b>\n${shown.map(a => `• ${a}`).join('\n')}`;
+      if (overflow > 0) section += `\n<i>...and ${overflow} more</i>`;
+      return section + '\n\n';
+    }
+
     let body = `<b>Good morning. Here's what I'm planning today:</b>\n\n`;
+    body += buildSection('Priority', priorityActions);
+    body += buildSection('Follow-ups', followUpActions);
+    body += buildSection('Warming up', warmingUp);
+    body += buildSection('Going cold', goingCold);
 
-    if (priorityActions.length > 0) {
-      body += `<b>Priority:</b>\n${priorityActions.map(a => `• ${a}`).join('\n')}\n\n`;
-    }
-    if (followUpActions.length > 0) {
-      body += `<b>Follow-ups:</b>\n${followUpActions.map(a => `• ${a}`).join('\n')}\n\n`;
-    }
-    if (warmingUp.length > 0) {
-      body += `<b>Warming up:</b>\n${warmingUp.map(a => `• ${a}`).join('\n')}\n\n`;
-    }
-    if (goingCold.length > 0) {
-      body += `<b>Going cold:</b>\n${goingCold.slice(0, 8).map(a => `• ${a}`).join('\n')}\n\n`;
-    }
+    const footer = `Total tasks today: ${(allTodayTasks || []).length} (${tasksCreated} created just now)`;
 
-    body += `Total tasks today: ${(allTodayTasks || []).length} (${tasksCreated} created just now)`;
+    // Truncate if still over limit
+    if (body.length + footer.length > MAX_MSG_LEN) {
+      body = body.substring(0, MAX_MSG_LEN - footer.length - 30) + '\n<i>...truncated</i>\n\n';
+    }
+    body += footer;
 
     await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
     fs.writeFileSync(MORNING_BRIEFING_FILE, todayStr);
