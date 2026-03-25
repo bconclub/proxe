@@ -2831,15 +2831,15 @@ const TEMPLATE_PARAM_COUNT = {
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
 const TEMPLATE_BODIES = {
-  'bcon_proxe_booking_reminder_24h': `Hi {{customer_name}}, just a reminder about your {{service_interest}} consultation tomorrow at {{booking_time}}. We look forward to speaking with you!`, // VERIFY: check Meta BM for exact text
-  'bcon_proxe_booking_reminder_30m': `Hi {{customer_name}}, your {{service_interest}} consultation starts in 30 minutes at {{booking_time}}. See you soon!`, // VERIFY: check Meta BM for exact text
-  'bcon_proxe_reengagement_engaged': `Hi {{customer_name}}, we were recently discussing {{pain_point}}. Would you like to continue the conversation?`, // VERIFY: check Meta BM for exact text
-  'bcon_proxe_reengagement_noengage': `Hi {{customer_name}}, we connected a while back but didn't get to dig in to details. Want to see how we build systems that help businesses like yours grow?`,
-  'bcon_proxe_first_outreach': `Hi {{customer_name}}, thanks for your interest in BCON! We'd love to learn more about your business and how we can help. When's a good time to chat?`, // VERIFY: check Meta BM for exact text
-  'bcon_proxe_post_call_followup': `Hi {{customer_name}}, thanks for the great conversation! If you have any questions, feel free to reach out. We're here to help!`, // VERIFY: check Meta BM for exact text
-  'bcon_proxe_followup_engaged': `Hi {{customer_name}}, following up on our conversation about {{service_interest}}. Would you like to schedule a call to discuss next steps?`, // VERIFY: check Meta BM for exact text
+  'bcon_proxe_booking_reminder_24h': `Hi {{customer_name}}, your call with the BCON Team is tomorrow at {{booking_time}}.\nWe'll be going over {{service_interest}} for your business.\nSee you there.`,
+  'bcon_proxe_booking_reminder_30m': `Hi {{customer_name}}, 30 minutes to go. Your call with the BCON Team for {{service_interest}} is at {{booking_time}}.\nWe are getting things ready for you`,
+  'bcon_proxe_reengagement_engaged': `Hi {{customer_name}}, you mentioned {{pain_point}} was a challenge. If that's still the case, we should chat.\nWe've been solving exactly that lately.`,
+  'bcon_proxe_reengagement_noengage': `Hi {{customer_name}}, we connected a while back but didn't get to dig in to details.\nWant to see how we build systems that help businesses like yours grow?`,
+  'bcon_proxe_first_outreach': `Hi {{customer_name}}, thanks for your interest in BCON! We'd love to learn more about your business and how we can help. When's a good time to chat?`, // NOT YET SUBMITTED TO META — placeholder text
+  'bcon_proxe_post_call_followup': `Hi {{customer_name}}, thanks for the great conversation! If you have any questions, feel free to reach out. We're here to help!`, // NOT YET SUBMITTED TO META — placeholder text
+  'bcon_proxe_followup_engaged': `Hi {{customer_name}}, we were talking about {{service_interest}} for your business. Let's continue where we left off?`,
   'bcon_proxe_followup_noengage': `Hi {{customer_name}}, you reached out to us recently about {{service_interest}}. Would you like to know how we can help?`,
-  'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`, // VERIFY: check Meta BM for exact text
+  'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`, // NOT YET SUBMITTED TO META — placeholder text
 };
 
 /**
