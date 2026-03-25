@@ -13,6 +13,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -38,7 +40,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add brands/bcon/agent/package.json brands/bcon/agent/.build-info
           git commit -m "chore: auto-increment build version [skip ci]" || echo "No changes to commit"
-          git push || echo "Nothing to push"
+          git push origin HEAD:main || echo "Nothing to push"
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
