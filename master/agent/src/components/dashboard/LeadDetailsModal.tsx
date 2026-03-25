@@ -88,7 +88,15 @@ function renderSummary(text: string) {
   );
 }
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
+const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'phone', 'social'];
+
+// Phone with sparkle icon for AI voice calls
+const PhoneSparkleIcon = ({ size = 16 }: { size?: number }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+    <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.24 1.01l-2.21 2.2z" />
+    <path d="M16.5 1c-.21 0-.39.18-.41.39-.18 1.41-1.29 2.52-2.7 2.7-.21.03-.39.2-.39.41s.18.39.39.41c1.41.18 2.52 1.29 2.7 2.7.03.21.2.39.41.39s.39-.18.41-.39c.18-1.41 1.29-2.52 2.7-2.7.21-.03.39-.2.39-.41s-.18-.39-.39-.41c-1.41-.18-2.52-1.29-2.7-2.7C16.89 1.18 16.71 1 16.5 1z" />
+  </svg>
+);
 
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
   const style = {
@@ -154,10 +162,16 @@ const CHANNEL_CONFIG = {
     emoji: '💬'
   },
   voice: {
-    name: 'Voice',
-    icon: MdPhone,
+    name: 'AI Voice',
+    icon: PhoneSparkleIcon,
     color: 'var(--accent-primary)',
     emoji: '📞'
+  },
+  phone: {
+    name: 'Phone',
+    icon: MdPhone,
+    color: '#6366F1',
+    emoji: '📱'
   },
   social: {
     name: 'Social',
@@ -208,11 +222,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     web: { count: number; firstDate: string | null; lastDate: string | null }
     whatsapp: { count: number; firstDate: string | null; lastDate: string | null }
     voice: { count: number; firstDate: string | null; lastDate: string | null }
+    phone: { count: number; firstDate: string | null; lastDate: string | null }
     social: { count: number; firstDate: string | null; lastDate: string | null }
   }>({
     web: { count: 0, firstDate: null, lastDate: null },
     whatsapp: { count: 0, firstDate: null, lastDate: null },
     voice: { count: 0, firstDate: null, lastDate: null },
+    phone: { count: 0, firstDate: null, lastDate: null },
     social: { count: 0, firstDate: null, lastDate: null },
   })
   const [quickStats, setQuickStats] = useState<{
@@ -533,6 +549,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           web: { count: 0, firstDate: null, lastDate: null },
           whatsapp: { count: 0, firstDate: null, lastDate: null },
           voice: { count: 0, firstDate: null, lastDate: null },
+          phone: { count: 0, firstDate: null, lastDate: null },
           social: { count: 0, firstDate: null, lastDate: null },
         }
 
@@ -546,6 +563,24 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             channelStats[channel].lastDate = msg.created_at
           }
         })
+
+        // Count admin-logged call activities as phone channel
+        const { data: callActivities } = await supabase
+          .from('activities')
+          .select('created_at')
+          .eq('lead_id', lead.id)
+          .eq('activity_type', 'call')
+          .order('created_at', { ascending: true })
+
+        if (callActivities && callActivities.length > 0) {
+          callActivities.forEach((activity: any) => {
+            channelStats.phone.count++
+            if (!channelStats.phone.firstDate) {
+              channelStats.phone.firstDate = activity.created_at
+            }
+            channelStats.phone.lastDate = activity.created_at
+          })
+        }
 
         setChannelData(channelStats)
       }
@@ -903,6 +938,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     if (channelData.web.count > 0) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
     if (channelData.whatsapp.count > 0) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
     if (channelData.voice.count > 0) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
+    if (channelData.phone.count > 0) channels.push({ ...CHANNEL_CONFIG.phone, key: 'phone', ...channelData.phone })
     if (channelData.social.count > 0) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
     return channels.sort((a, b) => {
       const aDate = a.firstDate ? new Date(a.firstDate).getTime() : 0
