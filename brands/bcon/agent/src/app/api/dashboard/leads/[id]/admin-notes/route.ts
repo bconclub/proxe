@@ -229,12 +229,16 @@ export async function POST(
 
     // 5. Classify note using Claude Haiku AI
     const actions: string[] = []
+    const actionsTaken: string[] = []
     const leadPhone = lead.customer_phone_normalized || lead.phone?.replace(/\D/g, '').slice(-10) || null
     const leadName = lead.customer_name || 'Lead'
     const now = new Date()
+    let newStage: string | null = null
+    let newScore: number | null = null
 
+    console.log(`[AdminNote] Step 1: Classifying note "${trimmedNote.substring(0, 80)}" for lead ${leadId}`)
     const classification = await classifyNote(trimmedNote)
-    console.log(`[AdminNote] AI classification for "${trimmedNote.substring(0, 50)}":`, JSON.stringify(classification))
+    console.log(`[AdminNote] Step 2: Classification result:`, JSON.stringify(classification))
     actions.push(`ai_category:${classification.category}`)
 
     // --- Execute actions based on AI classification ---
@@ -249,7 +253,11 @@ export async function POST(
         .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
         .select('id')
       const cancelCount = cancelledTasks?.length || 0
-      if (cancelCount > 0) actions.push(`cancelled_${cancelCount}_followup_tasks`)
+      if (cancelCount > 0) {
+        actions.push(`cancelled_${cancelCount}_followup_tasks`)
+        actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`)
+        console.log(`[AdminNote] Step 3a: Cancelled ${cancelCount} follow-up tasks`)
+      }
 
       // Resolve booking time
       const bookingAt = resolveBookingDate(
@@ -273,6 +281,8 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actions.push('booking_reminder_24h_created')
+        actionsTaken.push(`Created 24h booking reminder for ${classification.booking_date || 'tomorrow'} ${bookingTimeDisplay}`)
+        console.log(`[AdminNote] Step 3b: Created booking_reminder_24h at ${reminder24h.toISOString()}`)
       }
 
       // Create booking_reminder_30m (30min before booking)
@@ -290,21 +300,30 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actions.push('booking_reminder_30m_created')
+        actionsTaken.push(`Created 30min booking reminder`)
+        console.log(`[AdminNote] Step 3c: Created booking_reminder_30m at ${reminder30m.toISOString()}`)
       }
 
       // Update stage and boost score
+      newStage = 'Booking Made'
+      newScore = 80
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'Booking Made', stage_override: true, lead_score: 80 })
+        .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
         .eq('id', leadId)
       actions.push('stage_updated:Booking Made,score_80')
+      actionsTaken.push(`Stage changed to Booking Made`)
+      actionsTaken.push(`Score updated to 80`)
+      console.log(`[AdminNote] Step 3d: Stage → Booking Made, Score → 80`)
     }
 
     if (classification.category === 'POST_CALL') {
+      console.log(`[AdminNote] Step 3: POST_CALL — updating touchpoint and creating followup`)
       await supabase
         .from('all_leads')
         .update({ last_touchpoint: 'voice', last_interaction_at: now.toISOString() })
         .eq('id', leadId)
+      actionsTaken.push(`Marked last touchpoint as voice call`)
       const { error: taskError } = await supabase
         .from('agent_tasks')
         .insert({
@@ -318,11 +337,17 @@ export async function POST(
           metadata: { source: 'admin_note', sequence: 'post_call', step: 0 },
           created_at: now.toISOString(),
         })
-      if (!taskError) actions.push('post_call_followup_created')
-      else console.error('[AdminNote] Failed to create post_call_followup:', taskError.message)
+      if (!taskError) {
+        actions.push('post_call_followup_created')
+        actionsTaken.push(`Created post-call follow-up task (1 hour)`)
+        console.log(`[AdminNote] Step 3b: Created post_call_followup task`)
+      } else {
+        console.error('[AdminNote] Failed to create post_call_followup:', taskError.message)
+      }
     }
 
     if (classification.category === 'NOT_POTENTIAL') {
+      console.log(`[AdminNote] Step 3: NOT_POTENTIAL — cancelling tasks, closing lead`)
       // Cancel ALL pending tasks
       const { data: cancelledTasks } = await supabase
         .from('agent_tasks')
@@ -331,11 +356,18 @@ export async function POST(
         .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
         .select('id')
       const cancelCount = cancelledTasks?.length || 0
+      if (cancelCount > 0) actionsTaken.push(`Cancelled ${cancelCount} pending tasks`)
+      console.log(`[AdminNote] Step 3a: Cancelled ${cancelCount} tasks`)
 
+      newStage = 'Closed Lost'
+      newScore = 0
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'Closed Lost', stage_override: true, lead_score: 0 })
+        .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
         .eq('id', leadId)
+      actionsTaken.push(`Stage changed to Closed Lost`)
+      actionsTaken.push(`Score updated to 0`)
+      console.log(`[AdminNote] Step 3b: Stage → Closed Lost, Score → 0`)
 
       // Create quarterly re_engage (90 days)
       await supabase.from('agent_tasks').insert({
@@ -350,9 +382,12 @@ export async function POST(
         created_at: now.toISOString(),
       })
       actions.push(`not_potential:cancelled_${cancelCount}_tasks,stage_Closed_Lost,score_0,re_engage_90d`)
+      actionsTaken.push(`Scheduled 90-day re-engagement check-in`)
+      console.log(`[AdminNote] Step 3c: Created 90-day re_engage task`)
     }
 
     if (classification.category === 'HOT_LEAD') {
+      console.log(`[AdminNote] Step 3: HOT_LEAD — boosting lead`)
       // Set temperature to hot
       const { data: freshCtx } = await supabase
         .from('all_leads')
@@ -365,12 +400,18 @@ export async function POST(
           .update({ unified_context: { ...(freshCtx.unified_context || {}), lead_temperature: 'hot' } })
           .eq('id', leadId)
       }
+      actionsTaken.push(`Temperature set to hot`)
 
       // Update stage and boost score
+      newStage = 'High Intent'
+      newScore = 85
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'High Intent', stage_override: true, lead_score: 85 })
+        .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
         .eq('id', leadId)
+      actionsTaken.push(`Stage changed to High Intent`)
+      actionsTaken.push(`Score updated to 85`)
+      console.log(`[AdminNote] Step 3a: Stage → High Intent, Score → 85, Temp → hot`)
 
       // Check for existing booking
       const { data: bookingTasks } = await supabase
@@ -395,6 +436,8 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actions.push('high_potential:temp_hot,stage_High_Intent,score_85,prep_task_created')
+        actionsTaken.push(`Created prep task — review before existing booking`)
+        console.log(`[AdminNote] Step 3b: Created prep task (has existing booking)`)
       } else {
         await supabase.from('agent_tasks').insert({
           task_type: 'push_to_book',
@@ -408,10 +451,13 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actions.push('high_potential:temp_hot,stage_High_Intent,score_85,push_to_book_1h')
+        actionsTaken.push(`Created push-to-book task (1 hour)`)
+        console.log(`[AdminNote] Step 3b: Created push_to_book task (no existing booking)`)
       }
     }
 
     if (classification.category === 'WARM_LATER') {
+      console.log(`[AdminNote] Step 3: WARM_LATER — nurturing lead`)
       // Cancel existing tasks
       const { data: cancelledTasks } = await supabase
         .from('agent_tasks')
@@ -420,11 +466,16 @@ export async function POST(
         .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
         .select('id')
       const cancelCount = cancelledTasks?.length || 0
+      if (cancelCount > 0) actionsTaken.push(`Cancelled ${cancelCount} pending tasks`)
+      console.log(`[AdminNote] Step 3a: Cancelled ${cancelCount} tasks`)
 
+      newStage = 'Nurture'
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'Nurture', stage_override: true })
+        .update({ lead_stage: newStage, stage_override: true })
         .eq('id', leadId)
+      actionsTaken.push(`Stage changed to Nurture`)
+      console.log(`[AdminNote] Step 3b: Stage → Nurture`)
 
       // Create 90-day check-in
       await supabase.from('agent_tasks').insert({
@@ -439,14 +490,18 @@ export async function POST(
         created_at: now.toISOString(),
       })
       actions.push(`warm_later:cancelled_${cancelCount}_tasks,stage_Nurture,re_engage_90d`)
+      actionsTaken.push(`Scheduled 90-day check-in`)
+      console.log(`[AdminNote] Step 3c: Created 90-day re_engage task`)
     }
 
     if (classification.category === 'RNR') {
+      console.log(`[AdminNote] Step 3: RNR — creating follow-up sequence`)
       // Update last_touchpoint to voice (call attempt)
       await supabase
         .from('all_leads')
         .update({ last_touchpoint: 'voice', last_interaction_at: now.toISOString() })
         .eq('id', leadId)
+      actionsTaken.push(`Marked last touchpoint as voice call`)
 
       // Cancel any remaining booking reminder tasks
       await supabase
@@ -468,8 +523,13 @@ export async function POST(
         metadata: { source: 'admin_note', sequence: 'no_show', step: 0, timing_reason: 'RNR — follow-up in 30 min' },
         created_at: now.toISOString(),
       })
-      if (!missedErr) actions.push('missed_call_followup_created')
-      else console.error('[AdminNote] Failed to create missed_call_followup:', missedErr.message)
+      if (!missedErr) {
+        actions.push('missed_call_followup_created')
+        actionsTaken.push(`Created missed-call follow-up (30 min)`)
+        console.log(`[AdminNote] Step 3a: Created missed_call_followup`)
+      } else {
+        console.error('[AdminNote] Failed to create missed_call_followup:', missedErr.message)
+      }
 
       // Schedule follow-up sequence (day 1, 3, 5, 7)
       const rnrSequence = [
@@ -491,35 +551,50 @@ export async function POST(
           created_at: now.toISOString(),
         })
       }
+      newStage = 'In Sequence'
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'In Sequence' })
+        .update({ lead_stage: newStage })
         .eq('id', leadId)
       actions.push('sequence_created:rnr:4_steps')
+      actionsTaken.push(`Created 4-step follow-up sequence (day 1, 3, 5, 7)`)
+      actionsTaken.push(`Stage changed to In Sequence`)
+      console.log(`[AdminNote] Step 3b: Created RNR sequence, Stage → In Sequence`)
     }
 
     if (classification.category === 'NOT_INTERESTED') {
+      console.log(`[AdminNote] Step 3: NOT_INTERESTED — closing lead`)
+      newStage = 'Closed Lost'
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'Closed Lost', stage_override: true })
+        .update({ lead_stage: newStage, stage_override: true })
         .eq('id', leadId)
       actions.push('stage_updated:Closed Lost')
+      actionsTaken.push(`Stage changed to Closed Lost`)
+      console.log(`[AdminNote] Step 3a: Stage → Closed Lost`)
     }
 
     if (classification.category === 'CONVERTED') {
+      console.log(`[AdminNote] Step 3: CONVERTED — marking as won`)
+      newStage = 'Converted'
       await supabase
         .from('all_leads')
-        .update({ lead_stage: 'Converted', stage_override: true })
+        .update({ lead_stage: newStage, stage_override: true })
         .eq('id', leadId)
       actions.push('stage_updated:Converted')
+      actionsTaken.push(`Stage changed to Converted`)
+      console.log(`[AdminNote] Step 3a: Stage → Converted`)
     }
 
     if (classification.category === 'MEETING_REQUEST') {
+      console.log(`[AdminNote] Step 3: MEETING_REQUEST — sending WhatsApp + nudge`)
       if (leadPhone) {
         const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`
         const sendResult = await sendWhatsAppText(leadPhone, msg)
         if (sendResult.success) {
           actions.push('whatsapp_sent:meeting_request')
+          actionsTaken.push(`Sent WhatsApp: meeting time request`)
+          console.log(`[AdminNote] Step 3a: WhatsApp sent to ${leadPhone}`)
           await supabase.from('conversations').insert({
             lead_id: leadId,
             channel: 'whatsapp',
@@ -530,6 +605,8 @@ export async function POST(
           })
         } else {
           actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`)
+          actionsTaken.push(`WhatsApp send failed`)
+          console.error(`[AdminNote] Step 3a: WhatsApp failed:`, sendResult.error)
         }
       }
       // Create nudge_waiting task in 2 hours
@@ -545,14 +622,19 @@ export async function POST(
         created_at: now.toISOString(),
       })
       actions.push('nudge_waiting_created:2h')
+      actionsTaken.push(`Created nudge task if no reply (2 hours)`)
+      console.log(`[AdminNote] Step 3b: Created nudge_waiting task`)
     }
 
     if (classification.category === 'SEND_MESSAGE') {
+      console.log(`[AdminNote] Step 3: SEND_MESSAGE — sending direct message`)
       const directMessage = classification.send_message?.trim()
       if (directMessage && leadPhone) {
         const sendResult = await sendWhatsAppText(leadPhone, directMessage)
         if (sendResult.success) {
           actions.push('whatsapp_sent:direct_message')
+          actionsTaken.push(`Sent WhatsApp message to lead`)
+          console.log(`[AdminNote] Step 3a: Direct message sent to ${leadPhone}`)
           await supabase.from('conversations').insert({
             lead_id: leadId,
             channel: 'whatsapp',
@@ -563,11 +645,14 @@ export async function POST(
           })
         } else {
           actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`)
+          actionsTaken.push(`WhatsApp send failed`)
+          console.error(`[AdminNote] Step 3a: WhatsApp failed:`, sendResult.error)
         }
       }
     }
 
     if (classification.category === 'NAME_UPDATE' && classification.name) {
+      console.log(`[AdminNote] Step 3: NAME_UPDATE — updating name to "${classification.name}"`)
       const extractedName = classification.name.trim().replace(/\b\w/g, (c: string) => c.toUpperCase())
       if (extractedName.length >= 2) {
         await supabase
@@ -575,21 +660,30 @@ export async function POST(
           .update({ customer_name: extractedName })
           .eq('id', leadId)
         actions.push(`name_updated:${extractedName}`)
+        actionsTaken.push(`Name updated to ${extractedName}`)
+        console.log(`[AdminNote] Step 3a: Name → ${extractedName}`)
       }
     }
 
+    if (classification.category === 'INFO_ONLY') {
+      actionsTaken.push(`Note saved — no automated actions needed`)
+      console.log(`[AdminNote] Step 3: INFO_ONLY — no actions taken`)
+    }
+
     // 6. Log action summary to activity feed
-    if (actions.length > 0) {
-      const actionSummary = `PROXe: Note detected '${trimmedNote.substring(0, 40)}${trimmedNote.length > 40 ? '...' : ''}' → ${actions.join(', ')}`
+    if (actionsTaken.length > 0 && classification.category !== 'INFO_ONLY') {
+      const actionSummary = `PROXe: Note detected '${trimmedNote.substring(0, 40)}${trimmedNote.length > 40 ? '...' : ''}' → ${actionsTaken.join(', ')}`
       await supabase.from('activities').insert({
         lead_id: leadId,
         activity_type: 'automation',
         note: actionSummary,
         created_by: 'PROXe AI',
       })
+      console.log(`[AdminNote] Step 4: Activity logged`)
     }
 
     // 7. If any action was taken (beyond just classification), invalidate cached unified_summary
+    let summaryRefreshed = false
     if (classification.category !== 'INFO_ONLY') {
       const { data: freshLead } = await supabase
         .from('all_leads')
@@ -605,11 +699,26 @@ export async function POST(
           .eq('id', leadId)
         if (summaryErr) {
           console.error('[AdminNote] Failed to invalidate summary:', summaryErr.message)
+        } else {
+          summaryRefreshed = true
+          actionsTaken.push(`Summary refresh triggered`)
+          console.log(`[AdminNote] Step 5: Summary cache invalidated`)
         }
       }
     }
 
-    return NextResponse.json({ success: true, note: newNote, actions, classification: { category: classification.category, summary: classification.summary } })
+    console.log(`[AdminNote] Done. Category: ${classification.category}, Actions: ${actionsTaken.length}, Stage: ${newStage}, Score: ${newScore}`)
+
+    return NextResponse.json({
+      success: true,
+      note: newNote,
+      actions,
+      actions_taken: actionsTaken,
+      classification: { category: classification.category, summary: classification.summary },
+      new_stage: newStage,
+      new_score: newScore,
+      summary_refreshed: summaryRefreshed,
+    })
   } catch (error) {
     console.error('Error saving admin note:', error)
     return NextResponse.json(

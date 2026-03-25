@@ -294,6 +294,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [isListening, setIsListening] = useState(false)
   const [showAdminNotes, setShowAdminNotes] = useState(false)
   const recognitionRef = useRef<any>(null)
+  // AI classification progress state
+  const [noteProgress, setNoteProgress] = useState<{ steps: { text: string; done: boolean }[]; visible: boolean }>({ steps: [], visible: false })
 
   // Log a Call state
   const [showLogCallForm, setShowLogCallForm] = useState(false)
@@ -948,6 +950,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const handleSaveAdminNote = async () => {
     if (!adminNoteText.trim() || !lead) return
     setSavingAdminNote(true)
+    // Show initial analyzing step
+    setNoteProgress({ steps: [{ text: 'Analyzing note...', done: false }], visible: true })
     try {
       const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
         method: 'POST',
@@ -958,13 +962,54 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         const data = await response.json()
         throw new Error(data.error || 'Failed to save note')
       }
+      const result = await response.json()
+
+      // Build step-by-step progress from response
+      const allSteps: { text: string; done: boolean }[] = [
+        { text: 'Analyzing note...', done: true },
+      ]
+
+      // Show classification
+      const categoryLabels: Record<string, string> = {
+        BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
+        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
+        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Converted', MEETING_REQUEST: 'Meeting Request',
+        SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', INFO_ONLY: 'Info Only',
+      }
+      const categoryLabel = categoryLabels[result.classification?.category] || result.classification?.category || 'Unknown'
+      allSteps.push({ text: `Classified as: ${categoryLabel}`, done: true })
+
+      // Add each action taken
+      if (result.actions_taken) {
+        for (const action of result.actions_taken) {
+          allSteps.push({ text: action, done: true })
+        }
+      }
+
+      allSteps.push({ text: 'Done', done: true })
+
+      // Animate steps one by one
+      for (let i = 0; i < allSteps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 100 : 400))
+        setNoteProgress({ steps: allSteps.slice(0, i + 1), visible: true })
+      }
+
       setAdminNoteText('')
       setShowAdminNoteInput(false)
+
+      // Keep visible for a moment, then fade out and refresh
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setNoteProgress(prev => ({ ...prev, visible: false }))
+      await new Promise(resolve => setTimeout(resolve, 300))
+      setNoteProgress({ steps: [], visible: false })
+
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
     } catch (err) {
       console.error('Error saving admin note:', err)
+      setNoteProgress({ steps: [{ text: 'Analyzing note...', done: true }, { text: 'Error saving note', done: true }], visible: true })
+      setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
     } finally {
       setSavingAdminNote(false)
     }
@@ -1400,6 +1445,68 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdCheck size={12} />
                     </button>
+                  </div>
+                )}
+
+                {/* AI Classification Progress */}
+                {noteProgress.steps.length > 0 && (
+                  <div
+                    className="mt-2 p-2.5 rounded-lg border border-[var(--border-primary)] overflow-hidden"
+                    style={{
+                      background: 'var(--bg-primary)',
+                      opacity: noteProgress.visible ? 1 : 0,
+                      transition: 'opacity 0.3s ease',
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <MdAutoAwesome size={12} className="text-indigo-400 animate-pulse" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400">PROXe AI</span>
+                    </div>
+                    <div className="space-y-1">
+                      {noteProgress.steps.map((step, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-1.5"
+                          style={{
+                            animation: 'fadeSlideIn 0.3s ease forwards',
+                            animationDelay: `${i * 0.05}s`,
+                          }}
+                        >
+                          {step.done ? (
+                            step.text === 'Done' ? (
+                              <MdCheckCircle size={12} className="text-green-400 flex-shrink-0" />
+                            ) : step.text.startsWith('Error') ? (
+                              <MdClose size={12} className="text-red-400 flex-shrink-0" />
+                            ) : (
+                              <MdCheck size={12} className="text-emerald-400 flex-shrink-0" />
+                            )
+                          ) : (
+                            <div className="w-3 h-3 flex-shrink-0 flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                            </div>
+                          )}
+                          <span
+                            className={`text-[10px] ${
+                              step.text === 'Done'
+                                ? 'font-bold text-green-400'
+                                : step.text.startsWith('Classified as')
+                                  ? 'font-semibold text-[var(--text-primary)]'
+                                  : step.text.startsWith('Error')
+                                    ? 'font-medium text-red-400'
+                                    : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            {step.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <style>{`
+                      @keyframes fadeSlideIn {
+                        from { opacity: 0; transform: translateY(-4px); }
+                        to { opacity: 1; transform: translateY(0); }
+                      }
+                    `}</style>
                   </div>
                 )}
 
