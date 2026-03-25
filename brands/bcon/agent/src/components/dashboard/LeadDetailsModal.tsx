@@ -874,8 +874,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     null
   const daysInactive = lastInteraction ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
-  // Get health score from calculated score (live calculation)
-  const score = calculatedScore?.score ?? 0
+  // Get health score — use DB lead_score when admin has explicitly overridden, otherwise use calculated
+  const score = (currentLead.stage_override && currentLead.lead_score != null && currentLead.lead_score > 0)
+    ? Math.max(currentLead.lead_score, calculatedScore?.score ?? 0)
+    : (calculatedScore?.score ?? 0)
   const getHealthColor = (score: number) => {
     if (score >= 90) return { bg: '#22C55E', text: '#15803D', label: 'Hot 🔥' } // Green for Hot (90-100)
     if (score >= 70) return { bg: '#F97316', text: '#C2410C', label: 'Warm ⚡' } // Orange for Warm (70-89)
@@ -895,7 +897,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   // Auto-detect stage from conversation
   const autoDetectStage = (): string => {
-    if (currentLead.lead_stage && !currentLead.stage_override) {
+    // If admin explicitly set the stage, use it
+    if (currentLead.lead_stage && currentLead.stage_override) {
+      return currentLead.lead_stage
+    }
+
+    // If stage exists from DB (not overridden), still use it
+    if (currentLead.lead_stage) {
       return currentLead.lead_stage
     }
 
@@ -907,7 +915,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     return 'New'
   }
   const detectedStage = autoDetectStage()
-  const currentStage = currentLead.lead_stage || detectedStage
+  const currentStage = detectedStage
 
   // Calculate stage duration
   const getStageDuration = () => {
@@ -1341,6 +1349,35 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <MdEdit size={12} className="text-[var(--text-muted)]" />
                   </button>
                 </div>
+
+                {/* Service Interest & Pain Point pills - only for engaged leads (score 50+) */}
+                {score >= 50 && (() => {
+                  const ctx = currentLead.unified_context || {}
+                  const si = summaryData?.keyInfo?.serviceInterest
+                    || ctx.service_interest
+                    || ctx.form_data?.business_type
+                    || ctx.form_data?.service
+                    || null
+                  const pp = summaryData?.keyInfo?.painPoints
+                    || ctx.pain_point
+                    || null
+                  if (!si && !pp) return null
+                  return (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {si && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium" style={{ background: 'rgba(99,102,241,0.12)', color: 'rgba(139,142,255,0.95)' }}>
+                          <MdOutlineInsights size={10} />
+                          {si}
+                        </span>
+                      )}
+                      {pp && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] max-w-[200px] truncate" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                          {pp}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Contact Info Section - Bottom */}
@@ -1585,8 +1622,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </button>
                     {showAdminNotes && (
                       <div className="absolute left-0 top-6 z-50 w-64 max-h-48 overflow-y-auto bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-lg p-2 space-y-1.5">
-                        {(currentLead.unified_context.admin_notes as any[]).slice().reverse().map((note: any, i: number) => (
-                          <div key={i} className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
+                        {(currentLead.unified_context.admin_notes as any[])
+                          .filter((note: any, idx: number, arr: any[]) =>
+                            arr.findIndex((n: any) => n.text === note.text && n.created_at === note.created_at) === idx
+                          )
+                          .slice().reverse().map((note: any, i: number) => (
+                          <div key={`${note.created_at}-${i}`} className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
                             <MdNote size={11} className="mt-0.5 flex-shrink-0 text-orange-400" />
                             <span>{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
                           </div>
