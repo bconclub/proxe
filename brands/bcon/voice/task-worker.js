@@ -2788,20 +2788,78 @@ async function notifyTaskResult(task, success, errorMsg) {
 
 /**
  * Resolve service_interest and pain_point from lead record / task metadata.
+ * Checks form data, task metadata, unified_summary, and admin notes for context.
  */
 function resolveLeadContext(task, lead) {
   const ctx = lead?.unified_context || {};
   const formData = ctx.form_data || ctx.whatsapp?.profile || ctx.web?.profile || {};
-  const serviceInterest =
+
+  // 1. Try explicit fields first
+  let serviceInterest =
     formData.business_type || formData.service ||
     task.metadata?.service_interest || task.metadata?.business_type ||
-    task.metadata?.campaign || 'business growth';
+    task.metadata?.campaign || null;
+
+  // 2. If no explicit field, scan unified_summary and admin notes for topic keywords
+  if (!serviceInterest) {
+    serviceInterest = extractServiceFromContext(ctx);
+  }
+
+  // 3. Final fallback
+  if (!serviceInterest) {
+    serviceInterest = 'growing your business';
+  }
+
   const painPoint =
     ctx.pain_point ||
     task.metadata?.pain_point ||
     serviceInterest ||
     'growing your business';
   return { serviceInterest, painPoint };
+}
+
+/**
+ * Scan unified_context (summary, admin_notes, lead_temperature notes) for
+ * service-interest keywords and return a human-friendly description.
+ */
+function extractServiceFromContext(ctx) {
+  // Build a single text blob from available context
+  const parts = [];
+  if (ctx.unified_summary) parts.push(ctx.unified_summary);
+  if (ctx.summary) parts.push(ctx.summary);
+  if (Array.isArray(ctx.admin_notes)) {
+    for (const n of ctx.admin_notes) {
+      if (n.text) parts.push(n.text);
+    }
+  }
+  if (ctx.conversation_summary) parts.push(ctx.conversation_summary);
+  if (ctx.business_context) parts.push(ctx.business_context);
+
+  if (parts.length === 0) return null;
+
+  const blob = parts.join(' ').toLowerCase();
+
+  // Match specific service topics (ordered by specificity)
+  const topicMap = [
+    { keywords: ['lead gen', 'lead generation', 'lead machine', 'leads', 'getting leads', 'more leads'], label: 'lead generation' },
+    { keywords: ['ai agent', 'ai assistant', 'chatbot', 'ai bot', 'whatsapp bot', 'whatsapp automation'], label: 'AI automation' },
+    { keywords: ['ai system', 'ai solution', 'artificial intelligence', 'ai for business', 'ai-powered'], label: 'AI systems' },
+    { keywords: ['brand audit', 'ai brand audit', 'ai audit'], label: 'an AI Brand Audit' },
+    { keywords: ['marketing', 'digital marketing', 'social media', 'content', 'branding'], label: 'marketing' },
+    { keywords: ['website', 'web app', 'mobile app', 'app development', 'saas'], label: 'app development' },
+    { keywords: ['automation', 'automate', 'workflow', 'process automation'], label: 'automation' },
+    { keywords: ['crm', 'customer management', 'pipeline'], label: 'CRM and pipeline management' },
+    { keywords: ['analytics', 'dashboard', 'reporting', 'data'], label: 'analytics and dashboards' },
+    { keywords: ['e-commerce', 'ecommerce', 'online store', 'shopify'], label: 'e-commerce' },
+  ];
+
+  for (const topic of topicMap) {
+    if (topic.keywords.some(kw => blob.includes(kw))) {
+      return topic.label;
+    }
+  }
+
+  return null;
 }
 
 /**
