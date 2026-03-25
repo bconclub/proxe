@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.text();
   const params = new URLSearchParams(formData);
-  const callerPhone = params.get('From') || params.get('from') || '';
+  // For outbound calls: From = BCON's number, To = lead's number — use To
+  // For inbound calls: From = lead's number — use From
+  const callerPhone = direction === 'outbound'
+    ? (params.get('To') || params.get('to') || params.get('From') || params.get('from') || '')
+    : (params.get('From') || params.get('from') || '');
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
   console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName });
 
