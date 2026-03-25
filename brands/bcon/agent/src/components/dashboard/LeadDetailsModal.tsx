@@ -1284,7 +1284,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       >
         <dialog
           open={isOpen}
-          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg shadow-xl z-50 flex flex-col"
+          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg shadow-xl z-50 flex flex-col border border-[var(--border-primary)]"
           style={{
             width: '54vw',
             maxWidth: '720px',
@@ -2420,18 +2420,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           )}
                         </div>
 
-                        {/* Next step */}
-                        <p className="text-sm font-semibold text-[var(--text-primary)] pt-1">
-                          {calculatedScore.score >= 80
-                            ? 'High intent - ready for direct outreach or closing.'
-                            : calculatedScore.score >= 60
-                              ? calculatedScore.breakdown.details.hasBooking
-                                ? 'Booking exists - confirm attendance and prep for the call.'
-                                : 'Warm lead - push for a booking or direct call.'
-                              : calculatedScore.score >= 40
-                                ? 'Needs a follow-up to re-engage - conversation stalled.'
-                                : 'Cold lead - nurture with value content or re-qualify.'}
-                        </p>
                       </div>
                     ) : (
                       <div className="text-center py-20 animate-pulse text-[var(--text-muted)]">
