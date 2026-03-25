@@ -270,6 +270,13 @@ wss.on('connection', (ws, req) => {
         ws.normalizedPhone = normalizedPhone;
         console.log('Caller phone:', callerPhone, '-> normalized:', normalizedPhone);
 
+        // Detect outbound call direction and lead name from extraHeaders
+        const directionMatch = extraHeaders.match(/direction[=:\s]+(\w+)/);
+        const leadNameMatch = extraHeaders.match(/leadName[=:\s]+([^,}]+)/);
+        ws.callDirection = directionMatch ? directionMatch[1] : 'inbound';
+        ws.outboundLeadName = leadNameMatch ? decodeURIComponent(leadNameMatch[1].trim()) : null;
+        console.log('Call direction:', ws.callDirection, 'Lead name:', ws.outboundLeadName);
+
         // Create lead and voice session in Supabase
         if (normalizedPhone) {
           try {
@@ -321,7 +328,7 @@ wss.on('connection', (ws, req) => {
                   customer_phone: callerPhone,
                   customer_phone_normalized: normalizedPhone,
                   call_status: 'in-progress',
-                  call_direction: 'inbound',
+                  call_direction: ws.callDirection || 'inbound',
                   brand: 'bcon',
                   created_at: new Date().toISOString(),
                 })
@@ -338,15 +345,24 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        // Send cached greeting instantly - context loads in background after
-        if (greetingAudioChunks && ws.readyState === 1) {
+        // Send greeting — outbound uses a personalised opener, inbound uses cached audio
+        if (ws.callDirection === 'outbound') {
+          const name = ws.outboundLeadName && ws.outboundLeadName !== 'null' ? ws.outboundLeadName : null;
+          const greeting = name
+            ? `Hey ${name}, this is Prox-ee calling from Bee-Con Club. You had reached out to us earlier — just wanted to follow up. Is this a good time to talk?`
+            : `Hey, this is Prox-ee calling from Bee-Con Club. You had reached out to us earlier — just wanted to follow up. Is this a good time?`;
+          isSpeaking = true;
+          await speakToVobiz(ws, greeting, 'en-IN');
+          isSpeaking = false;
+          console.log('Outbound greeting sent');
+        } else if (greetingAudioChunks && ws.readyState === 1) {
           isSpeaking = true;
           await sendChunkedAudio(ws, greetingAudioChunks);
           isSpeaking = false;
           console.log('Greeting sent from cache');
         } else {
           console.log('No cached greeting, generating...');
-          await speakToVobiz(ws, "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
+          await speakToVobiz(ws, "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee. How can I help you today?", 'en-IN');
         }
 
         // Open Deepgram streaming STT (or fall back to Sarvam)
@@ -637,6 +653,29 @@ Missed something: "Sorry, say that again?"
 
 Rules: Match caller energy. Keep responses to 2-4 sentences. No markdown. No lists. No emojis. Never repeat what caller said.`;
 
+const OUTBOUND_SYSTEM_PROMPT = `You are Prox-ee (pronounced PROXY), a voice AI for BCON Club (pronounced BEE-kun Club). You are making an OUTBOUND follow-up call to someone who previously reached out to BCON Club.
+
+Tone: Warm, natural, friendly — like a human follow-up call. Not salesy. Genuine.
+
+Your goal: Remind them why they reached out, understand where they're at now, and move toward booking a discovery call with the Bee-Con team.
+
+OPENING IS ALREADY DONE — do not re-introduce yourself. The caller has already heard the greeting. Jump straight into the conversation from their first response.
+
+CONVERSATION FLOW:
+1. If they say "yes it's a good time" — ask what they were looking into when they reached out.
+2. Understand where they're at now — has anything changed? Are they still looking?
+3. Connect their need to what Bee-Con can do for them specifically.
+4. Push for the booking: "Want me to set up a quick call with the team to map that out for you?"
+
+ABOUT BEE-CON CLUB:
+We help businesses integrate AI and maximise their potential. Three areas: AI in Business (custom AI agents, lead automation, workflow automation, analytics), Brand Marketing (strategy to execution, AI-powered), and Business Apps (web apps, mobile apps, custom SaaS).
+
+If not a good time: "No worries at all — when would be a better time to call back?"
+Pricing: "Depends on the scope — the team maps that out on a discovery call. Worth 15 minutes."
+Missed something: "Sorry, say that again?"
+
+Rules: Keep responses to 2-3 sentences. No markdown. No lists. No emojis. Always end with a question or a push forward.`;
+
 async function loadLeadContext(leadId) {
   const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [], adminNotes: [], unifiedContext: null };
 
@@ -703,8 +742,8 @@ async function loadLeadContext(leadId) {
   return ctx;
 }
 
-function buildDynamicPrompt(leadContext) {
-  let dynamicPrompt = SYSTEM_PROMPT;
+function buildDynamicPrompt(leadContext, callDirection) {
+  let dynamicPrompt = callDirection === 'outbound' ? OUTBOUND_SYSTEM_PROMPT : SYSTEM_PROMPT;
   if (leadContext) {
     if (leadContext.name && leadContext.name !== 'Unknown') {
       dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
@@ -734,7 +773,7 @@ async function streamAndSpeak(transcript, conversationHistory, detectedLanguage,
   try {
     conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
 
-    const dynamicPrompt = buildDynamicPrompt(leadContext);
+    const dynamicPrompt = buildDynamicPrompt(leadContext, ws.callDirection);
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

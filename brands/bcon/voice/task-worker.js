@@ -681,7 +681,7 @@ async function attemptOutboundVoiceCall(phone, leadName) {
       body: JSON.stringify({
         from: VOBIZ_FROM_NUMBER,
         to: toPhone,
-        answer_url: VOBIZ_ANSWER_URL,
+        answer_url: `${VOBIZ_ANSWER_URL}?direction=outbound&lead_name=${encodeURIComponent(leadName || '')}`,
         caller_name: 'BCON Club',
       }),
     });
