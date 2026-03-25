@@ -50,6 +50,7 @@ export default function ThemeProvider({
       html.style.setProperty('--border-primary', 'rgba(255,255,255,0.1)');
       html.style.setProperty('--text-primary', '#ffffff');
       html.style.setProperty('--text-secondary', 'rgba(255,255,255,0.6)');
+      html.style.setProperty('--text-muted', 'rgba(255,255,255,0.4)');
     } else if (mode === 'bw-light') {
       html.setAttribute('data-theme', 'bw-light');
       html.classList.add('light');
@@ -63,6 +64,7 @@ export default function ThemeProvider({
       html.style.setProperty('--border-primary', 'rgba(0,0,0,0.1)');
       html.style.setProperty('--text-primary', '#000000');
       html.style.setProperty('--text-secondary', 'rgba(0,0,0,0.6)');
+      html.style.setProperty('--text-muted', 'rgba(0,0,0,0.4)');
     } else {
       // 'brand' mode - original behavior
       const color = config.colors.primary;

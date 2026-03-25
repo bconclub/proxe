@@ -1668,11 +1668,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               <section className="lead-quick-stats-section">
                 <h3 className="lead-quick-stats-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Quick Stats</h3>
                 <div className="lead-quick-stats-grid grid grid-cols-3 gap-2">
-                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
                     <p className="lead-stat-label text-sm text-[var(--text-muted)]">Messages</p>
                     <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
                   </article>
-                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
                     <p className="lead-stat-label text-sm text-[var(--text-muted)]">Response Rate</p>
                     <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
                   </article>
