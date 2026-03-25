@@ -722,7 +722,7 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage, 
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 30,
+        max_tokens: 60,
         system: dynamicPrompt,
         messages: conversationHistory,
       },
