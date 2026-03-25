@@ -23,6 +23,8 @@ import {
   MdRemove,
   MdAdd,
   MdClose,
+  MdViewList,
+  MdViewColumn,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -113,6 +115,161 @@ interface LeadsTableProps {
   showViewAll?: boolean
 }
 
+// Pipeline kanban view
+function PipelineView({
+  leads,
+  calculatedScores,
+  onLeadClick,
+}: {
+  leads: ExtendedLead[]
+  calculatedScores: Record<string, number>
+  onLeadClick: (lead: ExtendedLead) => void
+}) {
+  const getScore = (lead: ExtendedLead) => {
+    const calc = calculatedScores[lead.id]
+    return calc !== undefined ? calc : (lead.lead_score ?? 0)
+  }
+
+  const columns = [
+    { key: 'cold', label: 'Cold', min: 0, max: 40, color: '#3B82F6' },
+    { key: 'warm', label: 'Warm', min: 41, max: 70, color: '#F97316' },
+    { key: 'hot', label: 'Hot', min: 71, max: 100, color: '#EF4444' },
+  ] as const
+
+  const buckets = {
+    cold: leads.filter(l => getScore(l) <= 40).sort((a, b) => getScore(b) - getScore(a)),
+    warm: leads.filter(l => { const s = getScore(l); return s >= 41 && s <= 70 }).sort((a, b) => getScore(b) - getScore(a)),
+    hot: leads.filter(l => getScore(l) >= 71).sort((a, b) => getScore(b) - getScore(a)),
+  }
+
+  const getCompany = (lead: ExtendedLead) =>
+    lead.unified_context?.whatsapp?.profile?.company ||
+    lead.unified_context?.web?.profile?.company ||
+    lead.brand || null
+
+  const getChannels = (lead: ExtendedLead): string[] => {
+    const channels: string[] = []
+    const ctx = lead.unified_context || {}
+    if (ctx.web) channels.push('web')
+    if (ctx.whatsapp) channels.push('whatsapp')
+    if (ctx.voice) channels.push('voice')
+    if (ctx.social) channels.push('social')
+    if (channels.length === 0) {
+      const src = (lead.first_touchpoint || lead.source || '').toLowerCase()
+      if (['web', 'whatsapp', 'voice', 'social'].includes(src)) channels.push(src)
+    }
+    return channels
+  }
+
+  const getLatestNote = (lead: ExtendedLead): string | null => {
+    const ctx = lead.unified_context || {}
+    return ctx.latest_admin_note || ctx.admin_notes?.[0]?.note || null
+  }
+
+  const channelIcons: Record<string, { icon: typeof MdLanguage; color: string }> = {
+    web: { icon: MdLanguage, color: '#3B82F6' },
+    whatsapp: { icon: MdChat, color: '#22C55E' },
+    voice: { icon: MdCall, color: '#8B5CF6' },
+    social: { icon: MdPerson, color: '#EC4899' },
+  }
+
+  return (
+    <div className="flex gap-3 p-4 overflow-x-auto" style={{ minHeight: '60vh' }}>
+      {columns.map(col => {
+        const items = buckets[col.key]
+        return (
+          <div key={col.key} className="flex-1 min-w-[260px] flex flex-col rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+            {/* Column header */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-t-lg" style={{ backgroundColor: `${col.color}15` }}>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: col.color }}>
+                  {col.label}
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${col.color}20`, color: col.color }}>
+                {items.length}
+              </span>
+            </div>
+
+            {/* Cards */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-2" style={{ maxHeight: 'calc(80vh - 120px)' }}>
+              {items.length === 0 ? (
+                <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>No leads</p>
+              ) : items.map(lead => {
+                const score = getScore(lead)
+                const company = getCompany(lead)
+                const channels = getChannels(lead)
+                const note = getLatestNote(lead)
+                const lastActivity = lead.last_interaction_at || lead.timestamp
+
+                return (
+                  <div
+                    key={lead.id}
+                    className="rounded-md border p-2.5 cursor-pointer transition-all hover:shadow-sm"
+                    style={{
+                      borderColor: 'var(--border-primary)',
+                      backgroundColor: 'var(--bg-primary)',
+                    }}
+                    onClick={() => onLeadClick(lead)}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = col.color }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                  >
+                    {/* Name + Score */}
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {lead.name || 'Unknown'}
+                      </span>
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 tabular-nums"
+                        style={{ backgroundColor: `${col.color}15`, color: col.color }}
+                      >
+                        {score}
+                      </span>
+                    </div>
+
+                    {/* Company */}
+                    {company && (
+                      <p className="text-[11px] truncate mb-1" style={{ color: 'var(--text-secondary)' }}>
+                        {company}
+                      </p>
+                    )}
+
+                    {/* Channel icons + last activity */}
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1">
+                        {channels.map(ch => {
+                          const cfg = channelIcons[ch]
+                          if (!cfg) return null
+                          const Icon = cfg.icon
+                          return <Icon key={ch} size={12} style={{ color: cfg.color }} title={ch} />
+                        })}
+                      </div>
+                      <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                        {timeAgo(lastActivity)}
+                      </span>
+                    </div>
+
+                    {/* Latest note */}
+                    {note && (
+                      <p
+                        className="text-[10px] leading-tight mt-1 pt-1 border-t line-clamp-2"
+                        style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}
+                      >
+                        {note}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function LeadsTable({
   limit: initialLimit,
   sourceFilter: initialSourceFilter,
@@ -140,6 +297,8 @@ export default function LeadsTable({
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 50)
+
+  const [viewMode, setViewMode] = useState<'list' | 'pipeline'>('list')
 
   // Add Lead modal state
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false)
@@ -570,6 +729,32 @@ export default function LeadsTable({
             </select>
           )}
 
+          {/* View toggle */}
+          <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: 'var(--border-primary)' }}>
+            <button
+              onClick={() => setViewMode('list')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors"
+              style={{
+                backgroundColor: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--bg-primary)',
+                color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              <MdViewList size={14} />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('pipeline')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors"
+              style={{
+                backgroundColor: viewMode === 'pipeline' ? 'var(--accent-primary)' : 'var(--bg-primary)',
+                color: viewMode === 'pipeline' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              <MdViewColumn size={14} />
+              Pipeline
+            </button>
+          </div>
+
           <button
             onClick={() => { setIsAddLeadOpen(true); setAddLeadError(null); setAddLeadDuplicateId(null); setAddLeadSuccess(false) }}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md text-white transition-colors"
@@ -605,8 +790,17 @@ export default function LeadsTable({
         </div>
       </div>
 
+      {/* Pipeline View */}
+      {viewMode === 'pipeline' && (
+        <PipelineView
+          leads={filteredLeads}
+          calculatedScores={calculatedScores}
+          onLeadClick={handleRowClick}
+        />
+      )}
+
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-visible pb-6">
+      {viewMode === 'list' && <div className="overflow-x-auto overflow-y-visible pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '11%' }} />  {/* Name */}
@@ -834,7 +1028,7 @@ export default function LeadsTable({
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* Lead Details Modal */}
       <LeadDetailsModal
