@@ -2362,63 +2362,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </div>
                         )}
 
-                        {/* Signals list */}
-                        <div className="space-y-1.5">
-                          {/* Positive signals */}
-                          {calculatedScore.breakdown.details.hasBooking && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ Booking recorded</p>
-                          )}
-                          {calculatedScore.breakdown.details.hasContact && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ Direct contact info provided</p>
-                          )}
-                          {calculatedScore.breakdown.details.responseRate >= 80 && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ {calculatedScore.breakdown.details.responseRate}% response rate</p>
-                          )}
-                          {calculatedScore.breakdown.details.msgCount >= 5 && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ {calculatedScore.breakdown.details.msgCount} messages exchanged</p>
-                          )}
-                          {calculatedScore.breakdown.details.multiChannel && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ Multi-channel engagement</p>
-                          )}
-                          {calculatedScore.breakdown.details.sentimentScore >= 50 && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ Positive sentiment</p>
-                          )}
-                          {calculatedScore.breakdown.details.daysInactive <= 2 && (
-                            <p className="text-sm text-green-500 dark:text-green-400">+ Active recently</p>
-                          )}
-
-                          {/* Negative signals */}
-                          {calculatedScore.breakdown.details.buyingScore < 40 && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Buying signals low ({calculatedScore.breakdown.details.buyingScore}%)</p>
-                          )}
-                          {!calculatedScore.breakdown.details.multiChannel && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Single channel only</p>
-                          )}
-                          {calculatedScore.breakdown.details.intentScore < 80 && calculatedScore.breakdown.details.intentScore > 0 && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Intent level moderate ({calculatedScore.breakdown.details.intentScore}%)</p>
-                          )}
-                          {calculatedScore.breakdown.details.intentScore === 0 && (
-                            <p className="text-sm text-red-500 dark:text-red-400">- No intent signals detected</p>
-                          )}
-                          {!calculatedScore.breakdown.details.hasBooking && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- No booking yet</p>
-                          )}
-                          {!calculatedScore.breakdown.details.hasContact && (
-                            <p className="text-sm text-red-500 dark:text-red-400">- No contact info</p>
-                          )}
-                          {calculatedScore.breakdown.details.responseRate < 80 && calculatedScore.breakdown.details.responseRate > 0 && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Response rate low ({calculatedScore.breakdown.details.responseRate}%)</p>
-                          )}
-                          {calculatedScore.breakdown.details.daysInactive > 3 && (
-                            <p className="text-sm text-red-500 dark:text-red-400">- Inactive for {calculatedScore.breakdown.details.daysInactive} days</p>
-                          )}
-                          {calculatedScore.breakdown.details.sentimentScore < 50 && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Neutral sentiment</p>
-                          )}
-                          {calculatedScore.breakdown.details.msgCount < 5 && (
-                            <p className="text-sm text-orange-500 dark:text-orange-400">- Low message volume ({calculatedScore.breakdown.details.msgCount})</p>
-                          )}
-                        </div>
 
                       </div>
                     ) : (
