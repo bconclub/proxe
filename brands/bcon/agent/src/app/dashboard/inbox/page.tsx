@@ -1375,7 +1375,7 @@ export default function InboxPage() {
                   const formData = isCustomer ? parseFormFields(msg.content) : null;
 
                   const dateSeparator = showDateSeparator ? (
-                    <div className="flex items-center gap-3 my-2" key={`date-${msg.id}`}>
+                    <div className="flex items-center gap-3 py-2" key={`date-${msg.id}`} style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-primary)' }}>
                       <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
                       <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                         {formatDateSeparator(msg.created_at)}
