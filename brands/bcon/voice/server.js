@@ -183,38 +183,37 @@ wss.on('connection', (ws, req) => {
 
       console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
 
+      // Save customer message to DB immediately (don't wait for AI response)
+      if (ws.leadId) {
+        supabase.from('conversations').insert({
+          lead_id: ws.leadId,
+          channel: 'voice',
+          sender: 'customer',
+          content: transcript,
+          message_type: 'text',
+          metadata: { language: detectedLanguage, call_uuid: callUUID, stt_provider: useSarvamFallback ? 'sarvam' : 'deepgram' },
+          created_at: new Date().toISOString(),
+        }).catch(dbErr => console.error('Supabase customer msg error:', dbErr.message));
+      }
+
       const claudeStart = Date.now();
-      const response = await getAIResponse(transcript, conversationHistory, detectedLanguage, ws.leadContext);
-      const claudeMs = Date.now() - claudeStart;
+      isSpeaking = true;
+      // streamAndSpeak: streams Claude response and pipes each sentence to TTS+Vobiz immediately
+      const response = await streamAndSpeak(transcript, conversationHistory, detectedLanguage, ws.leadContext, ws);
+      const claudeAndTtsMs = Date.now() - claudeStart;
       console.log(`AI Response: "${response}"`);
 
-      // Log both messages to Supabase
-      if (ws.leadId) {
-        try {
-          await supabase.from('conversations').insert({
-            lead_id: ws.leadId,
-            channel: 'voice',
-            sender: 'customer',
-            content: transcript,
-            message_type: 'text',
-            metadata: { language: detectedLanguage, call_uuid: callUUID, stt_provider: useSarvamFallback ? 'sarvam' : 'deepgram' },
-            created_at: new Date().toISOString(),
-          });
-          if (response) {
-            await supabase.from('conversations').insert({
-              lead_id: ws.leadId,
-              channel: 'voice',
-              sender: 'agent',
-              content: response,
-              message_type: 'text',
-              metadata: { call_uuid: callUUID },
-              created_at: new Date().toISOString(),
-            });
-          }
-          console.log('Saved to DB: customer +', transcript.substring(0, 30), '| agent +', (response || '').substring(0, 30));
-        } catch (dbErr) {
-          console.error('Supabase conversation error:', dbErr.message);
-        }
+      // Save agent response to DB after streaming completes
+      if (ws.leadId && response) {
+        supabase.from('conversations').insert({
+          lead_id: ws.leadId,
+          channel: 'voice',
+          sender: 'agent',
+          content: response,
+          message_type: 'text',
+          metadata: { call_uuid: callUUID },
+          created_at: new Date().toISOString(),
+        }).catch(dbErr => console.error('Supabase agent msg error:', dbErr.message));
       }
 
       const safeResponse = (response && response !== 'null' && response.trim()) ? response : null;
@@ -223,29 +222,22 @@ wss.on('connection', (ws, req) => {
         aiFailures++;
         console.log('AI failure count:', aiFailures);
         if (aiFailures >= 2) {
-          isSpeaking = true;
           await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
           isSpeaking = false;
           const totalMs = Date.now() - pipelineStart;
-          console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (fallback)`);
+          console.log(`[TIMING] STT: ${sttMs}ms, Claude+TTS: ${claudeAndTtsMs}ms, Total: ${totalMs}ms (fallback)`);
           ws.close();
           return;
         }
-        isSpeaking = true;
         await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
-        isSpeaking = false;
         const totalMs = Date.now() - pipelineStart;
-        console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (AI fail)`);
+        console.log(`[TIMING] STT: ${sttMs}ms, Claude+TTS: ${claudeAndTtsMs}ms, Total: ${totalMs}ms (AI fail)`);
       } else {
         aiFailures = 0;
-        isSpeaking = true;
-        const ttsStart = Date.now();
-        await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
-        isSpeaking = false;
-        const ttsSendMs = Date.now() - ttsStart;
         const totalMs = Date.now() - pipelineStart;
-        console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${ttsSendMs}ms, Total: ${totalMs}ms`);
+        console.log(`[TIMING] STT: ${sttMs}ms, Claude+TTS (streaming): ${claudeAndTtsMs}ms, Total: ${totalMs}ms`);
       }
+      isSpeaking = false;
     } catch (err) {
       console.error('Processing error:', err.message);
     } finally {
@@ -711,78 +703,126 @@ async function loadLeadContext(leadId) {
   return ctx;
 }
 
-async function getAIResponse(transcript, conversationHistory, detectedLanguage, leadContext) {
-  const claudeStart = Date.now();
+function buildDynamicPrompt(leadContext) {
+  let dynamicPrompt = SYSTEM_PROMPT;
+  if (leadContext) {
+    if (leadContext.name && leadContext.name !== 'Unknown') {
+      dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
+    }
+    if (leadContext.unifiedContext) {
+      dynamicPrompt += ` Previous conversation summary: ${leadContext.unifiedContext}`;
+    }
+    if (leadContext.previousMessages && leadContext.previousMessages.length > 0) {
+      const recent = leadContext.previousMessages.slice(-5).map(m => `${m.sender}: ${m.content}`).join(' | ');
+      dynamicPrompt += ` This is a returning caller. Recent messages: ${recent}. Reference past interactions naturally if relevant, like "Last time we talked about X".`;
+    }
+    if (leadContext.stage) {
+      dynamicPrompt += ` This lead is currently at stage: ${leadContext.stage}. Adjust your approach accordingly.`;
+    }
+    if (leadContext.adminNotes && leadContext.adminNotes.length > 0) {
+      dynamicPrompt += ` Team notes: ${leadContext.adminNotes.join(' | ')}`;
+    }
+    if (leadContext.channels && leadContext.channels.length > 1) {
+      dynamicPrompt += ` This person has also contacted us via ${leadContext.channels.join(', ')}. They are an active lead.`;
+    }
+  }
+  return dynamicPrompt;
+}
+
+async function streamAndSpeak(transcript, conversationHistory, detectedLanguage, leadContext, ws) {
+  const streamStart = Date.now();
   try {
     conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
 
-    // Build dynamic system prompt with lead context
-    let dynamicPrompt = SYSTEM_PROMPT;
-    if (leadContext) {
-      if (leadContext.name && leadContext.name !== 'Unknown') {
-        dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
-      }
-      if (leadContext.unifiedContext) {
-        dynamicPrompt += ` Previous conversation summary: ${leadContext.unifiedContext}`;
-      }
-      if (leadContext.previousMessages && leadContext.previousMessages.length > 0) {
-        const recent = leadContext.previousMessages.slice(-5).map(m => `${m.sender}: ${m.content}`).join(' | ');
-        dynamicPrompt += ` This is a returning caller. Recent messages: ${recent}. Reference past interactions naturally if relevant, like "Last time we talked about X".`;
-      }
-      if (leadContext.stage) {
-        dynamicPrompt += ` This lead is currently at stage: ${leadContext.stage}. Adjust your approach accordingly.`;
-      }
-      if (leadContext.adminNotes && leadContext.adminNotes.length > 0) {
-        dynamicPrompt += ` Team notes: ${leadContext.adminNotes.join(' | ')}`;
-      }
-      if (leadContext.channels && leadContext.channels.length > 1) {
-        dynamicPrompt += ` This person has also contacted us via ${leadContext.channels.join(', ')}. They are an active lead.`;
-      }
-    }
+    const dynamicPrompt = buildDynamicPrompt(leadContext);
 
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
+        stream: true,
         system: dynamicPrompt,
         messages: conversationHistory,
-      },
-      {
-        headers: {
-          'x-api-key': process.env.CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        timeout: 5000,
-      }
-    );
+      }),
+    });
 
-    const claudeMs = Date.now() - claudeStart;
-    let aiText = response.data?.content?.[0]?.text?.trim() || null;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[Claude Stream ERROR] ${res.status}: ${errText}`);
+      return null;
+    }
 
-    // Truncate long responses to first sentence only (keeps TTS fast)
-    if (aiText && aiText.length > 60) {
-      const firstSentence = aiText.match(/^[^.!?]+[.!?]/);
-      if (firstSentence) {
-        const original = aiText;
-        aiText = firstSentence[0].trim();
-        console.log(`[Voice] Truncated: "${original}" → "${aiText}"`);
+    let fullText = '';
+    let buffer = '';
+    let incomplete = '';
+    let firstTokenMs = null;
+    let sentenceCount = 0;
+
+    for await (const chunk of res.body) {
+      const text = incomplete + chunk.toString('utf8');
+      incomplete = '';
+      const lines = text.split('\n');
+      incomplete = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (!data || data === '[DONE]') continue;
+
+        try {
+          const event = JSON.parse(data);
+          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+            const token = event.delta.text;
+            if (firstTokenMs === null) {
+              firstTokenMs = Date.now() - streamStart;
+              console.log(`[TIMING] Claude first token: ${firstTokenMs}ms`);
+            }
+            fullText += token;
+            buffer += token;
+
+            // Detect sentence boundary and speak immediately
+            const sentenceMatch = buffer.match(/^(.*?[.!?])\s*([\s\S]*)$/);
+            if (sentenceMatch && sentenceMatch[1].trim().length > 5) {
+              const sentence = sentenceMatch[1].trim();
+              buffer = sentenceMatch[2] || '';
+              sentenceCount++;
+              const sentenceMs = Date.now() - streamStart;
+              console.log(`[TIMING] Sentence ${sentenceCount} ready at: ${sentenceMs}ms — "${sentence}"`);
+              if (ws.readyState === 1) {
+                await speakToVobiz(ws, sentence, detectedLanguage || 'en-IN');
+              }
+            }
+          }
+        } catch (_) { /* ignore SSE parse errors */ }
       }
     }
 
-    if (aiText) {
-      conversationHistory.push({ role: 'assistant', content: aiText });
+    // Speak any remaining buffer that didn't end with punctuation
+    const remaining = buffer.trim();
+    if (remaining && remaining.length > 3 && ws.readyState === 1) {
+      await speakToVobiz(ws, remaining, detectedLanguage || 'en-IN');
     }
-    console.log(`[TIMING] Claude sent → received: ${claudeMs}ms`);
-    console.log('AI response:', aiText);
-    return aiText;
+
+    const totalMs = Date.now() - streamStart;
+    console.log(`[TIMING] Claude stream total: ${totalMs}ms`);
+
+    if (fullText) {
+      conversationHistory.push({ role: 'assistant', content: fullText });
+    }
+    return fullText || null;
   } catch (err) {
-    const claudeMs = Date.now() - claudeStart;
-    console.error(`Claude error (${claudeMs}ms):`, err.response?.status, JSON.stringify(err.response?.data || err.message));
+    const ms = Date.now() - streamStart;
+    console.error(`[Claude Stream ERROR] (${ms}ms): ${err.message}`);
     return null;
   }
 }
+
 
 const PORT = process.env.PORT || 3006;
 server.listen(PORT, async () => {
