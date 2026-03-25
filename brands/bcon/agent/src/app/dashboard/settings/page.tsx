@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { useTheme } from '@/components/dashboard/ThemeProvider';
 
 const ACCENT_THEMES = [
   { id: 'bcon', name: 'BCON Purple', color: '#8B5CF6', darkColor: '#8B5CF6' },
@@ -13,6 +14,7 @@ const ACCENT_THEMES = [
 type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
   const [selectedTheme, setSelectedTheme] = useState('bcon');
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
@@ -119,6 +121,44 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
+        {/* Appearance Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Appearance
+          </h2>
+          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Dashboard Mode
+            </h3>
+            <div className="grid grid-cols-2 gap-4 max-w-sm">
+              {[
+                { id: 'bw-dark', label: 'Dark', icon: '🌙' },
+                { id: 'bw-light', label: 'Light', icon: '☀️' },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setTheme(mode.id as 'bw-dark' | 'bw-light')}
+                  className="p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    borderColor: theme === mode.id ? 'var(--accent-primary)' : 'transparent',
+                  }}
+                >
+                  <span className="text-2xl">{mode.icon}</span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {mode.label}
+                  </span>
+                  {theme === mode.id && (
+                    <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
+                      ✓ Active
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Theme Section */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>

@@ -50,7 +50,7 @@ const navigation: NavItem[] = [
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
-  { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
+  { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
   // SYSTEM
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
