@@ -585,13 +585,16 @@ async function elevenLabsTTS(text) {
       return null;
     }
     let buffer = Buffer.from(await res.arrayBuffer());
+    const ttsMs = Date.now() - ttsStart;
+    console.log(`[TTS DEBUG] Total bytes: ${buffer.length}, first 16 bytes hex: ${buffer.slice(0, 16).toString('hex')}, ascii: "${buffer.slice(0, 4).toString('ascii')}"`);
     // Strip WAV header if present (ElevenLabs sometimes includes it)
     if (buffer.length > 44 && buffer.toString('ascii', 0, 4) === 'RIFF') {
       buffer = buffer.slice(44);
-      console.log('[TTS] Stripped WAV header from ElevenLabs response');
+      console.log('[TTS] Stripped WAV header');
+    } else {
+      console.log('[TTS] No WAV header detected, using raw buffer');
     }
-    const ttsMs = Date.now() - ttsStart;
-    console.log(`[TIMING] TTS sent → received: ${ttsMs}ms (audio bytes: ${buffer.length})`);
+    console.log(`[TIMING] TTS sent → received: ${ttsMs}ms (audio bytes after strip: ${buffer.length})`);
     return buffer;
   } catch (err) {
     const ttsMs = Date.now() - ttsStart;
