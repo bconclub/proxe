@@ -17,55 +17,19 @@ let greetingAudioChunks = null;
 
 async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
-  const raw = await sarvamTTS("Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
+  const raw = await elevenLabsTTS("Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?");
   if (raw) {
-    greetingAudioChunks = prepareAudioChunks(raw);
+    greetingAudioChunks = prepareUlawChunks(raw);
     console.log('Greeting audio ready, chunks:', greetingAudioChunks.length);
   }
 }
 
-// Strip WAV header if present, return raw PCM buffer and sample rate
-function stripWavHeader(base64Audio) {
-  if (base64Audio && base64Audio.startsWith('UklGR')) {
-    const buf = Buffer.from(base64Audio, 'base64');
-    const actualSampleRate = buf.readUInt32LE(24);
-    const bitsPerSample = buf.readUInt16LE(34);
-    const numChannels = buf.readUInt16LE(22);
-    console.log('WAV actual sample rate:', actualSampleRate, 'bits:', bitsPerSample, 'channels:', numChannels);
-    return { pcm: buf.slice(44), sampleRate: actualSampleRate };
-  }
-  return { pcm: Buffer.from(base64Audio, 'base64'), sampleRate: 16000 };
-}
-
-// Resample 16-bit PCM from srcRate to dstRate using linear interpolation
-function resamplePCM(pcmBuffer, srcRate, dstRate) {
-  if (srcRate === dstRate) return pcmBuffer;
-  const srcSamples = pcmBuffer.length / 2;
-  const dstSamples = Math.floor(srcSamples * dstRate / srcRate);
-  const output = Buffer.alloc(dstSamples * 2);
-  const ratio = srcRate / dstRate;
-  for (let i = 0; i < dstSamples; i++) {
-    const srcPos = i * ratio;
-    const srcIndex = Math.floor(srcPos);
-    const frac = srcPos - srcIndex;
-    const s0 = pcmBuffer.readInt16LE(srcIndex * 2);
-    const s1 = srcIndex + 1 < srcSamples ? pcmBuffer.readInt16LE((srcIndex + 1) * 2) : s0;
-    const sample = Math.round(s0 + frac * (s1 - s0));
-    output.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), i * 2);
-  }
-  console.log('Resampled:', srcRate, '->', dstRate, 'samples:', srcSamples, '->', dstSamples);
-  return output;
-}
-
-// Break raw audio buffer into chunks (300ms at 16kHz 16-bit mono)
-function prepareAudioChunks(base64Audio) {
-  const { pcm, sampleRate } = stripWavHeader(base64Audio);
-  const rawBuffer = sampleRate === 16000 ? pcm : resamplePCM(pcm, sampleRate, 16000);
-  const CHUNK_SIZE = 9600; // 300ms at 16kHz, 16-bit mono
+// Break raw ulaw_8000 buffer into 300ms chunks (8kHz, 8-bit, mono = 2400 bytes/chunk)
+function prepareUlawChunks(buffer) {
+  const CHUNK_SIZE = 2400; // 300ms at 8kHz, 8-bit mono
   const chunks = [];
-  for (let i = 0; i < rawBuffer.length; i += CHUNK_SIZE) {
-    const chunk = rawBuffer.slice(i, i + CHUNK_SIZE);
-    chunks.push(chunk.toString('base64'));
+  for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
+    chunks.push(buffer.slice(i, i + CHUNK_SIZE).toString('base64'));
   }
   return chunks;
 }
@@ -80,8 +44,8 @@ async function sendChunkedAudio(ws, chunks) {
     ws.send(JSON.stringify({
       event: 'playAudio',
       media: {
-        contentType: 'audio/x-l16',
-        sampleRate: 16000,
+        contentType: 'audio/x-mulaw',
+        sampleRate: 8000,
         payload: chunks[i]
       }
     }));
@@ -596,58 +560,52 @@ async function sarvamSTT(audioBuffer) {
   }
 }
 
-async function sarvamTTS(text, language = 'en-IN') {
+async function elevenLabsTTS(text) {
   const ttsStart = Date.now();
   try {
-    const response = await axios.post(
-      'https://api.sarvam.ai/text-to-speech',
+    const res = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream`,
       {
-        inputs: [text],
-        target_language_code: language,
-        speaker: 'maitreyi',
-        model: 'bulbul:v2',
-        encoding: 'pcm',
-        sample_rate: 16000,
-      },
-      {
+        method: 'POST',
         headers: {
-          'api-subscription-key': process.env.SARVAM_API_KEY,
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_flash_v2_5',
+          output_format: 'ulaw_8000',
+          voice_settings: { stability: 0.4, similarity_boost: 0.75 },
+        }),
       }
     );
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[TTS ERROR] ElevenLabs ${res.status}: ${errText}`);
+      return null;
+    }
+    const buffer = Buffer.from(await res.arrayBuffer());
     const ttsMs = Date.now() - ttsStart;
-    const audio = response.data?.audios?.[0] || null;
-    console.log(`[TIMING] TTS sent → received: ${ttsMs}ms (audio length: ${audio?.length || 0})`);
-    return audio;
+    console.log(`[TIMING] TTS sent → received: ${ttsMs}ms (audio bytes: ${buffer.length})`);
+    return buffer;
   } catch (err) {
     const ttsMs = Date.now() - ttsStart;
-    console.error(`[TTS ERROR] (${ttsMs}ms) Status: ${err.response?.status}`);
-    if (err.response?.data) {
-      console.error('Full Sarvam API error response:', JSON.stringify(err.response.data, null, 2));
-    } else {
-      console.error('Error message:', err.message);
-    }
+    console.error(`[TTS ERROR] (${ttsMs}ms): ${err.message}`);
     return null;
   }
 }
 
 async function speakToVobiz(ws, text, language = 'en-IN') {
   const ttsCallStart = Date.now();
-  // Ensure we don't try to process null or empty text
   if (!text || !text.trim()) {
     console.log('[Speak] Empty text received, skipping TTS');
     return;
   }
 
-  const audio = await sarvamTTS(text, language);
-  
-  if (audio && audio !== 'null' && ws.readyState === 1) {
-    const resampleStart = Date.now();
-    const chunks = prepareAudioChunks(audio);
-    const resampleMs = Date.now() - resampleStart;
-    console.log(`[TIMING] Resample + chunk: ${resampleMs}ms (${chunks.length} chunks)`);
-    
+  const audio = await elevenLabsTTS(text);
+
+  if (audio && ws.readyState === 1) {
+    const chunks = prepareUlawChunks(audio);
     if (chunks.length > 0) {
       const firstChunkTime = Date.now();
       await sendChunkedAudio(ws, chunks);
@@ -656,10 +614,9 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
       console.log('[Speak] No audio chunks generated from TTS response');
     }
   } else {
-    // Graceful handling of null audio or closed connection
     if (ws.readyState !== 1) {
       console.log('[Speak] WebSocket closed, audio not sent');
-    } else if (!audio || audio === 'null') {
+    } else if (!audio) {
       console.warn('[Speak] TTS failed to generate audio (null response)');
     }
   }
