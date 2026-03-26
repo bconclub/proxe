@@ -63,7 +63,7 @@ const DIVIDER_AFTER_INDICES = [3, 6]
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -259,8 +259,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     console.log('Logout disabled - authentication is not enabled')
   }
 
-  const sidebarWidth = isCollapsed ? '56px' : '220px'
-  const sidebarContentMargin = isMobile ? '0' : sidebarWidth
+  // showExpanded: sidebar shows labels when pinned open OR when hovered (hover-to-expand)
+  const showExpanded = !isCollapsed || isHovered
+  const sidebarWidth = showExpanded ? '220px' : '56px'
+  // Content margin uses only the pinned state so the main area doesn't shift on hover
+  const contentMarginWidth = isCollapsed ? '56px' : '220px'
+  const sidebarContentMargin = isMobile ? '0' : contentMarginWidth
 
   // Show loading while checking auth in development
   if (isCheckingAuth && process.env.NODE_ENV === 'development') {
@@ -320,11 +324,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div
           className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
           style={{
-            padding: isCollapsed ? '10px' : '10px 12px',
-            justifyContent: isCollapsed ? 'center' : 'space-between',
+            padding: !showExpanded ? '10px' : '10px 12px',
+            justifyContent: !showExpanded ? 'center' : 'space-between',
           }}
         >
-          {!isCollapsed && (
+          {showExpanded && (
             <>
               <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
               {!isMobile && (
@@ -361,7 +365,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </>
           )}
-          {isCollapsed && (
+          {!showExpanded && (
             <div
               className="dashboard-layout-sidebar-logo-collapsed flex items-center justify-center cursor-pointer"
               style={{
@@ -387,7 +391,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-hidden flex flex-col" style={{ padding: isCollapsed ? '8px 0' : '4px 8px' }}>
+        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-hidden flex flex-col" style={{ padding: !showExpanded ? '8px 0' : '4px 8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
@@ -406,11 +410,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   fontWeight: itemIsActive ? 600 : 400,
                   color: itemIsActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                   backgroundColor: itemIsActive ? 'var(--bg-hover)' : 'transparent',
-                  borderLeft: itemIsActive && !isCollapsed ? '2px solid var(--text-primary)' : '2px solid transparent',
-                  margin: isCollapsed ? '2px 6px' : '1px 4px',
+                  borderLeft: itemIsActive && showExpanded ? '2px solid var(--text-primary)' : '2px solid transparent',
+                  margin: !showExpanded ? '2px 6px' : '1px 4px',
                   borderRadius: '6px',
-                  padding: isCollapsed ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
-                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  padding: !showExpanded ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
+                  justifyContent: !showExpanded ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
                   transition: 'background 100ms ease',
@@ -423,7 +427,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
-                        marginRight: isCollapsed ? '0' : '10px',
+                        marginRight: !showExpanded ? '0' : '10px',
                         display: 'flex',
                         alignItems: 'center',
                         color: 'inherit',
@@ -431,7 +435,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     >
                       <navItem.icon size={16} />
                     </span>
-                    {!isCollapsed && (
+                    {showExpanded && (
                       <>
                         <span className="dashboard-layout-nav-item-label flex-1 truncate">{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
@@ -454,7 +458,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       key={navItem.name}
                       className="dashboard-layout-nav-item dashboard-layout-nav-item-coming-soon flex items-center rounded-md transition-all duration-200 relative"
                       style={baseStyle}
-                      title={isCollapsed ? navItem.name : undefined}
+                      title={!showExpanded ? navItem.name : undefined}
                       onMouseEnter={(e) => {
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -479,7 +483,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       rel="noopener noreferrer"
                       className="dashboard-layout-nav-item dashboard-layout-nav-item-external flex items-center rounded-md transition-all duration-200"
                       style={baseStyle}
-                      title={isCollapsed ? navItem.name : undefined}
+                      title={!showExpanded ? navItem.name : undefined}
                       onClick={() => {
                         if (!isMobile) {
                           handleSidebarItemClick()
@@ -503,7 +507,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       href={itemHref!}
                       className="dashboard-layout-nav-item dashboard-layout-nav-item-internal flex items-center rounded-md transition-all duration-200 relative"
                       style={baseStyle}
-                      title={isCollapsed ? navItem.name : undefined}
+                      title={!showExpanded ? navItem.name : undefined}
                       onClick={() => {
                         if (isMobile) {
                           setMobileSidebarOpen(false)
@@ -530,7 +534,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               return (
                 <React.Fragment key={item.name}>
-                  {needsDivider && !isCollapsed && (
+                  {needsDivider && showExpanded && (
                     <div
                       className="dashboard-layout-nav-group-label"
                       style={{
@@ -551,7 +555,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   {renderNavItem(item)}
 
                   {/* Render children if not collapsed */}
-                  {hasChildren && !isCollapsed && (
+                  {hasChildren && showExpanded && (
                     <div className="dashboard-layout-nav-children space-y-1">
                       {item.children!.map((child) => renderNavItem(child, true))}
                     </div>
@@ -573,8 +577,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div
             className="dashboard-layout-footer-row flex items-center"
             style={{
-              padding: isCollapsed ? '6px' : '5px 10px',
-              justifyContent: isCollapsed ? 'center' : 'space-between',
+              padding: !showExpanded ? '6px' : '5px 10px',
+              justifyContent: !showExpanded ? 'center' : 'space-between',
             }}
           >
             {/* Three-dot menu */}
@@ -641,7 +645,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Version badge inline */}
-            {!isCollapsed && (
+            {showExpanded && (
               <div
                 className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
                 style={{
@@ -682,7 +686,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
           height: '100vh',
-          width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
+          width: isMobile ? '100%' : `calc(100% - ${contentMarginWidth})`,
           overflow: 'hidden',
           transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1), width 200ms cubic-bezier(0.2,0,0,1)',
         }}
