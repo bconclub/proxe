@@ -2012,11 +2012,15 @@ async function executeTask(task) {
     }
   }
 
-  // Never send a template with a placeholder name — it looks unprofessional ("Hi Lead, ...")
+  // Never send a template with a placeholder or business name ("Hi Lead", "Hi ON A TRIP HOLIDAYS")
   const PLACEHOLDER_NAMES = ['lead', 'unknown', 'customer', ''];
-  if (!leadName || PLACEHOLDER_NAMES.includes(leadName.toLowerCase().trim())) {
-    console.log(`[executeTask] Skipping ${task.task_type} for lead ${task.lead_id} — no real name available (got: "${leadName}")`);
-    return { skipped: true, reason: 'No real customer name — would send "Hi Lead" or similar' };
+  const isPlaceholder = !leadName || PLACEHOLDER_NAMES.includes(leadName.toLowerCase().trim());
+  // Business names: all-caps multi-word names (e.g. "ON A TRIP HOLIDAYS", "WORK PLANET SOLUTIONS")
+  const words = leadName ? leadName.trim().split(/\s+/) : [];
+  const isBusinessName = words.length >= 3 && words.every(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+  if (isPlaceholder || isBusinessName) {
+    console.log(`[executeTask] Skipping ${task.task_type} for lead ${task.lead_id} — bad name "${leadName}" (placeholder=${isPlaceholder}, business=${isBusinessName})`);
+    return { skipped: true, reason: `Bad customer name "${leadName}" — placeholder or business name` };
   }
 
   // Propagate resolved name to all downstream functions that use task.lead_name
@@ -2026,12 +2030,13 @@ async function executeTask(task) {
 
   const waPhone = phone.length === 10 ? `91${phone}` : phone;
 
-  // ── Duplicate-send guard: skip if a template was already sent to this lead in the last 6h ──
-  // This prevents two different task types (e.g. follow_up_24h + nudge_waiting) sending the same template
+  // ── Duplicate-send guard: skip if same template was already sent to this lead via conversations log ──
+  // Covers cross-task-type duplicates (follow_up_day1, follow_up_day3, follow_up_day5 all use the same template)
   const TEMPLATE_TASK_TYPES = ['follow_up_24h', 'nudge_waiting', 'push_to_book', 'follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage', 'first_outreach'];
   if (TEMPLATE_TASK_TYPES.includes(task.task_type) && task.lead_id) {
+    // 1. Check agent_tasks: any of these task types completed in last 6h
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    const { data: recentSent } = await supabase
+    const { data: recentTask } = await supabase
       .from('agent_tasks')
       .select('id, task_type, completed_at')
       .eq('lead_id', task.lead_id)
@@ -2040,9 +2045,27 @@ async function executeTask(task) {
       .gte('completed_at', sixHoursAgo)
       .neq('id', task.id)
       .limit(1);
-    if (recentSent && recentSent.length > 0) {
-      console.log(`[executeTask] Duplicate guard: ${task.task_type} skipped for ${task.lead_name} — ${recentSent[0].task_type} already sent in last 6h`);
-      return { skipped: true, reason: `Duplicate guard — ${recentSent[0].task_type} already sent within 6h` };
+    if (recentTask && recentTask.length > 0) {
+      console.log(`[executeTask] Duplicate guard (tasks): ${task.task_type} skipped for ${task.lead_name} — ${recentTask[0].task_type} already completed in last 6h`);
+      return { skipped: true, reason: `Duplicate guard — ${recentTask[0].task_type} already sent within 6h` };
+    }
+
+    // 2. Check conversations: was a followup/noengage/engaged template sent to this lead before?
+    // Prevents same template being spammed across follow_up_day1/3/5 on different days
+    const FOLLOWUP_TEMPLATES = ['bcon_proxe_followup_engaged', 'bcon_proxe_followup_noengage'];
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentConvo } = await supabase
+      .from('conversations')
+      .select('id, metadata, created_at')
+      .eq('lead_id', task.lead_id)
+      .eq('sender', 'agent')
+      .gte('created_at', threeDaysAgo)
+      .not('metadata->template_name', 'is', null)
+      .limit(5);
+    const sentFollowup = (recentConvo || []).some(c => FOLLOWUP_TEMPLATES.includes(c.metadata?.template_name));
+    if (sentFollowup) {
+      console.log(`[executeTask] Duplicate guard (convos): ${task.task_type} skipped for ${task.lead_name} — followup template already sent in last 3 days`);
+      return { skipped: true, reason: 'Followup template already sent to this lead in last 3 days' };
     }
   }
 
