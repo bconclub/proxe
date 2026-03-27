@@ -280,7 +280,7 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
     const recipientId = status.recipient_id;
 
     if (!waMessageId || !statusType) continue;
-    if (statusType !== 'delivered' && statusType !== 'read') continue;
+    if (!['sent', 'delivered', 'read', 'failed'].includes(statusType)) continue;
 
     try {
       // Find the conversation record by WA message ID stored in metadata
@@ -301,12 +301,11 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
         : new Date().toISOString();
 
       if (statusType === 'read') {
-        // Update conversation record with read_at
         await supabase
           .from('conversations')
           .update({
             read_at: statusTime,
-            metadata: { ...msg.metadata, read_at: statusTime },
+            metadata: { ...msg.metadata, delivery_status: 'read', read_at: statusTime },
           })
           .eq('id', msg.id);
 
@@ -331,23 +330,40 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
           }
         }
 
-        // Track channel performance: message was read
         if (msg.lead_id) {
           updateChannelPerformance(supabase, msg.lead_id, 'whatsapp', 'read');
         }
 
         console.log(`[meta/status] READ receipt: msg ${msg.id} read at ${statusTime}`);
       } else if (statusType === 'delivered') {
-        // Update conversation record with delivered_at
         await supabase
           .from('conversations')
           .update({
             delivered_at: statusTime,
-            metadata: { ...msg.metadata, delivered_at: statusTime },
+            metadata: { ...msg.metadata, delivery_status: 'delivered', delivered_at: statusTime },
           })
           .eq('id', msg.id);
 
         console.log(`[meta/status] DELIVERED receipt: msg ${msg.id} at ${statusTime}`);
+      } else if (statusType === 'sent') {
+        await supabase
+          .from('conversations')
+          .update({
+            metadata: { ...msg.metadata, delivery_status: 'sent' },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] SENT receipt: msg ${msg.id}`);
+      } else if (statusType === 'failed') {
+        const errorMsg = status.errors?.[0]?.message || status.errors?.[0]?.title || 'unknown error';
+        await supabase
+          .from('conversations')
+          .update({
+            metadata: { ...msg.metadata, delivery_status: 'failed', delivery_error: errorMsg },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] FAILED receipt: msg ${msg.id} error: ${errorMsg}`);
       }
     } catch (err) {
       console.error(`[meta/status] Error processing ${statusType} for ${waMessageId}:`, err);

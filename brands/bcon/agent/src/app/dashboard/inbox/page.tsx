@@ -203,18 +203,6 @@ function gapColor(ms: number): string {
   return '#ef4444';
 }
 
-const TEMPLATE_LABELS: Record<string, string> = {
-  bcon_proxe_followup_engaged: 'Follow-up',
-  bcon_proxe_followup_noengage: 'Follow-up',
-  bcon_proxe_reengagement_engaged: 'Re-engagement',
-  bcon_proxe_reengagement_noengage: 'Re-engagement',
-  bcon_proxe_booking_reminder_24h: 'Booking Reminder 24h',
-  bcon_proxe_booking_reminder_30m: 'Booking Reminder 30m',
-}
-
-function getTemplateLabel(name: string): string {
-  return TEMPLATE_LABELS[name] || name.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
 
 function getDeliveryStatusStyle(status: string | undefined): { bg: string; color: string } {
   if (!status) return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
@@ -237,17 +225,6 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
   }
 }
 
-/** Infer effective delivery status: if the lead replied after this message, it was at least delivered */
-function getEffectiveDeliveryStatus(msg: Message, allMessages: Message[]): string {
-  const stored = msg.metadata?.delivery_status as string | undefined
-  if (stored === 'read' || stored === 'failed') return stored
-  const msgTime = new Date(msg.created_at).getTime()
-  const hasReplyAfter = allMessages.some(
-    m => m.sender === 'customer' && m.channel === msg.channel && new Date(m.created_at).getTime() > msgTime
-  )
-  if (hasReplyAfter) return 'delivered'
-  return stored || 'sent'
-}
 
 function DeliveryStatusIcon({ status }: { status: string | undefined }) {
   if (!status || status === 'sent' || status === 'pending') {
@@ -1568,7 +1545,7 @@ export default function InboxPage() {
                             ? 'rgba(255,255,255,0.12)'
                             : 'rgba(99,102,241,0.30)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(getEffectiveDeliveryStatus(msg, filteredMessages)).color}` } : {}),
+                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` } : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
@@ -1592,7 +1569,7 @@ export default function InboxPage() {
                           {renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
-                          const ds = getEffectiveDeliveryStatus(msg, filteredMessages)
+                          const ds = msg.metadata?.delivery_status
                           const statusStyle = getDeliveryStatusStyle(ds)
                           const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
                           return (
@@ -1605,7 +1582,10 @@ export default function InboxPage() {
                                 Template
                               </span>
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                                {getTemplateLabel(msg.metadata.template_name)}
+                                {msg.metadata.template_name}
+                              </span>
+                              <span className="flex items-center" title={ds || 'pending'}>
+                                <DeliveryStatusIcon status={ds} />
                               </span>
                             </div>
                           )
@@ -1624,8 +1604,8 @@ export default function InboxPage() {
                           </div>
                         )}
                         {!isCustomer && msg.channel === 'whatsapp' && (
-                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5" title={getDeliveryTooltip(getEffectiveDeliveryStatus(msg, filteredMessages), msg.metadata?.delivery_error)}>
-                            <DeliveryStatusIcon status={getEffectiveDeliveryStatus(msg, filteredMessages)} />
+                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5" title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
+                            <DeliveryStatusIcon status={msg.metadata?.delivery_status} />
                           </div>
                         )}
                       </div>
