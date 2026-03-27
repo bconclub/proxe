@@ -533,22 +533,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               return (
                 <React.Fragment key={item.name}>
-                  {needsDivider && showExpanded && (
-                    <div
-                      className="dashboard-layout-nav-group-label"
-                      style={{
-                        borderTop: '1px solid var(--border-primary)',
-                        margin: '8px 12px 4px',
-                        paddingTop: '8px',
-                        fontSize: '10px',
-                        fontWeight: 500,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      {index === 4 ? 'Operations' : index === 7 ? 'System' : ''}
-                    </div>
+                  {needsDivider && (
+                    <div style={{ borderTop: '1px solid var(--border-primary)', margin: '8px 12px 4px' }} />
                   )}
 
                   {renderNavItem(item)}

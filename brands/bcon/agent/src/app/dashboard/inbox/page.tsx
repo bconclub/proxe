@@ -214,6 +214,18 @@ function getDeliveryStatusStyle(status: string | undefined): { bg: string; color
   }
 }
 
+function getTaskTypeTag(taskType: string | undefined): { label: string; bg: string; color: string } | null {
+  if (!taskType) return null
+  const t = taskType.toLowerCase()
+  if (t.includes('nudge')) return { label: 'Nudge', bg: 'rgba(249,115,22,0.15)', color: '#F97316' }
+  if (t.includes('push_to_book')) return { label: 'Push to Book', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('follow_up') || t.includes('followup')) return { label: 'Follow-up', bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { label: 'Re-engage', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('first_outreach')) return { label: 'First Outreach', bg: 'rgba(99,102,241,0.15)', color: '#818CF8' }
+  if (t.includes('reminder')) return { label: 'Reminder', bg: 'rgba(59,130,246,0.15)', color: '#3B82F6' }
+  return null
+}
+
 function getDeliveryTooltip(status: string | undefined, error?: string): string {
   if (!status) return 'Status: Pending \u2013 awaiting delivery confirmation'
   switch (status) {
@@ -1521,6 +1533,7 @@ export default function InboxPage() {
 
                   // Regular message bubble
                   const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+                  const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
 
                   return (
                     <React.Fragment key={msg.id}>
@@ -1539,13 +1552,17 @@ export default function InboxPage() {
                         className="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border"
                         style={{
                           background: isCustomer
-                            ? 'rgba(255,255,255,0.08)'
-                            : 'rgba(99,102,241,0.15)',
+                            ? 'rgba(255,255,255,0.10)'
+                            : 'rgba(99,102,241,0.28)',
                           borderColor: isCustomer
-                            ? 'rgba(255,255,255,0.12)'
-                            : 'rgba(99,102,241,0.30)',
+                            ? 'rgba(255,255,255,0.18)'
+                            : 'rgba(99,102,241,0.45)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` } : {}),
+                          ...(msg.metadata?.template_name
+                            ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
+                            : taskTag
+                            ? { borderLeft: `3px solid ${taskTag.color}` }
+                            : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
@@ -1603,9 +1620,49 @@ export default function InboxPage() {
                             ))}
                           </div>
                         )}
+                        {!msg.metadata?.template_name && taskTag && (
+                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <span
+                              className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{ background: taskTag.bg, color: taskTag.color }}
+                            >
+                              {taskTag.label}
+                            </span>
+                            {msg.metadata?.autonomous && (
+                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Autonomous</span>
+                            )}
+                          </div>
+                        )}
                         {!isCustomer && msg.channel === 'whatsapp' && (
-                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5" title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
-                            <DeliveryStatusIcon status={msg.metadata?.delivery_status} />
+                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
+                            {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
+                              <div className="relative group flex items-center">
+                                <span
+                                  className="text-[8px] font-mono px-1 py-0.5 rounded cursor-default truncate max-w-[120px]"
+                                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
+                                >
+                                  {msg.metadata.delivery_error}
+                                </span>
+                                <div
+                                  className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block z-50 pointer-events-none"
+                                  style={{ minWidth: '200px', maxWidth: '280px' }}
+                                >
+                                  <div
+                                    className="text-[10px] leading-relaxed px-2.5 py-2 rounded-lg shadow-lg"
+                                    style={{ background: '#1a1a2e', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
+                                  >
+                                    <div className="font-semibold mb-0.5" style={{ color: '#EF4444' }}>Delivery Failed</div>
+                                    {msg.metadata.delivery_error}
+                                  </div>
+                                  <div className="flex justify-end pr-2">
+                                    <div className="w-2 h-2 rotate-45 -mt-1" style={{ background: '#1a1a2e', borderRight: '1px solid rgba(239,68,68,0.4)', borderBottom: '1px solid rgba(239,68,68,0.4)' }} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
+                              <DeliveryStatusIcon status={msg.metadata?.delivery_status} />
+                            </span>
                           </div>
                         )}
                       </div>
