@@ -1989,10 +1989,12 @@ async function executeTask(task) {
 
   // Always re-resolve phone from the lead record - task.lead_phone can be stale
   // (e.g. inherited from a parent task, or lead record was merged/overwritten)
+  let leadName = task.lead_name;
+
   if (task.lead_id) {
     const { data: freshLead } = await supabase
       .from('all_leads')
-      .select('customer_phone_normalized')
+      .select('customer_phone_normalized, customer_name')
       .eq('id', task.lead_id)
       .maybeSingle();
 
@@ -2003,7 +2005,22 @@ async function executeTask(task) {
         phone = freshPhone;
       }
     }
+
+    // Re-resolve name from lead record — task.lead_name may be stale or a placeholder
+    if (freshLead?.customer_name && freshLead.customer_name !== 'Lead' && freshLead.customer_name !== 'Unknown') {
+      leadName = freshLead.customer_name;
+    }
   }
+
+  // Never send a template with a placeholder name — it looks unprofessional ("Hi Lead, ...")
+  const PLACEHOLDER_NAMES = ['lead', 'unknown', 'customer', ''];
+  if (!leadName || PLACEHOLDER_NAMES.includes(leadName.toLowerCase().trim())) {
+    console.log(`[executeTask] Skipping ${task.task_type} for lead ${task.lead_id} — no real name available (got: "${leadName}")`);
+    return { skipped: true, reason: 'No real customer name — would send "Hi Lead" or similar' };
+  }
+
+  // Propagate resolved name to all downstream functions that use task.lead_name
+  task.lead_name = leadName;
 
   if (!phone) throw new Error('No phone number');
 
