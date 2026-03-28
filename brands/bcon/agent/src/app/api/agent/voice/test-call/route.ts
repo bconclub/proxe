@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     const authToken = process.env.VOBIZ_AUTH_TOKEN;
     const fromNumber = process.env.VOBIZ_FROM_NUMBER;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
-    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}&lead_name=${encodeURIComponent(leadName || '')}`;
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}&lead_name=${encodeURIComponent(leadName || '')}&lead_phone=${cleanPhone}`;
 
     const res = await fetch(
       `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,

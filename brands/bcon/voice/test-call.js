@@ -20,8 +20,9 @@ if (!VOBIZ_AUTH_ID || !VOBIZ_AUTH_TOKEN) {
   process.exit(1);
 }
 
+const phone10 = phone.replace(/\D/g, '').slice(-10);
 console.log(`Calling ${toPhone} (${leadName}) — direction: ${direction}`);
-console.log(`Answer URL: ${VOBIZ_ANSWER_URL}?direction=${direction}&lead_name=${encodeURIComponent(leadName)}`);
+console.log(`Answer URL: ${VOBIZ_ANSWER_URL}?direction=${direction}&lead_name=${encodeURIComponent(leadName)}&lead_phone=${phone10}`);
 
 fetch(`https://api.vobiz.ai/api/v1/Account/${VOBIZ_AUTH_ID}/Call/`, {
   method: 'POST',

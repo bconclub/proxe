@@ -21,7 +21,7 @@ export default function VoiceAgentTab() {
         body: JSON.stringify({ phone: phone.trim(), direction: 'cold_intro' }),
       });
       const data = await res.json();
-      setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${data.error}`);
+      setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
     } catch {
       setStatus('Error — check server logs');
     } finally {

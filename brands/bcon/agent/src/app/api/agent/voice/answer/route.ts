@@ -6,16 +6,17 @@ export async function POST(req: NextRequest) {
   const urlParams = req.nextUrl.searchParams;
   const direction = urlParams.get('direction') || 'inbound';
   const leadName = urlParams.get('lead_name') || '';
+  // For outbound/cold_intro: we pass lead_phone explicitly in the URL so we don't rely on Vobiz params
+  const leadPhoneFromUrl = urlParams.get('lead_phone') || '';
 
   const formData = await req.text();
   const params = new URLSearchParams(formData);
-  // For outbound calls: From = BCON's number, To = lead's number — use To
-  // For inbound calls: From = lead's number — use From
-  const callerPhone = direction === 'outbound'
-    ? (params.get('To') || params.get('to') || params.get('From') || params.get('from') || '')
-    : (params.get('From') || params.get('from') || '');
+  // For inbound: From = lead's number. For outbound: use lead_phone from URL (reliable), fall back to To
+  const callerPhone = direction === 'inbound'
+    ? (params.get('From') || params.get('from') || '')
+    : (leadPhoneFromUrl || params.get('To') || params.get('to') || params.get('From') || params.get('from') || '');
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
-  console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName });
+  console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl });
 
   const extraHeaders = `callerPhone=${callerPhone},callUUID=${callUUID},direction=${direction},leadName=${encodeURIComponent(leadName)}`;
   const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" extraHeaders="${extraHeaders}">${voiceServerUrl}/ws</Stream></Response>`;
