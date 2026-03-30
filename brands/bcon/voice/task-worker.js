@@ -1818,50 +1818,360 @@ async function createBookingReminderTasks() {
 }
 
 // ============================================
-// 2. FOLLOW-UP SILENT LEADS (24h no reply)
+// 2. FOLLOW-UP SILENT LEADS (stage-based logic)
 // ============================================
+
+/**
+ * Check if a follow-up message was already sent to this lead in the last N hours.
+ * This prevents duplicate sends when the task worker runs multiple times.
+ */
+async function wasFollowUpRecentlySent(leadId, hoursBack = 72) {
+  const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+  
+  const { data: recentMessages } = await supabase
+    .from('conversations')
+    .select('id, content, created_at')
+    .eq('lead_id', leadId)
+    .eq('sender', 'agent')
+    .gte('created_at', cutoff)
+    .limit(10);
+  
+  if (!recentMessages || recentMessages.length === 0) return false;
+  
+  // Check for follow-up template patterns
+  const followUpPatterns = [
+    'you reached out to us recently',
+    'follow up',
+    'following up',
+    'checking in',
+    'haven\'t heard back',
+    'still interested',
+    'quick chat',
+    'brand audit',
+    'ai brand audit',
+    'business like yours',
+  ];
+  
+  const found = recentMessages.some(msg => {
+    const content = (msg.content || '').toLowerCase();
+    return followUpPatterns.some(pattern => content.includes(pattern));
+  });
+  
+  if (found) {
+    console.log(`[Deduplication] Lead ${leadId} already received follow-up within ${hoursBack}h, skipping`);
+  }
+  
+  return found;
+}
+
+/**
+ * Check if lead is in cooldown period (user replied, delivery failed, etc.)
+ */
+async function isInCooldown(lead) {
+  if (!lead.follow_up_cooldown_until) return false;
+  const cooldownEnd = new Date(lead.follow_up_cooldown_until).getTime();
+  const now = Date.now();
+  const inCooldown = now < cooldownEnd;
+  if (inCooldown) {
+    console.log(`[Cooldown] Lead ${lead.id} in cooldown until ${lead.follow_up_cooldown_until}`);
+  }
+  return inCooldown;
+}
+
+/**
+ * Update lead record after successful follow-up send.
+ */
+async function markFollowUpSent(leadId, templateName) {
+  try {
+    await supabase
+      .from('all_leads')
+      .update({
+        last_follow_up_sent_at: new Date().toISOString(),
+        last_follow_up_template: templateName,
+        follow_up_count: supabase.rpc('increment_follow_up_count', { lead_id: leadId }),
+      })
+      .eq('id', leadId);
+  } catch (err) {
+    // Fallback if RPC doesn't exist - use raw increment
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('follow_up_count')
+      .eq('id', leadId)
+      .single();
+    
+    await supabase
+      .from('all_leads')
+      .update({
+        last_follow_up_sent_at: new Date().toISOString(),
+        last_follow_up_template: templateName,
+        follow_up_count: (lead?.follow_up_count || 0) + 1,
+      })
+      .eq('id', leadId);
+  }
+}
+
+/**
+ * Set cooldown period for a lead (user replied, delivery failure, etc.)
+ */
+async function setFollowUpCooldown(leadId, hours = 48) {
+  const cooldownUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  await supabase
+    .from('all_leads')
+    .update({
+      follow_up_cooldown_until: cooldownUntil,
+    })
+    .eq('id', leadId);
+  console.log(`[Cooldown] Set ${hours}h cooldown for lead ${leadId} until ${cooldownUntil}`);
+}
+
 async function createFollowUpTasks() {
+  const now = new Date();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
+  // Fetch all active leads with follow-up tracking fields
   const { data: leads } = await supabase
     .from('all_leads')
-    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
+    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, response_count, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup')
     .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
-    .lt('last_interaction_at', twentyFourHoursAgo)
-    .gt('last_interaction_at', fortyEightHoursAgo);
+    .lt('last_interaction_at', fortyEightHoursAgo)
+    .gt('last_interaction_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+    .or(`follow_up_cooldown_until.is.null,follow_up_cooldown_until.lt.${new Date().toISOString()}`);
 
   if (!leads || leads.length === 0) return;
 
+  let skippedCount = 0;
+  let createdCount = 0;
+
   for (const lead of leads) {
     try {
+      const hoursSinceInteraction = (Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60);
+      const responseCount = lead.response_count || 0;
+      const leadStage = lead.lead_stage || 'New';
+      const leadName = lead.customer_name || 'Lead';
+      const leadPhone = lead.customer_phone_normalized;
+      const leadId = lead.id;
+
+      // --- DEDUPLICATION GUARD 1: Skip if in cooldown ---
+      if (await isInCooldown(lead)) {
+        skippedCount++;
+        continue;
+      }
+
+      // --- DEDUPLICATION GUARD 2: Skip if follow-up sent in last 72h ---
+      if (await wasFollowUpRecentlySent(leadId, 72)) {
+        skippedCount++;
+        continue;
+      }
+
+      // --- DEDUPLICATION GUARD 3: Check last_follow_up_sent_at column ---
+      if (lead.last_follow_up_sent_at) {
+        const hoursSinceLastFollowUp = (Date.now() - new Date(lead.last_follow_up_sent_at).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLastFollowUp < 72) {
+          console.log(`[Deduplication] Lead ${leadId} has last_follow_up_sent_at ${hoursSinceLastFollowUp.toFixed(1)}h ago, skipping`);
+          skippedCount++;
+          continue;
+        }
+      }
+
+      // Get last message to check if last was from agent
       const { data: lastMsg } = await supabase
         .from('conversations')
         .select('sender, created_at')
-        .eq('lead_id', lead.id)
+        .eq('lead_id', leadId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
-      if (lastMsg && lastMsg.sender === 'agent') {
-        // Schedule 24h from their last interaction, not NOW
+      const lastMessageFromAgent = lastMsg && lastMsg.sender === 'agent';
+
+      // --- ONE_TOUCH: response_count < 2, silent 24-48h ---
+      if (responseCount < 2 && hoursSinceInteraction >= 24 && hoursSinceInteraction <= 48) {
+        const baseTime = new Date(lead.last_interaction_at).getTime();
+        const sequence = [
+          { type: 'follow_up_24h', offsetMs: 24 * 60 * 60 * 1000, tone: 'soft' },
+          { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000, tone: 'soft' },
+          { type: 'follow_up_day7', offsetMs: 7 * 24 * 60 * 60 * 1000, tone: 'soft' },
+          { type: 'follow_up_day30', offsetMs: 30 * 24 * 60 * 60 * 1000, tone: 'soft' },
+          { type: 'follow_up_day90', offsetMs: 90 * 24 * 60 * 60 * 1000, tone: 'soft' },
+        ];
+        for (const s of sequence) {
+          await createTaskIfNotExists({
+            taskType: s.type,
+            leadId,
+            leadPhone,
+            leadName,
+            scheduledAt: new Date(baseTime + s.offsetMs).toISOString(),
+            metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: s.tone, channel: 'whatsapp', bucket: 'ONE_TOUCH' },
+            initialStatus: 'pending',
+          });
+        }
+        console.log(`[FollowUp] ONE_TOUCH sequence created for ${leadName} (${responseCount} responses)`);
+        continue;
+      }
+
+      // --- ENGAGED: response_count 2-5, lead_stage = 'Engaged', silent 24-48h ---
+      if (responseCount >= 2 && responseCount <= 5 && leadStage === 'Engaged' && hoursSinceInteraction >= 24 && hoursSinceInteraction <= 48) {
         const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
         await createTaskIfNotExists({
           taskType: 'follow_up_24h',
-          leadId: lead.id,
-          leadPhone: lead.customer_phone_normalized,
-          leadName: lead.customer_name || 'Lead',
+          leadId,
+          leadPhone,
+          leadName,
           scheduledAt,
-          metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score },
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'normal', channel: 'whatsapp', bucket: 'ENGAGED' },
           initialStatus: 'pending',
         });
+        console.log(`[FollowUp] ENGAGED follow_up_24h created for ${leadName}`);
+        continue;
+      }
+
+      // --- HIGH_INTENT: lead_stage = 'High Intent', silent 24h ---
+      if (leadStage === 'High Intent' && hoursSinceInteraction >= 24 && hoursSinceInteraction < 48) {
+        const baseTime = new Date(lead.last_interaction_at).getTime();
+        // WhatsApp follow-up
+        await createTaskIfNotExists({
+          taskType: 'follow_up_24h',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 24 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'aggressive', channel: 'whatsapp', bucket: 'HIGH_INTENT' },
+          initialStatus: 'pending',
+        });
+        // Voice call 4 hours after the WhatsApp
+        await createTaskIfNotExists({
+          taskType: 'try_voice_call',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'aggressive', channel: 'voice', bucket: 'HIGH_INTENT' },
+          initialStatus: 'pending',
+        });
+        console.log(`[FollowUp] HIGH_INTENT WhatsApp + Voice created for ${leadName}`);
+        continue;
+      }
+
+      // --- BOOKING_MADE: lead_stage = 'Booking Made', silent 24h ---
+      if (leadStage === 'Booking Made' && hoursSinceInteraction >= 24 && hoursSinceInteraction < 48) {
+        const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
+        await createTaskIfNotExists({
+          taskType: 'nudge_waiting',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt,
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'aggressive', channel: 'whatsapp+voice', bucket: 'BOOKING_MADE' },
+          initialStatus: 'pending',
+        });
+        console.log(`[FollowUp] BOOKING_MADE nudge_waiting created for ${leadName}`);
+        continue;
+      }
+
+      // --- DEMO_TAKEN: lead_stage = 'Demo Taken', silent 24h ---
+      if (leadStage === 'Demo Taken' && hoursSinceInteraction >= 24 && hoursSinceInteraction < 48) {
+        const baseTime = new Date(lead.last_interaction_at).getTime();
+        const sequence = [
+          { type: 'follow_up_day1', offsetMs: 1 * 24 * 60 * 60 * 1000 },
+          { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000 },
+          { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000 },
+        ];
+        for (const s of sequence) {
+          await createTaskIfNotExists({
+            taskType: s.type,
+            leadId,
+            leadPhone,
+            leadName,
+            scheduledAt: new Date(baseTime + s.offsetMs).toISOString(),
+            metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'aggressive', channel: 'whatsapp', bucket: 'DEMO_TAKEN' },
+            initialStatus: 'pending',
+          });
+        }
+        // Voice call at +2 days
+        await createTaskIfNotExists({
+          taskType: 'try_voice_call',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 2 * 24 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'aggressive', channel: 'voice', bucket: 'DEMO_TAKEN' },
+          initialStatus: 'pending',
+        });
+        console.log(`[FollowUp] DEMO_TAKEN sequence + voice created for ${leadName}`);
+        continue;
+      }
+
+      // --- PROPOSAL_SENT: lead_stage = 'Proposal Sent', silent 24h ---
+      if (leadStage === 'Proposal Sent' && hoursSinceInteraction >= 24 && hoursSinceInteraction < 48) {
+        const baseTime = new Date(lead.last_interaction_at).getTime();
+        // Day 1 WhatsApp
+        await createTaskIfNotExists({
+          taskType: 'follow_up_day1',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 1 * 24 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'very_aggressive', channel: 'whatsapp', bucket: 'PROPOSAL_SENT' },
+          initialStatus: 'pending',
+        });
+        // Voice call at +4 hours same day
+        await createTaskIfNotExists({
+          taskType: 'try_voice_call',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 1 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'very_aggressive', channel: 'voice', bucket: 'PROPOSAL_SENT' },
+          initialStatus: 'pending',
+        });
+        // Day 3
+        await createTaskIfNotExists({
+          taskType: 'follow_up_day3',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'very_aggressive', channel: 'whatsapp', bucket: 'PROPOSAL_SENT' },
+          initialStatus: 'pending',
+        });
+        // Day 5
+        await createTaskIfNotExists({
+          taskType: 'follow_up_day5',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt: new Date(baseTime + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'very_aggressive', channel: 'whatsapp', bucket: 'PROPOSAL_SENT' },
+          initialStatus: 'pending',
+        });
+        console.log(`[FollowUp] PROPOSAL_SENT sequence + voice created for ${leadName}`);
+        continue;
+      }
+
+      // --- DEFAULT: all other stages, silent 24-48h, last message from agent ---
+      if (hoursSinceInteraction >= 24 && hoursSinceInteraction <= 48 && lastMessageFromAgent) {
+        const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
+        await createTaskIfNotExists({
+          taskType: 'follow_up_24h',
+          leadId,
+          leadPhone,
+          leadName,
+          scheduledAt,
+          metadata: { lead_stage: leadStage, lead_score: lead.lead_score, tone: 'normal', channel: 'whatsapp', bucket: 'DEFAULT' },
+          initialStatus: 'pending',
+        });
+        createdCount++;
+        console.log(`[FollowUp] DEFAULT follow_up_24h created for ${leadName}`);
       }
     } catch (err) {
       console.error(`[FollowUp] Error for lead ${lead.id}:`, err.message);
     }
   }
+  
+  console.log(`[FollowUp] Complete: ${createdCount} tasks created, ${skippedCount} leads skipped (deduplication/cooldown)`);
 }
 
 // ============================================
@@ -2035,6 +2345,11 @@ async function processPendingTasks() {
       }).eq('id', task.id);
       console.error(`[ProcessTasks] Failed: ${task.task_type} for ${task.lead_name}: ${err.message}`);
       await notifyTaskResult(task, false, err.message);
+      
+      // ── Delivery failure: Set 12h cooldown to avoid spamming invalid numbers ──
+      if (task.lead_id && !err.is24hWindow && task.task_type.includes('follow')) {
+        await setFollowUpCooldown(task.lead_id, 12);
+      }
     }
   }
 }
@@ -2108,7 +2423,7 @@ async function executeTask(task) {
       return { skipped: true, reason: `Duplicate guard — ${recentTask[0].task_type} already sent within 6h` };
     }
 
-    // 2. Check conversations: was a followup/noengage/engaged template sent to this lead before?
+    // 2. Check conversations: was any template sent to this lead in the last 3 days?
     // Prevents same template being spammed across follow_up_day1/3/5 on different days
     const FOLLOWUP_TEMPLATES = ['bcon_proxe_followup_engaged', 'bcon_proxe_followup_noengage'];
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -2118,9 +2433,11 @@ async function executeTask(task) {
       .eq('lead_id', task.lead_id)
       .eq('sender', 'agent')
       .gte('created_at', threeDaysAgo)
-      .not('metadata->template_name', 'is', null)
-      .limit(5);
-    const sentFollowup = (recentConvo || []).some(c => FOLLOWUP_TEMPLATES.includes(c.metadata?.template_name));
+      .limit(20);
+    // Filter client-side — avoids broken PostgREST JSONB filter syntax
+    const sentFollowup = (recentConvo || []).some(c =>
+      c.metadata?.template_name && FOLLOWUP_TEMPLATES.includes(c.metadata.template_name)
+    );
     if (sentFollowup) {
       console.log(`[executeTask] Duplicate guard (convos): ${task.task_type} skipped for ${task.lead_name} — followup template already sent in last 3 days`);
       return { skipped: true, reason: 'Followup template already sent to this lead in last 3 days' };
@@ -3076,13 +3393,17 @@ function renderTemplateText(templateName, params) {
 
 /**
  * Build a human-readable template preview showing template name and parameters.
+ * Implements template rotation: never sends same template twice in a row.
  */
-function getTemplatePreview(task, lead) {
+async function getTemplatePreview(task, lead) {
   const leadName = (task.lead_name && task.lead_name.trim()) || 'there';
   const taskType = task.task_type || '';
   const { serviceInterest, painPoint } = resolveLeadContext(task, lead);
   const bookingTime = task.metadata?.booking_time || 'your scheduled time';
   const engaged = isEngaged(lead);
+  
+  // Check last template sent for rotation
+  const lastTemplate = lead?.last_follow_up_template || null;
 
   if (taskType === 'booking_reminder_24h' || taskType === 'reminder_24h') {
     return {
@@ -3118,7 +3439,24 @@ function getTemplatePreview(task, lead) {
   } else if (taskType === 'post_call_followup') {
     return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {
+    // Template rotation: alternate between engaged/noengage variants
+    // If last was noengage, send engaged this time (and vice versa)
+    const lastWasNoEngage = lastTemplate === 'bcon_proxe_followup_noengage';
+    const lastWasEngaged = lastTemplate === 'bcon_proxe_followup_engaged';
+    
+    // Prefer engaged if lead is engaged, but rotate if same as last
     if (engaged) {
+      // If last was engaged, try noengage this time (rotation)
+      if (lastWasEngaged) {
+        console.log(`[TemplateRotation] Lead ${lead?.id}: Last was engaged, rotating to noengage`);
+        return {
+          name: 'bcon_proxe_followup_noengage',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          ],
+        };
+      }
       return {
         name: 'bcon_proxe_followup_engaged',
         params: [
@@ -3126,14 +3464,26 @@ function getTemplatePreview(task, lead) {
           { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
         ],
       };
+    } else {
+      // If last was noengage, try engaged this time (rotation)
+      if (lastWasNoEngage) {
+        console.log(`[TemplateRotation] Lead ${lead?.id}: Last was noengage, rotating to engaged`);
+        return {
+          name: 'bcon_proxe_followup_engaged',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          ],
+        };
+      }
+      return {
+        name: 'bcon_proxe_followup_noengage',
+        params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+        ],
+      };
     }
-    return {
-      name: 'bcon_proxe_followup_noengage',
-      params: [
-        { label: 'Name', parameter_name: 'customer_name', value: leadName },
-        { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
-      ],
-    };
   } else {
     return { name: 'bcon_proxe_rnr', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   }
@@ -3274,6 +3624,13 @@ async function executeSendMessage(task, waPhone, fallbackMessage) {
 
     // Track channel performance
     updateChannelPerformance(task.lead_id, 'whatsapp', 'sent', null).catch(() => {});
+    
+    // Track follow-up sent (for deduplication)
+    if (templateUsed && templateUsed.includes('followup')) {
+      await markFollowUpSent(task.lead_id, templateUsed).catch(err => {
+        console.error(`[FollowUpTracking] Failed to mark for lead ${task.lead_id}:`, err.message);
+      });
+    }
   }
 
   return null;
@@ -3344,12 +3701,12 @@ async function sendWhatsAppTemplate(phone, task) {
   let lead = null;
   if (task.lead_id) {
     const { data } = await supabase.from('all_leads')
-      .select('id, response_count, unified_context')
+      .select('id, response_count, unified_context, last_follow_up_template')
       .eq('id', task.lead_id).maybeSingle();
     lead = data;
   }
 
-  const tplInfo = getTemplatePreview(task, lead);
+  const tplInfo = await getTemplatePreview(task, lead);
   const templateName = tplInfo.name;
 
   // Enforce expected parameter count - truncate to what Meta template expects

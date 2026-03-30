@@ -209,7 +209,22 @@ export async function POST(request: NextRequest) {
       supabase,
     );
 
-    // 5. Fire-and-forget: trigger AI scoring
+    // 5. Pause follow-ups: Set 48h cooldown when user replies
+    try {
+      await supabase
+        .from('all_leads')
+        .update({
+          follow_up_cooldown_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+          follow_up_count: 0,
+          last_interaction_at: new Date().toISOString(),
+        })
+        .eq('id', leadId);
+      console.log(`[agent/whatsapp/webhook] Set 48h follow-up cooldown for lead ${leadId} (user replied)`);
+    } catch (cooldownErr) {
+      console.error('[agent/whatsapp/webhook] Failed to set cooldown:', cooldownErr);
+    }
+
+    // 6. Fire-and-forget: trigger AI scoring
     if (messageResult) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       fetch(`${appUrl}/api/webhooks/message-created`, {

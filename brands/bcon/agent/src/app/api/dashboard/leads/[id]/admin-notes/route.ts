@@ -5,7 +5,7 @@ import { sendWhatsAppText } from '@/lib/services/whatsappSender'
 export const dynamic = 'force-dynamic'
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a sales admin assistant. Given an admin note about a lead, extract:
-1) category (one of: POST_CALL, BOOKING_MADE, NOT_POTENTIAL, HOT_LEAD, WARM_LATER, RNR, NOT_INTERESTED, CONVERTED, MEETING_REQUEST, SEND_MESSAGE, NAME_UPDATE, INFO_ONLY)
+1) category (one of: POST_CALL, BOOKING_MADE, NOT_POTENTIAL, HOT_LEAD, WARM_LATER, RNR, NOT_INTERESTED, CONVERTED, DEMO_TAKEN, PROPOSAL_SENT, MEETING_REQUEST, SEND_MESSAGE, NAME_UPDATE, INFO_ONLY)
 2) any booking details if mentioned (date, time)
 3) any name if mentioned
 4) if a direct message should be sent (note starts with "send:", "message:", "tell them")
@@ -21,6 +21,8 @@ Category guide:
 - RNR: "no show", "didn't show", "no answer", "didn't pick up", "rnr", "rang no response", "not responding", "not replying", "no response" — couldn't reach them
 - NOT_INTERESTED: "not interested", "dead lead" — explicit disinterest
 - CONVERTED: "converted", "signed", "closed won", "deal done" — deal closed
+- DEMO_TAKEN: "demo done", "demo taken", "showed the demo", "demo complete", "they saw the demo" — a demo was given
+- PROPOSAL_SENT: "proposal sent", "sent proposal", "shared proposal", "sent the deck", "sent pricing" — proposal or pricing was sent
 - MEETING_REQUEST: "asked for a meet", "wants a call", "send them time", "schedule a call", "asked for google meet" — they want to meet
 - SEND_MESSAGE: note starts with "send:", "message:", "tell them" — direct message to send (extract the message text after the prefix into send_message)
 - NAME_UPDATE: "it's [name]", "name is [name]", "his/her name is [name]" — name correction
@@ -28,7 +30,7 @@ Category guide:
 
 For booking_date: use relative terms as-is ("tomorrow", "next Monday", "March 28"). For booking_time: extract the time ("4 pm", "10:30 am"). If not mentioned, use null.
 For name: extract the actual name mentioned, or null if none.
-For send_message: extract the exact message text to send (everything after "send:"/"message:"/"tell them"), or null.
+For send_message: extract the exact message text to send (everything after "send:" /"message:" /"tell them"), or null.
 
 Example: note "spoke to him have a demo booked for tomorrow 4 pm" → {"category": "BOOKING_MADE", "booking_date": "tomorrow", "booking_time": "4 pm", "name": null, "send_message": null, "summary": "Demo booked for tomorrow 4pm after call"}
 Example: note "send: Hey, just checking in!" → {"category": "SEND_MESSAGE", "booking_date": null, "booking_time": null, "name": null, "send_message": "Hey, just checking in!", "summary": "Direct message to send to lead"}`
@@ -605,6 +607,114 @@ export async function POST(
       console.log(`[AdminNote] Step 3a: Stage → Converted`)
     }
 
+    if (classification.category === 'DEMO_TAKEN') {
+      console.log(`[AdminNote] Step 3: DEMO_TAKEN — creating post-demo sequence`)
+      // Cancel all pending follow-up tasks
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: demo taken via admin note` })
+        .eq('lead_id', leadId)
+        .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'nudge_waiting', 'push_to_book', 'follow_up_24h'])
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const cancelCount = cancelledTasks?.length || 0
+      if (cancelCount > 0) {
+        actions.push(`cancelled_${cancelCount}_followup_tasks`)
+        actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`)
+        console.log(`[AdminNote] Step 3a: Cancelled ${cancelCount} tasks`)
+      }
+
+      // Update stage and score
+      newStage = 'Demo Taken'
+      newScore = 72
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
+        .eq('id', leadId)
+      actions.push('stage_updated:Demo Taken,score_72')
+      actionsTaken.push(`Stage changed to Demo Taken`)
+      actionsTaken.push(`Score updated to 72`)
+      console.log(`[AdminNote] Step 3b: Stage → Demo Taken, Score → 72`)
+
+      // Insert aggressive post-demo sequence
+      const demoSequence = [
+        { type: 'follow_up_day1',  offsetMs: 1 * 24 * 60 * 60 * 1000,            step: 1 },
+        { type: 'try_voice_call',  offsetMs: 2 * 24 * 60 * 60 * 1000,            step: 2 },
+        { type: 'follow_up_day3',  offsetMs: 3 * 24 * 60 * 60 * 1000,            step: 3 },
+        { type: 'follow_up_day5',  offsetMs: 5 * 24 * 60 * 60 * 1000,            step: 4 },
+      ]
+      for (const s of demoSequence) {
+        await supabase.from('agent_tasks').insert({
+          task_type: s.type,
+          task_description: `Post-demo step ${s.step}/4: ${s.type} for ${leadName}`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
+          metadata: { source: 'admin_note', sequence: 'post_demo', step: 0 },
+          created_at: now.toISOString(),
+        })
+      }
+      actions.push('sequence_created:post_demo:4_steps')
+      actionsTaken.push(`Created 4-step post-demo sequence (day 1, voice day 2, day 3, day 5)`)
+      console.log(`[AdminNote] Step 3c: Created post-demo sequence`)
+    }
+
+    if (classification.category === 'PROPOSAL_SENT') {
+      console.log(`[AdminNote] Step 3: PROPOSAL_SENT — creating post-proposal sequence`)
+      // Cancel all pending follow-up tasks
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: proposal sent via admin note` })
+        .eq('lead_id', leadId)
+        .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'nudge_waiting', 'push_to_book', 'follow_up_24h'])
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const cancelCount = cancelledTasks?.length || 0
+      if (cancelCount > 0) {
+        actions.push(`cancelled_${cancelCount}_followup_tasks`)
+        actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`)
+        console.log(`[AdminNote] Step 3a: Cancelled ${cancelCount} tasks`)
+      }
+
+      // Update stage and score
+      newStage = 'Proposal Sent'
+      newScore = 80
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
+        .eq('id', leadId)
+      actions.push('stage_updated:Proposal Sent,score_80')
+      actionsTaken.push(`Stage changed to Proposal Sent`)
+      actionsTaken.push(`Score updated to 80`)
+      console.log(`[AdminNote] Step 3b: Stage → Proposal Sent, Score → 80`)
+
+      // Insert post-proposal sequence
+      const proposalSequence = [
+        { type: 'follow_up_day1', offsetMs: 1 * 24 * 60 * 60 * 1000,                      step: 1 },
+        { type: 'try_voice_call', offsetMs: 1 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000, step: 2 },
+        { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000,                      step: 3 },
+        { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000,                      step: 4 },
+      ]
+      for (const s of proposalSequence) {
+        await supabase.from('agent_tasks').insert({
+          task_type: s.type,
+          task_description: `Post-proposal step ${s.step}/4: ${s.type} for ${leadName}`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
+          metadata: { source: 'admin_note', sequence: 'post_proposal', step: 0 },
+          created_at: now.toISOString(),
+        })
+      }
+      actions.push('sequence_created:post_proposal:4_steps')
+      actionsTaken.push(`Created 4-step post-proposal sequence (day 1, voice day 1+4h, day 3, day 5)`)
+      console.log(`[AdminNote] Step 3c: Created post-proposal sequence`)
+    }
+
     if (classification.category === 'MEETING_REQUEST') {
       console.log(`[AdminNote] Step 3: MEETING_REQUEST — sending WhatsApp + nudge`)
       if (leadPhone) {
@@ -691,7 +801,7 @@ export async function POST(
 
     // 6. Log action summary to activity feed
     if (actionsTaken.length > 0 && classification.category !== 'INFO_ONLY') {
-      const actionSummary = `PROXe: Note detected '${trimmedNote.substring(0, 40)}${trimmedNote.length > 40 ? '...' : ''}' → ${actionsTaken.join(', ')}`
+      const actionSummary = `PROXe: Note detected '${trimmedNote.substring(0, 40)}${trimmedNote.length > 40 ? '...' : ''}' (${classification.category}) → ${actionsTaken.join(', ')}`
       await supabase.from('activities').insert({
         lead_id: leadId,
         activity_type: 'automation',
