@@ -77,11 +77,10 @@ export async function PATCH(
     const oldSubStage = currentLead.sub_stage
     const wasOverridden = currentLead.stage_override
 
-    // Update lead stage (set both override columns for compatibility)
+    // Update lead stage and mark as manually overridden
     const updateData: any = {
       lead_stage: stage,
-      stage_override: true, // Mark as manually overridden
-      is_manual_override: true, // Also set this for compatibility
+      stage_override: true, // Mark as manually overridden - AI will not change this
       updated_at: new Date().toISOString()
     }
 
@@ -203,12 +202,11 @@ export async function DELETE(
 
     const leadId = params.id
 
-    // Remove override flag (clear both columns for compatibility)
+    // Remove override flag - return to AI-controlled scoring
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({
         stage_override: false,
-        is_manual_override: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', leadId)

@@ -45,7 +45,7 @@ export function useRealtimeLeads() {
         
         const { data: allLeadsData, error: allLeadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, status, brand, metadata')
+          .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, brand, metadata')
           .order('last_interaction_at', { ascending: false })
           .limit(1000)
 
@@ -144,7 +144,7 @@ export function useRealtimeLeads() {
             
             const { data: allLeadsData, error: allLeadsError } = await supabase
               .from('all_leads')
-              .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, status, brand, metadata')
+              .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, brand, metadata')
               .order('last_interaction_at', { ascending: false })
               .limit(1000)
 

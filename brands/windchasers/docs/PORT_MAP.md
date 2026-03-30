@@ -29,7 +29,7 @@
   - `.env.production.example` line 35: `PORT=3001`
   - Deployment workflow: `PORT=3001 pm2 start npm --name windchasers-web-agent -- start`
 - **PM2 Process**: `windchasers-web-agent`
-- **URL**: `http://localhost:3001` (proxied via nginx to `pilot.windchasers.in/widget`)
+- **URL**: `http://localhost:3001` (proxied via nginx to `proxe.windchasers.in/widget`)
 
 #### Next.js Default Behavior
 - **Default Port**: `3000` (if PORT not set)
@@ -55,7 +55,7 @@
   - `ecosystem.config.js` line 24: `PORT: 3003`
   - Deployment workflow: `PORT=3003 pm2 start npm --name windchasers-dashboard -- start`
 - **PM2 Process**: `windchasers-dashboard`
-- **URL**: `http://localhost:3003` (proxied via nginx to `pilot.windchasers.in`)
+- **URL**: `http://localhost:3003` (proxied via nginx to `proxe.windchasers.in`)
 
 #### Next.js Default Behavior
 - **Default Port**: `3000` (if PORT not set)
@@ -99,7 +99,7 @@
 ```bash
 PORT=3001                    # Explicit port for Next.js start
 NODE_ENV=production
-NEXT_PUBLIC_WEB_AGENT_URL=https://pilot.windchasers.in
+NEXT_PUBLIC_WEB_AGENT_URL=https://proxe.windchasers.in
 ```
 
 ### Dashboard Production `.env.local`
@@ -135,8 +135,8 @@ Both apps use PM2 ecosystem files that set `PORT` in the `env` section:
 - Widget Page: `http://localhost:4003/widget`
 
 ### Production URLs (via Nginx)
-- Web-Agent Widget: `https://pilot.windchasers.in/widget`
-- Dashboard: `https://pilot.windchasers.in`
+- Web-Agent Widget: `https://proxe.windchasers.in/widget`
+- Dashboard: `https://proxe.windchasers.in`
 - Internal (VPS only):
   - Web-Agent: `http://localhost:3001`
   - Dashboard: `http://localhost:3003`

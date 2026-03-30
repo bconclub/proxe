@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || 'bcon-proxe-verify';
+  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || 'windchasers-proxe-verify';
 
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('[meta/webhook] Verification successful');
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contacts = value.contacts || [];
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+    const brand = process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
     // Process each message (usually just one)
     for (const msg of messages) {

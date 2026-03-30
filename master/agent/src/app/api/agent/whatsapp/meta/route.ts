@@ -94,7 +94,7 @@ async function markAsRead(messageId: string): Promise<void> {
 
 // ─── Status Update Handler ────────────────────────────────────────────────────
 
-const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 99 };
+const STATUS_RANK: Record<string, number> = { pending: 0, sent: 1, delivered: 2, read: 3, failed: 99 };
 
 /** Process Meta status webhooks: update delivery_status on matching conversation rows */
 async function handleStatusUpdates(statuses: any[]): Promise<void> {
@@ -111,43 +111,103 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
 
     try {
       // Find the conversation row matching this wamid
-      // Messages are stored with wamid under either whatsapp_message_id or wa_message_id in metadata
-      const { data: rows } = await supabase
+      // Messages are stored with wamid under whatsapp_message_id in metadata
+      const { data: rows, error: queryError } = await supabase
         .from('conversations')
-        .select('id, delivery_status, metadata')
+        .select('id, delivery_status, status_updated_at, lead_id, metadata')
         .or(`metadata->>whatsapp_message_id.eq.${wamid},metadata->>wa_message_id.eq.${wamid}`)
         .limit(1);
 
-      if (!rows || rows.length === 0) continue;
+      if (queryError) {
+        console.error(`[meta/webhook] Query error for wamid ${wamid}:`, queryError);
+        continue;
+      }
+
+      // Handle race condition: webhook arrived before DB write
+      if (!rows || rows.length === 0) {
+        console.warn(`[meta/webhook] No conversation found for wamid ${wamid}. Queuing for retry.`);
+        // Log for sync cron to catch later
+        await supabase
+          .from('status_sync_queue')
+          .upsert({
+            whatsapp_message_id: wamid,
+            status: statusValue,
+            timestamp: timestamp ? new Date(parseInt(timestamp) * 1000).toISOString() : new Date().toISOString(),
+            retry_count: 0,
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'whatsapp_message_id' })
+          .catch((err) => {
+            // Queue table might not exist yet, just log
+            console.log(`[meta/webhook] Could not queue for retry: ${err.message}`);
+          });
+        continue;
+      }
 
       const row = rows[0];
 
       // Only update if new status is higher rank (or failed always overwrites)
       const currentRank = STATUS_RANK[row.delivery_status] || 0;
       const newRank = STATUS_RANK[statusValue] || 0;
-      if (newRank <= currentRank && statusValue !== 'failed') continue;
+      if (newRank <= currentRank && statusValue !== 'failed') {
+        console.log(`[meta/webhook] Skipping ${statusValue} for wamid ${wamid} (current: ${row.delivery_status})`);
+        continue;
+      }
+
+      const statusTime = timestamp
+        ? new Date(parseInt(timestamp) * 1000).toISOString()
+        : new Date().toISOString();
 
       const updateData: Record<string, any> = {
         delivery_status: statusValue,
-        status_updated_at: timestamp
-          ? new Date(parseInt(timestamp) * 1000).toISOString()
-          : new Date().toISOString(),
+        status_updated_at: statusTime,
       };
 
-      // For failed status, save error details into metadata
+      // For failed status, save error details
       if (statusValue === 'failed' && errors) {
+        const errorMsg = errors[0]?.message || errors[0]?.title || JSON.stringify(errors);
+        updateData.status_error = errorMsg;
         updateData.metadata = {
           ...row.metadata,
-          delivery_error: errors,
+          delivery_status: 'failed',
+          delivery_error: errorMsg,
+          failed_at: statusTime,
+        };
+
+        // Trigger lead cooldown for failed messages
+        if (row.lead_id) {
+          const cooldownUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+          await supabase
+            .from('all_leads')
+            .update({
+              follow_up_cooldown_until: cooldownUntil,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', row.lead_id)
+            .catch((err) => {
+              console.error(`[meta/webhook] Failed to set cooldown for lead ${row.lead_id}:`, err);
+            });
+          console.log(`[meta/webhook] Set 24h cooldown for lead ${row.lead_id} due to failed message`);
+        }
+      } else {
+        // Sync metadata with status for consistency
+        updateData.metadata = {
+          ...row.metadata,
+          delivery_status: statusValue,
+          [`${statusValue}_at`]: statusTime,
         };
       }
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('conversations')
         .update(updateData)
         .eq('id', row.id);
 
-      console.log(`[meta/webhook] Status ${statusValue} for wamid ${wamid}`);
+      if (updateError) {
+        console.error(`[meta/webhook] Update error for wamid ${wamid}:`, updateError);
+        continue;
+      }
+
+      console.log(`[meta/webhook] Status ${statusValue} for wamid ${wamid} (conversation: ${row.id})`);
     } catch (err) {
       console.error(`[meta/webhook] Status update failed for wamid ${wamid}:`, err);
     }
@@ -357,6 +417,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 8. Log AI response (include wamid for delivery status tracking)
+    // Set initial status: 'sent' if we got wamid (Meta confirmed receipt), 'pending' if send failed
+    const initialStatus = replyWamid ? 'sent' : 'pending';
     await logMessage(
       leadId,
       'whatsapp',
@@ -371,6 +433,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         ...(replyWamid ? { whatsapp_message_id: replyWamid } : {}),
       },
       supabase,
+      initialStatus,
+      replyWamid ? null : 'Failed to get wamid from Meta API',
     );
 
     // 9. Update lead context

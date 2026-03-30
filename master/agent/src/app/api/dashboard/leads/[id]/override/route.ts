@@ -117,13 +117,12 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to create activity' }, { status: 500 })
     }
 
-    // Update lead stage and set manual override (both columns for compatibility)
+    // Update lead stage and set manual override
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({
         lead_stage: new_stage,
         stage_override: true,
-        is_manual_override: true,
       })
       .eq('id', leadId)
 

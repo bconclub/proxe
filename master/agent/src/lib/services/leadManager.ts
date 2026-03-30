@@ -371,3 +371,72 @@ export async function updateLeadProfile(
 
   return leadId;
 }
+
+/**
+ * Clear stage override for a lead, allowing AI to resume automatic stage calculation
+ * 
+ * @param leadId - The lead UUID
+ * @param supabase - Optional Supabase client
+ * @returns Result object with success status and new stage info
+ */
+export async function clearStageOverride(
+  leadId: string,
+  supabase?: SupabaseClient | null,
+): Promise<{ success: boolean; message: string; newStage?: string; newScore?: number; error?: string }> {
+  const client = supabase || getServiceClient() || getClient();
+  if (!client) {
+    return { success: false, message: 'No database connection', error: 'No Supabase client' };
+  }
+
+  try {
+    // Clear override flag
+    const { error: updateError } = await client
+      .from('all_leads')
+      .update({
+        stage_override: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leadId);
+
+    if (updateError) {
+      console.error('[leadManager] Failed to clear stage override:', updateError);
+      return { success: false, message: 'Failed to clear override', error: updateError.message };
+    }
+
+    // Trigger recalculation using RPC
+    const { data: recalcResult, error: recalcError } = await client.rpc(
+      'update_lead_score_and_stage',
+      {
+        lead_uuid: leadId,
+        user_uuid: null,
+      }
+    );
+
+    if (recalcError) {
+      console.error('[leadManager] Failed to recalculate after clearing override:', recalcError);
+      return { 
+        success: true, 
+        message: 'Override cleared but recalculation failed',
+        error: recalcError.message 
+      };
+    }
+
+    // Parse result
+    const result = recalcResult as any;
+    console.log('[leadManager] Stage override cleared, new stage:', result?.new_stage);
+
+    return {
+      success: true,
+      message: 'Stage override cleared, AI control resumed',
+      newStage: result?.new_stage,
+      newScore: result?.new_score,
+    };
+  } catch (error) {
+    console.error('[leadManager] Error clearing stage override:', error);
+    return { 
+      success: false, 
+      message: 'Exception while clearing override',
+      error: (error as Error).message 
+    };
+  }
+}

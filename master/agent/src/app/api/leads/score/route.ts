@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     // Fetch lead data
     const { data: lead, error: leadError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, booking_date, booking_time, is_manual_override')
+      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, booking_date, booking_time, stage_override')
       .eq('id', lead_id)
       .single()
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if manual override is active - if so, skip scoring
-    if (lead.is_manual_override) {
+    if (lead.stage_override) {
       console.log('Lead has manual override, skipping scoring')
       return NextResponse.json({ 
         success: true, 

@@ -105,7 +105,73 @@ interface Message {
   message_type: string
   metadata: any
   created_at: string
+  delivery_status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null
+  status_updated_at?: string | null
+  status_error?: string | null
 }
+
+// Delivery status badge component
+const DeliveryStatusIcon = ({ status, error }: { status?: string | null; error?: string | null }) => {
+  if (!status) return null;
+  
+  const icons = {
+    pending: (
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <circle cx="6" cy="6" r="5" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="2 2" />
+      </svg>
+    ),
+    sent: (
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 6L5 9L10 3" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    delivered: (
+      <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+        <path d="M2 6L5 9L10 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 9L8 11L12 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    read: (
+      <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+        <path d="M2 6L5 9L10 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 9L8 11L12 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 9L10 11L14 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+      </svg>
+    ),
+    failed: (
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <circle cx="6" cy="6" r="5" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M4 4L8 8M8 4L4 8" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  };
+  
+  const tooltips: Record<string, string> = {
+    pending: 'Pending: Message queued for sending',
+    sent: 'Sent: Message accepted by Meta',
+    delivered: 'Delivered: Message reached device',
+    read: 'Read: Message opened by recipient',
+    failed: `Failed: ${error || 'Delivery failed'}`,
+  };
+  
+  return (
+    <span title={tooltips[status] || status} style={{ display: 'inline-flex', alignItems: 'center' }}>
+      {icons[status as keyof typeof icons] || null}
+    </span>
+  );
+};
+
+// Get delivery status style for message bubble
+const getDeliveryStatusStyle = (status?: string | null) => {
+  const styles: Record<string, { color: string; bg: string }> = {
+    pending: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    sent: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    delivered: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
+    read: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
+    failed: { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+  };
+  return styles[status || ''] || { color: 'var(--text-muted)', bg: 'transparent' };
+};
 
 
 function cleanMessageContent(text: string): string {
@@ -408,6 +474,21 @@ export default function InboxPage() {
           }
         }
       )
+      // Also listen for delivery status updates (UPDATE events)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'conversations' },
+        (payload) => {
+          // If viewing this conversation and it's a delivery status update
+          if (payload.new.lead_id === selectedLeadId) {
+            setMessages(prev => prev.map(msg => 
+              msg.id === payload.new.id 
+                ? { ...msg, delivery_status: payload.new.delivery_status, status_updated_at: payload.new.status_updated_at }
+                : msg
+            ))
+          }
+        }
+      )
       .subscribe()
 
     return () => {
@@ -415,6 +496,29 @@ export default function InboxPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
+
+  // Polling for delivery status updates (every 30 seconds for sent/pending messages)
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    
+    // Poll every 30 seconds to catch webhook updates
+    const pollInterval = setInterval(() => {
+      const hasPendingMessages = messages.some(
+        m => m.channel === 'whatsapp' 
+          && m.sender === 'agent' 
+          && (m.delivery_status === 'sent' || m.delivery_status === 'pending')
+          && new Date(m.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Only last 7 days
+      );
+      
+      if (hasPendingMessages) {
+        console.log('[inbox] Polling for delivery status updates...');
+        fetchMessages(selectedLeadId);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(pollInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLeadId, messages])
 
   async function fetchConversations() {
     setLoading(true)
@@ -794,6 +898,9 @@ export default function InboxPage() {
         message_type: String(msg?.message_type ?? ''),
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
+        delivery_status: msg?.delivery_status,
+        status_updated_at: msg?.status_updated_at,
+        status_error: msg?.status_error,
       }))
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {
@@ -888,7 +995,7 @@ export default function InboxPage() {
         first_touchpoint: typedLead.first_touchpoint || null,
         last_touchpoint: typedLead.last_touchpoint || null,
         timestamp: typedLead.created_at || typedLead.timestamp,
-        status: typedLead.status || typedWebSession.booking_status || 'New Lead',
+        status: typedLead.lead_stage || typedWebSession.booking_status || 'New Lead',
         booking_date: typedWebSession.booking_date || bookingFromContext || null,
         booking_time: bookingTime,
         unified_context: typedLead.unified_context || null,
@@ -1510,6 +1617,41 @@ export default function InboxPage() {
                                 ))}
                               </div>
                             )}
+                          </div>
+                        )}
+                        {/* WhatsApp Delivery Status Badge - only for agent messages in last 7 days */}
+                        {!isCustomer && msg.channel === 'whatsapp' && msg.delivery_status && (
+                          new Date(msg.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                        ) && (
+                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
+                            {msg.delivery_status === 'failed' && msg.status_error && (
+                              <div className="relative group flex items-center">
+                                <span
+                                  className="text-[8px] font-mono px-1 py-0.5 rounded cursor-default truncate max-w-[120px]"
+                                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
+                                >
+                                  {msg.status_error}
+                                </span>
+                                <div
+                                  className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block z-50 pointer-events-none"
+                                  style={{ minWidth: '200px', maxWidth: '280px' }}
+                                >
+                                  <div
+                                    className="text-[10px] leading-relaxed px-2.5 py-2 rounded-lg shadow-lg"
+                                    style={{ background: '#1a1a2e', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
+                                  >
+                                    <div className="font-semibold mb-0.5" style={{ color: '#EF4444' }}>Delivery Failed</div>
+                                    {msg.status_error}
+                                  </div>
+                                  <div className="flex justify-end pr-2">
+                                    <div className="w-2 h-2 rotate-45 -mt-1" style={{ background: '#1a1a2e', borderRight: '1px solid rgba(239,68,68,0.4)', borderBottom: '1px solid rgba(239,68,68,0.4)' }} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <span title={`${msg.delivery_status}${msg.status_updated_at ? ` at ${new Date(msg.status_updated_at).toLocaleTimeString()}` : ''}`}>
+                              <DeliveryStatusIcon status={msg.delivery_status} error={msg.status_error} />
+                            </span>
                           </div>
                         )}
                       </div>

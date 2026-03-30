@@ -3,7 +3,6 @@ name: Deploy Windchasers Agent
 on:
   push:
     branches:
-      - production
       - main
     paths:
       - 'brands/windchasers/agent/**'
@@ -13,27 +12,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # LTS - faster and more stable
+          node-version: '18'
           cache: 'npm'
           cache-dependency-path: brands/windchasers/agent/package-lock.json
-          cache: 'npm'
-          cache-dependency-path: brands/windchasers/agent/package-lock.json
-      
+
       - name: Increment build version
         working-directory: brands/windchasers/agent
         run: |
           node scripts/increment-build.js
-      
+
       - name: Commit version bump
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -41,17 +38,17 @@ jobs:
           git add brands/windchasers/agent/package.json brands/windchasers/agent/.build-info
           git commit -m "chore: auto-increment build version [skip ci]" || echo "No changes to commit"
           git push || echo "Nothing to push"
-      
+
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
-      
+
       - name: Add VPS to known hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.WINDCHASERS_VPS_HOST }} >> ~/.ssh/known_hosts
-      
+
       - name: Deploy to VPS via Rsync
         run: |
           rsync -avz --delete \
@@ -64,14 +61,7 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             brands/windchasers/agent/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/
-      
-      - name: Deploy PM2 Ecosystem Config
-        run: |
-          rsync -avz \
-            -e "ssh -o StrictHostKeyChecking=no" \
-            brands/windchasers/agent/ecosystem.config.js \
-            ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/ecosystem.config.js
-      
+
       - name: Build and Restart on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -83,277 +73,77 @@ jobs:
           command_timeout: 20m
           script: |
             cd /var/www/windchasers-proxe
-            
-            # Verify .env.local exists and contains required Supabase variables
+
+            # Verify .env.local exists
             if [ ! -f .env.local ]; then
               echo "❌ ERROR: .env.local not found on VPS!"
-              echo "Please create .env.local with required Supabase credentials:"
-              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
-              echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
-              echo "  - SUPABASE_SERVICE_ROLE_KEY"
-              echo "  - CLAUDE_API_KEY"
+              echo "Run the VPS setup script first: brands/windchasers/scripts/setup-vps.sh"
               exit 1
             fi
-            
-            # Check for required Supabase environment variables
-            echo "🔍 Verifying Supabase environment variables..."
-            if ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || ! grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local; then
-              echo "❌ ERROR: Required Supabase environment variables not found in .env.local"
-              echo "Missing variables:"
-              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
-              grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local || echo "  - NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+
+            # Check required env vars
+            echo "🔍 Verifying environment variables..."
+            MISSING=""
+            grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"    .env.local || MISSING="$MISSING NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL"
+            grep -q "NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY" .env.local || MISSING="$MISSING NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY"
+            grep -q "SUPABASE_SERVICE_ROLE_KEY"               .env.local || MISSING="$MISSING SUPABASE_SERVICE_ROLE_KEY"
+            grep -q "CLAUDE_API_KEY"                          .env.local || MISSING="$MISSING CLAUDE_API_KEY"
+            grep -q "META_WHATSAPP_ACCESS_TOKEN"              .env.local || MISSING="$MISSING META_WHATSAPP_ACCESS_TOKEN"
+
+            if [ -n "$MISSING" ]; then
+              echo "❌ ERROR: Missing env vars:$MISSING"
               exit 1
             fi
-            echo "✅ Supabase environment variables found in .env.local"
-            
-            # Clean install - remove old build artifacts
+            echo "✅ Environment variables OK"
+
+            # Clean build
             echo "🧹 Cleaning previous build..."
             rm -rf node_modules .next
-            
-            # Install dependencies
+
+            # Install
             echo "📦 Installing dependencies..."
-            echo "⏱️  Start time: $(date +%H:%M:%S)"
-            INSTALL_START=$(date +%s)
-            
             npm ci --prefer-offline --no-audit --no-fund --loglevel=warn
-            
-            INSTALL_DURATION=$(($(date +%s) - INSTALL_START))
-            echo "✅ Dependencies installed in ${INSTALL_DURATION}s"
-            
-            # Build the application
-            echo "🏗️  Building Next.js application..."
-            echo "⏱️  Build start time: $(date +%H:%M:%S)"
-            BUILD_START=$(date +%s)
-            
-            # Set environment variables for optimal builds
+
+            # Build
+            echo "🏗️  Building..."
             export NODE_OPTIONS="--max-old-space-size=4096"
             export NODE_ENV=production
             export NEXT_TELEMETRY_DISABLED=1
-            
             npm run build 2>&1 | tee build.log || {
-              echo "❌ Build command failed!"
-              echo "Last 50 lines of build output:"
-              tail -50 build.log || true
+              echo "❌ Build failed! Last 50 lines:"
+              tail -50 build.log
               exit 1
             }
-            
-            # Check build exit code
-            BUILD_EXIT_CODE=$?
-            if [ $BUILD_EXIT_CODE -ne 0 ]; then
-              echo "❌ ERROR: Build failed with exit code: $BUILD_EXIT_CODE"
-              echo "Checking for build errors..."
-              exit 1
-            fi
-            
-            # Verify build succeeded
-            if [ ! -d ".next" ]; then
-              echo "❌ ERROR: Build failed - .next directory not found!"
-              echo "Current directory contents:"
-              ls -la
-              exit 1
-            fi
-            
-            # Verify critical build files exist
-            if [ -f ".next/BUILD_ID" ]; then
-              echo "✅ BUILD_ID found: $(cat .next/BUILD_ID)"
-            else
-              echo "⚠️  WARNING: BUILD_ID not found, but build may still be successful"
-            fi
-            
-            # Check for static chunks directory
-            if [ -d ".next/static/chunks" ]; then
-              CHUNK_COUNT=$(find .next/static/chunks -name "*.js" | wc -l)
-              echo "✅ Found $CHUNK_COUNT chunk files"
-              # Lower threshold - 30+ chunks is reasonable for a Next.js app
-              # Also check if build manifest exists as secondary indicator
-              if [ "$CHUNK_COUNT" -lt 30 ]; then
-                echo "⚠️  WARNING: Only $CHUNK_COUNT chunks found (expected 30+)"
-                # Don't fail if BUILD_ID exists and manifest exists - might be a valid build
-                if [ -f ".next/BUILD_ID" ] && ([ -f ".next/BUILD_MANIFEST" ] || [ -f ".next/build-manifest.json" ]); then
-                  echo "✅ BUILD_ID and manifest exist - build may be valid despite low chunk count"
-                else
-                  echo "❌ ERROR: Build appears incomplete - missing BUILD_ID or manifest"
-                  exit 1
-                fi
-              fi
-            else
-              echo "❌ ERROR: .next/static/chunks directory not found!"
-              exit 1
-            fi
-            
-            # Verify BUILD_ID exists (critical for Next.js)
-            if [ ! -f ".next/BUILD_ID" ]; then
-              echo "❌ ERROR: BUILD_ID file not found - build is incomplete!"
-              echo "Next.js requires BUILD_ID for proper static file serving."
-              exit 1
-            fi
-            
-            # Check for CSS files
-            if [ -d ".next/static/css" ]; then
-              CSS_COUNT=$(find .next/static/css -name "*.css" | wc -l)
-              echo "✅ Found $CSS_COUNT CSS files"
-              if [ "$CSS_COUNT" -eq 0 ]; then
-                echo "⚠️  WARNING: No CSS files found - styling may be broken"
-              fi
-            else
-              echo "⚠️  WARNING: .next/static/css directory not found - CSS may not be generated"
-            fi
-            
-            # Verify build manifest exists
-            if [ -f ".next/BUILD_MANIFEST" ] || [ -f ".next/build-manifest.json" ]; then
-              echo "✅ Build manifest found"
-            else
-              echo "⚠️  WARNING: Build manifest not found"
-            fi
-            
-            echo "✅ Build verification complete"
-            
-            # Verify chunks were generated
-            if [ -d ".next/static/chunks" ]; then
-              CHUNK_COUNT=$(find .next/static/chunks -name "*.js" 2>/dev/null | wc -l)
-              echo "📦 Found $CHUNK_COUNT JavaScript chunks"
-              if [ "$CHUNK_COUNT" -lt 10 ]; then
-                echo "⚠️  WARNING: Very few chunks found ($CHUNK_COUNT) - build may be incomplete"
-              fi
-            else
-              echo "⚠️  WARNING: .next/static/chunks directory not found"
-            fi
-            
-            BUILD_DURATION=$(($(date +%s) - BUILD_START))
-            echo "✅ Build completed in ${BUILD_DURATION}s"
-            
-            # Create logs directory if it doesn't exist
+
+            # Sanity check
+            [ -f ".next/BUILD_ID" ] || { echo "❌ BUILD_ID missing"; exit 1; }
+            echo "✅ Build ID: $(cat .next/BUILD_ID)"
+
+            # Create logs dir
             mkdir -p logs
-            
-            # Force stop and delete old process to ensure clean restart
-            echo "🔄 Stopping old process..."
+
+            # Restart PM2
+            echo "🔄 Restarting PM2..."
             pm2 stop windchasers-dashboard 2>/dev/null || true
             pm2 delete windchasers-dashboard 2>/dev/null || true
-            pm2 stop ecosystem.config.js --only windchasers-dashboard 2>/dev/null || true
             sleep 2
-            
-            # Restart or start with PM2 ecosystem file
-            echo "🔄 Starting application with PM2 ecosystem..."
-            if [ -f ecosystem.config.js ]; then
-              # Use ecosystem file if it exists
-              pm2 start ecosystem.config.js --only windchasers-dashboard || {
-                echo "❌ Failed to start with ecosystem, trying fallback..."
-                PORT=3003 pm2 start npm --name windchasers-dashboard -- start
-              }
-            else
-              # Fallback to individual process
+            pm2 start ecosystem.config.js --only windchasers-dashboard || \
               PORT=3003 pm2 start npm --name windchasers-dashboard -- start
-            fi
-            
-            # Save PM2 configuration
             pm2 save
-            
-            # Verify process is running
-            echo "📊 Verifying PM2 process..."
-            pm2 list | grep windchasers || echo "⚠️  Process not found in PM2 list"
-            pm2 describe windchasers-dashboard | head -20 || true
-            
-            # Wait for app to start
+
+            # Health check
             echo "⏳ Waiting for app to start..."
             sleep 10
-            
-            # Health check with retries (check both /health and /api/health)
-            MAX_RETRIES=5
-            RETRY_COUNT=0
-            HEALTH_CHECK_PASSED=false
-            
-            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-              # Try /api/health first (more detailed)
-              if curl -f http://localhost:3003/api/health > /dev/null 2>&1; then
-                echo "✅ Health check passed (/api/health)"
-                HEALTH_CHECK_PASSED=true
-                # Get detailed health info
-                curl -s http://localhost:3003/api/health | head -20
+            for i in 1 2 3 4 5; do
+              if curl -sf http://localhost:3003/api/health > /dev/null; then
+                echo "✅ Health check passed"
+                curl -s http://localhost:3003/api/health
                 break
-              # Fallback to /health
-              elif curl -f http://localhost:3003/health > /dev/null 2>&1; then
-                echo "✅ Health check passed (/health)"
-                HEALTH_CHECK_PASSED=true
-                break
-              else
-                RETRY_COUNT=$((RETRY_COUNT + 1))
-                echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
-                sleep 3
               fi
+              echo "⏳ Attempt $i/5..."
+              sleep 5
             done
-            
-            if [ "$HEALTH_CHECK_PASSED" = false ]; then
-              echo "⚠️  Health check failed after $MAX_RETRIES attempts"
-              echo "Checking PM2 logs..."
-              pm2 logs windchasers-dashboard --lines 20 --nostream || true
-              echo "⚠️  Deployment completed but health check failed - please verify manually"
-            fi
-            
-            # Verify Supabase connection via /api/status endpoint
+
             echo ""
-            echo "🔍 Verifying Supabase connection..."
-            MAX_SUPABASE_RETRIES=5
-            SUPABASE_RETRY_COUNT=0
-            SUPABASE_CONNECTED=false
-            
-            while [ $SUPABASE_RETRY_COUNT -lt $MAX_SUPABASE_RETRIES ]; do
-              STATUS_RESPONSE=$(curl -s http://localhost:3003/api/status 2>/dev/null || echo "")
-              
-              if [ -n "$STATUS_RESPONSE" ]; then
-                # Check if jq is available for JSON parsing
-                if command -v jq &> /dev/null; then
-                  CAN_REACH=$(echo "$STATUS_RESPONSE" | jq -r '.connectivity.canReachSupabase // false')
-                  DB_STATUS=$(echo "$STATUS_RESPONSE" | jq -r '.database.status // "unknown"')
-                  
-                  if [ "$CAN_REACH" = "true" ] && [ "$DB_STATUS" = "connected" ]; then
-                    echo "✅ Supabase connection verified!"
-                    echo "   - Can reach Supabase: $CAN_REACH"
-                    echo "   - Database status: $DB_STATUS"
-                    SUPABASE_CONNECTED=true
-                    break
-                  else
-                    echo "⚠️  Supabase connection check: canReachSupabase=$CAN_REACH, database=$DB_STATUS"
-                  fi
-                else
-                  # Fallback: check if response contains "canReachSupabase":true
-                  if echo "$STATUS_RESPONSE" | grep -q '"canReachSupabase":true'; then
-                    echo "✅ Supabase connection verified (canReachSupabase: true)"
-                    SUPABASE_CONNECTED=true
-                    break
-                  fi
-                fi
-              fi
-              
-              SUPABASE_RETRY_COUNT=$((SUPABASE_RETRY_COUNT + 1))
-              if [ $SUPABASE_RETRY_COUNT -lt $MAX_SUPABASE_RETRIES ]; then
-                echo "⏳ Supabase verification attempt $SUPABASE_RETRY_COUNT/$MAX_SUPABASE_RETRIES failed, retrying..."
-                sleep 3
-              fi
-            done
-            
-            if [ "$SUPABASE_CONNECTED" = false ]; then
-              echo "⚠️  WARNING: Supabase connection verification failed after $MAX_SUPABASE_RETRIES attempts"
-              echo "Checking status endpoint response:"
-              curl -s http://localhost:3003/api/status | head -50 || echo "Status endpoint not responding"
-              echo ""
-              echo "Please verify Supabase credentials in .env.local and check PM2 logs:"
-              echo "  pm2 logs windchasers-dashboard --lines 50"
-            fi
-            
-            # Show PM2 status
-            echo "✅ Deployment complete. PM2 status:"
-            pm2 list | grep windchasers || echo "⚠️  Process not found in PM2 list"
-            
-            # Verify what's actually running
-            echo ""
-            echo "🔍 Verification:"
-            echo "---------------"
-            echo "PM2 process details:"
-            pm2 describe windchasers-dashboard 2>/dev/null | head -30 || echo "Process not found"
-            echo ""
-            echo "Checking if app is responding:"
-            sleep 5
-            curl -s http://localhost:3003 | head -50 || echo "App not responding on port 3003"
-            echo ""
-            echo "Checking for static HTML files that might interfere:"
-            find /var/www/windchasers-proxe -name "*.html" -type f | head -10 || echo "No HTML files found"
+            echo "✅ Deployment complete — https://proxe.windchasers.in"
+            pm2 list | grep windchasers

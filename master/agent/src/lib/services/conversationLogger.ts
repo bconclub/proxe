@@ -274,6 +274,8 @@ export async function logMessage(
   messageType: string = 'text',
   metadata: any = {},
   supabase?: SupabaseClient | null,
+  deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null,
+  statusError?: string | null,
 ): Promise<any | null> {
   if (!leadId || !content) {
     console.log('[conversationLogger] Missing leadId or content, skipping');
@@ -287,8 +289,9 @@ export async function logMessage(
   }
 
   const cleanedContent = stripHTML(content);
+  const now = new Date().toISOString();
 
-  const insertData = {
+  const insertData: any = {
     lead_id: leadId,
     channel: channel,
     sender: sender,
@@ -296,11 +299,21 @@ export async function logMessage(
     message_type: messageType,
     metadata: {
       ...metadata,
-      logged_at: new Date().toISOString(),
+      logged_at: now,
       topic: 'chat',
       extension: channel,
+      ...(deliveryStatus ? { delivery_status: deliveryStatus } : {}),
     },
   };
+
+  // Add delivery status columns if provided (WhatsApp tracking)
+  if (deliveryStatus) {
+    insertData.delivery_status = deliveryStatus;
+    insertData.status_updated_at = now;
+  }
+  if (statusError) {
+    insertData.status_error = statusError;
+  }
 
   try {
     // Verify lead exists (foreign key constraint)

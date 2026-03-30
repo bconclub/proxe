@@ -1236,22 +1236,34 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   role="menu"
                   aria-label="Select lead stage"
                 >
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold', 'R&R'].map((stage) => (
-                    <li key={stage} role="none">
+                  {[
+                    { value: 'New', label: 'New', isAuto: false },
+                    { value: 'Engaged', label: 'Engaged', isAuto: false },
+                    { value: 'Qualified', label: 'Qualified', isAuto: false },
+                    { value: 'High Intent', label: 'High Intent', isAuto: false },
+                    { value: 'Booking Made', label: 'Booking Made', isAuto: false },
+                    { value: 'Converted', label: 'Converted', isAuto: false },
+                    { value: 'Closed Lost', label: 'Closed Lost', isAuto: false },
+                    { value: 'In Sequence', label: 'In Sequence', isAuto: true, description: 'Auto-assigned for score < 61' },
+                    { value: 'Cold', label: 'Cold', isAuto: true, description: 'Dormant lead' },
+                  ].map((stage) => (
+                    <li key={stage.value} role="none">
                       <button
-                        onClick={() => handleStageChange(stage as LeadStage)}
-                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentStage === stage
-                          ? getStageBadgeClass(stage) + ' font-semibold'
+                        onClick={() => handleStageChange(stage.value as LeadStage)}
+                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${currentStage === stage.value
+                          ? getStageBadgeClass(stage.value) + ' font-semibold'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
                           }`}
-                        style={currentStage === stage && stage === 'In Sequence' ? {
-                          backgroundColor: 'var(--accent-subtle)',
-                          color: 'var(--accent-primary)'
-                        } : undefined}
                         role="menuitem"
-                        aria-label={`Change stage to ${stage}`}
+                        aria-label={`Change stage to ${stage.label}${stage.isAuto ? ' (auto-assigned)' : ''}`}
+                        title={stage.description || stage.label}
                       >
-                        {stage}
+                        <span>{stage.label}</span>
+                        {stage.isAuto && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-normal">
+                            Auto
+                          </span>
+                        )}
                       </button>
                     </li>
                   ))}
