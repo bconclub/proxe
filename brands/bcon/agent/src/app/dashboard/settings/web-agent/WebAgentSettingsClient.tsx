@@ -175,19 +175,30 @@ export default function WebAgentSettingsClient() {
         position: 'relative',
         overflow: 'hidden',
       }}>
-        <iframe
-          ref={iframeRef}
-          src="/widget"
-          style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            background: 'transparent',
-          }}
-          title="Widget Preview"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-          allow="microphone; camera"
-        />
+        {/* Scaled widget container */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '200%',
+          height: '200%',
+          transform: 'scale(0.5)',
+          transformOrigin: 'top right',
+        }}>
+          <iframe
+            ref={iframeRef}
+            src="/widget"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: 'transparent',
+            }}
+            title="Widget Preview"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            allow="microphone; camera"
+          />
+        </div>
       </div>
     </div>
   )
