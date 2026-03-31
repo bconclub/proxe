@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import {
   MdCode,
   MdRefresh,
@@ -35,7 +34,6 @@ export default function WebAgentSettingsClient() {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
-      setWidgetOpen(false)
       if (iframeRef.current) {
         iframeRef.current.src = '/widget'
       }
@@ -56,152 +54,141 @@ export default function WebAgentSettingsClient() {
   const embedCode = `<script src="${appUrl}/api/widget/embed.js"></script>`
 
   return (
-    <DashboardLayout>
+    <div className="h-full flex" style={{ minHeight: 600 }}>
+      {/* LEFT - Configuration */}
       <div style={{
-        width: 'calc(100% + 64px)',
-        height: '100%',
-        margin: '0 -32px',
-        padding: 0,
+        flex: '0 0 40%',
+        maxWidth: '40%',
+        borderRight: '1px solid var(--border-primary)',
+        backgroundColor: 'var(--bg-primary)',
         display: 'flex',
-        overflow: 'hidden',
-        flex: 1,
-        minHeight: 0,
+        flexDirection: 'column',
+        padding: '28px 32px',
+        gap: '20px',
+        overflowY: 'auto',
       }}>
-        {/* LEFT - Configuration */}
-        <div style={{
-          flex: '0 0 40%',
-          maxWidth: '40%',
-          borderRight: '1px solid var(--border-primary)',
-          backgroundColor: 'var(--bg-primary)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '28px 32px',
-          gap: '20px',
-          overflowY: 'auto',
-        }}>
-          {/* Title */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                Web Agent
-              </h1>
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                fontSize: '9px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase' as const,
-                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                color: '#22c55e',
-                border: '1px solid rgba(34, 197, 94, 0.2)',
-              }}>
-                <MdFiberManualRecord size={6} className="animate-pulse" />
-                Live
-              </span>
-            </div>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Preview your widget as visitors see it
-            </p>
+        {/* Title */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              Web Agent
+            </h1>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              fontSize: '9px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase' as const,
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              color: '#22c55e',
+              border: '1px solid rgba(34, 197, 94, 0.2)',
+            }}>
+              <MdFiberManualRecord size={6} className="animate-pulse" />
+              Live
+            </span>
           </div>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Preview your widget as visitors see it
+          </p>
+        </div>
 
-          {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
+        {/* Divider */}
+        <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
 
-          {/* Embed Code Section */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <MdCode size={16} style={{ color: 'var(--accent-primary)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Installation Code
-              </span>
-            </div>
-            <div
-              className="rounded-lg overflow-x-auto text-xs font-mono relative"
-              style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-primary)',
-                color: 'var(--accent-primary)',
-                padding: '14px 44px 14px 14px',
-              }}
-            >
-              <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{embedCode}</code>
-              <button
-                onClick={handleCopyCode}
-                className="absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded transition-all"
-                style={{
-                  backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                  color: copySuccess ? 'white' : 'var(--text-primary)',
-                  border: '1px solid var(--border-primary)',
-                }}
-                title="Copy to clipboard"
-              >
-                {copySuccess ? <MdCheckCircle size={14} /> : <MdContentCopy size={14} />}
-              </button>
-            </div>
-
-            <div
-              className="mt-3 p-3 rounded-lg flex gap-2"
-              style={{
-                backgroundColor: 'rgba(139, 92, 246, 0.05)',
-                border: '1px dashed rgba(139, 92, 246, 0.2)',
-              }}
-            >
-              <MdInfoOutline size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '1px' }} />
-              <p className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                Add before the closing <code style={{ color: 'var(--accent-primary)' }}>&lt;/body&gt;</code> tag on your website.
-              </p>
-            </div>
+        {/* Embed Code Section */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <MdCode size={16} style={{ color: 'var(--accent-primary)' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Installation Code
+            </span>
           </div>
-
-          {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
-
-          {/* Actions */}
-          <div>
+          <div
+            className="rounded-lg overflow-x-auto text-xs font-mono relative"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--accent-primary)',
+              padding: '14px 44px 14px 14px',
+            }}
+          >
+            <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{embedCode}</code>
             <button
-              onClick={handleResetWidget}
-              disabled={isResetting}
-              className="px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2"
+              onClick={handleCopyCode}
+              className="absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded transition-all"
               style={{
-                backgroundColor: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
+                backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                color: copySuccess ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border-primary)',
-                cursor: isResetting ? 'not-allowed' : 'pointer',
-                opacity: isResetting ? 0.6 : 1,
               }}
+              title="Copy to clipboard"
             >
-              <MdRefresh size={14} className={isResetting ? 'animate-spin' : ''} />
-              {isResetting ? 'Resetting...' : 'Reset Widget'}
+              {copySuccess ? <MdCheckCircle size={14} /> : <MdContentCopy size={14} />}
             </button>
           </div>
+
+          <div
+            className="mt-3 p-3 rounded-lg flex gap-2"
+            style={{
+              backgroundColor: 'rgba(139, 92, 246, 0.05)',
+              border: '1px dashed rgba(139, 92, 246, 0.2)',
+            }}
+          >
+            <MdInfoOutline size={14} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '1px' }} />
+            <p className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              Add before the closing <code style={{ color: 'var(--accent-primary)' }}>&lt;/body&gt;</code> tag on your website.
+            </p>
+          </div>
         </div>
 
-        {/* RIGHT - Widget preview full area */}
-        <div style={{
-          flex: '1 1 60%',
-          minWidth: 0,
-          backgroundColor: '#141420',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <iframe
-            ref={iframeRef}
-            src="/widget"
+        {/* Divider */}
+        <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />
+
+        {/* Actions */}
+        <div>
+          <button
+            onClick={handleResetWidget}
+            disabled={isResetting}
+            className="px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2"
             style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              background: 'transparent',
+              backgroundColor: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-primary)',
+              cursor: isResetting ? 'not-allowed' : 'pointer',
+              opacity: isResetting ? 0.6 : 1,
             }}
-            title="Widget Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-            allow="microphone; camera"
-          />
+          >
+            <MdRefresh size={14} className={isResetting ? 'animate-spin' : ''} />
+            {isResetting ? 'Resetting...' : 'Reset Widget'}
+          </button>
         </div>
       </div>
-    </DashboardLayout>
+
+      {/* RIGHT - Widget preview full area */}
+      <div style={{
+        flex: '1 1 60%',
+        minWidth: 0,
+        backgroundColor: '#141420',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <iframe
+          ref={iframeRef}
+          src="/widget"
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            background: 'transparent',
+          }}
+          title="Widget Preview"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          allow="microphone; camera"
+        />
+      </div>
+    </div>
   )
 }
