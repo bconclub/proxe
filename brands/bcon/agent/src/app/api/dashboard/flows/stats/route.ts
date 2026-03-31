@@ -1,7 +1,7 @@
 /**
  * GET /api/dashboard/flows/stats
  * 
- * Get template statistics + lead counts per stage for the 9-stage flow builder
+ * Return lead counts per stage and template coverage stats for the Flow Builder page.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,7 +9,7 @@ import { getServiceClient, getClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
-// 9 Stage definitions (matching the flow builder)
+// 9 Stage definitions
 const STAGES = [
   { id: 'one_touch', name: 'One Touch', timing: 'Day 1, 3, 7, 30' },
   { id: 'low_touch', name: 'Low Touch', timing: 'Day 3, 7, 30' },
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No database connection' }, { status: 500 })
     }
 
-    // 1. Get lead counts per stage
+    // 1. Query all_leads table - group by lead_stage
     const { data: leads, error: leadsError } = await supabase
       .from('all_leads')
       .select('lead_stage, id')
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       leadCounts[stageId] = (leadCounts[stageId] || 0) + 1
     })
 
-    // 2. Get template assignments
+    // 2. Query follow_up_templates table
     const { data: templates, error: templatesError } = await supabase
       .from('follow_up_templates')
       .select('*')
@@ -76,74 +76,48 @@ export async function GET(request: NextRequest) {
       console.error('[flows/stats] Failed to fetch templates:', templatesError)
     }
 
-    // Calculate coverage per stage
-    const coverageByStage: Record<string, any> = {}
+    // Calculate coverage % per stage (approved templates / total slots needed)
+    const coverageByStage: Record<string, number> = {}
     
     STAGES.forEach(stage => {
       if (stage.id === 'converted') {
-        coverageByStage[stage.id] = {
-          totalSlots: 0,
-          filledSlots: 0,
-          approvedSlots: 0,
-          pendingSlots: 0,
-          emptySlots: 0,
-          coverage: 100,
-        }
+        coverageByStage[stage.id] = 100
         return
       }
 
       const stageTemplates = templates?.filter((t: any) => t.stage === stage.id) || []
       
-      // Expected slots based on timing
+      // Expected slots based on timing rules
       const expectedSlots = stage.id === 'one_touch' ? 4 : 
                            stage.id === 'booking_made' ? 3 :
                            ['low_touch', 'engaged'].includes(stage.id) ? 3 :
                            4 // high_intent, no_show, demo_taken, proposal_sent
 
       const approved = stageTemplates.filter((t: any) => t.meta_status === 'approved').length
-      const pending = stageTemplates.filter((t: any) => t.meta_status === 'pending').length
-      const rejected = stageTemplates.filter((t: any) => t.meta_status === 'rejected').length
-
-      coverageByStage[stage.id] = {
-        totalSlots: expectedSlots,
-        filledSlots: stageTemplates.length,
-        approvedSlots: approved,
-        pendingSlots: pending,
-        rejectedSlots: rejected,
-        emptySlots: expectedSlots - approved,
-        coverage: expectedSlots > 0 ? Math.round((approved / expectedSlots) * 100) : 0,
-      }
+      coverageByStage[stage.id] = expectedSlots > 0 ? Math.round((approved / expectedSlots) * 100) : 0
     })
 
-    // 3. Get task stats
-    const { data: pendingTasks } = await supabase
-      .from('agent_tasks')
-      .select('id')
-      .in('status', ['pending', 'queued'])
+    // Build stages array with leadCount and coverage
+    const stages = STAGES.map(stage => ({
+      id: stage.id,
+      name: stage.name,
+      leadCount: leadCounts[stage.id] || 0,
+      coverage: coverageByStage[stage.id] || 0,
+    }))
 
-    const { data: completedToday } = await supabase
-      .from('agent_tasks')
-      .select('id')
-      .eq('status', 'completed')
-      .gte('completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    // Build templates array with stage/day/channel/status
+    const templatesList = (templates || []).map((t: any) => ({
+      stage: t.stage,
+      day: t.day,
+      channel: t.channel,
+      status: t.meta_status,
+      variant: t.variant,
+      templateName: t.meta_template_name,
+    }))
 
     return NextResponse.json({
-      success: true,
-      stats: {
-        leadCounts,
-        coverageByStage,
-        templateStats: {
-          total: templates?.length || 0,
-          approved: templates?.filter((t: any) => t.meta_status === 'approved').length || 0,
-          pending: templates?.filter((t: any) => t.meta_status === 'pending').length || 0,
-          rejected: templates?.filter((t: any) => t.meta_status === 'rejected').length || 0,
-        },
-        taskStats: {
-          pending: pendingTasks?.length || 0,
-          completedToday: completedToday?.length || 0,
-        },
-        stages: STAGES,
-      },
+      stages,
+      templates: templatesList,
     })
   } catch (error) {
     console.error('[flows/stats] Error:', error)
