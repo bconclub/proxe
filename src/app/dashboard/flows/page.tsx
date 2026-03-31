@@ -21,560 +21,104 @@ import {
   MdAdd,
   MdSync,
   MdInfo,
-  MdCheck,
-  MdError,
-  MdMoreVert,
+  MdEdit,
+  MdArrowForward,
+  MdCircle,
 } from 'react-icons/md'
 
 import { 
-  JOURNEY_STAGES, 
-  STAGE_MAP,
-  getTemplateSlotsForStage,
+  JOURNEY_STAGES,
+  STAGE_ORDER,
+  getStage,
   getToneColor,
-  getChannelInfo,
-  calculateStageCoverage,
+  getTemplateSlotsForStage,
+  isSlotApplicable,
   JourneyStageId,
   Channel,
-  Variant,
+  TemplateStatus,
 } from '@/lib/constants/flowStages'
-import { 
-  FollowUpTemplate, 
-  getAllTemplates, 
-  getTemplateStats,
-  getSlotStatus,
-} from '@/lib/services/templateLibrary'
 
-// --- Types ---
+// ============================================================================
+// TYPES
+// ============================================================================
 
-interface StageCount {
+interface LeadCounts {
+  [stageId: string]: number
+}
+
+interface CoverageData {
+  totalSlots: number
+  filledSlots: number
+  approvedSlots: number
+  pendingSlots: number
+  emptySlots: number
+  coverage: number
+}
+
+interface StageCoverage {
+  [stageId: string]: CoverageData
+}
+
+interface TemplateData {
+  id: string
   stage: string
-  count: number
-}
-
-interface TaskStats {
-  pendingCount: number
-  completedToday: number
-  stuckStages: number
-}
-
-interface TemplateMap {
-  [stageId: string]: FollowUpTemplate[]
-}
-
-interface SlotStatus {
-  hasTemplate: boolean
-  status: 'empty' | 'pending' | 'approved' | 'rejected' | 'mixed'
-  variants: FollowUpTemplate[]
-}
-
-// --- Components ---
-
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-  subtitle,
-}: {
-  label: string
-  value: string | number
-  icon: React.ReactNode
-  color: string
-  subtitle?: string
-}) {
-  return (
-    <div
-      style={{
-        flex: '1 1 0',
-        minWidth: 180,
-        background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 10,
-        padding: '18px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-      }}
-    >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          background: `${color}20`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color,
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div>
-        <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 4 }}>{label}</div>
-        <div style={{ color: 'var(--text-primary)', fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
-        {subtitle && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
-      </div>
-    </div>
-  )
-}
-
-function ChannelBadge({ channel }: { channel: Channel }) {
-  const info = getChannelInfo(channel)
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: info.bgColor,
-        color: info.color,
-        fontSize: 10,
-        fontWeight: 600,
-        padding: '2px 8px',
-        borderRadius: 4,
-      }}
-    >
-      {channel === 'whatsapp' && <MdWhatsapp size={11} />}
-      {channel === 'voice' && <MdPhoneInTalk size={11} />}
-      {info.label}
-    </span>
-  )
-}
-
-function TonePill({ tone }: { tone: string }) {
-  const style = getToneColor(tone as any)
-  return (
-    <span
-      style={{
-        background: style.bg,
-        color: style.color,
-        fontSize: 10,
-        fontWeight: 600,
-        padding: '3px 10px',
-        borderRadius: 12,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {style.label}
-    </span>
-  )
-}
-
-function StatusBadge({ status }: { status: SlotStatus['status'] }) {
-  const styles = {
-    empty: { bg: 'rgba(156, 163, 175, 0.1)', color: '#9ca3af', icon: null, label: 'Empty' },
-    pending: { bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', icon: <MdSchedule size={10} />, label: 'Pending' },
-    approved: { bg: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', icon: <MdCheck size={10} />, label: 'Approved' },
-    rejected: { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', icon: <MdError size={10} />, label: 'Rejected' },
-    mixed: { bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', icon: <MdMoreVert size={10} />, label: 'Mixed' },
-  }
-  
-  const s = styles[status]
-  
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 3,
-        background: s.bg,
-        color: s.color,
-        fontSize: 9,
-        fontWeight: 600,
-        padding: '2px 6px',
-        borderRadius: 4,
-        textTransform: 'uppercase',
-      }}
-    >
-      {s.icon}
-      {s.label}
-    </span>
-  )
-}
-
-function TemplateSlot({
-  stageId,
-  day,
-  channel,
-  templates,
-  onAssign,
-}: {
-  stageId: JourneyStageId
   day: number
-  channel: Channel
-  templates: FollowUpTemplate[]
-  onAssign: () => void
-}) {
-  const hasTemplate = templates.length > 0
-  const approvedCount = templates.filter(t => t.meta_status === 'approved').length
-  const status: SlotStatus['status'] = hasTemplate 
-    ? approvedCount === templates.length ? 'approved' 
-    : approvedCount === 0 ? (templates[0]?.meta_status === 'rejected' ? 'rejected' : 'pending')
-    : 'mixed'
-    : 'empty'
-
-  return (
-    <div
-      style={{
-        padding: '8px 12px',
-        background: hasTemplate ? 'rgba(255,255,255,0.03)' : 'transparent',
-        borderRadius: 6,
-        border: `1px dashed ${hasTemplate ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)'}`,
-        minHeight: 60,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
-          Day {day}
-        </span>
-        <StatusBadge status={status} />
-      </div>
-
-      {hasTemplate ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {templates.slice(0, 2).map((t) => (
-            <div
-              key={t.id}
-              style={{
-                fontSize: 11,
-                color: t.meta_status === 'approved' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 9,
-                  padding: '1px 4px',
-                  borderRadius: 3,
-                  background: t.variant === 'A' ? 'rgba(59,130,246,0.2)' : t.variant === 'B' ? 'rgba(34,197,94,0.2)' : 'rgba(139,92,246,0.2)',
-                  color: t.variant === 'A' ? '#3b82f6' : t.variant === 'B' ? '#22c55e' : '#8b5cf6',
-                }}
-              >
-                {t.variant}
-              </span>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {t.meta_template_name || 'Unnamed'}
-              </span>
-            </div>
-          ))}
-          {templates.length > 2 && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              +{templates.length - 2} more
-            </span>
-          )}
-          <button
-            onClick={onAssign}
-            style={{
-              marginTop: 4,
-              fontSize: 10,
-              color: 'var(--text-secondary)',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              padding: 0,
-            }}
-          >
-            Edit
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={onAssign}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '8px',
-            background: 'rgba(59,130,246,0.1)',
-            color: '#3b82f6',
-            border: '1px dashed rgba(59,130,246,0.3)',
-            borderRadius: 4,
-            fontSize: 11,
-            fontWeight: 500,
-            cursor: 'pointer',
-            marginTop: 'auto',
-          }}
-        >
-          <MdAdd size={14} />
-          Assign
-        </button>
-      )}
-    </div>
-  )
+  channel: string
+  variant: string
+  meta_template_name: string
+  meta_status: 'pending' | 'approved' | 'rejected'
+  content: string
 }
 
-function JourneyStageCard({
-  stage,
-  count,
-  isLast,
-  templates,
-  onAssignTemplate,
-  isExpanded,
-  onToggle,
-}: {
-  stage: typeof JOURNEY_STAGES[0]
-  count: number
-  isLast: boolean
-  templates: FollowUpTemplate[]
-  onAssignTemplate: (stageId: JourneyStageId, day: number, channel: Channel) => void
-  isExpanded: boolean
-  onToggle: () => void
-}) {
-  const stageConfig = STAGE_MAP[stage.id]
-  const Icon = stage.icon
-  
-  // Group templates by day and channel
-  const templatesBySlot: Record<string, FollowUpTemplate[]> = {}
-  templates.forEach(t => {
-    const key = `${t.day}-${t.channel}`
-    if (!templatesBySlot[key]) templatesBySlot[key] = []
-    templatesBySlot[key].push(t)
-  })
-
-  // Get unique days and channels for this stage
-  const slots = getTemplateSlotsForStage(stage.id)
-  const uniqueDays = [...new Set(slots.map(s => s.day))].sort((a, b) => a - b)
-  const uniqueChannels = [...new Set(slots.map(s => s.channel))]
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      {/* Stage Card */}
-      <div
-        style={{
-          width: '100%',
-          background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-          border: `1px solid ${isExpanded ? stage.color : 'rgba(255,255,255,0.08)'}`,
-          borderRadius: 12,
-          overflow: 'hidden',
-          transition: 'border-color 0.2s, transform 0.1s',
-        }}
-      >
-        {/* Header - Click to expand */}
-        <div
-          onClick={onToggle}
-          style={{
-            padding: '18px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 14,
-            cursor: 'pointer',
-          }}
-        >
-          {/* Header: Icon + Name + Count */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: `${stage.color}15`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: stage.color,
-                flexShrink: 0,
-              }}
-            >
-              <Icon size={22} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 2 }}>
-                {stage.name}
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{stage.condition}</div>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: count > 0 ? `${stage.color}20` : 'rgba(255,255,255,0.06)',
-                color: count > 0 ? stage.color : 'var(--text-secondary)',
-                padding: '6px 14px',
-                borderRadius: 20,
-                fontSize: 18,
-                fontWeight: 700,
-                minWidth: 50,
-                justifyContent: 'center',
-              }}
-            >
-              {count}
-            </div>
-            <div style={{ color: 'var(--text-muted)' }}>
-              {isExpanded ? <MdExpandLess size={24} /> : <MdExpandMore size={24} />}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: '18px' }}>
-            {stage.description}
-          </div>
-
-          {/* Timing */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <MdSchedule size={13} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{stage.timing}</span>
-          </div>
-
-          {/* Channels & Tone */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {stage.channels.length > 0 ? (
-                stage.channels.map((ch) => <ChannelBadge key={ch} channel={ch} />)
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontSize: 11, fontStyle: 'italic' }}>No follow-up</span>
-              )}
-            </div>
-            <TonePill tone={stage.tone} />
-          </div>
-
-          {/* Setup Status */}
-          {stage.requiresSetup && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-              {templates.length === 0 ? (
-                <span style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <MdWarning size={12} />
-                  Setup Required
-                </span>
-              ) : (
-                <span style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <MdCheck size={12} />
-                  {templates.length} templates configured
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Expanded: Template Grid */}
-        {isExpanded && !stage.isTerminal && (
-          <div style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Template Configuration
-            </div>
-            
-            {/* Grid Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: `100px repeat(${uniqueDays.length}, 1fr)`, gap: 8, marginBottom: 8 }}>
-              <div></div>
-              {uniqueDays.map(day => (
-                <div key={day} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  Day {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Grid Rows by Channel */}
-            {uniqueChannels.map(channel => (
-              <div key={channel} style={{ display: 'grid', gridTemplateColumns: `100px repeat(${uniqueDays.length}, 1fr)`, gap: 8, marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ChannelBadge channel={channel} />
-                </div>
-                {uniqueDays.map(day => {
-                  const slotTemplates = templatesBySlot[`${day}-${channel}`] || []
-                  return (
-                    <TemplateSlot
-                      key={`${day}-${channel}`}
-                      stageId={stage.id}
-                      day={day}
-                      channel={channel}
-                      templates={slotTemplates}
-                      onAssign={() => onAssignTemplate(stage.id, day, channel)}
-                    />
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Connector Arrow */}
-      {!isLast && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '10px 0',
-            color: 'rgba(255,255,255,0.15)',
-          }}
-        >
-          <MdArrowDownward size={20} />
-        </div>
-      )}
-    </div>
-  )
+interface SlotAssignment {
+  template?: TemplateData
+  status: TemplateStatus
 }
 
-// --- Main Page ---
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
 
 export default function FlowsPage() {
-  const [stageCounts, setStageCounts] = useState<Record<string, number>>({})
-  const [stats, setStats] = useState<TaskStats>({
-    pendingCount: 0,
-    completedToday: 0,
-    stuckStages: 0,
-  })
-  const [templates, setTemplates] = useState<TemplateMap>({})
-  const [templateStats, setTemplateStats] = useState<{
-    overall: { coverage: number; filledSlots: number; totalSlots: number }
-  } | null>(null)
+  const [leadCounts, setLeadCounts] = useState<LeadCounts>({})
+  const [coverage, setCoverage] = useState<StageCoverage>({})
+  const [templates, setTemplates] = useState<TemplateData[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [expandedStages, setExpandedStages] = useState<Set<JourneyStageId>>(new Set())
-  const [lastSync, setLastSync] = useState<string | null>(null)
+  const [expandedStage, setExpandedStage] = useState<JourneyStageId | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<{
+    stageId: JourneyStageId
+    day: number
+    channel: Channel
+  } | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      // Fetch stage counts from leads API
-      const stagesRes = await fetch('/api/dashboard/leads?group_by=lead_stage')
-      const stagesData = await stagesRes.json()
-
-      // Map API stage names to our journey stage IDs
-      const counts: Record<string, number> = {}
-      if (stagesData.leads) {
-        stagesData.leads.forEach((item: StageCount) => {
-          const stageKey = item.stage?.toLowerCase().replace(/\s+/g, '_') || 'unknown'
-          counts[stageKey] = (counts[stageKey] || 0) + item.count
-        })
-      }
-
-      // Fetch task stats
-      const tasksRes = await fetch('/api/dashboard/tasks')
-      const tasksData = await tasksRes.json()
-
-      // Calculate stuck stages
-      const stuckRes = await fetch('/api/dashboard/leads?stuck=true&days=7')
-      const stuckData = await stuckRes.json()
-
-      // Fetch templates
-      const templatesRes = await fetch('/api/dashboard/flows/templates')
-      const templatesData = await templatesRes.json()
-
-      // Fetch template stats
+      setLoading(true)
+      
+      // Fetch stats (includes lead counts + coverage)
       const statsRes = await fetch('/api/dashboard/flows/stats')
       const statsData = await statsRes.json()
+      
+      if (statsData.success) {
+        setLeadCounts(statsData.stats.leadCounts || {})
+        setCoverage(statsData.stats.coverageByStage || {})
+      }
 
-      setStageCounts(counts)
-      setStats({
-        pendingCount: tasksData.stats?.pendingCount || 0,
-        completedToday: tasksData.stats?.completedToday || 0,
-        stuckStages: stuckData.stuck_stages?.length || 0,
-      })
-      setTemplates(templatesData.templates || {})
-      setTemplateStats(statsData.stats || null)
-      setLastSync(statsData.stats?.lastSync || null)
+      // Fetch all templates
+      const templatesRes = await fetch('/api/dashboard/flows/templates')
+      const templatesData = await templatesRes.json()
+      
+      if (templatesData.success) {
+        // Flatten templates from grouped format
+        const allTemplates: TemplateData[] = []
+        Object.values(templatesData.templates || {}).forEach((stageTemplates: any) => {
+          allTemplates.push(...stageTemplates)
+        })
+        setTemplates(allTemplates)
+      }
     } catch (err) {
-      console.error('Failed to fetch journey data:', err)
+      console.error('Failed to fetch flow data:', err)
     } finally {
       setLoading(false)
     }
@@ -590,9 +134,7 @@ export default function FlowsPage() {
     setSyncing(true)
     try {
       const res = await fetch('/api/dashboard/flows/sync-meta', { method: 'POST' })
-      if (res.ok) {
-        await fetchData()
-      }
+      if (res.ok) await fetchData()
     } catch (err) {
       console.error('Sync failed:', err)
     } finally {
@@ -600,127 +142,774 @@ export default function FlowsPage() {
     }
   }
 
-  const toggleStage = (stageId: JourneyStageId) => {
-    setExpandedStages(prev => {
-      const next = new Set(prev)
-      if (next.has(stageId)) {
-        next.delete(stageId)
-      } else {
-        next.add(stageId)
-      }
-      return next
-    })
+  const getSlotAssignment = (stageId: JourneyStageId, day: number, channel: Channel): SlotAssignment => {
+    const template = templates.find(t => 
+      t.stage === stageId && t.day === day && t.channel === channel
+    )
+    
+    if (!template) return { status: 'empty' }
+    return { template, status: template.meta_status }
   }
 
-  const handleAssignTemplate = (stageId: JourneyStageId, day: number, channel: Channel) => {
-    // TODO: Open template assignment modal
-    console.log('Assign template:', { stageId, day, channel })
-    alert(`Template assignment for ${stageId} - Day ${day} - ${channel}\n\nThis would open the assignment modal.`)
-  }
-
-  // Map stage counts to journey stages
-  const getStageCount = (stageId: string): number => {
-    const mapping: Record<string, string[]> = {
-      one_touch: ['new', 'one_touch'],
-      low_touch: ['low_touch'],
-      engaged: ['engaged'],
-      high_intent: ['high_intent'],
-      booking_made: ['booking_made'],
-      no_show: ['no_show', 'rnr'],
-      demo_taken: ['demo_taken'],
-      proposal_sent: ['proposal_sent'],
-      converted: ['converted', 'closed_won', 'closed_lost'],
-    }
-    const keys = mapping[stageId] || [stageId]
-    return keys.reduce((sum, key) => sum + (stageCounts[key] || 0), 0)
+  const getTotalCoverage = (): number => {
+    const stages = JOURNEY_STAGES.filter(s => !s.isTerminal)
+    const totalSlots = stages.reduce((sum, s) => sum + (coverage[s.id]?.totalSlots || 0), 0)
+    const approvedSlots = stages.reduce((sum, s) => sum + (coverage[s.id]?.approvedSlots || 0), 0)
+    return totalSlots > 0 ? Math.round((approvedSlots / totalSlots) * 100) : 0
   }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading journey map...</span>
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <div style={{ color: 'var(--text-secondary)' }}>Loading flow builder...</div>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header */}
-      <div style={{ textAlign: 'center' }}>
-        <h1 style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 700, margin: '0 0 6px 0' }}>
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
           Customer Journey Flows
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
           Configure follow-up templates for each journey stage
         </p>
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap', justifyContent: 'center' }}>
         <StatCard
-          label="Active Sequences"
-          value={stats.pendingCount}
-          icon={<MdSchedule size={22} />}
+          label="Total Leads"
+          value={Object.values(leadCounts).reduce((a, b) => a + b, 0)}
+          icon={<MdInfo size={24} />}
           color="#3b82f6"
         />
         <StatCard
-          label="Tasks Sent Today"
-          value={stats.completedToday}
-          icon={<MdCheckCircle size={22} />}
-          color="#22c55e"
+          label="Template Coverage"
+          value={`${getTotalCoverage()}%`}
+          icon={<MdCheckCircle size={24} />}
+          color={getTotalCoverage() >= 80 ? '#22c55e' : getTotalCoverage() >= 50 ? '#f59e0b' : '#ef4444'}
         />
         <StatCard
-          label="Template Coverage"
-          value={`${templateStats?.overall?.coverage || 0}%`}
-          icon={<MdInfo size={22} />}
+          label="Stages Configured"
+          value={`${Object.values(coverage).filter(c => c.coverage > 0).length}/8`}
+          icon={<MdSchedule size={24} />}
           color="#8b5cf6"
-          subtitle={`${templateStats?.overall?.filledSlots || 0}/${templateStats?.overall?.totalSlots || 0} slots`}
         />
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
         <button
           onClick={handleSync}
           disabled={syncing}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
+            gap: 8,
+            padding: '10px 20px',
             background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 8,
-            fontSize: 13,
+            color: 'var(--text-primary)',
+            fontSize: 14,
             cursor: syncing ? 'not-allowed' : 'pointer',
             opacity: syncing ? 0.6 : 1,
           }}
         >
-          <MdSync size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+          <MdSync size={18} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
           {syncing ? 'Syncing...' : 'Sync with Meta'}
         </button>
-        {lastSync && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
-            Last sync: {new Date(lastSync).toLocaleString()}
-          </span>
+      </div>
+
+      {/* 9 Stage Cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {STAGE_ORDER.map((stageId, index) => {
+          const stage = getStage(stageId)
+          const isExpanded = expandedStage === stageId
+          const stageCoverage = coverage[stageId]
+          
+          return (
+            <StageCard
+              key={stageId}
+              stage={stage}
+              leadCount={leadCounts[stageId] || 0}
+              coverage={stageCoverage}
+              isExpanded={isExpanded}
+              isLast={index === STAGE_ORDER.length - 1}
+              hasBranch={stageId === 'booking_made'}
+              onToggle={() => setExpandedStage(isExpanded ? null : stageId)}
+              onSlotClick={(day, channel) => setSelectedSlot({ stageId, day, channel })}
+              getSlotAssignment={getSlotAssignment}
+            />
+          )
+        })}
+      </div>
+
+      {/* Assignment Modal */}
+      {selectedSlot && (
+        <SlotAssignmentModal
+          slot={selectedSlot}
+          existingTemplate={getSlotAssignment(selectedSlot.stageId, selectedSlot.day, selectedSlot.channel).template}
+          onClose={() => setSelectedSlot(null)}
+          onSaved={fetchData}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// STAGE CARD
+// ============================================================================
+
+interface StageCardProps {
+  stage: ReturnType<typeof getStage>
+  leadCount: number
+  coverage?: CoverageData
+  isExpanded: boolean
+  isLast: boolean
+  hasBranch?: boolean
+  onToggle: () => void
+  onSlotClick: (day: number, channel: Channel) => void
+  getSlotAssignment: (stageId: JourneyStageId, day: number, channel: Channel) => SlotAssignment
+}
+
+function StageCard({
+  stage,
+  leadCount,
+  coverage,
+  isExpanded,
+  isLast,
+  hasBranch,
+  onToggle,
+  onSlotClick,
+  getSlotAssignment,
+}: StageCardProps) {
+  const Icon = stage.icon
+  const toneStyle = getToneColor(stage.tone)
+  const gridDays = stage.gridDays
+  
+  // Get unique channels for this stage
+  const channels = stage.channels
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Card */}
+      <div
+        style={{
+          width: '100%',
+          background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+          border: `2px solid ${isExpanded ? stage.color : 'rgba(255,255,255,0.08)'}`,
+          borderRadius: 16,
+          overflow: 'hidden',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        {/* Header */}
+        <div
+          onClick={onToggle}
+          style={{
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            cursor: 'pointer',
+            background: isExpanded ? `${stage.color}08` : 'transparent',
+          }}
+        >
+          {/* Icon */}
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              background: `${stage.color}20`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: stage.color,
+            }}
+          >
+            <Icon size={24} />
+          </div>
+
+          {/* Info */}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {stage.name}
+              </h3>
+              {/* Lead Count Badge */}
+              <span
+                style={{
+                  padding: '4px 12px',
+                  background: leadCount > 0 ? `${stage.color}30` : 'rgba(255,255,255,0.06)',
+                  color: leadCount > 0 ? stage.color : 'var(--text-muted)',
+                  borderRadius: 20,
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {leadCount} leads
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+              {stage.description}
+            </p>
+          </div>
+
+          {/* Coverage Indicator */}
+          {!stage.isTerminal && coverage && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 16px',
+                background: coverage.coverage >= 80 
+                  ? 'rgba(34, 197, 94, 0.15)' 
+                  : coverage.coverage >= 50 
+                  ? 'rgba(245, 158, 11, 0.15)' 
+                  : 'rgba(239, 68, 68, 0.15)',
+                borderRadius: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: coverage.coverage >= 80 ? '#22c55e' : coverage.coverage >= 50 ? '#f59e0b' : '#ef4444',
+                }}
+              >
+                {coverage.coverage}%
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>coverage</span>
+            </div>
+          )}
+
+          {/* Expand Icon */}
+          <div style={{ color: 'var(--text-muted)' }}>
+            {isExpanded ? <MdExpandLess size={28} /> : <MdExpandMore size={28} />}
+          </div>
+        </div>
+
+        {/* Expanded Content */}
+        {isExpanded && !stage.isTerminal && (
+          <div style={{ padding: '0 24px 24px' }}>
+            {/* Timing Grid */}
+            <div style={{ marginBottom: 20 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `120px repeat(${gridDays.length}, 1fr)`,
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <div></div>
+                {gridDays.map(day => (
+                  <div
+                    key={day}
+                    style={{
+                      textAlign: 'center',
+                      padding: '8px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      background: 'rgba(255,255,255,0.04)',
+                      borderRadius: 6,
+                    }}
+                  >
+                    Day {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Channel Rows */}
+              {channels.map(channel => (
+                <div
+                  key={channel}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `120px repeat(${gridDays.length}, 1fr)`,
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  {/* Channel Label */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {channel === 'whatsapp' ? <MdWhatsapp size={16} /> : <MdPhoneInTalk size={16} />}
+                    {channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
+                  </div>
+
+                  {/* Slot Status */}
+                  {gridDays.map(day => {
+                    const isApplicable = isSlotApplicable(stage.id, day, channel)
+                    const assignment = isApplicable 
+                      ? getSlotAssignment(stage.id, day, channel)
+                      : { status: 'empty' as TemplateStatus }
+
+                    return (
+                      <SlotCell
+                        key={`${day}-${channel}`}
+                        day={day}
+                        channel={channel}
+                        isApplicable={isApplicable}
+                        assignment={assignment}
+                        onClick={() => isApplicable && onSlotClick(day, channel)}
+                      />
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Legend */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 16,
+                padding: '12px 16px',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 8,
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <StatusDot color="#22c55e" /> Approved
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <StatusDot color="#f59e0b" /> Pending
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <StatusDot color="#ef4444" /> Rejected
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <StatusDot color="#6b7280" /> Empty
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Journey Flow */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, padding: '0 0 20px 0' }}>
-        {JOURNEY_STAGES.map((stage, index) => (
-          <JourneyStageCard
-            key={stage.id}
-            stage={stage}
-            count={getStageCount(stage.id)}
-            isLast={index === JOURNEY_STAGES.length - 1}
-            templates={templates[stage.id] || []}
-            onAssignTemplate={handleAssignTemplate}
-            isExpanded={expandedStages.has(stage.id)}
-            onToggle={() => toggleStage(stage.id)}
+      {/* Connector Arrow */}
+      {!isLast && (
+        <div style={{ position: 'relative', height: 40, display: 'flex', alignItems: 'center' }}>
+          {/* Main flow line */}
+          <div
+            style={{
+              width: 2,
+              height: 40,
+              background: hasBranch ? 'transparent' : 'rgba(255,255,255,0.1)',
+              borderLeft: hasBranch ? '2px dashed rgba(255,255,255,0.2)' : 'none',
+            }}
           />
-        ))}
+          
+          {/* Arrow */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              color: 'rgba(255,255,255,0.3)',
+            }}
+          >
+            <MdArrowDownward size={20} />
+          </div>
+
+          {/* Branch indicator for Booking Made */}
+          {hasBranch && (
+            <div
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: 0,
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                fontSize: 11,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span>branches to</span>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <span style={{ color: '#ef4444' }}>No Show</span>
+                <span>or</span>
+                <span style={{ color: '#ec4899' }}>Demo</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// SLOT CELL
+// ============================================================================
+
+interface SlotCellProps {
+  day: number
+  channel: Channel
+  isApplicable: boolean
+  assignment: SlotAssignment
+  onClick: () => void
+}
+
+function SlotCell({ isApplicable, assignment, onClick }: SlotCellProps) {
+  if (!isApplicable) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          background: 'transparent',
+          borderRadius: 8,
+        }}
+      />
+    )
+  }
+
+  const statusColors = {
+    approved: '#22c55e',
+    pending: '#f59e0b',
+    rejected: '#ef4444',
+    empty: '#6b7280',
+  }
+
+  const color = statusColors[assignment.status]
+  const hasTemplate = assignment.status !== 'empty'
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '12px',
+        background: hasTemplate ? `${color}15` : 'rgba(255,255,255,0.04)',
+        border: `2px solid ${hasTemplate ? color : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: 8,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        transition: 'all 0.15s ease',
+      }}
+    >
+      <StatusDot color={color} size={12} />
+      {hasTemplate ? (
+        <span
+          style={{
+            fontSize: 10,
+            color: 'var(--text-secondary)',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {assignment.template?.meta_template_name?.slice(0, 15) || 'Template'}
+        </span>
+      ) : (
+        <MdAdd size={16} color={color} />
+      )}
+    </button>
+  )
+}
+
+function StatusDot({ color, size = 10 }: { color: string; size?: number }) {
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: color,
+        display: 'inline-block',
+        boxShadow: `0 0 8px ${color}60`,
+      }}
+    />
+  )
+}
+
+// ============================================================================
+// STAT CARD
+// ============================================================================
+
+function StatCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string
+  value: string | number
+  icon: React.ReactNode
+  color: string
+}) {
+  return (
+    <div
+      style={{
+        flex: '1 1 0',
+        minWidth: 140,
+        maxWidth: 200,
+        padding: '20px 24px',
+        background: 'var(--bg-secondary)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 12,
+          background: `${color}20`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color,
+        }}
+      >
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// SLOT ASSIGNMENT MODAL
+// ============================================================================
+
+interface SlotAssignmentModalProps {
+  slot: { stageId: JourneyStageId; day: number; channel: Channel }
+  existingTemplate?: TemplateData
+  onClose: () => void
+  onSaved: () => void
+}
+
+function SlotAssignmentModal({ slot, existingTemplate, onClose, onSaved }: SlotAssignmentModalProps) {
+  const [metaTemplates, setMetaTemplates] = useState<any[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState(existingTemplate?.meta_template_name || '')
+  const [content, setContent] = useState(existingTemplate?.content || '')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const stage = getStage(slot.stageId)
+
+  useEffect(() => {
+    fetchMetaTemplates()
+  }, [])
+
+  const fetchMetaTemplates = async () => {
+    try {
+      // Fetch from Meta sync endpoint
+      const res = await fetch('/api/dashboard/flows/templates')
+      const data = await res.json()
+      
+      if (data.success) {
+        // Flatten templates from all stages
+        const allTemplates: any[] = []
+        Object.values(data.templates || {}).forEach((stageTemplates: any) => {
+          allTemplates.push(...stageTemplates)
+        })
+        setMetaTemplates(allTemplates)
+      }
+    } catch (err) {
+      console.error('Failed to fetch templates:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!selectedTemplate) return
+    
+    setSaving(true)
+    try {
+      const res = await fetch('/api/dashboard/flows/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId: slot.stageId,
+          day: slot.day,
+          channel: slot.channel,
+          variant: 'A',
+          metaTemplateName: selectedTemplate,
+          content: content || selectedTemplate,
+          brand: 'default',
+        }),
+      })
+
+      if (res.ok) {
+        onSaved()
+        onClose()
+      } else {
+        const err = await res.json()
+        alert('Failed to save: ' + (err.error || 'Unknown error'))
+      }
+    } catch (err) {
+      console.error('Save failed:', err)
+      alert('Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--bg-primary)',
+          borderRadius: 16,
+          width: '100%',
+          maxWidth: 480,
+          maxHeight: '80vh',
+          overflow: 'auto',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '24px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <h2 style={{ margin: '0 0 4px 0', fontSize: 20, fontWeight: 700 }}>
+            Assign Template
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+            {stage.name} • Day {slot.day} • {slot.channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
+          </p>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: 24 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}>Loading...</div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  Select Meta Template
+                </label>
+                <select
+                  value={selectedTemplate}
+                  onChange={e => setSelectedTemplate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8,
+                    color: 'var(--text-primary)',
+                    fontSize: 14,
+                  }}
+                >
+                  <option value="">Select template...</option>
+                  {metaTemplates.map((t: any) => (
+                    <option key={t.meta_template_name || t.id} value={t.meta_template_name || t.id}>
+                      {t.meta_template_name || t.id} ({t.meta_status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  Content Preview
+                </label>
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 8,
+                    color: 'var(--text-primary)',
+                    fontSize: 14,
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  onClick={handleSave}
+                  disabled={!selectedTemplate || saving}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: stage.color,
+                    border: 'none',
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: !selectedTemplate || saving ? 'not-allowed' : 'pointer',
+                    opacity: !selectedTemplate || saving ? 0.6 : 1,
+                  }}
+                >
+                  {saving ? 'Saving...' : existingTemplate ? 'Update Assignment' : 'Assign Template'}
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 8,
+                    color: 'var(--text-secondary)',
+                    fontSize: 14,
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
