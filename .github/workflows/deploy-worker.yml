@@ -2,9 +2,10 @@ name: Deploy Template Sync Worker
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, production ]
     paths:
       - 'brands/bcon/workers/template-sync/**'
+      - '.github/workflows/deploy-worker.yml'
 
 jobs:
   deploy:
@@ -15,9 +16,9 @@ jobs:
       - name: Deploy to VPS
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.BCON_VPS_HOST }}
+          username: ${{ secrets.BCON_VPS_USER }}
+          key: ${{ secrets.BCON_VPS_SSH_KEY }}
           source: "brands/bcon/workers/template-sync/*"
           target: "/var/www/bcon-proxe/brands/bcon/workers/template-sync"
           strip_components: 4
@@ -25,9 +26,9 @@ jobs:
       - name: Restart Worker
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.BCON_VPS_HOST }}
+          username: ${{ secrets.BCON_VPS_USER }}
+          key: ${{ secrets.BCON_VPS_SSH_KEY }}
           script: |
             cd /var/www/bcon-proxe/brands/bcon/workers/template-sync
             npm install
