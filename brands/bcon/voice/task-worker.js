@@ -1926,11 +1926,37 @@ async function setFollowUpCooldown(leadId, hours = 48) {
 
 async function createFollowUpTasks() {
   const now = new Date();
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const nowIso = now.toISOString();
   const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const seventyTwoHoursAgo = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const seventyTwoHoursFromNow = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
 
-  // Fetch all active leads with follow-up tracking fields
-  const { data: leads } = await supabase
+  // 1. Add Exclusion for Leads with Pending Tasks
+  const { data: pendingTasks } = await supabase
+    .from('agent_tasks')
+    .select('lead_id')
+    .eq('status', 'pending')
+    .lte('scheduled_at', seventyTwoHoursFromNow)
+    .not('lead_id', 'is', null);
+
+  const leadsWithPendingTasks = [...new Set((pendingTasks || []).map(t => t.lead_id).filter(Boolean))];
+  console.log(`[FollowUp] Excluding ${leadsWithPendingTasks.length} leads with pending tasks in next 72h`);
+
+  // 2. Add Exclusion for Recent Follow-Ups
+  const { data: recentFollowUps } = await supabase
+    .from('all_leads')
+    .select('id')
+    .in('brand', ['bcon', 'default'])
+    .not('last_follow_up_sent_at', 'is', null)
+    .gte('last_follow_up_sent_at', seventyTwoHoursAgo);
+
+  const leadsWithRecentFollowUp = [...new Set((recentFollowUps || []).map(l => l.id).filter(Boolean))];
+  console.log(`[FollowUp] Excluding ${leadsWithRecentFollowUp.length} leads with recent follow-up in last 72h`);
+
+  const exclusionList = [...new Set([...leadsWithPendingTasks, ...leadsWithRecentFollowUp])];
+
+  // 4. Fix SQL Query Filters
+  let query = supabase
     .from('all_leads')
     .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, response_count, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup')
     .in('brand', ['bcon', 'default'])
@@ -1938,7 +1964,16 @@ async function createFollowUpTasks() {
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
     .lt('last_interaction_at', fortyEightHoursAgo)
     .gt('last_interaction_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
-    .or(`follow_up_cooldown_until.is.null,follow_up_cooldown_until.lt.${new Date().toISOString()}`);
+    .or(`follow_up_cooldown_until.is.null,follow_up_cooldown_until.lt.${nowIso}`)
+    .or(`last_follow_up_sent_at.is.null,last_follow_up_sent_at.lt.${seventyTwoHoursAgo}`);
+
+  if (exclusionList.length > 0) {
+    query = query.not('id', 'in', exclusionList);
+  }
+
+  const { data: leads } = await query;
+
+  console.log(`[FollowUp] Fetched ${leads ? leads.length : 0} leads for follow-up evaluation`);
 
   if (!leads || leads.length === 0) return;
 
@@ -1954,14 +1989,18 @@ async function createFollowUpTasks() {
       const leadPhone = lead.customer_phone_normalized;
       const leadId = lead.id;
 
+      console.log(`[FollowUp] Evaluating lead ${leadId} (${leadName}): stage=${leadStage}, responses=${responseCount}, hoursSinceInteraction=${hoursSinceInteraction.toFixed(1)}`);
+
       // --- DEDUPLICATION GUARD 1: Skip if in cooldown ---
       if (await isInCooldown(lead)) {
+        console.log(`[FollowUp] Skipping lead ${leadId}: in cooldown`);
         skippedCount++;
         continue;
       }
 
       // --- DEDUPLICATION GUARD 2: Skip if follow-up sent in last 72h ---
       if (await wasFollowUpRecentlySent(leadId, 72)) {
+        console.log(`[FollowUp] Skipping lead ${leadId}: follow-up recently sent (conversation pattern match)`);
         skippedCount++;
         continue;
       }
@@ -1970,7 +2009,7 @@ async function createFollowUpTasks() {
       if (lead.last_follow_up_sent_at) {
         const hoursSinceLastFollowUp = (Date.now() - new Date(lead.last_follow_up_sent_at).getTime()) / (1000 * 60 * 60);
         if (hoursSinceLastFollowUp < 72) {
-          console.log(`[Deduplication] Lead ${leadId} has last_follow_up_sent_at ${hoursSinceLastFollowUp.toFixed(1)}h ago, skipping`);
+          console.log(`[FollowUp] Skipping lead ${leadId}: last_follow_up_sent_at ${hoursSinceLastFollowUp.toFixed(1)}h ago (< 72h)`);
           skippedCount++;
           continue;
         }
@@ -2170,7 +2209,7 @@ async function createFollowUpTasks() {
       console.error(`[FollowUp] Error for lead ${lead.id}:`, err.message);
     }
   }
-  
+
   console.log(`[FollowUp] Complete: ${createdCount} tasks created, ${skippedCount} leads skipped (deduplication/cooldown)`);
 }
 
@@ -3782,6 +3821,22 @@ async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, sc
   const status = initialStatus || 'pending';
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  // 3. Make Task Creation Idempotent: check for identical pending task
+  if (leadId) {
+    const { data: identicalPending } = await supabase
+      .from('agent_tasks')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('task_type', taskType)
+      .eq('status', 'pending')
+      .limit(1);
+
+    if (identicalPending && identicalPending.length > 0) {
+      console.log(`[CreateTask] Skipped ${taskType} for ${leadName}: already has pending task`);
+      return;
+    }
+  }
+
   // Check for ANY existing task with same type + lead in last 7 days (regardless of status)
   let dedupQuery = supabase
     .from('agent_tasks')
@@ -3794,7 +3849,10 @@ async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, sc
   else dedupQuery = dedupQuery.eq('lead_phone', leadPhone);
 
   const { data: existingTask } = await dedupQuery;
-  if (existingTask && existingTask.length > 0) return;
+  if (existingTask && existingTask.length > 0) {
+    console.log(`[CreateTask] Skipped ${taskType} for ${leadName}: task already exists in last 7 days`);
+    return;
+  }
 
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: taskType,
