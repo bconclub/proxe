@@ -98,8 +98,8 @@ const STAGE_CONFIG: Record<string, {
     icon: <MdMessage size={22} />,
     color: '#3b82f6',
     bg: 'rgba(59,130,246,0.10)',
-    timing: 'Day 3, 7, 30',
-    days: [3, 7, 30],
+    timing: 'Day 1, 3, 7',
+    days: [1, 3, 7],
     channels: ['whatsapp', 'voice'],
   },
   engaged: {
