@@ -13,6 +13,16 @@ function isAuthorized(req: NextRequest): boolean {
   return token === secret;
 }
 
+// GET /api/website - Health check
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    endpoint: '/api/website',
+    methods: ['POST'],
+    description: 'Website form submission endpoint'
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Auth
