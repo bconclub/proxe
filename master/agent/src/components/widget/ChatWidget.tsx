@@ -1628,7 +1628,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     [isMobileViewport, messages.length]
   );
 
-  const mobileQuickActions = ["What's PROXe", 'Book a Demo', 'PROXe Pricing'];
+  const mobileQuickActions = config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"];
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;

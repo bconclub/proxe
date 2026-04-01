@@ -115,7 +115,7 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hey! I'm BCON's AI advisor. I help businesses plug in AI that actually works. What can I help with?",
+  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
   proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
 };
 function getWelcomeMessage(brand: string): string {
@@ -1628,7 +1628,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     [isMobileViewport, messages.length]
   );
 
-  const mobileQuickActions = ["What's PROXe", 'Book a Demo', 'PROXe Pricing'];
+  const mobileQuickActions = config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"];
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;

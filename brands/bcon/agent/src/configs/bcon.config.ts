@@ -20,74 +20,73 @@ export const bconConfig: BrandConfig = {
     },
   },
   colors: {
-    // Primary - purple only for interactive elements
-    primary: '#8B5CF6',
-    primaryLight: '#E0D4FC',
-    primaryDark: '#0A0A0B',
-    primaryVibrant: '#A78BFA',
+    // Primary Colors - Dark/Electric Purple Palette
+    primary: '#8B5CF6',              // Electric purple
+    primaryLight: '#E0D4FC',          // Light lavender
+    primaryDark: '#0A0A0B',           // Near black
+    primaryVibrant: '#A78BFA',        // Vibrant purple
 
     // Gradient
     gradientStart: '#0A0A0B',
     gradientMid: '#8B5CF6',
     gradientEnd: '#A78BFA',
 
-    // Backgrounds - pure blacks/dark grays, no purple tint
+    // Backgrounds
     darkBg: '#0A0A0B',
-    darkCard: 'rgba(255, 255, 255, 0.04)',
-    darkSurface: 'rgba(255, 255, 255, 0.02)',
-    glassBg: 'rgba(255, 255, 255, 0.03)',
-    glassBorder: 'rgba(255, 255, 255, 0.08)',
-    glassShadow: 'rgba(0, 0, 0, 0.3)',
+    darkCard: 'rgba(139, 92, 246, 0.3)',
+    darkSurface: 'rgba(10, 10, 11, 0.4)',
+    glassBg: 'rgba(139, 92, 246, 0.05)',
+    glassBorder: 'rgba(224, 212, 252, 0.1)',
+    glassShadow: 'rgba(139, 92, 246, 0.2)',
 
-    // Text - pure whites and grays
-    textPrimary: '#FAFAFA',
-    textSecondary: 'rgba(250, 250, 250, 0.7)',
-    textTertiary: 'rgba(250, 250, 250, 0.5)',
-    textMuted: 'rgba(250, 250, 250, 0.35)',
-    white: '#FAFAFA',
+    // Text Colors
+    textPrimary: '#E0D4FC',
+    textSecondary: 'rgba(224, 212, 252, 0.7)',
+    textTertiary: 'rgba(224, 212, 252, 0.5)',
+    textMuted: 'rgba(224, 212, 252, 0.4)',
+    white: '#E0D4FC',
 
-    // Borders - neutral grays
-    borderLight: 'rgba(255, 255, 255, 0.06)',
-    borderMedium: 'rgba(255, 255, 255, 0.10)',
-    borderAccent: 'rgba(255, 255, 255, 0.12)',
-    borderGlow: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Borders
+    borderLight: 'rgba(224, 212, 252, 0.08)',
+    borderMedium: 'rgba(224, 212, 252, 0.12)',
+    borderAccent: 'rgba(139, 92, 246, 0.3)',
+    borderGlow: 'rgba(139, 92, 246, 0.4)',
+    borderColor: 'rgba(139, 92, 246, 0.2)',
 
-    // Accents - semantic only
+    // Accents
     greenSuccess: '#10B981',
-    cyanAccent: '#06B6D4',
-    orangeAccent: '#F59E0B',
-    goldAccent: '#EAB308',
+    cyanAccent: '#A78BFA',
+    orangeAccent: '#8B5CF6',
+    goldAccent: '#A78BFA',
 
     // Background Variants
-    bgPrimary: 'rgba(255, 255, 255, 0.02)',
-    bgHeader: 'rgba(10, 10, 11, 0.9)',
-    bgMessageArea: 'rgba(255, 255, 255, 0.01)',
-    bgHover: 'rgba(255, 255, 255, 0.06)',
-    bgActive: 'rgba(255, 255, 255, 0.08)',
+    bgPrimary: 'rgba(10, 10, 11, 0.05)',
+    bgHeader: 'rgba(10, 10, 11, 0.85)',
+    bgMessageArea: 'rgba(139, 92, 246, 0.03)',
+    bgHover: 'rgba(139, 92, 246, 0.12)',
+    bgActive: 'rgba(139, 92, 246, 0.15)',
 
-    // Chat Bubbles - purple only for user bubbles
-    bubbleUserBg: 'rgba(139, 92, 246, 0.20)',
-    bubbleUserBorder: 'rgba(139, 92, 246, 0.5)',
-    bubbleUserShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
-    bubbleAiBg: 'rgba(255, 255, 255, 0.05)',
-    bubbleAiBorder: 'rgba(255, 255, 255, 0.08)',
-    bubbleAiShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
+    // Chat Bubbles
+    bubbleUserBg: 'rgba(139, 92, 246, 0.25)',
+    bubbleUserBorder: 'rgba(139, 92, 246, 0.7)',
+    bubbleUserShadow: '0 8px 32px rgba(139, 92, 246, 0.25)',
+    bubbleAiBg: 'rgba(10, 10, 11, 0.3)',
+    bubbleAiBorder: 'rgba(10, 10, 11, 0.7)',
+    bubbleAiShadow: '0 8px 32px rgba(10, 10, 11, 0.25)',
 
-    // Buttons - purple for primary action only
-    buttonBg: 'rgba(139, 92, 246, 0.20)',
-    buttonHover: 'rgba(139, 92, 246, 0.30)',
-    buttonActive: 'rgba(139, 92, 246, 0.40)',
+    // Buttons
+    buttonBg: 'rgba(139, 92, 246, 0.25)',
+    buttonHover: 'rgba(139, 92, 246, 0.35)',
+    buttonActive: 'rgba(139, 92, 246, 0.45)',
   },
   // Quick Actions: 3 buttons shown when chat opens
   quickButtons: [
-    'Explore AI Solutions',
-    'Book a Strategy Call',
-    'See Our Work'
+    'Tell me about BCON',
+    'I need help growing my business',
+    'Book a call'
   ],
-  // Explore Buttons: 4 service buttons
   exploreButtons: [
-    'AI in Business',
+    'AI in Marketing',
     'Brand Marketing',
     'Business Apps',
     'PROXe Platform'

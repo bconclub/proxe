@@ -81,13 +81,12 @@ export const bconConfig: BrandConfig = {
   },
   // Quick Actions: 3 buttons shown when chat opens
   quickButtons: [
-    'Explore AI Solutions',
-    'Book a Strategy Call',
-    'See Our Work'
+    'Tell me about BCON',
+    'I need help growing my business',
+    'Book a call'
   ],
-  // Explore Buttons: 4 service buttons
   exploreButtons: [
-    'AI in Business',
+    'AI in Marketing',
     'Brand Marketing',
     'Business Apps',
     'PROXe Platform'

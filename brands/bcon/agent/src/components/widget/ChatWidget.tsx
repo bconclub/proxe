@@ -38,9 +38,6 @@ import { createClient } from '@/lib/supabase/client';
 interface ChatWidgetProps {
   apiUrl?: string;
   widgetStyle?: 'searchbar' | 'bubble';
-  autoOpen?: boolean;
-  /** Render chat inline (no fixed positioning) - used for dashboard preview */
-  inline?: boolean;
 }
 
 // PROXE Logo component (white icon version)
@@ -106,8 +103,8 @@ const ICONS = {
         return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
       }
     }
-    // Fallback: Use image logo if brand has avatar source, infinity symbol for others
-    if (config && config.chatStructure?.avatar?.source) {
+    // Fallback: Use image logo for Windchasers, infinity symbol for others
+    if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
       return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
     }
     return <InfinitySymbol />;
@@ -118,11 +115,11 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hey! I'm BCON's AI. Tell me about your business and I'll show you how AI can help.",
-  proxe: "Hey! I'm BCON's AI. Tell me about your business and I'll show you how AI can help.",
+  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
+  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
 };
 function getWelcomeMessage(brand: string): string {
-  return welcomeMessages[brand] || welcomeMessages['bcon'];
+  return welcomeMessages[brand] || welcomeMessages['proxe'];
 }
 
 // Helper function to clean metadata strings from conversation summary
@@ -135,7 +132,7 @@ const cleanSummary = (summary: string | null | undefined): string => {
     .trim();
 };
 
-export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false, inline = false }: ChatWidgetProps) {
+export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProps) {
   const brand = getCurrentBrandId();
   const config = getBrandConfig(brand);
   const { openModal: openDeployModal, setOnFormSubmit } = useDeployModal();
@@ -235,42 +232,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
     }
   }, [isOpen]);
 
-  // Auto-open chat on mount when autoOpen prop is set (used by /widget preview page)
-  useEffect(() => {
-    if (autoOpen && !isOpen) {
-      handleOpenChat();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoOpen]);
-
   // Listen for viewport info from parent (for embed widget)
-  // Falls back to local detection if no parent message received
   useEffect(() => {
     if (widgetStyle !== 'bubble') return;
-
-    let timeoutId: ReturnType<typeof setTimeout>;
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
-        clearTimeout(timeoutId);
       }
     };
 
     window.addEventListener('message', handleMessage);
-
-    // Fallback: if no parent sends viewport info within 500ms, detect locally
-    timeoutId = setTimeout(() => {
-      setIsParentMobile((prev) => {
-        if (prev === null) return window.innerWidth <= 768;
-        return prev;
-      });
-    }, 500);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      clearTimeout(timeoutId);
-    };
+    return () => window.removeEventListener('message', handleMessage);
   }, [widgetStyle]);
 
   useEffect(() => {
@@ -1187,23 +1160,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
-
-    // Inline mode: fill parent container, no fixed positioning
-    if (inline) {
-      el.style.setProperty('position', 'relative', 'important');
-      el.style.setProperty('top', 'auto', 'important');
-      el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('right', 'auto', 'important');
-      el.style.setProperty('bottom', 'auto', 'important');
-      el.style.setProperty('width', '100%', 'important');
-      el.style.setProperty('height', '100%', 'important');
-      el.style.setProperty('max-width', '100%', 'important');
-      el.style.setProperty('max-height', '100%', 'important');
-      el.style.setProperty('transform', 'none', 'important');
-      el.style.setProperty('border-radius', '0', 'important');
-      return;
-    }
-
     // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
     const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
 
@@ -1672,7 +1628,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
     [isMobileViewport, messages.length]
   );
 
-  const mobileQuickActions = ["What's PROXe", 'Book a Demo', 'PROXe Pricing'];
+  const mobileQuickActions = config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"];
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
@@ -1715,77 +1671,168 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
     };
   }, [addAIMessage, setOnFormSubmit, externalSessionId, brandKey, persistUserProfile]);
 
-  // Restore conversation messages or show welcome when chat opens
+  // Restore conversation messages when chat opens
   useEffect(() => {
-    if (!isOpen || messages.length > 0 || hasShownWelcomeRef.current || !addAIMessage || !addUserMessage) return;
-
-    // Fast path: restore from ref if session init already fetched conversations
-    if (conversationsToRestoreRef.current.length > 0 && !hasRestoredMessagesRef.current) {
+    if (isOpen && conversationsToRestoreRef.current.length > 0 && !hasRestoredMessagesRef.current && messages.length === 0 && addUserMessage && addAIMessage) {
+      // Restore messages from conversations table
       const conversations = conversationsToRestoreRef.current;
+      
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Restoring conversation messages', { count: conversations.length });
+        console.log('[ChatWidget] Restoring conversation messages', {
+          count: conversations.length
+        });
       }
+      
+      // Restore messages in order
       conversations.forEach((conv) => {
-        if (conv.type === 'user') addUserMessage(conv.text);
-        else addAIMessage(conv.text);
+        if (conv.type === 'user') {
+          addUserMessage(conv.text);
+        } else {
+          addAIMessage(conv.text);
+        }
       });
+      
+      // Mark as restored so we don't restore again
       hasRestoredMessagesRef.current = true;
-      hasShownWelcomeRef.current = true;
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
-      return;
+      hasShownWelcomeRef.current = true; // Don't show welcome if we restored messages
+      
+      // Scroll to bottom after restoring
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+        }
+      }, 100);
     }
+  }, [isOpen, messages.length, addUserMessage, addAIMessage]);
 
-    // Slow path: fetch from DB if we have a session ID
-    if (externalSessionId && !hasRestoredMessagesRef.current) {
-      const fetchAndRestore = async () => {
+  // Re-fetch conversations when chat reopens (if not already restored)
+  useEffect(() => {
+    if (isOpen && messages.length === 0 && !hasRestoredMessagesRef.current && !hasShownWelcomeRef.current && externalSessionId) {
+      // Re-fetch conversations when chat reopens
+      const fetchConversationsOnReopen = async () => {
         try {
           const supabase = createClient();
-          if (!supabase) { addAIMessage(getWelcomeMessage(brand)); hasShownWelcomeRef.current = true; return; }
-
-          const { data: sessionData, error: sessionError } = await supabase
-            .from('web_sessions')
-            .select('lead_id')
-            .eq('external_session_id', externalSessionId)
-            .maybeSingle();
-
-          if (!sessionError && sessionData?.lead_id) {
-            const conversations = await fetchConversations(sessionData.lead_id);
-            if (conversations.length > 0) {
-              conversationsToRestoreRef.current = conversations.map((conv) => ({
-                id: conv.id,
-                type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
-                text: conv.content,
-                created_at: conv.created_at,
-              }));
-              conversations.forEach((conv) => {
-                if (conv.sender === 'customer') addUserMessage(conv.content);
-                else addAIMessage(conv.content);
-              });
-              hasRestoredMessagesRef.current = true;
-              hasShownWelcomeRef.current = true;
-              setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
-              return;
+          if (supabase && externalSessionId) {
+            const { data: sessionData, error: sessionError } = await supabase
+              .from('web_sessions')
+              .select('lead_id')
+              .eq('external_session_id', externalSessionId)
+              .maybeSingle();
+            
+            if (!sessionError && sessionData?.lead_id) {
+              const conversations = await fetchConversations(sessionData.lead_id);
+              if (conversations.length > 0) {
+                // Store conversations to restore
+                conversationsToRestoreRef.current = conversations.map((conv) => ({
+                  id: conv.id,
+                  type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+                  text: conv.content,
+                  created_at: conv.created_at
+                }));
+                
+                // Trigger restoration
+                if (addUserMessage && addAIMessage) {
+                  conversations.forEach((conv) => {
+                    if (conv.sender === 'customer') {
+                      addUserMessage(conv.content);
+                    } else {
+                      addAIMessage(conv.content);
+                    }
+                  });
+                  
+                  hasRestoredMessagesRef.current = true;
+                  hasShownWelcomeRef.current = true;
+                  
+                  // Scroll to bottom after restoring
+                  setTimeout(() => {
+                    if (messagesEndRef.current) {
+                      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+                    }
+                  }, 100);
+                }
+              }
             }
           }
-          // No conversations found - show welcome
-          addAIMessage(getWelcomeMessage(brand));
-          hasShownWelcomeRef.current = true;
         } catch (err) {
-          console.error('[ChatWidget] Error restoring conversations:', err);
-          addAIMessage(getWelcomeMessage(brand));
-          hasShownWelcomeRef.current = true;
+          console.error('[ChatWidget] Error fetching conversations on reopen:', err);
         }
       };
-      fetchAndRestore();
-      return;
+      
+      fetchConversationsOnReopen();
     }
+  }, [isOpen, externalSessionId, messages.length, addUserMessage, addAIMessage, brandKey]);
 
-    // No session yet or nothing to restore - show welcome
-    if (conversationsToRestoreRef.current.length === 0) {
+  // Re-fetch and restore conversations when chat reopens (if messages were cleared)
+  useEffect(() => {
+    if (isOpen && messages.length === 0 && !hasRestoredMessagesRef.current && !hasShownWelcomeRef.current && externalSessionId) {
+      // Re-fetch conversations when chat reopens and there are no messages
+      const fetchConversationsOnReopen = async () => {
+        try {
+          const supabase = createClient();
+          if (supabase && externalSessionId) {
+            const { data: sessionData, error: sessionError } = await supabase
+              .from('web_sessions')
+              .select('lead_id')
+              .eq('external_session_id', externalSessionId)
+              .maybeSingle();
+            
+            if (!sessionError && sessionData?.lead_id) {
+              const conversations = await fetchConversations(sessionData.lead_id);
+              if (conversations.length > 0 && addUserMessage && addAIMessage) {
+                // Store conversations to restore
+                conversationsToRestoreRef.current = conversations.map((conv) => ({
+                  id: conv.id,
+                  type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+                  text: conv.content,
+                  created_at: conv.created_at
+                }));
+                
+                // Restore messages
+                conversations.forEach((conv) => {
+                  if (conv.sender === 'customer') {
+                    addUserMessage(conv.content);
+                  } else {
+                    addAIMessage(conv.content);
+                  }
+                });
+                
+                hasRestoredMessagesRef.current = true;
+                hasShownWelcomeRef.current = true;
+                
+                // Scroll to bottom after restoring
+                setTimeout(() => {
+                  if (messagesEndRef.current) {
+                    messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+                  }
+                }, 100);
+                
+                return; // Don't show welcome message
+              }
+            }
+          }
+          
+          // No conversations found, show welcome message
+          if (addAIMessage) {
+            addAIMessage(getWelcomeMessage(brand));
+            hasShownWelcomeRef.current = true;
+          }
+        } catch (err) {
+          console.error('[ChatWidget] Error fetching conversations on reopen:', err);
+          // On error, show welcome message
+          if (addAIMessage) {
+            addAIMessage(getWelcomeMessage(brand));
+            hasShownWelcomeRef.current = true;
+          }
+        }
+      };
+      
+      fetchConversationsOnReopen();
+    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
+      // Show welcome message if no conversations to restore
       addAIMessage(getWelcomeMessage(brand));
       hasShownWelcomeRef.current = true;
     }
-  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brand]);
+  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
@@ -2608,9 +2655,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
   );
 
   if (!isOpen) {
-    // Inline preview: nothing to show when closed (autoOpen handles opening)
-    if (inline) return null;
-
     // Bubble widget style or docked bubble mode
     if (widgetStyle === 'bubble' || isDockedBubble) {
       return (
@@ -2633,11 +2677,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
 
   return (
     <>
-    {/* Only show searchbar if widgetStyle is not 'bubble' and not inline */}
-    {widgetStyle !== 'bubble' && !inline && searchbar}
-    <div
+    {/* Only show searchbar if widgetStyle is not 'bubble' */}
+    {widgetStyle !== 'bubble' && searchbar}
+    <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${inline ? '' : widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${!inline && widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${!inline && widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${!inline && widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
@@ -3270,7 +3314,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
       </div>
       </div>
     </div>
-    {!inline && (isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
+    {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
