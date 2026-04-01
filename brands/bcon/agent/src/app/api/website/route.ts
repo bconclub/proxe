@@ -178,21 +178,52 @@ export async function POST(req: NextRequest) {
       (async () => {
         try {
           if (normalizedPhone) {
-            // Send WhatsApp template immediately
-            await fetch('https://proxe.bconclub.com/api/agent/whatsapp/respond', {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.WEBHOOK_SECRET || ''}`
-              },
-              body: JSON.stringify({
-                phone: normalizedPhone,
-                message: getWelcomeTemplate(form_type || 'contact', name),
-                lead_id: leadId,
-                channel: 'whatsapp',
-                auto_triggered: true
-              })
-            });
+            // Determine probe_question based on service_interest
+            const serviceInterest = body.service_interest || '';
+            let probeQuestion: string;
+            if (serviceInterest === 'AI in Marketing') {
+              probeQuestion = 'Ready to plug an AI system into your marketing?';
+            } else if (serviceInterest === 'Brand Marketing') {
+              probeQuestion = 'Starting from scratch or scaling what\'s working?';
+            } else if (serviceInterest === 'Business Apps') {
+              probeQuestion = 'Got something built already or starting fresh?';
+            } else {
+              probeQuestion = 'What\'s the one thing you want to fix first?';
+            }
+
+            // Send WhatsApp Template for new web leads
+            const response = await fetch(
+              `https://graph.facebook.com/v18.0/${process.env.META_WHATSAPP_PHONE_NUMBER_ID}/messages`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.META_WHATSAPP_ACCESS_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: normalizedPhone.replace(/^\+/, ''),
+                  type: 'template',
+                  template: {
+                    name: 'bcon_welcome_web_v1',
+                    language: { code: 'en' },
+                    components: [{
+                      type: 'body',
+                      parameters: [
+                        { type: 'text', parameter_name: 'customer_name', text: name },
+                        { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
+                        { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
+                        { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
+                      ]
+                    }]
+                  }
+                })
+              }
+            );
+
+            if (!response.ok) {
+              console.error('Template send failed:', await response.text());
+            }
           } else if (email) {
             // Optional: Send email auto-responder via existing /api/send-email
             await fetch('https://bconclub.com/api/send-email', {
