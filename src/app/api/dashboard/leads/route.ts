@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const stage = searchParams.get('stage')
     const limit = parseInt(searchParams.get('limit') || '100')
     const offset = parseInt(searchParams.get('offset') || '0')
+    const includeNewsletter = searchParams.get('include_newsletter') === 'true'
 
     // Build query
     let query = supabase
@@ -40,6 +41,12 @@ export async function GET(request: NextRequest) {
     if (stuck === 'true') {
       const stuckDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
       query = query.lt('last_interaction_at', stuckDate)
+    }
+
+    // Exclude newsletter signups by default
+    if (!includeNewsletter) {
+      // Filter out leads where unified_context->web->form_submission->form_type = 'newsletter'
+      query = query.not('unified_context->web->form_submission->>form_type', 'eq', 'newsletter')
     }
 
     const { data: leads, error } = await query
