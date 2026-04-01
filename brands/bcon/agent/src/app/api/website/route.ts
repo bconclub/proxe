@@ -13,6 +13,18 @@ function isAuthorized(req: NextRequest): boolean {
   return token === secret;
 }
 
+// Template functions for auto-responder
+function getWelcomeTemplate(formType: string, name: string): string {
+  if (formType === 'newsletter') {
+    return `Hi ${name}, thanks for subscribing to BCON insights. Expect AI-powered business growth tips weekly. Want to chat about your specific challenges? Reply here.`;
+  }
+  return `Hi ${name}, got your message from our website. I'm BCON's AI assistant. While our team reviews your inquiry, can you tell me: What's your biggest business challenge right now?`;
+}
+
+function getEmailTemplate(formType: string, name: string): string {
+  return `Hi ${name},\n\nThanks for reaching out via our website. We've received your ${formType === 'newsletter' ? 'subscription' : 'message'}.\n\nOur team will review and get back to you within 24 hours.\n\nBest,\nBCON Team`;
+}
+
 // GET /api/website - Health check
 export async function GET() {
   return NextResponse.json({
@@ -158,6 +170,48 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       leadId = data.id;
       action = 'created';
+    }
+
+    // Auto-responder for new web leads
+    if (action === 'created' && (normalizedPhone || email)) {
+      // Fire-and-forget: don't await, don't block response
+      (async () => {
+        try {
+          if (normalizedPhone) {
+            // Send WhatsApp template immediately
+            await fetch('https://proxe.bconclub.com/api/agent/whatsapp/respond', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.WEBHOOK_SECRET || ''}`
+              },
+              body: JSON.stringify({
+                phone: normalizedPhone,
+                message: getWelcomeTemplate(form_type || 'contact', name),
+                lead_id: leadId,
+                channel: 'whatsapp',
+                auto_triggered: true
+              })
+            });
+          } else if (email) {
+            // Optional: Send email auto-responder via existing /api/send-email
+            await fetch('https://bconclub.com/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'lead',
+                email: email,
+                name: name,
+                subject: 'We received your message - BCON',
+                message: getEmailTemplate(form_type || 'contact', name)
+              })
+            });
+          }
+        } catch (e) {
+          console.error('Auto-responder failed:', e);
+          // Silent fail - don't break lead creation
+        }
+      })();
     }
 
     return NextResponse.json({
