@@ -57,8 +57,8 @@ export default function WebAgentSettingsClient() {
     <div className="h-full flex" style={{ minHeight: 600 }}>
       {/* LEFT - Configuration */}
       <div style={{
-        flex: '0 0 40%',
-        maxWidth: '40%',
+        flex: '0 0 30%',
+        maxWidth: '30%',
         borderRight: '1px solid var(--border-primary)',
         backgroundColor: 'var(--bg-primary)',
         display: 'flex',
@@ -169,7 +169,7 @@ export default function WebAgentSettingsClient() {
 
       {/* RIGHT - Widget preview full area */}
       <div style={{
-        flex: '1 1 60%',
+        flex: '1 1 70%',
         minWidth: 0,
         backgroundColor: '#141420',
         position: 'relative',
