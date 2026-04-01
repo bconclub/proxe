@@ -23,11 +23,17 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const includeNewsletter = searchParams.get('include_newsletter') === 'true'
 
     let query = supabase
       .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    // Exclude newsletter signups by default
+    if (!includeNewsletter) {
+      query = query.not('unified_context->web->form_submission->>form_type', 'eq', 'newsletter')
+    }
 
     if (source) {
       // Filter by first_touchpoint or last_touchpoint
