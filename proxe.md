@@ -1,5 +1,18 @@
 # PROXe — Build Truth
 
+**Last updated:** 2026-04-07
+
+## Changelog
+
+### 2026-04-07
+- fix: sync script preserves brand configs, prompts, theme CSS
+- feat(bcon): bcon-web-prompt.ts created for web widget
+- feat(bcon): promptBuilder routes web channel to web prompt
+- fix(bcon): mobile quick actions now dynamic from config
+- fix(bcon): exploreButtons AI in Marketing
+- fix(bcon): widget preview 30/70 layout with browser mockup
+- feat(bcon): BCON identity updated across prompts
+
 **Last updated:** 2026-03-17
 
 PROXe is a multi-brand AI agent platform. One codebase powers web chat, WhatsApp, voice, and social channels across multiple brands, each with its own database, theme, prompts, and deployment.

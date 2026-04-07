@@ -59,6 +59,11 @@ rsync -av --delete \
   --exclude='package-lock.json' \
   --exclude='.sync-backup-*' \
   --exclude='*.log' \
+  --exclude='configs/bcon.config.ts' \
+  --exclude='configs/proxe.config.ts' \
+  --exclude='configs/brand.config.ts' \
+  --exclude='configs/prompts/' \
+  --exclude='styles/theme.css' \
   "$MASTER_PATH/src/" "$BRAND_PATH/src/"
 
 echo ""

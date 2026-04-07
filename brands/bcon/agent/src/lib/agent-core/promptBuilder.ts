@@ -6,6 +6,7 @@
 import { Channel, HistoryEntry } from './types';
 import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
 import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
+import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 
 interface PromptOptions {
   channel: Channel;
@@ -24,10 +25,12 @@ interface PromptOptions {
 /**
  * Get brand-specific system prompt
  */
-function getBrandSystemPrompt(brand: string, context: string, messageCount?: number): string {
+function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
   switch (brand) {
     case 'bcon':
-      return getBconSystemPrompt(context, messageCount);
+      return channel === 'web'
+        ? getBconWebSystemPrompt(context, messageCount)
+        : getBconSystemPrompt(context, messageCount);
     case 'windchasers':
       return getWindchasersSystemPrompt(context, messageCount);
     default:
@@ -123,7 +126,7 @@ function buildSystemPrompt(
     }
   }
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote + formDataNote;
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
