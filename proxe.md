@@ -1,8 +1,18 @@
 # PROXe — Build Truth
 
-**Last updated:** 2026-04-09
+**Last updated:** 2026-04-10
 
 ## Changelog
+
+### 2026-04-10
+- fix(bcon): widget embed.js removed setTimeout on load, no animation
+- fix(bcon): widget quick buttons 2x2 grid layout for 4 buttons
+- fix(bcon): widget increased font sizes (message 15px, header 16px, buttons 14px)
+- fix(bcon): widget input box visible border and background
+- fix(bcon): lead dedup logic fixed order (phone→email→insert with conflict handling)
+- fix(bcon): calendar timezone set to Asia/Kolkata (GMT+05:30)
+- fix(bcon): LeadDetailsModal delete lead button with confirmation
+- fix(bcon): inbox View Full Details button uses router.push with leadId param
 
 ### 2026-04-09
 - fix(bcon): inbox source channel icons with colored backgrounds (web=blue, whatsapp=green)
