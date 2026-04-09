@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MdInbox,
   MdSend,
@@ -287,6 +287,7 @@ function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: 
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])

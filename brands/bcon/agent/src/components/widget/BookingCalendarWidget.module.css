@@ -91,6 +91,11 @@
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
 }
 
+.navButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 /* Month Grid */
 .monthGrid {
   display: flex;
@@ -157,6 +162,11 @@
   color: var(--text-primary, #ffffff);
 }
 
+.monthDateButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .monthDateOther {
   opacity: 0.3;
   color: var(--text-muted, rgba(255, 255, 255, 0.5));
@@ -220,6 +230,11 @@
 .timeSlot:hover:not(:disabled) {
   background: var(--bg-hover, rgba(255, 255, 255, 0.2));
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.timeSlot:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .timeSlotSelected {
@@ -302,6 +317,11 @@
 .closeButton:hover {
   background: var(--bg-active, rgba(255, 255, 255, 0.2));
   transform: scale(1.1);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .closeButton svg {
@@ -395,6 +415,11 @@
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
 }
 
+.backButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .submitButton {
   flex: 2;
   padding: 14px;
@@ -413,6 +438,11 @@
   background: var(--primary-vibrant, #A03BA8);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+.submitButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--white, #ffffff), 0 0 0 4px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 /* Confirmation View */
@@ -529,6 +559,11 @@
   box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
 }
 
+.addToCalendarButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--white, #ffffff), 0 0 0 4px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .downloadICSButton {
   background: var(--bg-primary, rgba(255, 255, 255, 0.1));
   backdrop-filter: blur(10px);
@@ -539,6 +574,11 @@
 .downloadICSButton:hover {
   background: var(--bg-hover, rgba(255, 255, 255, 0.2));
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.downloadICSButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .addToCalendarButton svg,
