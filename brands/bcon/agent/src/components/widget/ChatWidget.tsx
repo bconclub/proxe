@@ -115,8 +115,8 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
-  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
+  bcon: "Hi! I'm PROXe, BCON's AI. What brings you here today?",
+  proxe: "Hi! I'm PROXe, BCON's AI. What brings you here today?",
 };
 function getWelcomeMessage(brand: string): string {
   return welcomeMessages[brand] || welcomeMessages['proxe'];
@@ -2406,11 +2406,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const renderWelcomeButtons = useCallback(
     (wrapperClassName: string) => {
       // Get quick action buttons from brand config (3 fixed buttons)
-      const quickActions = config.quickButtons || [
-        'Start Pilot Training',
-        'Book a Demo Session',
-        'Explore Training Options'
-      ];
+      const quickActions = config.quickButtons || [];
       
       return (
         <div className={wrapperClassName}>

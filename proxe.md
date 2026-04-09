@@ -945,3 +945,29 @@ Recent evolution (Phase 8+):
 | Windchasers | proxe.windchasers.in | widget embedded | Meta Cloud API | — | — | 31 migrations |
 | PROXe | deployed | deployed | — | — | — | 24 migrations |
 | BCON | proxe.bconclub.com | deployed + booking tools | Meta Cloud API | voiceproxe.bconclub.com | PM2 cron (5min) | active |
+
+
+---
+
+## Active Sprint - Go-Live Readiness
+Start: 2026-04-07 | Target: 2026-04-14
+
+### Done
+- [2026-04-01] Form fills wired to /api/website
+- [2026-04-07] bcon_welcome_web_v1 template created
+- [2026-04-09] Sync script fixed - preserves brand configs
+- [2026-04-09] Web widget prompt created (bcon-web-prompt.ts)
+- [2026-04-09] Widget preview browser mockup
+
+### Pending
+- Fix phone ID undefined in task worker
+- Fix dedup - same template repeating
+- Widget live on bconclub.com
+- Welcome message fix in widget
+- Quick buttons update
+- Typing animation (3 dots)
+- Scroll-triggered widget reveal
+- DEMO_TAKEN + PROPOSAL_SENT admin notes
+- Stage-based follow-up logic
+- Flows page visual journey map
+- Outbound call button

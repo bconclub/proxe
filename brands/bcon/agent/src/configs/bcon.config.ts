@@ -80,11 +80,7 @@ export const bconConfig: BrandConfig = {
     buttonActive: 'rgba(139, 92, 246, 0.45)',
   },
   // Quick Actions: 3 buttons shown when chat opens
-  quickButtons: [
-    'Tell me about BCON',
-    'I need help growing my business',
-    'Book a call'
-  ],
+  quickButtons: ['About BCON', 'Solutions', 'See Portfolio', 'Talk to the Team'],
   exploreButtons: [
     'AI in Marketing',
     'Brand Marketing',

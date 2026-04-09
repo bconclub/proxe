@@ -323,9 +323,9 @@ export default function WebAgentSettingsClient() {
           <div
             style={{
               width: '100%',
-              maxWidth: '1200px',
+              maxWidth: '1000px',
               height: '100%',
-              maxHeight: '800px',
+              maxHeight: '680px',
               display: 'flex',
               flexDirection: 'column',
               borderRadius: '12px',
@@ -437,7 +437,7 @@ export default function WebAgentSettingsClient() {
                   bottom: '20px',
                   right: '20px',
                   width: '420px',
-                  height: '650px',
+                  height: '580px',
                   pointerEvents: 'none',
                 }}
               >
@@ -446,7 +446,7 @@ export default function WebAgentSettingsClient() {
                   src="/widget/bubble"
                   style={{
                     width: '420px',
-                    height: '650px',
+                    height: '580px',
                     border: 'none',
                     pointerEvents: 'auto',
                   }}

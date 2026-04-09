@@ -511,7 +511,126 @@ export default function StatusPage() {
             </ul>
           </div>
         )}
+
+        {/* Changelog */}
+        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Changelog
+          </h2>
+          <div className="space-y-4">
+            {CHANGELOG.map((entry) => (
+              <div key={entry.build} className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: 'var(--accent-purple)', color: 'white' }}>
+                    Build {entry.build}
+                  </span>
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    {new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                <ul className="space-y-1">
+                  {entry.changes.map((change, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5">✓</span>
+                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {change}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Active Sprint */}
+        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Active Sprint: Go-Live Readiness
+            </h2>
+            <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <span>Start: Apr 7</span>
+              <span>Target: Apr 14</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Done Column */}
+            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
+              <h3 className="font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-green-500">✓</span>
+                Done
+              </h3>
+              <ul className="space-y-2">
+                {SPRINT_DONE.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <div className="flex-1">
+                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {item.title}
+                      </span>
+                      <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
+                        ({item.date})
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pending Column */}
+            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
+              <h3 className="font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-orange-500">⏱</span>
+                Pending
+              </h3>
+              <ul className="space-y-2">
+                {SPRINT_PENDING.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-orange-500 mt-0.5">⏱</span>
+                    <div className="flex-1">
+                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {item.title}
+                      </span>
+                      <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
+                        (added {item.added})
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   )
 }
+
+const CHANGELOG = [
+  { build: 7, date: '2026-04-09', changes: ['bcon-web-prompt.ts created', 'BCON identity updated', 'Sync script preserves brand configs', 'Widget preview browser mockup', 'Mobile quick buttons dynamic'] },
+  { build: 6, date: '2026-04-01', changes: ['Widget preview 70%', 'exploreButtons AI in Marketing', 'Dynamic mobile quick buttons'] },
+  { build: 5, date: '2026-03-30', changes: ['/api/website endpoint', 'Welcome template wired', 'Newsletter excluded from leads'] },
+]
+
+const SPRINT_DONE = [
+  { title: 'Form fills wired to /api/website', date: 'Apr 1' },
+  { title: 'bcon_welcome_web_v1 template created', date: 'Apr 7' },
+  { title: 'Sync script fixed', date: 'Apr 9' },
+  { title: 'Web widget prompt created', date: 'Apr 9' },
+  { title: 'Widget preview browser mockup', date: 'Apr 9' },
+]
+
+const SPRINT_PENDING = [
+  { title: 'Fix phone ID undefined in task worker', added: 'Apr 9' },
+  { title: 'Fix dedup - same template repeating', added: 'Apr 9' },
+  { title: 'Widget live on bconclub.com', added: 'Apr 9' },
+  { title: 'Welcome message fix in widget', added: 'Apr 9' },
+  { title: 'Quick buttons update', added: 'Apr 9' },
+  { title: 'Typing animation (3 dots)', added: 'Apr 9' },
+  { title: 'Scroll-triggered widget reveal', added: 'Apr 9' },
+  { title: 'DEMO_TAKEN + PROPOSAL_SENT admin notes', added: 'Apr 9' },
+  { title: 'Stage-based follow-up logic', added: 'Apr 9' },
+  { title: 'Flows page visual journey map', added: 'Apr 9' },
+  { title: 'Outbound call button', added: 'Apr 9' },
+]
