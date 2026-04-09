@@ -1156,7 +1156,7 @@ export default function InboxPage() {
         {/* Search + Filters - flush at top */}
         <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <div
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-amber-500/50 mb-2"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-[var(--accent-primary)]/50 focus-within:ring-2 focus-within:ring-[var(--accent-primary)]/20 mb-2"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
@@ -1167,7 +1167,7 @@ export default function InboxPage() {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-xs"
+              className="bg-transparent border-none outline-none focus:outline-none flex-1 text-xs"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
@@ -1176,7 +1176,7 @@ export default function InboxPage() {
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
                   background: channelFilter === ch ? 'var(--button-bg, #fff)' : 'transparent',
                   color: channelFilter === ch ? 'var(--text-button, #000)' : 'var(--text-muted)',
@@ -1257,7 +1257,7 @@ export default function InboxPage() {
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); openLeadModal(conv.lead_id); }}
-                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80"
+                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                           style={{ color: 'var(--text-secondary)' }}
                           title="Open lead details"
                         >
