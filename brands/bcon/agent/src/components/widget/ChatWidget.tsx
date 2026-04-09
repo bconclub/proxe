@@ -186,6 +186,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
   const [isDockedBubble, setIsDockedBubble] = useState(false);
+  const [preLoadedLeadContext, setPreLoadedLeadContext] = useState<{ name?: string; service?: string; brand?: string; lead_id?: string } | null>(null);
   const SEARCHBAR_KEYBOARD_GAP = 5;
   const EMAIL_PROMPT_THRESHOLD = 5;
   const PHONE_PROMPT_THRESHOLD = 7;
@@ -232,13 +233,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [isOpen]);
 
-  // Listen for viewport info from parent (for embed widget)
+  // Listen for viewport info and lead context from parent (for embed widget)
   useEffect(() => {
     if (widgetStyle !== 'bubble') return;
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
+      }
+      if (e.data && e.data.type === 'proxe_lead_context') {
+        console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
+        setPreLoadedLeadContext(e.data.lead);
       }
     };
 
@@ -296,6 +301,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           }
           if (typeof storedUser.promptedPhone === 'boolean') {
             setHasAskedPhone(storedUser.promptedPhone);
+          }
+        }
+
+        // Apply pre-loaded lead context from parent page (form submission)
+        if (preLoadedLeadContext && !cancelled) {
+          console.log('[ChatWidget] Applying pre-loaded lead context:', preLoadedLeadContext);
+          const leadProfile: LocalUserProfile = {
+            ...storedUser,
+            name: preLoadedLeadContext.name || storedUser?.name,
+          };
+          setUserProfile(leadProfile);
+          storeUserProfile(leadProfile, brandKey);
+          if (preLoadedLeadContext.name) {
+            setHasAskedName(true);
           }
         }
 
@@ -476,7 +495,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preLoadedLeadContext]);
 
   useEffect(() => {
     if (showNamePrompt) {
@@ -1823,14 +1842,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           
           // No conversations found, show welcome message
           if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
+            const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
+              ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
+              : getWelcomeMessage(brand);
+            addAIMessage(welcomeMsg);
             hasShownWelcomeRef.current = true;
           }
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
           if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
+            const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
+              ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
+              : getWelcomeMessage(brand);
+            addAIMessage(welcomeMsg);
             hasShownWelcomeRef.current = true;
           }
         }
@@ -1839,10 +1864,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       fetchConversationsOnReopen();
     } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
-      addAIMessage(getWelcomeMessage(brand));
+      const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
+        ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
+        : getWelcomeMessage(brand);
+      addAIMessage(welcomeMsg);
       hasShownWelcomeRef.current = true;
     }
-  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);
+  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey, preLoadedLeadContext]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {

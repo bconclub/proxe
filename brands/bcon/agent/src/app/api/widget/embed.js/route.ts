@@ -30,6 +30,26 @@ export async function GET() {
   // Widget shows immediately on page load
   iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
 
+  // Check for pre-loaded lead context from host page
+  var leadContext = window.__proxe_lead || null;
+  
+  // Also check URL params for lead context (fallback)
+  if (!leadContext) {
+    var urlParams = new URLSearchParams(window.location.search);
+    var leadId = urlParams.get('leadId') || urlParams.get('lead_id');
+    var name = urlParams.get('name');
+    var service = urlParams.get('service') || urlParams.get('solution');
+    var brand = urlParams.get('brand');
+    if (leadId || name) {
+      leadContext = {
+        lead_id: leadId,
+        name: name,
+        service: service,
+        brand: brand || 'BCON'
+      };
+    }
+  }
+
   // Listen for messages from widget to resize iframe
   window.addEventListener('message', function(e) {
     if (e.data === 'wc-chat-open') {
@@ -62,6 +82,24 @@ export async function GET() {
   });
 
   document.body.appendChild(iframe);
+
+  // Pass lead context to widget when it's ready
+  if (leadContext) {
+    // Wait for iframe to load, then send lead context
+    var sendLeadContext = function() {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          type: 'proxe_lead_context',
+          lead: leadContext
+        }, '*');
+      }
+    };
+    
+    // Try immediately and also after a short delay to ensure widget is ready
+    sendLeadContext();
+    setTimeout(sendLeadContext, 500);
+    setTimeout(sendLeadContext, 1500);
+  }
 })();
   `;
 
