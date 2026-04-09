@@ -196,7 +196,7 @@ export default function LeadStageSelector({
                 onClick={() => handleStageChange(option.value)}
                 disabled={disabled || isUpdating}
                 className={`
-                  px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  px-3 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                   ${stage === option.value
                     ? `${getStageColor(option.value)} ring-2 ring-offset-2 ring-current`
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
