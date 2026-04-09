@@ -129,7 +129,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
           onClick={handleSyncCalendar}
           disabled={syncing}
           className={`
-            flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors
+            flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
             ${syncing ? 'bg-gray-400 cursor-not-allowed text-[var(--text-button)]' : 'text-[var(--text-button)] hover:opacity-90'}
           `}
           style={!syncing ? { backgroundColor: 'var(--button-bg)' } : undefined}
@@ -152,7 +152,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
               <span>{syncStatus.message}</span>
               {syncStatus.details && <span className="opacity-75">({syncStatus.details})</span>}
               {syncStatus.errorList && syncStatus.errorList.length > 0 && (
-                <button onClick={() => setShowErrors(!showErrors)} className="ml-0.5 underline opacity-75 hover:opacity-100 cursor-pointer">
+                <button onClick={() => setShowErrors(!showErrors)} className="ml-0.5 underline opacity-75 hover:opacity-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded px-1">
                   {showErrors ? 'Hide' : 'Errors'}
                 </button>
               )}
@@ -161,7 +161,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
               <div className="absolute top-full left-0 mt-1 z-50 w-[360px] max-h-48 overflow-y-auto border rounded-lg shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Sync Errors ({syncStatus.errorList.length})</span>
-                  <button onClick={() => setShowErrors(false)} className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>✕</button>
+                  <button onClick={() => setShowErrors(false)} className="text-[10px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded px-1" style={{ color: 'var(--text-secondary)' }}>✕</button>
                 </div>
                 <div className="space-y-1">
                   {syncStatus.errorList.map((err, idx) => (
