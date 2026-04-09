@@ -2368,6 +2368,35 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
+    // Handle booking intent buttons directly - trigger booking flow without AI round-trip
+    const bookingKeywords = ['book', 'call', 'schedule', 'demo', 'appointment', 'meeting', 'consultation', 'audit'];
+    const hasBookingIntent = bookingKeywords.some(keyword => lowerMessage.includes(keyword));
+    
+    if (hasBookingIntent && !bookingCompleted) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[ChatWidget] Booking intent detected, triggering booking flow directly');
+      }
+      
+      // Add user message to chat
+      addUserMessage(buttonText);
+      
+      // Trigger booking flow directly
+      setPendingCalendar(true);
+      
+      // Show calendar widget after a short delay
+      setTimeout(() => {
+        const calendarMessageId = `calendar-${Date.now()}`;
+        setShowCalendly(calendarMessageId);
+        setCalendarAnchorId(calendarMessageId);
+        
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[ChatWidget] Calendar opened from button click');
+        }
+      }, 300);
+      
+      return;
+    }
+
     const nextButtons = [...usedButtons, buttonText];
     const isExploreRequest = lowerMessage === 'explore proxe' || 
                              lowerMessage === 'explore training options' ||
@@ -2650,6 +2679,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     </div>
   );
 
+  // Add typing animation keyframes
+  const typingAnimationStyles = `
+    @keyframes typingPulse {
+      0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.3;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+  `;
+
   if (!isOpen) {
     // Bubble widget style or docked bubble mode
     if (widgetStyle === 'bubble' || isDockedBubble) {
@@ -2673,6 +2716,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   return (
     <>
+    {/* Typing animation styles */}
+    <style dangerouslySetInnerHTML={{ __html: typingAnimationStyles }} />
+    
     {/* Only show searchbar if widgetStyle is not 'bubble' */}
     {widgetStyle !== 'bubble' && searchbar}
     <div 
@@ -2780,21 +2826,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                         </span>
                       </div>
                       
-                      {/* Message content */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                        <div
-                          className={styles.messageText}
-                          style={{ flex: '1 1 auto', minWidth: 0 }}
-                          dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                        />
-                        {message.isStreaming && message.text && (
-                          <span className={styles.streamingCursor}>▋</span>
-                        )}
-                      </div>
+                      {/* Message content - hide text when calendar is showing for this message */}
+                      {!(showCalendly && calendarAnchorId === message.id) && (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                          <div
+                            className={styles.messageText}
+                            style={{ flex: '1 1 auto', minWidth: 0 }}
+                            dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                          />
+                          {message.isStreaming && message.text && (
+                            <span className={styles.streamingCursor}>▋</span>
+                          )}
+                        </div>
+                      )}
                       
-                      {/* Follow-up buttons inside the bubble for AI messages */}
+                      {/* Follow-up buttons inside the bubble for AI messages - pill style, inline */}
                       {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
-                        <div className={styles.followUpButtons}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
                           {message.followUps.map((followUp, followUpIndex) => {
                             // Rotate through accent colors for follow-up buttons
                             const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
@@ -2805,6 +2853,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                               key={followUpIndex}
                               className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
                               onClick={() => handleQuickButtonClick(followUp)}
+                              style={{
+                                width: 'auto',
+                                borderRadius: '20px',
+                                padding: '8px 16px',
+                                display: 'inline-block',
+                                fontSize: '13px',
+                                fontWeight: '500',
+                                whiteSpace: 'nowrap',
+                              }}
                             >
                               {followUp}
                             </button>
@@ -3223,6 +3280,65 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             </div>
           </div>
         )}
+        
+        {/* Typing indicator - shows while waiting for AI response */}
+        {isLoading && (
+          <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}>
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 0' }}>
+                    <span 
+                      className={styles.typingDot}
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#8B5CF6',
+                        animation: 'typingPulse 1.4s infinite ease-in-out both',
+                        animationDelay: '0s',
+                      }}
+                    />
+                    <span 
+                      className={styles.typingDot}
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#8B5CF6',
+                        animation: 'typingPulse 1.4s infinite ease-in-out both',
+                        animationDelay: '0.2s',
+                      }}
+                    />
+                    <span 
+                      className={styles.typingDot}
+                      style={{
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#8B5CF6',
+                        animation: 'typingPulse 1.4s infinite ease-in-out both',
+                        animationDelay: '0.4s',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
       {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}

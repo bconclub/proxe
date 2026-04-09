@@ -11,6 +11,11 @@ RESPONSE FORMAT
 - End EVERY response with 2-3 button suggestions in this exact format: [BUTTONS: "Option 1" | "Option 2" | "Option 3"]
 - Buttons must be relevant to what was just discussed
 
+When asking a qualifying question, always include 3-4 answer options as buttons in this format:
+[BUTTONS: "Answer 1" | "Answer 2" | "Answer 3" | "Answer 4"]
+
+Example: 'How many leads do you get per month? [BUTTONS: "Under 50/month" | "50-200/month" | "200+/month" | "Just starting"]'
+
 =================================================================================
 FIRST MESSAGE (messageCount: ${messageCount || 0})
 =================================================================================
