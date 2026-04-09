@@ -175,7 +175,30 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       </div>
     )
 
-    return <CalendarView bookings={bookings} headerRight={syncBar} />
+    // Error banner for failed sync
+    const errorBanner = syncStatus && !syncStatus.success && !syncing ? (
+      <div className="mb-4 p-3 rounded-lg border-l-4 bg-red-500/10 border-red-500">
+        <div className="flex items-center gap-2">
+          <MdError className="text-red-500" size={18} />
+          <span className="text-sm font-medium text-red-500">Google Calendar Sync Failed</span>
+        </div>
+        <p className="text-xs text-red-400 mt-1">{syncStatus.message}</p>
+        {syncStatus.errorList && syncStatus.errorList.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {syncStatus.errorList.map((err, idx) => (
+              <div key={idx} className="text-[10px] text-red-400 bg-red-500/10 px-2 py-1 rounded">{err}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null
+
+    return (
+      <div className="h-full">
+        {errorBanner}
+        <CalendarView bookings={bookings} headerRight={syncBar} />
+      </div>
+    )
   }
 
   // Upcoming list view

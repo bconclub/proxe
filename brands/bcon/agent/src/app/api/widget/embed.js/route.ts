@@ -27,57 +27,8 @@ export async function GET() {
   iframe.src = baseUrl + '/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
-  // Scroll-triggered reveal: hidden on load, revealed after first scroll
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;opacity:0;transform:translateY(20px);transition:opacity 0.4s ease,transform 0.4s ease;';
-
-  // Add pulse ring animation styles
-  var style = document.createElement('style');
-  style.textContent = 
-    '@keyframes pulseRing{' +
-      '0%{transform:scale(1);opacity:1}' +
-      '100%{transform:scale(1.4);opacity:0}' +
-    '}' +
-    '.wc-pulse-ring{' +
-      'position:absolute;' +
-      'inset:-8px;' +
-      'border:2px solid #8B5CF6;' +
-      'border-radius:50%;' +
-      'animation:pulseRing 1.5s ease-out;' +
-      'pointer-events:none;' +
-      'z-index:-1;' +
-    '}';
-  document.head.appendChild(style);
-
-  var revealed = false;
-  var pulseCount = 0;
-  var maxPulses = 3;
-
-  function showWidget() {
-    if (revealed) return;
-    revealed = true;
-    iframe.style.opacity = '1';
-    iframe.style.transform = 'translateY(0)';
-    
-    // Add pulse ring effect
-    function addPulse() {
-      if (pulseCount >= maxPulses) return;
-      pulseCount++;
-      var ring = document.createElement('div');
-      ring.className = 'wc-pulse-ring';
-      iframe.parentNode.insertBefore(ring, iframe);
-      setTimeout(function() { ring.remove(); }, 1500);
-      if (pulseCount < maxPulses) {
-        setTimeout(addPulse, 500);
-      }
-    }
-    setTimeout(addPulse, 400);
-  }
-
-  // Listen for first scroll event
-  window.addEventListener('scroll', showWidget, { passive: true, once: true });
-  
-  // Fallback: show after 5 seconds if no scroll
-  setTimeout(showWidget, 5000);
+  // Widget shows immediately on page load
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
 
   // Listen for messages from widget to resize iframe
   window.addEventListener('message', function(e) {

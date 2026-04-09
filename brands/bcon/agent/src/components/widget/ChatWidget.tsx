@@ -1648,6 +1648,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     [isLoading, messages]
   );
 
+  // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
+  const hasStreamingText = useMemo(
+    () => messages.some((m) => m.isStreaming && m.text),
+    [messages]
+  );
+
   // Register callback for when Deploy form is submitted
   useEffect(() => {
     const handleDeployFormSubmit = async () => {
@@ -2816,7 +2822,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             >
               <div className={styles.messageContent}>
                 <div className={styles.bubble}>
-                  {message.isStreaming && !message.text ? (
+                  {message.isStreaming && !message.text && !hasStreamingText ? (
                     <InfinityLoader />
                   ) : (
                     <div className={styles.bubbleContent}>

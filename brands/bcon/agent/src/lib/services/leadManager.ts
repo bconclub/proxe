@@ -141,11 +141,13 @@ export async function ensureOrUpdateLead(
 
     let existing: any = null;
 
-    // Try by normalized phone first
+    // Try by normalized phone first (with brand filter)
+    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
     const { data: byPhone, error: phoneErr } = await client
       .from('all_leads')
       .select('id, unified_context, email, customer_name, phone')
       .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', brand)
       .maybeSingle();
 
     if (phoneErr && phoneErr.code === '42P01') {
@@ -155,12 +157,13 @@ export async function ensureOrUpdateLead(
 
     existing = byPhone;
 
-    // Fallback: try by email
+    // Fallback: try by email (with brand filter)
     if (!existing && email) {
       const { data: byEmail } = await client
         .from('all_leads')
         .select('id, unified_context, email, customer_name, phone')
         .eq('email', email)
+        .eq('brand', brand)
         .maybeSingle();
 
       if (byEmail) existing = byEmail;
@@ -227,13 +230,14 @@ export async function ensureOrUpdateLead(
       .single();
 
     if (createError) {
-      // Duplicate - fetch existing
+      // Duplicate - fetch existing (with brand filter)
       if (createError.code === '23505' || createError.message?.includes('duplicate')) {
         let dup: any = null;
         const { data: d1 } = await client
           .from('all_leads')
           .select('id')
           .eq('customer_phone_normalized', normalizedPhone)
+          .eq('brand', brand)
           .maybeSingle();
         dup = d1;
 
@@ -242,11 +246,35 @@ export async function ensureOrUpdateLead(
             .from('all_leads')
             .select('id')
             .eq('email', email)
+            .eq('brand', brand)
             .maybeSingle();
           dup = d2;
         }
 
-        if (dup) return dup.id;
+        if (dup) {
+          // Update existing lead with new data
+          const existingCtx = dup.unified_context || {};
+          const mergedContext = {
+            ...existingCtx,
+            [channel]: {
+              ...(existingCtx[channel] || {}),
+              ...(unifiedContext[channel] || {}),
+            },
+          };
+
+          const updates: any = {
+            last_touchpoint: channel,
+            last_interaction_at: getISTTimestamp(),
+            unified_context: Object.keys(mergedContext).length > 0 ? mergedContext : undefined,
+          };
+
+          if (customerName) updates.customer_name = customerName;
+          if (email) updates.email = email;
+          if (phone) updates.phone = phone;
+
+          await client.from('all_leads').update(updates).eq('id', dup.id);
+          return dup.id;
+        }
       }
 
       console.error('[leadManager] Failed to create lead', {

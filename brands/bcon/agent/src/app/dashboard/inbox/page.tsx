@@ -22,33 +22,52 @@ import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
-// Channel Icons using custom SVGs
+// Channel Icons using custom SVGs with colored backgrounds
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
-  const style = {
-    opacity: active ? 1 : 0.3,
-    filter: 'invert(1) brightness(2)', // Inverts black to white for dark mode
+  const containerStyle: React.CSSProperties = {
+    width: size + 4,
+    height: size + 4,
+    borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: active ? 1 : 0.4,
   };
 
   switch (channel) {
     case 'web':
-      return <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={style} title="Website" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#3B82F6' }}>
+          <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={{ filter: 'invert(1)' }} title="Website" />
+        </div>
+      );
     case 'whatsapp':
-      return <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={style} title="WhatsApp" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#25D366' }}>
+          <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={{ filter: 'invert(1)' }} title="WhatsApp" />
+        </div>
+      );
     case 'voice':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ opacity: active ? 1 : 0.3 }} title="Voice">
-          <path
-            d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
-            stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-          />
-          <path
-            d="M18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6L18 2z"
-            fill="var(--accent-primary, #818cf8)" stroke="var(--accent-primary, #818cf8)" strokeWidth="0.5"
-          />
-        </svg>
+        <div style={{ ...containerStyle, backgroundColor: '#8B5CF6' }}>
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" title="Voice">
+            <path
+              d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
+              stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            />
+            <path
+              d="M18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6L18 2z"
+              fill="#fff" stroke="#fff" strokeWidth="0.5"
+            />
+          </svg>
+        </div>
       );
     case 'social':
-      return <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={style} title="Social" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#F59E0B' }}>
+          <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={{ filter: 'invert(1)' }} title="Social" />
+        </div>
+      );
     default:
       return null;
   }
@@ -110,6 +129,8 @@ interface Message {
   message_type: string
   metadata: any
   created_at: string
+  delivered_at?: string | null
+  read_at?: string | null
 }
 
 
@@ -238,20 +259,29 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
 }
 
 
-function DeliveryStatusIcon({ status }: { status: string | undefined }) {
-  if (!status || status === 'sent' || status === 'pending') {
-    return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string }) {
+  // Check for failed state: no delivery confirmation after 10 minutes
+  const isFailed = !deliveredAt && !readAt && createdAt && 
+    (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
+
+  if (isFailed) {
+    // Warning icon
+    return (
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1v10M8 13v2" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+      </svg>
+    );
   }
-  if (status === 'delivered') {
+  if (readAt) {
+    // Double green tick = read by recipient
     return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   }
-  if (status === 'read') {
-    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  if (deliveredAt) {
+    // Double amber tick = delivered
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   }
-  if (status === 'failed') {
-    return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3l-10 10" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/></svg>
-  }
-  return null
+  // Single amber tick = sent (no delivery confirmation)
+  return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 }
 
 export default function InboxPage() {
@@ -760,6 +790,8 @@ export default function InboxPage() {
         message_type: String(msg?.message_type ?? ''),
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
+        delivered_at: msg?.delivered_at ?? null,
+        read_at: msg?.read_at ?? null,
       }))
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {
@@ -1117,7 +1149,8 @@ export default function InboxPage() {
         className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
-          borderColor: 'var(--border-primary)'
+          borderColor: 'var(--border-primary)',
+          minWidth: '280px',
         }}
       >
         {/* Search + Filters - flush at top */}
@@ -1602,7 +1635,7 @@ export default function InboxPage() {
                                 {msg.metadata.template_name}
                               </span>
                               <span className="flex items-center" title={ds || 'pending'}>
-                                <DeliveryStatusIcon status={ds} />
+                                <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
                               </span>
                             </div>
                           )
@@ -1661,7 +1694,7 @@ export default function InboxPage() {
                               </div>
                             )}
                             <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
-                              <DeliveryStatusIcon status={msg.metadata?.delivery_status} />
+                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
                             </span>
                           </div>
                         )}
@@ -1864,8 +1897,8 @@ export default function InboxPage() {
               }}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity disabled:opacity-40"
               style={{
-                background: leadDetails.phone ? 'rgba(34,197,94,0.12)' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#22c55e' : 'var(--text-muted)',
+                background: leadDetails.phone ? '#22C55E' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
               }}
             >
               <MdPhone size={14} /> {callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
@@ -1876,8 +1909,8 @@ export default function InboxPage() {
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
               style={{
-                background: leadDetails.phone ? 'rgba(37,211,102,0.12)' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#25D366' : 'var(--text-muted)',
+                background: leadDetails.phone ? '#25D366' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
                 opacity: leadDetails.phone ? 1 : 0.4,
                 pointerEvents: leadDetails.phone ? 'auto' : 'none',
               }}
@@ -1888,8 +1921,8 @@ export default function InboxPage() {
               href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
               style={{
-                background: leadDetails.email ? 'rgba(168,85,247,0.12)' : 'var(--bg-tertiary)',
-                color: leadDetails.email ? '#a855f7' : 'var(--text-muted)',
+                background: leadDetails.email ? '#8B5CF6' : 'var(--bg-tertiary)',
+                color: leadDetails.email ? '#fff' : 'var(--text-muted)',
                 opacity: leadDetails.email ? 1 : 0.4,
                 pointerEvents: leadDetails.email ? 'auto' : 'none',
               }}
@@ -1985,7 +2018,7 @@ export default function InboxPage() {
           {/* 6. View Full Details - prominent button */}
           <div className="px-4 py-3 mt-auto">
             <button
-              onClick={() => openLeadModal(selectedLeadId)}
+              onClick={() => window.open(`/dashboard/leads?id=${leadDetails?.id}`, '_blank')}
               className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
               style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
             >

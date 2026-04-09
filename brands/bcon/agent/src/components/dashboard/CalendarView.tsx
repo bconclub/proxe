@@ -20,6 +20,7 @@ interface Booking {
   last_touchpoint?: string | null
   metadata?: any
   unified_context?: any
+  status?: string | null
 }
 
 interface CalendarViewProps {
@@ -240,6 +241,30 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
   const tzSign = tzOffset <= 0 ? '+' : '-'
   const tzLabel = `GMT${tzSign}${String(tzHours).padStart(2, '0')}:${String(tzMins).padStart(2, '0')}`
 
+// Get event color based on booking status and date
+function getEventColor(booking: Booking): string {
+  const today = new Date().toISOString().split('T')[0]
+  const isPast = booking.booking_date && booking.booking_date < today
+  
+  // Check status from metadata or unified_context
+  const status = booking.status || 
+    booking.metadata?.status || 
+    booking.metadata?.booking_status ||
+    booking.unified_context?.web?.booking_status ||
+    booking.unified_context?.whatsapp?.booking_status
+  
+  if (status === 'no_show' || status === 'no-show' || status === 'cancelled') {
+    return '#EF4444' // Red for no-show/cancelled
+  }
+  if (status === 'completed' || status === 'done' || status === 'attended') {
+    return '#22C55E' // Green for completed
+  }
+  if (isPast) {
+    return '#9CA3AF' // Gray for past bookings
+  }
+  return '#3B82F6' // Blue for upcoming
+}
+
   return (
     <div className="flex gap-0 h-[calc(100vh-64px)]">
       {/* Left Sidebar - Mini Calendar */}
@@ -432,18 +457,19 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       const leftPct = total > 1 ? idx * widthPct : 0
 
                       const topic = booking.booking_title || booking.metadata?.title || null
+                      const eventColor = getEventColor(booking)
                       return (
                         <div
                           key={booking.id}
                           onClick={(e) => handleBookingModalOpen(booking, e)}
-                          className="absolute rounded px-1.5 py-0.5 text-[var(--text-button)] cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
+                          className="absolute rounded px-1.5 py-0.5 text-white cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
                           style={{
                             top: `${top}px`,
                             height: `${height - 2}px`,
                             left: total > 1 ? `${leftPct}%` : '2px',
                             right: total > 1 ? undefined : '2px',
                             width: total > 1 ? `calc(${widthPct}% - 4px)` : undefined,
-                            backgroundColor: 'var(--button-bg)',
+                            backgroundColor: eventColor,
                             fontSize: '10px',
                             lineHeight: '1.3',
                           }}
@@ -497,16 +523,19 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       {format(day, 'd')}
                     </div>
                     <div className="flex-1 space-y-px overflow-y-auto">
-                      {dayBookings.map((booking) => (
-                        <div
-                          key={booking.id}
-                          onClick={(e) => handleBookingModalOpen(booking, e)}
-                          className="text-[10px] leading-tight px-1 py-px rounded text-[var(--text-button)] truncate cursor-pointer hover:brightness-110"
-                          style={{ backgroundColor: 'var(--button-bg)' }}
-                        >
-                          {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
-                        </div>
-                      ))}
+                      {dayBookings.map((booking) => {
+                        const eventColor = getEventColor(booking)
+                        return (
+                          <div
+                            key={booking.id}
+                            onClick={(e) => handleBookingModalOpen(booking, e)}
+                            className="text-[10px] leading-tight px-1 py-px rounded text-white truncate cursor-pointer hover:brightness-110"
+                            style={{ backgroundColor: eventColor }}
+                          >
+                            {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )

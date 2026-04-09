@@ -197,6 +197,315 @@ const STATUS_STYLE: Record<string, { color: string; bg: string; label: string }>
   empty:     { color: '#6b7280', bg: 'rgba(107,114,128,0.12)', label: 'Empty' },
 }
 
+// ── Funnel Section Component ──────────────────────────────────────
+
+interface FunnelSectionProps {
+  title: string
+  color: string
+  stageIds: string[]
+  stageStats: StageStats[]
+  stageConfig: Record<string, { icon: React.ReactNode; color: string; bg: string; timing: string; days: number[]; channels: string[] }>
+  expandedStage: string | null
+  setExpandedStage: (stage: string | null) => void
+  getSlotStatus: (stageId: string, day: number, channel: string) => string
+}
+
+function FunnelSection({
+  title,
+  color,
+  stageIds,
+  stageStats,
+  stageConfig,
+  expandedStage,
+  setExpandedStage,
+  getSlotStatus,
+}: FunnelSectionProps) {
+  const stages = stageIds
+    .map((id) => ({ id, stage: stageStats.find((s) => s.id === id) }))
+    .filter((item): item is { id: string; stage: StageStats } => !!item.stage)
+
+  if (stages.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      {/* Section Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 16,
+          padding: '12px 16px',
+          background: `${color}15`,
+          borderRadius: 12,
+          borderLeft: `4px solid ${color}`,
+        }}
+      >
+        <div
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            background: color,
+          }}
+        />
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: color,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {title}
+        </span>
+        <span
+          style={{
+            marginLeft: 'auto',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {stages.reduce((sum, s) => sum + s.stage.leadCount, 0)} leads
+        </span>
+      </div>
+
+      {/* Stage Cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {stages.map(({ id: stageId, stage }) => {
+          const config = stageConfig[stageId]
+          const isExpanded = expandedStage === stageId
+
+          return (
+            <div
+              key={stageId}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: `2px solid ${isExpanded ? config.color : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 16,
+                overflow: 'hidden',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {/* Header */}
+              <div
+                onClick={() => setExpandedStage(isExpanded ? null : stageId)}
+                style={{
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  cursor: 'pointer',
+                  background: isExpanded ? `${config.color}08` : 'transparent',
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    background: config.bg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: config.color,
+                  }}
+                >
+                  {config.icon}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 2 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {stage.name}
+                    </h3>
+                    <span
+                      style={{
+                        padding: '3px 10px',
+                        background: stage.leadCount > 0 ? `${config.color}30` : 'rgba(255,255,255,0.06)',
+                        color: stage.leadCount > 0 ? config.color : 'var(--text-muted)',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {stage.leadCount} leads
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>{config.timing}</p>
+                </div>
+
+                {/* Coverage */}
+                {!stageId.includes('converted') && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 12px',
+                      background:
+                        stage.coverage >= 80
+                          ? 'rgba(34, 197, 94, 0.15)'
+                          : stage.coverage >= 50
+                            ? 'rgba(245, 158, 11, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444',
+                      }}
+                    >
+                      {stage.coverage}%
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>coverage</span>
+                  </div>
+                )}
+
+                <div style={{ color: 'var(--text-muted)' }}>
+                  {isExpanded ? <MdExpandLess size={24} /> : <MdExpandMore size={24} />}
+                </div>
+              </div>
+
+              {/* Expanded Template Grid */}
+              {isExpanded && stageId !== 'converted' && (
+                <div style={{ padding: '0 20px 20px' }}>
+                  <div style={{ marginBottom: 16 }}>
+                    {/* Day Headers */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `100px repeat(${config.days.length}, 1fr)`,
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div></div>
+                      {config.days.map((day) => (
+                        <div
+                          key={day}
+                          style={{
+                            textAlign: 'center',
+                            padding: '6px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: 'var(--text-secondary)',
+                            background: 'rgba(255,255,255,0.04)',
+                            borderRadius: 6,
+                          }}
+                        >
+                          Day {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Channel Rows */}
+                    {config.channels.map((channel) => (
+                      <div
+                        key={channel}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `100px repeat(${config.days.length}, 1fr)`,
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '6px 10px',
+                            fontSize: 12,
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {channel === 'whatsapp' ? '💬' : '📞'}
+                          {channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
+                        </div>
+
+                        {config.days.map((day) => {
+                          const status = getSlotStatus(stageId, day, channel)
+                          const colors: Record<string, string> = {
+                            approved: '#22c55e',
+                            pending: '#f59e0b',
+                            rejected: '#ef4444',
+                            empty: '#6b7280',
+                          }
+                          const slotColor = colors[status] || '#6b7280'
+
+                          return (
+                            <button
+                              key={`${day}-${channel}`}
+                              style={{
+                                padding: '10px',
+                                background: status !== 'empty' ? `${slotColor}15` : 'rgba(255,255,255,0.04)',
+                                border: `2px solid ${status !== 'empty' ? slotColor : 'rgba(255,255,255,0.1)'}`,
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  background: slotColor,
+                                  boxShadow: `0 0 8px ${slotColor}60`,
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: 'var(--text-muted)',
+                                  textTransform: 'capitalize',
+                                }}
+                              >
+                                {status}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Legend */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 16,
+                      padding: '10px 14px',
+                      background: 'rgba(255,255,255,0.03)',
+                      borderRadius: 8,
+                      fontSize: 11,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    <LegendItem color="#22c55e" label="Approved" />
+                    <LegendItem color="#f59e0b" label="Pending" />
+                    <LegendItem color="#ef4444" label="Rejected" />
+                    <LegendItem color="#6b7280" label="Empty" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function relativeTime(dateStr: string | null): string {
@@ -603,272 +912,42 @@ export default function FlowsPage() {
           />
         </div>
 
-        {/* 9 Stage Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {STAGE_ORDER.map((stageId, index) => {
-            const stage = stageStats.find(s => s.id === stageId)
-            const config = STAGE_CONFIG[stageId]
-            const isExpanded = expandedStage === stageId
-            const isLast = index === STAGE_ORDER.length - 1
+        {/* Funnel Sections */}
+        {/* TOP OF FUNNEL - Awareness & First Contact */}
+        <FunnelSection
+          title="Awareness & First Contact"
+          color="#3B82F6"
+          stageIds={['one_touch', 'low_touch', 'engaged']}
+          stageStats={stageStats}
+          stageConfig={STAGE_CONFIG}
+          expandedStage={expandedStage}
+          setExpandedStage={setExpandedStage}
+          getSlotStatus={getSlotStatus}
+        />
 
-            if (!stage) return null
+        {/* MID FUNNEL - Consideration & Intent */}
+        <FunnelSection
+          title="Consideration & Intent"
+          color="#F59E0B"
+          stageIds={['high_intent', 'booking_made', 'no_show']}
+          stageStats={stageStats}
+          stageConfig={STAGE_CONFIG}
+          expandedStage={expandedStage}
+          setExpandedStage={setExpandedStage}
+          getSlotStatus={getSlotStatus}
+        />
 
-            return (
-              <React.Fragment key={stageId}>
-                <div
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: `2px solid ${isExpanded ? config.color : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: 16,
-                    overflow: 'hidden',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {/* Header */}
-                  <div
-                    onClick={() => setExpandedStage(isExpanded ? null : stageId)}
-                    style={{
-                      padding: '20px 24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 16,
-                      cursor: 'pointer',
-                      background: isExpanded ? `${config.color}08` : 'transparent',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 12,
-                        background: config.bg,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: config.color,
-                      }}
-                    >
-                      {config.icon}
-                    </div>
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 2 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {stage.name}
-                        </h3>
-                        <span
-                          style={{
-                            padding: '4px 12px',
-                            background: stage.leadCount > 0 ? `${config.color}30` : 'rgba(255,255,255,0.06)',
-                            color: stage.leadCount > 0 ? config.color : 'var(--text-muted)',
-                            borderRadius: 20,
-                            fontSize: 14,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {stage.leadCount} leads
-                        </span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
-                        {config.timing}
-                      </p>
-                    </div>
-
-                    {/* Coverage */}
-                    {!stageId.includes('converted') && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '8px 16px',
-                          background: stage.coverage >= 80 
-                            ? 'rgba(34, 197, 94, 0.15)' 
-                            : stage.coverage >= 50 
-                            ? 'rgba(245, 158, 11, 0.15)' 
-                            : 'rgba(239, 68, 68, 0.15)',
-                          borderRadius: 8,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444',
-                          }}
-                        >
-                          {stage.coverage}%
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>coverage</span>
-                      </div>
-                    )}
-
-                    <div style={{ color: 'var(--text-muted)' }}>
-                      {isExpanded ? <MdExpandLess size={28} /> : <MdExpandMore size={28} />}
-                    </div>
-                  </div>
-
-                  {/* Expanded Template Grid */}
-                  {isExpanded && stageId !== 'converted' && (
-                    <div style={{ padding: '0 24px 24px' }}>
-                      <div style={{ marginBottom: 20 }}>
-                        {/* Day Headers */}
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: `120px repeat(${config.days.length}, 1fr)`,
-                            gap: 8,
-                            marginBottom: 8,
-                          }}
-                        >
-                          <div></div>
-                          {config.days.map(day => (
-                            <div
-                              key={day}
-                              style={{
-                                textAlign: 'center',
-                                padding: '8px',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: 'var(--text-secondary)',
-                                background: 'rgba(255,255,255,0.04)',
-                                borderRadius: 6,
-                              }}
-                            >
-                              Day {day}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Channel Rows */}
-                        {config.channels.map(channel => (
-                          <div
-                            key={channel}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: `120px repeat(${config.days.length}, 1fr)`,
-                              gap: 8,
-                              marginBottom: 8,
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                padding: '8px 12px',
-                                fontSize: 13,
-                                color: 'var(--text-secondary)',
-                              }}
-                            >
-                              {channel === 'whatsapp' ? '💬' : '📞'}
-                              {channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
-                            </div>
-
-                            {config.days.map(day => {
-                              const status = getSlotStatus(stageId, day, channel)
-                              const colors: Record<string, string> = {
-                                approved: '#22c55e',
-                                pending: '#f59e0b',
-                                rejected: '#ef4444',
-                                empty: '#6b7280',
-                              }
-                              const color = colors[status] || '#6b7280'
-
-                              return (
-                                <button
-                                  key={`${day}-${channel}`}
-                                  style={{
-                                    padding: '12px',
-                                    background: status !== 'empty' ? `${color}15` : 'rgba(255,255,255,0.04)',
-                                    border: `2px solid ${status !== 'empty' ? color : 'rgba(255,255,255,0.1)'}`,
-                                    borderRadius: 8,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      width: 10,
-                                      height: 10,
-                                      borderRadius: '50%',
-                                      background: color,
-                                      boxShadow: `0 0 8px ${color}60`,
-                                    }}
-                                  />
-                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                                    {status}
-                                  </span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Legend */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: 16,
-                          padding: '12px 16px',
-                          background: 'rgba(255,255,255,0.03)',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          color: 'var(--text-muted)',
-                        }}
-                      >
-                        <LegendItem color="#22c55e" label="Approved" />
-                        <LegendItem color="#f59e0b" label="Pending" />
-                        <LegendItem color="#ef4444" label="Rejected" />
-                        <LegendItem color="#6b7280" label="Empty" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Connector */}
-                {!isLast && (
-                  <div style={{ position: 'relative', height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div
-                      style={{
-                        width: 2,
-                        height: 32,
-                        background: stageId === 'booking_made' 
-                          ? 'transparent' 
-                          : 'rgba(255,255,255,0.1)',
-                        borderLeft: stageId === 'booking_made' ? '2px dashed rgba(255,255,255,0.2)' : 'none',
-                      }}
-                    />
-                    <div style={{ position: 'absolute', color: 'rgba(255,255,255,0.3)' }}>
-                      ↓
-                    </div>
-                    
-                    {stageId === 'booking_made' && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 4,
-                          fontSize: 10,
-                          color: 'var(--text-muted)',
-                          display: 'flex',
-                          gap: 8,
-                        }}
-                      >
-                        <span style={{ color: '#ef4444' }}>→ No Show</span>
-                        <span>or</span>
-                        <span style={{ color: '#ec4899' }}>→ Demo</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </React.Fragment>
-            )
-          })}
-        </div>
+        {/* BOTTOM FUNNEL - Closing & Conversion */}
+        <FunnelSection
+          title="Closing & Conversion"
+          color="#22C55E"
+          stageIds={['demo_taken', 'proposal_sent', 'converted']}
+          stageStats={stageStats}
+          stageConfig={STAGE_CONFIG}
+          expandedStage={expandedStage}
+          setExpandedStage={setExpandedStage}
+          getSlotStatus={getSlotStatus}
+        />
       </div>
     )
   }
