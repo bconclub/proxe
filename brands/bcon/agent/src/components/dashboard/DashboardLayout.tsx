@@ -333,7 +333,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors"
+                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                   style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -349,7 +349,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors"
+                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                   style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -443,7 +443,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           </span>
                         )}
                         {navItem.comingSoon && (
-                          <span className="text-[9px] uppercase tracking-tighter opacity-50 font-black ml-2 px-1 bg-gray-500/10 rounded">Soon</span>
+                          <span className="text-[9px] uppercase tracking-tighter font-semibold ml-2 px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-muted)' }}>Soon</span>
                         )}
                       </>
                     )}
@@ -570,7 +570,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="dashboard-layout-more-options relative" ref={moreOptionsRef}>
               <button
                 onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
-                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
+                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                 style={{
                   width: '24px',
                   height: '24px',
@@ -580,6 +580,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                 }}
                 title="More Options"
+                aria-expanded={moreOptionsOpen}
+                aria-haspopup="menu"
                 onMouseEnter={(e) => {
                   if (!moreOptionsOpen) {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -632,7 +634,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Version badge inline */}
             {showExpanded && (
               <div
-                className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
+                className="dashboard-layout-version-badge px-1.5 py-0.5 rounded text-[10px] font-normal"
                 style={{
                   backgroundColor: 'transparent',
                   color: 'var(--text-muted)',
@@ -672,7 +674,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className="p-2 rounded-md transition-colors"
+            className="p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
             style={{
               backgroundColor: 'var(--bg-secondary)',
               border: '1px solid var(--border-primary)',

@@ -531,7 +531,7 @@ export default function LeadsTable({
         <div className="flex items-center gap-2">
           {/* Search bar */}
           <div
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md border"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md border focus-within:ring-2 focus-within:ring-[var(--accent-primary)] transition-shadow"
             style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
           >
             <MdSearch size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
@@ -540,7 +540,7 @@ export default function LeadsTable({
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-[120px]"
+              className="bg-transparent border-none outline-none focus:outline-none text-xs w-[120px]"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
@@ -723,17 +723,17 @@ export default function LeadsTable({
                 const srcCfg = sourceConfig[source] || sourceConfig.unknown
 
                 // Score pill colors
-                const scorePillBg = score != null ? (score >= 70 ? 'rgba(34,197,94,0.15)' : score >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)') : null
-                const scorePillColor = score != null ? (score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444') : null
+                // Score pill classes - using CSS variables for consistency
+                const scorePillClass = score != null 
+                  ? (score >= 70 ? 'bg-[rgba(34,197,94,0.15)] text-[#22c55e]' : score >= 40 ? 'bg-[rgba(245,158,11,0.15)] text-[#f59e0b]' : 'bg-[rgba(239,68,68,0.15)] text-[#ef4444]')
+                  : ''
 
                 return (
                   <tr
                     key={lead.id}
-                    className="cursor-pointer transition-colors"
+                    className="cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
                     style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
                     onClick={() => handleRowClick(lead)}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
@@ -775,8 +775,7 @@ export default function LeadsTable({
                     <td className="px-3 py-2 text-center">
                       {score != null ? (
                         <span
-                          className="inline-block px-2 py-0.5 rounded-full text-xs font-bold tabular-nums"
-                          style={{ backgroundColor: scorePillBg!, color: scorePillColor! }}
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${scorePillClass}`}
                         >
                           {score}
                         </span>
