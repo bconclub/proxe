@@ -179,7 +179,7 @@ export default function ActivityLoggerModal({
             <button
               onClick={handleClose}
               disabled={isSaving}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded"
             >
               <MdClose size={24} />
             </button>
@@ -203,7 +203,7 @@ export default function ActivityLoggerModal({
                       onClick={() => setActivityType(type.value)}
                       disabled={isSaving}
                       className={`
-                        flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all
+                        flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                         ${isSelected
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -241,7 +241,7 @@ export default function ActivityLoggerModal({
                       onClick={() => setDisqualificationReason(reason)}
                       disabled={isSaving}
                       className={`
-                        px-3 py-1.5 text-xs font-medium rounded-full border transition-all
+                        px-3 py-1.5 text-xs font-medium rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                         ${disqualificationReason === reason
                           ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 dark:border-red-400'
                           : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500'
@@ -334,14 +334,14 @@ export default function ActivityLoggerModal({
               <button
                 onClick={handleClose}
                 disabled={isSaving}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving || !note.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               >
                 {isSaving ? 'Saving...' : 'Save Activity'}
               </button>

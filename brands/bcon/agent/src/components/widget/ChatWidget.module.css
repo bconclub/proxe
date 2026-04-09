@@ -1462,11 +1462,11 @@
 
 .chatInput {
   flex: 1;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   outline: none;
   font-size: 15px;
   color: var(--text-primary);
-  background: var(--bg-message-area);
+  background: rgba(255, 255, 255, 0.05);
   font-family: inherit;
   padding: 10px 12px;
   padding-bottom: 10px;
@@ -1477,7 +1477,7 @@
 }
 
 .chatInput::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* Calendar container styles */
