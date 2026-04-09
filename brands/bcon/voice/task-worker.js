@@ -26,6 +26,18 @@ const AGENT_SYSTEM_PROMPT = [
 const WA_TOKEN = process.env.META_WHATSAPP_ACCESS_TOKEN;
 const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
+
+// ============================================
+// STARTUP GUARD: Required environment variables
+// ============================================
+if (!WA_PHONE_ID) {
+  console.error('[FATAL] META_WHATSAPP_PHONE_NUMBER_ID is not set. Cannot start task worker.');
+  process.exit(1);
+}
+if (!WA_TOKEN) {
+  console.error('[FATAL] META_WHATSAPP_ACCESS_TOKEN is not set. Cannot start task worker.');
+  process.exit(1);
+}
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
 const VOBIZ_AUTH_ID = process.env.VOBIZ_AUTH_ID || null;
@@ -3815,13 +3827,21 @@ async function sendWhatsAppTemplate(phone, task) {
 
 // ============================================
 // HELPER: Create task if not already exists
-// Dedup: ANY task with same task_type + lead_id in last 7 days (regardless of status)
+// Dedup logic:
+// - Follow-up tasks (follow_up_*): skip if completed in last 30 days
+// - Re-engage tasks: skip if created in last 14 days
+// - All tasks: skip if pending duplicate exists
 // ============================================
+
+// Task types that are considered "follow-ups" for dedup purposes
+const FOLLOWUP_TASK_TYPES = ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'follow_up_24h', 'follow_up_7d', 'follow_up_30d', 'follow_up_90d'];
+const REENGAGE_TASK_TYPES = ['re_engage'];
+
 async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata, initialStatus }) {
   const status = initialStatus || 'pending';
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // 3. Make Task Creation Idempotent: check for identical pending task
+  // 1. Check for identical pending task (always block duplicate pending tasks)
   if (leadId) {
     const { data: identicalPending } = await supabase
       .from('agent_tasks')
@@ -3837,7 +3857,42 @@ async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, sc
     }
   }
 
-  // Check for ANY existing task with same type + lead in last 7 days (regardless of status)
+  // 2. Follow-up dedup: skip if ANY follow-up was completed in last 30 days
+  if (FOLLOWUP_TASK_TYPES.includes(taskType) && leadId) {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentCompleted } = await supabase
+      .from('agent_tasks')
+      .select('id, task_type, completed_at')
+      .eq('lead_id', leadId)
+      .in('task_type', FOLLOWUP_TASK_TYPES)
+      .eq('status', 'completed')
+      .gte('completed_at', thirtyDaysAgo)
+      .limit(1);
+
+    if (recentCompleted && recentCompleted.length > 0) {
+      console.log(`[CreateTask] Skipped ${taskType} for ${leadName}: follow-up completed in last 30 days (${recentCompleted[0].task_type})`);
+      return;
+    }
+  }
+
+  // 3. Re-engage dedup: skip if re_engage exists in last 14 days (any status)
+  if (REENGAGE_TASK_TYPES.includes(taskType) && leadId) {
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentReengage } = await supabase
+      .from('agent_tasks')
+      .select('id, created_at')
+      .eq('lead_id', leadId)
+      .eq('task_type', 're_engage')
+      .gte('created_at', fourteenDaysAgo)
+      .limit(1);
+
+    if (recentReengage && recentReengage.length > 0) {
+      console.log(`[CreateTask] Skipped ${taskType} for ${leadName}: re_engage already exists in last 14 days`);
+      return;
+    }
+  }
+
+  // 4. General dedup: Check for ANY existing task with same type + lead in last 7 days
   let dedupQuery = supabase
     .from('agent_tasks')
     .select('id')
