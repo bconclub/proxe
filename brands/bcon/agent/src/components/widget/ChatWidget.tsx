@@ -3295,41 +3295,41 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       {config.name}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 4px', minWidth: '50px' }}>
                     <span 
-                      className={styles.typingDot}
                       style={{
-                        display: 'inline-block',
-                        width: '8px',
-                        height: '8px',
+                        display: 'block',
+                        width: '10px',
+                        height: '10px',
                         borderRadius: '50%',
                         backgroundColor: '#8B5CF6',
                         animation: 'typingPulse 1.4s infinite ease-in-out both',
                         animationDelay: '0s',
+                        flexShrink: 0,
                       }}
                     />
                     <span 
-                      className={styles.typingDot}
                       style={{
-                        display: 'inline-block',
-                        width: '8px',
-                        height: '8px',
+                        display: 'block',
+                        width: '10px',
+                        height: '10px',
                         borderRadius: '50%',
                         backgroundColor: '#8B5CF6',
                         animation: 'typingPulse 1.4s infinite ease-in-out both',
                         animationDelay: '0.2s',
+                        flexShrink: 0,
                       }}
                     />
                     <span 
-                      className={styles.typingDot}
                       style={{
-                        display: 'inline-block',
-                        width: '8px',
-                        height: '8px',
+                        display: 'block',
+                        width: '10px',
+                        height: '10px',
                         borderRadius: '50%',
                         backgroundColor: '#8B5CF6',
                         animation: 'typingPulse 1.4s infinite ease-in-out both',
                         animationDelay: '0.4s',
+                        flexShrink: 0,
                       }}
                     />
                   </div>
