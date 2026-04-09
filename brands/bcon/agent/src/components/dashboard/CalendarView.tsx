@@ -271,13 +271,13 @@ function getEventColor(booking: Booking): string {
       <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
         {/* Mini calendar month nav */}
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)]">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
             <MdChevronLeft size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
             {format(currentDate, 'MMM yyyy')}
           </span>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)]">
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
             <MdChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
@@ -301,7 +301,7 @@ function getEventColor(booking: Booking): string {
               <button
                 key={idx}
                 onClick={() => handleDateClick(day)}
-                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-[var(--bg-hover)]"
+                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
                   color: !isCurrentMonth ? 'var(--text-secondary)' : isSelected ? '#fff' : isToday ? 'var(--accent-primary)' : 'var(--text-primary)',
                   backgroundColor: isSelected ? 'var(--button-bg)' : isToday ? 'var(--accent-subtle)' : 'transparent',
@@ -342,15 +342,15 @@ function getEventColor(booking: Booking): string {
         <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <button
             onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()) }}
-            className="px-3 py-1 text-xs font-medium border rounded hover:shadow-sm transition-shadow"
+            className="px-3 py-1 text-xs font-medium border rounded hover:shadow-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
             style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
           >
             Today
           </button>
-          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)]">
+          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
             <MdChevronLeft size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)]">
+          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
             <MdChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <h2 className="text-sm font-medium ml-1" style={{ color: 'var(--text-primary)' }}>
@@ -362,7 +362,7 @@ function getEventColor(booking: Booking): string {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className="px-2 py-0.5 text-[10px] font-medium rounded capitalize"
+                className="px-2 py-0.5 text-[10px] font-medium rounded capitalize focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
                   backgroundColor: viewMode === mode ? 'var(--button-bg)' : 'transparent',
                   color: viewMode === mode ? 'var(--text-button)' : 'var(--text-secondary)',

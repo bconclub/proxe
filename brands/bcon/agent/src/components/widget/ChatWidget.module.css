@@ -40,11 +40,11 @@
 }
 
 .quickButtons {
-  display: flex;
-  flex-direction: row;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
   padding: 6px 8px;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   width: 400px;
   max-width: 90vw;
@@ -54,8 +54,6 @@
   animation: slideDown 0.3s ease;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  touch-action: pan-x;
   -webkit-user-select: none;
   user-select: none;
 }

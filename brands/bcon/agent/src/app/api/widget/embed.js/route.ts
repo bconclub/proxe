@@ -95,10 +95,8 @@ export async function GET() {
       }
     };
     
-    // Try immediately and also after a short delay to ensure widget is ready
+    // Send lead context to widget
     sendLeadContext();
-    setTimeout(sendLeadContext, 500);
-    setTimeout(sendLeadContext, 1500);
   }
 })();
   `;
