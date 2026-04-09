@@ -234,12 +234,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
     { value: 'note' as const, label: 'Note', icon: MdNote },
   ]
 
-  // Timezone label
-  const tzOffset = new Date().getTimezoneOffset()
-  const tzHours = Math.abs(Math.floor(tzOffset / 60))
-  const tzMins = Math.abs(tzOffset % 60)
-  const tzSign = tzOffset <= 0 ? '+' : '-'
-  const tzLabel = `GMT${tzSign}${String(tzHours).padStart(2, '0')}:${String(tzMins).padStart(2, '0')}`
+  // Timezone label - Asia/Kolkata (GMT+05:30)
+  const tzLabel = 'Asia/Kolkata (GMT+05:30)'
 
 // Get event color based on booking status and date
 function getEventColor(booking: Booking): string {

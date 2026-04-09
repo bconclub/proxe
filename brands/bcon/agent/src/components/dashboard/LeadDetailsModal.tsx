@@ -1359,7 +1359,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <button
                     ref={stageButtonRef}
                     onClick={() => setShowStageDropdown(!showStageDropdown)}
-                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0"
+                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                     title="Edit stage"
                     aria-label="Edit lead stage"
                     aria-expanded={showStageDropdown}
@@ -1483,6 +1483,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     />
                     <button
                       onClick={toggleVoiceDictation}
+                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
                       className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
                         isListening
                           ? 'bg-red-500 text-white animate-pulse'
@@ -1495,6 +1496,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </button>
                     <button
                       onClick={handleSaveAdminNote}
+                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
                       disabled={!adminNoteText.trim() || savingAdminNote}
                       className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
                       title="Save note"
@@ -1594,7 +1596,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <button
                       onClick={handleLogCall}
                       disabled={savingLogCall}
-                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors"
+                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                       title="Save call log"
                     >
                       <MdCheck size={12} />
@@ -1621,7 +1623,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <button
                       onClick={handleSendMessage}
                       disabled={!sendMessageText.trim() || sendingMessage}
-                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors"
+                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                       title="Send message"
                     >
                       <MdCheck size={12} />
@@ -1634,7 +1636,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="relative inline-block mt-1">
                     <button
                       onClick={() => setShowAdminNotes(!showAdminNotes)}
-                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded"
                       title={`${(currentLead.unified_context.admin_notes as any[]).length} admin notes`}
                     >
                       <MdMoreHoriz size={18} />
@@ -1741,7 +1743,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <div className="absolute top-4 right-4">
               <button
                 onClick={() => setShowActionDropdown(!showActionDropdown)}
-                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors"
+                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 aria-label="Quick actions"
                 aria-expanded={showActionDropdown}
                 aria-haspopup="true"
@@ -1754,13 +1756,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="absolute right-0 top-11 z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 w-44">
                     <button
                       onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowLogCallForm(true) }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                     >
                       <MdCall size={16} className="text-green-500" /> Log a Call
                     </button>
                     <button
                       onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowAdminNoteInput(true) }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
                     </button>
@@ -1790,7 +1792,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}
-                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentStage === stage
+                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${currentStage === stage
                           ? getStageBadgeClass(stage) + ' font-semibold'
                           : 'hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
                           }`}
@@ -1814,7 +1816,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -1827,7 +1829,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('activity')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -1840,7 +1842,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breakdown'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -1853,7 +1855,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('interaction')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'interaction'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}

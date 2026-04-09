@@ -137,12 +137,19 @@ export async function ensureOrUpdateLead(
       }
     }
 
-    // ── Look up existing lead ──────────────────────────────────────────────
+    // ── Lead Deduplication Logic ───────────────────────────────────────────
+    // 1. Normalize phone (last 10 digits)
+    // 2. Check by normalized_phone + brand first
+    // 3. If found: UPDATE not INSERT
+    // 4. Else check by email + brand
+    // 5. If found: UPDATE
+    // 6. Only INSERT if nothing matches
+    // 7. On unique constraint violation: catch and UPDATE instead
 
-    let existing: any = null;
-
-    // Try by normalized phone first (with brand filter)
     const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+    let existingLead: any = null;
+
+    // 2. Check by normalized_phone + brand first
     const { data: byPhone, error: phoneErr } = await client
       .from('all_leads')
       .select('id, unified_context, email, customer_name, phone')
@@ -155,10 +162,10 @@ export async function ensureOrUpdateLead(
       return null;
     }
 
-    existing = byPhone;
+    existingLead = byPhone;
 
-    // Fallback: try by email (with brand filter)
-    if (!existing && email) {
+    // 4. If not found by phone, check by email + brand
+    if (!existingLead && email) {
       const { data: byEmail } = await client
         .from('all_leads')
         .select('id, unified_context, email, customer_name, phone')
@@ -166,57 +173,61 @@ export async function ensureOrUpdateLead(
         .eq('brand', brand)
         .maybeSingle();
 
-      if (byEmail) existing = byEmail;
+      if (byEmail) existingLead = byEmail;
     }
 
-    // ── Update existing lead ───────────────────────────────────────────────
+    // Helper function to build merged context
+    const buildMergedContext = (existingCtx: any) => ({
+      ...existingCtx,
+      [channel]: {
+        ...(existingCtx[channel] || {}),
+        ...(unifiedContext[channel] || {}),
+      },
+      bcon: {
+        ...(existingCtx.bcon || existingCtx.windchasers || {}),
+        ...(unifiedContext.bcon || {}),
+      },
+    });
 
-    if (existing) {
-      const existingCtx = existing.unified_context || {};
-      const mergedContext = {
-        ...existingCtx,
-        [channel]: {
-          ...(existingCtx[channel] || {}),
-          ...(unifiedContext[channel] || {}),
-        },
-        bcon: {
-          ...(existingCtx.bcon || existingCtx.windchasers || {}),
-          ...(unifiedContext.bcon || {}),
-        },
-      };
-
+    // Helper function to build update payload
+    const buildUpdates = (existingCtx: any) => {
+      const mergedContext = buildMergedContext(existingCtx);
       const updates: any = {
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
         unified_context: Object.keys(mergedContext).length > 0 ? mergedContext : undefined,
       };
-
       if (customerName) updates.customer_name = customerName;
       if (email) updates.email = email;
       if (phone) updates.phone = phone;
       if (normalizedPhone) updates.customer_phone_normalized = normalizedPhone;
+      return updates;
+    };
+
+    // 3 & 5. If found: UPDATE not INSERT
+    if (existingLead) {
+      const updates = buildUpdates(existingLead.unified_context || {});
 
       const { error: updateError } = await client
         .from('all_leads')
         .update(updates)
-        .eq('id', existing.id);
+        .eq('id', existingLead.id);
 
       if (updateError) {
-        console.error('[leadManager] Failed to update lead', { error: updateError, leadId: existing.id });
+        console.error('[leadManager] Failed to update lead', { error: updateError, leadId: existingLead.id });
         return null;
       }
 
-      return existing.id;
+      return existingLead.id;
     }
 
-    // ── Create new lead ────────────────────────────────────────────────────
-
+    // 6. Only INSERT if nothing matches
     const insertData: any = {
       customer_name: customerName,
       email: email,
       phone: phone,
       customer_phone_normalized: normalizedPhone,
-      brand: process.env.NEXT_PUBLIC_BRAND || 'bcon',
+      brand: brand,
       first_touchpoint: channel,
       last_touchpoint: channel,
       last_interaction_at: new Date().toISOString(),
@@ -229,22 +240,28 @@ export async function ensureOrUpdateLead(
       .select('id')
       .single();
 
+    // 7. On unique constraint violation: catch and UPDATE instead
     if (createError) {
-      // Duplicate - fetch existing (with brand filter)
       if (createError.code === '23505' || createError.message?.includes('duplicate')) {
+        console.log('[leadManager] Duplicate key violation on insert, fetching existing lead to update');
+        
+        // Try to find the existing lead again (may have been created concurrently)
         let dup: any = null;
+        
+        // Try by phone first
         const { data: d1 } = await client
           .from('all_leads')
-          .select('id')
+          .select('id, unified_context')
           .eq('customer_phone_normalized', normalizedPhone)
           .eq('brand', brand)
           .maybeSingle();
         dup = d1;
 
+        // Fallback to email
         if (!dup && email) {
           const { data: d2 } = await client
             .from('all_leads')
-            .select('id')
+            .select('id, unified_context')
             .eq('email', email)
             .eq('brand', brand)
             .maybeSingle();
@@ -252,27 +269,15 @@ export async function ensureOrUpdateLead(
         }
 
         if (dup) {
-          // Update existing lead with new data
-          const existingCtx = dup.unified_context || {};
-          const mergedContext = {
-            ...existingCtx,
-            [channel]: {
-              ...(existingCtx[channel] || {}),
-              ...(unifiedContext[channel] || {}),
-            },
-          };
-
-          const updates: any = {
-            last_touchpoint: channel,
-            last_interaction_at: getISTTimestamp(),
-            unified_context: Object.keys(mergedContext).length > 0 ? mergedContext : undefined,
-          };
-
-          if (customerName) updates.customer_name = customerName;
-          if (email) updates.email = email;
-          if (phone) updates.phone = phone;
-
-          await client.from('all_leads').update(updates).eq('id', dup.id);
+          // Update the existing lead
+          const updates = buildUpdates(dup.unified_context || {});
+          const { error: updateError } = await client.from('all_leads').update(updates).eq('id', dup.id);
+          
+          if (updateError) {
+            console.error('[leadManager] Failed to update lead after duplicate conflict', { error: updateError, leadId: dup.id });
+            return null;
+          }
+          
           return dup.id;
         }
       }
