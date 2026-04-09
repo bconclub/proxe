@@ -115,8 +115,8 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm PROXe, BCON's AI. What brings you here today?",
-  proxe: "Hi! I'm PROXe, BCON's AI. What brings you here today?",
+  bcon: "Hi! I'm PROXe, your AI marketing assistant. Tell me about your business - what are you working on?",
+  proxe: "Hi! I'm PROXe, your AI marketing assistant. Tell me about your business - what are you working on?",
 };
 function getWelcomeMessage(brand: string): string {
   return welcomeMessages[brand] || welcomeMessages['proxe'];
@@ -868,7 +868,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setDynamicQuickButtons(null);
 
     if (containsBookingKeywords(trimmed) && !bookingCompleted) {
+      // Open calendar immediately while AI response streams
       setPendingCalendar(true);
+      const calendarMessageId = `calendar-${Date.now()}`;
+      setShowCalendly(calendarMessageId);
+      setCalendarAnchorId(calendarMessageId);
     }
 
     setIsOpen(true);
@@ -2369,7 +2373,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
 
     // Handle booking intent buttons directly - trigger booking flow without AI round-trip
-    const bookingKeywords = ['book', 'call', 'schedule', 'demo', 'appointment', 'meeting', 'consultation', 'audit'];
+    const bookingKeywords = ['book', 'call', 'schedule', 'demo', 'appointment', 'meeting', 'consultation', 'audit', 'slot'];
     const hasBookingIntent = bookingKeywords.some(keyword => lowerMessage.includes(keyword));
     
     if (hasBookingIntent && !bookingCompleted) {
