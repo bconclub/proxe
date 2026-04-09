@@ -1,8 +1,22 @@
 # PROXe — Build Truth
 
-**Last updated:** 2026-04-07
+**Last updated:** 2026-04-09
 
 ## Changelog
+
+### 2026-04-09
+- fix(bcon): inbox source channel icons with colored backgrounds (web=blue, whatsapp=green)
+- fix(bcon): inbox sidebar min-width 280px for stable layout on collapse/expand
+- fix(bcon): inbox right panel action button colors (Call=green, WhatsApp=#25D366, Email=purple)
+- fix(bcon): inbox View Full Details button opens lead in new tab
+- fix(bcon): calendar event color coding (upcoming=blue, past=gray, no-show=red, completed=green)
+- fix(bcon): calendar sync error banner with visible alert
+- fix(bcon): widget loading state - hide 3-dots when streaming text starts
+- fix(bcon): flows page 3-category funnel layout (Top/Mid/Bottom with colored headers)
+- fix(bcon): lead dedup by phone + brand filter to prevent cross-brand duplicates
+- fix(bcon): web prompt marketing-only focus with redirect for non-marketing queries
+- fix(bcon): widget embed.js scroll-trigger reveal removed, shows immediately on load
+- fix(bcon): widget streaming cursor removed, 3-dot indicator only
 
 ### 2026-04-07
 - fix: sync script preserves brand configs, prompts, theme CSS
@@ -958,6 +972,17 @@ Start: 2026-04-07 | Target: 2026-04-14
 - [2026-04-09] Sync script fixed - preserves brand configs
 - [2026-04-09] Web widget prompt created (bcon-web-prompt.ts)
 - [2026-04-09] Widget preview browser mockup
+- [2026-04-09] Inbox source channel icons with colored backgrounds
+- [2026-04-09] Inbox sidebar stable layout (min-width 280px)
+- [2026-04-09] Inbox right panel action buttons (Call, WhatsApp, Email)
+- [2026-04-09] Inbox View Full Details button opens lead in new tab
+- [2026-04-09] Calendar event color coding (upcoming/past/no-show/completed)
+- [2026-04-09] Calendar sync error banner
+- [2026-04-09] Widget loading state fixed (no double indicators)
+- [2026-04-09] Flows page 3-category funnel layout
+- [2026-04-09] Lead dedup with brand filter
+- [2026-04-09] Web prompt marketing-only focus
+- [2026-04-09] Widget shows immediately on load (scroll reveal removed)
 
 ### Pending
 - Fix phone ID undefined in task worker
@@ -965,9 +990,5 @@ Start: 2026-04-07 | Target: 2026-04-14
 - Widget live on bconclub.com
 - Welcome message fix in widget
 - Quick buttons update
-- Typing animation (3 dots)
-- Scroll-triggered widget reveal
 - DEMO_TAKEN + PROPOSAL_SENT admin notes
 - Stage-based follow-up logic
-- Flows page visual journey map
-- Outbound call button
