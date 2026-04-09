@@ -2581,6 +2581,40 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             )}
           </main>
+
+          {/* Footer with Delete Lead button */}
+          <footer className="lead-modal-footer flex items-center justify-between px-4 py-3 border-t border-[var(--border-primary)] flex-shrink-0">
+            <button
+              onClick={async () => {
+                if (!lead?.id) return;
+                if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
+                
+                try {
+                  const response = await fetch(`/api/dashboard/leads/${lead.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete lead');
+                  }
+                  
+                  onClose();
+                  // Refresh the page to update lead list
+                  window.location.reload();
+                } catch (err: any) {
+                  alert(err.message || 'Failed to delete lead');
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+            >
+              Delete Lead
+            </button>
+            <div className="text-[10px] text-[var(--text-muted)]">
+              ID: {lead?.id?.slice(0, 8)}...
+            </div>
+          </footer>
         </dialog>
       </div>
 

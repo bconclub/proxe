@@ -2019,7 +2019,7 @@ export default function InboxPage() {
           {/* 6. View Full Details - prominent button */}
           <div className="px-4 py-3 mt-auto">
             <button
-              onClick={() => window.open(`/dashboard/leads?id=${leadDetails?.id}`, '_blank')}
+              onClick={() => leadDetails?.id && router.push(`/dashboard/leads?leadId=${leadDetails.id}`)}
               className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
               style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
             >

@@ -3319,8 +3319,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         
-        {/* Typing indicator - shows while waiting for AI response */}
-        {isLoading && (
+        {/* Typing indicator - shows while waiting for AI response (hidden when streaming starts) */}
+        {isLoading && !hasStreamingText && (
           <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}>
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
