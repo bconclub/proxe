@@ -8,7 +8,22 @@
 - feat(bcon): web prompt - new first message asks "What is your biggest challenge in marketing right now?"
 - feat(bcon): strengthened button rules - only 2-4 specific options, never after open-ended questions
 - fix(bcon): delete lead API - added DELETE handler to /api/dashboard/leads/[id]/route.ts
-- fix(bcon): delete lead frontend URL changed from query param to REST path /api/dashboard/leads/${id}
+- fix(bcon): delete lead frontend URL fixed to query param /api/dashboard/leads?id=${leadId}
+- fix(bcon): quick buttons chip style — flex-wrap row, right-aligned, no 2x2 grid
+- fix(bcon): quickBtn sizing — padding 6px 14px, font-size 13px, white-space nowrap, width auto
+- fix(bcon): double typing indicator — suppressed when any message is already streaming
+- fix(bcon): compact user message bubble — smaller avatar (18px), header padding reduced, name 11px
+- fix(bcon): welcome message corrected to "Hi! I'm BCON's AI assistant. What is your biggest challenge in marketing right now?"
+- feat(bcon): rainbow conic-gradient border animation when AI responding (rotateBorder keyframe, @property --angle)
+- fix(bcon): calendar date selected highlight — border 2px solid var(--accent), removed box-shadow
+- fix(bcon): calendar bubble no longer shows duplicate BCON header — bubbleHeader removed, close button preserved
+- feat(bcon): prompt — added 4 strict rules (no text-less buttons, no PROXe mention, no duplicate name ask, no buttons after open-ended questions)
+- feat(bcon): prompt — probing questions tightened, booking push rule added after 3-4 messages
+- feat(bcon): prompt — Language line added: Simple, direct Indian English
+- feat(bcon): bcon.config quickButtons updated: About BCON, Our Work, Book a Call, Talk to the Team
+- feat(bcon): bcon.config exploreButtons updated: Customer Acquisition, Brand Management, Content and Ads, Book a Strategy Call
+- fix(bcon): containsBookingKeywords — added 'audit' to trigger calendar directly
+- fix(bcon): handleQuickButtonClick wrapped in try/catch to prevent UI freeze on error
 
 ### 2026-04-10
 - fix(bcon): widget embed.js removed scroll listeners, transform, translateY — always visible
