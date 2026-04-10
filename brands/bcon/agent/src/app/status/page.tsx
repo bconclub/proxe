@@ -24,6 +24,17 @@ interface MetricsData {
 
 const CHANGELOG: { version: string; date: string; items: string[] }[] = [
   {
+    version: '0.0.17',
+    date: '2026-04-11',
+    items: [
+      'Status page - color category chips',
+      'Prompt complete rewrite - marketing focus, no PROXe',
+      '3-part welcome message sequence',
+      'Audit keyword triggers calendar',
+      'Sprint tracker updated with Apr 14 deadline tasks',
+    ],
+  },
+  {
     version: '0.0.16',
     date: '2026-04-11',
     items: [
@@ -280,10 +291,10 @@ export default function StatusPage() {
         </div>
 
         {/* ZONE 2 — Two Column: Sprint + Changelog */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', minHeight: '0' }}>
 
           {/* LEFT — Active Sprint */}
-          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '700px' }}>
             <div>
               <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
                 Sprint: Go-Live Readiness
@@ -306,45 +317,84 @@ export default function StatusPage() {
             </div>
 
             {/* Done items grouped by category */}
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
-                Done
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {categories.map((cat) => (
-                  <div key={cat}>
-                    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px' }}>
-                      {cat}
-                    </p>
-                    {SPRINT_DONE.filter((i) => i.category === cat).map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
-                        <span style={{ color: '#22C55E', fontSize: '12px', flexShrink: 0 }}>✓</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>{item.date}</span>
+            {(() => {
+              const categoryColors: Record<string, string> = {
+                'Widget': '#8B5CF6',
+                'Product': '#3B82F6',
+                'Infrastructure': '#F59E0B',
+                'Lead Automation': '#10B981',
+              }
+              return (
+                <div>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
+                    Done
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {categories.map((cat) => (
+                      <div key={cat}>
+                        <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px' }}>
+                          {cat}
+                        </p>
+                        {SPRINT_DONE.filter((i) => i.category === cat).map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
+                            <span style={{ color: '#22C55E', fontSize: '12px', flexShrink: 0 }}>✓</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>{item.date}</span>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '20px',
+                              flexShrink: 0,
+                              background: `${categoryColors[item.category] || '#6B7280'}20`,
+                              color: categoryColors[item.category] || '#6B7280',
+                              border: `1px solid ${categoryColors[item.category] || '#6B7280'}40`,
+                            }}>{item.category}</span>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )
+            })()}
 
             {/* Pending items */}
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
-                Pending
-              </p>
-              {SPRINT_PENDING.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
-                  <span style={{ color: '#F59E0B', fontSize: '12px', flexShrink: 0 }}>⏱</span>
-                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>{item.category}</span>
+            {(() => {
+              const categoryColors: Record<string, string> = {
+                'Widget': '#8B5CF6',
+                'Product': '#3B82F6',
+                'Infrastructure': '#F59E0B',
+                'Lead Automation': '#10B981',
+              }
+              return (
+                <div>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
+                    Pending
+                  </p>
+                  {SPRINT_PENDING.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
+                      <span style={{ color: '#F59E0B', fontSize: '12px', flexShrink: 0 }}>⏱</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '20px',
+                        flexShrink: 0,
+                        background: `${categoryColors[item.category] || '#6B7280'}20`,
+                        color: categoryColors[item.category] || '#6B7280',
+                        border: `1px solid ${categoryColors[item.category] || '#6B7280'}40`,
+                      }}>{item.category}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })()}
           </div>
 
           {/* RIGHT — Build History */}
-          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '700px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
               Build History
             </h2>
