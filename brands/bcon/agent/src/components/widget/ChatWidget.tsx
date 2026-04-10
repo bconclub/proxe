@@ -2252,12 +2252,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
     // Check for booking-related keywords
-    return lowerText.includes('call') || 
-           lowerText.includes('demo') || 
+    return lowerText.includes('call') ||
+           lowerText.includes('demo') ||
            lowerText.includes('book') ||
            lowerText.includes('schedule') ||
            lowerText.includes('meeting') ||
-           lowerText.includes('appointment');
+           lowerText.includes('appointment') ||
+           lowerText.includes('audit');
   };
 
   const handleSend = () => {
@@ -2323,6 +2324,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [messages.length, conversationSummary, sessionRecord, isMobileViewport]);
 
   const handleQuickButtonClick = (buttonText: string, e?: React.MouseEvent) => {
+    try {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -2468,6 +2470,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (requestPhoneBeforeProceed(message, nextButtons)) return;
 
     submitMessage(message, nextButtons);
+    } catch (err) {
+      console.error('[ChatWidget] Button click error:', err);
+    }
   };
 
   const renderWelcomeButtons = useCallback(
