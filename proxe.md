@@ -5,14 +5,21 @@
 ## Changelog
 
 ### 2026-04-10
-- fix(bcon): widget embed.js removed setTimeout on load, no animation
-- fix(bcon): widget quick buttons 2x2 grid layout for 4 buttons
-- fix(bcon): widget increased font sizes (message 15px, header 16px, buttons 14px)
-- fix(bcon): widget input box visible border and background
-- fix(bcon): lead dedup logic fixed order (phone→email→insert with conflict handling)
-- fix(bcon): calendar timezone set to Asia/Kolkata (GMT+05:30)
-- fix(bcon): LeadDetailsModal delete lead button with confirmation
-- fix(bcon): inbox View Full Details button uses router.push with leadId param
+- fix(bcon): widget embed.js removed scroll listeners, transform, translateY — always visible
+- fix(bcon): widget quick buttons 2x2 grid layout (4 buttons, gridTemplateColumns 1fr 1fr)
+- fix(bcon): widget increased font sizes (message 15px, header 16px, buttons 14px, padding 10px 16px)
+- fix(bcon): widget input box visible border (rgba white 0.2), background, placeholder color
+- fix(bcon): lead dedup — phone+brand first → email+brand → insert → conflict catch+update
+- fix(bcon): calendar timezone Asia/Kolkata (GMT+05:30) displayed in CalendarView
+- fix(bcon): calendar event colors by status (upcoming=blue, past=gray, no-show=red, completed=green)
+- fix(bcon): inbox channel icon badges — web=blue, whatsapp=green, voice=purple, white icons
+- fix(bcon): inbox sidebar min-width 280px stable on collapse
+- fix(bcon): inbox right panel buttons — Call=green, WhatsApp=#25D366, Email=purple
+- fix(bcon): inbox View Full Details router.push /dashboard/leads?leadId
+- fix(bcon): widget typing dots hidden once streaming text starts (isLoading && !hasStreamingText)
+- fix(bcon): flows page funnel sections TOP/MID/BOTTOM with blue/orange/green headers
+- fix(bcon): LeadDetailsModal delete lead button (red outlined, confirm dialog, DELETE API)
+- fix(bcon): widget postMessage proxe_lead_context pre-loads name+service, skips generic welcome
 
 ### 2026-04-09
 - fix(bcon): inbox source channel icons with colored backgrounds (web=blue, whatsapp=green)
@@ -993,12 +1000,24 @@ Start: 2026-04-07 | Target: 2026-04-14
 - [2026-04-09] Lead dedup with brand filter
 - [2026-04-09] Web prompt marketing-only focus
 - [2026-04-09] Widget shows immediately on load (scroll reveal removed)
+- [2026-04-10] Widget quick buttons 2x2 grid (4 buttons)
+- [2026-04-10] Widget font sizes (message 15px, header 16px, button 14px)
+- [2026-04-10] Widget input box visible (border + bg + placeholder)
+- [2026-04-10] Lead dedup phone+brand → email+brand → insert → conflict catch
+- [2026-04-10] Calendar timezone Asia/Kolkata (GMT+05:30)
+- [2026-04-10] Calendar event color coding by status
+- [2026-04-10] Inbox channel icon colored backgrounds
+- [2026-04-10] Inbox sidebar stable min-width 280px
+- [2026-04-10] Inbox right panel button colors
+- [2026-04-10] Inbox View Full Details with router.push
+- [2026-04-10] Widget typing dots hide on stream start
+- [2026-04-10] Flows TOP/MID/BOTTOM funnel sections
+- [2026-04-10] LeadDetailsModal delete lead button
+- [2026-04-10] Widget proxe_lead_context pre-load from postMessage
 
 ### Pending
 - Fix phone ID undefined in task worker
 - Fix dedup - same template repeating
 - Widget live on bconclub.com
-- Welcome message fix in widget
-- Quick buttons update
 - DEMO_TAKEN + PROPOSAL_SENT admin notes
 - Stage-based follow-up logic

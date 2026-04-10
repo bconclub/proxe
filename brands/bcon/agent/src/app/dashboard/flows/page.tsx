@@ -913,9 +913,9 @@ export default function FlowsPage() {
         </div>
 
         {/* Funnel Sections */}
-        {/* TOP OF FUNNEL - Awareness & First Contact */}
+        {/* TOP OF FUNNEL */}
         <FunnelSection
-          title="Awareness & First Contact"
+          title="TOP"
           color="#3B82F6"
           stageIds={['one_touch', 'low_touch', 'engaged']}
           stageStats={stageStats}
@@ -925,9 +925,9 @@ export default function FlowsPage() {
           getSlotStatus={getSlotStatus}
         />
 
-        {/* MID FUNNEL - Consideration & Intent */}
+        {/* MID FUNNEL */}
         <FunnelSection
-          title="Consideration & Intent"
+          title="MID"
           color="#F59E0B"
           stageIds={['high_intent', 'booking_made', 'no_show']}
           stageStats={stageStats}
@@ -937,9 +937,9 @@ export default function FlowsPage() {
           getSlotStatus={getSlotStatus}
         />
 
-        {/* BOTTOM FUNNEL - Closing & Conversion */}
+        {/* BOTTOM FUNNEL */}
         <FunnelSection
-          title="Closing & Conversion"
+          title="BOTTOM"
           color="#22C55E"
           stageIds={['demo_taken', 'proposal_sent', 'converted']}
           stageStats={stageStats}

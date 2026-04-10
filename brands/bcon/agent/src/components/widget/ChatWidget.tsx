@@ -2478,8 +2478,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return (
         <div className={wrapperClassName}>
           <div className={styles.welcomeQuickButtonsContainer}>
-            <div className={styles.welcomeQuickButtonRow}>
-              {quickActions.slice(0, 3).map((buttonText, index) => (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' }}>
+              {quickActions.slice(0, 4).map((buttonText, index) => (
                 <button
                   key={buttonText}
                   className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
