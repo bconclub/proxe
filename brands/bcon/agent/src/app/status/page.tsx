@@ -4,633 +4,362 @@ import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 
 interface StatusData {
-  systemHealth: {
-    version: string
-    status: 'ok' | 'error'
-    timestamp: string
-  }
-  environmentKeys: {
-    key: string
-    isSet: boolean
-  }[]
-  supabaseConfig: {
-    url: string | null
-    urlValid: boolean
-    anonKey: string | null
-    anonKeyValid: boolean
-    serviceRoleKey: string | null
-    serviceRoleKeyValid: boolean
-  }
-  connectivity: {
-    canReachSupabase: boolean
-    responseTime?: number
-    error?: string
-  }
-  auth: {
-    status: 'ok' | 'error' | 'rate_limited'
-    canAuthenticate: boolean
-    error?: string
-    rateLimitInfo?: {
-      isRateLimited: boolean
-      retryAfter?: number
-    }
-  }
-  database: {
-    status: 'connected' | 'disconnected' | 'error' | 'unauthorized'
-    message: string
-    canQuery: boolean
-    error?: string
-    tablesAccessible?: string[]
-  }
-  project: {
-    status: 'active' | 'paused' | 'unknown'
-    message: string
-  }
-  apiStatus: {
-    claude: {
-      status: 'valid' | 'invalid' | 'error'
-      message?: string
-    }
-    supabase: {
-      status: 'valid' | 'invalid' | 'error'
-      message?: string
-    }
-  }
-  performance: {
-    averageGap: number
-    fastest: number
-    slowest: number
-    sample: string
-  }
-  recommendations: string[]
+  systemHealth: { version: string; status: 'ok' | 'error'; timestamp: string }
+  database: { status: string; canQuery: boolean }
+  connectivity: { canReachSupabase: boolean; responseTime?: number }
+  [key: string]: unknown
 }
+
+interface MetricsData {
+  totalLeads?: number
+  activeToday?: number
+  tasksPending?: number
+  avgResponseTime?: number
+  total_leads?: number
+  active_today?: number
+  tasks_pending?: number
+  avg_response_time?: number
+  [key: string]: unknown
+}
+
+const CHANGELOG: { version: string; date: string; items: string[] }[] = [
+  {
+    version: '0.0.15',
+    date: '2026-04-10',
+    items: [
+      'Widget scroll animation removed',
+      '4 quick buttons 2×2 grid layout',
+      'Bigger fonts (msg 15px, header 16px)',
+      'Visible input box with white border',
+      'Lead dedup: phone → email → upsert',
+      'Inbox channel icon colored backgrounds',
+      'Flows funnel TOP / MID / BOTTOM labels',
+      'Delete lead button with confirm dialog',
+      'Calendar timezone Asia/Kolkata GMT+05:30',
+      'Calendar event colors by status',
+      'Welcome message pre-loads name+service',
+    ],
+  },
+  {
+    version: '0.0.14',
+    date: '2026-04-09',
+    items: [
+      'bcon-web-prompt.ts created',
+      'BCON identity updated',
+      'Sync script preserves brand configs',
+      'Widget preview browser mockup',
+      'Mobile quick buttons dynamic',
+    ],
+  },
+  {
+    version: '0.0.13',
+    date: '2026-04-01',
+    items: [
+      'Widget preview 70% complete',
+      'exploreButtons AI in Marketing',
+      'Dynamic mobile quick buttons',
+      '/api/website endpoint live',
+      'Welcome template wired',
+    ],
+  },
+]
+
+const SPRINT_DONE: { title: string; date: string; category: string }[] = [
+  { title: 'Form fills wired to /api/website', date: 'Apr 1', category: 'Infrastructure' },
+  { title: 'bcon_welcome_web_v1 template created', date: 'Apr 7', category: 'Product' },
+  { title: 'Sync script fixed', date: 'Apr 9', category: 'Infrastructure' },
+  { title: 'Web widget prompt created', date: 'Apr 9', category: 'Widget' },
+  { title: 'Widget preview browser mockup', date: 'Apr 9', category: 'Widget' },
+  { title: 'Scroll animation removed from embed', date: 'Apr 10', category: 'Widget' },
+  { title: 'Quick buttons 2×2 grid (4 buttons)', date: 'Apr 10', category: 'Widget' },
+  { title: 'Bigger fonts + visible input box', date: 'Apr 10', category: 'Widget' },
+  { title: 'Welcome message pre-loads context', date: 'Apr 10', category: 'Widget' },
+  { title: 'Lead dedup order fixed', date: 'Apr 10', category: 'Lead Automation' },
+  { title: 'Delete lead button + confirm dialog', date: 'Apr 10', category: 'Lead Automation' },
+  { title: 'Calendar timezone + event colors', date: 'Apr 10', category: 'Product' },
+  { title: 'Inbox icon colors + sidebar width', date: 'Apr 10', category: 'Product' },
+  { title: 'Flows funnel TOP/MID/BOTTOM labels', date: 'Apr 10', category: 'Product' },
+]
+
+const SPRINT_PENDING: { title: string; added: string; category: string }[] = [
+  { title: 'Widget live on bconclub.com', added: 'Apr 9', category: 'Infrastructure' },
+  { title: 'Fix phone ID undefined in task worker', added: 'Apr 9', category: 'Lead Automation' },
+  { title: 'Fix dedup — same template repeating', added: 'Apr 9', category: 'Lead Automation' },
+  { title: 'DEMO_TAKEN + PROPOSAL_SENT admin notes', added: 'Apr 9', category: 'Product' },
+  { title: 'Stage-based follow-up logic', added: 'Apr 9', category: 'Product' },
+  { title: 'Outbound call button', added: 'Apr 9', category: 'Product' },
+]
 
 export default function StatusPage() {
   const [status, setStatus] = useState<StatusData | null>(null)
+  const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const fetchStatus = async () => {
+  const fetchAll = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      setError(null)
-      const response = await fetch('/api/status', {
-        credentials: 'include',
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch status: ${response.statusText}`)
+      const [statusRes, metricsRes] = await Promise.allSettled([
+        fetch('/api/status', { credentials: 'include' }),
+        fetch('/api/dashboard/founder-metrics', { credentials: 'include' }),
+      ])
+      if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+        setStatus(await statusRes.value.json())
       }
-      
-      const data = await response.json()
-      setStatus(data)
+      if (metricsRes.status === 'fulfilled' && metricsRes.value.ok) {
+        setMetrics(await metricsRes.value.json())
+      }
       setLastUpdated(new Date())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch status')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchStatus()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStatus, 30000)
+    fetchAll()
+    const interval = setInterval(fetchAll, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  const getStatusColor = (status: string) => {
-    if (status === 'ok' || status === 'connected' || status === 'valid' || status === 'active') {
-      return 'text-green-500'
-    }
-    if (status === 'error' || status === 'disconnected' || status === 'invalid' || status === 'unauthorized') {
-      return 'text-red-500'
-    }
-    if (status === 'rate_limited') {
-      return 'text-yellow-500'
-    }
-    return 'text-gray-500'
-  }
+  const dbOnline = status?.database?.canQuery === true
+  const webOnline = status?.systemHealth?.status === 'ok'
+  const supabaseOnline = status?.connectivity?.canReachSupabase === true
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'ok' || status === 'connected' || status === 'valid' || status === 'active') {
-      return 'bg-green-100 text-green-800'
-    }
-    if (status === 'error' || status === 'disconnected' || status === 'invalid' || status === 'unauthorized') {
-      return 'bg-red-100 text-red-800'
-    }
-    if (status === 'rate_limited') {
-      return 'bg-yellow-100 text-yellow-800'
-    }
-    return 'bg-gray-100 text-gray-800'
-  }
+  const totalLeads = metrics?.totalLeads ?? metrics?.total_leads ?? null
+  const activeToday = metrics?.activeToday ?? metrics?.active_today ?? null
+  const tasksPending = metrics?.tasksPending ?? metrics?.tasks_pending ?? null
+  const avgResponseTime = metrics?.avgResponseTime ?? metrics?.avg_response_time ?? null
 
-  if (loading && !status) {
-    return (
-      <DashboardLayout>
-        <div className="p-6">
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-current"></div>
-            <p className="mt-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Loading status...
-            </p>
-          </div>
-        </div>
-      </DashboardLayout>
-    )
-  }
+  const doneCount = SPRINT_DONE.length
+  const totalCount = SPRINT_DONE.length + SPRINT_PENDING.length
+  const progressPct = Math.round((doneCount / totalCount) * 100)
 
-  if (error && !status) {
-    return (
-      <DashboardLayout>
-        <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">Error: {error}</p>
-            <button
-              onClick={fetchStatus}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </DashboardLayout>
-    )
-  }
-
-  if (!status) return null
+  const categories = Array.from(new Set(SPRINT_DONE.map((i) => i.category)))
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-7xl mx-auto">
+      <div style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              System Status
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              Command Center
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-              {lastUpdated && `Last updated: ${lastUpdated.toLocaleTimeString()}`}
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading...'}
             </p>
           </div>
           <button
-            onClick={fetchStatus}
+            onClick={fetchAll}
             disabled={loading}
-            className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
             style={{
-              background: 'var(--button-bg)',
-              color: 'var(--text-button)',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 500,
+              background: '#8B5CF6',
+              color: 'white',
+              border: 'none',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
             }}
           >
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
-        {/* System Health */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+        {/* ZONE 1 — System Health Strip */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '14px 20px',
+          borderRadius: '10px',
+          background: 'var(--bg-secondary)',
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: '4px' }}>
             System Health
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Version</p>
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                {status.systemHealth.version}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</p>
-              <span className={`inline-block px-2 py-1 rounded text-sm font-medium ${getStatusBadge(status.systemHealth.status)}`}>
-                {status.systemHealth.status.toUpperCase()}
+          </span>
+          {[
+            { label: 'Database', online: dbOnline },
+            { label: 'Web Agent', online: webOnline },
+            { label: 'WhatsApp', online: null },
+            { label: 'Voice', online: null },
+          ].map(({ label, online }) => (
+            <div
+              key={label}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '20px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              <span style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: online === null ? '#6B7280' : online ? '#22C55E' : '#EF4444',
+                flexShrink: 0,
+                boxShadow: online ? '0 0 6px #22C55E80' : undefined,
+              }} />
+              <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                {label}
               </span>
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Timestamp</p>
-              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                {new Date(status.systemHealth.timestamp).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Supabase Configuration */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Supabase Configuration
-          </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>URL</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>
-                  {status.supabaseConfig.url || 'Not set'}
+              {status?.connectivity?.responseTime && label === 'Database' && (
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                  {status.connectivity.responseTime}ms
                 </span>
-                {status.supabaseConfig.urlValid ? (
-                  <span className="text-green-500">✓</span>
-                ) : (
-                  <span className="text-red-500">✗</span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Anon Key</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>
-                  {status.supabaseConfig.anonKey || 'Not set'}
-                </span>
-                {status.supabaseConfig.anonKeyValid ? (
-                  <span className="text-green-500">✓</span>
-                ) : (
-                  <span className="text-red-500">✗</span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Service Role Key</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>
-                  {status.supabaseConfig.serviceRoleKey || 'Not set'}
-                </span>
-                {status.supabaseConfig.serviceRoleKeyValid ? (
-                  <span className="text-green-500">✓</span>
-                ) : (
-                  <span className="text-red-500">✗</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Connectivity & Services */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Connectivity */}
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-              Connectivity
-            </h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Can Reach Supabase</span>
-                <span className={getStatusColor(status.connectivity.canReachSupabase ? 'ok' : 'error')}>
-                  {status.connectivity.canReachSupabase ? '✓ Yes' : '✗ No'}
-                </span>
-              </div>
-              {status.connectivity.responseTime && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Response Time</span>
-                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    {status.connectivity.responseTime}ms
-                  </span>
-                </div>
-              )}
-              {status.connectivity.error && (
-                <div className="mt-2 p-2 rounded bg-red-50">
-                  <p className="text-xs text-red-600">{status.connectivity.error}</p>
-                </div>
               )}
             </div>
-          </div>
-
-          {/* Auth Service */}
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-              Auth Service
-            </h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</span>
-                <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadge(status.auth.status)}`}>
-                  {status.auth.status.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Can Authenticate</span>
-                <span className={getStatusColor(status.auth.canAuthenticate ? 'ok' : 'error')}>
-                  {status.auth.canAuthenticate ? '✓ Yes' : '✗ No'}
-                </span>
-              </div>
-              {status.auth.rateLimitInfo?.isRateLimited && (
-                <div className="mt-2 p-2 rounded bg-yellow-50">
-                  <p className="text-xs text-yellow-600">
-                    Rate Limited{status.auth.rateLimitInfo.retryAfter && ` - Retry after ${status.auth.rateLimitInfo.retryAfter}s`}
-                  </p>
-                </div>
-              )}
-              {status.auth.error && (
-                <div className="mt-2 p-2 rounded bg-red-50">
-                  <p className="text-xs text-red-600">{status.auth.error}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          ))}
+          {status?.systemHealth?.version && (
+            <span style={{ marginLeft: 'auto', fontSize: '11px', fontFamily: 'monospace', color: '#8B5CF6', fontWeight: 600 }}>
+              v{status.systemHealth.version}
+            </span>
+          )}
         </div>
 
-        {/* Database */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Database
-          </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</span>
-              <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadge(status.database.status)}`}>
-                {status.database.status.toUpperCase()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Can Query</span>
-              <span className={getStatusColor(status.database.canQuery ? 'ok' : 'error')}>
-                {status.database.canQuery ? '✓ Yes' : '✗ No'}
-              </span>
-            </div>
+        {/* ZONE 2 — Two Column: Sprint + Changelog */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+          {/* LEFT — Active Sprint */}
+          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Message</p>
-              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{status.database.message}</p>
-            </div>
-            {status.database.error && (
-              <div className="mt-2 p-2 rounded bg-red-50">
-                <p className="text-xs text-red-600">{status.database.error}</p>
-              </div>
-            )}
-            {status.database.tablesAccessible && status.database.tablesAccessible.length > 0 && (
-              <div className="mt-3">
-                <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>Accessible Tables</p>
-                <div className="flex flex-wrap gap-2">
-                  {status.database.tablesAccessible.map((table) => (
-                    <span
-                      key={table}
-                      className="px-2 py-1 rounded text-xs"
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      {table}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* API Status */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            API Status
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Supabase API */}
-            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
-              <h3 className="font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Supabase API</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</span>
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadge(status.apiStatus.supabase.status)}`}>
-                    {status.apiStatus.supabase.status.toUpperCase()}
-                  </span>
-                </div>
-                {status.apiStatus.supabase.message && (
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {status.apiStatus.supabase.message}
-                  </p>
-                )}
-              </div>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                Sprint: Go-Live Readiness
+              </h2>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>Apr 7 → Apr 14</p>
             </div>
 
-            {/* Claude API */}
-            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
-              <h3 className="font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Claude API</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</span>
-                  <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadge(status.apiStatus.claude.status)}`}>
-                    {status.apiStatus.claude.status.toUpperCase()}
-                  </span>
-                </div>
-                {status.apiStatus.claude.message && (
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {status.apiStatus.claude.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Project Status */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Project Status
-          </h2>
-          <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Status</span>
-            <div className="flex items-center gap-3">
-              <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadge(status.project.status)}`}>
-                {status.project.status.toUpperCase()}
-              </span>
-            </div>
-          </div>
-          <p className="text-sm mt-2" style={{ color: 'var(--text-primary)' }}>
-            {status.project.message}
-          </p>
-        </div>
-
-        {/* Environment Keys */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Environment Variables
-          </h2>
-          <div className="space-y-2">
-            {status.environmentKeys.map((env) => (
-              <div key={env.key} className="flex items-center justify-between py-1">
-                <span className="text-sm font-mono" style={{ color: 'var(--text-primary)' }}>
-                  {env.key}
-                </span>
-                {env.isSet ? (
-                  <span className="text-green-500 text-sm">✓ Set</span>
-                ) : (
-                  <span className="text-red-500 text-sm">✗ Not Set</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Performance Metrics */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Performance Metrics
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Progress bar */}
             <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Average Gap</p>
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                {status.performance.averageGap}s
-              </p>
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Fastest</p>
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                {status.performance.fastest}s
-              </p>
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Slowest</p>
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                {status.performance.slowest}s
-              </p>
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Sample</p>
-              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                {status.performance.sample}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        {status.recommendations && status.recommendations.length > 0 && (
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-              Recommendations
-            </h2>
-            <ul className="space-y-2">
-              {status.recommendations.map((rec, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    {rec.startsWith('✅') ? '✅' : rec.startsWith('⚠️') ? '⚠️' : '•'}
-                  </span>
-                  <span className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>
-                    {rec.replace(/^[✅⚠️•]\s*/, '')}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Changelog */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Changelog
-          </h2>
-          <div className="space-y-4">
-            {CHANGELOG.map((entry) => (
-              <div key={entry.build} className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="px-2 py-1 rounded text-xs font-medium" style={{ background: 'var(--accent-purple)', color: 'white' }}>
-                    Build {entry.build}
-                  </span>
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    {new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-                <ul className="space-y-1">
-                  {entry.changes.map((change, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-green-500 mt-0.5">✓</span>
-                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {change}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{doneCount} of {totalCount} tasks done</span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#22C55E' }}>{progressPct}%</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Active Sprint */}
-        <div className="mb-6 p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Active Sprint: Go-Live Readiness
-            </h2>
-            <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              <span>Start: Apr 7</span>
-              <span>Target: Apr 14</span>
+              <div style={{ height: '6px', borderRadius: '3px', background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progressPct}%`, background: 'linear-gradient(90deg, #22C55E, #16A34A)', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+              </div>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Done Column */}
-            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
-              <h3 className="font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <span className="text-green-500">✓</span>
+
+            {/* Done items grouped by category */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#22C55E', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
                 Done
-              </h3>
-              <ul className="space-y-2">
-                {SPRINT_DONE.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <div className="flex-1">
-                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {item.title}
-                      </span>
-                      <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
-                        ({item.date})
-                      </span>
-                    </div>
-                  </li>
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {categories.map((cat) => (
+                  <div key={cat}>
+                    <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px' }}>
+                      {cat}
+                    </p>
+                    {SPRINT_DONE.filter((i) => i.category === cat).map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
+                        <span style={{ color: '#22C55E', fontSize: '12px', flexShrink: 0 }}>✓</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>{item.date}</span>
+                      </div>
+                    ))}
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
 
-            {/* Pending Column */}
-            <div className="p-4 rounded" style={{ background: 'var(--bg-tertiary)' }}>
-              <h3 className="font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <span className="text-orange-500">⏱</span>
+            {/* Pending items */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>
                 Pending
-              </h3>
-              <ul className="space-y-2">
-                {SPRINT_PENDING.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-orange-500 mt-0.5">⏱</span>
-                    <div className="flex-1">
-                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {item.title}
-                      </span>
-                      <span className="text-xs ml-2" style={{ color: 'var(--text-secondary)' }}>
-                        (added {item.added})
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              </p>
+              {SPRINT_PENDING.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '3px 0' }}>
+                  <span style={{ color: '#F59E0B', fontSize: '12px', flexShrink: 0 }}>⏱</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{item.title}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0 }}>{item.category}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RIGHT — Build History */}
+          <div style={{ borderRadius: '10px', background: 'var(--bg-secondary)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              Build History
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '560px' }}>
+              {CHANGELOG.map((entry) => (
+                <div key={entry.version} style={{ padding: '14px', borderRadius: '8px', background: 'var(--bg-tertiary)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                    <span style={{
+                      padding: '3px 9px',
+                      borderRadius: '5px',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      background: '#8B5CF620',
+                      color: '#8B5CF6',
+                      border: '1px solid #8B5CF640',
+                    }}>
+                      v{entry.version}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {entry.items.map((item, idx) => (
+                      <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                        <span style={{ color: '#22C55E', fontSize: '11px', marginTop: '1px', flexShrink: 0 }}>✓</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+
+        {/* ZONE 3 — Live Metrics Strip */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '12px',
+        }}>
+          {[
+            { label: 'Total Leads', value: totalLeads, suffix: '', color: '#8B5CF6' },
+            { label: 'Active Today', value: activeToday, suffix: '', color: '#3B82F6' },
+            { label: 'Tasks Pending', value: tasksPending, suffix: '', color: '#F59E0B' },
+            { label: 'Avg Response', value: avgResponseTime, suffix: avgResponseTime ? 's' : '', color: '#22C55E' },
+          ].map(({ label, value, suffix, color }) => (
+            <div
+              key={label}
+              style={{
+                padding: '16px 20px',
+                borderRadius: '10px',
+                background: 'var(--bg-secondary)',
+                border: `1px solid ${color}25`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {label}
+              </span>
+              <span style={{ fontSize: '28px', fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
+                {value !== null && value !== undefined ? `${value}${suffix}` : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+
       </div>
     </DashboardLayout>
   )
 }
-
-const CHANGELOG = [
-  { build: 7, date: '2026-04-09', changes: ['bcon-web-prompt.ts created', 'BCON identity updated', 'Sync script preserves brand configs', 'Widget preview browser mockup', 'Mobile quick buttons dynamic'] },
-  { build: 6, date: '2026-04-01', changes: ['Widget preview 70%', 'exploreButtons AI in Marketing', 'Dynamic mobile quick buttons'] },
-  { build: 5, date: '2026-03-30', changes: ['/api/website endpoint', 'Welcome template wired', 'Newsletter excluded from leads'] },
-]
-
-const SPRINT_DONE = [
-  { title: 'Form fills wired to /api/website', date: 'Apr 1' },
-  { title: 'bcon_welcome_web_v1 template created', date: 'Apr 7' },
-  { title: 'Sync script fixed', date: 'Apr 9' },
-  { title: 'Web widget prompt created', date: 'Apr 9' },
-  { title: 'Widget preview browser mockup', date: 'Apr 9' },
-]
-
-const SPRINT_PENDING = [
-  { title: 'Fix phone ID undefined in task worker', added: 'Apr 9' },
-  { title: 'Fix dedup - same template repeating', added: 'Apr 9' },
-  { title: 'Widget live on bconclub.com', added: 'Apr 9' },
-  { title: 'Welcome message fix in widget', added: 'Apr 9' },
-  { title: 'Quick buttons update', added: 'Apr 9' },
-  { title: 'Typing animation (3 dots)', added: 'Apr 9' },
-  { title: 'Scroll-triggered widget reveal', added: 'Apr 9' },
-  { title: 'DEMO_TAKEN + PROPOSAL_SENT admin notes', added: 'Apr 9' },
-  { title: 'Stage-based follow-up logic', added: 'Apr 9' },
-  { title: 'Flows page visual journey map', added: 'Apr 9' },
-  { title: 'Outbound call button', added: 'Apr 9' },
-]

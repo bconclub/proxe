@@ -18,23 +18,11 @@ const pkgPath = path.join(process.cwd(), 'package.json')
 const envLocal = path.join(process.cwd(), '.env.local')
 const buildInfoPath = path.join(process.cwd(), '.build-info')
 
-// ── 1. Derive version from git commit count (works on Vercel fresh clones) ──
+// ── 1. Use version from package.json (already incremented by increment-build.js) ──
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-const [major, minor] = (pkg.version || '0.0.1').split('.').map(Number)
-
-let commitCount = 0
-try {
-  const { execSync } = require('child_process')
-  commitCount = parseInt(execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim(), 10)
-} catch {
-  // Fallback: increment from package.json patch if git is unavailable
-  const fallbackPatch = (pkg.version || '0.0.1').split('.').map(Number)[2] || 0
-  commitCount = fallbackPatch + 1
-}
-
-const newVersion = `${major}.${minor}.${commitCount}`
-console.log(`📦 Version: ${newVersion} (commit #${commitCount})`)
+const newVersion = pkg.version || '0.0.1'
+console.log(`📦 Version: ${newVersion} (from package.json)`)
 
 // ── 2. Build timestamp ──────────────────────────────────────────────────────
 
@@ -74,6 +62,5 @@ export const BUILD_TIMESTAMP = '${buildTime}'
 `)
 
 console.log(`🕐 Build time: ${buildTime}`)
-console.log(`📦 Version: ${newVersion}`)
 console.log(`📝 Updated ${envLocal}`)
 console.log(`📝 Generated ${generatedVersionPath}`)
