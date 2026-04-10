@@ -1,8 +1,14 @@
 # PROXe — Build Truth
 
-**Last updated:** 2026-04-10
+**Last updated:** 2026-04-11
 
 ## Changelog
+
+### 2026-04-11
+- feat(bcon): web prompt - new first message asks "What is your biggest challenge in marketing right now?"
+- feat(bcon): strengthened button rules - only 2-4 specific options, never after open-ended questions
+- fix(bcon): delete lead API - added DELETE handler to /api/dashboard/leads/[id]/route.ts
+- fix(bcon): delete lead frontend URL changed from query param to REST path /api/dashboard/leads/${id}
 
 ### 2026-04-10
 - fix(bcon): widget embed.js removed scroll listeners, transform, translateY — always visible
@@ -236,7 +242,8 @@ Website (embed.js)    WhatsApp (webhook)    Voice (Vobiz)    Social DMs
 
 | Endpoint | Purpose |
 |---|---|
-| `/api/dashboard/leads` | Lead list, search, pagination, filters |
+| `/api/dashboard/leads` | Lead list, search, pagination, filters, DELETE by query params |
+| `/api/dashboard/leads/[id]` | GET lead details, DELETE lead by ID |
 | `/api/dashboard/leads/[id]/summary` | Full lead detail with channel data |
 | `/api/dashboard/leads/[id]/stage` | Update lead stage |
 | `/api/dashboard/leads/[id]/score` | Lead score breakdown |
@@ -1000,6 +1007,9 @@ Start: 2026-04-07 | Target: 2026-04-14
 - [2026-04-09] Lead dedup with brand filter
 - [2026-04-09] Web prompt marketing-only focus
 - [2026-04-09] Widget shows immediately on load (scroll reveal removed)
+- [2026-04-11] Web prompt first message updated (marketing challenge question)
+- [2026-04-11] Web prompt button rules strengthened (strict 2-4 options only)
+- [2026-04-11] Delete lead API fixed (DELETE handler in [id] route)
 - [2026-04-10] Widget quick buttons 2x2 grid (4 buttons)
 - [2026-04-10] Widget font sizes (message 15px, header 16px, button 14px)
 - [2026-04-10] Widget input box visible (border + bg + placeholder)
