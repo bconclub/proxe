@@ -130,6 +130,18 @@ const SPRINT_PENDING: { title: string; added: string; category: string }[] = [
   { title: 'Status page command center redesign', added: 'Apr 11', category: 'Product' },
   { title: '3-part welcome message sequence', added: 'Apr 11', category: 'Widget' },
   { title: 'AI response - no empty button-only messages', added: 'Apr 11', category: 'Widget' },
+  { title: 'Dashboard - avg lead score + combined response time widget', added: 'Apr 11', category: 'Product' },
+  { title: 'Dashboard - Leads Needing Attention logic fix', added: 'Apr 11', category: 'Product' },
+  { title: 'Leads table - bulk select + bulk delete with password (826991)', added: 'Apr 11', category: 'Product' },
+  { title: 'Lead modal - Next Actions stage-based logic', added: 'Apr 11', category: 'Product' },
+  { title: 'Pipeline view - stages not mapping to leads (all zeros)', added: 'Apr 11', category: 'Product' },
+  { title: 'Tasks - verify worker actually firing, not just UI state', added: 'Apr 11', category: 'Infrastructure' },
+  { title: 'Sequences - wire WhatsApp templates to Day 1/3/7/30 slots', added: 'Apr 11', category: 'Product' },
+  { title: 'Sequences - coverage % + clickable lead count badges', added: 'Apr 11', category: 'Product' },
+  { title: 'Sequences - remove Legacy View, keep Journey Flow only', added: 'Apr 11', category: 'Product' },
+  { title: 'Agents page - phone input + manual template send fix', added: 'Apr 11', category: 'Product' },
+  { title: 'Voice - latency reduction', added: 'Apr 11', category: 'Infrastructure' },
+  { title: 'Latency reduction across all channels (WA, web, voice)', added: 'Apr 11', category: 'Infrastructure' },
 ]
 
 export default function StatusPage() {
@@ -276,7 +288,10 @@ export default function StatusPage() {
               <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
                 Sprint: Go-Live Readiness
               </h2>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>Apr 7 → Apr 14</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 4px' }}>Apr 7 → Apr 14</p>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', margin: 0, letterSpacing: '0.04em' }}>
+                ⚑ APR 14 DEADLINE — GO LIVE SPRINT
+              </p>
             </div>
 
             {/* Progress bar */}
