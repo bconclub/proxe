@@ -54,9 +54,11 @@ export async function DELETE(
 
     console.log('[DELETE] Attempting to delete lead:', id)
 
-    // First delete related records to handle foreign key constraints
-    console.log('[DELETE] Deleting related conversations...')
-    const { error: convError, count: convCount } = await supabase
+    // CASCADE DELETE: Delete child records first to avoid FK constraints
+    
+    // 1. Delete conversations (messages)
+    console.log('[DELETE] Step 1: Deleting conversations...')
+    const { error: convError } = await supabase
       .from('conversations')
       .delete()
       .eq('lead_id', id)
@@ -64,12 +66,12 @@ export async function DELETE(
     if (convError) {
       console.error('[DELETE] Error deleting conversations:', convError)
     } else {
-      console.log(`[DELETE] Deleted ${convCount || 'unknown'} conversations`)
+      console.log('[DELETE] Deleted conversations')
     }
 
-    // Delete from activities table
-    console.log('[DELETE] Deleting related activities...')
-    const { error: actError, count: actCount } = await supabase
+    // 2. Delete activities
+    console.log('[DELETE] Step 2: Deleting activities...')
+    const { error: actError } = await supabase
       .from('activities')
       .delete()
       .eq('lead_id', id)
@@ -77,12 +79,12 @@ export async function DELETE(
     if (actError) {
       console.error('[DELETE] Error deleting activities:', actError)
     } else {
-      console.log(`[DELETE] Deleted ${actCount || 'unknown'} activities`)
+      console.log('[DELETE] Deleted activities')
     }
 
-    // Delete from agent_tasks
-    console.log('[DELETE] Deleting related tasks...')
-    const { error: taskError, count: taskCount } = await supabase
+    // 3. Delete agent_tasks
+    console.log('[DELETE] Step 3: Deleting agent_tasks...')
+    const { error: taskError } = await supabase
       .from('agent_tasks')
       .delete()
       .eq('lead_id', id)
@@ -90,11 +92,24 @@ export async function DELETE(
     if (taskError) {
       console.error('[DELETE] Error deleting tasks:', taskError)
     } else {
-      console.log(`[DELETE] Deleted ${taskCount || 'unknown'} tasks`)
+      console.log('[DELETE] Deleted tasks')
     }
 
-    // Finally delete the lead
-    console.log('[DELETE] Deleting lead from all_leads...')
+    // 4. Delete lead_stage_changes history
+    console.log('[DELETE] Step 4: Deleting lead_stage_changes...')
+    const { error: stageError } = await supabase
+      .from('lead_stage_changes')
+      .delete()
+      .eq('lead_id', id)
+    
+    if (stageError) {
+      console.error('[DELETE] Error deleting stage changes:', stageError)
+    } else {
+      console.log('[DELETE] Deleted stage changes')
+    }
+
+    // 5. Finally delete the lead
+    console.log('[DELETE] Step 5: Deleting lead from all_leads...')
     const { data, error } = await supabase
       .from('all_leads')
       .delete()

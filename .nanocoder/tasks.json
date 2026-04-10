@@ -1,0 +1,59 @@
+[
+  {
+    "id": "3001dbab",
+    "title": "Audit DashboardLayout.tsx - Sidebar state, mobile nav, memory leaks",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "c4380915",
+    "title": "Audit LeadsTable.tsx - Pagination bugs, filter logic, selection state",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "9c9c8a87",
+    "title": "Audit LeadDetailsModal.tsx - Admin notes CRUD, delete lead, stage updates",
+    "status": "completed",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:47:16.791Z",
+    "completedAt": "2026-04-10T15:47:16.791Z"
+  },
+  {
+    "id": "e0bb66b6",
+    "title": "Audit LeadStageSelector.tsx - Stage dropdown, API calls, optimistic UI",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "650a20f2",
+    "title": "Audit dashboard/page.tsx - Founder dashboard metrics, data fetching",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "4cc2cb4e",
+    "title": "Audit dashboard/leads/page.tsx - Lead list container, URL params handling",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "b195e07f",
+    "title": "Audit dashboard/inbox/page.tsx - Multi-channel view, reply functionality",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  },
+  {
+    "id": "1ebeb500",
+    "title": "Audit useRealtimeLeads.ts - Supabase realtime subscription",
+    "status": "pending",
+    "createdAt": "2026-04-10T15:39:47.887Z",
+    "updatedAt": "2026-04-10T15:39:47.887Z"
+  }
+]

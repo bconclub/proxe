@@ -108,15 +108,15 @@ export function useRealtimeLeads() {
 
     fetchLeads()
 
-    // Subscribe to real-time changes on unified_leads
+    // Subscribe to real-time changes on all_leads (FIXED: was unified_leads)
     const channel = supabase
-      .channel('leads-changes')
+      .channel('all_leads_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'unified_leads',
+          table: 'all_leads',
         },
         () => {
           fetchLeads()

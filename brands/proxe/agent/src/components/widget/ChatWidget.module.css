@@ -100,7 +100,7 @@
 .welcomeQuickButtonRow {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 10px;
   justify-content: flex-end;
   align-items: center;
   width: 100%;
@@ -108,8 +108,11 @@
 }
 
 .welcomeQuickButtonRow .quickBtn {
-  flex: 0 1 auto;
-  min-width: fit-content;
+  flex: 0 0 auto;
+  min-width: auto;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 /* Mobile quick actions pinned near the bottom of the chat modal */
@@ -151,7 +154,8 @@
 
   /* Slightly reduce quick action text size on mobile (10% smaller) */
   .mobileQuickActions .quickBtn {
-    font-size: 15.3px;
+    font-size: 15px;
+    padding: 10px 16px;
   }
 
   .mobileQuickActionsInner::-webkit-scrollbar {
@@ -224,6 +228,13 @@
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Quick buttons in the welcome row (at bottom of chat) are slightly bigger */
+.welcomeQuickButtons .quickBtn {
+  padding: 11px 20px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .quickBtn:hover {

@@ -23,6 +23,7 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Manual', scoreRange: 'Manual' },
   { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
   { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
+  { value: 'In Sequence', label: 'In Sequence', description: 'Automated follow-up', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [
