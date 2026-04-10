@@ -38,11 +38,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log('[DELETE] Handler invoked for lead:', params.id)
+  
   try {
     const supabase = await createClient()
     const { id } = params
 
     if (!id) {
+      console.log('[DELETE] Missing lead ID')
       return NextResponse.json(
         { error: 'Missing lead ID' },
         { status: 400 }
@@ -51,24 +54,47 @@ export async function DELETE(
 
     console.log('[DELETE] Attempting to delete lead:', id)
 
-    // First, try to delete related records in conversations table
-    // This handles foreign key constraints if they exist
-    try {
-      const { error: convError } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('lead_id', id)
-      
-      if (convError) {
-        console.log('[DELETE] No conversations deleted or error:', convError.message)
-      } else {
-        console.log('[DELETE] Deleted related conversations for lead:', id)
-      }
-    } catch (e) {
-      console.log('[DELETE] Error deleting conversations (may not exist):', e)
+    // First delete related records to handle foreign key constraints
+    console.log('[DELETE] Deleting related conversations...')
+    const { error: convError, count: convCount } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('lead_id', id)
+    
+    if (convError) {
+      console.error('[DELETE] Error deleting conversations:', convError)
+    } else {
+      console.log(`[DELETE] Deleted ${convCount || 'unknown'} conversations`)
     }
 
-    // Delete from all_leads
+    // Delete from activities table
+    console.log('[DELETE] Deleting related activities...')
+    const { error: actError, count: actCount } = await supabase
+      .from('activities')
+      .delete()
+      .eq('lead_id', id)
+    
+    if (actError) {
+      console.error('[DELETE] Error deleting activities:', actError)
+    } else {
+      console.log(`[DELETE] Deleted ${actCount || 'unknown'} activities`)
+    }
+
+    // Delete from agent_tasks
+    console.log('[DELETE] Deleting related tasks...')
+    const { error: taskError, count: taskCount } = await supabase
+      .from('agent_tasks')
+      .delete()
+      .eq('lead_id', id)
+    
+    if (taskError) {
+      console.error('[DELETE] Error deleting tasks:', taskError)
+    } else {
+      console.log(`[DELETE] Deleted ${taskCount || 'unknown'} tasks`)
+    }
+
+    // Finally delete the lead
+    console.log('[DELETE] Deleting lead from all_leads...')
     const { data, error } = await supabase
       .from('all_leads')
       .delete()
@@ -76,7 +102,7 @@ export async function DELETE(
       .select()
 
     if (error) {
-      console.error('[DELETE] Supabase error:', error)
+      console.error('[DELETE] Supabase error deleting lead:', error)
       return NextResponse.json(
         { error: 'Failed to delete lead', details: error.message, code: error.code },
         { status: 500 }
