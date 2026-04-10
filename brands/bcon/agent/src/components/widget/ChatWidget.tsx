@@ -115,7 +115,7 @@ const ICONS = {
 // Brand-aware welcome message
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm PROXe, your AI marketing assistant. Tell me about your business - what are you working on?",
+  bcon: "Hi! I'm BCON's AI assistant. What is your biggest challenge in marketing right now?",
   proxe: "Hi! I'm PROXe, your AI marketing assistant. Tell me about your business - what are you working on?",
 };
 function getWelcomeMessage(brand: string): string {
@@ -2478,7 +2478,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return (
         <div className={wrapperClassName}>
           <div className={styles.welcomeQuickButtonsContainer}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' }}>
               {quickActions.slice(0, 4).map((buttonText, index) => (
                 <button
                   key={buttonText}
@@ -2488,7 +2487,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                   {buttonText}
                 </button>
               ))}
-            </div>
           </div>
         </div>
       );
@@ -2931,24 +2929,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
                     <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.calendarCloseBtn}
-                      onClick={closeCalendarWidget}
-                      aria-label="Close booking widget"
-                    >
-                      {ICONS.close}
-                    </button>
-                  </div>
-                      
+                      {/* Close button */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closeCalendarWidget}
+                          aria-label="Close booking widget"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
                       {/* Custom Google Calendar widget */}
                   <div
                     className={styles.calendarScrollArea}
@@ -3320,7 +3311,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )}
         
         {/* Typing indicator - shows while waiting for AI response (hidden when streaming starts) */}
-        {isLoading && !hasStreamingText && (
+        {isLoading && !hasStreamingText && !messages.some(m => m.isStreaming) && (
           <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}>
             <div className={styles.messageContent}>
               <div className={styles.bubble}>

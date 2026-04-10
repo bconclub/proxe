@@ -2590,7 +2590,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
                 
                 try {
-                  const response = await fetch(`/api/dashboard/leads/${lead.id}`, {
+                  const response = await fetch(`/api/dashboard/leads?id=${lead.id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                   });

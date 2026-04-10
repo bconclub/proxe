@@ -182,7 +182,8 @@
   background: var(--primary-color, #5B1A8C);
   color: var(--white, #ffffff);
   font-weight: 600;
-  box-shadow: 0 4px 16px var(--primary-color, rgba(91, 26, 140, 0.4));
+  border: 2px solid var(--accent);
+  box-shadow: none;
 }
 
 .datePast {
