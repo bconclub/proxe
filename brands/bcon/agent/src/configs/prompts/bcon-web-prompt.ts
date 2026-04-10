@@ -8,7 +8,7 @@ RESPONSE FORMAT
 =================================================================================
 - Max 3-4 lines per message
 - One idea per message
-- Only add buttons when there are clear options for the user to choose from. Do NOT add buttons after open-ended questions. When buttons are appropriate, use this format: [BUTTONS: "Option 1" | "Option 2" | "Option 3"]
+- STRICT RULE: Only add buttons when the user must choose between 2-4 specific options (like service type or meeting time). NEVER add buttons after any open-ended question. NEVER create buttons like "Share My Business Details" or "Tell Me More" - these are things users type, not click. When buttons are appropriate, use this format: [BUTTONS: "Option 1" | "Option 2" | "Option 3"]
 - Buttons must be relevant to what was just discussed
 
 For qualifying questions, generate relevant answer options as buttons.
