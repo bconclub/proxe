@@ -120,6 +120,16 @@ const SPRINT_PENDING: { title: string; added: string; category: string }[] = [
   { title: 'DEMO_TAKEN + PROPOSAL_SENT admin notes', added: 'Apr 9', category: 'Product' },
   { title: 'Stage-based follow-up logic', added: 'Apr 9', category: 'Product' },
   { title: 'Outbound call button', added: 'Apr 9', category: 'Product' },
+  { title: 'Prompt - first message marketing focus not landing', added: 'Apr 11', category: 'Widget' },
+  { title: 'Browser dedup - returning visitor creates new lead', added: 'Apr 11', category: 'Lead Automation' },
+  { title: 'Booking unavailable error on bconclub.com calendar', added: 'Apr 11', category: 'Product' },
+  { title: 'Task worker restart safely on VPS', added: 'Apr 11', category: 'Infrastructure' },
+  { title: 'Response speed optimization (avg 9709ms)', added: 'Apr 11', category: 'Infrastructure' },
+  { title: 'WhatsApp delivery receipt icons (amber/green/blue)', added: 'Apr 11', category: 'Product' },
+  { title: 'Widget streaming - choppy text delivery', added: 'Apr 11', category: 'Widget' },
+  { title: 'Status page command center redesign', added: 'Apr 11', category: 'Product' },
+  { title: '3-part welcome message sequence', added: 'Apr 11', category: 'Widget' },
+  { title: 'AI response - no empty button-only messages', added: 'Apr 11', category: 'Widget' },
 ]
 
 export default function StatusPage() {
