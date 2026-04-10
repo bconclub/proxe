@@ -24,6 +24,26 @@ interface MetricsData {
 
 const CHANGELOG: { version: string; date: string; items: string[] }[] = [
   {
+    version: '0.0.16',
+    date: '2026-04-11',
+    items: [
+      'Quick buttons chip style — flex row, right-aligned, no 2×2 grid',
+      'Double typing indicator fixed — suppressed when streaming',
+      'Compact user bubble — smaller avatar + name',
+      'Welcome message corrected to BCON identity',
+      'Rainbow conic-gradient border when AI responding',
+      'Calendar date highlight — border not shadow',
+      'Calendar bubble — removed duplicate BCON header',
+      'Prompt: 4 strict rules (no PROXe, no text-less buttons, etc.)',
+      'Prompt: tighter probing questions + booking push after 3–4 msgs',
+      'Prompt: Indian English language tone added',
+      'Config: quickButtons + exploreButtons updated for BCON',
+      'Booking keywords: added "audit" to trigger calendar',
+      'handleQuickButtonClick wrapped in try/catch',
+      'Delete lead URL fixed to query param ?id=',
+    ],
+  },
+  {
     version: '0.0.15',
     date: '2026-04-10',
     items: [
@@ -79,6 +99,18 @@ const SPRINT_DONE: { title: string; date: string; category: string }[] = [
   { title: 'Calendar timezone + event colors', date: 'Apr 10', category: 'Product' },
   { title: 'Inbox icon colors + sidebar width', date: 'Apr 10', category: 'Product' },
   { title: 'Flows funnel TOP/MID/BOTTOM labels', date: 'Apr 10', category: 'Product' },
+  { title: 'Quick buttons chip style, right-aligned', date: 'Apr 11', category: 'Widget' },
+  { title: 'Double typing indicator fixed', date: 'Apr 11', category: 'Widget' },
+  { title: 'Compact user message bubble', date: 'Apr 11', category: 'Widget' },
+  { title: 'Welcome message corrected (BCON identity)', date: 'Apr 11', category: 'Widget' },
+  { title: 'Rainbow conic-gradient border on response', date: 'Apr 11', category: 'Widget' },
+  { title: 'Calendar date highlight — border not shadow', date: 'Apr 11', category: 'Widget' },
+  { title: 'Removed duplicate BCON header in calendar bubble', date: 'Apr 11', category: 'Widget' },
+  { title: 'Prompt strict rules + probing questions + booking push', date: 'Apr 11', category: 'Product' },
+  { title: 'Config quickButtons + exploreButtons updated', date: 'Apr 11', category: 'Product' },
+  { title: 'Audit keyword triggers calendar directly', date: 'Apr 11', category: 'Lead Automation' },
+  { title: 'Button click error safety (try/catch)', date: 'Apr 11', category: 'Infrastructure' },
+  { title: 'Delete lead URL fixed to ?id= query param', date: 'Apr 11', category: 'Lead Automation' },
 ]
 
 const SPRINT_PENDING: { title: string; added: string; category: string }[] = [
