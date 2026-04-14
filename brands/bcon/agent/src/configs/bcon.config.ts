@@ -94,5 +94,5 @@ export const bconConfig: BrandConfig = {
   // Welcome video embed
   showWelcomeVideo: true,
   welcomeVideoUrl: 'https://player.vimeo.com/video/1182869056',
-  welcomeVideoTitle: 'PROXe Beta Testing Live',
+  welcomeVideoTitle: 'PROXe Beta Live',
 };

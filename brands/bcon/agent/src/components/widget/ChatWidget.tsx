@@ -2910,31 +2910,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               </div>
             </div>
 
-            {message.type === 'ai' && index === 0 && messageCount === 0 && showWelcomeVideo && config.showWelcomeVideo && (
-              <div className={styles.videoEmbedContainer}>
-                <button
-                  type="button"
-                  className={styles.videoCloseBtn}
-                  onClick={() => {
-                    setShowWelcomeVideo(false);
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('bcon_video_closed', 'true');
-                    }
-                  }}
-                  aria-label="Close video"
-                >
-                  ×
-                </button>
-                <iframe
-                  src={config.welcomeVideoUrl}
-                  title={config.welcomeVideoTitle || 'Welcome video'}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            )}
-
             {showCalendly && calendarAnchorId === message.id && (
               <div 
                 key={showCalendly}
@@ -3366,6 +3341,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       {/* Desktop: quick buttons near input when showing welcome message */}
       {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
+
+      {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
+        <div className={styles.videoEmbedContainerBottom}>
+          <button
+            type="button"
+            className={styles.videoCloseBtn}
+            onClick={() => {
+              setShowWelcomeVideo(false);
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('bcon_video_closed', 'true');
+              }
+            }}
+            aria-label="Close video"
+          >
+            ×
+          </button>
+          <iframe
+            src={config.welcomeVideoUrl}
+            title={config.welcomeVideoTitle || 'Welcome video'}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )}
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
