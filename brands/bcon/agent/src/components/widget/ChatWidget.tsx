@@ -114,9 +114,9 @@ const ICONS = {
 
 // BCON sequential welcome sequence
 const bconWelcomeSequence = [
-  { text: "Hi.", delay: 0 },
-  { text: "This is PROXe.", delay: 800 },
-  { text: "I'm BCON's AI marketing agent. Tell me about your business. What are you working on?", delay: 1600 },
+  { text: "Hi. This is PROXe.", delay: 0 },
+  { text: "I'm BCON's AI marketing agent. Tell me more about your business.", delay: 400 },
+  { text: "What are you working on?", delay: 800 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -1680,7 +1680,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       if (item.delay > 0) {
         await new Promise(resolve => setTimeout(resolve, item.delay));
       }
-      await streamWelcomeMessage(item.text, 25);
+      await streamWelcomeMessage(item.text, 5);
     }
 
     setWelcomeComplete(true);
@@ -2883,12 +2883,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
               data-message-id={message.id}
             >
-              <div className={styles.messageContent}>
-                {message.type === 'ai' && (
-                  <div className={styles.inlineAvatar}>
+              {message.type === 'ai' && (index === 0 || messages[index - 1]?.type !== 'ai') && (
+                <div className={styles.aiHeader}>
+                  <div className={styles.aiHeaderAvatar}>
                     {ICONS.ai(brand, config)}
                   </div>
-                )}
+                  <span className={styles.aiHeaderName}>{config.name}</span>
+                </div>
+              )}
+              <div className={`${styles.messageContent} ${message.type === 'ai' ? styles.aiMessageIndent : ''}`}>
                 <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
                   <div className={styles.bubbleContent}>
                     {/* Typing indicator for loading state */}
