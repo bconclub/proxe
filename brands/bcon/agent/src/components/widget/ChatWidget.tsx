@@ -3313,7 +3313,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )}
         
         {/* Typing indicator - shows while waiting for AI response (hidden when streaming starts) */}
-        {isLoading && !hasStreamingText && !messages.some(m => m.isStreaming) && (
+        {isLoading && !hasStreamingText && (
           <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}>
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
@@ -3326,10 +3326,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       {config.name}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 4px', minWidth: '50px' }}>
-                    <span className={styles.typingDot} />
-                    <span className={`${styles.typingDot} ${styles.typingDotDelay1}`} />
-                    <span className={`${styles.typingDot} ${styles.typingDotDelay2}`} />
+                  <div className={styles.typingIndicator}>
+                    <span />
+                    <span />
+                    <span />
                   </div>
                 </div>
               </div>

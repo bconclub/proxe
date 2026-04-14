@@ -1180,31 +1180,30 @@
   50%, 100% { opacity: 0.3; }
 }
 
-.typingDot {
+.typingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px;
+  min-width: 50px;
+}
+
+.typingIndicator span {
   width: 6px;
   height: 6px;
-  background: white;
+  background: currentColor;
   border-radius: 50%;
-  display: inline-block;
-  animation: bounce 1.4s infinite ease-in-out both;
+  animation: typingBounce 1.4s infinite ease-in-out both;
   flex-shrink: 0;
 }
 
-.typingDotDelay1 {
-  animation-delay: -0.32s;
-}
+.typingIndicator span:nth-child(1) { animation-delay: -0.32s; }
+.typingIndicator span:nth-child(2) { animation-delay: -0.16s; }
+.typingIndicator span:nth-child(3) { animation-delay: 0s; }
 
-.typingDotDelay2 {
-  animation-delay: -0.16s;
-}
-
-@keyframes bounce {
-  0%, 80%, 100% {
-    transform: scale(0);
-  }
-  40% {
-    transform: scale(1);
-  }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
 }
 
 .followUpButtons {
