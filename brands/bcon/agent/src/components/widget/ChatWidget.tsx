@@ -152,6 +152,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
+  const [showWelcomeVideo, setShowWelcomeVideo] = useState(true);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
@@ -496,6 +497,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       cancelled = true;
     };
   }, [preLoadedLeadContext]);
+
+  // Initialize welcome video visibility from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const dismissed = window.localStorage.getItem('bcon_video_closed');
+      if (dismissed === 'true') {
+        setShowWelcomeVideo(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (showNamePrompt) {
@@ -2720,20 +2731,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     </div>
   );
 
-  // Add typing animation keyframes
-  const typingAnimationStyles = `
-    @keyframes typingPulse {
-      0%, 80%, 100% {
-        transform: scale(0.6);
-        opacity: 0.3;
-      }
-      40% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-  `;
-
   if (!isOpen) {
     // Bubble widget style or docked bubble mode
     if (widgetStyle === 'bubble' || isDockedBubble) {
@@ -2757,9 +2754,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   return (
     <>
-    {/* Typing animation styles */}
-    <style dangerouslySetInnerHTML={{ __html: typingAnimationStyles }} />
-    
     {/* Only show searchbar if widgetStyle is not 'bubble' */}
     {widgetStyle !== 'bubble' && searchbar}
     <div 
@@ -2915,6 +2909,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 </div>
               </div>
             </div>
+
+            {message.type === 'ai' && index === 0 && messageCount === 0 && showWelcomeVideo && config.showWelcomeVideo && (
+              <div className={styles.videoEmbedContainer}>
+                <button
+                  type="button"
+                  className={styles.videoCloseBtn}
+                  onClick={() => {
+                    setShowWelcomeVideo(false);
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('bcon_video_closed', 'true');
+                    }
+                  }}
+                  aria-label="Close video"
+                >
+                  ×
+                </button>
+                <iframe
+                  src={config.welcomeVideoUrl}
+                  title={config.welcomeVideoTitle || 'Welcome video'}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
 
             {showCalendly && calendarAnchorId === message.id && (
               <div 
@@ -3330,42 +3349,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 4px', minWidth: '50px' }}>
-                    <span 
-                      style={{
-                        display: 'block',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor: '#8B5CF6',
-                        animation: 'typingPulse 1.4s infinite ease-in-out both',
-                        animationDelay: '0s',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span 
-                      style={{
-                        display: 'block',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor: '#8B5CF6',
-                        animation: 'typingPulse 1.4s infinite ease-in-out both',
-                        animationDelay: '0.2s',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span 
-                      style={{
-                        display: 'block',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor: '#8B5CF6',
-                        animation: 'typingPulse 1.4s infinite ease-in-out both',
-                        animationDelay: '0.4s',
-                        flexShrink: 0,
-                      }}
-                    />
+                    <span className={styles.typingDot} />
+                    <span className={`${styles.typingDot} ${styles.typingDotDelay1}`} />
+                    <span className={`${styles.typingDot} ${styles.typingDotDelay2}`} />
                   </div>
                 </div>
               </div>

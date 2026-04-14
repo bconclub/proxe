@@ -77,6 +77,10 @@ export interface BrandConfig {
   exploreButtons?: string[];
   followUpButtons: string[]; // Default follow-up buttons
   firstMessageButtons?: string[]; // Buttons specifically for first message
+  // Welcome video embed configuration
+  showWelcomeVideo?: boolean;
+  welcomeVideoUrl?: string;
+  welcomeVideoTitle?: string;
 }
 
 export const proxeConfig: BrandConfig = {
