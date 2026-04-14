@@ -26,7 +26,8 @@ interface PromptOptions {
  * Get brand-specific system prompt
  */
 function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
-  switch (brand) {
+  console.log('[promptBuilder] Loading prompt for brand:', brand, 'channel:', channel);
+  switch (brand.toLowerCase()) {
     case 'bcon':
       return channel === 'web'
         ? getBconWebSystemPrompt(context, messageCount)
