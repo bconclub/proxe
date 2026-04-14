@@ -103,7 +103,7 @@ function buildSystemPrompt(
     : '';
 
   // Channel-specific adjustments
-  const channelNote = getChannelInstructions(channel);
+  const channelNote = getChannelInstructions(channel, brand);
 
   // Cross-channel context (e.g., "This user previously chatted on web about pilot training")
   const crossChannelNote = crossChannelContext
@@ -189,7 +189,7 @@ function buildUserPrompt(params: {
 /**
  * Get channel-specific prompt instructions
  */
-function getChannelInstructions(channel?: Channel): string {
+function getChannelInstructions(channel?: Channel, brand?: string): string {
   if (channel === 'whatsapp') {
     return `
 
@@ -216,6 +216,10 @@ natural-sounding, and easy to speak aloud. Avoid any formatting, lists, or URLs.
 
   // Web channel
   if (channel === 'web') {
+    const bconLeadNote = brand === 'bcon'
+      ? ''
+      : `- Collect name and email early in conversation - web visitors do not have phone numbers by default.\n- Ask "What's your name?" naturally in the first few messages.\n- Ask "What's the best email to reach you?" before booking.\n- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.`;
+
     return `
 
 =================================================================================
@@ -224,10 +228,7 @@ WEB CHAT RULES (MUST FOLLOW)
 This conversation is on the web chat widget. You MUST:
 - Responses can be 2-4 sentences (slightly longer than WhatsApp).
 - You can use **bold** for emphasis sparingly.
-- Collect name and email early in conversation - web visitors don't have phone numbers by default.
-- Ask "What's your name?" naturally in the first few messages.
-- Ask "What's the best email to reach you?" before booking.
-- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.
+${bconLeadNote}
 - Same booking flow: check_availability → book_consultation.
 - After booking: "You're booked! Check your email for the calendar invite."
 - You have the same booking tools as WhatsApp - use them the same way.
