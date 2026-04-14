@@ -2526,7 +2526,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     (wrapperClassName: string) => {
       // Show minimal 2-button mode after "About BCON", otherwise use config
       const quickActions = showMinimalButtons
-        ? ['See Solutions', 'Book a Call']
+        ? ['See Solutions', 'Book AI Brand Audit']
         : (config.quickButtons || []);
 
       return (
@@ -2543,7 +2543,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                     {quickActions.slice(0, 4).map((buttonText, index) => (
                       <button
                         key={buttonText}
-                        className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                        className={`${styles.quickBtn} ${buttonText === 'Book AI Brand Audit' ? styles.quickBtnPrimary : ''}`}
                         onClick={() => handleQuickButtonClick(buttonText)}
                       >
                         {buttonText}
