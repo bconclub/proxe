@@ -1146,7 +1146,12 @@
   margin-left: 32px;
 }
 
+.message.user .messageContent {
+  justify-content: flex-end;
+}
+
 .message.user .bubble {
+  margin-right: 8px;
   /* User bubbles use brand theme colors */
   background: var(--bubble-user-bg);
   backdrop-filter: blur(35px) saturate(100%);
@@ -1930,6 +1935,53 @@
   animation: slideUpVideo 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Portfolio Grid Styles */
+.portfolioGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+  animation: slideUpVideo 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.portfolioCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.portfolioCard:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.portfolioIcon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.portfolioTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.portfolioDesc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .portfolioGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @keyframes slideUpVideo {
   from {
     opacity: 0;
@@ -2338,6 +2390,7 @@
 .message.user .bubbleHeader {
   padding: 4px 0;
   min-height: unset;
+  border-bottom: none;
 }
 
 .message.user .bubbleAvatar {

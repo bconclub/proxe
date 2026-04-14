@@ -273,6 +273,7 @@ function cleanResponse(raw: string, channel?: string): string {
   let cleaned = raw
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .replace(/\[BUTTONS:[^\]]*\]/gi, '')
     .trim();
 
   // Strip HTML tags for non-web channels

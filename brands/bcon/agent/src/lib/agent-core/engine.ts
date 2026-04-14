@@ -262,10 +262,10 @@ export async function* processStream(
       }
     }
 
-    // Yield the full response as a single chunk
-    yield { type: 'chunk', text: rawResponse };
-
     const cleanedResponse = cleanResponse(rawResponse);
+
+    // Yield the cleaned response as a single chunk
+    yield { type: 'chunk', text: cleanedResponse };
 
     // 6. Generate follow-ups
     const followUps = await generateFollowUps({
@@ -303,6 +303,7 @@ function cleanResponse(raw: string, channel?: string): string {
   let cleaned = raw
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .replace(/\[BUTTONS:[^\]]*\]/gi, '')
     .trim();
 
   // Strip HTML tags for non-web channels

@@ -149,6 +149,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
+  const [showPortfolio, setShowPortfolio] = useState<string | null>(null);
+  const [portfolioAnchorId, setPortfolioAnchorId] = useState<string | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
@@ -743,6 +745,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setVideoAnchorId(null);
   }, []);
 
+  const closePortfolio = useCallback(() => {
+    setShowPortfolio(null);
+    setPortfolioAnchorId(null);
+  }, []);
+
   const handleCloseChat = useCallback(() => {
     setShowCloseConfirm(false);
     setIsOpen(false);
@@ -754,6 +761,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
+    closePortfolio();
     setDynamicQuickButtons(null);
     setExploreButtons(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
@@ -762,7 +770,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (window.parent !== window) {
       window.parent.postMessage('wc-chat-close', '*');
     }
-  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm]);
+  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
 
   const handleRequestCloseChat = useCallback(() => {
     setShowCloseConfirm(true);
@@ -1598,6 +1606,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
+    closePortfolio();
     setShowDeployForm(null);
     deployFormScrolledRef.current = false;
     setBookingCompleted(false);
@@ -1643,7 +1652,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsSearchbarHovered(false);
     setIsDockedBubble(false);
     hasEverOpenedRef.current = false;
-  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm]);
+  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
 
   const streamWelcomeMessage = useCallback(async (text: string, charDelay: number = 25) => {
     const msg = addStreamingAIMessage('');
@@ -2461,6 +2470,27 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
+    // Handle See Portfolio button - show portfolio grid inline
+    if (lowerMessage === 'see portfolio' || lowerMessage === 'see our work') {
+      closeCalendarWidget();
+      closeDeployForm();
+      closeVideoWidget();
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(false);
+      
+      const userMessage = addUserMessage('See Portfolio');
+      
+      setTimeout(() => {
+        const portfolioMessageId = `portfolio-${Date.now()}`;
+        setShowPortfolio(portfolioMessageId);
+        setPortfolioAnchorId(userMessage.id);
+      }, 100);
+      
+      return;
+    }
+
     // Handle booking intent buttons directly - trigger booking flow without AI round-trip
     const bookingKeywords = ['book', 'call', 'schedule', 'demo', 'appointment', 'meeting', 'consultation', 'audit', 'slot'];
     const hasBookingIntent = bookingKeywords.some(keyword => lowerMessage.includes(keyword));
@@ -2560,6 +2590,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
     if (showVideo) {
       closeVideoWidget();
+    }
+    if (showPortfolio) {
+      closePortfolio();
     }
     setIsInputActive(true);
     if (!isOpen) {
@@ -2751,6 +2784,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             if (showDeployForm) {
               closeDeployForm();
             }
+            if (showPortfolio) {
+              closePortfolio();
+            }
               handleSearchWidgetPress();
           }}
           onBlur={handleInputBlur}
@@ -2871,10 +2907,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
           const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
           
-          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo) {
+          const isClickOnPortfolio = target.closest(`.${styles.portfolioGrid}`);
+          
+          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
             // Close widgets when clicking in empty messages area (clicking away)
             closeCalendarWidget();
             closeVideoWidget();
+            closePortfolio();
           }
         }}
       >
@@ -3078,6 +3117,69 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                           <source src="/brands/proxe/assets/Markx.mp4" type="video/mp4" />
                           Your browser does not support the video tag.
                         </video>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showPortfolio && portfolioAnchorId === message.id && (
+              <div 
+                key={showPortfolio}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                onClick={(e) => e.stopPropagation()}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closePortfolio}
+                          aria-label="Close portfolio"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      
+                      <div className={styles.portfolioGrid} data-scroll-lock="allow">
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🎯</div>
+                          <div className={styles.portfolioTitle}>Customer Acquisition</div>
+                          <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🎨</div>
+                          <div className={styles.portfolioTitle}>Brand Management</div>
+                          <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>📝</div>
+                          <div className={styles.portfolioTitle}>Content & Ads</div>
+                          <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🤖</div>
+                          <div className={styles.portfolioTitle}>AI Automation</div>
+                          <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3426,6 +3528,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 }
                 if (showDeployForm) {
                   closeDeployForm();
+                }
+                if (showPortfolio) {
+                  closePortfolio();
                 }
                 // Scroll input into view above keyboard on mobile
     const scrollInputIntoView = () => {
