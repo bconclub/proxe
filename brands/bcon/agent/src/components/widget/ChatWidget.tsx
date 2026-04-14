@@ -1713,7 +1713,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
-  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete;
+  const hasUserMessage = messages.some((m) => m.type === 'user');
+  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
 
   const isResponding = useMemo(
     () =>
@@ -3359,7 +3360,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
 
       {/* Desktop: quick buttons near input when showing welcome message */}
-      {(!isMobileViewport) && isOpen && welcomeComplete && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {(!isMobileViewport) && isOpen && welcomeComplete && !hasUserMessage && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
 
       {/* Welcome video embed temporarily disabled */}
       {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
