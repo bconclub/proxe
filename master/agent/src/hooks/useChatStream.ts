@@ -240,7 +240,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
 
                             // Continue streaming if there are more characters in this chunk
                             if (charIndex < chars.length) {
-                              setTimeout(streamChars, 15); // Small delay for visible streaming effect
+                              setTimeout(streamChars, 0); // Stream characters immediately
                             } else {
                               // Move to next chunk in queue
                               setTimeout(processQueue, 0);

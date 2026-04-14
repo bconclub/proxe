@@ -2909,6 +2909,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       </div>
                     ) : (
                       <>
+                        {/* User message avatar header */}
+                        {message.type === 'user' && (
+                          <div className={styles.bubbleHeader}>
+                            <div className={styles.bubbleAvatar}>
+                              {ICONS.user}
+                            </div>
+                            <span className={styles.bubbleName}>You</span>
+                          </div>
+                        )}
                         {/* Message content - hide text when calendar is showing for this message */}
                         {!(showCalendly && calendarAnchorId === message.id) && (
                           <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
