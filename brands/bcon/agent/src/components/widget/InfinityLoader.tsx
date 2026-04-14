@@ -20,10 +20,14 @@ export function InfinityLoader() {
   }, []);
 
   if (!animationData) {
-    // Fallback while loading
+    // Fallback while loading - animated 3 dots
     return (
       <div className={styles.loadingContainer}>
-        <div className={styles.typingAnimation}>...</div>
+        <div className={styles.typingIndicatorFallback}>
+          <span />
+          <span />
+          <span />
+        </div>
       </div>
     );
   }

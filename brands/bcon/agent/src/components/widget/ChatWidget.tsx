@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
 import type { Message } from '@/hooks/useChatStream';
-import { InfinityLoader } from '@/components/widget/InfinityLoader';
+
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
@@ -2849,54 +2849,60 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               data-message-id={message.id}
             >
               <div className={styles.messageContent}>
-                <div className={styles.bubble}>
-                  {message.isStreaming && !message.text && !hasStreamingText ? (
-                    <InfinityLoader />
-                  ) : (
-                    <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {message.type === 'ai' ? config.name : 'You'}
-                        </span>
+                <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
+                  <div className={styles.bubbleContent}>
+                    {/* Header with avatar and name inside the bubble */}
+                    <div className={styles.bubbleHeader}>
+                      <div className={styles.bubbleAvatar}>
+                        {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
                       </div>
-                      
-                      {/* Message content - hide text when calendar is showing for this message */}
-                      {!(showCalendly && calendarAnchorId === message.id) && (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                          <div
-                            className={styles.messageText}
-                            style={{ flex: '1 1 auto', minWidth: 0 }}
-                            dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                          />
-                          {message.isStreaming && message.text && (
-                            <span className={styles.streamingCursor}>▋</span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Follow-up buttons inside the bubble for AI messages - pill style, inline */}
-                      {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                          {message.followUps.map((followUp, followUpIndex) => {
-                            // Rotate through accent colors for follow-up buttons
-                            const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
-                            const buttonAccentClass = `accent-${buttonAccentIndex}`;
-                            
-                            return (
-                            <button
-                              key={followUpIndex}
-                              className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
-                              onClick={() => handleQuickButtonClick(followUp)}
-                              style={{
-                                width: 'auto',
-                                borderRadius: '20px',
-                                padding: '8px 16px',
-                                display: 'inline-block',
-                                fontSize: '13px',
+                      <span className={styles.bubbleName}>
+                        {message.type === 'ai' ? config.name : 'You'}
+                      </span>
+                    </div>
+                    
+                    {/* Typing indicator for loading state */}
+                    {message.isStreaming && !message.text && !hasStreamingText ? (
+                      <div className={styles.typingIndicator}>
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Message content - hide text when calendar is showing for this message */}
+                        {!(showCalendly && calendarAnchorId === message.id) && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                            <div
+                              className={styles.messageText}
+                              style={{ flex: '1 1 auto', minWidth: 0 }}
+                              dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                            />
+                            {message.isStreaming && message.text && (
+                              <span className={styles.streamingCursor}>▋</span>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Follow-up buttons inside the bubble for AI messages - pill style, inline */}
+                        {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+                            {message.followUps.map((followUp, followUpIndex) => {
+                              // Rotate through accent colors for follow-up buttons
+                              const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
+                              const buttonAccentClass = `accent-${buttonAccentIndex}`;
+                              
+                              return (
+                              <button
+                                key={followUpIndex}
+                                className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
+                                onClick={() => handleQuickButtonClick(followUp)}
+                                style={{
+                                  width: 'auto',
+                                  borderRadius: '20px',
+                                  padding: '8px 16px',
+                                  display: 'inline-block',
+                                  fontSize: '13px',
                                 fontWeight: '500',
                                 whiteSpace: 'nowrap',
                               }}
@@ -2907,8 +2913,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                           })}
                         </div>
                       )}
-                    </div>
+                    </>
                   )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -3312,30 +3319,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         
-        {/* Typing indicator - shows while waiting for AI response (hidden when streaming starts) */}
-        {isLoading && !hasStreamingText && (
-          <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}>
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
-                  <div className={styles.typingIndicator}>
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         
         <div ref={messagesEndRef} />
       </div>

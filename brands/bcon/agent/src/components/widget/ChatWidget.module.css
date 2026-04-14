@@ -1185,7 +1185,12 @@
   align-items: center;
   gap: 4px;
   padding: 12px 4px;
-  min-width: 50px;
+  min-width: 60px;
+  overflow: visible;
+}
+
+.typingBubble {
+  min-width: 100px !important;
 }
 
 .typingIndicator span {
