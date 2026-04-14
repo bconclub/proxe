@@ -152,7 +152,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
-  const [showWelcomeVideo, setShowWelcomeVideo] = useState(true);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
@@ -499,20 +498,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [preLoadedLeadContext]);
 
   // Initialize welcome video visibility from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Clear stale BCON localStorage on mount to prevent old cached state issues
-      window.localStorage.removeItem('bcon.chat.sessionId');
-      window.localStorage.removeItem('bcon.chat.user');
-      window.localStorage.removeItem('bcon_video_closed');
-      console.log('[ChatWidget] Cleared stale BCON localStorage');
-      
-      const dismissed = window.localStorage.getItem('bcon_video_closed');
-      if (dismissed === 'true') {
-        setShowWelcomeVideo(false);
-      }
-    }
-  }, []);
+  // Video embed temporarily disabled
+  // useEffect(() => {
+  //   if (typeof window !== 'undefined') {
+  //     const dismissed = window.localStorage.getItem('bcon_video_closed');
+  //     if (dismissed === 'true') {
+  //       setShowWelcomeVideo(false);
+  //     }
+  //   }
+  // }, []);
 
   useEffect(() => {
     if (showNamePrompt) {
@@ -3351,30 +3345,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       {/* Desktop: quick buttons near input when showing welcome message */}
       {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
 
-      {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
-        <div className={styles.videoEmbedContainerBottom}>
-          <button
-            type="button"
-            className={styles.videoCloseBtn}
-            onClick={() => {
-              setShowWelcomeVideo(false);
-              if (typeof window !== 'undefined') {
-                window.localStorage.setItem('bcon_video_closed', 'true');
-              }
-            }}
-            aria-label="Close video"
-          >
-            ×
-          </button>
-          <iframe
-            src={config.welcomeVideoUrl}
-            title={config.welcomeVideoTitle || 'Welcome video'}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      )}
+      {/* Welcome video embed temporarily disabled */}
+      {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
+        <div className={styles.videoEmbedContainerBottom}>...</div>
+      )} */}
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
