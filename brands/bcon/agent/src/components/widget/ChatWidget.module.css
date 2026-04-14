@@ -77,18 +77,20 @@
 
 /* Welcome quick buttons at bottom near input box */
 .welcomeQuickButtons {
-  padding: 16px 20px;
+  padding: 8px 20px;
   display: flex;
   justify-content: flex-end;
-  align-items: flex-end;
+  align-items: flex-start;
   animation: slideDown 0.3s ease;
   flex-shrink: 0;
 }
 
 .welcomeQuickButtonsContainer {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   width: 100%;
 }
@@ -266,21 +268,19 @@
   box-shadow: none;
 }
 
-/* Modern minimal quick buttons in welcome container */
+/* Modern minimal quick buttons in welcome container — inline tile/tag style */
 .welcomeQuickButtonsContainer .quickBtn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   width: auto;
   text-align: center;
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   flex-shrink: 0;
   cursor: pointer;
   min-height: auto;
@@ -292,7 +292,7 @@
 
 .welcomeQuickButtonsContainer .quickBtn:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
 

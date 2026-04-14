@@ -2531,28 +2531,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       return (
         <div className={wrapperClassName}>
-          <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`} style={{ width: '100%' }}>
-            <div className={styles.messageContent}>
-              <div className={styles.inlineAvatar}>
-                {ICONS.ai(brand, config)}
-              </div>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  {/* All buttons grouped together */}
-                  <div className={styles.welcomeQuickButtonsContainer}>
-                    {quickActions.slice(0, 4).map((buttonText, index) => (
-                      <button
-                        key={buttonText}
-                        className={`${styles.quickBtn} ${buttonText === 'Book AI Brand Audit' ? styles.quickBtnPrimary : ''}`}
-                        onClick={() => handleQuickButtonClick(buttonText)}
-                      >
-                        {buttonText}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className={styles.welcomeQuickButtonsContainer}>
+            {quickActions.slice(0, 4).map((buttonText) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${buttonText === 'Book AI Brand Audit' ? styles.quickBtnPrimary : ''}`}
+                onClick={() => handleQuickButtonClick(buttonText)}
+              >
+                {buttonText}
+              </button>
+            ))}
           </div>
         </div>
       );
