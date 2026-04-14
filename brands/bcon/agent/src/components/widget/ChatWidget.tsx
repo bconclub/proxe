@@ -1216,8 +1216,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', '550px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 140px)', 'important');
+      el.style.setProperty('height', '620px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -2533,17 +2533,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         <div className={wrapperClassName}>
           <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`} style={{ width: '100%' }}>
             <div className={styles.messageContent}>
+              <div className={styles.inlineAvatar}>
+                {ICONS.ai(brand, config)}
+              </div>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  {/* Single AI header with avatar */}
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
                   {/* All buttons grouped together */}
                   <div className={styles.welcomeQuickButtonsContainer}>
                     {quickActions.slice(0, 4).map((buttonText, index) => (
@@ -2902,20 +2896,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               data-message-id={message.id}
             >
               <div className={styles.messageContent}>
+                {message.type === 'ai' && (
+                  <div className={styles.inlineAvatar}>
+                    {ICONS.ai(brand, config)}
+                  </div>
+                )}
                 <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
                   <div className={styles.bubbleContent}>
-                    {/* Header with avatar and name inside the bubble - hide on consecutive same-type messages */}
-                    {(index === 0 || messages[index - 1]?.type !== message.type) && (
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {message.type === 'ai' ? config.name : 'You'}
-                        </span>
-                      </div>
-                    )}
-                    
                     {/* Typing indicator for loading state */}
                     {message.isStreaming && !message.text && !hasStreamingText ? (
                       <div className={styles.typingIndicator}>
