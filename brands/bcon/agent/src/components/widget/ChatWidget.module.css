@@ -503,22 +503,23 @@
   --chat-border-radius: 24px;
   --chat-z-index: 2147483000;
   position: fixed !important;
-  top: auto !important;
+  top: 0 !important;
   left: auto !important;
   right: 24px !important;
-  bottom: 96px !important;
+  bottom: 0 !important;
   transform: none !important;
   -webkit-transform: none !important;
   -moz-transform: none !important;
   -ms-transform: none !important;
   display: flex;
   flex-direction: column;
-  margin: 0 !important;
+  margin-top: auto !important;
+  margin-bottom: auto !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
   width: 380px;
-  height: 80vh;
-  max-height: 80vh;
+  height: 580px;
+  max-height: 580px;
   border-radius: var(--chat-border-radius);
   z-index: var(--chat-z-index);
   overflow: visible;
@@ -653,6 +654,19 @@
   }
   100% {
     background-position: 200% 50%;
+  }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .chatboxContainer {
+    width: 360px !important;
+    height: 500px !important;
+    max-height: calc(100vh - 80px) !important;
+    max-height: calc(100dvh - 80px) !important;
+    right: 16px !important;
+    margin-top: auto !important;
+    margin-bottom: auto !important;
   }
 }
 

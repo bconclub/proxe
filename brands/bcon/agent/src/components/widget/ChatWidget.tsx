@@ -1207,17 +1207,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('bottom', '0', 'important');
       el.style.setProperty('width', '100%', 'important');
       el.style.setProperty('max-width', '100%', 'important');
+      el.style.setProperty('height', '100dvh', 'important');
       el.style.setProperty('height', '100vh', 'important');
+      el.style.setProperty('max-height', '100dvh', 'important');
       el.style.setProperty('max-height', '100vh', 'important');
+      el.style.setProperty('margin', '0', 'important');
     } else {
       el.style.setProperty('right', '24px', 'important');
-      el.style.setProperty('bottom', '104px', 'important');
       el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('top', 'auto', 'important');
+      el.style.setProperty('top', '0', 'important');
+      el.style.setProperty('bottom', '0', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', '620px', 'important');
+      el.style.setProperty('height', '580px', 'important');
       el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
+      el.style.setProperty('margin-top', 'auto', 'important');
+      el.style.setProperty('margin-bottom', 'auto', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
