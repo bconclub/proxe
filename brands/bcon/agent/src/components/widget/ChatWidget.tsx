@@ -501,6 +501,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   // Initialize welcome video visibility from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Clear stale BCON localStorage on mount to prevent old cached state issues
+      window.localStorage.removeItem('bcon.chat.sessionId');
+      window.localStorage.removeItem('bcon.chat.user');
+      window.localStorage.removeItem('bcon_video_closed');
+      console.log('[ChatWidget] Cleared stale BCON localStorage');
+      
       const dismissed = window.localStorage.getItem('bcon_video_closed');
       if (dismissed === 'true') {
         setShowWelcomeVideo(false);
@@ -1856,6 +1862,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
               ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
               : getWelcomeMessage(brand);
+            console.log('[ChatWidget] Welcome source: fetch-on-reopen (no conversations)', welcomeMsg);
             addAIMessage(welcomeMsg);
             hasShownWelcomeRef.current = true;
           }
@@ -1866,6 +1873,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
               ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
               : getWelcomeMessage(brand);
+            console.log('[ChatWidget] Welcome source: fetch-error fallback', welcomeMsg);
             addAIMessage(welcomeMsg);
             hasShownWelcomeRef.current = true;
           }
@@ -1878,6 +1886,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
         ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
         : getWelcomeMessage(brand);
+      console.log('[ChatWidget] Welcome source: direct-open (no restore)', welcomeMsg);
       addAIMessage(welcomeMsg);
       hasShownWelcomeRef.current = true;
     }
