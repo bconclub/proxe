@@ -1216,8 +1216,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', '700px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 80px)', 'important');
+      el.style.setProperty('height', '550px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 140px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -2904,15 +2904,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.messageContent}>
                 <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
                   <div className={styles.bubbleContent}>
-                    {/* Header with avatar and name inside the bubble */}
-                    <div className={styles.bubbleHeader}>
-                      <div className={styles.bubbleAvatar}>
-                        {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
+                    {/* Header with avatar and name inside the bubble - hide on consecutive same-type messages */}
+                    {(index === 0 || messages[index - 1]?.type !== message.type) && (
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {message.type === 'ai' ? config.name : 'You'}
+                        </span>
                       </div>
-                      <span className={styles.bubbleName}>
-                        {message.type === 'ai' ? config.name : 'You'}
-                      </span>
-                    </div>
+                    )}
                     
                     {/* Typing indicator for loading state */}
                     {message.isStreaming && !message.text && !hasStreamingText ? (
