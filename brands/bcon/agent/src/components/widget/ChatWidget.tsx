@@ -112,15 +112,12 @@ const ICONS = {
   infinity: <InfinitySymbol />,
 };
 
-// Brand-aware welcome message
-const welcomeMessages: Record<string, string> = {
-  windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm BCON's AI assistant. What is your biggest challenge in marketing right now?",
-  proxe: "Hi! I'm PROXe, your AI marketing assistant. Tell me about your business - what are you working on?",
-};
-function getWelcomeMessage(brand: string): string {
-  return welcomeMessages[brand] || welcomeMessages['proxe'];
-}
+// BCON sequential welcome sequence
+const bconWelcomeSequence = [
+  { text: "Hi.", delay: 0 },
+  { text: "This is PROXe.", delay: 800 },
+  { text: "I'm BCON's AI marketing agent. Tell me about your business. What are you working on?", delay: 1600 },
+];
 
 // Helper function to clean metadata strings from conversation summary
 const cleanSummary = (summary: string | null | undefined): string => {
@@ -182,6 +179,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [phoneInput, setPhoneInput] = useState('');
   const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
+  const [welcomeComplete, setWelcomeComplete] = useState(false);
+  const [showMinimalButtons, setShowMinimalButtons] = useState(false);
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
@@ -1217,8 +1216,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', '580px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
+      el.style.setProperty('height', '700px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 80px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -1584,7 +1583,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
 
-  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage } = useChat({
+  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage, addStreamingAIMessage, updateMessageText, finishMessage } = useChat({
     brand,
     apiUrl: finalApiUrl,
     onMessageComplete: handleAssistantMessageComplete,
@@ -1625,6 +1624,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     storeUserProfile({}, brandKey);
     setDynamicQuickButtons(null);
     setExploreButtons(null);
+    setWelcomeComplete(false);
+    setShowMinimalButtons(false);
     // Reset conversation restoration flags
     conversationsToRestoreRef.current = [];
     hasRestoredMessagesRef.current = false;
@@ -1638,6 +1639,52 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsDockedBubble(false);
     hasEverOpenedRef.current = false;
   }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm]);
+
+  const streamWelcomeMessage = useCallback(async (text: string, charDelay: number = 25) => {
+    const msg = addStreamingAIMessage('');
+    if (!msg) return;
+
+    setTimeout(() => {
+      window.dispatchEvent(new Event('message-updated'));
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+
+    const chars = text.split('');
+    for (let i = 0; i < chars.length; i++) {
+      const chunk = chars.slice(0, i + 1).join('');
+      updateMessageText(msg.id, chunk);
+      if (i % 3 === 0) {
+        window.dispatchEvent(new Event('message-updated'));
+      }
+      await new Promise(resolve => setTimeout(resolve, charDelay));
+    }
+
+    finishMessage(msg.id);
+    window.dispatchEvent(new Event('message-updated'));
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [addStreamingAIMessage, updateMessageText, finishMessage]);
+
+  const playWelcomeSequence = useCallback(async () => {
+    if (hasShownWelcomeRef.current) return;
+    hasShownWelcomeRef.current = true;
+
+    // If pre-loaded lead context exists, stream a single contextual message
+    if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
+      const text = `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`;
+      await streamWelcomeMessage(text, 20);
+      setWelcomeComplete(true);
+      return;
+    }
+
+    for (const item of bconWelcomeSequence) {
+      if (item.delay > 0) {
+        await new Promise(resolve => setTimeout(resolve, item.delay));
+      }
+      await streamWelcomeMessage(item.text, 25);
+    }
+
+    setWelcomeComplete(true);
+  }, [preLoadedLeadContext, streamWelcomeMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -1666,7 +1713,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
-  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && messages.length <= 1;
+  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete;
 
   const isResponding = useMemo(
     () =>
@@ -1852,39 +1899,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           }
           
           // No conversations found, show welcome message
-          if (addAIMessage) {
-            const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
-              ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
-              : getWelcomeMessage(brand);
-            console.log('[ChatWidget] Welcome source: fetch-on-reopen (no conversations)', welcomeMsg);
-            addAIMessage(welcomeMsg);
-            hasShownWelcomeRef.current = true;
-          }
+          playWelcomeSequence();
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
-          if (addAIMessage) {
-            const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
-              ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
-              : getWelcomeMessage(brand);
-            console.log('[ChatWidget] Welcome source: fetch-error fallback', welcomeMsg);
-            addAIMessage(welcomeMsg);
-            hasShownWelcomeRef.current = true;
-          }
+          playWelcomeSequence();
         }
       };
       
       fetchConversationsOnReopen();
-    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
+    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0) {
       // Show welcome message if no conversations to restore
-      const welcomeMsg = preLoadedLeadContext?.name && preLoadedLeadContext?.service
-        ? `Hey ${preLoadedLeadContext.name}! Saw you're interested in ${preLoadedLeadContext.service} for ${preLoadedLeadContext.brand || 'BCON'}. What's the main challenge you're trying to solve right now?`
-        : getWelcomeMessage(brand);
-      console.log('[ChatWidget] Welcome source: direct-open (no restore)', welcomeMsg);
-      addAIMessage(welcomeMsg);
-      hasShownWelcomeRef.current = true;
+      playWelcomeSequence();
     }
-  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey, preLoadedLeadContext]);
+  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, brandKey, preLoadedLeadContext, playWelcomeSequence]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
@@ -2355,6 +2383,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsExpanded(false);
     setShowQuickButtons(false);
 
+    // After clicking "About BCON", switch to minimal 2-button mode
+    if (lowerMessage === 'about bcon') {
+      setShowMinimalButtons(true);
+    }
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('[ChatWidget] Quick button clicked', { buttonText, message });
     }
@@ -2491,8 +2524,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   const renderWelcomeButtons = useCallback(
     (wrapperClassName: string) => {
-      // Get quick action buttons from brand config (3 fixed buttons)
-      const quickActions = config.quickButtons || [];
+      // Show minimal 2-button mode after "About BCON", otherwise use config
+      const quickActions = showMinimalButtons
+        ? ['See Solutions', 'Book a Call']
+        : (config.quickButtons || []);
       
       return (
         <div className={wrapperClassName}>
@@ -2510,7 +2545,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         </div>
       );
     },
-    [handleQuickButtonClick, config]
+    [handleQuickButtonClick, config, showMinimalButtons]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -3326,7 +3361,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
 
       {/* Desktop: quick buttons near input when showing welcome message */}
-      {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {(!isMobileViewport) && isOpen && welcomeComplete && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
 
       {/* Welcome video embed temporarily disabled */}
       {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (

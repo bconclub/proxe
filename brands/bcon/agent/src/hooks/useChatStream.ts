@@ -48,6 +48,27 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
     return aiMessage;
   }, []);
 
+  const addStreamingAIMessage = useCallback((initialText: string = '') => {
+    const aiMessage: Message = {
+      id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      type: 'ai',
+      text: initialText,
+      isStreaming: true,
+      hasStreamed: false,
+      followUps: [],
+    };
+    setMessages((prev) => [...prev, aiMessage]);
+    return aiMessage;
+  }, []);
+
+  const updateMessageText = useCallback((id: string, text: string) => {
+    setMessages((prev) => prev.map((msg) => msg.id === id ? { ...msg, text } : msg));
+  }, []);
+
+  const finishMessage = useCallback((id: string) => {
+    setMessages((prev) => prev.map((msg) => msg.id === id ? { ...msg, isStreaming: false, hasStreamed: true } : msg));
+  }, []);
+
   const sendMessage = useCallback(async (
     message: string,
     messageCount: number = 0,
@@ -384,5 +405,8 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
     clearMessages,
     addUserMessage,
     addAIMessage,
+    addStreamingAIMessage,
+    updateMessageText,
+    finishMessage,
   };
 }
