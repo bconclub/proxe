@@ -2528,24 +2528,42 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       const quickActions = showMinimalButtons
         ? ['See Solutions', 'Book a Call']
         : (config.quickButtons || []);
-      
+
       return (
         <div className={wrapperClassName}>
-          <div className={styles.welcomeQuickButtonsContainer}>
-              {quickActions.slice(0, 4).map((buttonText, index) => (
-                <button
-                  key={buttonText}
-                  className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
-                  onClick={() => handleQuickButtonClick(buttonText)}
-                >
-                  {buttonText}
-                </button>
-              ))}
+          <div className={`${styles.message} ${styles.ai} ${styles['accent-0']}`} style={{ width: '100%' }}>
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  {/* Single AI header with avatar */}
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                  </div>
+                  {/* All buttons grouped together */}
+                  <div className={styles.welcomeQuickButtonsContainer}>
+                    {quickActions.slice(0, 4).map((buttonText, index) => (
+                      <button
+                        key={buttonText}
+                        className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                        onClick={() => handleQuickButtonClick(buttonText)}
+                      >
+                        {buttonText}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       );
     },
-    [handleQuickButtonClick, config, showMinimalButtons]
+    [handleQuickButtonClick, config, showMinimalButtons, brand]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
