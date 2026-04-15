@@ -85,6 +85,35 @@
   color: #F4EEFF;
 }
 
+:global(.themeDark) .monthDateButton,
+:global(.themeDark) .timeSlot,
+:global(.themeDark) .navButton,
+:global(.themeDark) .formGroup input,
+:global(.themeDark) .backButton,
+:global(.themeDark) .downloadICSButton,
+:global(.themeDark) .closeButton {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  color: #F4EEFF !important;
+}
+
+:global(.themeDark) .monthDateButton:hover:not(:disabled),
+:global(.themeDark) .timeSlot:hover:not(:disabled),
+:global(.themeDark) .navButton:hover,
+:global(.themeDark) .backButton:hover,
+:global(.themeDark) .downloadICSButton:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+}
+
+:global(.themeDark) .monthDateOther,
+:global(.themeDark) .timeSlotUnavailable,
+:global(.themeDark) .formSubtitle,
+:global(.themeDark) .timeSlotsPlaceholder {
+  color: rgba(244, 238, 255, 0.7) !important;
+  opacity: 1 !important;
+}
+
 /* Vertical layout: Calendar on top, Time slots below (same as mobile) */
 .calendarLayout {
   display: flex;
