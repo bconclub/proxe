@@ -1185,17 +1185,74 @@
 /* Hard guard for BCON embed: prevent host/theme var drift from darkening AI text */
 [data-brand="bcon"] .message.ai .bubble,
 [data-theme="bcon-electric"] .message.ai .bubble {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #F5F7FF;
+  background: #E5E7EB;
+  border: 1px solid #D1D5DB;
+  color: #111827;
 }
 
 [data-brand="bcon"] .message.ai .messageText,
 [data-theme="bcon-electric"] .message.ai .messageText,
 [data-brand="bcon"] .message.ai .messageText *,
 [data-theme="bcon-electric"] .message.ai .messageText * {
-  color: #F5F7FF !important;
+  color: #111827 !important;
   opacity: 1 !important;
+}
+
+/* BCON welcome surface: keep a stable light canvas (no white->black flash) */
+[data-brand="bcon"] .chatboxContainer,
+[data-theme="bcon-electric"] .chatboxContainer,
+[data-brand="bcon"] .chatboxBubble,
+[data-theme="bcon-electric"] .chatboxBubble {
+  background: #F3F4F6 !important;
+  border: 1px solid #D1D5DB !important;
+}
+
+[data-brand="bcon"] .chatboxContainer::before,
+[data-theme="bcon-electric"] .chatboxContainer::before {
+  background: #F3F4F6 !important;
+}
+
+[data-brand="bcon"] .messagesArea,
+[data-theme="bcon-electric"] .messagesArea {
+  background: #F3F4F6;
+}
+
+[data-brand="bcon"] .welcomeQuickButtonsContainer .quickBtn,
+[data-theme="bcon-electric"] .welcomeQuickButtonsContainer .quickBtn {
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  color: #111827;
+}
+
+[data-brand="bcon"] .welcomeQuickButtonsContainer .quickBtn:hover,
+[data-theme="bcon-electric"] .welcomeQuickButtonsContainer .quickBtn:hover {
+  background: #F9FAFB;
+  border-color: #C9CED6;
+}
+
+[data-brand="bcon"] .inputArea,
+[data-theme="bcon-electric"] .inputArea,
+[data-brand="bcon"] .chatFooter,
+[data-theme="bcon-electric"] .chatFooter {
+  background: #F3F4F6;
+  border-top: 1px solid #E5E7EB;
+}
+
+[data-brand="bcon"] .chatInput,
+[data-theme="bcon-electric"] .chatInput {
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  color: #111827;
+}
+
+[data-brand="bcon"] .chatInput::placeholder,
+[data-theme="bcon-electric"] .chatInput::placeholder {
+  color: #9CA3AF;
+}
+
+[data-brand="bcon"] .inputIconBtn,
+[data-theme="bcon-electric"] .inputIconBtn {
+  color: #6B7280;
 }
 
 /* Hide per-message avatars and names (keep widget header only) */
