@@ -1168,7 +1168,7 @@
   background: #F3F4F6;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  color: #111827;
+  color: var(--text-primary);
   border: none;
   box-shadow: none;
   padding: 10px 14px;
@@ -1179,7 +1179,23 @@
 }
 
 .message.ai .messageText {
-  color: #111827;
+  color: var(--text-primary);
+}
+
+/* Hard guard for BCON embed: prevent host/theme var drift from darkening AI text */
+[data-brand="bcon"] .message.ai .bubble,
+[data-theme="bcon-electric"] .message.ai .bubble {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F5F7FF;
+}
+
+[data-brand="bcon"] .message.ai .messageText,
+[data-theme="bcon-electric"] .message.ai .messageText,
+[data-brand="bcon"] .message.ai .messageText *,
+[data-theme="bcon-electric"] .message.ai .messageText * {
+  color: #F5F7FF !important;
+  opacity: 1 !important;
 }
 
 /* Hide per-message avatars and names (keep widget header only) */
