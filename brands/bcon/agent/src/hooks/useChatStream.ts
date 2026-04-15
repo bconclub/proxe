@@ -39,7 +39,17 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
     return normalized;
   }
 
-  const lines = normalized
+  // Remove repeated strategist-intro phrases even when embedded inside longer paragraphs.
+  const strippedInlineIntro = normalized
+    .replace(/\bhi,?\s*i am bcon'?s ai strategist\.?\s*/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40},\s*i am bcon'?s ai strategist\.?\s*/gi, '')
+    .replace(/\bi am bcon'?s ai strategist\.?\s*/gi, '')
+    .replace(/\bhow can i help with your marketing today\??\s*/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = strippedInlineIntro
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
