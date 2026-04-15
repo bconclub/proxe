@@ -2210,110 +2210,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [showDeployForm]);
 
-  // Enable horizontal scrolling with mouse wheel and drag on desktop
-  useEffect(() => {
-    const quickButtonsElement = quickButtonsRef.current;
-    if (!quickButtonsElement) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      // Only handle wheel events if the element is scrollable horizontally
-      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
-        // Check if scrolling horizontally (shift + wheel) or convert vertical to horizontal
-        const isHorizontalScroll = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        
-        if (isHorizontalScroll || Math.abs(e.deltaX) > 0) {
-          // Horizontal scroll - allow default behavior
-          return;
-        }
-        
-        // Convert vertical scroll to horizontal
-        e.preventDefault();
-        quickButtonsElement.scrollBy({
-          left: e.deltaY,
-          behavior: 'auto'
-        });
-      }
-    };
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
-        setIsDragging(true);
-        hasDraggedRef.current = false;
-        dragStartX.current = e.pageX - quickButtonsElement.offsetLeft;
-        dragStartScrollLeft.current = quickButtonsElement.scrollLeft;
-        quickButtonsElement.style.cursor = 'grabbing';
-        quickButtonsElement.style.userSelect = 'none';
-        document.body.style.cursor = 'grabbing';
-        document.body.style.userSelect = 'none';
-        // Don't prevent default yet - wait to see if user drags
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      const x = e.pageX - quickButtonsElement.offsetLeft;
-      const deltaX = Math.abs(x - dragStartX.current);
-      
-      // Only prevent default and scroll if user has moved more than 5px (to distinguish from clicks)
-      if (deltaX > 5) {
-        hasDraggedRef.current = true;
-        e.preventDefault();
-        const walk = (x - dragStartX.current) * 2; // Scroll speed multiplier
-        quickButtonsElement.scrollLeft = dragStartScrollLeft.current - walk;
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (isDragging) {
-        setIsDragging(false);
-        quickButtonsElement.style.cursor = '';
-        quickButtonsElement.style.userSelect = '';
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        
-        // If user dragged, prevent click event on buttons
-        if (hasDraggedRef.current) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        hasDraggedRef.current = false;
-      }
-    };
-
-    const handleMouseLeave = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        quickButtonsElement.style.cursor = '';
-        quickButtonsElement.style.userSelect = '';
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-
-    // Only enable drag on desktop (not touch devices)
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
-    quickButtonsElement.addEventListener('wheel', handleWheel, { passive: false });
-    
-    if (!isTouchDevice) {
-      quickButtonsElement.addEventListener('mousedown', handleMouseDown);
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      quickButtonsElement.addEventListener('mouseleave', handleMouseLeave);
-    }
-    
-    return () => {
-      quickButtonsElement.removeEventListener('wheel', handleWheel);
-      if (!isTouchDevice) {
-        quickButtonsElement.removeEventListener('mousedown', handleMouseDown);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        quickButtonsElement.removeEventListener('mouseleave', handleMouseLeave);
-      }
-    };
-  }, [isExpanded, showQuickButtons, isDragging]);
-
   // Helper function to check if text contains booking keywords (call or demo)
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
@@ -2388,210 +2284,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }, 50);
     }
   }, [messages.length, conversationSummary, sessionRecord, isMobileViewport]);
-
-  const handleQuickButtonClick = (buttonText: string, e?: React.MouseEvent) => {
-    try {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    const message = buttonText.trim();
-    if (!message) return;
-
-    // Define lowerMessage once at the top for use throughout the function
-    const lowerMessage = message.toLowerCase().trim();
-
-    setIsDockedBubble(true);
-    setIsOpen(true);
-    setIsExpanded(false);
-    setShowQuickButtons(false);
-
-    // After clicking "About BCON", switch to minimal 2-button mode
-    if (lowerMessage === 'about bcon') {
-      setShowMinimalButtons(true);
-    }
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[ChatWidget] Quick button clicked', { buttonText, message });
-    }
-
-    // Handle Deploy PROXe button - show deploy form inline
-    // Match variations: "Deploy PROXe", "Deploy Proxe", "deploy proxe", etc.
-    if (lowerMessage.includes('deploy') && (lowerMessage.includes('proxe') || lowerMessage.includes('prox'))) {
-      closeCalendarWidget();
-      closeDeployForm();
-      setPendingCalendar(false);
-      if (showNamePrompt) {
-        setShowNamePrompt(false);
-      }
-      if (showEmailPrompt) {
-        setShowEmailPrompt(false);
-      }
-      if (showPhonePrompt) {
-        setShowPhonePrompt(false);
-      }
-      
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      
-      // Add user message to chat
-      addUserMessage('Deploy PROXe');
-      
-      // Show deploy form after the user message is added
-      // Use a longer timeout to ensure the message is in the array
-      setTimeout(() => {
-        const deployMessageId = `deploy-${Date.now()}`;
-        setShowDeployForm(deployMessageId);
-        deployFormScrolledRef.current = false;
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[ChatWidget] Deploy form opened', { 
-            messagesCount: messages.length,
-            deployMessageId
-          });
-        }
-      }, 300);
-      
-      return;
-    }
-
-    // Handle Watch Video button - show video widget
-    if (message.toLowerCase() === 'watch video') {
-      closeCalendarWidget();
-      closeDeployForm();
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      
-      // Add user message to chat and get the message object
-      const userMessage = addUserMessage('Watch Video');
-      
-      // Show video after the user message
-      setTimeout(() => {
-        const videoMessageId = `video-${Date.now()}`;
-        setShowVideo(videoMessageId);
-        setVideoAnchorId(userMessage.id);
-      }, 100);
-      
-      return;
-    }
-
-    // Handle See Portfolio button - show portfolio grid inline
-    if (lowerMessage === 'see portfolio' || lowerMessage === 'see our work') {
-      closeCalendarWidget();
-      closeDeployForm();
-      closeVideoWidget();
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      
-      const userMessage = addUserMessage('See Portfolio');
-      
-      setTimeout(() => {
-        const portfolioMessageId = `portfolio-${Date.now()}`;
-        setShowPortfolio(portfolioMessageId);
-        setPortfolioAnchorId(userMessage.id);
-      }, 100);
-      
-      return;
-    }
-
-    // Handle booking intent buttons directly - trigger booking flow without AI round-trip
-    const bookingKeywords = ['book', 'call', 'schedule', 'demo', 'appointment', 'meeting', 'consultation', 'audit', 'slot'];
-    const hasBookingIntent = bookingKeywords.some(keyword => lowerMessage.includes(keyword));
-    
-    if (hasBookingIntent && !bookingCompleted) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Booking intent detected, triggering booking flow directly');
-      }
-      
-      // Add user message to chat
-      addUserMessage(buttonText);
-      
-      // Trigger booking flow directly
-      setPendingCalendar(true);
-      
-      // Show calendar widget after a short delay
-      setTimeout(() => {
-        const calendarMessageId = `calendar-${Date.now()}`;
-        setShowCalendly(calendarMessageId);
-        setCalendarAnchorId(calendarMessageId);
-        
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[ChatWidget] Calendar opened from button click');
-        }
-      }, 300);
-      
-      return;
-    }
-
-    const nextButtons = [...usedButtons, buttonText];
-    const isExploreRequest = lowerMessage === 'explore proxe' || 
-                             lowerMessage === 'explore training options' ||
-                             lowerMessage === 'explore training';
-    const exploreOptions = config?.exploreButtons ?? [];
-
-    if (isExploreRequest && exploreOptions.length > 0) {
-      closeCalendarWidget();
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      setUsedButtons(nextButtons);
-      setExploreButtons(exploreOptions);
-      return;
-    }
-
-    setExploreButtons(null);
-    setDynamicQuickButtons(null);
-
-    if (requestNameBeforeProceed(message, nextButtons)) return;
-    if (requestEmailBeforeProceed(message, nextButtons)) return;
-
-    closeCalendarWidget();
-    setIsOpen(true);
-    setIsInputActive(true);
-    setIsExpanded(false);
-    setShowQuickButtons(false);
-    setUsedButtons(nextButtons);
-
-    if (requestPhoneBeforeProceed(message, nextButtons)) return;
-
-    submitMessage(message, nextButtons);
-    } catch (err) {
-      console.error('[ChatWidget] Button click error:', err);
-    }
-  };
-
-  const renderWelcomeButtons = useCallback(
-    (wrapperClassName: string) => {
-      // Show minimal 2-button mode after "About BCON", otherwise use config
-      const quickActions = showMinimalButtons
-        ? ['See Solutions', 'Book AI Brand Audit']
-        : (config.quickButtons || []);
-
-      return (
-        <div className={wrapperClassName}>
-          <div className={styles.welcomeQuickButtonsContainer}>
-            {quickActions.slice(0, 4).map((buttonText) => (
-              <button
-                key={buttonText}
-                className={`${styles.quickBtn} ${buttonText === 'Book AI Brand Audit' ? styles.quickBtnPrimary : ''}`}
-                onClick={() => handleQuickButtonClick(buttonText)}
-              >
-                {buttonText}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    },
-    [handleQuickButtonClick, config, showMinimalButtons, brand]
-  );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     if (showCalendly) {
@@ -2671,12 +2363,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
-    // Don't hide if clicking on a quick button
-    const relatedTarget = e.relatedTarget as HTMLElement;
-    if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
-      return;
-    }
-    
     setTimeout(() => {
       if (!inputValue.trim() && !isOpen) {
         setShowQuickButtons(false);
@@ -2905,13 +2591,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           // Only close widgets if clicking directly on the messages area, not on messages or buttons
           const target = e.target as HTMLElement;
           const isClickOnMessage = target.closest(`.${styles.message}`);
-          const isClickOnButton = target.closest(`.${styles.quickBtn}`) || target.closest(`.${styles.followUpBtn}`);
           const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
           const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
-          
           const isClickOnPortfolio = target.closest(`.${styles.portfolioGrid}`);
           
-          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
+          if (!isClickOnMessage && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
             // Close widgets when clicking in empty messages area (clicking away)
             closeCalendarWidget();
             closeVideoWidget();
@@ -2956,35 +2640,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                           </div>
                         )}
                         
-                        {/* Follow-up buttons inside the bubble for AI messages - pill style, inline */}
-                        {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                            {message.followUps.map((followUp, followUpIndex) => {
-                              // Rotate through accent colors for follow-up buttons
-                              const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
-                              const buttonAccentClass = `accent-${buttonAccentIndex}`;
-                              
-                              return (
-                              <button
-                                key={followUpIndex}
-                                className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
-                                onClick={() => handleQuickButtonClick(followUp)}
-                                style={{
-                                  width: 'auto',
-                                  borderRadius: '20px',
-                                  padding: '8px 16px',
-                                  display: 'inline-block',
-                                  fontSize: '13px',
-                                fontWeight: '500',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {followUp}
-                            </button>
-                            );
-                          })}
-                        </div>
-                      )}
+
                     </>
                   )}
                   </div>
@@ -3230,65 +2886,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
 
-        {exploreButtons && exploreButtons.length > 0 && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
-            }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
-                  <p className={styles.exploreTitle}>Choose your PROXe</p>
-                  <div className={styles.exploreButtonGroup}>
-                    {exploreButtons.map((option, optionIndex) => {
-                      // Map each PROXe type to its specific color class from "Meet Our PROXes" section
-                      let proxeColorClass = '';
-                      if (option.toLowerCase().includes('web')) {
-                        proxeColorClass = styles.exploreWeb;
-                      } else if (option.toLowerCase().includes('whatsapp')) {
-                        proxeColorClass = styles.exploreWhatsapp;
-                      } else if (option.toLowerCase().includes('voice')) {
-                        proxeColorClass = styles.exploreVoice;
-                      } else if (option.toLowerCase().includes('social')) {
-                        proxeColorClass = styles.exploreSocial;
-                      }
-                      return (
-                        <button
-                          key={optionIndex}
-                          className={`${styles.followUpBtn} ${proxeColorClass}`}
-                          onClick={() => {
-                            setExploreButtons(null);
-                            // Send a message about the specific PROXe type
-                            const proxeMessage = `Tell me more about ${option}`;
-                            handleQuickButtonClick(proxeMessage);
-                          }}
-                        >
-                          {option}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Inline Name Prompt Card */}
         {showNamePrompt && !showCalendly && !showDeployForm && (
@@ -3457,11 +3055,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         
         <div ref={messagesEndRef} />
       </div>
-      {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
-      {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
 
-      {/* Desktop: quick buttons near input when showing welcome message */}
-      {(!isMobileViewport) && isOpen && welcomeComplete && !hasUserMessage && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
 
       {/* Welcome video embed temporarily disabled */}
       {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
