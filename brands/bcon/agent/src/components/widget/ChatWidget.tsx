@@ -122,6 +122,24 @@ const ICONS = {
       <line x1="12" y1="19" x2="12" y2="22"/>
     </svg>
   ),
+  sun: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4"></circle>
+      <line x1="12" y1="2" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="22"></line>
+      <line x1="2" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="22" y2="12"></line>
+      <line x1="4.9" y1="4.9" x2="7" y2="7"></line>
+      <line x1="17" y1="17" x2="19.1" y2="19.1"></line>
+      <line x1="17" y1="7" x2="19.1" y2="4.9"></line>
+      <line x1="4.9" y1="19.1" x2="7" y2="17"></line>
+    </svg>
+  ),
+  moon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3c.5 0 .8.54.53.96A7 7 0 1 0 20.04 12.26c.42-.27.96.03.96.53z"></path>
+    </svg>
+  ),
 };
 
 // BCON sequential welcome sequence
@@ -193,6 +211,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
@@ -223,6 +242,24 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasShownWelcomeRef = useRef<boolean>(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedTheme = window.localStorage.getItem('bcon-widget-theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      setWidgetTheme(savedTheme);
+    }
+  }, []);
+
+  const toggleWidgetTheme = useCallback(() => {
+    setWidgetTheme((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('bcon-widget-theme', next);
+      }
+      return next;
+    });
+  }, []);
 
   const handleOpenChat = useCallback(() => {
     setShowCloseConfirm(false);
@@ -2584,7 +2621,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? styles.themeLight : styles.themeDark} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
@@ -2626,6 +2663,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <span>BCON AI</span>
         </div>
         <div className={styles.headerActions}>
+          <button
+            className={styles.themeBtn}
+            onClick={toggleWidgetTheme}
+            aria-label={widgetTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            title={widgetTheme === 'light' ? 'Dark theme' : 'Light theme'}
+          >
+            {widgetTheme === 'light' ? ICONS.moon : ICONS.sun}
+          </button>
           <button
             className={styles.closeBtn}
             onClick={handleRequestCloseChat}
@@ -3126,6 +3171,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       )} */}
 
       <div className={styles.inputArea}>
+        {isOpen && showPrivacyNotice && (
+          <div className={styles.privacyNotice}>
+            <span className={styles.privacyPoweredIcon}>
+              <PROXELogo />
+            </span>
+            <span>Powered by PROXe</span>
+          </div>
+        )}
         <div className={styles.chatInputRow}>
           <button className={styles.inputIconBtn} aria-label="Attach file" type="button">
             {ICONS.attachment}
@@ -3202,14 +3255,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           {ICONS.send}
         </button>
         </div>
-        {isOpen && showPrivacyNotice && (
-          <div className={styles.privacyNotice}>
-            <span className={styles.privacyPoweredIcon}>
-              <PROXELogo />
-            </span>
-            <span>Powered by PROXe</span>
-          </div>
-        )}
       </div>
       </div>
     </div>

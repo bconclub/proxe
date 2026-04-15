@@ -857,6 +857,31 @@
   height: 20px;
 }
 
+.themeBtn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: rgba(224, 212, 252, 0.75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.themeBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #E0D4FC;
+}
+
+.themeBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
 .messagesArea {
   flex: 1 1 auto;
   min-height: 0;
@@ -1315,6 +1340,130 @@
 [data-brand="bcon"] .inputIconBtn,
 [data-theme="bcon-electric"] .inputIconBtn {
   color: #6B7280;
+}
+
+/* Explicit widget theme modes toggled from header */
+.themeLight {
+  background: #F3F4F6 !important;
+  border: 1px solid #C9CED6 !important;
+}
+
+.themeLight::before {
+  background: #F3F4F6 !important;
+}
+
+.themeLight .messagesArea,
+.themeLight .inputArea,
+.themeLight .chatFooter {
+  background: #F3F4F6 !important;
+}
+
+.themeLight .chatInput {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+}
+
+.themeLight .chatInput::placeholder {
+  color: #9CA3AF !important;
+}
+
+.themeLight .message.ai .bubble {
+  background: #E5E7EB !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+}
+
+.themeLight .message.user .bubble {
+  background: #8B5CF6 !important;
+  border: 1px solid #7C3AED !important;
+  color: #FFFFFF !important;
+}
+
+.themeLight .inlinePromptText {
+  color: #111827 !important;
+}
+
+.themeLight .inlinePromptInput {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+}
+
+.themeLight .inlinePromptInput::placeholder {
+  color: #9CA3AF !important;
+}
+
+.themeLight .inlinePromptSendBtn {
+  background: #F3F4F6 !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+}
+
+.themeDark {
+  background: #0A0A0B !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.themeDark::before {
+  background: #0A0A0B !important;
+}
+
+.themeDark .messagesArea,
+.themeDark .inputArea,
+.themeDark .chatFooter {
+  background: #0A0A0B !important;
+}
+
+.themeDark .chatInput {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #E0D4FC !important;
+}
+
+.themeDark .chatInput::placeholder {
+  color: rgba(224, 212, 252, 0.55) !important;
+}
+
+.themeDark .message.ai .bubble {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #F4EEFF !important;
+}
+
+.themeDark .message.user .bubble {
+  background: #8B5CF6 !important;
+  border: 1px solid #7C3AED !important;
+  color: #FFFFFF !important;
+}
+
+.themeDark .messageText,
+.themeDark .messageText * {
+  color: #F4EEFF;
+}
+
+.themeDark .inlinePromptText {
+  color: #F4EEFF !important;
+}
+
+.themeDark .inlinePromptInput {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #F4EEFF !important;
+}
+
+.themeDark .inlinePromptInput::placeholder {
+  color: rgba(244, 238, 255, 0.6) !important;
+}
+
+.themeDark .inlinePromptSendBtn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #F4EEFF !important;
+}
+
+.themeDark .inlinePromptClose {
+  color: rgba(244, 238, 255, 0.7) !important;
 }
 
 /* Hide per-message avatars and names (keep widget header only) */

@@ -16,6 +16,75 @@
   box-sizing: border-box;
 }
 
+/* Theme integration with parent ChatWidget toggle */
+:global(.themeLight) .calendarContainer {
+  background: #E5E7EB;
+  border: 1px solid #D1D5DB;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+:global(.themeLight) .monthYear,
+:global(.themeLight) .monthDayHeader,
+:global(.themeLight) .monthDateButton,
+:global(.themeLight) .timeSlotsTitle,
+:global(.themeLight) .timeSlot,
+:global(.themeLight) .timeSlotsPlaceholder,
+:global(.themeLight) .loadingText,
+:global(.themeLight) .formTitle,
+:global(.themeLight) .formSubtitle,
+:global(.themeLight) .formGroup input,
+:global(.themeLight) .backButton,
+:global(.themeLight) .downloadICSButton,
+:global(.themeLight) .confirmationTitle,
+:global(.themeLight) .confirmationText,
+:global(.themeLight) .confirmationDetails {
+  color: #111827;
+}
+
+:global(.themeLight) .navButton,
+:global(.themeLight) .monthDateButton,
+:global(.themeLight) .timeSlot,
+:global(.themeLight) .formGroup input,
+:global(.themeLight) .backButton,
+:global(.themeLight) .downloadICSButton,
+:global(.themeLight) .closeButton {
+  background: #FFFFFF;
+  border-color: #D1D5DB;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:global(.themeLight) .monthDateOther,
+:global(.themeLight) .timeSlotUnavailable {
+  color: #9CA3AF;
+  opacity: 0.7;
+}
+
+:global(.themeDark) .calendarContainer {
+  background: rgba(20, 20, 24, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+:global(.themeDark) .monthYear,
+:global(.themeDark) .monthDayHeader,
+:global(.themeDark) .monthDateButton,
+:global(.themeDark) .timeSlotsTitle,
+:global(.themeDark) .timeSlot,
+:global(.themeDark) .timeSlotsPlaceholder,
+:global(.themeDark) .loadingText,
+:global(.themeDark) .formTitle,
+:global(.themeDark) .formSubtitle,
+:global(.themeDark) .formGroup input,
+:global(.themeDark) .backButton,
+:global(.themeDark) .downloadICSButton,
+:global(.themeDark) .confirmationTitle,
+:global(.themeDark) .confirmationText,
+:global(.themeDark) .confirmationDetails {
+  color: #F4EEFF;
+}
+
 /* Vertical layout: Calendar on top, Time slots below (same as mobile) */
 .calendarLayout {
   display: flex;
