@@ -126,7 +126,7 @@ const ICONS = {
 
 // BCON sequential welcome sequence
 const bconWelcomeSequence = [
-  { text: "We help businesses do better marketing.\n\n• Customer Acquisition\n• Brand Management\n• Content & Ads\n• Build Marketing Tools/Apps\n\nWhat is your biggest challenge in marketing right now?", delay: 0 },
+  { text: "Hi, I'm BCON AI - your marketing assistant.\n\nWe help businesses do better marketing.\n\n• Customer Acquisition\n• Brand Management\n• Content & Ads\n• Build Marketing Tools/Apps\n\nWhat is your biggest challenge in marketing right now?", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -2283,6 +2283,54 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [messages.length, conversationSummary, sessionRecord, isMobileViewport]);
 
+  const handleQuickButtonClick = (buttonText: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const message = buttonText.trim();
+    if (!message) return;
+
+    setIsDockedBubble(true);
+    setIsOpen(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsInputActive(true);
+    setExploreButtons(null);
+    setDynamicQuickButtons(null);
+
+    const nextButtons = [...usedButtons, buttonText];
+    setUsedButtons(nextButtons);
+
+    if (requestNameBeforeProceed(message, nextButtons)) return;
+    if (requestEmailBeforeProceed(message, nextButtons)) return;
+    if (requestPhoneBeforeProceed(message, nextButtons)) return;
+
+    submitMessage(message, nextButtons);
+  };
+
+  const renderWelcomeButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {quickButtonOptions.slice(0, 4).map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [handleQuickButtonClick, quickButtonOptions]
+  );
+
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     if (showCalendly) {
       closeCalendarWidget();
@@ -2361,6 +2409,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
+      return;
+    }
+
     setTimeout(() => {
       if (!inputValue.trim() && !isOpen) {
         setShowQuickButtons(false);
@@ -3053,6 +3106,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         
         <div ref={messagesEndRef} />
       </div>
+      {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
+      {(!isMobileViewport) &&
+        isOpen &&
+        hasQuickButtons &&
+        welcomeComplete &&
+        !hasUserMessage &&
+        hasShownWelcomeRef.current &&
+        messages.length >= 1 &&
+        messages[0].type === 'ai' &&
+        !messages[0].isStreaming &&
+        conversationsToRestoreRef.current.length === 0 &&
+        renderWelcomeButtons(styles.welcomeQuickButtons)}
 
 
       {/* Welcome video embed temporarily disabled */}
