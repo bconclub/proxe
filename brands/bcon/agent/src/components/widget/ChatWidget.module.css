@@ -801,6 +801,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+  min-width: fit-content;
 }
 
 .resetBtn {
@@ -845,6 +848,11 @@
   justify-content: center;
   border-radius: 8px;
   transition: all 0.2s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  visibility: visible;
+  opacity: 1;
 }
 
 .closeBtn:hover {
@@ -855,6 +863,7 @@
 .closeBtn svg {
   width: 20px;
   height: 20px;
+  display: block;
 }
 
 .themeBtn {
@@ -862,7 +871,7 @@
   height: 32px;
   padding: 0;
   background: transparent;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   color: rgba(224, 212, 252, 0.75);
   cursor: pointer;
   display: flex;
@@ -870,16 +879,23 @@
   justify-content: center;
   border-radius: 8px;
   transition: all 0.2s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  visibility: visible;
+  opacity: 1;
 }
 
 .themeBtn:hover {
   background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.34);
   color: #E0D4FC;
 }
 
 .themeBtn svg {
   width: 18px;
   height: 18px;
+  display: block;
 }
 
 .messagesArea {
