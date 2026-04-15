@@ -3215,7 +3215,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     </div>
     {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
-        className={styles.bubbleButton}
+        className={`${styles.bubbleButton} ${isOpen ? styles.bubbleButtonHidden : ''}`}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         data-brand={brand}

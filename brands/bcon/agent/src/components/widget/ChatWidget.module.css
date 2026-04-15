@@ -515,10 +515,10 @@
   margin-bottom: 0 !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
-  width: 420px;
-  height: 78vh;
-  min-height: 620px;
-  max-height: 760px;
+  width: 400px;
+  height: 68vh;
+  min-height: 540px;
+  max-height: 680px;
   border-radius: var(--chat-border-radius);
   z-index: var(--chat-z-index);
   overflow: hidden;
@@ -657,11 +657,11 @@
 /* Tablet breakpoint */
 @media (min-width: 769px) and (max-width: 1024px) {
   .chatboxContainer {
-    width: 390px !important;
-    height: calc(100vh - 110px) !important;
-    max-height: calc(100vh - 90px) !important;
-    max-height: calc(100dvh - 90px) !important;
-    min-height: 560px !important;
+    width: 380px !important;
+    height: calc(100vh - 130px) !important;
+    max-height: calc(100vh - 110px) !important;
+    max-height: calc(100dvh - 110px) !important;
+    min-height: 520px !important;
     right: 16px !important;
     margin-top: auto !important;
     margin-bottom: auto !important;
@@ -701,11 +701,11 @@
   -webkit-transform: none !important;
   -moz-transform: none !important;
   -ms-transform: none !important;
-  width: 420px !important;
+  width: 400px !important;
   max-width: calc(100vw - 40px) !important;
-  height: 78vh !important;
-  min-height: 620px !important;
-  max-height: 760px !important;
+  height: 68vh !important;
+  min-height: 540px !important;
+  max-height: 680px !important;
   border-radius: 16px !important;
   box-shadow: 0 14px 50px rgba(0,0,0,0.35);
 }
@@ -1227,12 +1227,25 @@
 [data-brand="bcon"] .chatboxBubble,
 [data-theme="bcon-electric"] .chatboxBubble {
   background: #F3F4F6 !important;
-  border: 1px solid #D1D5DB !important;
+  border: 1px solid #C9CED6 !important;
 }
 
 [data-brand="bcon"] .chatboxContainer::before,
 [data-theme="bcon-electric"] .chatboxContainer::before {
   background: #F3F4F6 !important;
+}
+
+/* Remove animated/double outline for BCON container */
+[data-brand="bcon"] .chatboxContainer.chatboxResponding,
+[data-theme="bcon-electric"] .chatboxContainer.chatboxResponding {
+  border: 1px solid #C9CED6 !important;
+}
+
+[data-brand="bcon"] .chatboxContainer.chatboxResponding::before,
+[data-theme="bcon-electric"] .chatboxContainer.chatboxResponding::before,
+[data-brand="bcon"] .chatboxResponding::after,
+[data-theme="bcon-electric"] .chatboxResponding::after {
+  display: none !important;
 }
 
 [data-brand="bcon"] .messagesArea,
@@ -1245,12 +1258,38 @@
   background: #FFFFFF;
   border: 1px solid #D1D5DB;
   color: #111827;
+  border-radius: 9999px;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 [data-brand="bcon"] .welcomeQuickButtonsContainer .quickBtn:hover,
 [data-theme="bcon-electric"] .welcomeQuickButtonsContainer .quickBtn:hover {
-  background: #F9FAFB;
-  border-color: #C9CED6;
+  background: #000000;
+  border-color: #000000;
+  color: #FFFFFF;
+}
+
+[data-brand="bcon"] .welcomeQuickButtonsContainer .quickBtn:focus-visible,
+[data-theme="bcon-electric"] .welcomeQuickButtonsContainer .quickBtn:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
+[data-brand="bcon"] .mobileQuickActions .quickBtn,
+[data-theme="bcon-electric"] .mobileQuickActions .quickBtn {
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  color: #111827;
+  border-radius: 9999px;
+}
+
+[data-brand="bcon"] .mobileQuickActions .quickBtn:hover,
+[data-theme="bcon-electric"] .mobileQuickActions .quickBtn:hover {
+  background: #000000;
+  border-color: #000000;
+  color: #FFFFFF;
 }
 
 [data-brand="bcon"] .inputArea,
@@ -2403,11 +2442,11 @@
   left: auto !important;
   transform: none !important;
   -webkit-transform: none !important;
-  width: 420px !important;
+  width: 400px !important;
   max-width: calc(100vw - 40px) !important;
-  height: 78vh !important;
-  min-height: 620px !important;
-  max-height: 760px !important;
+  height: 68vh !important;
+  min-height: 540px !important;
+  max-height: 680px !important;
   z-index: 2147483000 !important;
   pointer-events: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2459,10 +2498,10 @@
   right: 20px !important;
   top: auto !important;
   left: auto !important;
-  width: 420px !important;
-  height: 78vh !important;
-  min-height: 620px !important;
-  max-height: 760px !important;
+  width: 400px !important;
+  height: 68vh !important;
+  min-height: 540px !important;
+  max-height: 680px !important;
   border-radius: 16px !important;
 }
 
