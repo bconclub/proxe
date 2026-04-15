@@ -110,6 +110,18 @@ const ICONS = {
     return <InfinitySymbol />;
   },
   infinity: <InfinitySymbol />,
+  attachment: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+    </svg>
+  ),
+  mic: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19v3M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="22"/>
+    </svg>
+  ),
 };
 
 // BCON sequential welcome sequence
@@ -1931,14 +1943,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
-    if (isOpen && messagesAreaRef.current) {
-      // Force scroll to absolute top when chat opens
-      messagesAreaRef.current.scrollTop = 0;
-      
-      // Also ensure the container itself is at top
-      if (chatboxContainerRef.current) {
-        chatboxContainerRef.current.scrollTop = 0;
-      }
+    if (isOpen && messagesEndRef.current) {
+      // Scroll to bottom when chat opens
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [isOpen]);
 
@@ -1964,9 +1971,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             // Fallback: scroll to bottom
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
           }
-        } else if (messages.length <= 2 && messagesAreaRef.current) {
-          // Scroll to top of messages area to show first question header
-          messagesAreaRef.current.scrollTop = 0;
         } else if (messagesEndRef.current) {
           // Scroll to bottom for subsequent messages
           messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -2173,10 +2177,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (!isOpen) return;
 
     const handleMessageUpdate = () => {
-      // On first message, keep at top. For subsequent messages, scroll to bottom
-      if (messages.length <= 2 && messagesAreaRef.current) {
-        messagesAreaRef.current.scrollTop = 0;
-      } else if (messagesEndRef.current) {
+      // Always scroll to bottom on new messages
+      if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     };
@@ -2186,6 +2188,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       window.removeEventListener('message-updated', handleMessageUpdate);
     };
   }, [isOpen, messages.length]);
+
+  // Always scroll to bottom when messages change
+  useEffect(() => {
+    if (isOpen && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
 
   // Scroll deploy form into view only once when it first appears
   useEffect(() => {
@@ -2877,16 +2886,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>{config.name}</span>
+          <span>BCON AI</span>
         </div>
         <div className={styles.headerActions}>
-          <button 
-            className={styles.resetBtn} 
-            onClick={handleRequestResetChat}
-            title="Reset chat"
-          >
-            {ICONS.reset}
-          </button>
           <button
             className={styles.closeBtn}
             onClick={handleRequestCloseChat}
@@ -2928,15 +2930,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
               data-message-id={message.id}
             >
-              {message.type === 'ai' && (index === 0 || messages[index - 1]?.type !== 'ai') && (
-                <div className={styles.aiHeader}>
-                  <div className={styles.aiHeaderAvatar}>
-                    {ICONS.ai(brand, config)}
-                  </div>
-                  <span className={styles.aiHeaderName}>{config.name}</span>
-                </div>
-              )}
-              <div className={`${styles.messageContent} ${message.type === 'ai' ? styles.aiMessageIndent : ''}`}>
+              <div className={styles.messageContent}>
                 <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
                   <div className={styles.bubbleContent}>
                     {/* Typing indicator for loading state */}
@@ -2948,15 +2942,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       </div>
                     ) : (
                       <>
-                        {/* User message avatar header */}
-                        {message.type === 'user' && (
-                          <div className={styles.bubbleHeader}>
-                            <div className={styles.bubbleAvatar}>
-                              {ICONS.user}
-                            </div>
-                            <span className={styles.bubbleName}>You</span>
-                          </div>
-                        )}
                         {/* Message content - hide text when calendar is showing for this message */}
                         {!(showCalendly && calendarAnchorId === message.id) && (
                           <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
@@ -3484,15 +3469,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       )} */}
 
       <div className={styles.inputArea}>
-        {isOpen && showPrivacyNotice && (
-          <div className={styles.privacyNotice}>
-            <span className={styles.privacyPoweredIcon}>
-              <PROXELogo />
-            </span>
-            <span>Powered by PROXe</span>
-          </div>
-        )}
         <div className={styles.chatInputRow}>
+          <button className={styles.inputIconBtn} aria-label="Attach file" type="button">
+            {ICONS.attachment}
+          </button>
           <div className={styles.chatInputWrapper}>
             <input
               ref={chatInputRef}
@@ -3558,10 +3538,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             }}
           />
         </div>
+          <button className={styles.inputIconBtn} aria-label="Voice message" type="button">
+            {ICONS.mic}
+          </button>
         <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
           {ICONS.send}
         </button>
         </div>
+        {isOpen && showPrivacyNotice && (
+          <div className={styles.privacyNotice}>
+            <span className={styles.privacyPoweredIcon}>
+              <PROXELogo />
+            </span>
+            <span>Powered by PROXe</span>
+          </div>
+        )}
       </div>
       </div>
     </div>
