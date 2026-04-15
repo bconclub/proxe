@@ -2071,6 +2071,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // Wait for AI message to be fully streamed and not currently streaming
       // Also check that message has text content (more reliable than just hasStreamed)
       if (lastMessage && lastMessage.type === 'ai' && !lastMessage.isStreaming && lastMessage.text && lastMessage.text.length > 0) {
+        const normalizedLastText = lastMessage.text.toLowerCase();
+        const hasInlineTimeSlots =
+          (lastMessage.text.match(/\b\d{1,2}:\d{2}\s?(am|pm)\b/gi)?.length ?? 0) >= 2;
+        const isAskingForTimeChoice =
+          /which time works|what time works|pick a time|choose a time/.test(normalizedLastText);
+
+        // If the AI already showed concrete time slots in text, don't open calendar too.
+        if (hasInlineTimeSlots && isAskingForTimeChoice) {
+          setPendingCalendar(false);
+          return;
+        }
+
         // Use setTimeout to ensure state updates properly
         const timer = setTimeout(async () => {
           setPendingCalendar(false);

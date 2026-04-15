@@ -295,7 +295,21 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                             setMessages((prev) =>
                               prev.map((msg) =>
                                 msg.id === streamingMessage.id
-                                  ? { ...msg, text: (msg.text || '') + charsToAdd }
+                                  ? (() => {
+                                      const hasPriorAssistantMessage = prev.some(
+                                        (existing) =>
+                                          existing.id !== streamingMessage.id &&
+                                          existing.type === 'ai' &&
+                                          Boolean(existing.text?.trim())
+                                      );
+
+                                      const nextRawText = (msg.text || '') + charsToAdd;
+                                      const nextText = hasPriorAssistantMessage
+                                        ? sanitizeAssistantText(nextRawText, true)
+                                        : nextRawText;
+
+                                      return { ...msg, text: nextText };
+                                    })()
                                   : msg
                               )
                             );
