@@ -2326,8 +2326,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       e.stopPropagation();
     }
 
-    const message = buttonText.trim();
+    let message = buttonText.trim();
     if (!message) return;
+
+    if (/^view use cases$/i.test(message)) {
+      message = 'I want to view case studies. First ask me which industry I am in.';
+    }
 
     setIsDockedBubble(true);
     setIsOpen(true);
