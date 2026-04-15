@@ -1188,9 +1188,9 @@
 /* Hard guard for BCON embed: prevent host/theme var drift from darkening AI text */
 [data-brand="bcon"] .message.ai .bubble,
 [data-theme="bcon-electric"] .message.ai .bubble {
-  background: #E5E7EB;
-  border: 1px solid #D1D5DB;
-  color: #111827;
+  background: #E5E7EB !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -1206,9 +1206,9 @@
 
 [data-brand="bcon"] .message.user .bubble,
 [data-theme="bcon-electric"] .message.user .bubble {
-  background: #8B5CF6;
-  border: 1px solid #7C3AED;
-  color: #FFFFFF;
+  background: #8B5CF6 !important;
+  border: 1px solid #7C3AED !important;
+  color: #FFFFFF !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
