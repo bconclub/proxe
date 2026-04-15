@@ -201,13 +201,11 @@
 }
 
 .quickBtn {
-  padding: 6px 14px;
-  background: var(--button-bg, rgba(91, 26, 140, 0.25));
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-accent, transparent);
-  color: var(--white);
-  border-radius: 20px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
@@ -231,8 +229,8 @@
 }
 
 .quickBtn:hover {
-  background: var(--button-hover, rgba(91, 26, 140, 0.35));
-  border-color: var(--border-glow, transparent);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
   box-shadow: none;
   transform: translateY(-1px);
   text-shadow: none;
@@ -271,10 +269,10 @@
 /* Modern minimal quick buttons in welcome container — inline tile/tag style */
 .welcomeQuickButtonsContainer .quickBtn {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.9);
   padding: 6px 12px;
-  border-radius: 12px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -729,7 +727,7 @@
   position: absolute;
   inset: 0;
   border-radius: var(--chat-border-radius);
-  background: #FFFFFF;
+  background: #0A0A0B;
   z-index: 0;
   border: none;
 }
@@ -746,12 +744,12 @@
 .chatHeader {
   padding: 14px 20px;
   margin: 0;
-  background: #FFFFFF;
-  color: #111827;
+  background: #0A0A0B;
+  color: #E0D4FC;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   border-top: none;
@@ -765,7 +763,7 @@
 .brandName {
   font-weight: 600;
   font-size: 16px;
-  color: #111827;
+  color: #E0D4FC;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -837,7 +835,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  color: #6B7280;
+  color: rgba(224, 212, 252, 0.7);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -847,8 +845,8 @@
 }
 
 .closeBtn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #111827;
+  background: rgba(255, 255, 255, 0.08);
+  color: #E0D4FC;
 }
 
 .closeBtn svg {
@@ -875,7 +873,7 @@
 
 .messagesArea {
   scrollbar-width: thin; /* Firefox */
-  scrollbar-color: rgba(0,0,0,0.2) transparent; /* Firefox */
+  scrollbar-color: rgba(255,255,255,0.2) transparent; /* Firefox */
 }
 
 .messagesArea::-webkit-scrollbar {
@@ -887,13 +885,13 @@
 }
 
 .messagesArea::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.15);
+  background: rgba(255,255,255,0.15);
   border-radius: 3px;
   transition: background 0.2s ease;
 }
 
 .messagesArea::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.25);
+  background: rgba(255,255,255,0.25);
 }
 
 .message {
@@ -1040,14 +1038,14 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: #6B7280;
+  color: rgba(224, 212, 252, 0.7);
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
 .calendarCloseBtn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #111827;
+  background: rgba(255, 255, 255, 0.08);
+  color: #E0D4FC;
 }
 
 .calendarCloseBtn:active {
@@ -1178,6 +1176,10 @@
   border-bottom-left-radius: 4px;
   width: auto;
   max-width: 85%;
+}
+
+.message.ai .messageText {
+  color: #111827;
 }
 
 /* Hide per-message avatars and names (keep widget header only) */
@@ -1348,12 +1350,10 @@
 
 .followUpBtn {
   padding: 14px 20px;
-  /* Frosted glass button with brand theme colors */
-  background: var(--button-bg);
-  backdrop-filter: blur(20px) saturate(100%);
-  -webkit-backdrop-filter: blur(20px) saturate(100%);
-  border: 1px solid var(--border-accent);
-  color: var(--text-button, var(--text-primary));
+  /* Minimal tile button */
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
   cursor: pointer;
   font-size: 16px;
@@ -1361,18 +1361,14 @@
   text-align: left;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  box-shadow: 
-    0 2px 6px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .followUpBtn:hover {
-  background: var(--button-hover);
-  box-shadow: 
-    0 4px 12px var(--glass-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
   transform: translateY(-1px);
-  border-color: var(--border-glow);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* Follow-up buttons use brand theme colors */
@@ -1469,7 +1465,7 @@
   flex-direction: column;
   gap: 6px;
   border: none;
-  background: #FFFFFF;
+  background: #0A0A0B;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   position: relative;
@@ -1477,7 +1473,7 @@
   border-radius: 0;
   box-shadow: none;
   flex-shrink: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chatInputRow {
@@ -1492,7 +1488,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  color: #6B7280;
+  color: rgba(224, 212, 252, 0.7);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1503,8 +1499,8 @@
 }
 
 .inputIconBtn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #111827;
+  background: rgba(255, 255, 255, 0.08);
+  color: #E0D4FC;
 }
 
 .inputIconBtn svg {
@@ -1515,7 +1511,7 @@
 .chatFooter {
   padding: 6px 16px 10px 16px;
   margin: 0;
-  background: #FFFFFF;
+  background: #0A0A0B;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: none;
@@ -1569,17 +1565,17 @@
 .closeConfirmCard {
   width: 100%;
   max-width: 320px;
-  background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #0A0A0B;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   padding: 20px;
   text-align: center;
-  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.35);
 }
 
 .closeConfirmMessage {
   margin: 0 0 16px;
-  color: #111827;
+  color: #E0D4FC;
   font-size: 16px;
   font-weight: 600;
 }
@@ -1611,17 +1607,17 @@
 .closeConfirmContinueBtn {
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   background: transparent;
-  color: #374151;
+  color: #E0D4FC;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .closeConfirmContinueBtn:hover {
-  border-color: rgba(0, 0, 0, 0.3);
-  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .chatInputWrapper {
@@ -1686,11 +1682,11 @@
 
 .chatInput {
   flex: 1;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   outline: none;
   font-size: 15px;
-  color: #111827;
-  background: #F9FAFB;
+  color: #E0D4FC;
+  background: rgba(255, 255, 255, 0.06);
   font-family: inherit;
   padding: 10px 12px;
   padding-bottom: 10px;
@@ -1701,7 +1697,7 @@
 }
 
 .chatInput::placeholder {
-  color: #9CA3AF;
+  color: rgba(224, 212, 252, 0.5);
 }
 
 /* Calendar container styles */
