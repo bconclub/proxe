@@ -142,6 +142,37 @@
   overflow: hidden;
 }
 
+.stepHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stepBackButton {
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  color: var(--text-primary, #ffffff);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stepBackButton:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.selectedDateLabel {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Calendar Header */
 .calendarHeader {
   display: flex;

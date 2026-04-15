@@ -905,7 +905,7 @@
   padding: 18px 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   /* Clean transparent background - let the main glass effect show through */
   background: transparent;
   backdrop-filter: blur(40px) saturate(100%);
@@ -941,7 +941,7 @@
 .message {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   position: relative;
   z-index: 10;
 }
@@ -957,7 +957,7 @@
 .messageContent {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
   flex-direction: row;
@@ -1047,7 +1047,7 @@
 .bubbleContent {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
 }
 
@@ -1056,7 +1056,7 @@
 }
 
 .bubbleContent > * + * {
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .bubbleContent p {
@@ -2037,7 +2037,7 @@
 
 /* Calendar container styles */
 .calendarContainer {
-  margin-top: 16px;
+  margin-top: 8px;
   width: 100%;
   min-height: 600px;
   max-height: 800px;
@@ -2810,7 +2810,7 @@
 .chatboxBubble .calendarContainer {
   min-height: 400px !important;
   max-height: none !important;
-  margin-top: 12px !important;
+  margin-top: 4px !important;
   overflow: visible !important;
 }
 

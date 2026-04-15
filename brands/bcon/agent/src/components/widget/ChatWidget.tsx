@@ -211,7 +211,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
-  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
@@ -1776,6 +1776,50 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasQuickButtons = quickButtonOptions.length > 0;
   const hasUserMessage = messages.some((m) => m.type === 'user');
   const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
+  const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
+  const challengeButtons = ['Leads', 'Engagement', 'Conversion', 'Retention'];
+  const contextualButtons = useMemo(() => {
+    const text = lastAiMessage?.text || '';
+    if (!text) return [] as string[];
+
+    const match = text.match(/is it\s+([^?]+)\?/i);
+    if (!match?.[1]) return [] as string[];
+
+    const cleanedOptions = match[1]
+      .split(/,\s*|\s+or\s+/i)
+      .map((option) =>
+        option
+          .replace(/^(getting|converting|keeping|improving|boosting)\s+/i, '')
+          .replace(/[?.!,]+$/g, '')
+          .trim()
+      )
+      .filter((option) => option.length > 2)
+      .map((option) => option.charAt(0).toUpperCase() + option.slice(1))
+      .slice(0, 4);
+
+    return Array.from(new Set(cleanedOptions));
+  }, [lastAiMessage?.text]);
+  const hasSelectedContextual = usedButtons.some((button) =>
+    contextualButtons.includes(button)
+  );
+  const showContextualButtons =
+    isOpen &&
+    !isLoading &&
+    contextualButtons.length >= 2 &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedContextual;
+  const hasSelectedChallenge = usedButtons.some((button) =>
+    challengeButtons.includes(button)
+  );
+  const showChallengeButtons =
+    isOpen &&
+    !isLoading &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedChallenge &&
+    contextualButtons.length === 0 &&
+    /biggest marketing challenge/i.test(lastAiMessage?.text || '');
 
   const isResponding = useMemo(
     () =>
@@ -2208,28 +2252,38 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
   // Listen for streaming updates to auto-scroll
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const container = messagesAreaRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handleMessageUpdate = () => {
-      // Always scroll to bottom on new messages
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      // Always keep latest message in focus
+      scrollMessagesToBottom('smooth');
     };
 
     window.addEventListener('message-updated', handleMessageUpdate);
     return () => {
       window.removeEventListener('message-updated', handleMessageUpdate);
     };
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages.length, scrollMessagesToBottom]);
 
   // Always scroll to bottom when messages change
   useEffect(() => {
-    if (isOpen && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isOpen) {
+      scrollMessagesToBottom('smooth');
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, scrollMessagesToBottom]);
 
   // Scroll deploy form into view only once when it first appears
   useEffect(() => {
@@ -2329,6 +2383,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     let message = buttonText.trim();
     if (!message) return;
 
+    if (/^explore ai marketing solutions$/i.test(message)) {
+      message = 'Please ask me to share a bit about my business and industry first so you can suggest relevant marketing solutions.';
+    }
+
     if (/^view use cases$/i.test(message)) {
       message = 'I want to view case studies. First ask me which industry I am in.';
     }
@@ -2370,6 +2428,48 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       </div>
     ),
     [handleQuickButtonClick, quickButtonOptions]
+  );
+
+  const renderChallengeButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {challengeButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [challengeButtons, handleQuickButtonClick]
+  );
+
+  const renderContextualButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {contextualButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [contextualButtons, handleQuickButtonClick]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -2625,7 +2725,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? styles.themeLight : styles.themeDark} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
@@ -3167,6 +3267,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         !messages[0].isStreaming &&
         conversationsToRestoreRef.current.length === 0 &&
         renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
+      {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
 
 
       {/* Welcome video embed temporarily disabled */}

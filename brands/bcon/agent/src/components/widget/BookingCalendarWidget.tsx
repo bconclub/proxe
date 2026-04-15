@@ -227,16 +227,6 @@ export function BookingCalendarWidget({
     setBookingError(null);
     setIsWarning(false);
 
-    // Check for required environment variables
-    const hasCalendarConfig = typeof process !== 'undefined' && 
-      (process.env.GOOGLE_CALENDAR_ID || process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_ID);
-    
-    if (!hasCalendarConfig) {
-      console.error('[BookingCalendar] Missing GOOGLE_CALENDAR_ID environment variable');
-      setBookingError('Booking unavailable right now. Please WhatsApp us directly.');
-      return;
-    }
-
     try {
       const dateStr = formatDateForAPI(selectedDate);
       
@@ -589,73 +579,94 @@ export function BookingCalendarWidget({
       )}
 
       <div className={styles.calendarLayout}>
-        {/* Calendar Section */}
-        <div className={styles.calendarSection}>
-          <div className={styles.calendarHeader}>
-            <button onClick={() => navigateMonth('prev')} className={styles.navButton}>
-              ←
-            </button>
-            <span className={styles.monthYear}>{currentMonth}</span>
-            <button onClick={() => navigateMonth('next')} className={styles.navButton}>
-              →
-            </button>
-          </div>
-
-          <div className={styles.monthGrid}>
-            <div className={styles.monthDaysHeader}>
-              {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
-                <div key={day} className={styles.monthDayHeader}>{day}</div>
-              ))}
+        {!selectedDate ? (
+          <div className={styles.calendarSection}>
+            <div className={styles.calendarHeader}>
+              <button onClick={() => navigateMonth('prev')} className={styles.navButton}>
+                ←
+              </button>
+              <span className={styles.monthYear}>{currentMonth}</span>
+              <button onClick={() => navigateMonth('next')} className={styles.navButton}>
+                →
+              </button>
             </div>
-            <div className={styles.monthDaysGrid}>
-              {monthDays.map((day, index) => {
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const isToday = day.toDateString() === new Date().toDateString();
-                const isSelected = selectedDate?.toDateString() === day.toDateString();
-                const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
-                const isSunday = day.getDay() === 0;
 
-                return (
+            <div className={styles.monthGrid}>
+              <div className={styles.monthDaysHeader}>
+                {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
+                  <div key={day} className={styles.monthDayHeader}>{day}</div>
+                ))}
+              </div>
+              <div className={styles.monthDaysGrid}>
+                {monthDays.map((day, index) => {
+                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                  const isToday = day.toDateString() === new Date().toDateString();
+                  const isSelected = selectedDate?.toDateString() === day.toDateString();
+                  const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+                  const isSunday = day.getDay() === 0;
+
+                  return (
+                    <button
+                      key={index}
+                      className={`${styles.monthDateButton} ${!isCurrentMonth ? styles.monthDateOther : ''} ${isToday ? styles.dateToday : ''} ${isSelected ? styles.dateSelected : ''} ${isPast || isSunday ? styles.datePast : ''}`}
+                      onClick={() => handleDateClick(day)}
+                      disabled={isPast || !isCurrentMonth || isSunday}
+                      title={isSunday ? 'Sundays are unavailable' : ''}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.timeSlotsSection}>
+            <div className={styles.stepHeader}>
+              <button
+                type="button"
+                className={styles.stepBackButton}
+                onClick={() => {
+                  setSelectedDate(null);
+                  setSelectedTime(null);
+                  setShowTimeSlots(false);
+                  setBookingError(null);
+                }}
+              >
+                ← Back to dates
+              </button>
+              <span className={styles.selectedDateLabel}>
+                {selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </span>
+            </div>
+            <h3 className={styles.timeSlotsTitle}>Time</h3>
+            {loadingAvailability ? (
+              <div className={styles.loadingText}>Checking availability...</div>
+            ) : showTimeSlots ? (
+              <div className={styles.timeSlotsList}>
+                {timeSlots.map((slot) => (
                   <button
-                    key={index}
-                    className={`${styles.monthDateButton} ${!isCurrentMonth ? styles.monthDateOther : ''} ${isToday ? styles.dateToday : ''} ${isSelected ? styles.dateSelected : ''} ${isPast || isSunday ? styles.datePast : ''}`}
-                    onClick={() => handleDateClick(day)}
-                    disabled={isPast || !isCurrentMonth || isSunday}
-                    title={isSunday ? 'Sundays are unavailable' : ''}
+                    key={slot.time}
+                    className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
+                    onClick={() => handleTimeClick(slot.time)}
+                    disabled={!slot.available}
+                    title={!slot.available ? 'This slot is already booked' : ''}
                   >
-                    {day.getDate()}
+                    {slot.displayTime}
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.timeSlotsPlaceholder}>
+                Select a date to see available times
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Time Slots Section */}
-        <div className={styles.timeSlotsSection}>
-          <h3 className={styles.timeSlotsTitle}>Time</h3>
-          {loadingAvailability ? (
-            <div className={styles.loadingText}>Checking availability...</div>
-          ) : selectedDate ? (
-            <div className={styles.timeSlotsList}>
-              {timeSlots.map((slot) => (
-                <button
-                  key={slot.time}
-                  className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
-                  onClick={() => handleTimeClick(slot.time)}
-                  disabled={!slot.available}
-                  title={!slot.available ? 'This slot is already booked' : ''}
-                >
-                  {slot.displayTime}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className={styles.timeSlotsPlaceholder}>
-              Select a date to see available times
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
