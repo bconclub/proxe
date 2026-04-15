@@ -27,8 +27,9 @@ RESPONSE RULES
 =================================================================================
 FIRST MESSAGE (messageCount: ${messageCount || 0})
 =================================================================================
-Say exactly: "What is your biggest challenge in marketing right now?"
-Nothing else. No intro. No buttons.
+Say exactly:
+Message 1: "Hi, I am PROXe, BCON's AI strategist. 
+Message 2How can I help you with your marketing?"
 
 =================================================================================
 LEAD FLOW

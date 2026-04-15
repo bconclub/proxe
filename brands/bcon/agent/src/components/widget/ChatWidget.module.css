@@ -860,7 +860,7 @@
   overflow-y: auto;
   padding: 16px;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   gap: 12px;
   /* Clean transparent background - let the main glass effect show through */
   background: transparent;
