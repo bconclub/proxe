@@ -515,9 +515,10 @@
   margin-bottom: 0 !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
-  width: 380px;
-  height: auto;
-  max-height: 600px;
+  width: 420px;
+  height: 78vh;
+  min-height: 620px;
+  max-height: 760px;
   border-radius: var(--chat-border-radius);
   z-index: var(--chat-z-index);
   overflow: hidden;
@@ -656,10 +657,11 @@
 /* Tablet breakpoint */
 @media (min-width: 769px) and (max-width: 1024px) {
   .chatboxContainer {
-    width: 360px !important;
-    height: 500px !important;
-    max-height: calc(100vh - 80px) !important;
-    max-height: calc(100dvh - 80px) !important;
+    width: 390px !important;
+    height: calc(100vh - 110px) !important;
+    max-height: calc(100vh - 90px) !important;
+    max-height: calc(100dvh - 90px) !important;
+    min-height: 560px !important;
     right: 16px !important;
     margin-top: auto !important;
     margin-bottom: auto !important;
@@ -699,10 +701,11 @@
   -webkit-transform: none !important;
   -moz-transform: none !important;
   -ms-transform: none !important;
-  width: 380px !important;
+  width: 420px !important;
   max-width: calc(100vw - 40px) !important;
-  height: auto !important;
-  max-height: 600px !important;
+  height: 78vh !important;
+  min-height: 620px !important;
+  max-height: 760px !important;
   border-radius: 16px !important;
   box-shadow: 0 14px 50px rgba(0,0,0,0.35);
 }
@@ -714,7 +717,7 @@
     bottom: 80px !important;
     top: auto !important;
     width: calc(100vw - 40px) !important;
-    max-width: 380px !important;
+    max-width: 400px !important;
     height: auto !important;
     max-height: calc(100vh - 100px) !important;
     border-radius: 16px !important;
@@ -858,7 +861,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 18px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1188,6 +1191,9 @@
   background: #E5E7EB;
   border: 1px solid #D1D5DB;
   color: #111827;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 [data-brand="bcon"] .message.ai .messageText,
@@ -1196,6 +1202,23 @@
 [data-theme="bcon-electric"] .message.ai .messageText * {
   color: #111827 !important;
   opacity: 1 !important;
+}
+
+[data-brand="bcon"] .message.user .bubble,
+[data-theme="bcon-electric"] .message.user .bubble {
+  background: #8B5CF6;
+  border: 1px solid #7C3AED;
+  color: #FFFFFF;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-brand="bcon"] .message.user .messageText,
+[data-theme="bcon-electric"] .message.user .messageText,
+[data-brand="bcon"] .message.user .messageText *,
+[data-theme="bcon-electric"] .message.user .messageText * {
+  color: #FFFFFF !important;
 }
 
 /* BCON welcome surface: keep a stable light canvas (no white->black flash) */
@@ -2380,10 +2403,11 @@
   left: auto !important;
   transform: none !important;
   -webkit-transform: none !important;
-  width: 380px !important;
+  width: 420px !important;
   max-width: calc(100vw - 40px) !important;
-  height: auto !important;
-  max-height: 600px !important;
+  height: 78vh !important;
+  min-height: 620px !important;
+  max-height: 760px !important;
   z-index: 2147483000 !important;
   pointer-events: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2422,7 +2446,7 @@
   right: 20px !important;
   bottom: 80px !important;
   width: calc(100vw - 40px) !important;
-  max-width: 380px !important;
+  max-width: 400px !important;
   height: auto !important;
   max-height: calc(100vh - 100px) !important;
   border-radius: 16px !important;
@@ -2435,9 +2459,10 @@
   right: 20px !important;
   top: auto !important;
   left: auto !important;
-  width: 380px !important;
-  height: auto !important;
-  max-height: 600px !important;
+  width: 420px !important;
+  height: 78vh !important;
+  min-height: 620px !important;
+  max-height: 760px !important;
   border-radius: 16px !important;
 }
 
