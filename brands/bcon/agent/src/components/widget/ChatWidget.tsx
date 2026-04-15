@@ -126,7 +126,7 @@ const ICONS = {
 
 // BCON sequential welcome sequence
 const bconWelcomeSequence = [
-  { text: "What is your biggest challenge in marketing right now?", delay: 0 },
+  { text: "Hi, I am BCON's AI strategist.\n\nHow can I help you with your marketing?", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -1694,7 +1694,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // If pre-loaded lead context exists, stream a single contextual message
     if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
-      const text = `What is your biggest challenge in marketing right now?`;
+      const text = `Hi, I am BCON's AI strategist.\n\nHow can I help you with your marketing?`;
       await streamWelcomeMessage(text, 20);
       setWelcomeComplete(true);
       return;
