@@ -2716,7 +2716,7 @@
 /* Header: smaller padding and font */
 .chatboxBubble .chatHeader {
   padding: 12px 18px !important;
-  margin: 6px 6px 0 6px !important;
+  margin: 0 !important;
 }
 
 .chatboxBubble .brandName {
@@ -2892,7 +2892,7 @@
   .chatHeader {
     border-top-left-radius: var(--chat-border-radius) !important;
     border-top-right-radius: var(--chat-border-radius) !important;
-    margin: 8px 8px 0 8px !important;
+    margin: 0 !important;
     border-top: none !important;
     border-left: none !important;
     border-right: none !important;
@@ -2937,7 +2937,7 @@
     padding-right: max(16px, env(safe-area-inset-right, 16px)) !important;
     padding-top: 8px !important;
     padding-bottom: 40px !important;
-    margin: 0 8px !important;
+    margin: 0 !important;
     margin-bottom: 0 !important;
     background: transparent !important;
     backdrop-filter: none !important;
@@ -2974,7 +2974,7 @@
     padding-right: max(16px, env(safe-area-inset-right, 16px)) !important;
     padding-top: 6px !important;
     padding-bottom: 6px !important;
-    margin: 0 8px 8px 8px !important;
+    margin: 0 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
     background: #FFFFFF !important;
