@@ -81,7 +81,7 @@ export const bconConfig: BrandConfig = {
   },
   // Quick Actions: shown on first chat load
   quickButtons: [
-    'Explore AI in Marketing Solutions',
+    'Explore AI Marketing Solutions',
     'Book AI Brand Audit',
     'View Use Cases',
     'See Work Portfolio',
