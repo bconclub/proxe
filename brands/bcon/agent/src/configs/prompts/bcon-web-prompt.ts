@@ -29,7 +29,7 @@ FIRST MESSAGE (messageCount: ${messageCount || 0})
 =================================================================================
 Say exactly (two lines):
 "Hi, I am BCON's AI strategist."
-"How can I help you with your marketing?"
+"How can I help with your marketing today?"
 Nothing else. No extra claims.
 
 =================================================================================
