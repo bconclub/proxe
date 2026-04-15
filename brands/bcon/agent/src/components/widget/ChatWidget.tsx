@@ -934,6 +934,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     let contextualMessage = trimmed;
     let displayMessage = trimmed; // Message to show in chat and store
 
+    // Keep quick-button instructions hidden from the visible user bubble.
+    if (/^explore ai marketing solutions$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user for business and industry context before suggesting solutions.] ${trimmed}`;
+    } else if (/^view use cases$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
+    }
+
     const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
     if (isBookingRepeat) {
       contextualMessage = `[Booking already scheduled] ${trimmed}`;
@@ -942,7 +949,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // Add name context to AI message only (not displayed to user)
     if (nextCount === 1 && userProfile.name) {
-      contextualMessage = `[User's name is ${userProfile.name}] ${trimmed}`;
+      contextualMessage = `[User's name is ${userProfile.name}] ${contextualMessage}`;
       // displayMessage stays as original trimmed message
     }
 
@@ -2380,16 +2387,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       e.stopPropagation();
     }
 
-    let message = buttonText.trim();
+    const message = buttonText.trim();
     if (!message) return;
-
-    if (/^explore ai marketing solutions$/i.test(message)) {
-      message = 'Please ask me to share a bit about my business and industry first so you can suggest relevant marketing solutions.';
-    }
-
-    if (/^view use cases$/i.test(message)) {
-      message = 'I want to view case studies. First ask me which industry I am in.';
-    }
 
     setIsDockedBubble(true);
     setIsOpen(true);

@@ -18,8 +18,10 @@ interface UseChatStreamOptions {
 
 const BCON_INTRO_LINE_REGEXES = [
   /^hi,?\s*i am bcon'?s ai strategist\.?$/i,
+  /^hi,?\s*i['’]m bcon'?s ai strategist\.?$/i,
   /^how can i help with your marketing today\??$/i,
   /^[a-z0-9 _.'-]{1,40},\s*i am bcon'?s ai strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40},\s*i['’]m bcon'?s ai strategist\.?$/i,
 ];
 
 const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
@@ -44,8 +46,11 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
     .map((line) =>
       line
         .replace(/^\s*[a-z0-9 _.'-]{1,40},\s*i am bcon'?s ai strategist\.?\s*/i, '')
+        .replace(/^\s*[a-z0-9 _.'-]{1,40},\s*i['’]m bcon'?s ai strategist\.?\s*/i, '')
         .replace(/^\s*hi,?\s*i am bcon'?s ai strategist\.?\s*/i, '')
+        .replace(/^\s*hi,?\s*i['’]m bcon'?s ai strategist\.?\s*/i, '')
         .replace(/^\s*i am bcon'?s ai strategist\.?\s*/i, '')
+        .replace(/^\s*i['’]m bcon'?s ai strategist\.?\s*/i, '')
         .trim()
     )
     .filter(Boolean);
