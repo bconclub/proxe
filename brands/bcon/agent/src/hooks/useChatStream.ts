@@ -16,6 +16,41 @@ interface UseChatStreamOptions {
   onMessageComplete?: (message: Message) => void;
 }
 
+const BCON_INTRO_LINE_REGEXES = [
+  /^hi,?\s*i am bcon'?s ai strategist\.?$/i,
+  /^how can i help with your marketing today\??$/i,
+  /^[a-z0-9 _.'-]{1,40},\s*i am bcon'?s ai strategist\.?$/i,
+];
+
+const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
+  if (!rawText) return '';
+
+  const withoutGenericGreeting = rawText
+    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
+    .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .trim();
+
+  const normalized = withoutGenericGreeting
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!hasPriorAssistantMessage) {
+    return normalized;
+  }
+
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const filtered = lines.filter(
+    (line) => !BCON_INTRO_LINE_REGEXES.some((regex) => regex.test(line))
+  );
+
+  return filtered.join('\n').trim();
+};
+
 export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStreamOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -317,10 +352,16 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                     setMessages((prev) => {
                       const updated = prev.map((msg) => {
                         if (msg.id === streamingMessage.id) {
-                          const finalText = msg.text
-                            ?.replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
-                            .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
-                            .trim() || '';
+                          const hasPriorAssistantMessage = prev.some(
+                            (existing) =>
+                              existing.id !== streamingMessage.id &&
+                              existing.type === 'ai' &&
+                              Boolean(existing.text?.trim())
+                          );
+                          const finalText = sanitizeAssistantText(
+                            msg.text || '',
+                            hasPriorAssistantMessage
+                          );
 
                           const completedMessage: Message = {
                             ...msg,
