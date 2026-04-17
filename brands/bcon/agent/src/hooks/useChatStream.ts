@@ -18,8 +18,10 @@ interface UseChatStreamOptions {
 
 const BCON_INTRO_LINE_REGEXES = [
   /^hi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
   /^how can i help with your marketing today\??$/i,
   /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
 ];
 
 const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
@@ -41,10 +43,14 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
 
   const strippedRepeatedIntro = normalized
     .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
     .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
     .replace(/\bi\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '');
+  const strippedRepeatedIdentity = strippedRepeatedIntro
+    .replace(/\bi\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
 
-  const lines = strippedRepeatedIntro
+  const lines = strippedRepeatedIdentity
     .split('\n')
     .map((line) =>
       line

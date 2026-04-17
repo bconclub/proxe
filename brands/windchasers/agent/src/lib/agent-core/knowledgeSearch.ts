@@ -1,5 +1,5 @@
 /**
- * Knowledge Base Search — Hybrid full-text + vector search
+ * Knowledge Base Search - Hybrid full-text + vector search
  * Extracted from web-agent/api/chat/route.ts (searchKnowledgeBase)
  */
 

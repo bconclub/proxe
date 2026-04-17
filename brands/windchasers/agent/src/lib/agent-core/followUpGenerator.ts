@@ -1,10 +1,11 @@
 /**
- * Follow-Up Button Generator — Claude-powered contextual buttons
+ * Follow-Up Button Generator - Claude-powered contextual buttons
  * Brand-aware: uses brand config for button pools and Claude prompt context
  */
 
 import { generateShort } from './claudeClient';
 import { Channel } from './types';
+import { getBrandConfig } from '@/configs';
 
 /** Brand-specific button pools for fallback/static generation */
 const brandButtonPools: Record<string, {
@@ -44,14 +45,14 @@ AVAILABLE BUTTON TYPES:
     defaultFallback: 'Book a Strategy Call',
     costButtons: ['Get a Proposal', 'See Pricing', 'Book Strategy Call'],
     interestButtons: ['Book Strategy Call', 'See Case Studies', 'Start a Project'],
-    genericButtons: ['Book a Strategy Call', 'Explore AI Solutions', 'See Our Work', 'Get a Proposal', 'How It Works'],
+    genericButtons: ['Book a Strategy Call', 'Get a Proposal', 'See Case Studies'],
     bookingAware: ['See Case Studies', 'How It Works', 'Get a Proposal'],
     claudeContext: `BCON AI business solutions chatbot.
 BCON helps businesses understand and implement AI solutions:
-- AI in Business — Custom AI automation, chatbots, workflow optimization
-- Brand Marketing — AI-powered campaigns, content strategy
-- Business Apps — Custom web apps, dashboards, SaaS products
-- PROXe Platform — AI-powered business operating system
+- AI in Business - Custom AI automation, chatbots, workflow optimization
+- Brand Marketing - AI-powered campaigns, content strategy
+- Business Apps - Custom web apps, dashboards, SaaS products
+- PROXe Platform - AI-powered business operating system
 
 AVAILABLE BUTTON TYPES:
 - Information: "Learn More", "See Case Studies", "How It Works"
@@ -69,10 +70,10 @@ AVAILABLE BUTTON TYPES:
     bookingAware: ['See Features', 'Compare Plans', 'Deploy PROXe'],
     claudeContext: `PROXe AI-powered business platform chatbot.
 PROXe is an AI-powered business operating system:
-- Web PROXe — AI chat widget for websites
-- WhatsApp PROXe — WhatsApp AI agent
-- Voice PROXe — Voice AI agent
-- Social PROXe — Social media AI agent
+- Web PROXe - AI chat widget for websites
+- WhatsApp PROXe - WhatsApp AI agent
+- Voice PROXe - Voice AI agent
+- Social PROXe - Social media AI agent
 
 AVAILABLE BUTTON TYPES:
 - Information: "Learn More", "See Features", "Compare Plans"
@@ -84,7 +85,20 @@ AVAILABLE BUTTON TYPES:
 };
 
 function getBrandPool(brand?: string) {
-  return brandButtonPools[brand || 'windchasers'] || brandButtonPools['windchasers'];
+  return brandButtonPools[brand || 'bcon'] || brandButtonPools['bcon'];
+}
+
+const BANNED_BUTTONS = [
+  'tell me my business',
+  'learn more',
+  'explore solutions',
+  'click here',
+  'get started',
+];
+
+function isBannedButton(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return BANNED_BUTTONS.some(banned => lower.includes(banned));
 }
 
 /**
@@ -102,6 +116,8 @@ export async function generateFollowUps(params: {
 }): Promise<string[]> {
   const { channel, userMessage, assistantMessage, messageCount, usedButtons, hasExistingBooking, exploreButtons, brand } = params;
   const pool = getBrandPool(brand);
+  const brandConfig = getBrandConfig(brand);
+  const quickButtons = brandConfig.quickButtons || [];
 
   // WhatsApp and other non-web channels don't get buttons
   if (channel !== 'web') {
@@ -111,6 +127,11 @@ export async function generateFollowUps(params: {
   const lowerMessage = userMessage.toLowerCase();
   const isFirstMessage = messageCount === 1 || messageCount === 0;
   const usedButtonsLower = usedButtons.map(b => b.toLowerCase());
+
+  // First message: always show hardcoded quickButtons from config, no AI generation
+  if (isFirstMessage) {
+    return quickButtons;
+  }
 
   // Check for explore click → show explore buttons from brand config
   if (pool.exploreKeywords.some(kw => lowerMessage.includes(kw)) && exploreButtons.length > 0) {
@@ -122,12 +143,9 @@ export async function generateFollowUps(params: {
     return generateBookingAwareButtons(isFirstMessage, usedButtons, usedButtonsLower, pool);
   }
 
-  // Normal flow: 3-2-1 button structure
-  if (isFirstMessage) {
-    return await generateFirstMessageButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower, pool);
-  }
-
-  return await generateSubsequentButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower, pool);
+  // Subsequent messages: restricted dynamic generation from whitelist only
+  const allowedButtons = [...quickButtons, ...exploreButtons];
+  return await generateSubsequentButtons(userMessage, assistantMessage, messageCount, usedButtons, usedButtonsLower, pool, allowedButtons);
 }
 
 /**
@@ -156,6 +174,7 @@ function generateBookingAwareButtons(
 
 /**
  * Generate 2 buttons for the first message
+ * NOTE: Currently unused — first message uses config.quickButtons directly
  */
 async function generateFirstMessageButtons(
   userMessage: string,
@@ -197,7 +216,8 @@ async function generateSubsequentButtons(
   messageCount: number,
   usedButtons: string[],
   usedButtonsLower: string[],
-  pool: ReturnType<typeof getBrandPool>
+  pool: ReturnType<typeof getBrandPool>,
+  allowedButtons: string[]
 ): Promise<string[]> {
   const lowerMessage = userMessage.toLowerCase();
   const lowerResponse = assistantMessage.toLowerCase();
@@ -228,13 +248,13 @@ async function generateSubsequentButtons(
   const finalPool = unusedButtons.length > 0 ? unusedButtons : contextualButtons;
 
   try {
-    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount, pool);
-    if (generated && !usedButtonsLower.includes(generated.toLowerCase())) {
+    const generated = await generateContextualButton(userMessage, assistantMessage, messageCount, pool, allowedButtons);
+    if (generated && allowedButtons.some(btn => btn.toLowerCase() === generated.toLowerCase()) && !isBannedButton(generated)) {
       return [generated];
     }
-    return finalPool.length > 0 ? [finalPool[Math.floor(Math.random() * finalPool.length)]] : [pool.defaultFallback];
+    return allowedButtons.length > 0 ? [allowedButtons[0]] : [pool.defaultFallback];
   } catch {
-    return finalPool.length > 0 ? [finalPool[Math.floor(Math.random() * finalPool.length)]] : [pool.defaultFallback];
+    return allowedButtons.length > 0 ? [allowedButtons[0]] : [pool.defaultFallback];
   }
 }
 
@@ -245,19 +265,30 @@ async function generateContextualButton(
   userMessage: string,
   assistantMessage: string,
   messageCount: number,
-  pool: ReturnType<typeof getBrandPool>
+  pool: ReturnType<typeof getBrandPool>,
+  allowedButtons?: string[]
 ): Promise<string | null> {
-  const systemPrompt = `You create one short, direct follow-up call-to-action button label for ${pool.claudeContext}
+  const whitelistBlock = allowedButtons && allowedButtons.length > 0
+    ? `\n\nSTRICT WHITELIST: You MUST choose ONLY from this exact list: [${allowedButtons.join(', ')}]. Never invent new buttons. If none fit, respond SKIP.`
+    : '';
 
-BUTTON GENERATION RULES:
-- First user message (messageCount = 1): Generate 1 button most relevant to their question
-- Subsequent messages: Generate 1 button for the next logical step
-- 3-7 words. Title case. No emojis.
-- Be contextual - match the conversation flow
-- NEVER repeat what was just explained
-- NEVER suggest something they already understood
+  const systemPrompt = `Based on what was just discussed, create one follow-up button that moves the conversation forward. Context: ${pool.claudeContext}
 
-TONE: Direct, professional. No sales-y language.
+BUTTON RULES:
+- 3-6 words. Title case. No emojis.
+- Be SPECIFIC to the conversation - never generic like "Learn More" or "Explore Solutions" or "Get Started".
+- Match what they actually talked about.
+- NEVER repeat what was just explained.${whitelistBlock}
+
+BANNED BUTTONS: Never generate "Tell Me My Business", "Learn More", "Explore Solutions", "Click Here", "Get Started", or any generic filler.
+
+EXAMPLES:
+- After discussing Meta ads: "Fix My Meta Ad Leads"
+- After discussing pricing: "See Pricing Options"
+- After qualifying: "Book a Quick Call"
+- After discussing enrollment: "Fill My Empty Seats"
+- After discussing AI chatbots: "Build My Chatbot"
+- After discussing marketing: "Automate My Marketing"
 
 If no relevant follow-up is appropriate, respond with only: SKIP
 Output ONLY the button label text. No quotes. No explanation.`;
@@ -272,7 +303,11 @@ Output ONLY the button label text. No quotes. No explanation.`;
       return null;
     }
 
-    return normalized.replace(/["']/g, '').trim();
+    const cleaned = normalized.replace(/["']/g, '').trim();
+    if (isBannedButton(cleaned)) {
+      return null;
+    }
+    return cleaned;
   } catch {
     return null;
   }

@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 // No authentication required - this is for public website use
 export async function GET() {
   try {
-    const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
-    const supabaseUrl = process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+    const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
+    const supabaseUrl = process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_BCON_SUPABASE_URL
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {

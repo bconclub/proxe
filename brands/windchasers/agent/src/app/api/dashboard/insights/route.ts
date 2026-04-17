@@ -125,17 +125,36 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Average Response Time (mock data for now - replace with actual calculation from messages)
+    // Average Response Time from real metadata.input_to_output_gap_ms
+    const { data: agentMsgs } = await supabase
+      .from('conversations')
+      .select('created_at, metadata')
+      .eq('sender', 'agent')
+      .not('metadata->input_to_output_gap_ms', 'is', null)
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+
+    const responseByDate = new Map<string, { total: number; count: number }>()
+    agentMsgs?.forEach((msg) => {
+      const dateKey = format(parseISO(msg.created_at), 'MMM d')
+      const gapMs = msg.metadata?.input_to_output_gap_ms
+      const gapMsNum = typeof gapMs === 'number' ? gapMs : parseFloat(gapMs)
+      if (!isNaN(gapMsNum) && gapMsNum > 0) {
+        const existing = responseByDate.get(dateKey) || { total: 0, count: 0 }
+        existing.total += gapMsNum
+        existing.count++
+        responseByDate.set(dateKey, existing)
+      }
+    })
+
     const avgResponseTime: { date: string; value: number }[] = []
-    const baseResponseTime = 5000 // 5 seconds in milliseconds
     for (let i = days - 1; i >= 0; i--) {
       const date = subDays(endDate, i)
       const dateKey = format(date, 'MMM d')
-      // Mock data with slight variation
-      const variance = 1 + (Math.random() - 0.5) * 0.3
+      const entry = responseByDate.get(dateKey)
       avgResponseTime.push({
         date: dateKey,
-        value: Math.round(baseResponseTime * variance),
+        value: entry ? Math.round(entry.total / entry.count) : 0,
       })
     }
 
@@ -156,9 +175,10 @@ export async function GET(request: NextRequest) {
       ? conversionRatio.reduce((sum, item) => sum + item.value, 0) / conversionRatio.length
       : 0
     
-    // Average response time
-    const avgResponseTimeValue = avgResponseTime.length > 0
-      ? Math.round(avgResponseTime.reduce((sum, item) => sum + item.value, 0) / avgResponseTime.length)
+    // Average response time (only from days with actual data)
+    const daysWithData = avgResponseTime.filter(item => item.value > 0)
+    const avgResponseTimeValue = daysWithData.length > 0
+      ? Math.round(daysWithData.reduce((sum, item) => sum + item.value, 0) / daysWithData.length)
       : 0
 
     return NextResponse.json({

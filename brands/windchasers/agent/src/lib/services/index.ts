@@ -1,5 +1,5 @@
 /**
- * services/ — Shared business logic for the unified PROXe agent
+ * services/ - Shared business logic for the unified PROXe agent
  *
  * Phase 2 of the Unified Agent Architecture.
  * These modules are channel-agnostic and used by both web and WhatsApp adapters.
@@ -69,9 +69,19 @@ export {
   createCalendarEvent,
 } from './bookingManager';
 
+// WhatsApp messaging
+export {
+  sendWhatsAppText,
+  sendWhatsAppTemplate,
+  sendBookingConfirmation,
+  sendBookingReminder,
+  sendMissedCallMessage,
+} from './whatsappSender';
+
 // Cross-channel context
 export {
   type CustomerContext,
+  type BrandUserProfile,
   type WindchasersUserProfile,
   extractTopics,
   formatBookingInfo,

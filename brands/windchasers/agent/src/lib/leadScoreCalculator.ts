@@ -1,5 +1,6 @@
 // Shared lead score calculation utility
 // Used by both LeadsTable and LeadDetailsModal to ensure consistent scoring
+// Weights: AI 60%, Activity 25%, Business Readiness 15%
 
 import { createClient } from './supabase/client'
 import type { Lead } from '@/types'
@@ -8,6 +9,7 @@ export interface ScoreBreakdown {
   ai: number
   activity: number
   business: number
+  readiness: number
   details: {
     intentScore: number
     sentimentScore: number
@@ -18,6 +20,11 @@ export interface ScoreBreakdown {
     hasBooking: boolean
     hasContact: boolean
     multiChannel: boolean
+    hasWebsite: boolean
+    hasAiSystems: boolean
+    urgencyLevel: string | null
+    monthlyLeads: string | null
+    websiteLive: boolean
   }
 }
 
@@ -39,6 +46,8 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
 
     // Get conversation summaries from unified_context
     const unifiedContext = leadData.unified_context || {}
+    const formData = unifiedContext.form_data || {}
+    const businessIntel = unifiedContext.business_intel || {}
     const conversationSummary =
       unifiedContext.unified_summary ||
       unifiedContext.web?.conversation_summary ||
@@ -54,7 +63,7 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
     ].join(' ').toLowerCase()
 
     // ============================================
-    // 1. AI Analysis (60% weight)
+    // 1. AI Analysis (60 points max)
     // ============================================
     let aiScore = 0
 
@@ -70,10 +79,9 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
       const found = keywords.some(keyword => allText.includes(keyword))
       if (found) intentSignals++
     })
-    // Intent signals: 0-3, normalize to 0-100
     const intentScore = Math.min(100, (intentSignals / 3) * 100)
 
-    // Sentiment analysis (simple keyword-based)
+    // Sentiment analysis
     const positiveWords = ['good', 'great', 'excellent', 'perfect', 'love', 'amazing', 'wonderful', 'happy', 'satisfied', 'interested', 'yes', 'sure', 'definitely']
     const negativeWords = ['bad', 'terrible', 'worst', 'hate', 'disappointed', 'frustrated', 'angry', 'no', 'not', "don't", "won't", 'cancel']
 
@@ -92,25 +100,18 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
     const buyingSignalCount = buyingSignals.filter(signal => allText.includes(signal)).length
     const buyingSignalScore = Math.min(100, buyingSignalCount * 20)
 
-    // Combine AI scores (weighted average)
     aiScore = (intentScore * 0.4 + sentimentScore * 0.3 + buyingSignalScore * 0.3)
 
     // ============================================
-    // 2. Activity (30% weight)
+    // 2. Activity (25 points max, was 30)
     // ============================================
     const messageCount = messages?.length || 0
-    // Message count: normalize to 0-1 (100 messages = 1.0, capped at 1.0)
     const msgCountNormalized = Math.min(1.0, messageCount / 100)
 
-    // Response rate (52% = good baseline)
     const customerMessages = messages?.filter((m: any) => m.sender === 'customer').length || 0
     const agentMessages = messages?.filter((m: any) => m.sender === 'agent').length || 0
-    const responseRate = customerMessages > 0
-      ? (agentMessages / customerMessages)
-      : 0
-    // Response rate is already 0-1 (e.g., 0.52 for 52%)
+    const responseRate = customerMessages > 0 ? (agentMessages / customerMessages) : 0
 
-    // Recency score (days since last interaction)
     const lastInteraction =
       leadData.last_interaction_at ||
       unifiedContext.whatsapp?.last_interaction ||
@@ -123,24 +124,19 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
       ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24))
       : 999
 
-    // Recency: 0 days = 1.0, 7 days = 0.5, 30 days = 0 (normalize to 0-1)
     const recencyScore = Math.max(0, Math.min(1.0, 1.0 - (daysSinceLastInteraction / 30)))
 
-    // Channel mix bonus (2+ channels = bonus) - add 0.1 to the average
     const activeChannels = new Set(messages?.map((m: any) => m.channel).filter(Boolean) || []).size
     const channelMixBonus = activeChannels >= 2 ? 0.1 : 0
 
-    // Activity score: ((msg_count/100 + response_rate + recency_score) / 3) * 0.3
-    // Then convert to 0-100 scale for display
     const activityScoreBase = ((msgCountNormalized + responseRate + recencyScore) / 3) + channelMixBonus
     const activityScore = Math.min(100, activityScoreBase * 100)
 
     // ============================================
-    // 3. Business Signals (10% weight)
+    // 3. Business Signals (booking boost)
     // ============================================
     let businessScore = 0
 
-    // Booking exists = +10 points
     const hasBooking = !!(leadData.booking_date || leadData.booking_time ||
       unifiedContext.web?.booking_date || unifiedContext.web?.booking?.date ||
       unifiedContext.whatsapp?.booking_date || unifiedContext.whatsapp?.booking?.date ||
@@ -148,31 +144,68 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
       unifiedContext.social?.booking_date || unifiedContext.social?.booking?.date)
     if (hasBooking) businessScore += 10
 
-    // Email/phone provided = +5 points
     if (leadData.email || leadData.phone) businessScore += 5
-
-    // Multi-touchpoint = +5 points (2+ channels)
     if (activeChannels >= 2) businessScore += 5
 
-    // Business score can be 0-20, but we need it to contribute 10% (0-10 points) to total
-    // So we normalize: businessScore (0-20) -> (0-10) for the 10% weight
     const businessScoreNormalized = Math.min(10, businessScore)
 
     // ============================================
+    // 4. Business Readiness (15 points max, NEW)
+    // ============================================
+    let readinessScore = 0
+
+    const hasWebsite = formData.has_website === true || !!unifiedContext.website_url
+    const hasAiSystems = formData.has_ai_systems === true
+    const urgencyLevel: string | null = formData.urgency || null
+    const monthlyLeads: string | null = formData.monthly_leads || null
+    const websiteLive = businessIntel.website_live === true
+
+    // has_website = true: +5
+    if (hasWebsite) readinessScore += 5
+
+    // has_ai_systems = false (they NEED us): +3
+    if (formData.has_ai_systems === false) readinessScore += 3
+
+    // urgency is extremely_urgent or asap: +4
+    if (urgencyLevel) {
+      const u = urgencyLevel.toLowerCase()
+      if (['extremely_urgent', 'asap', 'immediately', 'right_now'].includes(u)) {
+        readinessScore += 4
+      } else if (['urgent', 'soon', 'this_week', 'this_month'].includes(u)) {
+        readinessScore += 2
+      }
+    }
+
+    // monthly_leads > 50: +3
+    if (monthlyLeads) {
+      const leadsNum = parseInt(monthlyLeads.replace(/[^0-9]/g, ''), 10) || 0
+      if (leadsNum > 50) readinessScore += 3
+      else if (leadsNum > 20) readinessScore += 1
+    }
+
+    // website_live from crawl: +2 bonus
+    if (websiteLive) readinessScore += 2
+
+    readinessScore = Math.min(15, readinessScore)
+
+    // ============================================
     // Calculate Total Score
+    // AI (60) + Activity (25) + Readiness (15) + business boost
     // ============================================
     const totalScore = Math.min(100,
       (aiScore * 0.6) +
-      (activityScore * 0.3) +
+      (activityScore * 0.25) +
+      readinessScore +
       businessScoreNormalized
     )
 
     return {
       score: Math.round(totalScore),
       breakdown: {
-        ai: Math.round(aiScore * 0.6), // Already weighted (0-60)
-        activity: Math.round(activityScore * 0.3), // Already weighted (0-30)
-        business: Math.round(businessScoreNormalized), // Already normalized to 0-10 for 10% weight
+        ai: Math.round(aiScore * 0.6),
+        activity: Math.round(activityScore * 0.25),
+        business: Math.round(businessScoreNormalized),
+        readiness: readinessScore,
         details: {
           intentScore: Math.round(intentScore),
           sentimentScore: Math.round(sentimentScore),
@@ -182,7 +215,12 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
           daysInactive: daysSinceLastInteraction,
           hasBooking,
           hasContact: !!(leadData.email || leadData.phone),
-          multiChannel: activeChannels >= 2
+          multiChannel: activeChannels >= 2,
+          hasWebsite,
+          hasAiSystems,
+          urgencyLevel,
+          monthlyLeads,
+          websiteLive,
         }
       }
     }
@@ -194,6 +232,7 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
         ai: 0,
         activity: 0,
         business: 0,
+        readiness: 0,
         details: {
           intentScore: 0,
           sentimentScore: 0,
@@ -203,7 +242,12 @@ export async function calculateLeadScore(leadData: Lead): Promise<CalculatedScor
           daysInactive: 0,
           hasBooking: false,
           hasContact: false,
-          multiChannel: false
+          multiChannel: false,
+          hasWebsite: false,
+          hasAiSystems: false,
+          urgencyLevel: null,
+          monthlyLeads: null,
+          websiteLive: false,
         }
       }
     }

@@ -1,11 +1,12 @@
 /**
- * Prompt Builder — Channel-aware, brand-aware prompt construction
+ * Prompt Builder - Channel-aware, brand-aware prompt construction
  * Merged from: web-agent/lib/promptBuilder.ts + dashboard/integrations/whatsapp/system-prompt
  */
 
 import { Channel, HistoryEntry } from './types';
 import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
 import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
+import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 
 interface PromptOptions {
   channel: Channel;
@@ -18,15 +19,19 @@ interface PromptOptions {
   messageCount?: number;
   crossChannelContext?: string;
   brand?: string;
+  formData?: Record<string, any> | null;
 }
 
 /**
  * Get brand-specific system prompt
  */
-function getBrandSystemPrompt(brand: string, context: string, messageCount?: number): string {
-  switch (brand) {
+function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
+  console.log('[promptBuilder] Loading prompt for brand:', brand, 'channel:', channel);
+  switch (brand.toLowerCase()) {
     case 'bcon':
-      return getBconSystemPrompt(context, messageCount);
+      return channel === 'web'
+        ? getBconWebSystemPrompt(context, messageCount)
+        : getBconSystemPrompt(context, messageCount);
     case 'windchasers':
       return getWindchasersSystemPrompt(context, messageCount);
     default:
@@ -49,13 +54,25 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     messageCount,
     crossChannelContext,
     brand,
+    formData,
   } = options;
 
   // Resolve brand: explicit param > env var > default
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
-  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext);
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
+
+  // Calculate lead's average message length from history to enforce mirroring
+  if (history && history.length > 0) {
+    const userMessages = history.filter(h => h.role === 'user');
+    if (userMessages.length > 0) {
+      const avgLen = Math.round(userMessages.reduce((sum, m) => sum + m.content.length, 0) / userMessages.length);
+      if (avgLen < 20) {
+        systemPrompt += `\n\nIMPORTANT: This lead sends very short messages (avg ${avgLen} chars). Keep all replies under 15 words. One sentence only.`;
+      }
+    }
+  }
 
   // Build the user prompt with context
   const userPrompt = buildUserPrompt({
@@ -79,21 +96,38 @@ function buildSystemPrompt(
   knowledgeBase?: string,
   messageCount?: number,
   channel?: Channel,
-  crossChannelContext?: string
+  crossChannelContext?: string,
+  formData?: Record<string, any> | null,
 ): string {
   const nameLine = userName
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
     : '';
 
   // Channel-specific adjustments
-  const channelNote = getChannelInstructions(channel);
+  const channelNote = getChannelInstructions(channel, brand);
 
   // Cross-channel context (e.g., "This user previously chatted on web about pilot training")
   const crossChannelNote = crossChannelContext
     ? `\n\n=================================================================================\nCROSS-CHANNEL CONTEXT\n=================================================================================\n${crossChannelContext}`
     : '';
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount) + nameLine + channelNote + crossChannelNote;
+  // Form data context - tell the AI what the lead already answered
+  let formDataNote = '';
+  if (formData && Object.keys(formData).length > 0) {
+    const lines: string[] = [];
+    if (formData.brand_name) lines.push(`Brand/Company: ${formData.brand_name}`);
+    if (formData.has_website === true) lines.push('Has website: Yes');
+    else if (formData.has_website === false) lines.push('Has website: No (still setting up)');
+    if (formData.monthly_leads) lines.push(`Monthly leads they can handle: ${formData.monthly_leads}`);
+    if (formData.urgency) lines.push(`Setup urgency: ${formData.urgency.replace(/_/g, ' ')}`);
+    if (formData.has_ai_systems === true) lines.push('Already has AI systems running');
+    else if (formData.has_ai_systems === false) lines.push('No AI systems yet (opportunity)');
+    if (lines.length > 0) {
+      formDataNote = `\n\n=================================================================================\nFORM DATA (lead filled this out before chatting)\n=================================================================================\n${lines.join('\n')}\n\nUse this to personalize your conversation. Do NOT ask questions they already answered in the form. Do NOT repeat this data back verbatim - weave it naturally into conversation.`;
+    }
+  }
+
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
@@ -135,8 +169,8 @@ function buildUserPrompt(params: {
     ? 'Plain text only. Max 2 sentences.'
     : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
-  // Inject current date for WhatsApp so Claude can resolve relative dates ("tomorrow", "next Monday")
-  const dateContext = channel === 'whatsapp'
+  // Inject current date so Claude can resolve relative dates ("tomorrow", "next Monday")
+  const dateContext = (channel === 'whatsapp' || channel === 'web')
     ? `Today's date: ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })})`
     : '';
 
@@ -156,7 +190,7 @@ function buildUserPrompt(params: {
 /**
  * Get channel-specific prompt instructions
  */
-function getChannelInstructions(channel?: Channel): string {
+function getChannelInstructions(channel?: Channel, brand?: string): string {
   if (channel === 'whatsapp') {
     return `
 
@@ -181,7 +215,27 @@ IMPORTANT: This conversation is on a voice channel. Keep responses very brief,
 natural-sounding, and easy to speak aloud. Avoid any formatting, lists, or URLs.`;
   }
 
-  // Web channel — default (HTML formatting is fine)
+  // Web channel
+  if (channel === 'web') {
+    const bconLeadNote = brand === 'bcon'
+      ? ''
+      : `- Collect name and email early in conversation - web visitors do not have phone numbers by default.\n- Ask "What's your name?" naturally in the first few messages.\n- Ask "What's the best email to reach you?" before booking.\n- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.`;
+
+    return `
+
+=================================================================================
+WEB CHAT RULES (MUST FOLLOW)
+=================================================================================
+This conversation is on the web chat widget. You MUST:
+- Responses can be 2-4 sentences (slightly longer than WhatsApp).
+- You can use **bold** for emphasis sparingly.
+${bconLeadNote}
+- Same booking flow: check_availability → book_consultation.
+- After booking: "You're booked! Check your email for the calendar invite."
+- You have the same booking tools as WhatsApp - use them the same way.
+=================================================================================`;
+  }
+
   return '';
 }
 

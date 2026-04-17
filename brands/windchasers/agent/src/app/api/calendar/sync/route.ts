@@ -282,9 +282,6 @@ export async function POST(request: NextRequest) {
             dateTime: eventEnd,
             timeZone: TIMEZONE,
           },
-          attendees: booking.email
-            ? [{ email: booking.email, displayName: booking.name || 'Guest' }]
-            : [],
         }
 
         // Check all possible sources for googleEventId
@@ -306,7 +303,7 @@ export async function POST(request: NextRequest) {
             updated++
           } catch (updateError: any) {
             if (updateError.code === 404) {
-              // Event was deleted from calendar — re-create
+              // Event was deleted from calendar - re-create
               const newEvent = await calendar.events.insert({
                 calendarId: CALENDAR_ID,
                 requestBody: eventData,
@@ -318,14 +315,14 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // No tracked googleEventId — check if a matching event already exists
+          // No tracked googleEventId - check if a matching event already exists
           // by matching name + date + hour (fingerprint dedup)
           const bookingName = (booking.name || '').toLowerCase().trim()
           const fingerprint = `${bookingName}|${bookingDate}|${hour.toString().padStart(2, '0')}`
           const existingMatch = existingEventsByFingerprint.get(fingerprint)
 
           if (existingMatch?.id) {
-            // Event already exists on calendar — link it, don't create a duplicate
+            // Event already exists on calendar - link it, don't create a duplicate
             console.log(`[calendar/sync] Linking existing event ${existingMatch.id} to booking ${booking.id} (${booking.name})`)
             await updateBookingMetadata(supabase, booking, existingMatch.id)
             // Also update the event details to latest
@@ -338,7 +335,7 @@ export async function POST(request: NextRequest) {
             } catch (_) { /* best effort update */ }
             updated++
           } else {
-            // Truly new booking — create event
+            // Truly new booking - create event
             try {
               const newEvent = await calendar.events.insert({
                 calendarId: CALENDAR_ID,

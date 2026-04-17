@@ -8,7 +8,7 @@ interface UseChatOptions {
 }
 
 export function useChat({ brand, apiUrl, onMessageComplete }: UseChatOptions) {
-  const { messages, isLoading, error, sendMessage, clearMessages, addUserMessage, addAIMessage } = useChatStream({
+  const { messages, isLoading, error, sendMessage, clearMessages, addUserMessage, addAIMessage, addStreamingAIMessage, updateMessageText, finishMessage } = useChatStream({
     brand,
     apiUrl,
     onMessageComplete,
@@ -50,5 +50,8 @@ export function useChat({ brand, apiUrl, onMessageComplete }: UseChatOptions) {
     clearMessages,
     addUserMessage,
     addAIMessage,
+    addStreamingAIMessage,
+    updateMessageText,
+    finishMessage,
   };
 }

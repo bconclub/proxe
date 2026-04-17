@@ -1,5 +1,5 @@
 /**
- * services/utils.ts — Shared utility functions for all service modules
+ * services/utils.ts - Shared utility functions for all service modules
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  * Used by: all services

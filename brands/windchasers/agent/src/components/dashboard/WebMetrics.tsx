@@ -163,16 +163,36 @@ export default function WebMetrics() {
       }
       setConversionRatio(conversionRatioSeries)
 
-      // Average Response Time (mock data for now - would need actual response time data)
+      // Average Response Time from real metadata.input_to_output_gap_ms
       const avgResponseTimeSeries: ChartData[] = []
-      const baseResponseTime = 5000 // 5 seconds in milliseconds
+      const webAgentMessages = (allMessages || []).filter(
+        (m: any) => m.sender === 'agent' && m.metadata?.input_to_output_gap_ms != null
+      )
+      const responseByDate = new Map<string, { total: number; count: number }>()
+      webAgentMessages.forEach((m: any) => {
+        if (!m.created_at) return
+        const msgDate = new Date(m.created_at)
+        const dateStr = format(msgDate, 'yyyy-MM-dd')
+        if (dateStr >= format(startDate, 'yyyy-MM-dd') && dateStr <= format(endDate, 'yyyy-MM-dd')) {
+          const dateKey = format(msgDate, 'MMM d')
+          const gapMs = typeof m.metadata.input_to_output_gap_ms === 'number'
+            ? m.metadata.input_to_output_gap_ms
+            : parseFloat(m.metadata.input_to_output_gap_ms)
+          if (!isNaN(gapMs) && gapMs > 0) {
+            const existing = responseByDate.get(dateKey) || { total: 0, count: 0 }
+            existing.total += gapMs
+            existing.count++
+            responseByDate.set(dateKey, existing)
+          }
+        }
+      })
       for (let i = days - 1; i >= 0; i--) {
         const date = subDays(endDate, i)
         const dateKey = format(date, 'MMM d')
-        const variance = 1 + (Math.random() - 0.5) * 0.3
+        const entry = responseByDate.get(dateKey)
         avgResponseTimeSeries.push({
           date: dateKey,
-          value: Math.round(baseResponseTime * variance),
+          value: entry ? Math.round(entry.total / entry.count) : 0,
         })
       }
       setAvgResponseTime(avgResponseTimeSeries)
@@ -324,9 +344,9 @@ export default function WebMetrics() {
         <ChartCard
           title="Avg Response Time"
           value={
-            avgResponseTime.length > 0
-              ? Math.round(avgResponseTime.reduce((sum, item) => sum + item.value, 0) / avgResponseTime.length) || 0
-              : 0
+            avgResponseTime.some(item => item.value > 0)
+              ? Math.round(avgResponseTime.filter(item => item.value > 0).reduce((sum, item) => sum + item.value, 0) / avgResponseTime.filter(item => item.value > 0).length)
+              : 'No data'
           }
           data={avgResponseTime}
           suffix="ms"

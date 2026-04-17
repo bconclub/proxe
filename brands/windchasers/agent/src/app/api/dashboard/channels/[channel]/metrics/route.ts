@@ -105,8 +105,30 @@ export async function GET(
         ? Math.round((bookedLeads / totalConversations) * 100)
         : 0
 
-    // Average response time (mock data - replace with actual calculation)
-    const avgResponseTime = 5 // minutes
+    // Average response time from conversations metadata
+    const { data: agentMessages } = await supabase
+      .from('conversations')
+      .select('metadata')
+      .eq('sender', 'agent')
+      .eq('channel', channel)
+      .not('metadata->input_to_output_gap_ms', 'is', null)
+
+    let avgResponseTime = 0
+    if (agentMessages && agentMessages.length > 0) {
+      let totalMs = 0
+      let count = 0
+      agentMessages.forEach((msg) => {
+        const gapMs = msg.metadata?.input_to_output_gap_ms
+        const gapMsNum = typeof gapMs === 'number' ? gapMs : parseFloat(gapMs)
+        if (!isNaN(gapMsNum) && gapMsNum > 0) {
+          totalMs += gapMsNum
+          count++
+        }
+      })
+      if (count > 0) {
+        avgResponseTime = Math.round(totalMs / count / 60000) // convert ms to minutes
+      }
+    }
 
     // Conversations over time (last 7 days)
     const conversationsOverTime = []

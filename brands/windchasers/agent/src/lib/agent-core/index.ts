@@ -1,5 +1,5 @@
 /**
- * Unified PROXe Agent Core — Public API
+ * Unified PROXe Agent Core - Public API
  */
 
 // Engine (main entry point)

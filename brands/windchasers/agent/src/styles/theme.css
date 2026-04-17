@@ -92,51 +92,51 @@
   --primary-dark: #0A0A0B;
   --primary-vibrant: #A78BFA;
 
-  /* Backgrounds */
+  /* Backgrounds - neutral, no purple tint */
   --dark-bg: #0A0A0B;
-  --dark-card: rgba(139, 92, 246, 0.3);
-  --dark-surface: rgba(10, 10, 11, 0.4);
-  --glass-bg: rgba(139, 92, 246, 0.05);
-  --glass-border: rgba(224, 212, 252, 0.1);
-  --glass-shadow: rgba(139, 92, 246, 0.2);
+  --dark-card: rgba(255, 255, 255, 0.04);
+  --dark-surface: rgba(255, 255, 255, 0.02);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
 
-  /* Text */
-  --text-primary: #E0D4FC;
-  --text-secondary: rgba(224, 212, 252, 0.7);
-  --text-tertiary: rgba(224, 212, 252, 0.5);
-  --text-muted: rgba(224, 212, 252, 0.4);
-  --white: #E0D4FC;
+  /* Text - pure whites and grays */
+  --text-primary: #FAFAFA;
+  --text-secondary: rgba(250, 250, 250, 0.7);
+  --text-tertiary: rgba(250, 250, 250, 0.5);
+  --text-muted: rgba(250, 250, 250, 0.35);
+  --white: #FAFAFA;
 
-  /* Borders */
-  --border-light: rgba(224, 212, 252, 0.08);
-  --border-medium: rgba(224, 212, 252, 0.12);
-  --border-accent: rgba(139, 92, 246, 0.3);
-  --border-glow: rgba(139, 92, 246, 0.4);
-  --border-color: rgba(139, 92, 246, 0.2);
-  --chat-border-color: rgba(139, 92, 246, 0.4);
+  /* Borders - neutral grays */
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-accent: rgba(255, 255, 255, 0.12);
+  --border-glow: rgba(255, 255, 255, 0.08);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --chat-border-color: rgba(255, 255, 255, 0.12);
 
-  /* Other */
+  /* Other - semantic colors */
   --green-success: #10B981;
-  --cyan-accent: #A78BFA;
-  --bg-header: rgba(10, 10, 11, 0.85);
-  --bg-message-area: rgba(139, 92, 246, 0.03);
-  --bg-primary: rgba(10, 10, 11, 0.05);
-  --bg-hover: rgba(139, 92, 246, 0.12);
-  --bg-active: rgba(139, 92, 246, 0.15);
+  --cyan-accent: #06B6D4;
+  --bg-header: rgba(10, 10, 11, 0.9);
+  --bg-message-area: rgba(255, 255, 255, 0.01);
+  --bg-primary: rgba(255, 255, 255, 0.02);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.08);
 
-  /* Bubble backgrounds */
-  --bubble-user-bg: rgba(139, 92, 246, 0.25);
-  --bubble-user-border: rgba(139, 92, 246, 0.7);
-  --bubble-user-shadow: 0 8px 32px rgba(139, 92, 246, 0.25);
+  /* Bubble backgrounds - purple only for user bubbles */
+  --bubble-user-bg: rgba(139, 92, 246, 0.20);
+  --bubble-user-border: rgba(139, 92, 246, 0.5);
+  --bubble-user-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 
-  --bubble-ai-bg: rgba(10, 10, 11, 0.3);
-  --bubble-ai-border: rgba(10, 10, 11, 0.7);
-  --bubble-ai-shadow: 0 8px 32px rgba(10, 10, 11, 0.25);
+  --bubble-ai-bg: rgba(255, 255, 255, 0.05);
+  --bubble-ai-border: rgba(255, 255, 255, 0.08);
+  --bubble-ai-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 
-  /* Buttons */
-  --button-bg: rgba(139, 92, 246, 0.25);
-  --button-hover: rgba(139, 92, 246, 0.35);
-  --button-active: rgba(139, 92, 246, 0.45);
+  /* Buttons - purple for primary actions only */
+  --button-bg: rgba(139, 92, 246, 0.20);
+  --button-hover: rgba(139, 92, 246, 0.30);
+  --button-active: rgba(139, 92, 246, 0.40);
   --text-button: #FFFFFF;
 
   /* Blur */
@@ -213,6 +213,150 @@
   --text-button: #FFFFFF;
 
   /* Blur */
+  --blur-sm: blur(8px);
+  --blur-md: blur(12px);
+  --blur-lg: blur(16px);
+  --blur-xl: blur(24px);
+}
+
+/* Black & White Dark Theme (Vercel-style) */
+[data-theme="bw-dark"] {
+  --chatbox-bg: #000000;
+  --accent-1: #ffffff;
+  --accent-2: #111111;
+  --accent-3: #ffffff;
+  --accent-4: #ffffff;
+  --accent-5: #ffffff;
+  --accent-6: #ffffff;
+  --accent-7: #ffffff;
+
+  --primary-color: #ffffff;
+  --primary-light: #ffffff;
+  --primary-dark: #000000;
+  --primary-vibrant: #ffffff;
+
+  --dark-bg: #000000;
+  --dark-card: #111111;
+  --dark-surface: #1a1a1a;
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(0, 0, 0, 0.5);
+
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-tertiary: rgba(255, 255, 255, 0.4);
+  --text-muted: rgba(255, 255, 255, 0.3);
+  --white: #ffffff;
+
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.1);
+  --border-accent: rgba(255, 255, 255, 0.1);
+  --border-glow: rgba(255, 255, 255, 0.1);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --chat-border-color: rgba(255, 255, 255, 0.1);
+
+  --green-success: #10B981;
+  --cyan-accent: #06B6D4;
+  --bg-header: rgba(0, 0, 0, 0.9);
+  --bg-message-area: rgba(255, 255, 255, 0.01);
+  --bg-primary: #000000;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.08);
+
+  --bubble-user-bg: rgba(255, 255, 255, 0.1);
+  --bubble-user-border: rgba(255, 255, 255, 0.15);
+  --bubble-user-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+
+  --bubble-ai-bg: rgba(255, 255, 255, 0.04);
+  --bubble-ai-border: rgba(255, 255, 255, 0.08);
+  --bubble-ai-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+
+  --button-bg: #ffffff;
+  --button-hover: rgba(255, 255, 255, 0.9);
+  --button-active: rgba(255, 255, 255, 0.8);
+  --text-button: #000000;
+
+  /* Dashboard layout vars */
+  --accent-primary: #ffffff;
+  --accent-subtle: rgba(255, 255, 255, 0.08);
+  --bg-secondary: #111111;
+  --bg-tertiary: #1a1a1a;
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --bg-avatar: #333333;
+
+  --blur-sm: blur(8px);
+  --blur-md: blur(12px);
+  --blur-lg: blur(16px);
+  --blur-xl: blur(24px);
+}
+
+/* Black & White Light Theme (Vercel-style) */
+[data-theme="bw-light"] {
+  --chatbox-bg: #ffffff;
+  --accent-1: #000000;
+  --accent-2: #f2f2f2;
+  --accent-3: #000000;
+  --accent-4: #000000;
+  --accent-5: #000000;
+  --accent-6: #000000;
+  --accent-7: #000000;
+
+  --primary-color: #000000;
+  --primary-light: #000000;
+  --primary-dark: #ffffff;
+  --primary-vibrant: #000000;
+
+  --dark-bg: #ffffff;
+  --dark-card: #f2f2f2;
+  --dark-surface: #fafafa;
+  --glass-bg: rgba(0, 0, 0, 0.03);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-shadow: rgba(0, 0, 0, 0.08);
+
+  --text-primary: #000000;
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --text-tertiary: rgba(0, 0, 0, 0.4);
+  --text-muted: rgba(0, 0, 0, 0.3);
+  --white: #000000;
+
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-medium: rgba(0, 0, 0, 0.1);
+  --border-accent: rgba(0, 0, 0, 0.1);
+  --border-glow: rgba(0, 0, 0, 0.1);
+  --border-color: rgba(0, 0, 0, 0.1);
+  --chat-border-color: rgba(0, 0, 0, 0.1);
+
+  --green-success: #10B981;
+  --cyan-accent: #06B6D4;
+  --bg-header: rgba(255, 255, 255, 0.9);
+  --bg-message-area: rgba(0, 0, 0, 0.01);
+  --bg-primary: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+
+  --bubble-user-bg: rgba(0, 0, 0, 0.08);
+  --bubble-user-border: rgba(0, 0, 0, 0.12);
+  --bubble-user-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+
+  --bubble-ai-bg: rgba(0, 0, 0, 0.03);
+  --bubble-ai-border: rgba(0, 0, 0, 0.06);
+  --bubble-ai-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+
+  --button-bg: #000000;
+  --button-hover: rgba(0, 0, 0, 0.85);
+  --button-active: rgba(0, 0, 0, 0.7);
+  --text-button: #ffffff;
+
+  /* Dashboard layout vars */
+  --accent-primary: #000000;
+  --accent-subtle: rgba(0, 0, 0, 0.06);
+  --bg-secondary: #f2f2f2;
+  --bg-tertiary: #e8e8e8;
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --bg-avatar: #cccccc;
+
   --blur-sm: blur(8px);
   --blur-md: blur(12px);
   --blur-lg: blur(16px);

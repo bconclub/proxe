@@ -50,7 +50,7 @@ const navigation: NavItem[] = [
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
-  { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
+  { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
   // SYSTEM
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
@@ -300,7 +300,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="dashboard-layout min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
       {/* Mobile overlay */}
-      {isMobile && mobileSidebarOpen && (
+      {mobileSidebarOpen && (
         <div
           className="dashboard-layout-mobile-overlay fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setMobileSidebarOpen(false)}
@@ -309,8 +309,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-visible ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
-          }`}
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-visible ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{
           width: sidebarWidth,
           backgroundColor: 'var(--bg-primary)',
@@ -334,7 +333,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors"
+                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                   style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -350,7 +349,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors"
+                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                   style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -444,7 +443,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           </span>
                         )}
                         {navItem.comingSoon && (
-                          <span className="text-[9px] uppercase tracking-tighter opacity-50 font-black ml-2 px-1 bg-gray-500/10 rounded">Soon</span>
+                          <span className="text-[9px] uppercase tracking-tighter font-semibold ml-2 px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-muted)' }}>Soon</span>
                         )}
                       </>
                     )}
@@ -534,22 +533,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               return (
                 <React.Fragment key={item.name}>
-                  {needsDivider && showExpanded && (
-                    <div
-                      className="dashboard-layout-nav-group-label"
-                      style={{
-                        borderTop: '1px solid var(--border-primary)',
-                        margin: '8px 12px 4px',
-                        paddingTop: '8px',
-                        fontSize: '10px',
-                        fontWeight: 500,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      {index === 4 ? 'Operations' : index === 7 ? 'System' : ''}
-                    </div>
+                  {needsDivider && (
+                    <div style={{ borderTop: '1px solid var(--border-primary)', margin: '8px 12px 4px' }} />
                   )}
 
                   {renderNavItem(item)}
@@ -585,7 +570,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="dashboard-layout-more-options relative" ref={moreOptionsRef}>
               <button
                 onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
-                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
+                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
                 style={{
                   width: '24px',
                   height: '24px',
@@ -595,6 +580,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                 }}
                 title="More Options"
+                aria-expanded={moreOptionsOpen}
+                aria-haspopup="menu"
                 onMouseEnter={(e) => {
                   if (!moreOptionsOpen) {
                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
@@ -647,7 +634,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Version badge inline */}
             {showExpanded && (
               <div
-                className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
+                className="dashboard-layout-version-badge px-1.5 py-0.5 rounded text-[10px] font-normal"
                 style={{
                   backgroundColor: 'transparent',
                   color: 'var(--text-muted)',
@@ -663,36 +650,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="dashboard-layout-mobile-menu-button fixed top-4 left-4 z-30 p-2 rounded-md transition-colors"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-primary)',
-            color: 'var(--text-primary)',
-          }}
-          aria-label="Open sidebar"
-        >
-          <MdMenu size={24} />
-        </button>
-      )}
-
       {/* Main Content */}
       <div
-        className="dashboard-layout-main-content flex flex-col"
+        className={`dashboard-layout-main-content flex flex-col ${isCollapsed ? 'md:ml-14' : 'md:ml-[220px]'}`}
         style={{
-          marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
           height: '100vh',
-          width: isMobile ? '100%' : `calc(100% - ${contentMarginWidth})`,
           overflow: 'hidden',
-          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1), width 200ms cubic-bezier(0.2,0,0,1)',
+          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1)',
         }}
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
+
+        {/* Mobile top bar — only visible on mobile */}
+        <div
+          className="md:hidden flex items-center gap-3 flex-shrink-0 border-b px-4"
+          style={{
+            height: '56px',
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--border-primary)',
+          }}
+        >
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--text-primary)',
+            }}
+            aria-label="Open sidebar"
+          >
+            <MdMenu size={20} />
+          </button>
+          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+        </div>
 
         {/* Page content */}
         {pathname === '/dashboard/inbox' ? (
@@ -701,7 +694,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         ) : (
           <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
-            <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <div className="dashboard-layout-main-content-container py-4 sm:py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
               <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
                 {children}
               </div>

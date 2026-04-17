@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -65,6 +66,55 @@ function formatBookingDateShort(dateString: string | null | undefined): string {
   }
 }
 
+function formatCountdown(scheduledAt: string): string {
+  const now = Date.now()
+  const target = new Date(scheduledAt).getTime()
+  const diff = target - now
+
+  if (diff <= 0) return 'Now'
+
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (days > 0) {
+    const date = new Date(scheduledAt)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    const dayAfter = new Date(tomorrow)
+    dayAfter.setDate(dayAfter.getDate() + 1)
+
+    if (target < dayAfter.getTime()) {
+      return `Tomorrow at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
+    }
+    return `In ${days}d ${hours % 24}h`
+  }
+
+  if (hours > 0) return `In ${hours}h ${minutes % 60}m`
+  return `In ${minutes}m`
+}
+
+function getTaskTypeConfig(taskType: string): { color: string; bg: string; label: string } {
+  const t = (taskType || '').toLowerCase()
+  if (t.includes('nudge')) return { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'Nudge' }
+  if (t.includes('reminder')) return { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'Reminder' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { color: '#EF4444', bg: 'rgba(239,68,68,0.12)', label: 'Re-engage' }
+  if (t.includes('follow')) return { color: '#22C55E', bg: 'rgba(34,197,94,0.12)', label: 'Follow-up' }
+  return { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', label: taskType?.replace(/_/g, ' ') || 'Task' }
+}
+
+function getTaskActionLabel(task: any): string {
+  const channel = task.metadata?.channel || 'WhatsApp'
+  const t = (task.task_type || '').toLowerCase()
+  if (t.includes('nudge')) return `${channel} nudge`
+  if (t.includes('reminder') && t.includes('booking')) return 'Booking reminder'
+  if (t.includes('reminder')) return `${channel} reminder`
+  if (t.includes('follow')) return `${channel} follow-up`
+  if (t.includes('re_engage') || t.includes('reengage')) return `${channel} re-engagement`
+  return task.task_description || task.task_type?.replace(/_/g, ' ') || 'Scheduled action'
+}
+
 function renderMarkdown(text: string) {
   if (!text) return null;
 
@@ -72,31 +122,23 @@ function renderMarkdown(text: string) {
   const parts = text.split(/(\*\*.*?\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-bold text-[var(--text-primary)]">{part.slice(2, -2)}</strong>;
     }
     return part;
   });
 }
 
-/** Render summary as plain text — just sentences, no formatting */
+/** Render summary as plain text - just sentences, no formatting */
 function renderSummary(text: string) {
   if (!text) return null;
   return (
-    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+    <p className="text-[13px] leading-relaxed font-normal" style={{ color: 'var(--text-primary)' }}>
       {text.trim()}
     </p>
   );
 }
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'phone', 'social'];
-
-// Phone with sparkle icon for AI voice calls
-const PhoneSparkleIcon = ({ size = 16 }: { size?: number }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-    <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.24 1.01l-2.21 2.2z" />
-    <path d="M16.5 1c-.21 0-.39.18-.41.39-.18 1.41-1.29 2.52-2.7 2.7-.21.03-.39.2-.39.41s.18.39.39.41c1.41.18 2.52 1.29 2.7 2.7.03.21.2.39.41.39s.39-.18.41-.39c.18-1.41 1.29-2.52 2.7-2.7.21-.03.39-.2.39-.41s-.18-.39-.39-.41c-1.41-.18-2.52-1.29-2.7-2.7C16.89 1.18 16.71 1 16.5 1z" />
-  </svg>
-);
+const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social', 'meta_forms'];
 
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
   const style = {
@@ -157,27 +199,27 @@ const CHANNEL_CONFIG = {
   },
   whatsapp: {
     name: 'WhatsApp',
-    icon: MdChat,
+    icon: FaWhatsapp,
     color: '#22C55E',
     emoji: '💬'
   },
   voice: {
-    name: 'AI Voice',
-    icon: PhoneSparkleIcon,
-    color: '#8B5CF6',
-    emoji: '📞'
-  },
-  phone: {
-    name: 'Phone',
+    name: 'Voice',
     icon: MdPhone,
-    color: '#6366F1',
-    emoji: '📱'
+    color: 'var(--accent-primary)',
+    emoji: '📞'
   },
   social: {
     name: 'Social',
     icon: MdShare,
     color: '#EC4899',
     emoji: '📱'
+  },
+  meta_forms: {
+    name: 'Meta Forms',
+    icon: MdDynamicForm,
+    color: '#1877F2',
+    emoji: '📋'
   }
 }
 
@@ -222,14 +264,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     web: { count: number; firstDate: string | null; lastDate: string | null }
     whatsapp: { count: number; firstDate: string | null; lastDate: string | null }
     voice: { count: number; firstDate: string | null; lastDate: string | null }
-    phone: { count: number; firstDate: string | null; lastDate: string | null }
+    meta_forms: { count: number; firstDate: string | null; lastDate: string | null }
     social: { count: number; firstDate: string | null; lastDate: string | null }
   }>({
     web: { count: 0, firstDate: null, lastDate: null },
     whatsapp: { count: 0, firstDate: null, lastDate: null },
     voice: { count: 0, firstDate: null, lastDate: null },
-    phone: { count: 0, firstDate: null, lastDate: null },
     social: { count: 0, firstDate: null, lastDate: null },
+    meta_forms: { count: 0, firstDate: null, lastDate: null },
   })
   const [quickStats, setQuickStats] = useState<{
     totalMessages: number
@@ -246,21 +288,49 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [freshLeadData, setFreshLeadData] = useState<Lead | null>(null)
   const [calculatedScore, setCalculatedScore] = useState<CalculatedScore | null>(null)
 
-  // Recalculate score via API (persists to DB so list and modal always match)
+  // Admin notes state
+  const [showAdminNoteInput, setShowAdminNoteInput] = useState(false)
+  const [adminNoteText, setAdminNoteText] = useState('')
+  const [savingAdminNote, setSavingAdminNote] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [showAdminNotes, setShowAdminNotes] = useState(false)
+  const recognitionRef = useRef<any>(null)
+  // AI classification progress state
+  const [noteProgress, setNoteProgress] = useState<{ steps: { text: string; done: boolean }[]; visible: boolean }>({ steps: [], visible: false })
+
+  // Log a Call state
+  const [showLogCallForm, setShowLogCallForm] = useState(false)
+  const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
+  const [logCallNotes, setLogCallNotes] = useState('')
+  const [savingLogCall, setSavingLogCall] = useState(false)
+
+  // Send Message state
+  const [showSendMessageForm, setShowSendMessageForm] = useState(false)
+  const [sendMessageText, setSendMessageText] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+
+  // "+" action dropdown
+  const [showActionDropdown, setShowActionDropdown] = useState(false)
+
+  // Next Actions state
+  const [leadTasks, setLeadTasks] = useState<any[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [, setTick] = useState(0)
+
+  // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
     if (!lead) return
-    try {
-      const res = await fetch(`/api/dashboard/leads/${lead.id}/score`, { method: 'POST' })
-      const data = await res.json()
-      if (data.lead?.lead_score != null) {
-        setCalculatedScore({ score: data.lead.lead_score } as CalculatedScore)
+    const leadData = freshLeadData || lead
+    const result = await calculateLeadScoreUtil(leadData as ScoreLead)
+    setCalculatedScore(result)
+
+    // Persist recalculated score to DB so list and modal always match
+    if (result && typeof result.score === 'number') {
+      try {
+        await fetch(`/api/dashboard/leads/${lead.id}/score`, { method: 'POST' })
+      } catch (err) {
+        console.error('Failed to persist recalculated score:', err)
       }
-    } catch (err) {
-      console.error('Error recalculating score:', err)
-      // Fallback to client-side calculation
-      const leadData = freshLeadData || lead
-      const result = await calculateLeadScoreUtil(leadData as ScoreLead)
-      setCalculatedScore(result)
     }
   }
 
@@ -451,6 +521,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       loadChannelData()
       loadQuickStats()
       loadScoreHistory()
+      loadLeadTasks()
       // Calculate score immediately with lead prop (will recalculate when freshLeadData loads)
       calculateAndSetScore()
     }
@@ -474,9 +545,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, lead, isOpen])
 
+  // Live countdown timer - re-render every 60s for task countdowns
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadUnifiedSummary = async (refresh = false) => {
     if (!lead) return
+    setUnifiedSummary('')
+    setSummaryAttribution('')
+    setSummaryData(null)
     setLoadingSummary(true)
     try {
       console.log('Loading unified summary for lead:', lead.id, { refresh })
@@ -549,8 +628,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           web: { count: 0, firstDate: null, lastDate: null },
           whatsapp: { count: 0, firstDate: null, lastDate: null },
           voice: { count: 0, firstDate: null, lastDate: null },
-          phone: { count: 0, firstDate: null, lastDate: null },
           social: { count: 0, firstDate: null, lastDate: null },
+          meta_forms: { count: 0, firstDate: null, lastDate: null },
         }
 
         messages.forEach((msg: any) => {
@@ -563,24 +642,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             channelStats[channel].lastDate = msg.created_at
           }
         })
-
-        // Count admin-logged call activities as phone channel
-        const { data: callActivities } = await supabase
-          .from('activities')
-          .select('created_at')
-          .eq('lead_id', lead.id)
-          .eq('activity_type', 'call')
-          .order('created_at', { ascending: true })
-
-        if (callActivities && callActivities.length > 0) {
-          callActivities.forEach((activity: any) => {
-            channelStats.phone.count++
-            if (!channelStats.phone.firstDate) {
-              channelStats.phone.firstDate = activity.created_at
-            }
-            channelStats.phone.lastDate = activity.created_at
-          })
-        }
 
         setChannelData(channelStats)
       }
@@ -622,32 +683,38 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           : 0
 
         // Calculate average response time from metadata.response_time_ms
+        // Use only last 5 agent messages to reflect current performance
         let totalResponseTime = 0
         let responseCount = 0
 
-        // First, try to use metadata.response_time_ms
-        messages.forEach((msg: any) => {
-          if (msg.sender === 'agent' && msg.metadata?.response_time_ms) {
-            const responseTimeMs = typeof msg.metadata.response_time_ms === 'number'
-              ? msg.metadata.response_time_ms
-              : parseInt(msg.metadata.response_time_ms, 10)
-            if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
-              totalResponseTime += responseTimeMs
-              responseCount++
-            }
+        // First, try to use metadata.response_time_ms (last 5 only)
+        const agentMsgsWithTime = messages.filter((msg: any) =>
+          msg.sender === 'agent' && msg.metadata?.response_time_ms
+        ).slice(-5)
+
+        agentMsgsWithTime.forEach((msg: any) => {
+          const responseTimeMs = typeof msg.metadata.response_time_ms === 'number'
+            ? msg.metadata.response_time_ms
+            : parseInt(msg.metadata.response_time_ms, 10)
+          if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
+            totalResponseTime += responseTimeMs
+            responseCount++
           }
         })
 
         // Fallback to timestamp calculation if no metadata.response_time_ms
+        // Use last 10 messages to find up to 5 customer→agent pairs
         if (responseCount === 0) {
-          for (let i = 0; i < messages.length - 1; i++) {
-            const msg1 = messages[i] as any
-            const msg2 = messages[i + 1] as any
+          const recentMessages = messages.slice(-10)
+          for (let i = 0; i < recentMessages.length - 1; i++) {
+            const msg1 = recentMessages[i] as any
+            const msg2 = recentMessages[i + 1] as any
             if (msg1.sender === 'customer' && msg2.sender === 'agent') {
               const timeDiff = new Date(msg2.created_at).getTime() - new Date(msg1.created_at).getTime()
               if (timeDiff > 0) {
                 totalResponseTime += timeDiff
                 responseCount++
+                if (responseCount >= 5) break
               }
             }
           }
@@ -757,6 +824,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  const loadLeadTasks = async () => {
+    if (!lead) return
+    setLoadingTasks(true)
+    try {
+      const response = await fetch(`/api/dashboard/tasks?lead_id=${lead.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setLeadTasks(data.tasks || [])
+      }
+    } catch (error) {
+      console.error('Error loading lead tasks:', error)
+    } finally {
+      setLoadingTasks(false)
+    }
+  }
+
+  const handleCancelTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/dashboard/tasks/${taskId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      if (response.ok) {
+        loadLeadTasks()
+      }
+    } catch (error) {
+      console.error('Error cancelling task:', error)
+    }
+  }
+
 
   if (!isOpen || !lead) return null
 
@@ -777,8 +875,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     null
   const daysInactive = lastInteraction ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
-  // Use stored DB score to match the leads table (no live recalculation)
-  const score = currentLead.lead_score ?? lead.lead_score ?? 0
+  // Get health score — use DB lead_score when admin has explicitly overridden, otherwise use calculated
+  const score = (currentLead.stage_override && currentLead.lead_score != null && currentLead.lead_score > 0)
+    ? Math.max(currentLead.lead_score, calculatedScore?.score ?? 0)
+    : (calculatedScore?.score ?? 0)
   const getHealthColor = (score: number) => {
     if (score >= 90) return { bg: '#22C55E', text: '#15803D', label: 'Hot 🔥' } // Green for Hot (90-100)
     if (score >= 70) return { bg: '#F97316', text: '#C2410C', label: 'Warm ⚡' } // Orange for Warm (70-89)
@@ -798,7 +898,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   // Auto-detect stage from conversation
   const autoDetectStage = (): string => {
-    if (currentLead.lead_stage && !currentLead.stage_override) {
+    // If admin explicitly set the stage, use it
+    if (currentLead.lead_stage && currentLead.stage_override) {
+      return currentLead.lead_stage
+    }
+
+    // If stage exists from DB (not overridden), still use it
+    if (currentLead.lead_stage) {
       return currentLead.lead_stage
     }
 
@@ -810,7 +916,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     return 'New'
   }
   const detectedStage = autoDetectStage()
-  const currentStage = currentLead.lead_stage || detectedStage
+  const currentStage = detectedStage
 
   // Calculate stage duration
   const getStageDuration = () => {
@@ -847,6 +953,186 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     }
     return stageColors[stage] || stageColors['New']
+  }
+
+  // Admin note handlers
+  const handleSaveAdminNote = async () => {
+    if (!adminNoteText.trim() || !lead) return
+    setSavingAdminNote(true)
+    // Show initial analyzing step
+    setNoteProgress({ steps: [{ text: 'Analyzing note...', done: false }], visible: true })
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: adminNoteText.trim() }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save note')
+      }
+      const result = await response.json()
+
+      // Build step-by-step progress from response
+      const allSteps: { text: string; done: boolean }[] = [
+        { text: 'Analyzing note...', done: true },
+      ]
+
+      // Show classification
+      const categoryLabels: Record<string, string> = {
+        BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
+        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
+        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Converted', MEETING_REQUEST: 'Meeting Request',
+        SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', INFO_ONLY: 'Info Only',
+      }
+      const categoryLabel = categoryLabels[result.classification?.category] || result.classification?.category || 'Unknown'
+      allSteps.push({ text: `Classified as: ${categoryLabel}`, done: true })
+
+      // Add each action taken
+      if (result.actions_taken) {
+        for (const action of result.actions_taken) {
+          allSteps.push({ text: action, done: true })
+        }
+      }
+
+      allSteps.push({ text: 'Done', done: true })
+
+      // Animate steps one by one
+      for (let i = 0; i < allSteps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 100 : 400))
+        setNoteProgress({ steps: allSteps.slice(0, i + 1), visible: true })
+      }
+
+      setAdminNoteText('')
+      setShowAdminNoteInput(false)
+
+      // Keep visible for a moment, then fade out and refresh
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setNoteProgress(prev => ({ ...prev, visible: false }))
+      await new Promise(resolve => setTimeout(resolve, 300))
+      setNoteProgress({ steps: [], visible: false })
+
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error saving admin note:', err)
+      setNoteProgress({ steps: [{ text: 'Analyzing note...', done: true }, { text: 'Error saving note', done: true }], visible: true })
+      setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
+    } finally {
+      setSavingAdminNote(false)
+    }
+  }
+
+  const handleDeleteAdminNote = async (note: any) => {
+    if (!lead || !confirm('Delete this note?')) return
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_id: note.id, note_text: note.text, note_created_at: note.created_at }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete note')
+      }
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error deleting admin note:', err)
+    }
+  }
+
+  const handleLogCall = async () => {
+    if (!lead) return
+    setSavingLogCall(true)
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome: logCallOutcome, notes: logCallNotes.trim() || undefined }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to log call')
+      }
+      setShowLogCallForm(false)
+      setLogCallOutcome('Connected')
+      setLogCallNotes('')
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error logging call:', err)
+    } finally {
+      setSavingLogCall(false)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!sendMessageText.trim() || !lead) return
+    setSendingMessage(true)
+    try {
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          channel: 'whatsapp',
+          action: 'send',
+          message: sendMessageText.trim(),
+        }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to send message')
+      }
+      setSendMessageText('')
+      setShowSendMessageForm(false)
+      loadActivities()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error sending message:', err)
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  const closeAllActionForms = () => {
+    setShowLogCallForm(false)
+    setShowAdminNoteInput(false)
+    setShowSendMessageForm(false)
+  }
+
+  const toggleVoiceDictation = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Voice dictation is not supported in this browser.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = 'en-IN'
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setAdminNoteText((prev) => (prev ? prev + ' ' + transcript : transcript))
+      setIsListening(false)
+    }
+
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
   }
 
   // Handle stage change
@@ -935,11 +1221,46 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       firstDate: string | null
       lastDate: string | null
     }> = []
-    if (channelData.web.count > 0) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
-    if (channelData.whatsapp.count > 0) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
-    if (channelData.voice.count > 0) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
-    if (channelData.phone.count > 0) channels.push({ ...CHANNEL_CONFIG.phone, key: 'phone', ...channelData.phone })
-    if (channelData.social.count > 0) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
+    // Add meta_forms as first step if first_touchpoint is meta_forms (even with 0 conversation messages)
+    const ft = currentLead.first_touchpoint
+    const leadSources: string[] = currentLead.unified_context?.lead_sources || []
+    if (ft === 'meta_forms' || leadSources.includes('meta_forms')) {
+      const config = CHANNEL_CONFIG.meta_forms
+      channels.push({
+        ...config,
+        key: 'meta_forms',
+        count: channelData.meta_forms.count || 1,
+        firstDate: channelData.meta_forms.firstDate || currentLead.created_at || currentLead.timestamp,
+        lastDate: channelData.meta_forms.lastDate || currentLead.created_at || currentLead.timestamp,
+      })
+    }
+    const lt = currentLead.last_touchpoint
+    const uc = currentLead.unified_context || {}
+    const hasChannel = (ch: string) =>
+      channelData[ch as keyof typeof channelData]?.count > 0 ||
+      ft === ch || lt === ch ||
+      leadSources.includes(ch) ||
+      !!(uc[ch])
+    const alreadyAdded = channels.map(c => c.key)
+    if (hasChannel('web') && !alreadyAdded.includes('web')) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
+    if (hasChannel('whatsapp') && !alreadyAdded.includes('whatsapp')) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
+    if (hasChannel('voice') && !alreadyAdded.includes('voice')) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
+    if (hasChannel('social') && !alreadyAdded.includes('social')) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
+
+    // If lead_sources array exists, sort by that order; otherwise sort by firstDate
+    if (leadSources.length > 0) {
+      return channels.sort((a, b) => {
+        const aIdx = leadSources.indexOf(a.key)
+        const bIdx = leadSources.indexOf(b.key)
+        // Items in lead_sources come first in order; others sort by firstDate
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+        if (aIdx !== -1) return -1
+        if (bIdx !== -1) return 1
+        const aDate = a.firstDate ? new Date(a.firstDate).getTime() : 0
+        const bDate = b.firstDate ? new Date(b.firstDate).getTime() : 0
+        return aDate - bDate
+      })
+    }
     return channels.sort((a, b) => {
       const aDate = a.firstDate ? new Date(a.firstDate).getTime() : 0
       const bDate = b.firstDate ? new Date(b.firstDate).getTime() : 0
@@ -963,7 +1284,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       >
         <dialog
           open={isOpen}
-          className="lead-modal-dialog lead-details-modal relative bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50 flex flex-col"
+          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg shadow-xl z-50 flex flex-col border border-[var(--border-primary)]"
           style={{
             width: '54vw',
             maxWidth: '720px',
@@ -975,16 +1296,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           aria-modal="true"
         >
           {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
-          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0 relative min-h-[140px]">
+          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-[var(--border-primary)] flex-shrink-0 relative min-h-[140px]">
             {/* LEFT HALF: Contact Card - Business Card Style */}
-            <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-gray-50/50 dark:bg-gray-800/30 rounded-xl border border-gray-200/50 dark:border-gray-700/30">
+            <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
               {/* Top Section: Name, Score, Status */}
               <div className="lead-contact-card-header">
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <h2
                     id="lead-modal-title"
-                    className="lead-contact-name text-xl font-bold text-gray-900 dark:text-white leading-tight flex-1 min-w-0 truncate"
+                    className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight flex-1 min-w-0 truncate"
                   >
                     {currentLead.name || 'Unknown Lead'}
                   </h2>
@@ -1038,15 +1359,44 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <button
                     ref={stageButtonRef}
                     onClick={() => setShowStageDropdown(!showStageDropdown)}
-                    className="lead-stage-edit-button p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                     title="Edit stage"
                     aria-label="Edit lead stage"
                     aria-expanded={showStageDropdown}
                     aria-haspopup="true"
                   >
-                    <MdEdit size={12} className="text-gray-500 dark:text-gray-400" />
+                    <MdEdit size={12} className="text-[var(--text-muted)]" />
                   </button>
                 </div>
+
+                {/* Service Interest & Pain Point pills - only for engaged leads (score 50+) */}
+                {score >= 50 && (() => {
+                  const ctx = currentLead.unified_context || {}
+                  const si = summaryData?.keyInfo?.serviceInterest
+                    || ctx.service_interest
+                    || ctx.form_data?.business_type
+                    || ctx.form_data?.service
+                    || null
+                  const pp = summaryData?.keyInfo?.painPoints
+                    || ctx.pain_point
+                    || null
+                  if (!si && !pp) return null
+                  return (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {si && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium" style={{ background: 'rgba(99,102,241,0.12)', color: 'rgba(139,142,255,0.95)' }}>
+                          <MdOutlineInsights size={10} />
+                          {si}
+                        </span>
+                      )}
+                      {pp && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] max-w-[200px] truncate" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                          {pp}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Contact Info Section - Bottom */}
@@ -1054,12 +1404,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Email with icon */}
                 {currentLead.email && (
                   <div className="lead-contact-email flex items-center gap-1.5">
-                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <MdEmail className="text-gray-600 dark:text-gray-300" size={14} />
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdEmail className="text-[var(--text-secondary)]" size={14} />
                     </div>
                     <a
                       href={`mailto:${currentLead.email}`}
-                      className="lead-contact-email-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight truncate"
+                      className="lead-contact-email-link text-sm font-medium text-[var(--text-secondary)] leading-tight truncate"
                     >
                       {currentLead.email}
                     </a>
@@ -1069,12 +1419,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Phone with icon */}
                 {currentLead.phone && (
                   <div className="lead-contact-phone flex items-center gap-1.5">
-                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <MdPhone className="text-gray-600 dark:text-gray-300" size={14} />
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdPhone className="text-[var(--text-secondary)]" size={14} />
                     </div>
                     <a
                       href={`tel:${currentLead.phone}`}
-                      className="lead-contact-phone-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight"
+                      className="lead-contact-phone-link text-sm font-medium text-[var(--text-secondary)] leading-tight"
                     >
                       {currentLead.phone}
                     </a>
@@ -1082,7 +1432,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 )}
 
                 {!currentLead.email && !currentLead.phone && (
-                  <p className="lead-contact-empty text-sm text-gray-500 dark:text-gray-400">No contact info</p>
+                  <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
                 )}
               </address>
             </section>
@@ -1091,67 +1441,249 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <section className="lead-journey-stats-section flex-1 flex flex-col h-full gap-4">
               {/* Customer Journey - TOP */}
               <section className="lead-journey-section">
-                <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2 border-b border-transparent">Customer Journey</h3>
-                {activeChannels.length > 0 ? (
-                  <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
-                    {activeChannels.map((channel, index) => (
-                      <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
-                        <div
-                          className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
-                          style={{ backgroundColor: channel.color }}
-                          title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
-                          aria-label={`${channel.name} channel`}
-                        >
-                          <channel.icon size={14} />
+                <h3 className="lead-journey-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Customer Journey</h3>
+                <div className="lead-journey-row flex items-center gap-1.5">
+                  {activeChannels.length > 0 ? (
+                    <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
+                      {activeChannels.map((channel, index) => (
+                        <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
+                          <div
+                            className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
+                            style={{ backgroundColor: channel.color }}
+                            title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                            aria-label={`${channel.name} channel`}
+                          >
+                            <channel.icon size={14} />
+                          </div>
+                          {index < activeChannels.length - 1 && (
+                            <MdChevronRight className="lead-journey-separator text-[var(--text-muted)] flex-shrink-0" size={16} aria-hidden="true" />
+                          )}
                         </div>
-                        {index < activeChannels.length - 1 && (
-                          <MdChevronRight className="lead-journey-separator text-gray-400 dark:text-gray-500 flex-shrink-0" size={16} aria-hidden="true" />
-                        )}
+                      ))}
+                    </nav>
+                  ) : (
+                    <p className="lead-journey-empty text-xs text-[var(--text-muted)]">No channels yet</p>
+                  )}
+                </div>
+
+                {/* Inline admin note input */}
+                {showAdminNoteInput && (
+                  <div className="lead-admin-note-input flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <input
+                      type="text"
+                      value={adminNoteText}
+                      onChange={(e) => setAdminNoteText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && adminNoteText.trim()) handleSaveAdminNote()
+                      }}
+                      placeholder="Add context about this lead..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+                      autoFocus
+                      disabled={savingAdminNote}
+                    />
+                    <button
+                      onClick={toggleVoiceDictation}
+                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
+                      className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                        isListening
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                      title={isListening ? 'Stop dictation' : 'Voice dictation'}
+                      aria-label={isListening ? 'Stop voice dictation' : 'Start voice dictation'}
+                    >
+                      <MdMic size={14} />
+                    </button>
+                    <button
+                      onClick={handleSaveAdminNote}
+                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
+                      disabled={!adminNoteText.trim() || savingAdminNote}
+                      className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
+                      title="Save note"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* AI Classification Progress */}
+                {noteProgress.steps.length > 0 && (
+                  <div
+                    className="mt-2 p-2.5 rounded-lg border border-[var(--border-primary)] overflow-hidden"
+                    style={{
+                      background: 'var(--bg-primary)',
+                      opacity: noteProgress.visible ? 1 : 0,
+                      transition: 'opacity 0.3s ease',
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <MdAutoAwesome size={12} className="text-indigo-400 animate-pulse" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400">PROXe AI</span>
+                    </div>
+                    <div className="space-y-1">
+                      {noteProgress.steps.map((step, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-1.5"
+                          style={{
+                            animation: 'fadeSlideIn 0.3s ease forwards',
+                            animationDelay: `${i * 0.05}s`,
+                          }}
+                        >
+                          {step.done ? (
+                            step.text === 'Done' ? (
+                              <MdCheckCircle size={12} className="text-green-400 flex-shrink-0" />
+                            ) : step.text.startsWith('Error') ? (
+                              <MdClose size={12} className="text-red-400 flex-shrink-0" />
+                            ) : (
+                              <MdCheck size={12} className="text-emerald-400 flex-shrink-0" />
+                            )
+                          ) : (
+                            <div className="w-3 h-3 flex-shrink-0 flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                            </div>
+                          )}
+                          <span
+                            className={`text-[10px] ${
+                              step.text === 'Done'
+                                ? 'font-bold text-green-400'
+                                : step.text.startsWith('Classified as')
+                                  ? 'font-semibold text-[var(--text-primary)]'
+                                  : step.text.startsWith('Error')
+                                    ? 'font-medium text-red-400'
+                                    : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            {step.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <style>{`
+                      @keyframes fadeSlideIn {
+                        from { opacity: 0; transform: translateY(-4px); }
+                        to { opacity: 1; transform: translateY(0); }
+                      }
+                    `}</style>
+                  </div>
+                )}
+
+                {/* Log a Call form */}
+                {showLogCallForm && (
+                  <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <select
+                      value={logCallOutcome}
+                      onChange={(e) => setLogCallOutcome(e.target.value)}
+                      className="text-xs bg-transparent border border-[var(--border-primary)] rounded px-1.5 py-1 text-[var(--text-primary)] outline-none"
+                      disabled={savingLogCall}
+                    >
+                      <option value="Connected">Connected</option>
+                      <option value="No Answer">No Answer</option>
+                      <option value="Busy">Busy</option>
+                      <option value="Voicemail">Voicemail</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={logCallNotes}
+                      onChange={(e) => setLogCallNotes(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleLogCall()
+                      }}
+                      placeholder="Notes (optional)..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+                      disabled={savingLogCall}
+                    />
+                    <button
+                      onClick={handleLogCall}
+                      disabled={savingLogCall}
+                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      title="Save call log"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Send Message form */}
+                {showSendMessageForm && (
+                  <div className="lead-send-message-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <FaWhatsapp className="text-green-500 flex-shrink-0" size={14} />
+                    <input
+                      type="text"
+                      value={sendMessageText}
+                      onChange={(e) => setSendMessageText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && sendMessageText.trim()) handleSendMessage()
+                      }}
+                      placeholder="Type a WhatsApp message..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+                      autoFocus
+                      disabled={sendingMessage}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!sendMessageText.trim() || sendingMessage}
+                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      title="Send message"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Admin notes - 3-dot menu */}
+                {currentLead.unified_context?.admin_notes?.length > 0 && (
+                  <div className="relative inline-block mt-1">
+                    <button
+                      onClick={() => setShowAdminNotes(!showAdminNotes)}
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded"
+                      title={`${(currentLead.unified_context.admin_notes as any[]).length} admin notes`}
+                    >
+                      <MdMoreHoriz size={18} />
+                    </button>
+                    {showAdminNotes && (
+                      <div className="absolute left-0 top-6 z-50 w-64 max-h-48 overflow-y-auto bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-lg p-2 space-y-1.5">
+                        {(currentLead.unified_context.admin_notes as any[])
+                          .filter((note: any, idx: number, arr: any[]) =>
+                            arr.findIndex((n: any) => n.text === note.text && n.created_at === note.created_at) === idx
+                          )
+                          .slice().reverse().map((note: any, i: number) => (
+                          <div key={note.id || `${note.created_at}-${i}`} className="group text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
+                            <MdNote size={11} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                            <span className="flex-1">{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteAdminNote(note) }}
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
+                              title="Delete note"
+                            >
+                              <MdClose size={10} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </nav>
-                ) : (
-                  <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+                    )}
+                  </div>
                 )}
               </section>
 
               {/* Quick Stats - BELOW Journey (3 in a row) */}
               <section className="lead-quick-stats-section">
-                <h3 className="lead-quick-stats-title text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2 border-b border-transparent">Quick Stats</h3>
+                <h3 className="lead-quick-stats-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Quick Stats</h3>
                 <div className="lead-quick-stats-grid grid grid-cols-3 gap-2">
-                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#333333]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-400 font-medium">Messages</p>
-                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
+                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Messages</p>
+                    <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
                   </article>
-                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#333333]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-400 font-medium">Response Rate</p>
-                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
+                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)]">
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Response Rate</p>
+                    <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
                   </article>
                   <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${(() => {
-                    const bookingDate = currentLead.booking_date ||
-                      currentLead.unified_context?.web?.booking_date ||
-                      currentLead.unified_context?.web?.booking?.date ||
-                      currentLead.unified_context?.whatsapp?.booking_date ||
-                      currentLead.unified_context?.whatsapp?.booking?.date ||
-                      currentLead.unified_context?.voice?.booking_date ||
-                      currentLead.unified_context?.voice?.booking?.date ||
-                      currentLead.unified_context?.social?.booking_date ||
-                      currentLead.unified_context?.social?.booking?.date;
-                    const bookingTime = currentLead.booking_time ||
-                      currentLead.unified_context?.web?.booking_time ||
-                      currentLead.unified_context?.web?.booking?.time ||
-                      currentLead.unified_context?.whatsapp?.booking_time ||
-                      currentLead.unified_context?.whatsapp?.booking?.time ||
-                      currentLead.unified_context?.voice?.booking_time ||
-                      currentLead.unified_context?.voice?.booking?.time ||
-                      currentLead.unified_context?.social?.booking_time ||
-                      currentLead.unified_context?.social?.booking?.time;
-                    return bookingDate && bookingTime
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                      : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#333333]';
-                  })()
-                    }`}>
-                    <p className="lead-stat-label text-xs text-gray-400 dark:text-gray-400 font-medium">Key Event</p>
+                    const bd = currentLead.booking_date || currentLead.unified_context?.web?.booking_date || currentLead.unified_context?.web?.booking?.date || currentLead.unified_context?.whatsapp?.booking_date || currentLead.unified_context?.whatsapp?.booking?.date || currentLead.unified_context?.voice?.booking_date || currentLead.unified_context?.voice?.booking?.date || currentLead.unified_context?.social?.booking_date || currentLead.unified_context?.social?.booking?.date;
+                    const bt = currentLead.booking_time || currentLead.unified_context?.web?.booking_time || currentLead.unified_context?.web?.booking?.time || currentLead.unified_context?.whatsapp?.booking_time || currentLead.unified_context?.whatsapp?.booking?.time || currentLead.unified_context?.voice?.booking_time || currentLead.unified_context?.voice?.booking?.time || currentLead.unified_context?.social?.booking_time || currentLead.unified_context?.social?.booking?.time;
+                    return bd && bt ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)]' : 'bg-[var(--bg-primary)] border-[var(--border-primary)]';
+                  })()}`}>
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Key Event</p>
                     <div className="lead-stat-content mt-auto">
                       {(() => {
                         const bookingDate = currentLead.booking_date ||
@@ -1182,13 +1714,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               className="lead-booking-link flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Optionally navigate to calendar with date filter
                               }}
                               aria-label={`View booking on ${formattedDate} at ${formattedTime}`}
                             >
                               <div className="lead-booking-date flex items-center gap-1">
-                                <MdEvent className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={16} aria-hidden="true" />
-                                <time className="text-lg font-bold text-blue-700 dark:text-blue-300" dateTime={bookingDate}>
+                                <MdEvent className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={14} aria-hidden="true" />
+                                <time className="text-sm font-bold text-blue-700 dark:text-blue-300" dateTime={bookingDate}>
                                   {formattedDate}
                                 </time>
                               </div>
@@ -1199,7 +1730,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           );
                         }
                         return (
-                          <p className="lead-stat-empty text-2xl font-bold text-gray-500 dark:text-gray-400" aria-label="No key event">-</p>
+                          <p className="lead-stat-empty text-2xl font-bold text-[var(--text-muted)]" aria-label="No key event">-</p>
                         );
                       })()}
                     </div>
@@ -1208,16 +1739,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </section>
             </section>
 
-            {/* Close Button - Absolute positioned top right */}
-            <button
-              onClick={onClose}
-              className="lead-modal-close-button absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-              aria-label="Close lead details modal"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Action "+" Button - Absolute positioned top right */}
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={() => setShowActionDropdown(!showActionDropdown)}
+                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                aria-label="Quick actions"
+                aria-expanded={showActionDropdown}
+                aria-haspopup="true"
+              >
+                <MdAdd size={22} />
+              </button>
+              {showActionDropdown && (
+                <>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setShowActionDropdown(false)} aria-hidden="true" />
+                  <div className="absolute right-0 top-11 z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 w-44">
+                    <button
+                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowLogCallForm(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdCall size={16} className="text-green-500" /> Log a Call
+                    </button>
+                    <button
+                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowAdminNoteInput(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdNote size={16} className="text-blue-500" /> Add a Note
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Stage Dropdown */}
             {showStageDropdown && stageButtonRef.current && (
@@ -1228,7 +1780,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   aria-hidden="true"
                 />
                 <menu
-                  className="lead-stage-dropdown fixed z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]"
+                  className="lead-stage-dropdown fixed z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl p-2 w-[220px]"
                   style={{
                     top: `${stageButtonRef.current.getBoundingClientRect().bottom + 8}px`,
                     left: `${Math.max(8, stageButtonRef.current.getBoundingClientRect().right - 220)}px`,
@@ -1240,9 +1792,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}
-                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentStage === stage
+                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${currentStage === stage
                           ? getStageBadgeClass(stage) + ' font-semibold'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          : 'hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
                           }`}
                         style={currentStage === stage && stage === 'In Sequence' ? {
                           backgroundColor: 'var(--accent-subtle)',
@@ -1261,12 +1813,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           </header>
 
           {/* TABS */}
-          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0" role="tablist" aria-label="Lead details sections">
+          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'summary'}
@@ -1277,9 +1829,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('activity')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'activity'}
@@ -1290,9 +1842,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breakdown'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'breakdown'}
@@ -1303,9 +1855,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('interaction')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'interaction'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'interaction'}
@@ -1328,17 +1880,61 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 style={{ width: '70%', maxWidth: '840px' }}
               >
                 {loadingActivities ? (
-                  <div className="lead-activity-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                  <div className="lead-activity-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                     <div className="animate-pulse">Loading activities...</div>
                   </div>
                 ) : activities.length === 0 ? (
-                  <div className="lead-activity-empty text-sm text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="lead-activity-empty text-sm text-center py-8 text-[var(--text-muted)]">
                     No activities yet
                   </div>
                 ) : (
                   <ol className="lead-activity-list space-y-4" aria-label="Lead activity timeline">
-                    {activities.map((activity, index) => {
+                    {(() => {
+                      // Merge activities with task events for unified timeline
+                      const taskActivities: any[] = []
+                      leadTasks.forEach((task: any) => {
+                        // Task creation event
+                        taskActivities.push({
+                          id: `task-created-${task.id}`,
+                          type: 'proxe',
+                          actor: 'PROXe',
+                          action: `Created ${task.task_type?.replace(/_/g, ' ')} task`,
+                          content: task.task_description || null,
+                          timestamp: task.created_at,
+                          color: '#8B5CF6',
+                          _taskIcon: 'created',
+                        })
+                        // Task completion event
+                        if (task.status === 'completed' && task.completed_at) {
+                          taskActivities.push({
+                            id: `task-done-${task.id}`,
+                            type: 'proxe',
+                            actor: 'PROXe',
+                            action: task.metadata?.completed_action || `Sent ${task.task_type?.replace(/_/g, ' ')}`,
+                            channel: task.metadata?.channel || 'whatsapp',
+                            timestamp: task.completed_at,
+                            color: '#22C55E',
+                            _taskIcon: 'completed',
+                          })
+                        }
+                        // Task failure event
+                        if ((task.status === 'failed' || task.status === 'failed_24h_window') && task.completed_at) {
+                          taskActivities.push({
+                            id: `task-fail-${task.id}`,
+                            type: 'proxe',
+                            actor: 'PROXe',
+                            action: task.error_message || `${task.task_type?.replace(/_/g, ' ')} failed`,
+                            timestamp: task.completed_at,
+                            color: '#EF4444',
+                            _taskIcon: 'failed',
+                          })
+                        }
+                      })
+                      const merged = [...activities, ...taskActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                      return merged.map((activity, index) => {
                       const getActivityIcon = () => {
+                        if (activity._taskIcon === 'completed') return <MdCheckCircle size={18} />
+                        if (activity._taskIcon === 'failed') return <MdReportProblem size={18} />
                         if (activity.type === 'proxe') {
                           return <MdSmartToy size={18} />
                         } else if (activity.type === 'customer') {
@@ -1370,7 +1966,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             >
                               {Icon}
                             </div>
-                            {index < activities.length - 1 && (
+                            {index < merged.length - 1 && (
                               <div
                                 className="lead-activity-connector w-0.5 flex-1 mt-2"
                                 style={{ backgroundColor: color, opacity: 0.3 }}
@@ -1397,14 +1993,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
+                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
                                 {renderMarkdown(activity.content)}
                               </p>
                             ) : null}
 
                             <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                               <div className={`lead-activity-meta flex items-center gap-2 flex-1 min-w-0 ${isCustomer ? 'flex-row-reverse' : ''}`}>
-                                <h4 className="lead-activity-action text-sm font-semibold text-gray-900 dark:text-white">
+                                <h4 className="lead-activity-action text-sm font-semibold text-[var(--text-primary)]">
                                   {activity.action || 'Activity'}
                                 </h4>
                                 {activity.channel && (
@@ -1420,7 +2016,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   </span>
                                 )}
                               </div>
-                              <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-gray-400 dark:text-gray-500 flex-shrink-0" dateTime={activity.timestamp}>
+                              <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-[var(--text-muted)] flex-shrink-0" dateTime={activity.timestamp}>
                                 {formatDateTimeIST(activity.timestamp)}
                               </time>
                             </div>
@@ -1430,7 +2026,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </article>
                         </li>
                       )
-                    })}
+                    })})()}
                   </ol>
                 )}
               </section>
@@ -1447,8 +2043,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     aria-labelledby="lead-tab-summary"
                     className="lead-tabpanel-summary space-y-4"
                   >
-                    <article className="lead-summary-card p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                      <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-gray-900 dark:text-white">
+                    <article className="lead-summary-card p-3 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+                      <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-[var(--text-primary)]">
                         <div className="flex items-center gap-1.5">
                           <MdAutoAwesome size={14} className="text-blue-500" aria-hidden="true" />
                           Summary
@@ -1456,7 +2052,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         <button
                           onClick={() => loadUnifiedSummary(true)}
                           disabled={loadingSummary}
-                          className="p-0.5 px-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition-colors flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-0.5 px-1.5 hover:bg-[var(--bg-hover)] rounded-full transition-colors flex items-center gap-1 text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: 'var(--accent-primary)' }}
                           title="Regenerate summary"
                         >
                           <MdRefresh size={12} className={loadingSummary ? 'animate-spin' : ''} />
@@ -1464,7 +2060,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </button>
                       </h3>
                       {loadingSummary && !unifiedSummary ? (
-                        <div className="lead-summary-loading-state text-xs text-gray-500 dark:text-gray-400 py-1" aria-live="polite">
+                        <div className="lead-summary-loading-state text-xs text-[var(--text-muted)] py-1" aria-live="polite">
                           <div className="animate-pulse flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
                             Loading summary...
@@ -1473,10 +2069,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       ) : (
                         <div className={`lead-summary-content transition-opacity ${loadingSummary ? 'opacity-60' : 'opacity-100'}`}>
                           <div className="lead-summary-text mb-2">
-                            {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-gray-500">No summary available. Click Refresh to generate one.</p>}
+                            {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-[var(--text-muted)]">No summary available. Click Refresh to generate one.</p>}
                           </div>
                           {summaryAttribution && (
-                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-gray-400 dark:text-gray-400">
+                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-[var(--border-primary)] text-[var(--text-muted)]">
                               {summaryAttribution}
                             </footer>
                           )}
@@ -1484,8 +2080,72 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )}
                     </article>
 
-                    {/* Compact Intelligence Insights - Inline to save scroll space */}
-                    <article className="lead-intelligence-insights p-4 rounded-xl bg-gray-50/30 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+                    {/* Next Actions */}
+                    <section className="lead-next-actions mt-4">
+                      <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-[var(--text-primary)]">
+                        <MdSchedule size={14} className="text-orange-500" />
+                        Next Actions
+                      </h3>
+                      {loadingTasks ? (
+                        <div className="text-xs text-[var(--text-muted)] animate-pulse py-2">Loading tasks...</div>
+                      ) : (() => {
+                        const pendingTasks = leadTasks.filter(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                        if (pendingTasks.length === 0) {
+                          return (
+                            <p className="text-xs text-[var(--text-muted)] py-2 italic">
+                              No actions scheduled. Add a note to trigger next steps.
+                            </p>
+                          )
+                        }
+                        return (
+                          <div className="space-y-2">
+                            {pendingTasks.map((task: any) => {
+                              const typeConfig = getTaskTypeConfig(task.task_type)
+                              const actionLabel = getTaskActionLabel(task)
+                              const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
+                              return (
+                                <div key={task.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] group">
+                                  <span
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 mt-0.5"
+                                    style={{ color: typeConfig.color, backgroundColor: typeConfig.bg }}
+                                  >
+                                    {typeConfig.label}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{actionLabel}</p>
+                                    {task.scheduled_at && (
+                                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                        <MdSchedule size={11} className="inline mr-0.5 -mt-0.5" />
+                                        {formatCountdown(task.scheduled_at)}
+                                      </p>
+                                    )}
+                                    {reason && (
+                                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{reason}</p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleCancelTask(task.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
+                                    title="Cancel task"
+                                  >
+                                    <MdClose size={14} />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </section>
+
+                    {/* Compact Intelligence Insights - Only render when data exists */}
+                    {(() => {
+                      const hasKeyInfo = summaryData?.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints)
+                      const brandProfileCheck = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {}
+                      const hasProfile = Object.keys(brandProfileCheck).length > 0
+                      if (!hasKeyInfo && !hasProfile) return null
+                      return (
+                    <article className="lead-intelligence-insights p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
                       <div className="flex flex-col gap-6">
                         {/* Buying Signals Group */}
                         {summaryData && summaryData.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints) && (
@@ -1501,8 +2161,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdAccountBalanceWallet size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Budget</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white">{summaryData.keyInfo.budget}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Budget</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)]">{summaryData.keyInfo.budget}</p>
                                   </div>
                                 </div>
                               )}
@@ -1512,8 +2172,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdOutlineInsights size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Interest</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white">{summaryData.keyInfo.serviceInterest}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Interest</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)]">{summaryData.keyInfo.serviceInterest}</p>
                                   </div>
                                 </div>
                               )}
@@ -1523,8 +2183,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdReportProblem size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Pain Point</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white max-w-[200px] truncate">{summaryData.keyInfo.painPoints}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Pain Point</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)] max-w-[200px] truncate">{summaryData.keyInfo.painPoints}</p>
                                   </div>
                                 </div>
                               )}
@@ -1534,7 +2194,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                         {/* Divider Line */}
                         {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
-                          <div className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
+                          <div className="h-px bg-[var(--border-primary)] w-full" />
                         )}
 
                         {/* Lead Profile Group */}
@@ -1545,41 +2205,41 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                           return (
                             <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.2em]">
                                 <MdPersonOutline size={12} />
                                 Lead Profile
                               </h4>
                               <div className="flex flex-wrap gap-x-8 gap-y-3">
                                 {brandProfileData.user_type && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdPerson size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.user_type}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Type</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.user_type}</p>
                                     </div>
                                   </div>
                                 )}
                                 {brandProfileData.course_interest && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdFlightTakeoff size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.course_interest}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Course</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.course_interest}</p>
                                     </div>
                                   </div>
                                 )}
                                 {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchedule size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Timeline</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200">
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Timeline</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)]">
                                         {(() => {
                                           const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
                                           const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
@@ -1591,12 +2251,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 )}
                                 {brandProfileData.education && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchool size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.education.replace('_', ' ')}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Edu</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.education.replace('_', ' ')}</p>
                                     </div>
                                   </div>
                                 )}
@@ -1606,6 +2266,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         })()}
                       </div>
                     </article>
+                      )
+                    })()}
+
+                    {/* Next step one-liner */}
+                    {(() => {
+                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                      if (!firstPending) return null
+                      const actionLabel = getTaskActionLabel(firstPending)
+                      const countdown = firstPending.scheduled_at ? formatCountdown(firstPending.scheduled_at) : ''
+                      return (
+                        <p className="text-xs text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border-primary)] flex items-center gap-1.5">
+                          <MdFlashOn size={13} className="text-orange-500 flex-shrink-0" />
+                          <span><strong className="text-[var(--text-primary)]">Next:</strong> {actionLabel} {countdown ? countdown.toLowerCase() : ''}{firstPending.metadata?.next_action_reason ? ` — ${firstPending.metadata.next_action_reason}` : ''}</span>
+                        </p>
+                      )
+                    })()}
                   </section>
                 )}
 
@@ -1618,65 +2294,81 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     className="lead-tabpanel-breakdown space-y-5"
                   >
                     {calculatedScore ? (
-                      <>
-                        {/* Score Header */}
-                        <div className="space-y-1">
+                      <div className="space-y-4">
+                        {/* Score headline + Temperature badge */}
+                        <div>
                           <div className="flex items-baseline gap-2">
-                            <p className="text-5xl font-extrabold leading-none" style={{ color: 'var(--text-primary)' }}>
-                              {calculatedScore.score}<span className="text-2xl" style={{ color: 'var(--text-muted)' }}>/100</span>
-                            </p>
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${healthColor.bg}20`, color: healthColor.text }}>
-                              {healthColor.label}
-                            </span>
+                            <span className="text-3xl font-extrabold text-[var(--text-primary)]">{calculatedScore.score}/100</span>
+                            <span className="text-sm font-bold" style={{ color: healthColor.text }}>{healthColor.label}</span>
+                            {(() => {
+                              const temp = currentLead.unified_context?.lead_temperature
+                              if (!temp) return null
+                              const tempConfig: Record<string, { color: string; bg: string; label: string }> = {
+                                hot:  { color: '#DC2626', bg: 'rgba(220,38,38,0.12)', label: 'HOT' },
+                                warm: { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'WARM' },
+                                cool: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'COOL' },
+                                cold: { color: '#6B7280', bg: 'rgba(107,114,128,0.12)', label: 'COLD' },
+                              }
+                              const cfg = tempConfig[temp] || tempConfig.warm
+                              return (
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                                  style={{ color: cfg.color, backgroundColor: cfg.bg }}
+                                >
+                                  {temp === 'hot' ? '🔥' : temp === 'warm' ? '🟠' : temp === 'cool' ? '🔵' : '⚪'} {cfg.label}
+                                </span>
+                              )
+                            })()}
                           </div>
-                          <p className="text-sm max-w-md" style={{ color: 'var(--text-muted)' }}>
-                            This score reflects the lead&#39;s overall quality based on behavioral data, channel engagement, and explicit intent signals.
-                          </p>
+                          <p className="text-xs text-[var(--text-muted)] mt-1">Based on conversation activity and intent signals</p>
                         </div>
 
                         {/* Radar Chart */}
-                        <div style={{ width: '100%', height: 300 }}>
+                        <div style={{ width: '100%', height: 260 }}>
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={[
                               { axis: 'Intent', value: calculatedScore.breakdown.details.intentScore },
                               { axis: 'Buying Signals', value: calculatedScore.breakdown.details.buyingScore },
                               { axis: 'Sentiment', value: calculatedScore.breakdown.details.sentimentScore },
-                              { axis: 'Activity', value: Math.round(calculatedScore.breakdown.activity / 30 * 100) },
                               { axis: 'Response Rate', value: calculatedScore.breakdown.details.responseRate },
                               { axis: 'Recency', value: Math.max(0, 100 - calculatedScore.breakdown.details.daysInactive * 10) },
                             ]}>
                               <PolarGrid stroke="var(--border-primary)" />
-                              <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                              <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
                               <Radar dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
                             </RadarChart>
                           </ResponsiveContainer>
                         </div>
 
-                        {/* Compact Stat Cards */}
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>AI Analysis</p>
-                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
-                              {calculatedScore.breakdown.ai}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/60</span>
-                            </p>
+                        {/* Temperature History Timeline */}
+                        {currentLead.unified_context?.temperature_history?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">Temperature History</p>
+                            <div className="flex items-center gap-0.5 overflow-x-auto pb-1">
+                              {(currentLead.unified_context.temperature_history as Array<{temperature: string; timestamp: string; reason: string}>).slice(-15).map((entry: {temperature: string; timestamp: string; reason: string}, i: number) => {
+                                const dotColor = entry.temperature === 'hot' ? '#DC2626' : entry.temperature === 'warm' ? '#F97316' : entry.temperature === 'cool' ? '#3B82F6' : '#6B7280'
+                                const time = new Date(entry.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                return (
+                                  <div key={i} className="flex flex-col items-center group relative" title={`${entry.temperature}: ${entry.reason}\n${time}`}>
+                                    <div
+                                      className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer transition-transform group-hover:scale-150"
+                                      style={{ backgroundColor: dotColor }}
+                                    />
+                                    {i < (currentLead.unified_context.temperature_history as Array<any>).slice(-15).length - 1 && (
+                                      <div className="w-3 h-px bg-[var(--border-secondary)]" />
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
-                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Active Engagement</p>
-                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
-                              {calculatedScore.breakdown.activity}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/30</span>
-                            </p>
-                          </div>
-                          <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                            <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Business Logic</p>
-                            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
-                              {calculatedScore.breakdown.business}<span className="text-sm" style={{ color: 'var(--text-muted)' }}>/10</span>
-                            </p>
-                          </div>
-                        </div>
-                      </>
+                        )}
+
+
+                      </div>
                     ) : (
-                      <div className="text-center py-20 animate-pulse text-gray-400">
-                        Analyzing intelligence signals...
+                      <div className="text-center py-20 animate-pulse text-[var(--text-muted)]">
+                        Analyzing...
                       </div>
                     )}
                   </section>
@@ -1691,7 +2383,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     className="lead-tabpanel-interaction space-y-4"
                   >
                     {loading30Days ? (
-                      <div className="lead-interaction-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                      <div className="lead-interaction-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                         <div className="animate-pulse">Loading interaction data...</div>
                       </div>
                     ) : interaction30Days ? (
@@ -1706,34 +2398,34 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </p>
                               <span className="text-xs font-semibold text-blue-600/60 dark:text-blue-400/60 uppercase">Interactions</span>
                             </div>
-                            <p className="lead-interaction-total-label text-[10px] text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-medium">First 30 days activity</p>
+                            <p className="lead-interaction-total-label text-[10px] text-[var(--text-muted)] mt-1 uppercase tracking-wider font-medium">First 30 days activity</p>
                           </article>
 
                           <div className="grid grid-cols-1 gap-3">
                             {/* Lead In Day */}
-                            <article className="lead-interaction-lead-in p-3 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-100 dark:border-gray-800 shadow-sm">
-                              <p className="lead-interaction-label text-[10px] text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider font-bold">Contact Created</p>
-                              <p className="lead-interaction-value text-sm font-semibold text-gray-900 dark:text-white">
+                            <article className="lead-interaction-lead-in p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm">
+                              <p className="lead-interaction-label text-[10px] text-[var(--text-muted)] mb-1 uppercase tracking-wider font-bold">Contact Created</p>
+                              <p className="lead-interaction-value text-sm font-semibold text-[var(--text-primary)]">
                                 {interaction30Days.leadInDay || 'Unknown'}
                               </p>
                             </article>
 
                             {/* Last Touch Day */}
-                            <article className="lead-interaction-last-touch p-3 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-100 dark:border-gray-800 shadow-sm">
-                              <p className="lead-interaction-label text-[10px] text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider font-bold">Latest Touchpoint</p>
-                              <p className="lead-interaction-value text-sm font-semibold text-gray-900 dark:text-white">
+                            <article className="lead-interaction-last-touch p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm">
+                              <p className="lead-interaction-label text-[10px] text-[var(--text-muted)] mb-1 uppercase tracking-wider font-bold">Latest Touchpoint</p>
+                              <p className="lead-interaction-value text-sm font-semibold text-[var(--text-primary)]">
                                 {interaction30Days.lastTouchDay || 'No interactions yet'}
                               </p>
                             </article>
                           </div>
 
                           <div className="interaction-legend pt-4">
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mb-2">Legend</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold mb-2">Legend</p>
                             <div className="flex items-center gap-2">
                               {[0.08, 0.5, 0.85, 1.0].map((op, i) => (
                                 <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--accent-primary)', opacity: op }}></div>
                               ))}
-                              <span className="text-[10px] text-gray-500 ml-1">Low → High Activity</span>
+                              <span className="text-[10px] text-[var(--text-muted)] ml-1">Low → High Activity</span>
                             </div>
                           </div>
                         </section>
@@ -1803,8 +2495,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             return (
                               <div className="lead-calendar-container flex flex-col gap-1">
                                 {/* Calendar Title */}
-                                <div className="lead-calendar-title mb-4 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg flex items-center justify-between">
-                                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">{startMonth}</p>
+                                <div className="lead-calendar-title mb-4 bg-[var(--bg-secondary)] p-2 rounded-lg flex items-center justify-between">
+                                  <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">{startMonth}</p>
                                   <div className="flex gap-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
                                     <span className="text-[8px] font-bold text-blue-500 uppercase">Live Journey</span>
@@ -1812,9 +2504,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 </div>
 
                                 {/* Day labels row at top */}
-                                <div className="lead-calendar-header grid grid-cols-7 gap-3 mb-3 border-b border-gray-100 dark:border-gray-800 pb-2" role="row">
+                                <div className="lead-calendar-header grid grid-cols-7 gap-3 mb-3 border-b border-[var(--border-primary)] pb-2" role="row">
                                   {dayNames.map((dayName, index) => (
-                                    <div key={index} className="lead-calendar-day-label text-center text-[10px] text-gray-400 dark:text-gray-500 font-bold" role="columnheader">
+                                    <div key={index} className="lead-calendar-day-label text-center text-[10px] text-[var(--text-muted)] font-bold" role="columnheader">
                                       {dayName}
                                     </div>
                                   ))}
@@ -1880,7 +2572,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </section>
                       </div>
                     ) : (
-                      <div className="lead-interaction-empty text-sm text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="lead-interaction-empty text-sm text-center py-4 text-[var(--text-muted)]">
                         No interaction data available
                       </div>
                     )}
@@ -1889,6 +2581,40 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               </div>
             )}
           </main>
+
+          {/* Footer with Delete Lead button */}
+          <footer className="lead-modal-footer flex items-center justify-between px-4 py-3 border-t border-[var(--border-primary)] flex-shrink-0">
+            <button
+              onClick={async () => {
+                if (!lead?.id) return;
+                if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
+                
+                try {
+                  const response = await fetch(`/api/dashboard/leads?id=${lead.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete lead');
+                  }
+                  
+                  onClose();
+                  // Refresh the page to update lead list
+                  window.location.reload();
+                } catch (err: any) {
+                  alert(err.message || 'Failed to delete lead');
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+            >
+              Delete Lead
+            </button>
+            <div className="text-[10px] text-[var(--text-muted)]">
+              ID: {lead?.id?.slice(0, 8)}...
+            </div>
+          </footer>
         </dialog>
       </div>
 

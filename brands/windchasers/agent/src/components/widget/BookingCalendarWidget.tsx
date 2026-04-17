@@ -74,7 +74,6 @@ export function BookingCalendarWidget({
     name: prefillName || '',
     email: prefillEmail || '',
     phone: cleanPhoneNumber(prefillPhone),
-    sessionType: '' as 'online' | 'offline' | '',
   });
   useEffect(() => {
     setFormData((prev) => {
@@ -225,17 +224,20 @@ export function BookingCalendarWidget({
       return;
     }
 
-    // Require session type selection
-    if (!formData.sessionType) {
-      setBookingError('Please select session type (Online or Facility Visit)');
-      return;
-    }
-
     setBookingError(null);
     setIsWarning(false);
 
     try {
       const dateStr = formatDateForAPI(selectedDate);
+      
+      console.log('[BookingCalendar] Creating booking:', {
+        date: dateStr,
+        time: selectedTime,
+        name: formData.name,
+        email: formData.email,
+        hasSessionId: !!sessionId,
+        hasBrand: !!brand,
+      });
 
       const response = await fetch(getApiUrl('/api/agent/calendar/book'), {
         method: 'POST',
@@ -248,7 +250,7 @@ export function BookingCalendarWidget({
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          sessionType: formData.sessionType,
+
           ...(sessionId && { sessionId }),
           ...(brand && { brand }),
         }),
@@ -371,10 +373,10 @@ export function BookingCalendarWidget({
     const startStr = formatGoogleDate(startDate);
     const endStr = formatGoogleDate(endDate);
 
-    const eventTitle = config?.name ? `${config.name} Consultation` : 'Aviation Consultation';
+    const eventTitle = config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit';
     const title = encodeURIComponent(eventTitle);
     const details = encodeURIComponent(`Consultation Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
-    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)');
+    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)');
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
   };
@@ -404,17 +406,17 @@ export function BookingCalendarWidget({
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Windchasers//Booking Calendar//EN',
+      'PRODID:-//BCON//Booking Calendar//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      `UID:${Date.now()}@windchasers.in`,
+      `UID:${Date.now()}@bconclub.com`,
       `DTSTAMP:${nowStr}`,
       `DTSTART:${startStr}`,
       `DTEND:${endStr}`,
-      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'Aviation Consultation'}`,
+      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit'}`,
       `DESCRIPTION:Consultation Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
-      `LOCATION:${formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)'}`,
+      `LOCATION:${formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)'}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',
@@ -537,62 +539,6 @@ export function BookingCalendarWidget({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="sessionType" style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
-                Session Type <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  padding: '10px 16px',
-                  border: `2px solid ${formData.sessionType === 'online' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '8px',
-                  backgroundColor: formData.sessionType === 'online' ? '#eff6ff' : 'transparent',
-                  transition: 'all 0.2s',
-                  flex: '1',
-                  minWidth: '120px'
-                }}>
-                  <input
-                    type="radio"
-                    id="sessionType-online"
-                    name="sessionType"
-                    value="online"
-                    checked={formData.sessionType === 'online'}
-                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
-                    style={{ marginRight: '8px' }}
-                    required
-                  />
-                  <span>Online Session</span>
-                </label>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  padding: '10px 16px',
-                  border: `2px solid ${formData.sessionType === 'offline' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '8px',
-                  backgroundColor: formData.sessionType === 'offline' ? '#eff6ff' : 'transparent',
-                  transition: 'all 0.2s',
-                  flex: '1',
-                  minWidth: '120px'
-                }}>
-                  <input
-                    type="radio"
-                    id="sessionType-offline"
-                    name="sessionType"
-                    value="offline"
-                    checked={formData.sessionType === 'offline'}
-                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
-                    style={{ marginRight: '8px' }}
-                    required
-                  />
-                  <span>Facility Visit</span>
-                </label>
-              </div>
-            </div>
-
             <div className={styles.formActions}>
               <button
                 type="button"
@@ -633,73 +579,94 @@ export function BookingCalendarWidget({
       )}
 
       <div className={styles.calendarLayout}>
-        {/* Calendar Section */}
-        <div className={styles.calendarSection}>
-          <div className={styles.calendarHeader}>
-            <button onClick={() => navigateMonth('prev')} className={styles.navButton}>
-              ←
-            </button>
-            <span className={styles.monthYear}>{currentMonth}</span>
-            <button onClick={() => navigateMonth('next')} className={styles.navButton}>
-              →
-            </button>
-          </div>
-
-          <div className={styles.monthGrid}>
-            <div className={styles.monthDaysHeader}>
-              {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
-                <div key={day} className={styles.monthDayHeader}>{day}</div>
-              ))}
+        {!selectedDate ? (
+          <div className={styles.calendarSection}>
+            <div className={styles.calendarHeader}>
+              <button onClick={() => navigateMonth('prev')} className={styles.navButton}>
+                ←
+              </button>
+              <span className={styles.monthYear}>{currentMonth}</span>
+              <button onClick={() => navigateMonth('next')} className={styles.navButton}>
+                →
+              </button>
             </div>
-            <div className={styles.monthDaysGrid}>
-              {monthDays.map((day, index) => {
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const isToday = day.toDateString() === new Date().toDateString();
-                const isSelected = selectedDate?.toDateString() === day.toDateString();
-                const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
-                const isSunday = day.getDay() === 0;
 
-                return (
+            <div className={styles.monthGrid}>
+              <div className={styles.monthDaysHeader}>
+                {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
+                  <div key={day} className={styles.monthDayHeader}>{day}</div>
+                ))}
+              </div>
+              <div className={styles.monthDaysGrid}>
+                {monthDays.map((day, index) => {
+                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                  const isToday = day.toDateString() === new Date().toDateString();
+                  const isSelected = selectedDate?.toDateString() === day.toDateString();
+                  const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+                  const isSunday = day.getDay() === 0;
+
+                  return (
+                    <button
+                      key={index}
+                      className={`${styles.monthDateButton} ${!isCurrentMonth ? styles.monthDateOther : ''} ${isToday ? styles.dateToday : ''} ${isSelected ? styles.dateSelected : ''} ${isPast || isSunday ? styles.datePast : ''}`}
+                      onClick={() => handleDateClick(day)}
+                      disabled={isPast || !isCurrentMonth || isSunday}
+                      title={isSunday ? 'Sundays are unavailable' : ''}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.timeSlotsSection}>
+            <div className={styles.stepHeader}>
+              <button
+                type="button"
+                className={styles.stepBackButton}
+                onClick={() => {
+                  setSelectedDate(null);
+                  setSelectedTime(null);
+                  setShowTimeSlots(false);
+                  setBookingError(null);
+                }}
+              >
+                ← Back to dates
+              </button>
+              <span className={styles.selectedDateLabel}>
+                {selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </span>
+            </div>
+            <h3 className={styles.timeSlotsTitle}>Time</h3>
+            {loadingAvailability ? (
+              <div className={styles.loadingText}>Checking availability...</div>
+            ) : showTimeSlots ? (
+              <div className={styles.timeSlotsList}>
+                {timeSlots.map((slot) => (
                   <button
-                    key={index}
-                    className={`${styles.monthDateButton} ${!isCurrentMonth ? styles.monthDateOther : ''} ${isToday ? styles.dateToday : ''} ${isSelected ? styles.dateSelected : ''} ${isPast || isSunday ? styles.datePast : ''}`}
-                    onClick={() => handleDateClick(day)}
-                    disabled={isPast || !isCurrentMonth || isSunday}
-                    title={isSunday ? 'Sundays are unavailable' : ''}
+                    key={slot.time}
+                    className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
+                    onClick={() => handleTimeClick(slot.time)}
+                    disabled={!slot.available}
+                    title={!slot.available ? 'This slot is already booked' : ''}
                   >
-                    {day.getDate()}
+                    {slot.displayTime}
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.timeSlotsPlaceholder}>
+                Select a date to see available times
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Time Slots Section */}
-        <div className={styles.timeSlotsSection}>
-          <h3 className={styles.timeSlotsTitle}>Time</h3>
-          {loadingAvailability ? (
-            <div className={styles.loadingText}>Checking availability...</div>
-          ) : selectedDate ? (
-            <div className={styles.timeSlotsList}>
-              {timeSlots.map((slot) => (
-                <button
-                  key={slot.time}
-                  className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
-                  onClick={() => handleTimeClick(slot.time)}
-                  disabled={!slot.available}
-                  title={!slot.available ? 'This slot is already booked' : ''}
-                >
-                  {slot.displayTime}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className={styles.timeSlotsPlaceholder}>
-              Select a date to see available times
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ export default function WidgetLayout({
   children: React.ReactNode
 }) {
   const brand = getCurrentBrandId()
-  const theme = brandThemeMap[brand] || 'aviation-gold'
+  const theme = brandThemeMap[brand] || 'bcon-electric'
 
   return (
     <div

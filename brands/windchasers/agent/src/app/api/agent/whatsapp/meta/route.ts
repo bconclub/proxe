@@ -1,15 +1,15 @@
 /**
  * Meta Cloud API WhatsApp Webhook
- * GET  /api/agent/whatsapp/meta — Webhook verification (hub.challenge)
- * POST /api/agent/whatsapp/meta — Incoming messages from Meta
+ * GET  /api/agent/whatsapp/meta - Webhook verification (hub.challenge)
+ * POST /api/agent/whatsapp/meta - Incoming messages from Meta
  *
  * Bridges Meta's webhook format into the PROXe unified agent engine.
  * Each brand deployment has its own Meta app, phone number, and env vars.
  *
  * Required env vars:
- *   META_WHATSAPP_VERIFY_TOKEN      — custom string set in Meta Developer Console
- *   META_WHATSAPP_ACCESS_TOKEN      — permanent Graph API token
- *   META_WHATSAPP_PHONE_NUMBER_ID   — WhatsApp Business phone number ID
+ *   META_WHATSAPP_VERIFY_TOKEN      - custom string set in Meta Developer Console
+ *   META_WHATSAPP_ACCESS_TOKEN      - permanent Graph API token
+ *   META_WHATSAPP_PHONE_NUMBER_ID   - WhatsApp Business phone number ID
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -51,14 +51,14 @@ function isMessageAlreadyProcessed(messageId: string): boolean {
 
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
 
-/** Send a text reply back to the customer via Meta Graph API */
-async function sendWhatsAppReply(to: string, message: string): Promise<boolean> {
+/** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
+async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
     console.error('[meta/webhook] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
-    return false;
+    return null;
   }
 
   try {
@@ -80,13 +80,14 @@ async function sendWhatsAppReply(to: string, message: string): Promise<boolean> 
     if (!res.ok) {
       const err = await res.text();
       console.error('[meta/webhook] Graph API error:', res.status, err);
-      return false;
+      return null;
     }
 
-    return true;
+    const data = await res.json();
+    return data?.messages?.[0]?.id || null;
   } catch (err) {
     console.error('[meta/webhook] Failed to send reply:', err);
-    return false;
+    return null;
   }
 }
 
@@ -110,7 +111,7 @@ async function markAsRead(messageId: string): Promise<void> {
   }).catch((err) => console.error('[meta/webhook] markAsRead failed:', err));
 }
 
-// ─── GET — Webhook Verification ───────────────────────────────────────────────
+// ─── GET - Webhook Verification ───────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || 'windchasers-proxe-verify';
+  const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || 'bcon-proxe-verify';
 
   if (mode === 'subscribe' && token === verifyToken) {
     console.log('[meta/webhook] Verification successful');
@@ -129,10 +130,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 });
 }
 
-// ─── POST — Incoming Messages ─────────────────────────────────────────────────
+// ─── POST - Incoming Messages ─────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  // Always respond 200 quickly — Meta retries on non-2xx
+  // Always respond 200 quickly - Meta retries on non-2xx
   // We process the message synchronously here since Meta gives us ~30s
   try {
     const body = await request.json();
@@ -150,8 +151,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'no_value' }, { status: 200 });
     }
 
-    // Skip status updates (delivered, read, etc.)
+    // Handle status updates (delivered, read receipts)
     if (value.statuses && !value.messages) {
+      await handleStatusUpdates(value.statuses);
       return NextResponse.json({ status: 'status_update' }, { status: 200 });
     }
 
@@ -161,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contacts = value.contacts || [];
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
     // Process each message (usually just one)
     for (const msg of messages) {
@@ -207,6 +209,165 @@ export async function POST(request: NextRequest) {
     console.error('[meta/webhook] Error:', error);
     // Still return 200 to prevent Meta from retrying
     return NextResponse.json({ status: 'error' }, { status: 200 });
+  }
+}
+
+// ─── Channel Performance Tracking ─────────────────────────────────────────────
+
+async function updateChannelPerformance(
+  supabase: any,
+  leadId: string,
+  channel: string,
+  event: 'sent' | 'read' | 'response',
+  responseTimeSec?: number,
+): Promise<void> {
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (!lead) return;
+
+    const ctx = lead.unified_context || {};
+    const perf = ctx.channel_performance || {};
+    const ch = perf[channel] || {
+      messages_sent: 0,
+      messages_read: 0,
+      responses_received: 0,
+      avg_response_time: null,
+      last_successful_contact: null,
+    };
+
+    if (event === 'sent') {
+      ch.messages_sent = (ch.messages_sent || 0) + 1;
+    } else if (event === 'read') {
+      ch.messages_read = (ch.messages_read || 0) + 1;
+    } else if (event === 'response') {
+      ch.responses_received = (ch.responses_received || 0) + 1;
+      ch.last_successful_contact = new Date().toISOString();
+      if (responseTimeSec != null && responseTimeSec > 0) {
+        const prevAvg = ch.avg_response_time || responseTimeSec;
+        const prevCount = Math.max((ch.responses_received || 1) - 1, 1);
+        ch.avg_response_time = Math.round((prevAvg * prevCount + responseTimeSec) / (prevCount + 1));
+      }
+    }
+
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...ctx,
+          channel_performance: { ...perf, [channel]: ch },
+        },
+      })
+      .eq('id', leadId);
+  } catch (err) {
+    console.error(`[meta/channelPerf] Failed to update ${channel}/${event} for ${leadId}:`, err);
+  }
+}
+
+// ─── Read Receipt / Delivery Status Handling ──────────────────────────────────
+
+async function handleStatusUpdates(statuses: any[]): Promise<void> {
+  const supabase = getServiceClient() || getClient();
+  if (!supabase) return;
+
+  for (const status of statuses) {
+    const waMessageId = status.id;
+    const statusType = status.status; // 'delivered', 'read', 'sent', 'failed'
+    const timestamp = status.timestamp;
+    const recipientId = status.recipient_id;
+
+    if (!waMessageId || !statusType) continue;
+    if (!['sent', 'delivered', 'read', 'failed'].includes(statusType)) continue;
+
+    try {
+      // Find the conversation record by WA message ID stored in metadata
+      const { data: msg } = await supabase
+        .from('conversations')
+        .select('id, lead_id, metadata')
+        .filter('metadata->>wa_message_id', 'eq', waMessageId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!msg) {
+        console.log(`[meta/status] No conversation found for wa_message_id ${waMessageId}`);
+        continue;
+      }
+
+      const statusTime = timestamp
+        ? new Date(parseInt(timestamp) * 1000).toISOString()
+        : new Date().toISOString();
+
+      if (statusType === 'read') {
+        await supabase
+          .from('conversations')
+          .update({
+            read_at: statusTime,
+            metadata: { ...msg.metadata, delivery_status: 'read', read_at: statusTime },
+          })
+          .eq('id', msg.id);
+
+        // Also update lead's unified_context.last_read_at
+        if (msg.lead_id) {
+          const { data: lead } = await supabase
+            .from('all_leads')
+            .select('unified_context')
+            .eq('id', msg.lead_id)
+            .maybeSingle();
+
+          if (lead) {
+            await supabase
+              .from('all_leads')
+              .update({
+                unified_context: {
+                  ...(lead.unified_context || {}),
+                  last_read_at: new Date().toISOString(),
+                },
+              })
+              .eq('id', msg.lead_id);
+          }
+        }
+
+        if (msg.lead_id) {
+          updateChannelPerformance(supabase, msg.lead_id, 'whatsapp', 'read');
+        }
+
+        console.log(`[meta/status] READ receipt: msg ${msg.id} read at ${statusTime}`);
+      } else if (statusType === 'delivered') {
+        await supabase
+          .from('conversations')
+          .update({
+            delivered_at: statusTime,
+            metadata: { ...msg.metadata, delivery_status: 'delivered', delivered_at: statusTime },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] DELIVERED receipt: msg ${msg.id} at ${statusTime}`);
+      } else if (statusType === 'sent') {
+        await supabase
+          .from('conversations')
+          .update({
+            metadata: { ...msg.metadata, delivery_status: 'sent' },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] SENT receipt: msg ${msg.id}`);
+      } else if (statusType === 'failed') {
+        const errorMsg = status.errors?.[0]?.message || status.errors?.[0]?.title || 'unknown error';
+        await supabase
+          .from('conversations')
+          .update({
+            metadata: { ...msg.metadata, delivery_status: 'failed', delivery_error: errorMsg },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] FAILED receipt: msg ${msg.id} error: ${errorMsg}`);
+      }
+    } catch (err) {
+      console.error(`[meta/status] Error processing ${statusType} for ${waMessageId}:`, err);
+    }
   }
 }
 
@@ -320,6 +481,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       supabase,
     );
 
+    // Track channel performance: customer responded on WhatsApp
+    updateChannelPerformance(supabase, leadId, 'whatsapp', 'response').catch(() => {});
+
     // 4. Fetch cross-channel context
     const customerContext = await fetchCustomerContext(customerPhone, customerName, supabase);
 
@@ -366,7 +530,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 8. Log AI response (with response time for dashboard metrics)
+    // 8. Send reply via Meta Graph API (send first to get WA message ID)
+    const waReplyId = await sendWhatsAppReply(customerPhone, result.response);
+    if (!waReplyId) {
+      console.error('[meta/webhook] Failed to send reply to', customerPhone);
+    } else {
+      // Track channel performance: agent message sent on WhatsApp
+      updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
+    }
+
+    // 9. Log AI response (with response time + WA message ID for read receipt tracking)
     await logMessage(
       leadId,
       'whatsapp',
@@ -379,11 +552,12 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         intent: result.intent,
         source: 'meta_cloud_api',
         input_to_output_gap_ms: responseTimeMs,
+        wa_message_id: waReplyId || undefined,
       },
       supabase,
     );
 
-    // 9. Update lead context
+    // 10. Update lead context
     await supabase
       .from('all_leads')
       .update({
@@ -392,16 +566,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       })
       .eq('id', leadId);
 
-    // 10. Send reply via Meta Graph API
-    const sent = await sendWhatsAppReply(customerPhone, result.response);
-    if (!sent) {
-      console.error('[meta/webhook] Failed to send reply to', customerPhone);
-    }
-
-    // 11. Link lead_id to whatsapp session
+    // 11. Link lead_id + phone to whatsapp session
+    const normalizedSessionPhone = normalizePhone(customerPhone);
     await supabase
       .from('whatsapp_sessions')
-      .update({ lead_id: leadId })
+      .update({
+        lead_id: leadId,
+        customer_phone: customerPhone,
+        customer_phone_normalized: normalizedSessionPhone,
+        customer_name: customerName !== 'WhatsApp User' ? customerName : undefined,
+      })
       .eq('external_session_id', sessionId);
 
     // 12. Fire-and-forget: trigger AI scoring

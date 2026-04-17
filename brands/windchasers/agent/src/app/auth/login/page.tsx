@@ -22,9 +22,9 @@ const brandTaglines: Record<string, string> = {
 export default function LoginPage() {
   const router = useRouter()
 
-  // Brand config — resolved from env var or hostname detection
+  // Brand config - resolved from env var or hostname detection
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'windchasers').toLowerCase()
+  const brandId = (brand.brand || 'bcon').toLowerCase()
   const colors = brand.colors
   const tagline = brandTaglines[brandId] || brand.name
   const website = brandWebsites[brandId] || '#'

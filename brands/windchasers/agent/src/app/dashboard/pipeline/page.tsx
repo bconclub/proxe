@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { MdSearch, MdChevronLeft, MdChevronRight } from 'react-icons/md'
+import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
 // --- Types ---
 
@@ -84,7 +85,7 @@ function chevronClip(position: 'first' | 'middle' | 'last'): string {
 
 // --- Score dot ---
 function ScoreDot({ score }: { score: number | null }) {
-  if (score === null || score === undefined) return <span style={{ color: '#525252', fontSize: 11 }}>—</span>
+  if (score === null || score === undefined) return <span style={{ color: '#525252', fontSize: 11 }}>-</span>
   const color = score >= 60 ? '#34d399' : score >= 30 ? '#fbbf24' : '#f87171'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -149,6 +150,8 @@ export default function PipelinePage() {
   const [sortBy, setSortBy] = useState<'score' | 'activity' | 'days'>('score')
   const [page, setPage] = useState(1)
   const perPage = 20
+  const [selectedLead, setSelectedLead] = useState<any>(null)
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -161,6 +164,40 @@ export default function PipelinePage() {
       setLoading(false)
     }
   }, [])
+
+  const handleLeadClick = useCallback((lead: Lead) => {
+    setSelectedLead({
+      id: lead.id,
+      name: lead.name || 'Unknown',
+      email: '',
+      phone: lead.phone || '',
+      source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
+      first_touchpoint: lead.first_touchpoint || null,
+      last_touchpoint: lead.last_touchpoint || null,
+      timestamp: lead.created_at || '',
+      status: lead.lead_stage || null,
+      booking_date: null,
+      booking_time: null,
+      lead_score: lead.lead_score,
+      lead_stage: lead.lead_stage,
+    })
+    setIsLeadModalOpen(true)
+  }, [])
+
+  const updateLeadStatus = useCallback(async (leadId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok && selectedLead?.id === leadId) {
+        setSelectedLead({ ...selectedLead, status: newStatus })
+      }
+    } catch (err) {
+      console.error('Failed to update lead status:', err)
+    }
+  }, [selectedLead])
 
   useEffect(() => {
     fetchLeads()
@@ -372,13 +409,16 @@ export default function PipelinePage() {
                 style={{ padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.1px' }}>
+                  <div
+                    onClick={(e) => { e.stopPropagation(); handleLeadClick(lead) }}
+                    style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.1px', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', textUnderlineOffset: 2 }}
+                  >
                     {lead.name || 'Unknown'}
                   </div>
                   {lead.phone && <div style={{ color: '#525252', fontSize: 11, marginTop: 1 }}>{lead.phone}</div>}
                 </div>
                 <span>
-                  <span style={{ background: `${stageObj?.bg}25`, color: stageObj?.text, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>
+                  <span style={{ background: stageObj?.bg, color: stageObj?.text, padding: '2px 8px', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>
                     {stageObj?.label}
                   </span>
                 </span>
@@ -405,6 +445,15 @@ export default function PipelinePage() {
           </div>
         )}
       </div>
+
+      {selectedLead && (
+        <LeadDetailsModal
+          lead={selectedLead}
+          isOpen={isLeadModalOpen}
+          onClose={() => { setIsLeadModalOpen(false); setSelectedLead(null) }}
+          onStatusUpdate={updateLeadStatus}
+        />
+      )}
 
       <style>{`
         .chevron-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

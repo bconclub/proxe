@@ -1,5 +1,5 @@
 /**
- * Unified PROXe Agent — Core Types
+ * Unified PROXe Agent - Core Types
  * Channel-agnostic interfaces for the AI engine
  */
 
@@ -20,6 +20,7 @@ export interface AgentInput {
   summary: string;
   usedButtons?: string[];
   metadata?: Record<string, any>;
+  adminNotes?: Array<{ text: string; created_by: string; created_at: string }>;
 }
 
 export interface AgentOutput {

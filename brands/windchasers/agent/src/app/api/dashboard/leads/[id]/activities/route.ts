@@ -177,3 +177,45 @@ export async function GET(
     )
   }
 }
+
+/**
+ * POST /api/dashboard/leads/[id]/activities
+ * Create a new activity/note for a lead
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient()
+    const leadId = params.id
+    const body = await request.json()
+    const { activity_type, note, duration_minutes } = body
+
+    if (!note?.trim()) {
+      return NextResponse.json({ error: 'Note is required' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('activities')
+      .insert({
+        lead_id: leadId,
+        activity_type: activity_type || 'note',
+        note: note.trim(),
+        duration_minutes: duration_minutes || null,
+        created_by: 'system',
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true, activity: data })
+  } catch (error) {
+    console.error('Error creating activity:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}

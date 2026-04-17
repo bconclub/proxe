@@ -10,8 +10,10 @@ const ALLOWED_STAGES = [
   'Booking Made',
   'Converted',
   'Closed Lost',
+  'Not Qualified',
   'In Sequence',
-  'Cold'
+  'Cold',
+  'R&R'
 ]
 
 // Sub-stages for High Intent

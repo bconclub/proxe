@@ -23,11 +23,17 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const includeNewsletter = searchParams.get('include_newsletter') === 'true'
 
     let query = supabase
-      .from('unified_leads')
+      .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    // Exclude newsletter signups by default
+    if (!includeNewsletter) {
+      query = query.not('unified_context->web->form_submission->>form_type', 'eq', 'newsletter')
+    }
 
     if (source) {
       // Filter by first_touchpoint or last_touchpoint
@@ -59,8 +65,15 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
+    // Map all_leads columns to the shape the frontend expects
+    const leads = (data || []).map((lead: any) => ({
+      ...lead,
+      name: lead.customer_name || lead.name || null,
+      source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
+    }))
+
     return NextResponse.json({
-      leads: data || [],
+      leads,
       pagination: {
         page,
         limit,
@@ -76,6 +89,57 @@ export async function GET(request: NextRequest) {
         error: 'Failed to fetch leads',
         details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
       },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/dashboard/leads - Delete leads by email or id
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { searchParams } = new URL(request.url)
+    
+    const id = searchParams.get('id')
+    const email = searchParams.get('email')
+    const phone = searchParams.get('phone')
+
+    if (!id && !email && !phone) {
+      return NextResponse.json(
+        { error: 'Missing id, email, or phone parameter' },
+        { status: 400 }
+      )
+    }
+
+    let query = supabase.from('all_leads').delete()
+
+    if (id) {
+      query = query.eq('id', id)
+    } else if (email) {
+      query = query.eq('email', email)
+    } else if (phone) {
+      query = query.eq('customer_phone_normalized', phone.replace(/\D/g, '').slice(-10))
+    }
+
+    const { data, error } = await query.select()
+
+    if (error) {
+      console.error('[API] Failed to delete lead:', error)
+      return NextResponse.json(
+        { error: 'Failed to delete lead' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      deleted: data?.length || 0,
+      leads: data 
+    })
+  } catch (error) {
+    console.error('[API] Failed to delete lead:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete lead' },
       { status: 500 }
     )
   }

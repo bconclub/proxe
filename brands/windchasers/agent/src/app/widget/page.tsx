@@ -1,14 +1,14 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ChatWidget } from '@/components/widget/ChatWidget'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Widget-only page for embedding
- * This page shows only the ChatWidget without any page content
- * Using client-side only rendering to avoid hydration mismatches
+ * Widget-only page for embedding and dashboard preview.
+ * Renders ChatWidget with transparent background - widget handles
+ * its own positioning (bubble bottom-right, fixed within iframe).
  */
 export default function WidgetPage() {
   const [mounted, setMounted] = useState(false)
@@ -17,35 +17,7 @@ export default function WidgetPage() {
     setMounted(true)
   }, [])
 
-  if (!mounted) {
-    return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'transparent',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        overflow: 'hidden',
-        margin: 0,
-        padding: 0
-      }} />
-    )
-  }
+  if (!mounted) return null
 
-  return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      backgroundColor: '#0F0A06',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      margin: 0,
-      padding: 0,
-      overflow: 'hidden'
-    }}>
-      <ChatWidget widgetStyle="bubble" />
-    </div>
-  )
+  return <ChatWidget widgetStyle="bubble" />
 }

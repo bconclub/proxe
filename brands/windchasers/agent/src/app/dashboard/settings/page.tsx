@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import { useTheme } from '@/components/dashboard/ThemeProvider';
 
 const ACCENT_THEMES = [
-  { id: 'windchasers', name: 'Windchasers Gold', color: '#C9A961', darkColor: '#C9A961' },
+  { id: 'bcon', name: 'BCON Purple', color: '#8B5CF6', darkColor: '#8B5CF6' },
   { id: 'gold', name: 'Electric Lime', color: '#afd510', darkColor: '#afd510' },
   { id: 'orange', name: 'Sunset Orange', color: '#fc7301', darkColor: '#fc7301' },
   { id: 'grey', name: 'Neutral Grey', color: '#6B7280', darkColor: '#9CA3AF' },
@@ -13,7 +14,8 @@ const ACCENT_THEMES = [
 type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
-  const [selectedTheme, setSelectedTheme] = useState('windchasers');
+  const { theme, setTheme } = useTheme();
+  const [selectedTheme, setSelectedTheme] = useState('bcon');
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
@@ -22,13 +24,13 @@ export default function SettingsPage() {
 
   // Load saved theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('windchasers-accent-theme');
+    const savedTheme = localStorage.getItem('bcon-accent-theme');
     if (savedTheme) {
       setSelectedTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to Windchasers theme
-      applyTheme('windchasers');
+      // Default to BCON theme
+      applyTheme('bcon');
     }
   }, []);
 
@@ -66,7 +68,7 @@ export default function SettingsPage() {
   function handleThemeSelect(themeId: string) {
     setSelectedTheme(themeId);
     applyTheme(themeId);
-    localStorage.setItem('windchasers-accent-theme', themeId);
+    localStorage.setItem('bcon-accent-theme', themeId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -119,9 +121,43 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
-          Settings
-        </h1>
+        {/* Appearance Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Appearance
+          </h2>
+          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Dashboard Mode
+            </h3>
+            <div className="grid grid-cols-2 gap-4 max-w-sm">
+              {[
+                { id: 'bw-dark', label: 'Dark', icon: '🌙' },
+                { id: 'bw-light', label: 'Light', icon: '☀️' },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setTheme(mode.id as 'bw-dark' | 'bw-light')}
+                  className="p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    borderColor: theme === mode.id ? 'var(--accent-primary)' : 'transparent',
+                  }}
+                >
+                  <span className="text-2xl">{mode.icon}</span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {mode.label}
+                  </span>
+                  {theme === mode.id && (
+                    <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
+                      ✓ Active
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* Theme Section */}
         <div className="mb-8">
@@ -219,7 +255,7 @@ export default function SettingsPage() {
                   className={`p-6 rounded-lg border-2 transition-all text-left ${
                     widgetStyle === 'searchbar'
                       ? 'border-current'
-                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'border-transparent hover:border-[var(--border-primary)]'
                   }`}
                   style={{
                     background: 'var(--bg-tertiary)',
@@ -247,10 +283,10 @@ export default function SettingsPage() {
                     {widgetStyle === 'searchbar' && (
                       <div
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-4 h-4 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -265,7 +301,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Visual Preview */}
                   <div
                     className="mt-4 p-4 rounded border"
@@ -313,7 +349,7 @@ export default function SettingsPage() {
                   className={`p-6 rounded-lg border-2 transition-all text-left ${
                     widgetStyle === 'bubble'
                       ? 'border-current'
-                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'border-transparent hover:border-[var(--border-primary)]'
                   }`}
                   style={{
                     background: 'var(--bg-tertiary)',
@@ -341,10 +377,10 @@ export default function SettingsPage() {
                     {widgetStyle === 'bubble' && (
                       <div
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-4 h-4 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -359,7 +395,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Visual Preview */}
                   <div
                     className="mt-4 p-4 rounded border relative"
@@ -372,10 +408,10 @@ export default function SettingsPage() {
                     <div className="absolute bottom-2 right-2">
                       <div
                         className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-7 h-7 text-white"
+                          className="w-7 h-7 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -433,8 +469,8 @@ export default function SettingsPage() {
             <div className="flex flex-wrap gap-4">
               {/* Button Preview */}
               <button
-                className="px-4 py-2 rounded-lg font-medium text-white"
-                style={{ background: 'var(--accent-primary)' }}
+                className="px-4 py-2 rounded-lg font-medium text-[var(--text-button)]"
+                style={{ background: 'var(--button-bg)' }}
               >
                 Primary Button
               </button>

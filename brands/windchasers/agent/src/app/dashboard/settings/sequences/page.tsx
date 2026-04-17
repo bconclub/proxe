@@ -17,7 +17,7 @@ const SAMPLE_SEQUENCES = [
   {
     id: '1',
     name: 'Post-Booking Reminder',
-    description: '30 min before a booked call — WhatsApp + Email reminder',
+    description: '30 min before a booked call - WhatsApp + Email reminder',
     status: 'active' as const,
     steps: 3,
     enrolled: 0,
@@ -26,7 +26,7 @@ const SAMPLE_SEQUENCES = [
   {
     id: '2',
     name: 'New Lead Nurture',
-    description: 'Welcome sequence for new web leads — 3 touchpoints over 7 days',
+    description: 'Welcome sequence for new web leads - 3 touchpoints over 7 days',
     status: 'draft' as const,
     steps: 5,
     enrolled: 0,
@@ -55,18 +55,10 @@ export default function SequencesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Sequences
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Automated follow-up sequences for leads — email, WhatsApp, and timed triggers
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
-          style={{ backgroundColor: 'var(--primary-color)' }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-button)] transition-opacity hover:opacity-85"
+          style={{ backgroundColor: 'var(--button-bg)' }}
           disabled
         >
           <MdAdd size={18} />
@@ -203,7 +195,7 @@ export default function SequencesPage() {
         }}
       >
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Sequence builder coming soon — create automated follow-up flows with WhatsApp, email, delays, and conditional logic.
+          Sequence builder coming soon - create automated follow-up flows with WhatsApp, email, delays, and conditional logic.
         </p>
       </div>
     </div>

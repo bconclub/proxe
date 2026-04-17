@@ -1,47 +1,102 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MdInbox,
   MdSend,
   MdSearch,
   MdAutoAwesome,
-  MdPerson,
+  MdEvent,
+  MdEventAvailable,
+  MdOpenInNew,
   MdPhone,
   MdEmail,
   MdLocationOn,
   MdBusiness,
-  MdEvent,
   MdNotes,
-  MdOpenInNew
+  MdLanguage,
 } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
-// Channel Icons using custom SVGs
+// Channel Icons using custom SVGs with colored backgrounds
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
-  const style = {
-    opacity: active ? 1 : 0.3,
-    filter: 'invert(1) brightness(2)', // Inverts black to white for dark mode
+  const containerStyle: React.CSSProperties = {
+    width: size + 4,
+    height: size + 4,
+    borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: active ? 1 : 0.4,
   };
 
   switch (channel) {
     case 'web':
-      return <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={style} title="Website" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#3B82F6' }}>
+          <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={{ filter: 'invert(1)' }} title="Website" />
+        </div>
+      );
     case 'whatsapp':
-      return <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={style} title="WhatsApp" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#25D366' }}>
+          <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={{ filter: 'invert(1)' }} title="WhatsApp" />
+        </div>
+      );
     case 'voice':
-      return <img src="/ai-voice-stroke-rounded.svg" alt="Voice" width={size} height={size} style={style} title="Voice" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#8B5CF6' }}>
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" title="Voice">
+            <path
+              d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
+              stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            />
+            <path
+              d="M18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6L18 2z"
+              fill="#fff" stroke="#fff" strokeWidth="0.5"
+            />
+          </svg>
+        </div>
+      );
     case 'social':
-      return <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={style} title="Social" />;
+      return (
+        <div style={{ ...containerStyle, backgroundColor: '#F59E0B' }}>
+          <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={{ filter: 'invert(1)' }} title="Social" />
+        </div>
+      );
     default:
       return null;
   }
 };
 
 const ALL_CHANNELS = ['web', 'whatsapp'];
+
+// Score Ring - circular progress indicator with score inside
+const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
+  const s = score ?? 0;
+  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
+  const r = (size / 2) - 2.5;
+  const circumference = 2 * Math.PI * r;
+  const dashLen = (s / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="2.5"
+        strokeDasharray={`${dashLen} ${circumference}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dasharray 0.3s ease' }}
+      />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
+        fill="var(--text-primary)" fontSize="10" fontWeight="bold">{s}</text>
+    </svg>
+  );
+};
 
 // Types
 interface Conversation {
@@ -53,6 +108,16 @@ interface Conversation {
   last_message: string
   last_message_at: string
   unread_count: number
+  booking_status: string | null
+  brand_name: string | null
+  lead_score: number | null
+  lead_stage: string | null
+  city: string | null
+  booking_date: string | null
+  booking_time: string | null
+  next_touchpoint: string | null
+  form_data: Record<string, any> | null
+  first_touchpoint: string | null
 }
 
 interface Message {
@@ -64,6 +129,8 @@ interface Message {
   message_type: string
   metadata: any
   created_at: string
+  delivered_at?: string | null
+  read_at?: string | null
 }
 
 
@@ -94,9 +161,133 @@ function renderMarkdown(text: string) {
   });
 }
 
+/** Parse form submission data from a message into structured fields */
+function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
+  if (!content) return null;
+  const fieldPattern = /\b(\w+(?:_\w+)+\??)\s*:\s*/g;
+  const matches = [...content.matchAll(fieldPattern)];
+  if (matches.length < 3) return null;
+
+  const intro = content.substring(0, matches[0].index!).trim();
+  const fields: { key: string; value: string }[] = [];
+
+  for (let i = 0; i < matches.length; i++) {
+    const rawKey = matches[i][1];
+    const valueStart = matches[i].index! + matches[i][0].length;
+    const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
+    const value = content.substring(valueStart, valueEnd).trim();
+    const cleanKey = rawKey
+      .replace(/\?$/, '')
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    fields.push({ key: cleanKey, value });
+  }
+  return { intro, fields };
+}
+
+/** Extract a short label for a form field */
+function getFormFieldLabel(key: string): string {
+  const k = key.toLowerCase();
+  if (k.includes('brand name') || k.includes('business name')) return 'Brand';
+  if (k.includes('full name') || k === 'name') return 'Name';
+  if (k.includes('email')) return 'Email';
+  if (k.includes('phone')) return 'Phone';
+  if (k.includes('city') || k.includes('location')) return 'City';
+  if (k.includes('how fast') || k.includes('urgency')) return 'Urgency';
+  if (k.includes('business type') || k.includes('choose business')) return 'Type';
+  if (k.includes('website')) return 'Website';
+  if (k.includes('leads') || k.includes('handle')) return 'Volume';
+  if (k.includes('ai system')) return 'AI Systems';
+  return key.length > 15 ? key.substring(0, 15) + '…' : key;
+}
+
+/** Format a time gap in ms to a human-readable short string */
+function formatGap(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  if (hrs < 24) return remainMins > 0 ? `${hrs}h ${remainMins}m` : `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
+
+/** Color for gap: green < 5min, yellow 5-30min, red > 30min */
+function gapColor(ms: number): string {
+  const mins = ms / 60000;
+  if (mins < 5) return '#22c55e';
+  if (mins <= 30) return '#f59e0b';
+  return '#ef4444';
+}
+
+
+function getDeliveryStatusStyle(status: string | undefined): { bg: string; color: string } {
+  if (!status) return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  switch (status) {
+    case 'read': return { bg: 'rgba(59,130,246,0.12)', color: '#3B82F6' }
+    case 'delivered': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+    case 'failed': return { bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+    default: return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  }
+}
+
+function getTaskTypeTag(taskType: string | undefined): { label: string; bg: string; color: string } | null {
+  if (!taskType) return null
+  const t = taskType.toLowerCase()
+  if (t.includes('nudge')) return { label: 'Nudge', bg: 'rgba(249,115,22,0.15)', color: '#F97316' }
+  if (t.includes('push_to_book')) return { label: 'Push to Book', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('follow_up') || t.includes('followup')) return { label: 'Follow-up', bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { label: 'Re-engage', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('first_outreach')) return { label: 'First Outreach', bg: 'rgba(99,102,241,0.15)', color: '#818CF8' }
+  if (t.includes('reminder')) return { label: 'Reminder', bg: 'rgba(59,130,246,0.15)', color: '#3B82F6' }
+  return null
+}
+
+function getDeliveryTooltip(status: string | undefined, error?: string): string {
+  if (!status) return 'Status: Pending \u2013 awaiting delivery confirmation'
+  switch (status) {
+    case 'sent': return 'Status: Sent \u2013 waiting for delivery'
+    case 'delivered': return 'Status: Delivered'
+    case 'read': return 'Status: Read by customer'
+    case 'failed': return `Status: Failed \u2013 ${error || 'unknown error'}`
+    default: return 'Status: Pending \u2013 awaiting delivery confirmation'
+  }
+}
+
+
+function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string }) {
+  // Check for failed state: no delivery confirmation after 10 minutes
+  const isFailed = !deliveredAt && !readAt && createdAt && 
+    (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
+
+  if (isFailed) {
+    // Warning icon
+    return (
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1v10M8 13v2" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  if (readAt) {
+    // Double green tick = read by recipient
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  if (deliveredAt) {
+    // Double amber tick = delivered
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  // Single amber tick = sent (no delivery confirmation)
+  return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+}
+
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -110,7 +301,12 @@ export default function InboxPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [conversationSummary, setConversationSummary] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -167,29 +363,32 @@ export default function InboxPage() {
     setShowSummary(false)
   }, [selectedLeadId])
 
-  // Fetch lead details for right panel when conversation selected
+  // Fetch lead details for right panel
   useEffect(() => {
-    if (!selectedLeadId) {
-      setLeadDetails(null)
-      return
-    }
+    if (!selectedLeadId) { setLeadDetails(null); return }
     async function fetchLeadDetails() {
       try {
+        console.log('[RIGHT PANEL] Fetching lead details for:', selectedLeadId)
         const { data, error } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, lead_score, lead_stage, sub_stage, booking_date, booking_time, unified_context, status, first_touchpoint, last_touchpoint, created_at, admin_notes')
+          .select('*')
           .eq('id', selectedLeadId)
-          .single()
-        if (error) {
-          console.error('Error fetching lead details for panel:', error)
-          setLeadDetails(null)
+          .maybeSingle()
+        console.log('[RIGHT PANEL] Result:', data ? 'found' : 'null', error ? `Error: ${error.message}` : 'no error')
+        if (error || !data) {
+          // Try lead_id as fallback
+          console.log('[RIGHT PANEL] Trying lead_id fallback...')
+          const { data: data2, error: error2 } = await supabase
+            .from('all_leads')
+            .select('*')
+            .eq('lead_id', selectedLeadId)
+            .maybeSingle()
+          console.log('[RIGHT PANEL] Fallback result:', data2 ? 'found' : 'null', error2 ? `Error: ${error2.message}` : 'no error')
+          setLeadDetails(data2 || null)
           return
         }
         setLeadDetails(data)
-      } catch (err) {
-        console.error('Error fetching lead details:', err)
-        setLeadDetails(null)
-      }
+      } catch (err) { console.error('[RIGHT PANEL] Exception:', err); setLeadDetails(null) }
     }
     fetchLeadDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -301,7 +500,7 @@ export default function InboxPage() {
         console.log('Attempting fallback: fetching leads with recent activity...')
         const { data: activeLeads, error: leadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage, booking_date, booking_time')
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
@@ -315,16 +514,40 @@ export default function InboxPage() {
             if (lead.last_touchpoint && !channels.includes(lead.last_touchpoint)) {
               channels.push(lead.last_touchpoint)
             }
+            const fbUc = lead.unified_context || {};
+            const fbName =
+              fbUc?.whatsapp?.profile?.full_name ||
+              fbUc?.web?.profile?.full_name ||
+              lead.customer_name ||
+              lead.phone ||
+              'Unknown';
+            const fbBrand =
+              fbUc?.web?.what_is_your_brand_name ||
+              fbUc?.whatsapp?.what_is_your_brand_name ||
+              fbUc?.bcon?.brand_name ||
+              fbUc?.whatsapp?.profile?.company ||
+              fbUc?.web?.profile?.company ||
+              null;
 
             return {
               lead_id: lead.id,
-              lead_name: lead.customer_name || 'Unknown',
+              lead_name: fbName,
               lead_email: lead.email || '',
               lead_phone: lead.phone || '',
               channels: channels.length > 0 ? channels : ['web'],
               last_message: 'No messages yet',
               last_message_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : new Date().toISOString(),
-              unread_count: 0
+              unread_count: 0,
+              booking_status: null,
+              brand_name: fbBrand,
+              lead_score: lead.lead_score ?? null,
+              lead_stage: lead.lead_stage ?? null,
+              city: fbUc?.whatsapp?.profile?.city || fbUc?.web?.profile?.city || null,
+              booking_date: lead.booking_date ?? null,
+              booking_time: lead.booking_time ?? null,
+              next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
+              form_data: fbUc?.form_data || null,
+              first_touchpoint: lead.first_touchpoint || null,
             }
           })
 
@@ -390,7 +613,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone')
+        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score, first_touchpoint')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -426,6 +649,11 @@ export default function InboxPage() {
         customer_name?: string | null
         email?: string | null
         phone?: string | null
+        unified_context?: any
+        booking_date?: string | null
+        booking_time?: string | null
+        lead_stage?: string | null
+        lead_score?: number | null
       }>
 
       for (const [leadId, convData] of conversationMap) {
@@ -441,15 +669,67 @@ export default function InboxPage() {
           continue;
         }
 
+        // Extract booking status: check direct columns first, then unified_context
+        const ctx = lead?.unified_context || {};
+        const bookingStatus = (lead?.booking_date ? 'Call Booked' : null)
+          || (lead?.lead_stage === 'Booking Made' ? 'Call Booked' : null)
+          || ctx?.whatsapp?.booking_status
+          || ctx?.web?.booking_status
+          || null;
+
+        // Extract brand name from unified_context or form data
+        const uc = lead?.unified_context || {};
+        const brandName =
+          uc?.web?.what_is_your_brand_name ||
+          uc?.whatsapp?.what_is_your_brand_name ||
+          uc?.bcon?.brand_name ||
+          uc?.web?.brand_name ||
+          uc?.whatsapp?.brand_name ||
+          uc?.whatsapp?.profile?.company ||
+          uc?.web?.profile?.company ||
+          null;
+
+        // Extract city from unified_context profile
+        const cityValue =
+          uc?.whatsapp?.profile?.city ||
+          uc?.web?.profile?.city ||
+          uc?.bcon?.city ||
+          null;
+
+        // Extract next touchpoint / next action
+        const nextTouchpoint =
+          uc?.next_touchpoint ||
+          uc?.sequence?.next_step ||
+          null;
+
+        // Prefer profile full_name (set by save_lead_profile tool) over customer_name
+        // customer_name sometimes has the brand name instead of the person's name
+        const resolvedName =
+          uc?.whatsapp?.profile?.full_name ||
+          uc?.web?.profile?.full_name ||
+          lead?.customer_name ||
+          lead?.phone ||
+          'Unknown';
+
         const conversation: Conversation = {
           lead_id: leadId,
-          lead_name: lead?.customer_name || 'Unknown',
+          lead_name: resolvedName,
           lead_email: lead?.email || '',
           lead_phone: lead?.phone || '',
           channels: Array.from(convData.channels),
           last_message: cleanedLastMessage,
           last_message_at: convData.last_message_at,
-          unread_count: 0
+          unread_count: 0,
+          booking_status: bookingStatus,
+          brand_name: brandName,
+          lead_score: lead?.lead_score ?? null,
+          lead_stage: lead?.lead_stage ?? null,
+          city: cityValue,
+          booking_date: lead?.booking_date ?? null,
+          booking_time: lead?.booking_time ?? null,
+          next_touchpoint: nextTouchpoint,
+          form_data: uc?.form_data || null,
+          first_touchpoint: (lead as any)?.first_touchpoint || null,
         }
 
         console.log('Adding conversation:', {
@@ -485,30 +765,11 @@ export default function InboxPage() {
 
   async function fetchMessages(leadId: string) {
     setMessagesLoading(true)
+    setMessageChannelFilter('all')
     try {
-      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel)
+      console.log('Fetching all messages for lead:', leadId)
 
-      // First, try to fetch messages for the selected channel if one is set
-      if (selectedChannel) {
-        const { data: channelData, error: channelError } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('lead_id', leadId)
-          .eq('channel', selectedChannel)
-          .order('created_at', { ascending: true })
-
-        if (channelError) {
-          console.error('Error fetching messages by channel:', channelError)
-        } else if (channelData && channelData.length > 0) {
-          console.log('Fetched messages for channel:', selectedChannel, 'count:', channelData.length)
-          setMessages(channelData)
-          setMessagesLoading(false)
-          return
-        }
-      }
-
-      // Fallback: Fetch all conversations for this lead (regardless of channel)
-      console.log('Fetching all conversations for lead (no channel filter)')
+      // Always fetch ALL messages for this lead (channel filtering is done client-side)
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
@@ -530,6 +791,8 @@ export default function InboxPage() {
         message_type: String(msg?.message_type ?? ''),
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
+        delivered_at: msg?.delivered_at ?? null,
+        read_at: msg?.read_at ?? null,
       }))
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {
@@ -617,7 +880,7 @@ export default function InboxPage() {
       // Transform to match the Lead interface expected by LeadDetailsModal
       const leadData = {
         id: typedLead.id,
-        name: typedLead.customer_name || 'Unknown',
+        name: typedLead.customer_name || typedLead.phone || 'Unknown',
         email: typedLead.email || '',
         phone: typedLead.phone || '',
         source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
@@ -714,6 +977,81 @@ export default function InboxPage() {
     setSummaryLoading(false);
   }
 
+  // Generate AI response for the current conversation
+  async function generateAIResponse() {
+    if (!selectedLeadId || !selectedChannel || messages.length === 0) return;
+
+    setIsGenerating(true);
+    try {
+      const conversationHistory = messages.map(msg => ({
+        sender: msg.sender,
+        content: msg.content,
+      }));
+
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          channel: selectedChannel,
+          action: 'generate',
+          conversationHistory,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.generatedMessage) {
+          setReplyText(data.generatedMessage);
+        }
+      } else {
+        const err = await response.json();
+        console.error('Failed to generate AI response:', err);
+        alert(err.error || 'Failed to generate AI response');
+      }
+    } catch (err) {
+      console.error('Error generating AI response:', err);
+      alert('Failed to generate AI response');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  // Send reply to customer
+  async function sendReply() {
+    if (!selectedLeadId || !selectedChannel || !replyText.trim() || isSending) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          channel: selectedChannel,
+          action: 'send',
+          message: replyText.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setReplyText('');
+        // Refresh messages to show the sent message
+        fetchMessages(selectedLeadId);
+        fetchConversations();
+      } else {
+        const err = await response.json();
+        console.error('Failed to send reply:', err);
+        alert(err.error || 'Failed to send message');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
+  }
+
   // Time ago helper
   function timeAgo(timestamp: string) {
     const now = new Date()
@@ -738,6 +1076,23 @@ export default function InboxPage() {
     })
   }
 
+  function formatDateSeparator(timestamp: string) {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 86400000)
+    const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+    if (msgDate.getTime() === today.getTime()) return 'Today'
+    if (msgDate.getTime() === yesterday.getTime()) return 'Yesterday'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  function getDateKey(timestamp: string) {
+    const d = new Date(timestamp)
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  }
+
   // Filter conversations by search
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true
@@ -751,9 +1106,39 @@ export default function InboxPage() {
 
   const selectedConversation = conversations.find((c) => c.lead_id === selectedLeadId)
 
+  // Filter messages by channel tab selection (client-side)
+  const filteredMessages = messageChannelFilter === 'all'
+    ? messages
+    : messages.filter(m => m.channel === messageChannelFilter)
+
   // Render the inbox UI
   return (
-    <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 flex overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)', position: 'absolute', inset: 0 }}>
+      <style>{`
+        .template-status-tag { position: relative; }
+        .template-status-tag::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          bottom: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0;
+          text-transform: none;
+          white-space: nowrap;
+          background: #1a1a1a;
+          color: #e0e0e0;
+          border: 1px solid rgba(255,255,255,0.12);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.15s;
+          z-index: 10;
+        }
+        .template-status-tag:hover::after { opacity: 1; }
+      `}</style>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -762,48 +1147,40 @@ export default function InboxPage() {
 
       {/* Left Panel - Conversations List */}
       <div
-        className="w-[350px] flex flex-col border-r"
+        className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
-          borderColor: 'var(--border-primary)'
+          borderColor: 'var(--border-primary)',
+          minWidth: '280px',
         }}
       >
-        {/* Header */}
-        <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-          <h1 className="text-2xl font-black tracking-tight mb-3" style={{ color: 'var(--accent-primary)' }}>
-            INBOX
-          </h1>
-
-          {/* Search */}
+        {/* Search + Filters - flush at top */}
+        <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <div
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-amber-500/50 mb-4"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-[var(--accent-primary)]/50 focus-within:ring-2 focus-within:ring-[var(--accent-primary)]/20 mb-2"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
-              <MdSearch size={18} />
+              <MdSearch size={16} />
             </span>
             <input
               type="text"
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-sm font-medium"
+              className="bg-transparent border-none outline-none focus:outline-none flex-1 text-xs"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
-
-          {/* Channel Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-1">
             {['all', 'web', 'whatsapp'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border`}
+                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
-                  background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  borderColor: channelFilter === ch ? 'var(--accent-primary)' : 'var(--border-primary)',
-                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
-                  boxShadow: channelFilter === ch ? '0 4px 14px 0 rgba(0,0,0,0.1)' : 'none'
+                  background: channelFilter === ch ? 'var(--button-bg, #fff)' : 'transparent',
+                  color: channelFilter === ch ? 'var(--text-button, #000)' : 'var(--text-muted)',
                 }}
               >
                 {ch}
@@ -815,42 +1192,115 @@ export default function InboxPage() {
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>
+            <div className="p-3 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
               Loading...
             </div>
           ) : conversations.length === 0 ? (
-            <div className="p-4 text-center space-y-2">
-              <p style={{ color: 'var(--text-secondary)' }}>
-                No conversations found
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Messages will appear here once conversations start
-              </p>
+            <div className="p-3 text-center space-y-1">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No conversations found</p>
               <button
                 onClick={() => fetchConversations()}
-                className="mt-2 px-3 py-1.5 text-xs rounded-md"
-                style={{
-                  background: 'var(--accent-primary)',
-                  color: 'white'
-                }}
+                className="mt-1 px-3 py-1 text-[10px] rounded"
+                style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
               >
                 Refresh
               </button>
             </div>
           ) : filteredConversations.length === 0 ? (
-            <div className="p-4 text-center space-y-2">
-              <p style={{ color: 'var(--text-secondary)' }}>
-                No conversations match your search
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Try adjusting your search query
-              </p>
+            <div className="p-3 text-center">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No conversations match your search</p>
             </div>
           ) : (
             filteredConversations.map((conv) => {
               const isSelected = selectedLeadId === conv.lead_id;
               const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
+              // Temperature helpers
+              const scoreColor = conv.lead_score != null
+                ? (conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444')
+                : null;
+
+              if (isSelected) {
+                // ── SELECTED CARD (minimal) ──
+                return (
+                  <div
+                    key={conv.lead_id}
+                    onClick={() => {
+                      setSelectedLeadId(conv.lead_id);
+                      if (conv.channels && conv.channels.length > 0) {
+                        setSelectedChannel(conv.channels[0]);
+                      } else {
+                        setSelectedChannel('');
+                      }
+                    }}
+                    className="cursor-pointer border-b relative"
+                    style={{
+                      borderColor: 'var(--border-primary)',
+                      background: 'var(--accent-subtle)',
+                    }}
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
+
+                    <div className="px-3 py-2 pl-4">
+                      {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
+                      <div className="flex items-center gap-2.5">
+                        <ScoreRing score={conv.lead_score} size={28} />
+                        <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                          {conv.channels.map((ch) => (
+                            <ChannelIcon key={ch} channel={ch} size={14} active={true} />
+                          ))}
+                        </span>
+                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                        </span>
+                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          {timeAgo(conv.last_message_at)}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openLeadModal(conv.lead_id); }}
+                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                          style={{ color: 'var(--text-secondary)' }}
+                          title="Open lead details"
+                        >
+                          <MdOpenInNew size={13} />
+                        </button>
+                      </div>
+
+                      {/* Line 2: Brand · Location */}
+                      {(conv.brand_name || conv.city) && (
+                        <div className="text-xs truncate mt-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
+                          {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+
+                      {/* Line 3: Event pill (highlighted for upcoming, muted for past) */}
+                      {conv.booking_date && (() => {
+                        const isPast = conv.booking_date < new Date().toISOString().split('T')[0]
+                        return (
+                        <div className="mt-1.5" style={{ paddingLeft: '38px' }}>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                            style={isPast
+                              ? { background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: '1px solid var(--border-primary)', opacity: 0.6 }
+                              : { background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            <MdEvent size={11} />
+                            {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {conv.booking_time && (() => {
+                              const tp = conv.booking_time.toString().split(':');
+                              if (tp.length < 2) return `, ${conv.booking_time}`;
+                              const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                              if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
+                              return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                            })()}
+                          </span>
+                        </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                );
+              }
+
+              // ── UNSELECTED (compact, scannable) ──
               return (
                 <div
                   key={conv.lead_id}
@@ -862,56 +1312,40 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'
-                    }`}
+                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-[var(--bg-hover)]"
                   style={{
                     borderColor: 'var(--border-primary)',
-                    background: isSelected ? 'var(--accent-subtle)' : 'transparent'
                   }}
                 >
-                  {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'var(--accent-primary)' }} />
-                  )}
-
-                  <div className="flex items-center gap-3">
-                    {/* Avatar */}
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'
-                        }`}
-                      style={{
-                        background: isSelected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                        color: isSelected ? 'white' : 'var(--text-secondary)',
-                      }}
-                    >
-                      {initials}
+                  <div className="px-3 py-2.5">
+                    {/* Line 1: Channel icons + Name + Timestamp */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                        {conv.channels.map((ch) => (
+                          <ChannelIcon key={ch} channel={ch} size={13} active={true} />
+                        ))}
+                      </span>
+                      <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                        {conv.lead_name || conv.lead_phone || 'Unknown'}
+                      </span>
+                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
+                        {timeAgo(conv.last_message_at)}
+                      </span>
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className={`text-[13px] font-bold truncate ${isSelected ? '' : 'text-gray-900 dark:text-gray-100'}`} style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                    {/* Line 2: Last message preview + EVENT badge */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-[11px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+                        {conv.last_message || '\u00A0'}
+                      </p>
+                      {conv.booking_status && (
+                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
+                          style={{
+                            background: '#22c55e',
+                            color: '#fff',
+                          }}>
+                          EVENT
                         </span>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-0.5">
-                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
-                              conv.channels.includes(ch) && (
-                                <div key={ch} className="opacity-80">
-                                  <ChannelIcon channel={ch} size={12} active={true} />
-                                </div>
-                              )
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-medium opacity-60 whitespace-nowrap">
-                            {timeAgo(conv.last_message_at)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <p className="text-[12px] truncate opacity-60 flex-1">
-                          {conv.last_message}
-                        </p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -922,125 +1356,38 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="mx-auto mb-4" style={{ color: 'var(--text-secondary)' }}>
-                <MdInbox size={64} />
-              </div>
-              <p style={{ color: 'var(--text-secondary)' }}>Select a conversation to view messages</p>
+              <MdInbox size={48} style={{ color: 'var(--text-secondary)', margin: '0 auto 8px' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Select a conversation</p>
             </div>
           </div>
         ) : (
           <>
-            {/* Conversation Header with Channel Tabs */}
-            <div
-              className="border-b"
-              style={{ borderColor: 'var(--border-primary)' }}
-            >
-              {/* Lead Info - Clickable name */}
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <h2
-                    className="font-semibold cursor-pointer hover:underline"
-                    style={{ color: 'var(--accent-primary)' }}
-                    onClick={() => openLeadModal(selectedLeadId!)}
-                    title="Click to view lead details"
-                  >
-                    {selectedConversation?.lead_name || 'Unknown'}
-                  </h2>
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    {selectedConversation?.lead_phone}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* AI Summary Button */}
-                  <button
-                    onClick={summarizeConversation}
-                    disabled={summaryLoading || messages.length === 0}
-                    className="p-2 rounded-md transition-colors flex items-center gap-1"
-                    style={{
-                      background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: showSummary ? 'white' : 'var(--text-secondary)',
-                      opacity: messages.length === 0 ? 0.5 : 1
-                    }}
-                    title="Generate AI Summary"
-                  >
-                    <MdAutoAwesome size={18} className={summaryLoading ? 'animate-spin' : ''} />
-                  </button>
-
-                  {/* View Details Button */}
-                  <button
-                    onClick={() => openLeadModal(selectedLeadId!)}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    View Details
-                  </button>
-                </div>
-              </div>
-
-              {/* Channel Tabs - Only show channels this customer has used */}
-              <div className="flex items-center gap-1 px-4 pb-3">
-                {selectedConversation?.channels.map((ch) => (
-                  <button
-                    key={ch}
-                    onClick={() => setSelectedChannel(ch)}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-2"
-                    style={{
-                      background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
-                    }}
-                  >
-                    <ChannelIcon channel={ch} size={14} active={true} />
-                    <span className="capitalize">{ch}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Summary Panel */}
+            {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
-                className="mx-4 mb-4 p-4 rounded-lg border"
+                className="mx-3 mt-2 mb-1 p-3 rounded-lg border"
                 style={{
                   background: 'var(--bg-tertiary)',
                   borderColor: 'var(--accent-primary)',
-                  borderWidth: '1px'
                 }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <MdAutoAwesome size={16} style={{ color: 'var(--accent-primary)' }} />
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      AI Summary
-                    </span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <MdAutoAwesome size={12} style={{ color: 'var(--accent-primary)' }} />
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>AI Summary</span>
                   </div>
-                  <button
-                    onClick={() => setShowSummary(false)}
-                    className="text-xs"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    ✕ Close
-                  </button>
+                  <button onClick={() => setShowSummary(false)} className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>✕</button>
                 </div>
-
                 {summaryLoading ? (
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    Generating summary...
-                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Generating...</p>
                 ) : (
                   <div
-                    className="text-sm whitespace-pre-wrap"
-                    style={{
-                      color: 'var(--text-secondary)',
-                      lineHeight: '1.6'
-                    }}
+                    className="text-xs whitespace-pre-wrap leading-relaxed"
+                    style={{ color: 'var(--text-secondary)' }}
                     dangerouslySetInnerHTML={{
                       __html: conversationSummary
                         ?.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary); font-weight: 600;">$1</strong>')
@@ -1051,95 +1398,366 @@ export default function InboxPage() {
               </div>
             )}
 
+            {/* Channel filter tabs */}
+            {selectedConversation && selectedConversation.channels.length > 0 && (
+              <div className="px-4 pt-2 pb-1 border-b flex items-center gap-1" style={{ borderColor: 'var(--border-primary)' }}>
+                {['all', ...selectedConversation.channels].map((ch) => {
+                  const isActive = messageChannelFilter === ch
+                  const label = ch === 'all' ? 'All' : ch === 'whatsapp' ? 'WhatsApp' : ch === 'web' ? 'Web' : ch === 'voice' ? 'Voice' : ch === 'social' ? 'Social' : ch
+                  const count = ch === 'all' ? messages.length : messages.filter(m => m.channel === ch).length
+                  return (
+                    <button
+                      key={ch}
+                      onClick={() => setMessageChannelFilter(ch)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all"
+                      style={{
+                        background: isActive ? 'var(--accent-subtle)' : 'transparent',
+                        color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                        borderBottom: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      }}
+                    >
+                      {ch !== 'all' && <ChannelIcon channel={ch} size={12} active={isActive} />}
+                      {label}
+                      <span className="text-[9px] opacity-60">({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto p-6 space-y-6 relative"
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
               {messagesLoading ? (
-                <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-                  Loading messages...
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-                  No messages yet
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
+              ) : filteredMessages.length === 0 ? (
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {messageChannelFilter !== 'all' ? `No ${messageChannelFilter} messages` : 'No messages yet'}
                 </div>
               ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
-                        ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
-                        : ''
-                        }`}
-                      style={{
-                        position: 'relative',
-                        background: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-subtle)' : undefined,
-                        borderColor: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-primary)' : undefined,
-                        borderWidth: '1px'
-                      }}
-                    >
-                      {/* Message header - show sender name and channel */}
-                      <div className="flex items-center justify-between gap-4 mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <ChannelIcon channel={msg.channel} size={10} active={true} />
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider"
-                            style={{
-                              color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'var(--accent-primary)'
-                            }}
-                          >
-                            {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
-                          </span>
+                <>
+                {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
+                {messageChannelFilter === 'all' && selectedConversation?.form_data && !parseFormFields(filteredMessages[0]?.content) && (() => {
+                  const fd = selectedConversation.form_data!
+                  const formFields: { label: string; value: string }[] = []
+                  if (fd.brand_name) formFields.push({ label: 'Brand', value: fd.brand_name })
+                  if (fd.has_website === true) formFields.push({ label: 'Website', value: 'Yes' })
+                  else if (fd.has_website === false) formFields.push({ label: 'Website', value: 'No' })
+                  if (fd.monthly_leads) formFields.push({ label: 'Volume', value: fd.monthly_leads })
+                  if (fd.urgency) formFields.push({ label: 'Urgency', value: fd.urgency.replace(/_/g, ' ') })
+                  if (fd.has_ai_systems === true) formFields.push({ label: 'AI Systems', value: 'Yes' })
+                  else if (fd.has_ai_systems === false) formFields.push({ label: 'AI Systems', value: 'No' })
+                  if (formFields.length === 0) return null
+                  return (
+                    <div className="flex justify-start mb-2">
+                      <div className="max-w-[90%] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                              {selectedConversation?.lead_name || 'Lead'}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
+                              Meta Form Submission
+                            </span>
+                          </div>
                         </div>
-                        <span
-                          className="text-[9px] font-medium"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          {formatTime(msg.created_at)}
-                        </span>
-                      </div>
-
-                      <div
-                        className="text-sm leading-relaxed"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {renderMarkdown(msg.content)}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {formFields.map((f, i) => (
+                            <div key={i} className="flex items-baseline gap-1">
+                              <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{f.label}:</span>
+                              <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })()}
+                {filteredMessages.map((msg, msgIdx) => {
+                  // Date separator between messages from different days
+                  const showDateSeparator = msgIdx === 0 ||
+                    getDateKey(msg.created_at) !== getDateKey(filteredMessages[msgIdx - 1].created_at);
+
+                  // Check if this is a form data message (first customer message with form fields)
+                  const isCustomer = msg.sender === 'customer';
+                  const formData = isCustomer ? parseFormFields(msg.content) : null;
+
+                  const dateSeparator = showDateSeparator ? (
+                    <div className="flex items-center gap-3 py-2" key={`date-${msg.id}`} style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-primary)' }}>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                      <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateSeparator(msg.created_at)}
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                    </div>
+                  ) : null;
+
+                  if (formData) {
+                    // Render as compact form data card
+                    const priorityFields = formData.fields.filter(f => {
+                      const k = f.key.toLowerCase();
+                      return k.includes('brand') || k.includes('full name') || k.includes('email') ||
+                             k.includes('phone') || k.includes('city') || k.includes('how fast') ||
+                             k.includes('business type');
+                    });
+                    const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
+
+                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+
+                    return (
+                      <React.Fragment key={msg.id}>
+                      {dateSeparator}
+                      {msgIdx > 0 && formGapMs > 60000 && !showDateSeparator && (
+                        <div className="flex justify-center my-0.5">
+                          <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(formGapMs), background: 'rgba(255,255,255,0.03)' }}>
+                            {formatGap(formGapMs)} gap
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-start">
+                        <div
+                          className="max-w-[90%] rounded-lg px-3 py-2 border"
+                          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <ChannelIcon channel={msg.channel} size={10} active={true} />
+                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                                {selectedConversation?.lead_name || 'Customer'}
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                                Form Submission
+                              </span>
+                            </div>
+                            <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
+                          </div>
+                          {/* Compact fields grid */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1">
+                            {priorityFields.map((f, i) => (
+                              <div key={i} className="flex items-baseline gap-1">
+                                <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
+                                <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {otherFields.length > 0 && (
+                            <details className="mt-1">
+                              <summary className="text-[9px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>+{otherFields.length} more fields</summary>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                                {otherFields.map((f, i) => (
+                                  <div key={i} className="flex items-baseline gap-1">
+                                    <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
+                                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                      </React.Fragment>
+                    );
+                  }
+
+                  // Regular message bubble
+                  const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+                  const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
+
+                  return (
+                    <React.Fragment key={msg.id}>
+                    {dateSeparator}
+                    {msgIdx > 0 && gapMs > 60000 && !showDateSeparator && (
+                      <div className="flex justify-center my-0.5">
+                        <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(gapMs), background: 'rgba(255,255,255,0.03)' }}>
+                          {formatGap(gapMs)} gap
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border"
+                        style={{
+                          background: isCustomer
+                            ? 'rgba(255,255,255,0.10)'
+                            : 'rgba(99,102,241,0.28)',
+                          borderColor: isCustomer
+                            ? 'rgba(255,255,255,0.18)'
+                            : 'rgba(99,102,241,0.45)',
+                          borderWidth: '1px',
+                          ...(msg.metadata?.template_name
+                            ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
+                            : taskTag
+                            ? { borderLeft: `3px solid ${taskTag.color}` }
+                            : {}),
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <div className="flex items-center gap-1">
+                            <ChannelIcon channel={msg.channel} size={11} active={true} />
+                            <span
+                              className="text-[9px] font-bold uppercase tracking-wider"
+                              style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                            >
+                              {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                            </span>
+                            <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
+                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
+                            </span>
+                          </div>
+                          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                            {formatTime(msg.created_at)}
+                          </span>
+                        </div>
+                        <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                          {renderMarkdown(msg.content)}
+                        </div>
+                        {msg.metadata?.template_name && (() => {
+                          const ds = msg.metadata?.delivery_status
+                          const statusStyle = getDeliveryStatusStyle(ds)
+                          const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
+                          return (
+                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                              <span
+                                className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
+                                style={{ background: statusStyle.bg, color: statusStyle.color }}
+                                data-tooltip={tooltip}
+                              >
+                                Template
+                              </span>
+                              <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                {msg.metadata.template_name}
+                              </span>
+                              <span className="flex items-center" title={ds || 'pending'}>
+                                <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                              </span>
+                            </div>
+                          )
+                        })()}
+                        {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                              <span
+                                key={btnIdx}
+                                className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
+                              >
+                                {btn}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {!msg.metadata?.template_name && taskTag && (
+                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <span
+                              className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{ background: taskTag.bg, color: taskTag.color }}
+                            >
+                              {taskTag.label}
+                            </span>
+                            {msg.metadata?.autonomous && (
+                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Autonomous</span>
+                            )}
+                          </div>
+                        )}
+                        {!isCustomer && msg.channel === 'whatsapp' && (
+                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
+                            {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
+                              <div className="relative group flex items-center">
+                                <span
+                                  className="text-[8px] font-mono px-1 py-0.5 rounded cursor-default truncate max-w-[120px]"
+                                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
+                                >
+                                  {msg.metadata.delivery_error}
+                                </span>
+                                <div
+                                  className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block z-50 pointer-events-none"
+                                  style={{ minWidth: '200px', maxWidth: '280px' }}
+                                >
+                                  <div
+                                    className="text-[10px] leading-relaxed px-2.5 py-2 rounded-lg shadow-lg"
+                                    style={{ background: '#1a1a2e', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
+                                  >
+                                    <div className="font-semibold mb-0.5" style={{ color: '#EF4444' }}>Delivery Failed</div>
+                                    {msg.metadata.delivery_error}
+                                  </div>
+                                  <div className="flex justify-end pr-2">
+                                    <div className="w-2 h-2 rotate-45 -mt-1" style={{ background: '#1a1a2e', borderRight: '1px solid rgba(239,68,68,0.4)', borderBottom: '1px solid rgba(239,68,68,0.4)' }} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
+                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    </React.Fragment>
+                  );
+                })
+                }
+                </>
               )}
             </div>
 
-            {/* Message Input (Read-only for now) */}
-            <div
-              className="p-4 border-t"
-              style={{ borderColor: 'var(--border-primary)' }}
-            >
+            {/* Message Input - compact */}
+            <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
               <div
-                className="flex items-center gap-2 px-4 py-3 rounded-lg"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
               >
+                <button
+                  onClick={generateAIResponse}
+                  disabled={isGenerating || messages.length === 0}
+                  className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+                  style={{
+                    background: isGenerating ? 'var(--accent-primary)' : 'transparent',
+                    color: isGenerating ? 'var(--text-button, #000)' : 'var(--text-secondary)',
+                    opacity: messages.length === 0 ? 0.3 : 1,
+                  }}
+                  title="Generate AI Response"
+                >
+                  <MdAutoAwesome size={18} className={isGenerating ? 'animate-spin' : ''} />
+                </button>
                 <input
                   type="text"
-                  placeholder="Reply feature coming soon..."
-                  disabled
-                  className="bg-transparent border-none outline-none flex-1 text-sm"
-                  style={{ color: 'var(--text-secondary)' }}
+                  placeholder={
+                    isGenerating ? 'Generating AI response...'
+                    : selectedChannel === 'whatsapp' ? 'Type a reply (24h window)...'
+                    : 'Type a reply...'
+                  }
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && replyText.trim()) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                  disabled={isSending || isGenerating}
+                  className="bg-transparent border-none outline-none flex-1 text-xs"
+                  style={{ color: 'var(--text-primary)' }}
                 />
                 <button
-                  disabled
-                  className="p-2 rounded-lg opacity-50"
-                  style={{ background: 'var(--accent-primary)' }}
+                  onClick={sendReply}
+                  disabled={!replyText.trim() || isSending}
+                  className="p-1.5 rounded-lg transition-opacity flex-shrink-0"
+                  style={{
+                    background: 'var(--button-bg, #fff)',
+                    opacity: !replyText.trim() || isSending ? 0.4 : 1,
+                  }}
+                  title="Send Message"
                 >
-                  <MdSend size={20} color="white" />
+                  <MdSend size={18} style={{ color: 'var(--text-button, #000)' }} />
                 </button>
               </div>
             </div>
@@ -1148,186 +1766,268 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Lead Details Sidebar */}
-      {selectedLeadId && leadDetails && (
+      {selectedLeadId && (
         <div
-          className="hidden lg:flex w-[280px] flex-col border-l overflow-y-auto"
-          style={{
-            background: 'var(--bg-secondary)',
-            borderColor: 'var(--border-primary)'
-          }}
+          className="flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
+          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
         >
-          {/* Lead Card */}
-          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
-              >
-                {(leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                  {leadDetails.customer_name || 'Unknown'}
-                </p>
-              </div>
+          {!leadDetails ? (
+            <div className="p-4 text-center">
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
             </div>
-            <div className="space-y-1.5">
-              {leadDetails.phone && (
-                <div className="flex items-center gap-2">
-                  <MdPhone size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
-                </div>
-              )}
-              {leadDetails.email && (
-                <div className="flex items-center gap-2">
-                  <MdEmail size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
-                </div>
-              )}
-              {(() => {
-                const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-                const city = ctx.city || ctx.location
-                const brand = ctx.brand || ctx.brand_name || ctx.company
-                const businessType = ctx.type || ctx.business_type
-                return (
-                  <>
-                    {city && (
-                      <div className="flex items-center gap-2">
-                        <MdLocationOn size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{city}</span>
-                      </div>
-                    )}
-                    {brand && (
-                      <div className="flex items-center gap-2">
-                        <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{brand}</span>
-                      </div>
-                    )}
-                    {businessType && (
-                      <div className="flex items-center gap-2">
-                        <MdPerson size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{businessType}</span>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-
-          {/* Score + Stage */}
-          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Score</p>
-                <span
-                  className="text-lg font-bold"
-                  style={{
-                    color: (leadDetails.lead_score ?? 0) >= 60 ? '#22C55E'
-                      : (leadDetails.lead_score ?? 0) >= 30 ? '#F59E0B'
-                      : '#EF4444'
-                  }}
-                >
-                  {leadDetails.lead_score ?? '—'}
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Stage</p>
-                <span
-                  className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                  style={{
-                    background: leadDetails.lead_stage === 'Converted' ? 'rgba(34,197,94,0.15)' :
-                      leadDetails.lead_stage === 'Booking Made' ? 'rgba(59,130,246,0.15)' :
-                      leadDetails.lead_stage === 'High Intent' ? 'rgba(168,85,247,0.15)' :
-                      leadDetails.lead_stage === 'Qualified' ? 'rgba(245,158,11,0.15)' :
-                      leadDetails.lead_stage === 'Engaged' ? 'rgba(34,197,94,0.15)' :
-                      'rgba(156,163,175,0.15)',
-                    color: leadDetails.lead_stage === 'Converted' ? '#22C55E' :
-                      leadDetails.lead_stage === 'Booking Made' ? '#3B82F6' :
-                      leadDetails.lead_stage === 'High Intent' ? '#A855F7' :
-                      leadDetails.lead_stage === 'Qualified' ? '#F59E0B' :
-                      leadDetails.lead_stage === 'Engaged' ? '#22C55E' :
-                      'var(--text-secondary)'
-                  }}
-                >
-                  {leadDetails.lead_stage || 'New'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Upcoming Booking */}
+          ) : (
+          <>
+          {/* 1. Header - Avatar, Name, Company, City + Channel */}
           {(() => {
-            const uc = leadDetails.unified_context || {}
-            const bookingDate = leadDetails.booking_date ||
-              uc.web?.booking_date || uc.web?.booking?.date ||
-              uc.whatsapp?.booking_date || uc.whatsapp?.booking?.date ||
-              uc.voice?.booking_date || uc.voice?.booking?.date
-            const bookingTime = leadDetails.booking_time ||
-              uc.web?.booking_time || uc.web?.booking?.time ||
-              uc.whatsapp?.booking_time || uc.whatsapp?.booking?.time ||
-              uc.voice?.booking_time || uc.voice?.booking?.time
-            const meetLink = uc.web?.meeting_link || uc.whatsapp?.meeting_link || uc.bcon?.meeting_link || uc.windchasers?.meeting_link
-
-            if (!bookingDate) return null
+            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+            const city = ctx.city || ctx.location || ''
+            const brand = ctx.brand || ctx.brand_name || ctx.company || ''
+            const initials = (leadDetails.customer_name || leadDetails.phone || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const stageAvatarColors: Record<string, string> = {
+              'Converted': '#22c55e',
+              'Booking Made': '#60a5fa',
+              'High Intent': '#f59e0b',
+              'Qualified': '#a855f7',
+              'Engaged': '#6b7280',
+              'In Sequence': '#8b5cf6',
+            }
+            const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
+            const channelLabel = selectedChannel === 'whatsapp' ? 'WhatsApp' : selectedChannel === 'web' ? 'Web' : selectedChannel === 'voice' ? 'Voice' : selectedChannel || ''
             return (
-              <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Upcoming Event
+              <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
+                  style={{ background: avatarBg, color: 'var(--text-button, #000)' }}
+                >
+                  {initials}
+                </div>
+                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
                 </p>
-                <div className="flex items-start gap-2">
-                  <MdEvent size={14} style={{ color: '#3B82F6', marginTop: 1, flexShrink: 0 }} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {bookingDate}
-                    </p>
-                    {bookingTime && (
-                      <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                        {typeof bookingTime === 'string' ? bookingTime : String(bookingTime)}
-                      </p>
-                    )}
-                    {meetLink && (
-                      <a
-                        href={meetLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] flex items-center gap-1 mt-0.5 hover:underline"
-                        style={{ color: '#3B82F6' }}
-                      >
-                        Join meeting <MdOpenInNew size={10} />
-                      </a>
+                {brand && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{brand}</p>
+                )}
+                {(city || channelLabel) && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {city && <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{city}</span>}
+                    {city && channelLabel && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>·</span>}
+                    {channelLabel && (
+                      <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                        {selectedChannel === 'whatsapp' ? <FaWhatsapp size={10} style={{ color: '#25D366' }} /> :
+                         selectedChannel === 'web' ? <MdLanguage size={11} style={{ color: 'var(--text-muted)' }} /> :
+                         selectedChannel === 'voice' ? <MdPhone size={11} style={{ color: 'var(--text-muted)' }} /> : null}
+                        {channelLabel}
+                      </span>
                     )}
                   </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 2. Score + Stage + Last Active */}
+          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
+            <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-primary)' }}>
+              {leadDetails.lead_score != null && (
+                <span className="text-sm font-bold px-2 py-0.5 rounded-md" style={{
+                  background: leadDetails.lead_score >= 60 ? 'rgba(34,197,94,0.15)' : leadDetails.lead_score >= 30 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444',
+                }}>
+                  {leadDetails.lead_score}
+                </span>
+              )}
+              {leadDetails.lead_stage && (() => {
+                const stageColors: Record<string, { bg: string; text: string }> = {
+                  'New':          { bg: '#3266ad', text: '#E6F1FB' },
+                  'Engaged':      { bg: '#3d5fa0', text: '#E6F1FB' },
+                  'Qualified':    { bg: '#485693', text: '#F1EFE8' },
+                  'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
+                  'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
+                  'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
+                  'Converted':    { bg: '#639922', text: '#EAF3DE' },
+                  'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
+                  'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
+                  'Cold':         { bg: '#993C1D', text: '#FAECE7' },
+                }
+                const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
+                return (
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                    style={{ background: sc.bg, color: sc.text }}>
+                    {leadDetails.lead_stage}
+                  </span>
+                )
+              })()}
+              {leadDetails.last_message_at && (
+                <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
+                  {(() => {
+                    const diff = Date.now() - new Date(leadDetails.last_message_at || leadDetails.updated_at || '').getTime()
+                    const mins = Math.floor(diff / 60000)
+                    if (mins < 1) return 'Just now'
+                    if (mins < 60) return `${mins}m ago`
+                    const hrs = Math.floor(mins / 60)
+                    if (hrs < 24) return `${hrs}h ago`
+                    const days = Math.floor(hrs / 24)
+                    return `${days}d ago`
+                  })()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 3. Quick Action Buttons - Call, WhatsApp, Email */}
+          <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
+            <button
+              disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
+              onClick={async () => {
+                if (!leadDetails.phone) return;
+                setCallingLeadId(leadDetails.id);
+                try {
+                  const res = await fetch('/api/agent/voice/test-call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: leadDetails.phone, leadName: leadDetails.customer_name }),
+                  });
+                  const data = await res.json();
+                  if (data.success) alert(`Calling ${leadDetails.customer_name || leadDetails.phone}...`);
+                  else alert(`Call failed: ${JSON.stringify(data.error)}`);
+                } catch (e: any) {
+                  alert(`Error: ${e.message}`);
+                } finally {
+                  setCallingLeadId(null);
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity disabled:opacity-40"
+              style={{
+                background: leadDetails.phone ? '#22C55E' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
+              }}
+            >
+              <MdPhone size={14} /> {callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
+            </button>
+            <a
+              href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              style={{
+                background: leadDetails.phone ? '#25D366' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
+                opacity: leadDetails.phone ? 1 : 0.4,
+                pointerEvents: leadDetails.phone ? 'auto' : 'none',
+              }}
+            >
+              <FaWhatsapp size={14} /> WhatsApp
+            </a>
+            <a
+              href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              style={{
+                background: leadDetails.email ? '#8B5CF6' : 'var(--bg-tertiary)',
+                color: leadDetails.email ? '#fff' : 'var(--text-muted)',
+                opacity: leadDetails.email ? 1 : 0.4,
+                pointerEvents: leadDetails.email ? 'auto' : 'none',
+              }}
+            >
+              <MdEmail size={14} /> Email
+            </a>
+          </div>
+
+          {/* 4. Business Info - label: value pairs */}
+          {(() => {
+            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+            const fields: { label: string; value: string | undefined }[] = [
+              { label: 'Business Type', value: ctx.type || ctx.business_type },
+              { label: 'Urgency', value: ctx.urgency || ctx.timeline },
+              { label: 'Volume', value: ctx.volume || ctx.team_size || ctx.scale },
+              { label: 'Website', value: ctx.website || ctx.url },
+              { label: 'AI Systems', value: ctx.ai_systems || ctx.current_tools || ctx.existing_ai },
+            ].filter(f => f.value)
+            if (fields.length === 0) return null
+            return (
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business Info</p>
+                <div className="space-y-1.5">
+                  {fields.map(f => (
+                    <div key={f.label} className="flex justify-between items-baseline gap-2">
+                      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                      <span className="text-[11px] text-right truncate" style={{ color: 'var(--text-secondary)' }}>{f.value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )
           })()}
 
-          {/* Admin Notes */}
-          {leadDetails.admin_notes && (
-            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                Notes
-              </p>
-              <div className="flex items-start gap-2">
-                <MdNotes size={14} style={{ color: 'var(--text-muted)', marginTop: 1, flexShrink: 0 }} />
-                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  {leadDetails.admin_notes}
-                </p>
+          {/* 5. Upcoming Events */}
+          {(() => {
+            const bd = leadDetails.booking_date
+              || leadDetails.unified_context?.web?.booking_date
+              || leadDetails.unified_context?.whatsapp?.booking_date
+            const bt = leadDetails.booking_time
+              || leadDetails.unified_context?.web?.booking_time
+              || leadDetails.unified_context?.whatsapp?.booking_time
+            const ml = leadDetails.unified_context?.web?.booking_meet_link
+              || leadDetails.unified_context?.whatsapp?.booking_meet_link
+            // Filter: only show if booking date is today or in the future
+            const today = new Date().toISOString().split('T')[0]
+            const isUpcoming = bd && bd >= today
+            return (
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
+                {isUpcoming ? (
+                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid #22c55e' }}>
+                    <div className="flex items-center gap-1.5">
+                      <MdEvent size={14} style={{ color: '#22c55e' }} />
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    {bt && (
+                      <p className="text-[11px] mt-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
+                        {(() => {
+                          const tp = bt.toString().split(':')
+                          if (tp.length < 2) return bt
+                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                          if (isNaN(h) || isNaN(m)) return bt
+                          return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                        })()}
+                      </p>
+                    )}
+                    {ml && (
+                      <a href={ml} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] mt-1.5 pl-5 inline-block hover:underline" style={{ color: 'var(--accent-primary)' }}>
+                        Join Meeting →
+                      </a>
+                    )}
+                  </div>
+                ) : bd ? (
+                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid var(--text-muted)', opacity: 0.6 }}>
+                    <div className="flex items-center gap-1.5">
+                      <MdEvent size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} (past)
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
+                )}
               </div>
-            </div>
-          )}
+            )
+          })()}
 
-          {/* View Full Details link */}
-          <div className="p-3">
+          {/* 6. View Full Details - prominent button */}
+          <div className="px-4 py-3 mt-auto">
             <button
-              onClick={() => openLeadModal(selectedLeadId!)}
-              className="w-full text-center text-[11px] font-medium py-1.5 rounded-md transition-colors hover:opacity-80"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+              onClick={() => leadDetails?.id && router.push(`/dashboard/leads?leadId=${leadDetails.id}`)}
+              className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
+              style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
             >
-              View Full Details
+              <MdOpenInNew size={14} /> View Full Details
             </button>
           </div>
+          </>
+          )}
         </div>
       )}
 

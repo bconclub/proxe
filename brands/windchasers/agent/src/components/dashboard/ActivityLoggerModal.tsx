@@ -11,6 +11,7 @@ interface ActivityLoggerModalProps {
     note: string
     duration?: number
     next_followup?: string
+    disqualification_reason?: string
   }) => Promise<void>
   leadName?: string
   stageChange?: {
@@ -18,6 +19,28 @@ interface ActivityLoggerModalProps {
     newStage: string
   }
 }
+
+const NOT_QUALIFIED_REASONS = [
+  'Not Responding',
+  'Wrong Fit / Not Target Market',
+  'Budget Constraints',
+  'Not the Decision Maker',
+  'Timing Not Right',
+  'Competitor Chosen',
+  'Duplicate Lead',
+  'Spam / Invalid',
+  'Other',
+]
+
+const CLOSED_LOST_REASONS = [
+  'Lost to Competitor',
+  'Budget Constraints',
+  'No Longer Interested',
+  'Went Silent / Not Responding',
+  'Bad Timing',
+  'Wrong Fit',
+  'Other',
+]
 
 const ACTIVITY_TYPES = [
   { value: 'call' as const, label: 'Call', icon: MdPhone, color: '#3B82F6' },
@@ -38,8 +61,12 @@ export default function ActivityLoggerModal({
   const [duration, setDuration] = useState('')
   const [nextFollowupDate, setNextFollowupDate] = useState('')
   const [nextFollowupTime, setNextFollowupTime] = useState('')
+  const [disqualificationReason, setDisqualificationReason] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const showReasonPicker = stageChange && (stageChange.newStage === 'Not Qualified' || stageChange.newStage === 'Closed Lost')
+  const reasonOptions = stageChange?.newStage === 'Not Qualified' ? NOT_QUALIFIED_REASONS : CLOSED_LOST_REASONS
 
   // Generate time options in 30-minute intervals
   const generateTimeOptions = () => {
@@ -68,6 +95,11 @@ export default function ActivityLoggerModal({
       return
     }
 
+    if (showReasonPicker && !disqualificationReason) {
+      setError('Please select a reason')
+      return
+    }
+
     setError(null)
     setIsSaving(true)
 
@@ -88,6 +120,7 @@ export default function ActivityLoggerModal({
         note: note.trim(),
         duration: duration ? parseInt(duration, 10) : undefined,
         next_followup: nextFollowupDateTime,
+        disqualification_reason: disqualificationReason || undefined,
       })
       
       // Reset form
@@ -95,6 +128,7 @@ export default function ActivityLoggerModal({
       setDuration('')
       setNextFollowupDate('')
       setNextFollowupTime('')
+      setDisqualificationReason('')
       setActivityType('call')
       onClose()
     } catch (err) {
@@ -110,6 +144,7 @@ export default function ActivityLoggerModal({
       setDuration('')
       setNextFollowupDate('')
       setNextFollowupTime('')
+      setDisqualificationReason('')
       setError(null)
       onClose()
     }
@@ -144,7 +179,7 @@ export default function ActivityLoggerModal({
             <button
               onClick={handleClose}
               disabled={isSaving}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded"
             >
               <MdClose size={24} />
             </button>
@@ -168,7 +203,7 @@ export default function ActivityLoggerModal({
                       onClick={() => setActivityType(type.value)}
                       disabled={isSaving}
                       className={`
-                        flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all
+                        flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                         ${isSelected
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
@@ -191,6 +226,35 @@ export default function ActivityLoggerModal({
                 })}
               </div>
             </div>
+
+            {/* Disqualification Reason (for Not Qualified / Closed Lost) */}
+            {showReasonPicker && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {reasonOptions.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setDisqualificationReason(reason)}
+                      disabled={isSaving}
+                      className={`
+                        px-3 py-1.5 text-xs font-medium rounded-full border transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
+                        ${disqualificationReason === reason
+                          ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 dark:border-red-400'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500'
+                        }
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                      `}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Note (Required) */}
             <div>
@@ -270,14 +334,14 @@ export default function ActivityLoggerModal({
               <button
                 onClick={handleClose}
                 disabled={isSaving}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving || !note.trim()}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               >
                 {isSaving ? 'Saving...' : 'Save Activity'}
               </button>

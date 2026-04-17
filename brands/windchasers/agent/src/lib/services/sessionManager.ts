@@ -1,5 +1,5 @@
 /**
- * services/sessionManager.ts — Channel-agnostic session CRUD
+ * services/sessionManager.ts - Channel-agnostic session CRUD
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  *   - mapSession()          (lines 538-562)
@@ -234,7 +234,7 @@ export async function ensureSession(
       return null;
     }
 
-    // Table doesn't exist — fallback
+    // Table doesn't exist - fallback
     if (insertError.code === '42P01' || insertError.code === '42703' || insertError.code === '42702') {
       console.log('[sessionManager] Channel table unavailable, creating in fallback');
       const { data: fallbackCreated, error: fallbackError } = await client
@@ -254,7 +254,7 @@ export async function ensureSession(
       if (fallbackCreated) return mapSession(fallbackCreated);
     }
 
-    // NOT NULL constraint — try minimal insert
+    // NOT NULL constraint - try minimal insert
     if (insertError.code === '23502') {
       console.log('[sessionManager] Trying minimal insert');
       const { data: minimalCreated, error: minimalError } = await client

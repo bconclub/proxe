@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/calendar/availability — Check available calendar slots
+ * POST /api/agent/calendar/availability - Check available calendar slots
  *
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/calendar/availability/route.ts.

@@ -16,6 +16,58 @@ interface UseChatStreamOptions {
   onMessageComplete?: (message: Message) => void;
 }
 
+const BCON_INTRO_LINE_REGEXES = [
+  /^hi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+  /^how can i help with your marketing today\??$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+];
+
+const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
+  if (!rawText) return '';
+
+  const withoutGenericGreeting = rawText
+    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
+    .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .trim();
+
+  const normalized = withoutGenericGreeting
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!hasPriorAssistantMessage) {
+    return normalized;
+  }
+
+  const strippedRepeatedIntro = normalized
+    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\bi\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '');
+  const strippedRepeatedIdentity = strippedRepeatedIntro
+    .replace(/\bi\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
+
+  const lines = strippedRepeatedIdentity
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*[,\-:]\s*/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    )
+    .filter(Boolean);
+
+  const filtered = lines.filter(
+    (line) => !BCON_INTRO_LINE_REGEXES.some((regex) => regex.test(line))
+  );
+
+  const cleaned = filtered.join('\n').trim();
+  return cleaned || normalized;
+};
+
 export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStreamOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +98,27 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
     };
     setMessages((prev) => [...prev, aiMessage]);
     return aiMessage;
+  }, []);
+
+  const addStreamingAIMessage = useCallback((initialText: string = '') => {
+    const aiMessage: Message = {
+      id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      type: 'ai',
+      text: initialText,
+      isStreaming: true,
+      hasStreamed: false,
+      followUps: [],
+    };
+    setMessages((prev) => [...prev, aiMessage]);
+    return aiMessage;
+  }, []);
+
+  const updateMessageText = useCallback((id: string, text: string) => {
+    setMessages((prev) => prev.map((msg) => msg.id === id ? { ...msg, text } : msg));
+  }, []);
+
+  const finishMessage = useCallback((id: string) => {
+    setMessages((prev) => prev.map((msg) => msg.id === id ? { ...msg, isStreaming: false, hasStreamed: true } : msg));
   }, []);
 
   const sendMessage = useCallback(async (
@@ -227,7 +300,17 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                             setMessages((prev) =>
                               prev.map((msg) =>
                                 msg.id === streamingMessage.id
-                                  ? { ...msg, text: (msg.text || '') + charsToAdd }
+                                  ? (() => {
+                                      const hasPriorAssistantMessage = prev.some(
+                                        (existing) =>
+                                          existing.id !== streamingMessage.id &&
+                                          existing.type === 'ai' &&
+                                          Boolean(existing.text?.trim())
+                                      );
+
+                                      const nextRawText = (msg.text || '') + charsToAdd;
+                                      return { ...msg, text: nextRawText };
+                                    })()
                                   : msg
                               )
                             );
@@ -296,10 +379,16 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                     setMessages((prev) => {
                       const updated = prev.map((msg) => {
                         if (msg.id === streamingMessage.id) {
-                          const finalText = msg.text
-                            ?.replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
-                            .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
-                            .trim() || '';
+                          const hasPriorAssistantMessage = prev.some(
+                            (existing) =>
+                              existing.id !== streamingMessage.id &&
+                              existing.type === 'ai' &&
+                              Boolean(existing.text?.trim())
+                          );
+                          const finalText = sanitizeAssistantText(
+                            msg.text || '',
+                            hasPriorAssistantMessage
+                          );
 
                           const completedMessage: Message = {
                             ...msg,
@@ -384,5 +473,8 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
     clearMessages,
     addUserMessage,
     addAIMessage,
+    addStreamingAIMessage,
+    updateMessageText,
+    finishMessage,
   };
 }

@@ -16,6 +16,104 @@
   box-sizing: border-box;
 }
 
+/* Theme integration with parent ChatWidget toggle */
+:global(.themeLight) .calendarContainer {
+  background: #E5E7EB;
+  border: 1px solid #D1D5DB;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+:global(.themeLight) .monthYear,
+:global(.themeLight) .monthDayHeader,
+:global(.themeLight) .monthDateButton,
+:global(.themeLight) .timeSlotsTitle,
+:global(.themeLight) .timeSlot,
+:global(.themeLight) .timeSlotsPlaceholder,
+:global(.themeLight) .loadingText,
+:global(.themeLight) .formTitle,
+:global(.themeLight) .formSubtitle,
+:global(.themeLight) .formGroup input,
+:global(.themeLight) .backButton,
+:global(.themeLight) .downloadICSButton,
+:global(.themeLight) .confirmationTitle,
+:global(.themeLight) .confirmationText,
+:global(.themeLight) .confirmationDetails {
+  color: #111827;
+}
+
+:global(.themeLight) .navButton,
+:global(.themeLight) .monthDateButton,
+:global(.themeLight) .timeSlot,
+:global(.themeLight) .formGroup input,
+:global(.themeLight) .backButton,
+:global(.themeLight) .downloadICSButton,
+:global(.themeLight) .closeButton {
+  background: #FFFFFF;
+  border-color: #D1D5DB;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:global(.themeLight) .monthDateOther,
+:global(.themeLight) .timeSlotUnavailable {
+  color: #9CA3AF;
+  opacity: 0.7;
+}
+
+:global(.themeDark) .calendarContainer {
+  background: rgba(20, 20, 24, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+:global(.themeDark) .monthYear,
+:global(.themeDark) .monthDayHeader,
+:global(.themeDark) .monthDateButton,
+:global(.themeDark) .timeSlotsTitle,
+:global(.themeDark) .timeSlot,
+:global(.themeDark) .timeSlotsPlaceholder,
+:global(.themeDark) .loadingText,
+:global(.themeDark) .formTitle,
+:global(.themeDark) .formSubtitle,
+:global(.themeDark) .formGroup input,
+:global(.themeDark) .backButton,
+:global(.themeDark) .downloadICSButton,
+:global(.themeDark) .confirmationTitle,
+:global(.themeDark) .confirmationText,
+:global(.themeDark) .confirmationDetails {
+  color: #F4EEFF;
+}
+
+:global(.themeDark) .monthDateButton,
+:global(.themeDark) .timeSlot,
+:global(.themeDark) .navButton,
+:global(.themeDark) .formGroup input,
+:global(.themeDark) .backButton,
+:global(.themeDark) .downloadICSButton,
+:global(.themeDark) .closeButton {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  color: #F4EEFF !important;
+}
+
+:global(.themeDark) .monthDateButton:hover:not(:disabled),
+:global(.themeDark) .timeSlot:hover:not(:disabled),
+:global(.themeDark) .navButton:hover,
+:global(.themeDark) .backButton:hover,
+:global(.themeDark) .downloadICSButton:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+}
+
+:global(.themeDark) .monthDateOther,
+:global(.themeDark) .timeSlotUnavailable,
+:global(.themeDark) .formSubtitle,
+:global(.themeDark) .timeSlotsPlaceholder {
+  color: rgba(244, 238, 255, 0.7) !important;
+  opacity: 1 !important;
+}
+
 /* Vertical layout: Calendar on top, Time slots below (same as mobile) */
 .calendarLayout {
   display: flex;
@@ -42,6 +140,37 @@
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.stepHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stepBackButton {
+  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  color: var(--text-primary, #ffffff);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stepBackButton:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.selectedDateLabel {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Calendar Header */
@@ -89,6 +218,11 @@
 .navButton:hover {
   background: var(--bg-active, rgba(255, 255, 255, 0.2));
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.navButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 /* Month Grid */
@@ -157,6 +291,11 @@
   color: var(--text-primary, #ffffff);
 }
 
+.monthDateButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .monthDateOther {
   opacity: 0.3;
   color: var(--text-muted, rgba(255, 255, 255, 0.5));
@@ -172,7 +311,8 @@
   background: var(--primary-color, #5B1A8C);
   color: var(--white, #ffffff);
   font-weight: 600;
-  box-shadow: 0 4px 16px var(--primary-color, rgba(91, 26, 140, 0.4));
+  border: 2px solid var(--accent);
+  box-shadow: none;
 }
 
 .datePast {
@@ -220,6 +360,11 @@
 .timeSlot:hover:not(:disabled) {
   background: var(--bg-hover, rgba(255, 255, 255, 0.2));
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.timeSlot:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .timeSlotSelected {
@@ -302,6 +447,11 @@
 .closeButton:hover {
   background: var(--bg-active, rgba(255, 255, 255, 0.2));
   transform: scale(1.1);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .closeButton svg {
@@ -395,6 +545,11 @@
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
 }
 
+.backButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .submitButton {
   flex: 2;
   padding: 14px;
@@ -413,6 +568,11 @@
   background: var(--primary-vibrant, #A03BA8);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
+}
+
+.submitButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--white, #ffffff), 0 0 0 4px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 /* Confirmation View */
@@ -529,6 +689,11 @@
   box-shadow: 0 6px 20px var(--primary-color, rgba(91, 26, 140, 0.4));
 }
 
+.addToCalendarButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--white, #ffffff), 0 0 0 4px var(--primary-color, rgba(91, 26, 140, 0.5));
+}
+
 .downloadICSButton {
   background: var(--bg-primary, rgba(255, 255, 255, 0.1));
   backdrop-filter: blur(10px);
@@ -539,6 +704,11 @@
 .downloadICSButton:hover {
   background: var(--bg-hover, rgba(255, 255, 255, 0.2));
   border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+}
+
+.downloadICSButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
 .addToCalendarButton svg,

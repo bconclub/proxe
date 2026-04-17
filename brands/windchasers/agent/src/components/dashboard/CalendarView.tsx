@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns'
-import { MdChevronLeft, MdChevronRight, MdViewWeek, MdViewModule, MdClose, MdPerson, MdEmail, MdPhone, MdCalendarToday, MdAccessTime } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdClose, MdCalendarToday, MdAccessTime, MdAdd, MdSend, MdPhone, MdEvent, MdMessage, MdNote } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
 
@@ -20,31 +20,43 @@ interface Booking {
   last_touchpoint?: string | null
   metadata?: any
   unified_context?: any
+  status?: string | null
 }
 
 interface CalendarViewProps {
   bookings: Booking[]
   onDateSelect?: (date: Date) => void
+  headerRight?: React.ReactNode
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
-const DAYS_OF_WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+// Business hours only - 8 AM to 6 PM
+const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 8,9,10,...,18
+const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
-// All events use brand accent color
-const getSourceColor = (_source: string | null) => {
-  return '' // Using inline style with var(--accent-primary) instead
+function formatHour(hour: number): string {
+  if (hour === 0) return '12 AM'
+  if (hour < 12) return `${hour} AM`
+  if (hour === 12) return '12 PM'
+  return `${hour - 12} PM`
 }
 
-export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
+export default function CalendarView({ bookings, onDateSelect, headerRight }: CalendarViewProps) {
   const router = useRouter()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('month')
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [loadingLead, setLoadingLead] = useState(false)
+  const [showNoteInput, setShowNoteInput] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteType, setNoteType] = useState<'note' | 'call' | 'meeting' | 'message'>('note')
+  const [savingNote, setSavingNote] = useState(false)
+  const [recentNotes, setRecentNotes] = useState<Array<{ note: string; activity_type: string; created_at: string }>>([])
+  const [loadingNotes, setLoadingNotes] = useState(false)
 
   // Check for date query parameter on mount
   useEffect(() => {
@@ -56,66 +68,39 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         if (!isNaN(date.getTime())) {
           setSelectedDate(date)
           setCurrentDate(date)
-          if (viewMode === 'week') {
-            // Switch to week view to show the selected date
-            setViewMode('week')
-          }
         }
       }
     }
+  }, [])
+
+  // Auto-scroll to top on mount (grid already starts at 8 AM)
+  useEffect(() => {
+    if (scrollRef.current && viewMode === 'week') {
+      scrollRef.current.scrollTop = 0
+    }
   }, [viewMode])
 
-  // Get bookings for a specific date
   const getBookingsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
-    return bookings.filter(
-      (b) => b.booking_date === dateStr && b.booking_time
-    )
+    return bookings.filter((b) => b.booking_date === dateStr && b.booking_time)
   }
 
-  // Get bookings for a specific date and time slot (hour)
   const getBookingsForTimeSlot = (date: Date, hour: number) => {
-    const dateBookings = getBookingsForDate(date)
-    return dateBookings.filter((b) => {
+    return getBookingsForDate(date).filter((b) => {
       if (!b.booking_time) return false
-      const [hours] = b.booking_time.split(':').map(Number)
-      return hours === hour
+      const [h] = b.booking_time.split(':').map(Number)
+      return h === hour
     })
   }
 
-  // Calculate position and height for booking block within an hour slot
-  const getBookingStyle = (booking: Booking, hour: number) => {
-    if (!booking.booking_time) return {}
-    const [hours, minutes = 0] = booking.booking_time.split(':').map(Number)
-
-    // Position within the hour slot (0-60 minutes)
-    // Each hour slot is 48px tall (40% smaller than 80px), so 1 minute = 48/60 = 0.8px
-    const minutesInHour = minutes
-    const topOffset = (minutesInHour / 60) * 48 // Position within the hour slot
-
-    // Default height: 1 hour (48px), but can be adjusted
-    const height = 48 // 1 hour block (40% smaller)
-
-    return {
-      top: `${topOffset}px`,
-      height: `${height}px`,
-      position: 'absolute' as const,
-      left: '4px',
-      right: '4px',
-    }
-  }
-
-  // Week view
+  // Week calculations
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
 
-  // Month view
+  // Month calculations
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
-
-  // Calendar grid for month view (including previous/next month days)
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
@@ -128,79 +113,43 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
     }
   }
 
-  const handleDateClick = (date: Date, fromMiniCalendar?: boolean) => {
+  const handleDateClick = (date: Date) => {
     setSelectedDate(date)
-    if (viewMode === 'week' || fromMiniCalendar) {
-      setCurrentDate(date)
-    }
+    setCurrentDate(date)
     onDateSelect?.(date)
-    // Navigate to bookings page with date filter
-    const dateStr = format(date, 'yyyy-MM-dd')
-    router.push(`/dashboard/bookings?date=${dateStr}`)
-  }
-
-  const handleBookingClick = (booking: Booking, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent date click
-    setSelectedBooking(booking)
-    setIsModalOpen(true)
   }
 
   const handleViewClientDetails = async () => {
     if (!selectedBooking) return
-
     setIsModalOpen(false)
     setLoadingLead(true)
-
     try {
-      // Fetch full lead details from unified_leads
       const response = await fetch(`/api/dashboard/leads?limit=1000`)
       if (!response.ok) throw new Error('Failed to fetch leads')
-
       const data = await response.json()
       const lead = data.leads?.find((l: any) => l.id === selectedBooking.id)
-
-      if (lead) {
-        // Convert to Lead type expected by LeadDetailsModal
-        const modalLead: Lead = {
-          id: lead.id,
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone,
-          source: lead.first_touchpoint || lead.last_touchpoint || lead.source || 'web',
-          timestamp: lead.timestamp || lead.last_interaction_at || new Date().toISOString(),
-          status: lead.status || null,
-          booking_date: lead.booking_date || selectedBooking.booking_date,
-          booking_time: lead.booking_time || selectedBooking.booking_time,
-          metadata: lead.metadata,
-        }
-        setSelectedLead(modalLead)
-        setIsLeadModalOpen(true)
-      } else {
-        // If not found in leads, create from booking data
-        const modalLead: Lead = {
-          id: selectedBooking.id,
-          name: selectedBooking.name,
-          email: selectedBooking.email,
-          phone: selectedBooking.phone,
-          source: selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web',
-          timestamp: new Date().toISOString(),
-          status: null,
-          booking_date: selectedBooking.booking_date,
-          booking_time: selectedBooking.booking_time,
-          metadata: selectedBooking.metadata,
-        }
-        setSelectedLead(modalLead)
-        setIsLeadModalOpen(true)
+      const source = lead || selectedBooking
+      const modalLead: Lead = {
+        id: source.id,
+        name: source.name || source.customer_name,
+        email: source.email,
+        phone: source.phone,
+        source: source.first_touchpoint || source.last_touchpoint || source.source || 'web',
+        timestamp: source.timestamp || source.last_interaction_at || new Date().toISOString(),
+        status: source.status || null,
+        booking_date: source.booking_date || selectedBooking.booking_date,
+        booking_time: source.booking_time || selectedBooking.booking_time,
+        metadata: source.metadata,
       }
-    } catch (error) {
-      console.error('Error fetching lead details:', error)
-      // Fallback: create lead from booking data
+      setSelectedLead(modalLead)
+      setIsLeadModalOpen(true)
+    } catch {
       const modalLead: Lead = {
         id: selectedBooking.id,
         name: selectedBooking.name,
         email: selectedBooking.email,
         phone: selectedBooking.phone,
-        source: selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web',
+        source: selectedBooking.source || 'web',
         timestamp: new Date().toISOString(),
         status: null,
         booking_date: selectedBooking.booking_date,
@@ -221,10 +170,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
-
       if (!response.ok) throw new Error('Failed to update status')
-
-      // Update selected lead status
       if (selectedLead && selectedLead.id === leadId) {
         setSelectedLead({ ...selectedLead, status: newStatus || null })
       }
@@ -234,262 +180,355 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
     }
   }
 
+  // Fetch recent notes when modal opens
+  const fetchNotes = async (leadId: string) => {
+    setLoadingNotes(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/activities`)
+      if (!res.ok) return
+      const data = await res.json()
+      const notes = (data.activities || [])
+        .filter((a: any) => a.type === 'team')
+        .slice(0, 5)
+        .map((a: any) => ({ note: a.content, activity_type: a.icon, created_at: a.timestamp }))
+      setRecentNotes(notes)
+    } catch { /* ignore */ }
+    finally { setLoadingNotes(false) }
+  }
+
+  const handleSaveNote = async () => {
+    if (!selectedBooking || !noteText.trim()) return
+    setSavingNote(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${selectedBooking.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activity_type: noteType, note: noteText.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      setNoteText('')
+      setShowNoteInput(false)
+      fetchNotes(selectedBooking.id)
+    } catch (err) {
+      console.error('Error saving note:', err)
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const handleBookingModalOpen = (booking: Booking, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedBooking(booking)
+    setIsModalOpen(true)
+    setShowNoteInput(false)
+    setNoteText('')
+    setNoteType('note')
+    setRecentNotes([])
+    fetchNotes(booking.id)
+  }
+
+  const NOTE_TYPES = [
+    { value: 'call' as const, label: 'Call', icon: MdPhone },
+    { value: 'meeting' as const, label: 'Meeting', icon: MdEvent },
+    { value: 'message' as const, label: 'Message', icon: MdMessage },
+    { value: 'note' as const, label: 'Note', icon: MdNote },
+  ]
+
+  // Timezone label - Asia/Kolkata (GMT+05:30)
+  const tzLabel = 'Asia/Kolkata (GMT+05:30)'
+
+// Get event color based on booking status and date
+function getEventColor(booking: Booking): string {
+  const today = new Date().toISOString().split('T')[0]
+  const isPast = booking.booking_date && booking.booking_date < today
+  
+  // Check status from metadata or unified_context
+  const status = booking.status || 
+    booking.metadata?.status || 
+    booking.metadata?.booking_status ||
+    booking.unified_context?.web?.booking_status ||
+    booking.unified_context?.whatsapp?.booking_status
+  
+  if (status === 'no_show' || status === 'no-show' || status === 'cancelled') {
+    return '#EF4444' // Red for no-show/cancelled
+  }
+  if (status === 'completed' || status === 'done' || status === 'attended') {
+    return '#22C55E' // Green for completed
+  }
+  if (isPast) {
+    return '#9CA3AF' // Gray for past bookings
+  }
+  return '#3B82F6' // Blue for upcoming
+}
+
   return (
-    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-[calc(100vh-200px)]">
+    <div className="flex gap-0 h-[calc(100vh-64px)]">
       {/* Left Sidebar - Mini Calendar */}
-      <div className="hidden md:block w-64 flex-shrink-0 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg p-4">
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
-            >
-              <MdChevronLeft size={20} />
-            </button>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {format(currentDate, 'MMMM yyyy')}
-            </span>
-            <button
-              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
-            >
-              <MdChevronRight size={20} />
-            </button>
-          </div>
+      <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
+        {/* Mini calendar month nav */}
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
+            <MdChevronLeft size={16} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+          <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+            {format(currentDate, 'MMM yyyy')}
+          </span>
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
+            <MdChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
+          </button>
         </div>
 
-        {/* Mini Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) => (
-            <div
-              key={day}
-              className="text-xs text-center text-gray-500 dark:text-gray-400 font-medium py-1"
-            >
-              {day}
-            </div>
+        {/* Day headers */}
+        <div className="grid grid-cols-7">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+            <div key={i} className="text-[9px] text-center font-medium py-0.5" style={{ color: 'var(--text-secondary)' }}>{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
+
+        {/* Mini calendar grid */}
+        <div className="grid grid-cols-7 gap-0">
           {calendarDays.map((day, idx) => {
             const isCurrentMonth = isSameMonth(day, currentDate)
-            const isSelected = isSameDay(day, selectedDate)
             const isToday = isSameDay(day, new Date())
-            const dayBookings = getBookingsForDate(day)
+            const isSelected = isSameDay(day, selectedDate)
+            const hasBookings = getBookingsForDate(day).length > 0
 
             return (
               <button
                 key={idx}
-                onClick={() => handleDateClick(day, true)}
-                className={`
-                  aspect-square text-xs p-1 rounded
-                  ${!isCurrentMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-900 dark:text-gray-100'}
-                  ${isSelected ? 'text-white font-semibold' : ''}
-                  ${isToday && !isSelected ? 'font-semibold' : ''}
-                  hover:bg-gray-100 dark:hover:bg-[#262626]
-                  relative
-                `}
+                onClick={() => handleDateClick(day)}
+                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
-                  ...(isSelected ? { backgroundColor: 'var(--accent-primary)', color: 'white' } : {}),
-                  ...(isToday && !isSelected ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } : {}),
+                  color: !isCurrentMonth ? 'var(--text-secondary)' : isSelected ? '#fff' : isToday ? 'var(--accent-primary)' : 'var(--text-primary)',
+                  backgroundColor: isSelected ? 'var(--button-bg)' : isToday ? 'var(--accent-subtle)' : 'transparent',
+                  fontWeight: isToday || isSelected ? 600 : 400,
+                  opacity: !isCurrentMonth ? 0.4 : 1,
                 }}
               >
                 {format(day, 'd')}
-                {dayBookings.length > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-0.5 pb-0.5">
-                    {dayBookings.slice(0, 3).map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-1 h-1 rounded-full"
-                        style={{ backgroundColor: 'var(--accent-primary)' }}
-                      />
-                    ))}
-                  </div>
+                {hasBookings && !isSelected && (
+                  <span className="absolute bottom-0 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--button-bg)' }} />
                 )}
               </button>
             )
           })}
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#262626]">
-          <div className="flex gap-2">
+        {/* View toggle */}
+        <div className="mt-3 pt-3 flex gap-1" style={{ borderTop: '1px solid var(--border-primary)' }}>
+          {(['week', 'month'] as const).map((mode) => (
             <button
-              onClick={() => setViewMode('week')}
-              className={`
-                flex-1 px-3 py-2 text-sm rounded-md transition-colors
-                ${viewMode === 'week'
-                  ? 'text-white'
-                  : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
-                }
-              `}
-              style={viewMode === 'week' ? { backgroundColor: 'var(--accent-primary)' } : undefined}
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className="flex-1 py-1 text-[10px] font-medium rounded transition-colors capitalize"
+              style={{
+                backgroundColor: viewMode === mode ? 'var(--button-bg)' : 'transparent',
+                color: viewMode === mode ? 'var(--text-button)' : 'var(--text-secondary)',
+              }}
             >
-              <span className="inline mr-1">
-                <MdViewWeek size={16} />
-              </span>
-              Week
+              {mode}
             </button>
-            <button
-              onClick={() => setViewMode('month')}
-              className={`
-                flex-1 px-3 py-2 text-sm rounded-md transition-colors
-                ${viewMode === 'month'
-                  ? 'text-white'
-                  : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
-                }
-              `}
-              style={viewMode === 'month' ? { backgroundColor: 'var(--accent-primary)' } : undefined}
-            >
-              <span className="inline mr-1">
-                <MdViewModule size={16} />
-              </span>
-              Month
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Main Calendar View */}
-      <div className="flex-1 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg overflow-hidden min-w-0">
-        {/* Header */}
-        <div className="border-b border-gray-200 dark:border-[#262626] p-2 md:p-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 md:gap-4">
+      {/* Main Calendar */}
+      <div className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+        {/* Top bar */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+          <button
+            onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()) }}
+            className="px-3 py-1 text-xs font-medium border rounded hover:shadow-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+          >
+            Today
+          </button>
+          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
+            <MdChevronLeft size={20} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]">
+            <MdChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+          <h2 className="text-sm font-medium ml-1" style={{ color: 'var(--text-primary)' }}>
+            {format(currentDate, 'MMMM yyyy')}
+          </h2>
+          {/* Mobile view toggle */}
+          <div className="lg:hidden flex gap-1">
+            {(['week', 'month'] as const).map((mode) => (
               <button
-                onClick={() => navigateDate('prev')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className="px-2 py-0.5 text-[10px] font-medium rounded capitalize focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                style={{
+                  backgroundColor: viewMode === mode ? 'var(--button-bg)' : 'transparent',
+                  color: viewMode === mode ? 'var(--text-button)' : 'var(--text-secondary)',
+                }}
               >
-                <MdChevronLeft size={20} />
+                {mode}
               </button>
-              <h2 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white">
-                {viewMode === 'week'
-                  ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`
-                  : format(currentDate, 'MMMM yyyy')}
-              </h2>
-              <button
-                onClick={() => navigateDate('next')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
-              >
-                <MdChevronRight size={20} />
-              </button>
-            </div>
-            <button
-              onClick={() => {
-                setCurrentDate(new Date())
-                setSelectedDate(new Date())
-              }}
-              className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm text-white rounded-md hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
-            >
-              Today
-            </button>
+            ))}
           </div>
+          {/* Right side - sync button etc. */}
+          {headerRight && <div className="ml-auto">{headerRight}</div>}
         </div>
 
-        {/* Calendar Grid */}
-        <div className="overflow-x-auto overflow-y-auto h-[calc(100%-60px)] md:h-[calc(100%-80px)]">
-          {viewMode === 'week' ? (
-            /* Week View */
-            <div className="grid grid-cols-8 min-w-[800px] md:min-w-full">
-              {/* Time column */}
-              <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10 w-16 md:w-auto">
-                {/* Empty header to align with day headers - exact match */}
-                <div className="border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center flex flex-col justify-center" style={{ height: '60px', minHeight: '60px' }}></div>
-                {HOURS.map((hour) => (
+        {viewMode === 'week' ? (
+          /* ===== WEEK VIEW - Google Calendar Style ===== */
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {/* Day header row - fixed */}
+            <div className="flex border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              {/* Timezone label in corner */}
+              <div className="w-[48px] flex-shrink-0 flex items-end justify-center pb-0.5">
+                <span className="text-[8px]" style={{ color: 'var(--text-secondary)' }}>{tzLabel}</span>
+              </div>
+              {/* Day columns */}
+              {weekDays.map((day, i) => {
+                const isToday = isSameDay(day, new Date())
+                return (
                   <div
-                    key={hour}
-                    className="border-b border-gray-100 dark:border-[#262626] px-1 md:px-2 flex items-center"
-                    style={{ height: '48px', minHeight: '48px' }}
+                    key={i}
+                    className="flex-1 text-center py-1 border-l"
+                    style={{ borderColor: 'var(--border-primary)' }}
                   >
-                    <span className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 font-medium">
-                      {hour === 0 ? '12A' : hour < 12 ? `${hour}A` : hour === 12 ? '12P' : `${hour - 12}P`}
-                    </span>
+                    <div className="text-[10px] font-medium" style={{ color: isToday ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                      {DAY_LABELS[i]}
+                    </div>
+                    <div
+                      className="text-lg font-normal leading-tight mx-auto flex items-center justify-center"
+                      style={{
+                        color: isToday ? '#fff' : 'var(--text-primary)',
+                        backgroundColor: isToday ? 'var(--button-bg)' : 'transparent',
+                        borderRadius: '50%',
+                        width: '30px',
+                        height: '30px',
+                      }}
+                    >
+                      {format(day, 'd')}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Scrollable time grid */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex relative">
+                {/* Time labels */}
+                <div className="w-[48px] flex-shrink-0">
+                  {HOURS.map((hour) => (
+                    <div
+                      key={hour}
+                      className="relative border-b"
+                      style={{ height: '52px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                    >
+                      {hour > 0 && (
+                        <span className="absolute -top-[6px] right-1.5 text-[9px] leading-none" style={{ color: 'var(--text-secondary)' }}>
+                          {formatHour(hour)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day columns with time slots */}
+                {weekDays.map((day, dayIdx) => (
+                  <div key={dayIdx} className="flex-1 border-l relative" style={{ borderColor: 'var(--border-primary)' }}>
+                    {HOURS.map((hour) => (
+                      <div
+                        key={hour}
+                        className="border-b"
+                        style={{ height: '52px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                      />
+                    ))}
+                    {/* Booking events overlaid */}
+                    {getBookingsForDate(day).map((booking, bIdx) => {
+                      if (!booking.booking_time) return null
+                      const [h, m] = booking.booking_time.split(':').map(Number)
+                      const top = (h - 8) * 52 + Math.round((m || 0) * 52 / 60)
+                      const height = 52 // 1-hour block
+                      const dayBookingsAtHour = getBookingsForTimeSlot(day, h)
+                      const total = dayBookingsAtHour.length
+                      const idx = dayBookingsAtHour.indexOf(booking)
+                      const widthPct = total > 1 ? 100 / total : 100
+                      const leftPct = total > 1 ? idx * widthPct : 0
+
+                      const topic = booking.booking_title || booking.metadata?.title || null
+                      const eventColor = getEventColor(booking)
+                      return (
+                        <div
+                          key={booking.id}
+                          onClick={(e) => handleBookingModalOpen(booking, e)}
+                          className="absolute rounded px-1.5 py-0.5 text-white cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
+                          style={{
+                            top: `${top}px`,
+                            height: `${height - 2}px`,
+                            left: total > 1 ? `${leftPct}%` : '2px',
+                            right: total > 1 ? undefined : '2px',
+                            width: total > 1 ? `calc(${widthPct}% - 4px)` : undefined,
+                            backgroundColor: eventColor,
+                            fontSize: '10px',
+                            lineHeight: '1.3',
+                          }}
+                          title={`${booking.booking_time?.substring(0, 5)} - ${booking.name || 'Unnamed'}${topic ? ` - ${topic}` : ''}`}
+                        >
+                          <div className="font-semibold truncate">{booking.name || 'Unnamed'}</div>
+                          <div className="opacity-90 truncate">{booking.booking_time?.substring(0, 5)}{topic ? ` - ${topic}` : ''}</div>
+                        </div>
+                      )
+                    })}
                   </div>
                 ))}
               </div>
-
-              {/* Day columns */}
-              {weekDays.map((day, dayIdx) => {
-                const dayBookings = getBookingsForDate(day)
-                const isSelected = isSameDay(day, selectedDate)
+            </div>
+          </div>
+        ) : (
+          /* ===== MONTH VIEW ===== */
+          <div className="flex-1 flex flex-col overflow-hidden p-2">
+            <div className="flex-1 grid grid-cols-7 overflow-hidden rounded border" style={{ borderColor: 'var(--border-primary)', gridTemplateRows: `auto repeat(${Math.ceil(calendarDays.length / 7)}, 1fr)` }}>
+              {/* Day headers */}
+              {DAY_LABELS.map((day) => (
+                <div key={day} className="text-center text-[10px] font-medium py-1" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                  {day}
+                </div>
+              ))}
+              {/* Calendar days */}
+              {calendarDays.map((day, idx) => {
+                const isCurrentMonth = isSameMonth(day, currentDate)
                 const isToday = isSameDay(day, new Date())
-
+                const dayBookings = getBookingsForDate(day)
                 return (
                   <div
-                    key={dayIdx}
-                    className="border-r border-gray-200 dark:border-[#262626] last:border-r-0 relative"
+                    key={idx}
+                    onClick={() => handleDateClick(day)}
+                    className="p-1 cursor-pointer hover:brightness-110 transition-all overflow-y-auto flex flex-col"
+                    style={{
+                      backgroundColor: isCurrentMonth ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                      borderTop: '1px solid var(--border-primary)',
+                      borderRight: (idx % 7 !== 6) ? '1px solid color-mix(in srgb, var(--border-primary) 40%, transparent)' : 'none',
+                      opacity: isCurrentMonth ? 1 : 0.5,
+                      minHeight: 0,
+                    }}
                   >
-                    {/* Day header */}
                     <div
-                      className="border-b border-gray-200 dark:border-[#262626] p-1 md:p-2 text-center"
+                      className="text-[11px] font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full"
                       style={{
-                        height: '60px',
-                        minHeight: '60px',
-                        ...(isSelected ? { backgroundColor: 'var(--accent-subtle)' } : isToday ? { backgroundColor: 'var(--accent-subtle)' } : {}),
+                        color: isToday ? '#fff' : 'var(--text-primary)',
+                        backgroundColor: isToday ? 'var(--button-bg)' : 'transparent',
                       }}
                     >
-                      <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
-                        {DAYS_OF_WEEK[dayIdx].substring(0, 3)}
-                      </div>
-                      <div
-                        className={`
-                          text-xs md:text-sm font-semibold mt-0.5 md:mt-1
-                          ${!isToday ? 'text-gray-900 dark:text-white' : ''}
-                        `}
-                        style={isToday ? { color: 'var(--accent-primary)' } : undefined}
-                      >
-                        {format(day, 'd')}
-                      </div>
+                      {format(day, 'd')}
                     </div>
-
-                    {/* Time slots */}
-                    <div className="relative">
-                      {HOURS.map((hour) => {
-                        const hourBookings = getBookingsForTimeSlot(day, hour)
+                    <div className="flex-1 space-y-px overflow-y-auto">
+                      {dayBookings.map((booking) => {
+                        const eventColor = getEventColor(booking)
                         return (
                           <div
-                            key={hour}
-                            className="border-b border-gray-100 dark:border-[#262626] relative"
-                            style={{ height: '48px' }}
+                            key={booking.id}
+                            onClick={(e) => handleBookingModalOpen(booking, e)}
+                            className="text-[10px] leading-tight px-1 py-px rounded text-white truncate cursor-pointer hover:brightness-110"
+                            style={{ backgroundColor: eventColor }}
                           >
-                            {hourBookings.map((booking, idx) => {
-                              const style = getBookingStyle(booking, hour)
-                              const total = hourBookings.length
-                              const widthPercent = 100 / total
-                              const leftPercent = idx * widthPercent
-                              const callTopic = booking.booking_title
-                                || booking.metadata?.title
-                                || booking.metadata?.conversation_summary
-                                || booking.metadata?.summary
-                                || null
-                              return (
-                                <div
-                                  key={booking.id}
-                                  onClick={(e) => handleBookingClick(booking, e)}
-                                  className="rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight text-white cursor-pointer hover:opacity-90 hover:shadow-lg z-10 transition-all overflow-hidden"
-                                  style={{
-                                    ...style,
-                                    backgroundColor: 'var(--accent-primary)',
-                                    left: total > 1 ? `${leftPercent}%` : '4px',
-                                    right: total > 1 ? undefined : '4px',
-                                    width: total > 1 ? `calc(${widthPercent}% - 4px)` : undefined,
-                                  }}
-                                  title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${callTopic ? ` · ${callTopic}` : ''}`}
-                                >
-                                  <div className="font-semibold truncate text-[8px] md:text-[10px]">
-                                    {booking.booking_time?.substring(0, 5)}
-                                  </div>
-                                  <div className="font-medium truncate text-[8px] md:text-[10px]">
-                                    {booking.name || 'Unnamed'}
-                                  </div>
-                                  {callTopic && (
-                                    <div className="text-[7px] md:text-[9px] opacity-80 truncate">
-                                      {callTopic}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
+                            {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
                           </div>
                         )
                       })}
@@ -498,129 +537,61 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                 )
               })}
             </div>
-          ) : (
-            /* Month View */
-            <div className="p-4">
-              <div className="grid grid-cols-7 gap-2">
-                {/* Day headers */}
-                {DAYS_OF_WEEK.map((day) => (
-                  <div
-                    key={day}
-                    className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-2"
-                  >
-                    {day}
-                  </div>
-                ))}
-
-                {/* Calendar days */}
-                {calendarDays.map((day, idx) => {
-                  const isCurrentMonth = isSameMonth(day, currentDate)
-                  const isSelected = isSameDay(day, selectedDate)
-                  const isToday = isSameDay(day, new Date())
-                  const dayBookings = getBookingsForDate(day)
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => handleDateClick(day, false)}
-                      className={`
-                        min-h-24 p-2 border border-gray-200 dark:border-[#262626] rounded
-                        ${!isCurrentMonth ? 'bg-gray-50 dark:bg-[#0D0D0D] opacity-50' : 'bg-white dark:bg-[#1A1A1A]'}
-                        cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]
-                      `}
-                      style={{
-                        ...(isSelected ? { boxShadow: '0 0 0 2px var(--accent-primary)' } : {}),
-                        ...(isToday ? { backgroundColor: 'var(--accent-subtle)' } : {}),
-                      }}
-                    >
-                      <div
-                        className={`
-                          text-sm font-semibold mb-1
-                          ${!isToday ? 'text-gray-900 dark:text-white' : ''}
-                        `}
-                        style={isToday ? { color: 'var(--accent-primary)' } : undefined}
-                      >
-                        {format(day, 'd')}
-                      </div>
-                      <div className="space-y-1">
-                        {dayBookings.slice(0, 3).map((booking) => {
-                          const topic = booking.booking_title || booking.metadata?.title || null
-                          return (
-                            <div
-                              key={booking.id}
-                              onClick={(e) => handleBookingClick(booking, e)}
-                              className="text-xs px-2 py-1 rounded text-white cursor-pointer hover:opacity-90 hover:shadow-md transition-all"
-                              style={{ backgroundColor: 'var(--accent-primary)' }}
-                              title={`${booking.booking_time?.substring(0, 5)} · ${booking.name || 'Unnamed'}${topic ? ` · ${topic}` : ''}`}
-                            >
-                              <div className="truncate">{booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}</div>
-                              {topic && <div className="truncate opacity-80 text-[10px]">{topic}</div>}
-                            </div>
-                          )
-                        })}
-                        {dayBookings.length > 3 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            +{dayBookings.length - 3} more
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Booking Details Modal — Clean, wider card */}
+      {/* Booking Details Modal */}
       {isModalOpen && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1A1A1A] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-[#333]">
-            <div className="p-6">
-              {/* Header row: Name + Close */}
-              <div className="flex items-start justify-between mb-5">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+          <div
+            className="rounded-xl shadow-xl max-w-lg w-full border"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {selectedBooking.name || 'Unnamed Lead'}
                   </h3>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {selectedBooking.email && <span>{selectedBooking.email}</span>}
-                    {selectedBooking.email && selectedBooking.phone && <span>•</span>}
+                    {selectedBooking.email && selectedBooking.phone && <span>-</span>}
                     {selectedBooking.phone && <span>{selectedBooking.phone}</span>}
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
-                >
-                  <MdClose size={22} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowNoteInput(!showNoteInput)}
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                    title="Add context note"
+                    style={{ color: showNoteInput ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                  >
+                    <MdAdd size={20} />
+                  </button>
+                  <button onClick={() => setIsModalOpen(false)} className="p-1 rounded hover:bg-[var(--bg-hover)]">
+                    <MdClose size={20} style={{ color: 'var(--text-secondary)' }} />
+                  </button>
+                </div>
               </div>
 
-              {/* Date & Time row */}
-              <div className="flex items-center gap-6 p-4 rounded-lg mb-4" style={{ backgroundColor: 'var(--bg-tertiary, #262626)' }}>
+              <div className="flex items-center gap-5 p-3 rounded-lg mb-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                 <div className="flex items-center gap-2">
-                  <MdCalendarToday size={18} style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-base font-medium text-gray-900 dark:text-white">
+                  <MdCalendarToday size={16} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     {selectedBooking.booking_date && format(new Date(selectedBooking.booking_date), 'EEE, MMM d, yyyy')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MdAccessTime size={18} style={{ color: 'var(--accent-primary)' }} />
-                  <span className="text-base font-medium text-gray-900 dark:text-white">
-                    {selectedBooking.booking_time}
-                  </span>
+                  <MdAccessTime size={16} style={{ color: 'var(--accent-primary)' }} />
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{selectedBooking.booking_time}</span>
                 </div>
-                <span
-                  className="ml-auto px-2.5 py-0.5 text-[11px] font-semibold rounded-full text-white"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                >
-                  {selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web'}
+                <span className="ml-auto px-2 py-0.5 text-[10px] font-semibold rounded-full text-[var(--text-button)]" style={{ backgroundColor: 'var(--button-bg)' }}>
+                  {selectedBooking.source || selectedBooking.first_touchpoint || 'web'}
                 </span>
               </div>
 
-              {/* Summary (if available) */}
               {(() => {
                 const summary = selectedBooking.metadata?.conversationSummary ||
                   selectedBooking.metadata?.conversation_summary ||
@@ -628,19 +599,94 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   selectedBooking.unified_context?.whatsapp?.conversation_summary
                 if (!summary) return null
                 return (
-                  <div className="text-sm text-gray-600 dark:text-gray-300 p-3 rounded-lg mb-4 leading-relaxed" style={{ backgroundColor: 'var(--bg-tertiary, #262626)' }}>
+                  <div className="text-[13px] leading-relaxed font-normal p-3 rounded-lg mb-3" style={{ color: 'var(--text-primary)' }}>
                     {summary}
                   </div>
                 )
               })()}
 
-              {/* Action */}
+              {/* Add Context Note Section */}
+              {showNoteInput && (
+                <div className="mb-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                  <div className="flex items-center gap-1 mb-2">
+                    {NOTE_TYPES.map((type) => {
+                      const Icon = type.icon
+                      const isActive = noteType === type.value
+                      return (
+                        <button
+                          key={type.value}
+                          onClick={() => setNoteType(type.value)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                          style={{
+                            backgroundColor: isActive ? 'var(--button-bg)' : 'transparent',
+                            color: isActive ? 'var(--text-button)' : 'var(--text-secondary)',
+                          }}
+                        >
+                          <Icon size={12} />
+                          {type.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && noteText.trim()) handleSaveNote() }}
+                      placeholder="Quick note... e.g. Had a call, discussed pricing"
+                      className="flex-1 px-2.5 py-1.5 text-xs rounded border bg-transparent focus:outline-none focus:ring-1"
+                      style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as any}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSaveNote}
+                      disabled={savingNote || !noteText.trim()}
+                      className="px-2.5 py-1.5 rounded text-[var(--text-button)] text-xs font-medium disabled:opacity-40 hover:brightness-110 transition-all"
+                      style={{ backgroundColor: 'var(--button-bg)' }}
+                    >
+                      {savingNote ? '...' : <MdSend size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Notes */}
+              {recentNotes.length > 0 && (
+                <div className="mb-3 space-y-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>Recent Notes</div>
+                  {recentNotes.map((n, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs px-2 py-1.5 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                      <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        {n.activity_type === 'call' ? <MdPhone size={12} /> : n.activity_type === 'meeting' ? <MdEvent size={12} /> : n.activity_type === 'message' ? <MdMessage size={12} /> : <MdNote size={12} />}
+                      </span>
+                      <span className="flex-1 text-[12px]" style={{ color: 'var(--text-primary)' }}>{n.note}</span>
+                      <span className="text-[9px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                        {(() => {
+                          try {
+                            const d = new Date(n.created_at)
+                            const now = new Date()
+                            const diffMs = now.getTime() - d.getTime()
+                            const diffMins = Math.floor(diffMs / 60000)
+                            if (diffMins < 60) return `${diffMins}m ago`
+                            const diffHrs = Math.floor(diffMins / 60)
+                            if (diffHrs < 24) return `${diffHrs}h ago`
+                            const diffDays = Math.floor(diffHrs / 24)
+                            return `${diffDays}d ago`
+                          } catch { return '' }
+                        })()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <button
                 onClick={handleViewClientDetails}
-                className="w-full px-4 py-2.5 text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                className="w-full py-2.5 text-sm font-medium text-[var(--text-button)] rounded-lg hover:brightness-110 transition-all"
+                style={{ backgroundColor: 'var(--button-bg)' }}
               >
-                View Client Details →
+                View Client Details
               </button>
             </div>
           </div>
@@ -651,10 +697,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
       <LeadDetailsModal
         lead={selectedLead}
         isOpen={isLeadModalOpen}
-        onClose={() => {
-          setIsLeadModalOpen(false)
-          setSelectedLead(null)
-        }}
+        onClose={() => { setIsLeadModalOpen(false); setSelectedLead(null) }}
         onStatusUpdate={handleUpdateLeadStatus}
       />
     </div>

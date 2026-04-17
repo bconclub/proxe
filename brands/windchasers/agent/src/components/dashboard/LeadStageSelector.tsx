@@ -20,8 +20,10 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Booking Made', label: 'Booking Made', description: '86-100 score', scoreRange: '86-100' },
   { value: 'Converted', label: 'Converted', description: 'Manual close', scoreRange: 'Manual' },
   { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual', scoreRange: 'Manual' },
-  { value: 'In Sequence', label: 'In Sequence', description: 'Auto for <61 score', scoreRange: 'Auto' },
-  { value: 'Cold', label: 'Cold', description: 'Exhausted sequences', scoreRange: 'Auto' },
+  { value: 'Not Qualified', label: 'Not Qualified', description: 'Manual', scoreRange: 'Manual' },
+  { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
+  { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
+  { value: 'In Sequence', label: 'In Sequence', description: 'Automated follow-up', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [
@@ -39,8 +41,10 @@ const getStageColor = (stage: LeadStage | null): string => {
     'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
     'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
     'In Sequence': '', // Uses inline styles with CSS variables
     'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
   }
   return stage ? colors[stage] : colors['New']
 }
@@ -92,6 +96,7 @@ export default function LeadStageSelector({
     note: string
     duration?: number
     next_followup?: string
+    disqualification_reason?: string
   }) => {
     if (!pendingStageChange) return
 
@@ -111,6 +116,7 @@ export default function LeadStageSelector({
           note: activity.note,
           duration_minutes: activity.duration,
           next_followup_date: activity.next_followup,
+          disqualification_reason: activity.disqualification_reason,
         }),
       })
 
@@ -191,7 +197,7 @@ export default function LeadStageSelector({
                 onClick={() => handleStageChange(option.value)}
                 disabled={disabled || isUpdating}
                 className={`
-                  px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  px-3 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                   ${stage === option.value
                     ? `${getStageColor(option.value)} ring-2 ring-offset-2 ring-current`
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Fetch recent conversation (last 10 messages for scoring — saves tokens on long convos)
+    // Fetch recent conversation (last 10 messages for scoring - saves tokens on long convos)
     const { data: messages, error: messagesError } = await supabase
       .from('conversations')
       .select('content, sender, created_at, channel')

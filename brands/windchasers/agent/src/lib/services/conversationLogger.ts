@@ -1,5 +1,5 @@
 /**
- * services/conversationLogger.ts — Message logging + summary management
+ * services/conversationLogger.ts - Message logging + summary management
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  *   - addUserInput()      (lines 1067-1175)
@@ -264,7 +264,7 @@ export async function fetchSummary(
 
 /**
  * Log a message to the conversations table (used by Dashboard Inbox)
- * Requires leadId — use leadManager.ensureOrUpdateLead() first
+ * Requires leadId - use leadManager.ensureOrUpdateLead() first
  */
 export async function logMessage(
   leadId: string,
@@ -331,7 +331,7 @@ export async function logMessage(
       });
 
       if (error.code === '23503') {
-        console.error('[conversationLogger] Foreign key constraint — lead_id not in all_leads');
+        console.error('[conversationLogger] Foreign key constraint - lead_id not in all_leads');
       }
       return null;
     }

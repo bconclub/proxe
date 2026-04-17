@@ -1,5 +1,5 @@
 /**
- * services/bookingManager.ts — Booking storage + Google Calendar integration
+ * services/bookingManager.ts - Booking storage + Google Calendar integration
  *
  * Extracted from:
  *   - web-agent/src/lib/chatSessions.ts: storeBooking() (1321-1492), checkExistingBooking() (1495-1669)
@@ -71,7 +71,7 @@ export interface TimeSlot {
  * Get Google Calendar auth client (JWT with service account)
  */
 export async function getGoogleCalendarAuth(): Promise<any> {
-  // Dynamic import — googleapis is only needed when calendar features are used
+  // Dynamic import - googleapis is only needed when calendar features are used
   const { google } = await import('googleapis');
 
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -252,13 +252,13 @@ export async function storeBooking(
 
   if (error) {
     console.error('[bookingManager] Failed to store booking in session table', error);
-    // Session update failed — but DON'T return early.
+    // Session update failed - but DON'T return early.
     // We still need to save booking data to all_leads below.
   } else if (data && data.length > 0) {
     sessionData = data[0];
   }
 
-  // Sync to all_leads — ALWAYS attempt this, even if session update failed.
+  // Sync to all_leads - ALWAYS attempt this, even if session update failed.
   // Resolve lead_id from session data, or from profile update, or by looking up the session.
   let leadId = sessionData?.lead_id || currentLeadId;
 
@@ -321,7 +321,7 @@ export async function storeBooking(
 
     console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
-    console.error('[bookingManager] Could not find lead_id to save booking — data may be lost', { externalSessionId, channel });
+    console.error('[bookingManager] Could not find lead_id to save booking - data may be lost', { externalSessionId, channel });
   }
 }
 
@@ -519,7 +519,7 @@ export async function createCalendarEvent(booking: {
         ? courseNameMap[booking.courseInterest.toLowerCase()]
         : booking.courseInterest || 'Aviation Course Inquiry';
 
-    // Event title — use AI-generated title if provided, otherwise auto-generate
+    // Event title - use AI-generated title if provided, otherwise auto-generate
     let eventTitle: string;
     if (booking.title) {
       eventTitle = booking.title;
@@ -531,7 +531,7 @@ export async function createCalendarEvent(booking: {
       }
     }
 
-    // Description — brand-aware
+    // Description - brand-aware
     const brandName = (() => {
       try {
         const { getBrandConfig, getCurrentBrandId } = require('@/configs');
@@ -569,7 +569,7 @@ export async function createCalendarEvent(booking: {
           conferenceSolutionKey: { type: 'hangoutsMeet' },
         },
       },
-      ...(hasRealEmail ? { attendees: [{ email: booking.email, displayName: booking.name }] } : {}),
+      // No attendees - service account lacks Domain-Wide Delegation; customers get details via WhatsApp
       reminders: {
         useDefault: false,
         overrides: [
@@ -585,30 +585,11 @@ export async function createCalendarEvent(booking: {
       event.location = 'Online Session (Video Call)';
     }
 
-    let createdEvent;
-    let hasAttendees = false;
-
-    try {
-      createdEvent = await calendar.events.insert({
-        calendarId: CALENDAR_ID,
-        requestBody: event,
-        conferenceDataVersion: 1,
-      });
-      hasAttendees = true;
-    } catch (calendarError: any) {
-      // Try without attendees (Domain-Wide Delegation not available)
-      if (calendarError.code === 403 && (calendarError.message?.includes('Domain-Wide') || calendarError.message?.includes('attendees'))) {
-        const { attendees, ...eventWithoutAttendees } = event;
-        createdEvent = await calendar.events.insert({
-          calendarId: CALENDAR_ID,
-          requestBody: eventWithoutAttendees,
-          conferenceDataVersion: 1,
-        });
-        hasAttendees = false;
-      } else {
-        throw calendarError;
-      }
-    }
+    const createdEvent = await calendar.events.insert({
+      calendarId: CALENDAR_ID,
+      requestBody: event,
+      conferenceDataVersion: 1,
+    });
 
     if (!createdEvent?.data?.id) return null;
 
@@ -620,7 +601,7 @@ export async function createCalendarEvent(booking: {
     return {
       eventId: createdEvent.data.id,
       eventLink: createdEvent.data.htmlLink || '',
-      hasAttendees,
+      hasAttendees: false,
       meetLink,
     };
   } catch (error) {

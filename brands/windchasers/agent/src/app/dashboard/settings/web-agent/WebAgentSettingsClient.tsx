@@ -19,10 +19,9 @@ export default function WebAgentSettingsClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Auto-load preview when component mounts
-  // Widget is served from the same unified app at /widget (same-origin)
   useEffect(() => {
     if (iframeRef.current) {
-      iframeRef.current.src = '/widget'
+      iframeRef.current.src = '/widget/bubble'
     }
   }, [])
 
@@ -47,7 +46,7 @@ export default function WebAgentSettingsClient() {
       keysToRemove.forEach(key => localStorage.removeItem(key))
 
       if (iframeRef.current) {
-        iframeRef.current.src = '/widget'
+        iframeRef.current.src = '/widget/bubble'
       }
 
       setTimeout(() => {
@@ -138,7 +137,7 @@ export default function WebAgentSettingsClient() {
                   }}
                 >
                   <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                    Add this script tag to your website's footer to embed the chat widget.
+                    Add this script tag to your website&apos;s footer to embed the chat widget.
                   </p>
 
                   <div className="relative group">
@@ -195,129 +194,271 @@ export default function WebAgentSettingsClient() {
           </div>
         )}
 
-        {/* Main Preview Container */}
+        {/* LEFT PANEL (30%) - Controls */}
         <div
           style={{
-            flex: 1,
+            width: '30%',
             height: '100%',
-            position: 'relative',
-            backgroundColor: 'var(--bg-primary)',
             display: 'flex',
             flexDirection: 'column',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            borderRight: '1px solid var(--border-primary)',
+            backgroundColor: 'var(--bg-secondary)',
           }}
         >
-          {/* Header with controls */}
+          {/* Header */}
           <div
             style={{
-              padding: '16px 32px',
+              padding: '24px',
               borderBottom: '1px solid var(--border-primary)',
-              backgroundColor: 'rgba(26, 15, 10, 0.8)', // Semi-transparent dark
-              backdropFilter: 'blur(12px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexShrink: 0,
-              zIndex: 10,
+              backgroundColor: 'var(--bg-secondary)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                    Widget Preview
-                  </h1>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                      color: '#22c55e',
-                      border: '1px solid rgba(34, 197, 94, 0.2)'
-                    }}
-                  >
-                    <MdFiberManualRecord size={8} className="animate-pulse" />
-                    Live
-                  </span>
-                </div>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Interact with your virtual agent in real-time
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button
-                onClick={() => setShowCodePanel(!showCodePanel)}
-                className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                Widget Preview
+              </h1>
+              <span
                 style={{
-                  backgroundColor: showCodePanel ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                  color: showCodePanel ? 'white' : 'var(--text-primary)',
-                  border: '1px solid var(--border-primary)',
-                  cursor: 'pointer',
-                  boxShadow: showCodePanel ? '0 0 15px rgba(201, 169, 97, 0.4)' : 'none'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                  color: '#22c55e',
+                  border: '1px solid rgba(34, 197, 94, 0.2)'
                 }}
               >
-                <MdCode size={18} />
-                {showCodePanel ? 'Code Active' : 'Show Code'}
-              </button>
-
-              <button
-                onClick={handleResetWidget}
-                disabled={isResetting}
-                className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
-                style={{
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-primary)',
-                  cursor: isResetting ? 'not-allowed' : 'pointer',
-                  opacity: isResetting ? 0.6 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                }}
-              >
-                <MdRefresh size={18} className={isResetting ? 'animate-spin' : ''} />
-                {isResetting ? 'Resetting...' : 'Reset Widget'}
-              </button>
+                <MdFiberManualRecord size={8} className="animate-pulse" />
+                Live
+              </span>
             </div>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Interact with your virtual agent in real-time
+            </p>
           </div>
 
-          {/* Widget Container - Full Screen */}
+          {/* Controls */}
           <div
             style={{
               flex: 1,
-              position: 'relative',
-              overflow: 'hidden',
-              backgroundColor: '#000', // Dark background for the preview area
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
             }}
           >
-            {/* Overlay Gradient for more premium look if needed, but the widget has its own UI */}
-            <iframe
-              ref={iframeRef}
-              src="/widget"
-              className="w-full h-full border-0"
+            <button
+              onClick={() => setShowCodePanel(!showCodePanel)}
+              className="w-full px-6 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
               style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
+                backgroundColor: showCodePanel ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                color: showCodePanel ? 'white' : 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                cursor: 'pointer',
               }}
-              title="Widget Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-              allow="microphone; camera"
-              onError={(e) => {
-                console.error('Widget iframe error:', e)
+            >
+              <MdCode size={18} />
+              {showCodePanel ? 'Code Active' : 'Show Installation Code'}
+            </button>
+
+            <button
+              onClick={handleResetWidget}
+              disabled={isResetting}
+              className="w-full px-6 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                cursor: isResetting ? 'not-allowed' : 'pointer',
+                opacity: isResetting ? 0.6 : 1,
               }}
-            />
+              onMouseEnter={(e) => {
+                if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+              }}
+            >
+              <MdRefresh size={18} className={isResetting ? 'animate-spin' : ''} />
+              {isResetting ? 'Resetting...' : 'Reset Widget'}
+            </button>
+
+            <div
+              style={{
+                marginTop: 'auto',
+                padding: '16px',
+                borderRadius: '12px',
+                backgroundColor: 'var(--accent-subtle)',
+                border: '1px dashed var(--accent-primary)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <MdInfoOutline size={16} style={{ color: 'var(--accent-primary)' }} />
+                <h4 className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Preview Mode</h4>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                The widget appears as it would on your website. Click the bubble to open the chat.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT PANEL (70%) - Browser Mockup */}
+        <div
+          style={{
+            width: '70%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--bg-primary)',
+            padding: '40px',
+          }}
+        >
+          {/* Browser Mockup Container */}
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '1000px',
+              height: '100%',
+              maxHeight: '680px',
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+              backgroundColor: 'var(--bg-secondary)',
+            }}
+          >
+            {/* Browser Top Bar */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderBottom: '1px solid var(--border-primary)',
+              }}
+            >
+              {/* Window Controls (3 dots) */}
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <div
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FF5F57',
+                  }}
+                />
+                <div
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFBD2E',
+                  }}
+                />
+                <div
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: '#28CA41',
+                  }}
+                />
+              </div>
+
+              {/* URL Bar */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px 16px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-primary)',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  }}
+                >
+                  bconclub.com
+                </span>
+              </div>
+            </div>
+
+            {/* Browser Content Area */}
+            <div
+              style={{
+                flex: 1,
+                position: 'relative',
+                backgroundColor: 'var(--bg-primary)',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Fake Page Content Background */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
+                }}
+              >
+                {/* Mock website content lines */}
+                <div style={{ padding: '60px', opacity: 0.3 }}>
+                  <div style={{ width: '40%', height: '24px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px', marginBottom: '24px' }} />
+                  <div style={{ width: '60%', height: '12px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px', marginBottom: '12px' }} />
+                  <div style={{ width: '50%', height: '12px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px', marginBottom: '12px' }} />
+                  <div style={{ width: '55%', height: '12px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px', marginBottom: '40px' }} />
+                  <div style={{ width: '80%', height: '200px', backgroundColor: 'var(--text-secondary)', borderRadius: '8px', marginBottom: '24px' }} />
+                  <div style={{ width: '45%', height: '12px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px', marginBottom: '12px' }} />
+                  <div style={{ width: '40%', height: '12px', backgroundColor: 'var(--text-secondary)', borderRadius: '4px' }} />
+                </div>
+              </div>
+
+              {/* Widget Iframe - Positioned bottom-right like a real chat bubble */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '20px',
+                  right: '20px',
+                  width: '420px',
+                  height: '580px',
+                  pointerEvents: 'none',
+                }}
+              >
+                <iframe
+                  ref={iframeRef}
+                  src="/widget/bubble"
+                  style={{
+                    width: '420px',
+                    height: '580px',
+                    border: 'none',
+                    pointerEvents: 'auto',
+                  }}
+                  title="Widget Preview"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  allow="microphone; camera"
+                  onError={(e) => {
+                    console.error('Widget iframe error:', e)
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

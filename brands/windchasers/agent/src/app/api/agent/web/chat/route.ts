@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/web/chat — SSE streaming chat route
+ * POST /api/agent/web/chat - SSE streaming chat route
  *
  * Phase 3 of the Unified Agent Architecture.
  * Replaces web-agent's 1500-line monolithic /api/chat route.
@@ -164,9 +164,22 @@ async function postProcess(
   responseTimeMs?: number,
 ): Promise<void> {
   try {
-    // 1. Update session profile + create/link lead
+    // 1. Check for existing lead from session first
     let leadId: string | null = null;
-    if (userProfile.name || userProfile.email || userProfile.phone) {
+    let isNewLead = false;
+    
+    const { data: sessionData } = await supabase
+      .from('web_sessions')
+      .select('lead_id')
+      .eq('external_session_id', externalSessionId)
+      .maybeSingle();
+    
+    if (sessionData?.lead_id) {
+      leadId = sessionData.lead_id;
+    }
+
+    // 2. Only create/update lead if phone OR email is provided (name alone is not enough)
+    if (!leadId && (userProfile.email || userProfile.phone)) {
       leadId = await updateLeadProfile(
         externalSessionId,
         {
@@ -177,9 +190,25 @@ async function postProcess(
         'web',
         supabase,
       );
+      isNewLead = true;
+      
+      // 2b. Backfill previous conversations for this session with the new lead_id
+      if (leadId) {
+        const { error: backfillError } = await supabase
+          .from('conversations')
+          .update({ lead_id: leadId })
+          .eq('metadata->>session_id', externalSessionId)
+          .is('lead_id', null);
+        
+        if (backfillError) {
+          console.error('[agent/web/chat] Failed to backfill conversations:', backfillError);
+        } else {
+          console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId);
+        }
+      }
     }
 
-    // 2. Log user input to session
+    // 3. Log user input to session
     await addUserInput(
       externalSessionId,
       userMessage,
@@ -189,35 +218,37 @@ async function postProcess(
       supabase,
     );
 
-    // 3. Log messages to conversations table (if we have a lead)
-    if (leadId) {
-      // Log customer message
+    // 4. Log messages to conversations table (always log with session_id in metadata)
+    // Log customer message
+    await logMessage(
+      leadId,  // leadId can be null, message will be stored with session_id in metadata
+      'web',
+      'customer',
+      userMessage,
+      'text',
+      { 
+        session_id: externalSessionId,
+        ...(leadId ? {} : { anonymous: true }),
+      },
+      supabase,
+    );
+
+    // Log agent response (with response time for dashboard metrics)
+    if (assistantResponse) {
       await logMessage(
         leadId,
         'web',
-        'customer',
-        userMessage,
+        'agent',
+        assistantResponse,
         'text',
-        { session_id: externalSessionId },
+        {
+          session_id: externalSessionId,
+          ai_generated: true,
+          ...(responseTimeMs ? { input_to_output_gap_ms: responseTimeMs } : {}),
+          ...(leadId ? {} : { anonymous: true }),
+        },
         supabase,
       );
-
-      // Log agent response (with response time for dashboard metrics)
-      if (assistantResponse) {
-        await logMessage(
-          leadId,
-          'web',
-          'agent',
-          assistantResponse,
-          'text',
-          {
-            session_id: externalSessionId,
-            ai_generated: true,
-            ...(responseTimeMs ? { input_to_output_gap_ms: responseTimeMs } : {}),
-          },
-          supabase,
-        );
-      }
     }
 
     // 4. Generate and save conversation summary (every 3rd message to save tokens)

@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/calendar/book — Create a booking + Google Calendar event
+ * POST /api/agent/calendar/book - Create a booking + Google Calendar event
  *
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/calendar/book/route.ts.
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       courseInterest,
       sessionType,
-      brand = 'windchasers',
+      brand = 'bcon',
       checkOnly = false,
     } = body;
 
@@ -78,11 +78,16 @@ export async function POST(request: NextRequest) {
 
     // Check credentials
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+      console.error('[agent/calendar/book] Missing Google Service Account credentials');
       return NextResponse.json(
         { error: 'Google Calendar credentials not configured' },
         { status: 503 },
       );
     }
+
+    // Log and validate GOOGLE_CALENDAR_ID
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
+    console.log('[agent/calendar/book] Using calendar ID:', calendarId, '(from env:', !!process.env.GOOGLE_CALENDAR_ID, ')');
 
     // Create Google Calendar event
     const calendarResult = await createCalendarEvent({
@@ -123,7 +128,7 @@ export async function POST(request: NextRequest) {
         );
       } catch (storeError) {
         console.error('[agent/calendar/book] Failed to save booking to DB:', storeError);
-        // Don't fail — calendar event was created successfully
+        // Don't fail - calendar event was created successfully
       }
     }
 

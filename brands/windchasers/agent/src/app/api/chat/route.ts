@@ -1,5 +1,5 @@
 /**
- * POST /api/chat — Backward-compatibility proxy
+ * POST /api/chat - Backward-compatibility proxy
  *
  * Phase 4 of the Unified Agent Architecture.
  * Proxies requests from the old /api/chat endpoint to the new

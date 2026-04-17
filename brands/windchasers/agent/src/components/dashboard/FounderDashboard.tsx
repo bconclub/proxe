@@ -22,7 +22,7 @@ import {
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
-  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
+  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
   totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
   engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
@@ -70,9 +70,9 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('30D')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
+  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
   const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
   
   // Hot Leads threshold with localStorage persistence
@@ -365,248 +365,138 @@ export default function FounderDashboard() {
           }}
         >
           <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
+              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
+              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
+              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={120} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
+              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={96} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
             </div>
           </div>
         </div>
       )}
 
       {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         {/* Card 1: Total Conversations */}
         <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(59, 130, 246, 0.05)',
             borderColor: 'rgba(59, 130, 246, 0.2)',
           }}
         >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdChatBubble className="text-blue-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdChatBubble className="text-blue-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Conversations</h3>
+            </div>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
               {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
               {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
             </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              {metrics.totalConversations.trend7D !== 0 && (
-                <div className="flex items-center gap-1">
-                  {metrics.totalConversations.trend7D > 0 ? (
-                    <>
-                      <MdTrendingUp className="text-green-600" size={16} />
-                      <span className="text-sm text-green-600 font-medium">↑ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  ) : (
-                    <>
-                      <MdTrendingDown className="text-red-600" size={16} />
-                      <span className="text-sm text-red-600 font-medium">↓ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  )}
-                </div>
-              )}
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                {metrics.totalConversations.total} all time
-              </p>
-              {metrics.trends?.conversations && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.conversations.data}
-                    color="#3B82F6"
-                    height={28}
-                  />
-                </div>
-              )}
-            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {metrics.totalConversations.total} all time
+            </p>
           </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => router.push('/dashboard/inbox')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#3B82F6' }}
-            >
-              View All <MdArrowForward size={14} />
+          {metrics.trends?.conversations && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
+              <Sparkline data={metrics.trends.conversations.data} color="#3B82F6" height={36} />
+            </div>
+          )}
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
+            <button onClick={() => router.push('/dashboard/inbox')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#3B82F6' }}>
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setConversationTimeFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    conversationTimeFilter === period ? 'text-white' : ''
-                  }`}
-                  style={conversationTimeFilter === period
-                    ? { backgroundColor: '#3B82F6' }
-                    : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#3B82F6'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
+                <button key={period} onClick={() => setConversationTimeFilter(period)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={conversationTimeFilter === period ? { backgroundColor: '#3B82F6' } : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }}
+                >{period}</button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Card 2: Engaged Leads - Stage-based engagement */}
+        {/* Card 2: Engaged Leads */}
         <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(34, 197, 94, 0.05)',
             borderColor: 'rgba(34, 197, 94, 0.2)',
           }}
         >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdLocalFireDepartment className="text-green-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdLocalFireDepartment className="text-green-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
+            </div>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {metrics.engagedLeads?.count ?? 0}
             </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
-                {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% of total
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                From {metrics.engagedLeads?.total ?? metrics.totalLeads.count} leads
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="#22C55E"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
+            <p className="text-xs mt-1" style={{ color: '#22C55E' }}>
+              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%
+            </p>
           </div>
-          {/* View All */}
-          <button
-            onClick={() => router.push('/dashboard/leads?filter=engaged')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline mt-2"
-            style={{ color: '#22C55E' }}
-          >
-            View All <MdArrowForward size={14} />
+          {metrics.trends?.leads && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
+              <Sparkline data={metrics.trends.leads.data} color="#22C55E" height={36} showGradient={true} />
+            </div>
+          )}
+          <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline mt-2 sm:mt-0" style={{ color: '#22C55E' }}>
+            View <MdArrowForward size={12} />
           </button>
         </div>
 
-        {/* Card 3: Warm Leads - Score 40-69, warming up */}
+        {/* Card 3: Warm Leads */}
         <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(249, 115, 22, 0.05)',
             borderColor: 'rgba(249, 115, 22, 0.2)',
           }}
         >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdLocalFireDepartment className="text-orange-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdLocalFireDepartment className="text-orange-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
+            </div>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
               {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
             </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#F97316' }}>
-                Score 40-69
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                From {metrics.totalLeads.count} total leads
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="#F97316"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
+            <p className="text-xs mt-1" style={{ color: '#F97316' }}>
+              Score 40–69
+            </p>
           </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => router.push('/dashboard/leads?filter=warm')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#F97316' }}
-            >
-              View All <MdArrowForward size={14} />
+          {metrics.trends?.leads && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
+              <Sparkline data={metrics.trends.leads.data} color="#F97316" height={36} showGradient={true} />
+            </div>
+          )}
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
+            <button onClick={() => router.push('/dashboard/leads?filter=warm')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#F97316' }}>
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setWarmLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    warmLeadsFilter === period ? 'text-white' : ''
-                  }`}
-                  style={warmLeadsFilter === period
-                    ? { backgroundColor: '#F97316' }
-                    : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#F97316'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
+                <button key={period} onClick={() => setWarmLeadsFilter(period)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={warmLeadsFilter === period ? { backgroundColor: '#F97316' } : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }}
+                >{period}</button>
               ))}
             </div>
           </div>
@@ -614,81 +504,41 @@ export default function FounderDashboard() {
 
         {/* Card 4: Total Leads */}
         <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'var(--accent-subtle)',
             borderColor: 'var(--accent-primary)',
           }}
         >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdPeople style={{ color: 'var(--accent-primary)' }} size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdPeople className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
+            </div>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
               {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
               {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
             </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>
-                {metrics.totalLeads.count} all time
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                {metrics.totalLeads.fromConversations} from conversations
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="var(--accent-primary)"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--accent-primary)' }}>
+              {metrics.totalLeads.count} all time
+            </p>
           </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
+          {metrics.trends?.leads && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
+              <Sparkline data={metrics.trends.leads.data} color="var(--accent-primary)" height={36} showGradient={true} />
+            </div>
+          )}
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
+            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    leadsFilter === period ? 'text-white' : ''
-                  }`}
-                  style={leadsFilter === period
-                    ? { backgroundColor: 'var(--accent-primary)' }
-                    : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-primary)'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
+                <button key={period} onClick={() => setLeadsFilter(period)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={leadsFilter === period ? { backgroundColor: 'var(--button-bg)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}
+                >{period}</button>
               ))}
             </div>
           </div>
@@ -698,7 +548,7 @@ export default function FounderDashboard() {
 
       {/* Upcoming Events - Full width below cards */}
       <div
-        className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg mb-6"
+        className="rounded-lg p-3 sm:p-6 border transition-all hover:shadow-lg mb-4 sm:mb-6"
         style={{
           backgroundColor: 'rgba(59, 130, 246, 0.05)',
           borderColor: 'rgba(59, 130, 246, 0.2)',
@@ -836,8 +686,8 @@ export default function FounderDashboard() {
                       {formatTimeAgo(lead.lastContact)}
                     </span>
                     <button 
-                    className="px-3 py-1.5 text-white text-xs rounded-lg transition-colors flex-shrink-0"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                    className="px-3 py-1.5 text-[var(--text-button)] text-xs rounded-lg transition-colors flex-shrink-0"
+                    style={{ backgroundColor: 'var(--button-bg)' }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                     onClick={(e) => {
@@ -922,7 +772,7 @@ export default function FounderDashboard() {
                     }
                   }
                   
-                  // 3. STAGE CHANGES — color-coded by target stage
+                  // 3. STAGE CHANGES - color-coded by target stage
                   if (textLower.includes('entered') && textLower.includes('stage') || textLower.includes('moved from') || type === 'stage_change') {
                     // Determine color based on the NEW stage
                     const stageColorMap: Record<string, { color: string; icon: any }> = {

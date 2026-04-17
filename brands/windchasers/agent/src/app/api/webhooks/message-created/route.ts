@@ -20,13 +20,14 @@ export async function POST(request: NextRequest) {
 
     console.log('Webhook: New message created for lead:', lead_id)
 
-    // Call scoring endpoint
+    // Call AI scoring endpoint
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const scoreResponse = await fetch(`${appUrl}/api/dashboard/leads/${lead_id}/score`, {
+    const scoreResponse = await fetch(`${appUrl}/api/leads/score`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ lead_id }),
     })
 
     if (!scoreResponse.ok) {
