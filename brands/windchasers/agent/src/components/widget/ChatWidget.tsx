@@ -928,12 +928,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     const trimmed = rawMessage.trim();
     if (!trimmed) return;
     const normalizedTrimmed = trimmed.toLowerCase();
+    const lastAiMessageText =
+      [...messages].reverse().find((message) => message.type === 'ai')?.text?.toLowerCase() || '';
+    const isAffirmativeConsultationReply =
+      /^yes[.!?]*$/.test(normalizedTrimmed) &&
+      (
+        lastAiMessageText.includes('set up a 1:1 consultation') ||
+        lastAiMessageText.includes('book a consultation')
+      );
     const isExactDemoBookingTrigger =
       normalizedTrimmed === 'book a demo session' || normalizedTrimmed === 'book a demo';
     const isBookButtonMessage =
       buttons.some((button) => button.trim().toLowerCase() === normalizedTrimmed) &&
       normalizedTrimmed.includes('book');
-    const shouldForceCalendarFromBookButton = isExactDemoBookingTrigger || isBookButtonMessage;
+    const shouldForceCalendarFromBookButton =
+      isExactDemoBookingTrigger || isBookButtonMessage || isAffirmativeConsultationReply;
 
     if (showCalendly) {
       closeCalendarWidget();
@@ -984,7 +993,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setDynamicQuickButtons(null);
     setFlowOverrideButtons(null);
 
-    if ((containsBookingKeywords(trimmed) || isExactDemoBookingTrigger) && !bookingCompleted) {
+    if (
+      (containsBookingKeywords(trimmed) || isExactDemoBookingTrigger || isAffirmativeConsultationReply) &&
+      !bookingCompleted
+    ) {
       // Open calendar immediately while AI response streams
       setPendingCalendar(true);
       setForceCalendarFromBookButton(shouldForceCalendarFromBookButton);
