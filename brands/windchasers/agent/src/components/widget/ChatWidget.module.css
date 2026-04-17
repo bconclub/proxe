@@ -1083,6 +1083,14 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.inlinePromptHeader {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  gap: 0;
+  justify-content: flex-end;
+}
+
 .calendarCloseBtn {
   margin-left: auto;
   width: 28px;

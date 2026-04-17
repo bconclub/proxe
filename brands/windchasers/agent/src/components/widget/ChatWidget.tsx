@@ -3234,7 +3234,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
                   {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
+                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
                     <div className={styles.bubbleAvatar}>
                       {ICONS.ai(brand, config)}
                     </div>
@@ -3297,13 +3297,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
+                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
                     <button
                       type="button"
                       className={styles.inlinePromptClose}
