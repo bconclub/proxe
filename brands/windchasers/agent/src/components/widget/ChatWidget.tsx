@@ -3412,7 +3412,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         !isLoading &&
         flowOverrideButtons &&
         flowOverrideButtons.length > 0 &&
-        Boolean(lastAiMessage?.text) &&
+        true &&
         !lastAiMessage?.isStreaming &&
         renderFlowOverrideButtons(styles.welcomeQuickButtons)}
 
