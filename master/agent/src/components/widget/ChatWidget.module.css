@@ -1481,8 +1481,7 @@
 .calendarContainer {
   margin-top: 4px;
   width: 100%;
-  min-height: 0;
-  max-height: none;
+  min-height: 320px;
   overflow: hidden;
   position: relative;
 }
@@ -1490,8 +1489,9 @@
 .calendarEmbed {
   width: 100%;
   height: auto;
-  min-height: 0;
-  overflow: visible;
+  max-height: 380px;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: var(--primary-color) transparent; /* Firefox */
@@ -1518,8 +1518,9 @@
 }
 
 .calendarScrollArea {
-  max-height: none;
-  overflow: visible;
+  min-height: 320px;
+  max-height: 420px;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: var(--primary-color) transparent; /* Firefox */
@@ -2168,20 +2169,21 @@
 
 /* === Calendar compact sizing for bubble widget === */
 .chatboxBubble .calendarContainer {
-  min-height: 0 !important;
-  max-height: none !important;
-  margin-top: 4px !important;
-  overflow: visible !important;
+  min-height: 300px !important;
+  max-height: 400px !important;
+  margin-top: 8px !important;
 }
 
 .chatboxBubble .calendarScrollArea {
-  max-height: none !important;
-  overflow: visible !important;
+  min-height: 320px !important;
+  max-height: 420px !important;
+  overflow: auto !important;
 }
 
 .chatboxBubble .calendarEmbed {
-  min-height: 0 !important;
-  max-height: none !important;
+  max-height: 380px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 /* Mobile styles - Fullscreen */
