@@ -255,8 +255,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
+  const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+
+  const setPendingFlowOverrideState = useCallback((rule: FlowOverrideRule | null) => {
+    pendingFlowOverrideRef.current = rule;
+    setPendingFlowOverride(rule);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -828,7 +834,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setDynamicQuickButtons(null);
     setExploreButtons(null);
     setFlowOverrideButtons(null);
-    setPendingFlowOverride(null);
+    setPendingFlowOverrideState(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
     // Only reset if user explicitly resets the chat
     // Notify parent iframe to disable pointer events
@@ -1188,7 +1194,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleAssistantMessageComplete = async (message: Message) => {
-    const activeFlowOverride = pendingFlowOverride;
+    const activeFlowOverride = pendingFlowOverrideRef.current;
     console.log(
       'DEBUG flowOverride:',
       activeFlowOverride,
@@ -1201,7 +1207,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       setFlowOverrideButtons(activeFlowOverride.followUpButtons);
       setDynamicQuickButtons(null);
-      setPendingFlowOverride(null);
+      setPendingFlowOverrideState(null);
     }
 
     if (message.text) {
@@ -1749,7 +1755,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setDynamicQuickButtons(null);
     setExploreButtons(null);
     setFlowOverrideButtons(null);
-    setPendingFlowOverride(null);
+    setPendingFlowOverrideState(null);
     setWelcomeComplete(false);
     setShowMinimalButtons(false);
     // Reset conversation restoration flags
@@ -2565,7 +2571,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       return null;
     })();
-    setPendingFlowOverride(flowRule);
+    setPendingFlowOverrideState(flowRule);
 
     if (requestNameBeforeProceed(message, nextButtons)) return;
     if (requestEmailBeforeProceed(message, nextButtons)) return;
