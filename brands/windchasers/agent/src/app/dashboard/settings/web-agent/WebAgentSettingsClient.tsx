@@ -14,6 +14,7 @@ import {
 
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
+  const [isResettingChat, setIsResettingChat] = useState(false)
   const [showCodePanel, setShowCodePanel] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -55,6 +56,27 @@ export default function WebAgentSettingsClient() {
     } catch (error) {
       console.error('Error resetting widget:', error)
       setIsResetting(false)
+    }
+  }
+
+  const handleResetChat = () => {
+    if (typeof window === 'undefined') return
+
+    setIsResettingChat(true)
+    try {
+      // ChatWidget stores the session id at this key for windchasers.
+      window.localStorage.removeItem('windchasers.chat.sessionId')
+
+      if (iframeRef.current) {
+        iframeRef.current.src = `/widget/bubble?reset=${Date.now()}`
+      }
+
+      setTimeout(() => {
+        setIsResettingChat(false)
+      }, 800)
+    } catch (error) {
+      console.error('Error resetting chat session:', error)
+      setIsResettingChat(false)
     }
   }
 
@@ -285,6 +307,28 @@ export default function WebAgentSettingsClient() {
             >
               <MdRefresh size={18} className={isResetting ? 'animate-spin' : ''} />
               {isResetting ? 'Resetting...' : 'Reset Widget'}
+            </button>
+
+            <button
+              onClick={handleResetChat}
+              disabled={isResettingChat}
+              className="w-full px-6 py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                cursor: isResettingChat ? 'not-allowed' : 'pointer',
+                opacity: isResettingChat ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isResettingChat) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+              }}
+              onMouseLeave={(e) => {
+                if (!isResettingChat) e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+              }}
+            >
+              <MdRefresh size={18} className={isResettingChat ? 'animate-spin' : ''} />
+              {isResettingChat ? 'Resetting chat...' : 'Reset Chat'}
             </button>
 
             <div
