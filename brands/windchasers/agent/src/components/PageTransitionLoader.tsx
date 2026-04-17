@@ -46,8 +46,8 @@ export default function PageTransitionLoader() {
           />
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
             <Image
-              src="/bcon-icon.png"
-              alt="BCON"
+              src="/logo.png"
+              alt="Windchasers"
               width={80}
               height={80}
               className="page-transition-loader-icon drop-shadow-lg"

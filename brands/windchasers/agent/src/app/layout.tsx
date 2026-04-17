@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'PROXe Windchasers',
-  description: 'Windchasers - Dashboard for managing leads, bookings, and metrics',
+  description: 'Windchasers Dashboard',
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',

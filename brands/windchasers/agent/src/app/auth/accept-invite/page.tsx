@@ -8,7 +8,7 @@ import { getBrandConfig } from '@/configs'
 /** Brand taglines */
 const brandTaglines: Record<string, string> = {
   windchasers: 'WindChasers Aviation Academy',
-  bcon: 'BCON Club',
+  bcon: 'Windchasers',
   proxe: 'PROXe AI Platform',
 }
 

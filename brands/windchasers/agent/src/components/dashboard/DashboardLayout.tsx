@@ -285,8 +285,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/bcon-icon.png"
-                alt="BCON"
+                src="/logo.png"
+                alt="Windchasers"
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -329,7 +329,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {showExpanded && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -380,8 +380,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               title="Click to expand sidebar"
             >
               <img
-                src="/bcon-icon.png"
-                alt="BCON"
+                src="/logo.png"
+                alt="Windchasers"
                 className="w-full h-full object-contain"
                 style={{ maxWidth: '32px', maxHeight: '32px' }}
               />
@@ -684,7 +684,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <MdMenu size={20} />
           </button>
-          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
         </div>
 
         {/* Page content */}
