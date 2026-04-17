@@ -1180,7 +1180,7 @@
 .message.user .bubble {
   margin-right: 0;
   /* User bubbles: brand accent */
-  background: #8B5CF6;
+  background: var(--primary-color, #C9A961);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   color: #FFFFFF;
@@ -1202,7 +1202,7 @@
 .message.user.accent-4 .bubble,
 .message.user.accent-5 .bubble,
 .message.user.accent-6 .bubble {
-  background: #8B5CF6;
+  background: var(--primary-color, #C9A961);
   border-color: transparent;
   box-shadow: none;
 }
@@ -1390,10 +1390,54 @@
   color: #111827 !important;
 }
 
+.themeLight .message.ai .messageText,
+.themeLight .message.ai .messageText *,
+.themeLight .message.ai .bubble strong,
+.themeLight .message.ai .bubble em,
+.themeLight .message.ai .bubble a {
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+
 .themeLight .message.user .bubble {
-  background: #8B5CF6 !important;
-  border: 1px solid #7C3AED !important;
+  background: var(--primary-color, #C9A961) !important;
+  border: 1px solid var(--primary-vibrant, #D4AF37) !important;
   color: #FFFFFF !important;
+}
+
+.themeLight .welcomeQuickButtonsContainer .quickBtn,
+.themeLight .mobileQuickActions .quickBtn {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+  border-radius: 9999px;
+  box-shadow: none !important;
+}
+
+.themeLight .welcomeQuickButtonsContainer .quickBtn:hover,
+.themeLight .mobileQuickActions .quickBtn:hover {
+  background: rgba(201, 169, 97, 0.14) !important;
+  border-color: rgba(201, 169, 97, 0.55) !important;
+  color: #1A0F0A !important;
+}
+
+.themeLight .followUpBtn {
+  background: #FFFFFF !important;
+  border: 1px solid #D1D5DB !important;
+  color: #111827 !important;
+}
+
+.themeLight .followUpBtn:hover {
+  background: rgba(201, 169, 97, 0.14) !important;
+  border-color: rgba(201, 169, 97, 0.55) !important;
+  color: #1A0F0A !important;
+}
+
+.themeLight .exploreTitle,
+.themeLight .privacyNotice,
+.themeLight .chatFooter,
+.themeLight .chatFooter a {
+  color: #6B7280 !important;
 }
 
 .themeLight .inlinePromptText {
@@ -1483,8 +1527,8 @@
 }
 
 .themeDark .message.user .bubble {
-  background: #8B5CF6 !important;
-  border: 1px solid #7C3AED !important;
+  background: var(--primary-color, #C9A961) !important;
+  border: 1px solid var(--primary-vibrant, #D4AF37) !important;
   color: #FFFFFF !important;
 }
 
@@ -2037,19 +2081,19 @@
 
 /* Calendar container styles */
 .calendarContainer {
-  margin-top: 8px;
+  margin-top: 4px;
   width: 100%;
-  min-height: 600px;
-  max-height: 800px;
+  min-height: 0;
+  max-height: none;
   overflow: hidden;
   position: relative;
 }
 
 .calendarEmbed {
   width: 100%;
-  height: 100%;
-  min-height: 600px;
-  overflow: auto;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: var(--primary-color) transparent; /* Firefox */
@@ -2076,9 +2120,8 @@
 }
 
 .calendarScrollArea {
-  max-height: 540px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  max-height: none;
+  overflow: visible;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: var(--primary-color) transparent; /* Firefox */
@@ -2514,14 +2557,14 @@
   height: 56px;
   border-radius: 50%;
   background: #0A0A0B;
-  border: 2px solid #8B5CF6;
+  border: 2px solid var(--primary-color, #C9A961);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
-    0 0 10px rgba(139, 92, 246, 0.25);
+    0 0 10px var(--glass-shadow, rgba(201, 169, 97, 0.25));
   z-index: 2147483001;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -2539,7 +2582,7 @@
   transform: scale(1.05);
   box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.4),
-    0 0 15px rgba(139, 92, 246, 0.4);
+    0 0 15px var(--border-glow, rgba(201, 169, 97, 0.4));
 }
 
 .bubbleButton:active {
@@ -2808,7 +2851,7 @@
 
 /* === Calendar compact sizing for bubble widget === */
 .chatboxBubble .calendarContainer {
-  min-height: 400px !important;
+  min-height: 0 !important;
   max-height: none !important;
   margin-top: 4px !important;
   overflow: visible !important;
@@ -2820,7 +2863,7 @@
 }
 
 .chatboxBubble .calendarEmbed {
-  min-height: 400px !important;
+  min-height: 0 !important;
   max-height: none !important;
 }
 
