@@ -313,7 +313,7 @@ export default function FounderDashboard() {
             />
             <div className="relative animate-pulse">
               <Image
-                src="/bcon-icon.png"
+                src="/logo.png"
                 alt="BCON"
                 width={80}
                 height={80}

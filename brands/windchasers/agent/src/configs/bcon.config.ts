@@ -16,7 +16,7 @@ export const bconConfig: BrandConfig = {
     maxFollowUps: 3,
     avatar: {
       type: 'image',
-      source: '/bcon-icon.png',
+      source: '/logo.png',
     },
   },
   colors: {
