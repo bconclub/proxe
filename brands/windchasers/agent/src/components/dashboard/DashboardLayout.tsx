@@ -64,7 +64,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [isHovered, setIsHovered] = useState(false)
+  const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
@@ -212,7 +212,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const toggleSidebar = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
-    setIsHovered(false)
+    setHoveredNavItem(null)
     setIsScrolled(false)
     localStorage.setItem('sidebar-collapsed', String(newState))
 
@@ -225,12 +225,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleSidebarMouseEnter = () => {
     if (isMobile) return
-    setIsHovered(true)
   }
 
   const handleSidebarMouseLeave = () => {
     if (isMobile) return
-    setIsHovered(false)
+    setHoveredNavItem(null)
   }
 
   const handleSidebarItemClick = () => {
@@ -259,8 +258,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     console.log('Logout disabled - authentication is not enabled')
   }
 
-  // showExpanded: sidebar shows labels when pinned open OR when hovered (hover-to-expand)
-  const showExpanded = !isCollapsed || isHovered
+  // showExpanded: sidebar labels show only when pinned open
+  const showExpanded = !isCollapsed
   const sidebarWidth = showExpanded ? '220px' : '56px'
   // Content margin uses only the pinned state so the main area doesn't shift on hover
   const contentMarginWidth = isCollapsed ? '56px' : '220px'
@@ -390,7 +389,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-hidden flex flex-col" style={{ padding: !showExpanded ? '8px 0' : '4px 8px' }}>
+        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: !showExpanded ? '8px 0' : '4px 8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
@@ -403,6 +402,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               const renderNavItem = (navItem: NavItem, isChild = false) => {
                 const itemIsActive = pathname === navItem.href
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
+                const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
@@ -416,9 +416,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   justifyContent: !showExpanded ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
-                  transition: 'background 100ms ease',
+                  transition: 'background 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
                   position: 'relative',
                   overflow: 'hidden',
+                  width: !showExpanded ? '44px' : 'auto',
+                  zIndex: !showExpanded && isItemHovered ? 40 : 1,
+                  transform: !showExpanded && isItemHovered ? 'translateX(1px)' : 'translateX(0)',
+                  boxShadow: !showExpanded && isItemHovered ? '0 6px 14px rgba(0,0,0,0.2)' : 'none',
                 }
 
                 const content = (
@@ -447,6 +451,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         )}
                       </>
                     )}
+                    {!showExpanded && isItemHovered && (
+                      <span
+                        className="dashboard-layout-nav-item-flyout-label"
+                        style={{
+                          position: 'absolute',
+                          left: 'calc(100% + 8px)',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          height: '36px',
+                          padding: '0 14px',
+                          borderRadius: '10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          whiteSpace: 'nowrap',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          background: 'rgba(18, 22, 32, 0.78)',
+                          backdropFilter: 'blur(14px) saturate(135%)',
+                          WebkitBackdropFilter: 'blur(14px) saturate(135%)',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          boxShadow: '0 10px 28px rgba(0,0,0,0.35)',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {navItem.name}
+                      </span>
+                    )}
                   </>
                 )
 
@@ -459,11 +491,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       style={baseStyle}
                       title={!showExpanded ? navItem.name : undefined}
                       onMouseEnter={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem(navItem.name)
+                        }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                         }
                       }}
                       onMouseLeave={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem((prev) => (prev === navItem.name ? null : prev))
+                        }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
                         }
@@ -489,9 +527,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                       }}
                       onMouseEnter={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem(navItem.name)
+                        }
                         e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                       }}
                       onMouseLeave={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem((prev) => (prev === navItem.name ? null : prev))
+                        }
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
@@ -515,11 +559,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                       }}
                       onMouseEnter={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem(navItem.name)
+                        }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                         }
                       }}
                       onMouseLeave={(e) => {
+                        if (!showExpanded) {
+                          setHoveredNavItem((prev) => (prev === navItem.name ? null : prev))
+                        }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
                         }

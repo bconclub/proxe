@@ -5,17 +5,29 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useTheme } from '@/components/dashboard/ThemeProvider';
 
 const ACCENT_THEMES = [
-  { id: 'bcon', name: 'BCON Purple', color: '#8B5CF6', darkColor: '#8B5CF6' },
-  { id: 'gold', name: 'Electric Lime', color: '#afd510', darkColor: '#afd510' },
-  { id: 'orange', name: 'Sunset Orange', color: '#fc7301', darkColor: '#fc7301' },
-  { id: 'grey', name: 'Neutral Grey', color: '#6B7280', darkColor: '#9CA3AF' },
+  {
+    id: 'aviation-gold',
+    name: 'Aviation Gold',
+    color: '#C9A961',
+    bgSecondary: '#1A0F0A',
+    bgTertiary: 'rgba(201, 169, 97, 0.12)',
+    bgHover: 'rgba(201, 169, 97, 0.16)',
+    borderPrimary: 'rgba(201, 169, 97, 0.32)',
+    textPrimary: '#E8D5B7',
+    textSecondary: 'rgba(232, 213, 183, 0.75)',
+    buttonBg: '#C9A961',
+    textButton: '#1A0F0A',
+  },
+  { id: 'gold', name: 'Electric Lime', color: '#afd510' },
+  { id: 'orange', name: 'Sunset Orange', color: '#fc7301' },
+  { id: 'grey', name: 'Neutral Grey', color: '#6B7280' },
 ];
 
 type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [selectedTheme, setSelectedTheme] = useState('bcon');
+  const [selectedTheme, setSelectedTheme] = useState(ACCENT_THEMES[0].id);
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
@@ -24,13 +36,13 @@ export default function SettingsPage() {
 
   // Load saved theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('bcon-accent-theme');
-    if (savedTheme) {
+    const storageKey = 'windchasers-accent-theme';
+    const savedTheme = localStorage.getItem(storageKey);
+    if (savedTheme && ACCENT_THEMES.some(({ id }) => id === savedTheme)) {
       setSelectedTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to BCON theme
-      applyTheme('bcon');
+      applyTheme(ACCENT_THEMES[0].id);
     }
   }, []);
 
@@ -61,6 +73,27 @@ export default function SettingsPage() {
       document.documentElement.style.setProperty('--accent-primary', theme.color);
       document.documentElement.style.setProperty('--accent-light', theme.color);
       document.documentElement.style.setProperty('--accent-subtle', `${theme.color}20`);
+
+      // Only the Windchasers-specific Aviation Gold preset overrides full UI tokens.
+      if (theme.id === 'aviation-gold') {
+        document.documentElement.style.setProperty('--bg-secondary', theme.bgSecondary);
+        document.documentElement.style.setProperty('--bg-tertiary', theme.bgTertiary);
+        document.documentElement.style.setProperty('--bg-hover', theme.bgHover);
+        document.documentElement.style.setProperty('--border-primary', theme.borderPrimary);
+        document.documentElement.style.setProperty('--text-primary', theme.textPrimary);
+        document.documentElement.style.setProperty('--text-secondary', theme.textSecondary);
+        document.documentElement.style.setProperty('--button-bg', theme.buttonBg);
+        document.documentElement.style.setProperty('--text-button', theme.textButton);
+      } else {
+        document.documentElement.style.removeProperty('--bg-secondary');
+        document.documentElement.style.removeProperty('--bg-tertiary');
+        document.documentElement.style.removeProperty('--bg-hover');
+        document.documentElement.style.removeProperty('--border-primary');
+        document.documentElement.style.removeProperty('--text-primary');
+        document.documentElement.style.removeProperty('--text-secondary');
+        document.documentElement.style.removeProperty('--button-bg');
+        document.documentElement.style.removeProperty('--text-button');
+      }
     }
   }
 
@@ -68,7 +101,7 @@ export default function SettingsPage() {
   function handleThemeSelect(themeId: string) {
     setSelectedTheme(themeId);
     applyTheme(themeId);
-    localStorage.setItem('bcon-accent-theme', themeId);
+    localStorage.setItem('windchasers-accent-theme', themeId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -167,7 +200,7 @@ export default function SettingsPage() {
           
           <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
             <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Accent Color
+              Windchasers Color System
             </h3>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
