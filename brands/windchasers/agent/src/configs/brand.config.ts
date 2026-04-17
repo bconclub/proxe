@@ -16,7 +16,7 @@ export const windchasersConfig: BrandConfig = {
     maxFollowUps: 3,
     avatar: {
       type: 'image',
-      source: '/windchasers-icon.png',
+      source: '/logo.png',
     },
   },
   colors: {
