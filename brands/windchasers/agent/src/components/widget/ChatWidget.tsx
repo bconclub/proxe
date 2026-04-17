@@ -144,7 +144,7 @@ const ICONS = {
 
 // BCON sequential welcome sequence
 const bconWelcomeSequence = [
-  { text: "HI i am PROXe, BCON's AI Marketing Strategist\n\nHow can I help with your marketing today?", delay: 0 },
+  { text: "Hi! I'm here to help you understand WindChasers training, ask me anything.", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -1738,7 +1738,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // If pre-loaded lead context exists, stream a single contextual message
     if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
-      const text = `HI i am PROXe, BCON's AI Marketing Strategist\n\nHow can I help with your marketing today?`;
+      const text = `Hi! I'm here to help you understand WindChasers training, ask me anything.`;
       await streamWelcomeMessage(text, 20);
       setWelcomeComplete(true);
       return;
@@ -2775,7 +2775,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>BCON AI</span>
+          <span>Windchasers AI</span>
         </div>
         <div className={styles.headerActions}>
           <button
