@@ -10,12 +10,12 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'PROXe BCON',
-  description: 'BCON Club - Dashboard for managing leads, bookings, and metrics',
+  title: 'PROXe Windchasers',
+  description: 'Windchasers - Dashboard for managing leads, bookings, and metrics',
   icons: {
-    icon: '/bcon-icon.png',
-    shortcut: '/bcon-icon.png',
-    apple: '/bcon-icon.png',
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
   },
 }
 
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="bw-dark">
+    <html lang="en" suppressHydrationWarning data-brand="windchasers" data-theme="aviation-gold">
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
@@ -41,7 +41,7 @@ export default function RootLayout({
                     el.classList.add('light');
                     el.classList.remove('dark');
                   } else if (t === 'brand') {
-                    el.setAttribute('data-theme', 'bcon-electric');
+                    el.setAttribute('data-theme', 'aviation-gold');
                     el.classList.add('dark');
                     el.classList.remove('light');
                   } else {
