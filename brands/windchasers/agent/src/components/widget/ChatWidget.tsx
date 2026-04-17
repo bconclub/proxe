@@ -40,6 +40,13 @@ interface ChatWidgetProps {
   widgetStyle?: 'searchbar' | 'bubble';
 }
 
+interface FlowOverrideRule {
+  responseText?: string;
+  followUpButtons: string[];
+}
+
+const FLOW_COUNTRIES = ['USA', 'Canada', 'Hungary', 'New Zealand', 'Thailand', 'Australia'] as const;
+
 // PROXE Logo component (white icon version)
 const PROXELogo = () => (
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 643 643" style={{ width: '100%', height: '100%' }}>
@@ -84,6 +91,11 @@ const ICONS = {
   chevronDown: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  ),
+  chevronUp: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 15 12 9 18 15"></polyline>
     </svg>
   ),
   user: (
@@ -210,6 +222,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [phoneInput, setPhoneInput] = useState('');
   const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
+  const [flowOverrideButtons, setFlowOverrideButtons] = useState<string[] | null>(null);
+  const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
   const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
@@ -813,6 +827,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closePortfolio();
     setDynamicQuickButtons(null);
     setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverride(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
     // Only reset if user explicitly resets the chat
     // Notify parent iframe to disable pointer events
@@ -966,6 +982,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setMessageCount(nextCount);
     setExploreButtons(null);
     setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
 
     if ((containsBookingKeywords(trimmed) || isExactDemoBookingTrigger) && !bookingCompleted) {
       // Open calendar immediately while AI response streams
@@ -1159,9 +1176,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleAssistantMessageComplete = async (message: Message) => {
+    const activeFlowOverride = pendingFlowOverride;
+    if (activeFlowOverride) {
+      if (activeFlowOverride.responseText && message.id) {
+        updateMessageText(message.id, activeFlowOverride.responseText);
+      }
+      setFlowOverrideButtons(activeFlowOverride.followUpButtons);
+      setDynamicQuickButtons(null);
+      setPendingFlowOverride(null);
+    }
+
     if (message.text) {
       // Strip HTML tags before adding to history for summarization
-      const plainText = message.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      const finalMessageText = activeFlowOverride?.responseText || message.text;
+      const plainText = finalMessageText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
       appendHistory({ role: 'assistant', content: plainText });
       // Don't store assistant messages - we focus on user inputs and summaries
     }
@@ -1702,6 +1730,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     storeUserProfile({}, brandKey);
     setDynamicQuickButtons(null);
     setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverride(null);
     setWelcomeComplete(false);
     setShowMinimalButtons(false);
     // Reset conversation restoration flags
@@ -2423,9 +2453,63 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsInputActive(true);
     setExploreButtons(null);
     setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
 
     const nextButtons = [...usedButtons, buttonText];
     setUsedButtons(nextButtons);
+
+    const normalizedButton = message.toLowerCase();
+    const flowRule = (() : FlowOverrideRule | null => {
+      if (normalizedButton === 'start pilot training') {
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'airplane') {
+        return {
+          responseText: 'Have you completed your DGCA ground classes?',
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (normalizedButton === 'yes, completed dgca') {
+        return {
+          followUpButtons: [...FLOW_COUNTRIES],
+        };
+      }
+      if (FLOW_COUNTRIES.some((country) => country.toLowerCase() === normalizedButton)) {
+        return {
+          followUpButtons: ['Book a Consultation'],
+        };
+      }
+      if (normalizedButton === 'no, starting fresh') {
+        return {
+          followUpButtons: ['PPL - Private Pilot License', 'CPL - Commercial Pilot License'],
+        };
+      }
+      if (
+        normalizedButton === 'ppl - private pilot license' ||
+        normalizedButton === 'cpl - commercial pilot license'
+      ) {
+        return {
+          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+        };
+      }
+      if (normalizedButton === 'yes, completed 12th science') {
+        return {
+          followUpButtons: ['Book a Consultation'],
+        };
+      }
+      if (normalizedButton === 'helicopter') {
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (normalizedButton === 'explore training options') {
+        return {
+          followUpButtons: config.exploreButtons ?? [],
+        };
+      }
+      return null;
+    })();
+    setPendingFlowOverride(flowRule);
 
     if (requestNameBeforeProceed(message, nextButtons)) return;
     if (requestEmailBeforeProceed(message, nextButtons)) return;
@@ -2495,6 +2579,27 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       </div>
     ),
     [contextualButtons, handleQuickButtonClick]
+  );
+
+  const renderFlowOverrideButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {flowOverrideButtons?.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index % 7}`]}`}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [flowOverrideButtons, handleQuickButtonClick]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -3294,6 +3399,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         renderWelcomeButtons(styles.welcomeQuickButtons)}
       {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
       {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
+      {isOpen &&
+        !isLoading &&
+        flowOverrideButtons &&
+        flowOverrideButtons.length > 0 &&
+        Boolean(lastAiMessage?.text) &&
+        !lastAiMessage?.isStreaming &&
+        renderFlowOverrideButtons(styles.welcomeQuickButtons)}
 
 
       {/* Welcome video embed temporarily disabled */}
@@ -3391,13 +3503,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     </div>
     {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
-        className={`${styles.bubbleButton} ${isOpen ? styles.bubbleButtonHidden : ''}`}
+        className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         data-brand={brand}
       >
         <div className={styles.bubbleIcon}>
-          {isOpen ? ICONS.chevronDown : ICONS.ai(brand, config)}
+          {isOpen ? ICONS.chevronUp : ICONS.chevronDown}
         </div>
       </button>
     )}
