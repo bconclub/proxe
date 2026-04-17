@@ -144,7 +144,7 @@ const ICONS = {
 
 // BCON sequential welcome sequence
 const bconWelcomeSequence = [
-  { text: "Hi! I'm here to help you understand WindChasers training, ask me anything.", delay: 0 },
+  { text: "Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -172,6 +172,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [showCalendly, setShowCalendly] = useState<string | null>(null);
   const [calendarAnchorId, setCalendarAnchorId] = useState<string | null>(null);
   const [pendingCalendar, setPendingCalendar] = useState(false);
+  const [forceCalendarFromBookButton, setForceCalendarFromBookButton] = useState(false);
   const [showDeployForm, setShowDeployForm] = useState<string | null>(null);
   const [bookingCompleted, setBookingCompleted] = useState(false);
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
@@ -777,6 +778,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const closeCalendarWidget = useCallback(() => {
     setShowCalendly(null);
     setPendingCalendar(false);
+    setForceCalendarFromBookButton(false);
     setCalendarAnchorId(null);
   }, []);
 
@@ -909,6 +911,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const submitMessage = async (rawMessage: string, buttons: string[] = usedButtons) => {
     const trimmed = rawMessage.trim();
     if (!trimmed) return;
+    const normalizedTrimmed = trimmed.toLowerCase();
+    const isExactDemoBookingTrigger =
+      normalizedTrimmed === 'book a demo session' || normalizedTrimmed === 'book a demo';
+    const isBookButtonMessage =
+      buttons.some((button) => button.trim().toLowerCase() === normalizedTrimmed) &&
+      normalizedTrimmed.includes('book');
+    const shouldForceCalendarFromBookButton = isExactDemoBookingTrigger || isBookButtonMessage;
 
     if (showCalendly) {
       closeCalendarWidget();
@@ -958,9 +967,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setExploreButtons(null);
     setDynamicQuickButtons(null);
 
-    if (containsBookingKeywords(trimmed) && !bookingCompleted) {
+    if ((containsBookingKeywords(trimmed) || isExactDemoBookingTrigger) && !bookingCompleted) {
       // Open calendar immediately while AI response streams
       setPendingCalendar(true);
+      setForceCalendarFromBookButton(shouldForceCalendarFromBookButton);
       const calendarMessageId = `calendar-${Date.now()}`;
       setShowCalendly(calendarMessageId);
       setCalendarAnchorId(calendarMessageId);
@@ -1738,7 +1748,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // If pre-loaded lead context exists, stream a single contextual message
     if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
-      const text = `Hi! I'm here to help you understand WindChasers training, ask me anything.`;
+      const text = `Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.`;
       await streamWelcomeMessage(text, 20);
       setWelcomeComplete(true);
       return;
@@ -2078,7 +2088,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           /which time works|what time works|pick a time|choose a time/.test(normalizedLastText);
 
         // If the AI already showed concrete time slots in text, don't open calendar too.
-        if (hasInlineTimeSlots && isAskingForTimeChoice) {
+        if (hasInlineTimeSlots && isAskingForTimeChoice && !forceCalendarFromBookButton) {
           setPendingCalendar(false);
           return;
         }
@@ -2086,6 +2096,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         // Use setTimeout to ensure state updates properly
         const timer = setTimeout(async () => {
           setPendingCalendar(false);
+          setForceCalendarFromBookButton(false);
           
           // Check for existing booking before showing calendar
           const phone = userProfile.phone;
@@ -2131,7 +2142,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
     }
     
-  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey]);
+  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton]);
 
   // Handle booking completion
   const handleBookingComplete = useCallback(async (bookingData: any) => {
@@ -2321,6 +2332,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   // Helper function to check if text contains booking keywords (call or demo)
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
+    if (lowerText === 'book a demo session' || lowerText === 'book a demo') {
+      return true;
+    }
     // Check for booking-related keywords
     return lowerText.includes('call') ||
            lowerText.includes('demo') ||
