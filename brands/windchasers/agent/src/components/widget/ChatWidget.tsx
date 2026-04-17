@@ -1189,6 +1189,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   const handleAssistantMessageComplete = async (message: Message) => {
     const activeFlowOverride = pendingFlowOverride;
+    console.log(
+      'DEBUG flowOverride:',
+      activeFlowOverride,
+      'flowOverrideButtons:',
+      flowOverrideButtons,
+    );
     if (activeFlowOverride) {
       if (activeFlowOverride.responseText && message.id) {
         updateMessageText(message.id, activeFlowOverride.responseText);
@@ -1836,6 +1842,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasUserMessage = messages.some((m) => m.type === 'user');
   const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
   const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
+  const desktopWelcomeEligible =
+    !isMobileViewport &&
+    isOpen &&
+    hasQuickButtons &&
+    welcomeComplete &&
+    !hasUserMessage &&
+    hasShownWelcomeRef.current &&
+    messages.length >= 1 &&
+    messages[0].type === 'ai' &&
+    !messages[0].isStreaming &&
+    conversationsToRestoreRef.current.length === 0;
   const challengeButtons = ['Leads', 'Engagement', 'Conversion', 'Retention'];
   const contextualButtons = useMemo(() => {
     const text = lastAiMessage?.text || '';
@@ -1879,6 +1896,36 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     !hasSelectedChallenge &&
     contextualButtons.length === 0 &&
     /biggest marketing challenge/i.test(lastAiMessage?.text || '');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H1',location:'ChatWidget.tsx:quick-button-options',message:'Computed quick button options',data:{brand,isMobileViewport,isMobileNewChat,quickButtonOptionsLength:quickButtonOptions.length,quickButtonOptions},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H2',location:'ChatWidget.tsx:welcome-gates',message:'Welcome button gating snapshot',data:{showMobileQuickActions,desktopWelcomeEligible,isOpen,hasQuickButtons,welcomeComplete,hasUserMessage,hasShownWelcome:hasShownWelcomeRef.current,messagesLength:messages.length,firstMessageType:messages[0]?.type ?? null,firstMessageStreaming:Boolean(messages[0]?.isStreaming),restoredConversationCount:conversationsToRestoreRef.current.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H3',location:'ChatWidget.tsx:welcome-status',message:'Welcome sequence status',data:{welcomeComplete,hasShownWelcome:hasShownWelcomeRef.current,lastAiStreaming:Boolean(lastAiMessage?.isStreaming),lastAiLength:lastAiMessage?.text?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    // #region agent log
+    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H4',location:'ChatWidget.tsx:viewport-routing',message:'Viewport determines quick action route',data:{isMobileViewport,showMobileQuickActions,desktopWelcomeEligible,windowInnerWidth:typeof window !== 'undefined' ? window.innerWidth : null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [
+    brand,
+    desktopWelcomeEligible,
+    hasQuickButtons,
+    hasUserMessage,
+    isMobileNewChat,
+    isMobileViewport,
+    isOpen,
+    lastAiMessage?.isStreaming,
+    lastAiMessage?.text,
+    messages,
+    quickButtonOptions,
+    showMobileQuickActions,
+    welcomeComplete,
+  ]);
 
   const isResponding = useMemo(
     () =>
@@ -2598,7 +2645,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             {flowOverrideButtons?.map((buttonText, index) => (
               <button
                 key={buttonText}
-                className={`${styles.quickBtn} ${styles[`accent-${index % 7}`]}`}
+                className={`${styles.quickBtn} ${styles.flowOverrideBtn} ${styles[`accent-${index % 7}`]}`}
                 onClick={(e) => handleQuickButtonClick(buttonText, e)}
               >
                 {buttonText}
@@ -3390,31 +3437,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             </div>
           </div>
         )}
-        
-        
+        {isOpen &&
+          !isLoading &&
+          flowOverrideButtons &&
+          flowOverrideButtons.length > 0 &&
+          true &&
+          !lastAiMessage?.isStreaming &&
+          (console.log('DEBUG render check:', isOpen, isLoading, flowOverrideButtons),
+          renderFlowOverrideButtons(styles.welcomeQuickButtons))}
         <div ref={messagesEndRef} />
       </div>
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
-      {(!isMobileViewport) &&
-        isOpen &&
-        hasQuickButtons &&
-        welcomeComplete &&
-        !hasUserMessage &&
-        hasShownWelcomeRef.current &&
-        messages.length >= 1 &&
-        messages[0].type === 'ai' &&
-        !messages[0].isStreaming &&
-        conversationsToRestoreRef.current.length === 0 &&
-        renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {desktopWelcomeEligible && renderWelcomeButtons(styles.welcomeQuickButtons)}
       {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
       {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
-      {isOpen &&
-        !isLoading &&
-        flowOverrideButtons &&
-        flowOverrideButtons.length > 0 &&
-        true &&
-        !lastAiMessage?.isStreaming &&
-        renderFlowOverrideButtons(styles.welcomeQuickButtons)}
 
 
       {/* Welcome video embed temporarily disabled */}
