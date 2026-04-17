@@ -2476,10 +2476,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
       if (normalizedButton === 'airplane') {
-        return {
-          responseText: 'Have you completed your DGCA ground classes?',
-          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
-        };
+        return { followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'] };
       }
       if (normalizedButton === 'yes, completed dgca') {
         return {
