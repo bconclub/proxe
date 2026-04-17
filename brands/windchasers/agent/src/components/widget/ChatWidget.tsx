@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
 import type { Message } from '@/hooks/useChatStream';
-
+import { InfinityLoader } from '@/components/widget/InfinityLoader';
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
@@ -110,42 +110,17 @@ const ICONS = {
     return <InfinitySymbol />;
   },
   infinity: <InfinitySymbol />,
-  attachment: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-    </svg>
-  ),
-  mic: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 19v3M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-      <line x1="12" y1="19" x2="12" y2="22"/>
-    </svg>
-  ),
-  sun: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="4"></circle>
-      <line x1="12" y1="2" x2="12" y2="5"></line>
-      <line x1="12" y1="19" x2="12" y2="22"></line>
-      <line x1="2" y1="12" x2="5" y2="12"></line>
-      <line x1="19" y1="12" x2="22" y2="12"></line>
-      <line x1="4.9" y1="4.9" x2="7" y2="7"></line>
-      <line x1="17" y1="17" x2="19.1" y2="19.1"></line>
-      <line x1="17" y1="7" x2="19.1" y2="4.9"></line>
-      <line x1="4.9" y1="19.1" x2="7" y2="17"></line>
-    </svg>
-  ),
-  moon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3c.5 0 .8.54.53.96A7 7 0 1 0 20.04 12.26c.42-.27.96.03.96.53z"></path>
-    </svg>
-  ),
 };
 
-// BCON sequential welcome sequence
-const bconWelcomeSequence = [
-  { text: "Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.", delay: 0 },
-];
+// Brand-aware welcome message
+const welcomeMessages: Record<string, string> = {
+  windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
+  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
+  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
+};
+function getWelcomeMessage(brand: string): string {
+  return welcomeMessages[brand] || welcomeMessages['proxe'];
+}
 
 // Helper function to clean metadata strings from conversation summary
 const cleanSummary = (summary: string | null | undefined): string => {
@@ -178,8 +153,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
-  const [showPortfolio, setShowPortfolio] = useState<string | null>(null);
-  const [portfolioAnchorId, setPortfolioAnchorId] = useState<string | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
@@ -210,14 +183,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [phoneInput, setPhoneInput] = useState('');
   const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
-  const [welcomeComplete, setWelcomeComplete] = useState(false);
-  const [showMinimalButtons, setShowMinimalButtons] = useState(false);
-  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
   const [isDockedBubble, setIsDockedBubble] = useState(false);
-  const [preLoadedLeadContext, setPreLoadedLeadContext] = useState<{ name?: string; service?: string; brand?: string; lead_id?: string } | null>(null);
   const SEARCHBAR_KEYBOARD_GAP = 5;
   const EMAIL_PROMPT_THRESHOLD = 5;
   const PHONE_PROMPT_THRESHOLD = 7;
@@ -244,24 +213,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedTheme = window.localStorage.getItem('bcon-widget-theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-      setWidgetTheme(savedTheme);
-    }
-  }, []);
-
-  const toggleWidgetTheme = useCallback(() => {
-    setWidgetTheme((prev) => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('bcon-widget-theme', next);
-      }
-      return next;
-    });
-  }, []);
-
   const handleOpenChat = useCallback(() => {
     setShowCloseConfirm(false);
     setIsDockedBubble(true);
@@ -282,17 +233,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [isOpen]);
 
-  // Listen for viewport info and lead context from parent (for embed widget)
+  // Listen for viewport info from parent (for embed widget)
   useEffect(() => {
     if (widgetStyle !== 'bubble') return;
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
-      }
-      if (e.data && e.data.type === 'proxe_lead_context') {
-        console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
-        setPreLoadedLeadContext(e.data.lead);
       }
     };
 
@@ -350,20 +297,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           }
           if (typeof storedUser.promptedPhone === 'boolean') {
             setHasAskedPhone(storedUser.promptedPhone);
-          }
-        }
-
-        // Apply pre-loaded lead context from parent page (form submission)
-        if (preLoadedLeadContext && !cancelled) {
-          console.log('[ChatWidget] Applying pre-loaded lead context:', preLoadedLeadContext);
-          const leadProfile: LocalUserProfile = {
-            ...storedUser,
-            name: preLoadedLeadContext.name || storedUser?.name,
-          };
-          setUserProfile(leadProfile);
-          storeUserProfile(leadProfile, brandKey);
-          if (preLoadedLeadContext.name) {
-            setHasAskedName(true);
           }
         }
 
@@ -544,18 +477,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     return () => {
       cancelled = true;
     };
-  }, [preLoadedLeadContext]);
-
-  // Initialize welcome video visibility from localStorage
-  // Video embed temporarily disabled
-  // useEffect(() => {
-  //   if (typeof window !== 'undefined') {
-  //     const dismissed = window.localStorage.getItem('bcon_video_closed');
-  //     if (dismissed === 'true') {
-  //       setShowWelcomeVideo(false);
-  //     }
-  //   }
-  // }, []);
+  }, []);
 
   useEffect(() => {
     if (showNamePrompt) {
@@ -794,11 +716,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setVideoAnchorId(null);
   }, []);
 
-  const closePortfolio = useCallback(() => {
-    setShowPortfolio(null);
-    setPortfolioAnchorId(null);
-  }, []);
-
   const handleCloseChat = useCallback(() => {
     setShowCloseConfirm(false);
     setIsOpen(false);
@@ -810,7 +727,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
-    closePortfolio();
     setDynamicQuickButtons(null);
     setExploreButtons(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
@@ -819,7 +735,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (window.parent !== window) {
       window.parent.postMessage('wc-chat-close', '*');
     }
-  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
+  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm]);
 
   const handleRequestCloseChat = useCallback(() => {
     setShowCloseConfirm(true);
@@ -943,13 +859,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     let contextualMessage = trimmed;
     let displayMessage = trimmed; // Message to show in chat and store
 
-    // Keep quick-button instructions hidden from the visible user bubble.
-    if (/^explore ai marketing solutions$/i.test(trimmed)) {
-      contextualMessage = `[Button intent: Ask user for business and industry context before suggesting solutions.] ${trimmed}`;
-    } else if (/^view use cases$/i.test(trimmed)) {
-      contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
-    }
-
     const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
     if (isBookingRepeat) {
       contextualMessage = `[Booking already scheduled] ${trimmed}`;
@@ -958,7 +867,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // Add name context to AI message only (not displayed to user)
     if (nextCount === 1 && userProfile.name) {
-      contextualMessage = `[User's name is ${userProfile.name}] ${contextualMessage}`;
+      contextualMessage = `[User's name is ${userProfile.name}] ${trimmed}`;
       // displayMessage stays as original trimmed message
     }
 
@@ -968,7 +877,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setDynamicQuickButtons(null);
 
     if ((containsBookingKeywords(trimmed) || isExactDemoBookingTrigger) && !bookingCompleted) {
-      // Open calendar immediately while AI response streams
       setPendingCalendar(true);
       setForceCalendarFromBookButton(shouldForceCalendarFromBookButton);
       const calendarMessageId = `calendar-${Date.now()}`;
@@ -1279,22 +1187,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('bottom', '0', 'important');
       el.style.setProperty('width', '100%', 'important');
       el.style.setProperty('max-width', '100%', 'important');
-      el.style.setProperty('height', '100dvh', 'important');
       el.style.setProperty('height', '100vh', 'important');
-      el.style.setProperty('max-height', '100dvh', 'important');
       el.style.setProperty('max-height', '100vh', 'important');
-      el.style.setProperty('margin', '0', 'important');
     } else {
       el.style.setProperty('right', '24px', 'important');
+      el.style.setProperty('bottom', '104px', 'important');
       el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('top', '0', 'important');
-      el.style.setProperty('bottom', '0', 'important');
+      el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
       el.style.setProperty('height', '580px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
-      el.style.setProperty('margin-top', 'auto', 'important');
-      el.style.setProperty('margin-bottom', 'auto', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -1660,7 +1563,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
 
-  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage, addStreamingAIMessage, updateMessageText, finishMessage } = useChat({
+  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage } = useChat({
     brand,
     apiUrl: finalApiUrl,
     onMessageComplete: handleAssistantMessageComplete,
@@ -1670,7 +1573,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
-    closePortfolio();
     setShowDeployForm(null);
     deployFormScrolledRef.current = false;
     setBookingCompleted(false);
@@ -1702,8 +1604,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     storeUserProfile({}, brandKey);
     setDynamicQuickButtons(null);
     setExploreButtons(null);
-    setWelcomeComplete(false);
-    setShowMinimalButtons(false);
     // Reset conversation restoration flags
     conversationsToRestoreRef.current = [];
     hasRestoredMessagesRef.current = false;
@@ -1716,53 +1616,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsSearchbarHovered(false);
     setIsDockedBubble(false);
     hasEverOpenedRef.current = false;
-  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
-
-  const streamWelcomeMessage = useCallback(async (text: string, charDelay: number = 25) => {
-    const msg = addStreamingAIMessage('');
-    if (!msg) return;
-
-    setTimeout(() => {
-      window.dispatchEvent(new Event('message-updated'));
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
-
-    const chars = text.split('');
-    for (let i = 0; i < chars.length; i++) {
-      const chunk = chars.slice(0, i + 1).join('');
-      updateMessageText(msg.id, chunk);
-      if (i % 3 === 0) {
-        window.dispatchEvent(new Event('message-updated'));
-      }
-      await new Promise(resolve => setTimeout(resolve, charDelay));
-    }
-
-    finishMessage(msg.id);
-    window.dispatchEvent(new Event('message-updated'));
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [addStreamingAIMessage, updateMessageText, finishMessage]);
-
-  const playWelcomeSequence = useCallback(async () => {
-    if (hasShownWelcomeRef.current) return;
-    hasShownWelcomeRef.current = true;
-
-    // If pre-loaded lead context exists, stream a single contextual message
-    if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
-      const text = `Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.`;
-      await streamWelcomeMessage(text, 20);
-      setWelcomeComplete(true);
-      return;
-    }
-
-    for (const item of bconWelcomeSequence) {
-      if (item.delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, item.delay));
-      }
-      await streamWelcomeMessage(item.text, 5);
-    }
-
-    setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage]);
+  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -1791,52 +1645,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
-  const hasUserMessage = messages.some((m) => m.type === 'user');
-  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
-  const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
-  const challengeButtons = ['Leads', 'Engagement', 'Conversion', 'Retention'];
-  const contextualButtons = useMemo(() => {
-    const text = lastAiMessage?.text || '';
-    if (!text) return [] as string[];
-
-    const match = text.match(/is it\s+([^?]+)\?/i);
-    if (!match?.[1]) return [] as string[];
-
-    const cleanedOptions = match[1]
-      .split(/,\s*|\s+or\s+/i)
-      .map((option) =>
-        option
-          .replace(/^(getting|converting|keeping|improving|boosting)\s+/i, '')
-          .replace(/[?.!,]+$/g, '')
-          .trim()
-      )
-      .filter((option) => option.length > 2)
-      .map((option) => option.charAt(0).toUpperCase() + option.slice(1))
-      .slice(0, 4);
-
-    return Array.from(new Set(cleanedOptions));
-  }, [lastAiMessage?.text]);
-  const hasSelectedContextual = usedButtons.some((button) =>
-    contextualButtons.includes(button)
-  );
-  const showContextualButtons =
-    isOpen &&
-    !isLoading &&
-    contextualButtons.length >= 2 &&
-    Boolean(lastAiMessage?.text) &&
-    !lastAiMessage?.isStreaming &&
-    !hasSelectedContextual;
-  const hasSelectedChallenge = usedButtons.some((button) =>
-    challengeButtons.includes(button)
-  );
-  const showChallengeButtons =
-    isOpen &&
-    !isLoading &&
-    Boolean(lastAiMessage?.text) &&
-    !lastAiMessage?.isStreaming &&
-    !hasSelectedChallenge &&
-    contextualButtons.length === 0 &&
-    /biggest marketing challenge/i.test(lastAiMessage?.text || '');
+  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && messages.length <= 1;
 
   const isResponding = useMemo(
     () =>
@@ -1846,12 +1655,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           message.type === 'ai' && (message.isStreaming || !message.hasStreamed)
       ),
     [isLoading, messages]
-  );
-
-  // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
-  const hasStreamingText = useMemo(
-    () => messages.some((m) => m.isStreaming && m.text),
-    [messages]
   );
 
   // Register callback for when Deploy form is submitted
@@ -2022,26 +1825,38 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           }
           
           // No conversations found, show welcome message
-          playWelcomeSequence();
+          if (addAIMessage) {
+            addAIMessage(getWelcomeMessage(brand));
+            hasShownWelcomeRef.current = true;
+          }
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
-          playWelcomeSequence();
+          if (addAIMessage) {
+            addAIMessage(getWelcomeMessage(brand));
+            hasShownWelcomeRef.current = true;
+          }
         }
       };
       
       fetchConversationsOnReopen();
-    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0) {
+    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
-      playWelcomeSequence();
+      addAIMessage(getWelcomeMessage(brand));
+      hasShownWelcomeRef.current = true;
     }
-  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, brandKey, preLoadedLeadContext, playWelcomeSequence]);
+  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
-    if (isOpen && messagesEndRef.current) {
-      // Scroll to bottom when chat opens
-      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    if (isOpen && messagesAreaRef.current) {
+      // Force scroll to absolute top when chat opens
+      messagesAreaRef.current.scrollTop = 0;
+      
+      // Also ensure the container itself is at top
+      if (chatboxContainerRef.current) {
+        chatboxContainerRef.current.scrollTop = 0;
+      }
     }
   }, [isOpen]);
 
@@ -2067,6 +1882,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             // Fallback: scroll to bottom
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
           }
+        } else if (messages.length <= 2 && messagesAreaRef.current) {
+          // Scroll to top of messages area to show first question header
+          messagesAreaRef.current.scrollTop = 0;
         } else if (messagesEndRef.current) {
           // Scroll to bottom for subsequent messages
           messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -2282,38 +2100,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
   // Listen for streaming updates to auto-scroll
-  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    const container = messagesAreaRef.current;
-    if (container) {
-      container.scrollTo({ top: container.scrollHeight, behavior });
-      return;
-    }
-
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
-    }
-  }, []);
-
   useEffect(() => {
     if (!isOpen) return;
 
     const handleMessageUpdate = () => {
-      // Always keep latest message in focus
-      scrollMessagesToBottom('smooth');
+      // On first message, keep at top. For subsequent messages, scroll to bottom
+      if (messages.length <= 2 && messagesAreaRef.current) {
+        messagesAreaRef.current.scrollTop = 0;
+      } else if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     };
 
     window.addEventListener('message-updated', handleMessageUpdate);
     return () => {
       window.removeEventListener('message-updated', handleMessageUpdate);
     };
-  }, [isOpen, messages.length, scrollMessagesToBottom]);
-
-  // Always scroll to bottom when messages change
-  useEffect(() => {
-    if (isOpen) {
-      scrollMessagesToBottom('smooth');
-    }
-  }, [messages, isOpen, scrollMessagesToBottom]);
+  }, [isOpen, messages.length]);
 
   // Scroll deploy form into view only once when it first appears
   useEffect(() => {
@@ -2329,6 +2132,110 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [showDeployForm]);
 
+  // Enable horizontal scrolling with mouse wheel and drag on desktop
+  useEffect(() => {
+    const quickButtonsElement = quickButtonsRef.current;
+    if (!quickButtonsElement) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Only handle wheel events if the element is scrollable horizontally
+      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
+        // Check if scrolling horizontally (shift + wheel) or convert vertical to horizontal
+        const isHorizontalScroll = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+        
+        if (isHorizontalScroll || Math.abs(e.deltaX) > 0) {
+          // Horizontal scroll - allow default behavior
+          return;
+        }
+        
+        // Convert vertical scroll to horizontal
+        e.preventDefault();
+        quickButtonsElement.scrollBy({
+          left: e.deltaY,
+          behavior: 'auto'
+        });
+      }
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
+        setIsDragging(true);
+        hasDraggedRef.current = false;
+        dragStartX.current = e.pageX - quickButtonsElement.offsetLeft;
+        dragStartScrollLeft.current = quickButtonsElement.scrollLeft;
+        quickButtonsElement.style.cursor = 'grabbing';
+        quickButtonsElement.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+        // Don't prevent default yet - wait to see if user drags
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      const x = e.pageX - quickButtonsElement.offsetLeft;
+      const deltaX = Math.abs(x - dragStartX.current);
+      
+      // Only prevent default and scroll if user has moved more than 5px (to distinguish from clicks)
+      if (deltaX > 5) {
+        hasDraggedRef.current = true;
+        e.preventDefault();
+        const walk = (x - dragStartX.current) * 2; // Scroll speed multiplier
+        quickButtonsElement.scrollLeft = dragStartScrollLeft.current - walk;
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (isDragging) {
+        setIsDragging(false);
+        quickButtonsElement.style.cursor = '';
+        quickButtonsElement.style.userSelect = '';
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // If user dragged, prevent click event on buttons
+        if (hasDraggedRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        hasDraggedRef.current = false;
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        quickButtonsElement.style.cursor = '';
+        quickButtonsElement.style.userSelect = '';
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    // Only enable drag on desktop (not touch devices)
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    quickButtonsElement.addEventListener('wheel', handleWheel, { passive: false });
+    
+    if (!isTouchDevice) {
+      quickButtonsElement.addEventListener('mousedown', handleMouseDown);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      quickButtonsElement.addEventListener('mouseleave', handleMouseLeave);
+    }
+    
+    return () => {
+      quickButtonsElement.removeEventListener('wheel', handleWheel);
+      if (!isTouchDevice) {
+        quickButtonsElement.removeEventListener('mousedown', handleMouseDown);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        quickButtonsElement.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, [isExpanded, showQuickButtons, isDragging]);
+
   // Helper function to check if text contains booking keywords (call or demo)
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
@@ -2336,13 +2243,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return true;
     }
     // Check for booking-related keywords
-    return lowerText.includes('call') ||
-           lowerText.includes('demo') ||
+    return lowerText.includes('call') || 
+           lowerText.includes('demo') || 
            lowerText.includes('book') ||
            lowerText.includes('schedule') ||
            lowerText.includes('meeting') ||
-           lowerText.includes('appointment') ||
-           lowerText.includes('audit');
+           lowerText.includes('appointment');
   };
 
   const handleSend = () => {
@@ -2416,85 +2322,144 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     const message = buttonText.trim();
     if (!message) return;
 
+    // Define lowerMessage once at the top for use throughout the function
+    const lowerMessage = message.toLowerCase().trim();
+
     setIsDockedBubble(true);
     setIsOpen(true);
     setIsExpanded(false);
     setShowQuickButtons(false);
-    setIsInputActive(true);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Quick button clicked', { buttonText, message });
+    }
+
+    // Handle Deploy PROXe button - show deploy form inline
+    // Match variations: "Deploy PROXe", "Deploy Proxe", "deploy proxe", etc.
+    if (lowerMessage.includes('deploy') && (lowerMessage.includes('proxe') || lowerMessage.includes('prox'))) {
+      closeCalendarWidget();
+      closeDeployForm();
+      setPendingCalendar(false);
+      if (showNamePrompt) {
+        setShowNamePrompt(false);
+      }
+      if (showEmailPrompt) {
+        setShowEmailPrompt(false);
+      }
+      if (showPhonePrompt) {
+        setShowPhonePrompt(false);
+      }
+      
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(false);
+      
+      // Add user message to chat
+      addUserMessage('Deploy PROXe');
+      
+      // Show deploy form after the user message is added
+      // Use a longer timeout to ensure the message is in the array
+      setTimeout(() => {
+        const deployMessageId = `deploy-${Date.now()}`;
+        setShowDeployForm(deployMessageId);
+        deployFormScrolledRef.current = false;
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[ChatWidget] Deploy form opened', { 
+            messagesCount: messages.length,
+            deployMessageId
+          });
+        }
+      }, 300);
+      
+      return;
+    }
+
+    // Handle Watch Video button - show video widget
+    if (message.toLowerCase() === 'watch video') {
+      closeCalendarWidget();
+      closeDeployForm();
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(false);
+      
+      // Add user message to chat and get the message object
+      const userMessage = addUserMessage('Watch Video');
+      
+      // Show video after the user message
+      setTimeout(() => {
+        const videoMessageId = `video-${Date.now()}`;
+        setShowVideo(videoMessageId);
+        setVideoAnchorId(userMessage.id);
+      }, 100);
+      
+      return;
+    }
+
+    const nextButtons = [...usedButtons, buttonText];
+    const isExploreRequest = lowerMessage === 'explore proxe' || 
+                             lowerMessage === 'explore training options' ||
+                             lowerMessage === 'explore training';
+    const exploreOptions = config?.exploreButtons ?? [];
+
+    if (isExploreRequest && exploreOptions.length > 0) {
+      closeCalendarWidget();
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(false);
+      setUsedButtons(nextButtons);
+      setExploreButtons(exploreOptions);
+      return;
+    }
+
     setExploreButtons(null);
     setDynamicQuickButtons(null);
 
-    const nextButtons = [...usedButtons, buttonText];
-    setUsedButtons(nextButtons);
-
     if (requestNameBeforeProceed(message, nextButtons)) return;
     if (requestEmailBeforeProceed(message, nextButtons)) return;
+
+    closeCalendarWidget();
+    setIsOpen(true);
+    setIsInputActive(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setUsedButtons(nextButtons);
+
     if (requestPhoneBeforeProceed(message, nextButtons)) return;
 
     submitMessage(message, nextButtons);
   };
 
   const renderWelcomeButtons = useCallback(
-    (wrapperClassName: string) => (
-      <div className={wrapperClassName}>
-        <div className={styles.welcomeQuickButtonsContainer}>
-          <div className={styles.welcomeQuickButtonRow}>
-            {quickButtonOptions.slice(0, 3).map((buttonText, index) => (
-              <button
-                key={buttonText}
-                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
-                onClick={(e) => handleQuickButtonClick(buttonText, e)}
-              >
-                {buttonText}
-              </button>
-            ))}
+    (wrapperClassName: string) => {
+      // Get quick action buttons from brand config (3 fixed buttons)
+      const quickActions = config.quickButtons || [
+        'Start Pilot Training',
+        'Book a Demo Session',
+        'Explore Training Options'
+      ];
+      
+      return (
+        <div className={wrapperClassName}>
+          <div className={styles.welcomeQuickButtonsContainer}>
+            <div className={styles.welcomeQuickButtonRow}>
+              {quickActions.slice(0, 3).map((buttonText, index) => (
+                <button
+                  key={buttonText}
+                  className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                  onClick={() => handleQuickButtonClick(buttonText)}
+                >
+                  {buttonText}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    ),
-    [handleQuickButtonClick, quickButtonOptions]
-  );
-
-  const renderChallengeButtons = useCallback(
-    (wrapperClassName: string) => (
-      <div className={wrapperClassName}>
-        <div className={styles.welcomeQuickButtonsContainer}>
-          <div className={styles.welcomeQuickButtonRow}>
-            {challengeButtons.map((buttonText, index) => (
-              <button
-                key={buttonText}
-                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
-                onClick={(e) => handleQuickButtonClick(buttonText, e)}
-              >
-                {buttonText}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-    [challengeButtons, handleQuickButtonClick]
-  );
-
-  const renderContextualButtons = useCallback(
-    (wrapperClassName: string) => (
-      <div className={wrapperClassName}>
-        <div className={styles.welcomeQuickButtonsContainer}>
-          <div className={styles.welcomeQuickButtonRow}>
-            {contextualButtons.map((buttonText, index) => (
-              <button
-                key={buttonText}
-                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
-                onClick={(e) => handleQuickButtonClick(buttonText, e)}
-              >
-                {buttonText}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-    [contextualButtons, handleQuickButtonClick]
+      );
+    },
+    [handleQuickButtonClick, config]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -2503,9 +2468,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
     if (showVideo) {
       closeVideoWidget();
-    }
-    if (showPortfolio) {
-      closePortfolio();
     }
     setIsInputActive(true);
     if (!isOpen) {
@@ -2575,11 +2537,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
+    // Don't hide if clicking on a quick button
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
       return;
     }
-
+    
     setTimeout(() => {
       if (!inputValue.trim() && !isOpen) {
         setShowQuickButtons(false);
@@ -2696,9 +2659,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             if (showDeployForm) {
               closeDeployForm();
             }
-            if (showPortfolio) {
-              closePortfolio();
-            }
               handleSearchWidgetPress();
           }}
           onBlur={handleInputBlur}
@@ -2750,7 +2710,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           <div className={styles.chatContent}>
@@ -2789,16 +2749,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>Windchasers AI</span>
+          <span>{config.name}</span>
         </div>
         <div className={styles.headerActions}>
-          <button
-            className={styles.themeBtn}
-            onClick={toggleWidgetTheme}
-            aria-label={widgetTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
-            title={widgetTheme === 'light' ? 'Dark theme' : 'Light theme'}
+          <button 
+            className={styles.resetBtn} 
+            onClick={handleRequestResetChat}
+            title="Reset chat"
           >
-            {widgetTheme === 'light' ? ICONS.moon : ICONS.sun}
+            {ICONS.reset}
           </button>
           <button
             className={styles.closeBtn}
@@ -2816,15 +2775,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           // Only close widgets if clicking directly on the messages area, not on messages or buttons
           const target = e.target as HTMLElement;
           const isClickOnMessage = target.closest(`.${styles.message}`);
+          const isClickOnButton = target.closest(`.${styles.quickBtn}`) || target.closest(`.${styles.followUpBtn}`);
           const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
           const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
-          const isClickOnPortfolio = target.closest(`.${styles.portfolioGrid}`);
           
-          if (!isClickOnMessage && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
+          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo) {
             // Close widgets when clicking in empty messages area (clicking away)
             closeCalendarWidget();
             closeVideoWidget();
-            closePortfolio();
           }
         }}
       >
@@ -2840,35 +2798,55 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               data-message-id={message.id}
             >
               <div className={styles.messageContent}>
-                <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
-                  <div className={styles.bubbleContent}>
-                    {/* Typing indicator for loading state */}
-                    {message.isStreaming && !message.text && !hasStreamingText ? (
-                      <div className={styles.typingIndicator}>
-                        <span />
-                        <span />
-                        <span />
+                <div className={styles.bubble}>
+                  {message.isStreaming && !message.text ? (
+                    <InfinityLoader />
+                  ) : (
+                    <div className={styles.bubbleContent}>
+                      {/* Header with avatar and name inside the bubble */}
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {message.type === 'ai' ? config.name : 'You'}
+                        </span>
                       </div>
-                    ) : (
-                      <>
-                        {/* Message content - hide text when calendar is showing for this message */}
-                        {!(showCalendly && calendarAnchorId === message.id) && (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                            <div
-                              className={styles.messageText}
-                              style={{ flex: '1 1 auto', minWidth: 0 }}
-                              dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                            />
-                            {message.isStreaming && message.text && (
-                              <span className={styles.streamingCursor}>▋</span>
-                            )}
-                          </div>
+                      
+                      {/* Message content */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                        <div
+                          className={styles.messageText}
+                          style={{ flex: '1 1 auto', minWidth: 0 }}
+                          dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                        />
+                        {message.isStreaming && message.text && (
+                          <span className={styles.streamingCursor}>▋</span>
                         )}
-                        
-
-                    </>
+                      </div>
+                      
+                      {/* Follow-up buttons inside the bubble for AI messages */}
+                      {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
+                        <div className={styles.followUpButtons}>
+                          {message.followUps.map((followUp, followUpIndex) => {
+                            // Rotate through accent colors for follow-up buttons
+                            const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
+                            const buttonAccentClass = `accent-${buttonAccentIndex}`;
+                            
+                            return (
+                            <button
+                              key={followUpIndex}
+                              className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
+                              onClick={() => handleQuickButtonClick(followUp)}
+                            >
+                              {followUp}
+                            </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -2891,17 +2869,24 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
                     <div className={styles.bubbleContent}>
-                      {/* Close button */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
-                        <button
-                          type="button"
-                          className={styles.calendarCloseBtn}
-                          onClick={closeCalendarWidget}
-                          aria-label="Close booking widget"
-                        >
-                          {ICONS.close}
-                        </button>
-                      </div>
+                      {/* Header with avatar and name inside the bubble */}
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.calendarCloseBtn}
+                      onClick={closeCalendarWidget}
+                      aria-label="Close booking widget"
+                    >
+                      {ICONS.close}
+                    </button>
+                  </div>
+                      
                       {/* Custom Google Calendar widget */}
                   <div
                     className={styles.calendarScrollArea}
@@ -2989,69 +2974,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 </div>
               </div>
             )}
-
-            {showPortfolio && portfolioAnchorId === message.id && (
-              <div 
-                key={showPortfolio}
-                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-                onClick={(e) => e.stopPropagation()}
-                ref={(el) => {
-                  if (el) {
-                    requestAnimationFrame(() => {
-                      setTimeout(() => {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
-                      }, 100);
-                    });
-                  }
-                }}
-              >
-                <div className={styles.messageContent}>
-                  <div className={styles.bubble}>
-                    <div className={styles.bubbleContent}>
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {ICONS.ai(brand, config)}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {config.name}
-                        </span>
-                        <button
-                          type="button"
-                          className={styles.calendarCloseBtn}
-                          onClick={closePortfolio}
-                          aria-label="Close portfolio"
-                        >
-                          {ICONS.close}
-                        </button>
-                      </div>
-                      
-                      <div className={styles.portfolioGrid} data-scroll-lock="allow">
-                        <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>🎯</div>
-                          <div className={styles.portfolioTitle}>Customer Acquisition</div>
-                          <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
-                        </div>
-                        <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>🎨</div>
-                          <div className={styles.portfolioTitle}>Brand Management</div>
-                          <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
-                        </div>
-                        <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>📝</div>
-                          <div className={styles.portfolioTitle}>Content & Ads</div>
-                          <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
-                        </div>
-                        <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>🤖</div>
-                          <div className={styles.portfolioTitle}>AI Automation</div>
-                          <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </React.Fragment>
           );
         })}
@@ -3111,7 +3033,65 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
 
-
+        {exploreButtons && exploreButtons.length > 0 && (
+          <div
+            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+            ref={(el) => {
+              if (el) {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 100);
+                });
+              }
+            }}
+          >
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                  </div>
+                  <p className={styles.exploreTitle}>Choose your PROXe</p>
+                  <div className={styles.exploreButtonGroup}>
+                    {exploreButtons.map((option, optionIndex) => {
+                      // Map each PROXe type to its specific color class from "Meet Our PROXes" section
+                      let proxeColorClass = '';
+                      if (option.toLowerCase().includes('web')) {
+                        proxeColorClass = styles.exploreWeb;
+                      } else if (option.toLowerCase().includes('whatsapp')) {
+                        proxeColorClass = styles.exploreWhatsapp;
+                      } else if (option.toLowerCase().includes('voice')) {
+                        proxeColorClass = styles.exploreVoice;
+                      } else if (option.toLowerCase().includes('social')) {
+                        proxeColorClass = styles.exploreSocial;
+                      }
+                      return (
+                        <button
+                          key={optionIndex}
+                          className={`${styles.followUpBtn} ${proxeColorClass}`}
+                          onClick={() => {
+                            setExploreButtons(null);
+                            // Send a message about the specific PROXe type
+                            const proxeMessage = `Tell me more about ${option}`;
+                            handleQuickButtonClick(proxeMessage);
+                          }}
+                        >
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Inline Name Prompt Card */}
         {showNamePrompt && !showCalendly && !showDeployForm && (
@@ -3276,30 +3256,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             </div>
           </div>
         )}
-        
-        
         <div ref={messagesEndRef} />
       </div>
+      {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
-      {(!isMobileViewport) &&
-        isOpen &&
-        hasQuickButtons &&
-        welcomeComplete &&
-        !hasUserMessage &&
-        hasShownWelcomeRef.current &&
-        messages.length >= 1 &&
-        messages[0].type === 'ai' &&
-        !messages[0].isStreaming &&
-        conversationsToRestoreRef.current.length === 0 &&
-        renderWelcomeButtons(styles.welcomeQuickButtons)}
-      {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
-      {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
 
-
-      {/* Welcome video embed temporarily disabled */}
-      {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
-        <div className={styles.videoEmbedContainerBottom}>...</div>
-      )} */}
+      {/* Desktop: quick buttons near input when showing welcome message */}
+      {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
@@ -3311,9 +3274,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         <div className={styles.chatInputRow}>
-          <button className={styles.inputIconBtn} aria-label="Attach file" type="button">
-            {ICONS.attachment}
-          </button>
           <div className={styles.chatInputWrapper}>
             <input
               ref={chatInputRef}
@@ -3350,9 +3310,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 if (showDeployForm) {
                   closeDeployForm();
                 }
-                if (showPortfolio) {
-                  closePortfolio();
-                }
                 // Scroll input into view above keyboard on mobile
     const scrollInputIntoView = () => {
                 const input = e.target;
@@ -3379,9 +3336,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             }}
           />
         </div>
-          <button className={styles.inputIconBtn} aria-label="Voice message" type="button">
-            {ICONS.mic}
-          </button>
         <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
           {ICONS.send}
         </button>
@@ -3391,7 +3345,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     </div>
     {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
-        className={`${styles.bubbleButton} ${isOpen ? styles.bubbleButtonHidden : ''}`}
+        className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         data-brand={brand}

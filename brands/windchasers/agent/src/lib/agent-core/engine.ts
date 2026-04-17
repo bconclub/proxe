@@ -306,6 +306,9 @@ function cleanResponse(raw: string, channel?: string): string {
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
     .trim();
 
+  // Hard guard: never emit em/en dashes in user-facing responses.
+  cleaned = cleaned.replace(/[—–]/g, '-');
+
   // Strip HTML tags for non-web channels
   if (channel && channel !== 'web') {
     cleaned = cleaned

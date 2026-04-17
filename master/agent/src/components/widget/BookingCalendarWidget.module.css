@@ -3,7 +3,7 @@
   position: relative;
   width: 100%;
   max-width: 100%;
-  margin-top: 16px;
+  margin-top: 8px;
   border-radius: 16px;
   overflow: hidden;
   background: var(--dark-card, rgba(0, 0, 0, 0.4));
@@ -12,7 +12,7 @@
   border: 1px solid var(--border-accent, rgba(255, 255, 255, 0.2));
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 16px;
-  min-height: 380px;
+  min-height: 0;
   box-sizing: border-box;
 }
 
