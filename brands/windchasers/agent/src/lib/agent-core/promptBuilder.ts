@@ -58,7 +58,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   } = options;
 
   // Resolve brand: explicit param > env var > default
-  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
+  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
   // Build the core system prompt (brand-specific)
   let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
