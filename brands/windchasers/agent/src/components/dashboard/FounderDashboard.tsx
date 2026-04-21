@@ -70,10 +70,10 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('30D')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
-  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('30D')
-  const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [leadsFilter, setLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [hotLeadsFilter, setHotLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
@@ -402,6 +402,7 @@ export default function FounderDashboard() {
               <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Conversations</h3>
             </div>
             <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? 0)}
               {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
               {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
               {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
@@ -420,7 +421,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setConversationTimeFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={conversationTimeFilter === period ? { backgroundColor: '#3B82F6' } : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }}
@@ -474,6 +475,7 @@ export default function FounderDashboard() {
               <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
             </div>
             <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              {warmLeadsFilter === 'All' && (metrics.warmLeads?.count ?? 0)}
               {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
               {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
@@ -492,7 +494,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setWarmLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={warmLeadsFilter === period ? { backgroundColor: '#F97316' } : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }}
@@ -516,6 +518,7 @@ export default function FounderDashboard() {
               <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
             </div>
             <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              {leadsFilter === 'All' && metrics.totalLeads.count}
               {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
               {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
               {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
@@ -534,7 +537,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={leadsFilter === period ? { backgroundColor: 'var(--button-bg)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}

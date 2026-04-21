@@ -70,10 +70,10 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [leadsFilter, setLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
-  const [hotLeadsFilter, setHotLeadsFilter] = useState<'7D' | '14D' | '30D'>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [leadsFilter, setLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [hotLeadsFilter, setHotLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
@@ -405,6 +405,7 @@ export default function FounderDashboard() {
           <div className="flex items-center gap-4">
             {/* Left: Big Number */}
             <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+              {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? 0)}
               {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
               {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
               {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
@@ -450,7 +451,7 @@ export default function FounderDashboard() {
               View All <MdArrowForward size={14} />
             </button>
             <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setConversationTimeFilter(period)}
@@ -547,6 +548,7 @@ export default function FounderDashboard() {
           <div className="flex items-center gap-4">
             {/* Left: Big Number */}
             <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+              {warmLeadsFilter === 'All' && (metrics.warmLeads?.count ?? 0)}
               {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
               {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
@@ -581,7 +583,7 @@ export default function FounderDashboard() {
               View All <MdArrowForward size={14} />
             </button>
             <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setWarmLeadsFilter(period)}
@@ -629,6 +631,7 @@ export default function FounderDashboard() {
           <div className="flex items-center gap-4">
             {/* Left: Big Number */}
             <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
+              {leadsFilter === 'All' && metrics.totalLeads.count}
               {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
               {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
               {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
@@ -663,7 +666,7 @@ export default function FounderDashboard() {
               View All <MdArrowForward size={14} />
             </button>
             <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setLeadsFilter(period)}
