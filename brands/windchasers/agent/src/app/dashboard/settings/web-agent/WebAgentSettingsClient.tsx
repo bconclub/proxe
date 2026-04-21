@@ -437,7 +437,17 @@ export default function WebAgentSettingsClient() {
                     fontFamily: 'system-ui, -apple-system, sans-serif',
                   }}
                 >
-                  bconclub.com
+                  {(() => {
+                    const raw =
+                      process.env.NEXT_PUBLIC_SITE_URL ||
+                      process.env.NEXT_PUBLIC_APP_URL ||
+                      'https://windchasers.in'
+                    try {
+                      return new URL(raw).hostname.replace(/^www\./, '')
+                    } catch {
+                      return raw.replace(/^https?:\/\//, '').replace(/^www\./, '')
+                    }
+                  })()}
                 </span>
               </div>
             </div>

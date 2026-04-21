@@ -3441,10 +3441,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           !isLoading &&
           flowOverrideButtons &&
           flowOverrideButtons.length > 0 &&
-          true &&
           !lastAiMessage?.isStreaming &&
-          (console.log('DEBUG render check:', isOpen, isLoading, flowOverrideButtons),
-          renderFlowOverrideButtons(styles.welcomeQuickButtons))}
+          renderFlowOverrideButtons(styles.welcomeQuickButtons)}
         <div ref={messagesEndRef} />
       </div>
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
