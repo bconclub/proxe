@@ -1903,36 +1903,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     contextualButtons.length === 0 &&
     /biggest marketing challenge/i.test(lastAiMessage?.text || '');
 
-  useEffect(() => {
-    if (!isOpen) return;
-    // #region agent log
-    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H1',location:'ChatWidget.tsx:quick-button-options',message:'Computed quick button options',data:{brand,isMobileViewport,isMobileNewChat,quickButtonOptionsLength:quickButtonOptions.length,quickButtonOptions},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    // #region agent log
-    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H2',location:'ChatWidget.tsx:welcome-gates',message:'Welcome button gating snapshot',data:{showMobileQuickActions,desktopWelcomeEligible,isOpen,hasQuickButtons,welcomeComplete,hasUserMessage,hasShownWelcome:hasShownWelcomeRef.current,messagesLength:messages.length,firstMessageType:messages[0]?.type ?? null,firstMessageStreaming:Boolean(messages[0]?.isStreaming),restoredConversationCount:conversationsToRestoreRef.current.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    // #region agent log
-    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H3',location:'ChatWidget.tsx:welcome-status',message:'Welcome sequence status',data:{welcomeComplete,hasShownWelcome:hasShownWelcomeRef.current,lastAiStreaming:Boolean(lastAiMessage?.isStreaming),lastAiLength:lastAiMessage?.text?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    // #region agent log
-    fetch('http://127.0.0.1:7570/ingest/74801c34-b2a7-4a83-b0f5-90dd11c10708',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4080fe'},body:JSON.stringify({sessionId:'4080fe',runId:'pre-fix',hypothesisId:'H4',location:'ChatWidget.tsx:viewport-routing',message:'Viewport determines quick action route',data:{isMobileViewport,showMobileQuickActions,desktopWelcomeEligible,windowInnerWidth:typeof window !== 'undefined' ? window.innerWidth : null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [
-    brand,
-    desktopWelcomeEligible,
-    hasQuickButtons,
-    hasUserMessage,
-    isMobileNewChat,
-    isMobileViewport,
-    isOpen,
-    lastAiMessage?.isStreaming,
-    lastAiMessage?.text,
-    messages,
-    quickButtonOptions,
-    showMobileQuickActions,
-    welcomeComplete,
-  ]);
-
   const isResponding = useMemo(
     () =>
       isLoading ||
