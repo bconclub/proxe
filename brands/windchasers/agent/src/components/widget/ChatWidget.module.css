@@ -3245,13 +3245,45 @@
   color: #e5e2e1 !important;
 }
 
+/* Hover = solid gold pill + dark text per design system CTA pattern */
 .themeDark[data-brand="windchasers"] .welcomeQuickButtonsContainer .quickBtn:hover,
 .themeDark[data-brand="windchasers"] .mobileQuickActions .quickBtn:hover,
 [data-brand="windchasers"] .themeDark .welcomeQuickButtonsContainer .quickBtn:hover,
 [data-brand="windchasers"] .themeDark .mobileQuickActions .quickBtn:hover {
-  background: rgba(197, 165, 114, 0.2) !important;
-  border-color: rgba(197, 165, 114, 0.5) !important;
+  background: #C5A572 !important;
+  border-color: #C5A572 !important;
   color: #1A1A1A !important;
+  box-shadow: 0 4px 12px rgba(197, 165, 114, 0.25) !important;
+}
+
+/* Follow-up buttons (the "Yes, Completed 12th Science / Still in School" pills)
+   default = subtle gold-tinted card on dark; hover = solid gold pill */
+[data-brand="windchasers"] .followUpBtn,
+[data-brand="windchasers"] .followUpBtn.accent-0,
+[data-brand="windchasers"] .followUpBtn.accent-1,
+[data-brand="windchasers"] .followUpBtn.accent-2,
+[data-brand="windchasers"] .followUpBtn.accent-3,
+[data-brand="windchasers"] .followUpBtn.accent-4,
+[data-brand="windchasers"] .followUpBtn.accent-5,
+[data-brand="windchasers"] .followUpBtn.accent-6 {
+  background: rgba(197, 165, 114, 0.08) !important;
+  border: 1px solid rgba(197, 165, 114, 0.35) !important;
+  color: #e5e2e1 !important;
+}
+
+[data-brand="windchasers"] .followUpBtn:hover,
+[data-brand="windchasers"] .followUpBtn.accent-0:hover,
+[data-brand="windchasers"] .followUpBtn.accent-1:hover,
+[data-brand="windchasers"] .followUpBtn.accent-2:hover,
+[data-brand="windchasers"] .followUpBtn.accent-3:hover,
+[data-brand="windchasers"] .followUpBtn.accent-4:hover,
+[data-brand="windchasers"] .followUpBtn.accent-5:hover,
+[data-brand="windchasers"] .followUpBtn.accent-6:hover {
+  background: #C5A572 !important;
+  border-color: #C5A572 !important;
+  color: #1A1A1A !important;
+  box-shadow: 0 4px 12px rgba(197, 165, 114, 0.3) !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Light mode user bubble — gold pill instead of purple */
