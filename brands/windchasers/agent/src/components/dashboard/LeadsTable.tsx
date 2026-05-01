@@ -716,14 +716,37 @@ export default function LeadsTable({
                   uc?.voice?.booking_time || uc?.voice?.booking?.time ||
                   uc?.social?.booking_time || uc?.social?.booking?.time
 
-                // SOURCE = major medium (Web / Meta / Google / WhatsApp / etc.)
-                // SUB-SOURCE = where on that medium they actually entered
-                // (PAT, Demo Booked, Lead Form, …). The major medium comes
-                // from the channel_type enum; the sub-source is derived from
-                // unified_context.raw_form_fields.form_type and friends —
-                // because the inbound route has to map unknown form sources
-                // to "form" to satisfy the enum, the original is buried there.
-                const sourceConfig: Record<string, { label: string; color: string }> = {
+                // SOURCE column = where the lead actually came from.
+                //
+                // TOP badge: prefer utm_source (Google / Meta / Instagram /
+                //   YouTube / etc. — the ad platform that drove the visit)
+                //   so a "Google ad → Web → PAT" lead reads as Google, not
+                //   Web. Falls back to the channel medium (Web/WhatsApp/etc.)
+                //   when no UTM is present (direct traffic, organic, etc.).
+                //
+                // SUB line: the specific entry point — usually form_type
+                //   (PAT, Demo Booked, …). If form_type is missing we fall
+                //   back to utm_medium (cpc, social, organic) so the line
+                //   still tells you HOW they got here.
+
+                // Pull UTM info — website's /api/leads stuffs UTM into
+                // custom_fields, which PROXe stores under raw_form_fields.
+                // Older leads have it under web.utm.
+                const utmSourceRaw = String(
+                  uc?.raw_form_fields?.utm_source ||
+                  uc?.web?.utm?.source ||
+                  uc?.landing_page?.utm_source ||
+                  ''
+                ).trim().toLowerCase()
+                const utmMediumRaw = String(
+                  uc?.raw_form_fields?.utm_medium ||
+                  uc?.web?.utm?.medium ||
+                  uc?.landing_page?.utm_medium ||
+                  ''
+                ).trim().toLowerCase()
+
+                // Channel-medium fallback (when no utm_source).
+                const channelConfig: Record<string, { label: string; color: string }> = {
                   web: { label: 'Web', color: '#3B82F6' },
                   form: { label: 'Web', color: '#3B82F6' },
                   whatsapp: { label: 'WhatsApp', color: '#22C55E' },
@@ -739,10 +762,49 @@ export default function LeadsTable({
                   manual: { label: 'Manual', color: '#6B7280' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
-                const srcCfg = sourceConfig[source] || sourceConfig.unknown
 
-                // Derive sub-source from raw form data first; fall back to
-                // sensible per-medium defaults so the line is rarely empty.
+                // Friendly label + color per known utm_source.
+                const utmSourceConfig: Record<string, { label: string; color: string }> = {
+                  google: { label: 'Google', color: '#EA4335' },
+                  google_ads: { label: 'Google', color: '#EA4335' },
+                  googleads: { label: 'Google', color: '#EA4335' },
+                  youtube: { label: 'YouTube', color: '#FF0000' },
+                  yt: { label: 'YouTube', color: '#FF0000' },
+                  meta: { label: 'Meta', color: '#1877F2' },
+                  facebook: { label: 'Meta', color: '#1877F2' },
+                  fb: { label: 'Meta', color: '#1877F2' },
+                  instagram: { label: 'Instagram', color: '#E4405F' },
+                  ig: { label: 'Instagram', color: '#E4405F' },
+                  linkedin: { label: 'LinkedIn', color: '#0A66C2' },
+                  twitter: { label: 'X', color: '#000000' },
+                  x: { label: 'X', color: '#000000' },
+                  tiktok: { label: 'TikTok', color: '#000000' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                  email: { label: 'Email', color: '#0EA5E9' },
+                  newsletter: { label: 'Newsletter', color: '#0EA5E9' },
+                  direct: { label: 'Direct', color: '#6B7280' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                }
+
+                // Resolve the top badge: utm_source wins, then channel.
+                let srcCfg: { label: string; color: string }
+                if (utmSourceRaw && utmSourceConfig[utmSourceRaw]) {
+                  srcCfg = utmSourceConfig[utmSourceRaw]
+                } else if (utmSourceRaw) {
+                  // Unknown utm_source — title-case it and use a neutral colour.
+                  srcCfg = {
+                    label: utmSourceRaw
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase()),
+                    color: '#6366F1',
+                  }
+                } else {
+                  srcCfg = channelConfig[source] || channelConfig.unknown
+                }
+
+                // Derive sub-source from form_type first, then utm_medium,
+                // then per-channel default.
                 const formTypeRaw =
                   uc?.raw_form_fields?.form_type ||
                   uc?.web?.form_submission?.form_type ||
@@ -765,11 +827,30 @@ export default function LeadsTable({
                   page: 'Web Form',
                   event: 'Event',
                 }
+                const utmMediumLabels: Record<string, string> = {
+                  cpc: 'Ads',
+                  ppc: 'Ads',
+                  paid: 'Ads',
+                  ad: 'Ads',
+                  ads: 'Ads',
+                  paid_social: 'Paid Social',
+                  social: 'Social',
+                  organic: 'Organic',
+                  email: 'Email',
+                  referral: 'Referral',
+                  affiliate: 'Affiliate',
+                }
                 let subSource = ''
                 if (formType) {
                   subSource =
                     subSourceLabels[formType] ||
                     formType
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (utmMediumRaw) {
+                  subSource =
+                    utmMediumLabels[utmMediumRaw] ||
+                    utmMediumRaw
                       .replace(/[_-]+/g, ' ')
                       .replace(/\b\w/g, (c) => c.toUpperCase())
                 } else if (source === 'meta_forms') {
