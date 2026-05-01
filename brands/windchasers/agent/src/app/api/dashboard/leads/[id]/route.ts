@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,9 +40,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   console.log('[DELETE] Handler invoked for lead:', params.id)
-  
+
   try {
-    const supabase = await createClient()
+    // Use the service-role client so the cascade actually executes — the
+    // anon/cookie client is filtered by RLS (`auth.role() = 'authenticated'`)
+    // and silently returns 0 rows even though the response looks like success.
+    const supabase = getServiceClient() || (await createClient())
     const { id } = params
 
     if (!id) {
@@ -124,12 +128,20 @@ export async function DELETE(
       )
     }
 
-    console.log('[DELETE] Successfully deleted lead:', id, 'Rows affected:', data?.length || 0)
+    const deletedCount = data?.length || 0
+    console.log('[DELETE] Successfully deleted lead:', id, 'Rows affected:', deletedCount)
 
-    return NextResponse.json({ 
-      success: true, 
-      deleted: data?.length || 0,
-      leadId: id
+    if (deletedCount === 0) {
+      return NextResponse.json(
+        { error: 'Lead not deleted (not found or blocked by policy)', leadId: id },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      deleted: deletedCount,
+      leadId: id,
     })
   } catch (error: any) {
     console.error('[DELETE] Unexpected error:', error)
