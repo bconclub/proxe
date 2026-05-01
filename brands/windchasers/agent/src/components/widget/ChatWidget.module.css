@@ -2615,14 +2615,30 @@
 
 .bubbleButton[data-theme="warm-frost"]::after,
 .bubbleButton[data-brand="windchasers"]::after {
-  background: linear-gradient(90deg, 
-    #C9A961 0%, 
-    #D4AF37 25%,
-    #E8D5B7 50%,
-    #D4AF37 75%,
-    #C9A961 100%
+  background: linear-gradient(90deg,
+    #C5A572 0%,
+    #e4c28c 25%,
+    #e5e2e1 50%,
+    #e4c28c 75%,
+    #C5A572 100%
   );
   background-size: 200% 100%;
+}
+
+/* Windchasers bubble: gold border + gold glow (override default purple) */
+.bubbleButton[data-brand="windchasers"],
+[data-brand="windchasers"] .bubbleButton {
+  border-color: #C5A572 !important;
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(197, 165, 114, 0.3) !important;
+}
+
+.bubbleButton[data-brand="windchasers"]:hover,
+[data-brand="windchasers"] .bubbleButton:hover {
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    0 0 18px rgba(197, 165, 114, 0.45) !important;
 }
 
 .bubbleButton:hover::after {
