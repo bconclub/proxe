@@ -76,6 +76,8 @@ export async function process(
   const { systemPrompt, userPrompt } = buildPrompt({
     channel: input.channel,
     userName: input.userProfile.name,
+    userEmail: input.userProfile.email,
+    userPhone: input.userProfile.phone,
     summary: input.summary,
     history: input.conversationHistory,
     knowledgeBase: knowledgeContext,
@@ -226,6 +228,8 @@ export async function* processStream(
     const { systemPrompt, userPrompt } = buildPrompt({
       channel: input.channel,
       userName: input.userProfile.name,
+      userEmail: input.userProfile.email,
+      userPhone: input.userProfile.phone,
       summary: input.summary,
       history: input.conversationHistory,
       knowledgeBase: knowledgeContext,
@@ -573,7 +577,7 @@ function buildBookingTools(
       if (!bookingPhone && !bookingEmail) {
         return JSON.stringify({
           success: false,
-          error: 'Need either phone number or email to book. Ask the user for their email address.',
+          error: 'Cannot lock the slot without a phone number or email address. Use the KNOWN CONTACT block in the system prompt to identify which contact fields are still missing for this user, then ask for ONLY those fields.',
         });
       }
 
