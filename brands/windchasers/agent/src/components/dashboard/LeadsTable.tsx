@@ -681,7 +681,10 @@ export default function LeadsTable({
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 const displayStage = stage || 'New'
                 const stageColor = getStageColor(displayStage)
-                const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
+                // SOURCE = the most recent medium the lead came through.
+                // Falls back to first_touchpoint and the legacy `source` field
+                // so older leads still render something.
+                const source = (lead.last_touchpoint || lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
                 const uc = lead.unified_context || {}
@@ -713,54 +716,74 @@ export default function LeadsTable({
                   uc?.voice?.booking_time || uc?.voice?.booking?.time ||
                   uc?.social?.booking_time || uc?.social?.booking?.time
 
+                // SOURCE = major medium (Web / Meta / Google / WhatsApp / etc.)
+                // SUB-SOURCE = where on that medium they actually entered
+                // (PAT, Demo Booked, Lead Form, …). The major medium comes
+                // from the channel_type enum; the sub-source is derived from
+                // unified_context.raw_form_fields.form_type and friends —
+                // because the inbound route has to map unknown form sources
+                // to "form" to satisfy the enum, the original is buried there.
                 const sourceConfig: Record<string, { label: string; color: string }> = {
                   web: { label: 'Web', color: '#3B82F6' },
-                  whatsapp: { label: 'WA', color: '#22C55E' },
+                  form: { label: 'Web', color: '#3B82F6' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
                   voice: { label: 'Voice', color: '#8B5CF6' },
                   social: { label: 'Social', color: '#EC4899' },
-                  facebook: { label: 'FB', color: '#1877F2' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
                   meta_forms: { label: 'Meta', color: '#1877F2' },
                   google: { label: 'Google', color: '#EA4335' },
                   ads: { label: 'Ads', color: '#F97316' },
                   pabbly: { label: 'Pabbly', color: '#F59E0B' },
-                  referral: { label: 'Ref', color: '#10B981' },
+                  referral: { label: 'Referral', color: '#10B981' },
                   organic: { label: 'Organic', color: '#84CC16' },
                   manual: { label: 'Manual', color: '#6B7280' },
-                  form: { label: 'Form', color: '#A855F7' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
-                // For 'form' touchpoint, surface a more specific label from
-                // raw_form_fields.form_type (e.g. PAT, Demo) — the original
-                // source string lives there because the channel_type enum
-                // forces unknown sources down to 'form'.
+                const srcCfg = sourceConfig[source] || sourceConfig.unknown
+
+                // Derive sub-source from raw form data first; fall back to
+                // sensible per-medium defaults so the line is rarely empty.
                 const formTypeRaw =
                   uc?.raw_form_fields?.form_type ||
                   uc?.web?.form_submission?.form_type ||
                   uc?.landing_page?.form_name ||
+                  uc?.raw_form_fields?.event_name ||
                   ''
-                const formType = String(formTypeRaw).toLowerCase()
-                const formTypeLabels: Record<string, string> = {
+                const formType = String(formTypeRaw).toLowerCase().trim()
+                const subSourceLabels: Record<string, string> = {
                   pilot_aptitude_test: 'PAT',
                   pat: 'PAT',
-                  demo_booked: 'Demo',
+                  demo_booked: 'Demo Booked',
                   demo: 'Demo',
-                  visit_booked: 'Visit',
+                  visit_booked: 'Visit Booked',
                   visit: 'Visit',
                   eligibility: 'Eligibility',
-                  guide_download: 'Guide',
+                  guide_download: 'Guide Download',
                   guide: 'Guide',
-                  contact: 'Contact',
-                  newsletter: 'News',
+                  contact: 'Contact Form',
+                  newsletter: 'Newsletter',
+                  page: 'Web Form',
+                  event: 'Event',
                 }
-                let srcCfg = sourceConfig[source] || sourceConfig.unknown
-                if (source === 'form' && formType) {
-                  const friendlyLabel =
-                    formTypeLabels[formType] ||
-                    // Fallback: take everything before the first '_' / '-' and capitalise
-                    (formType.split(/[_-]/)[0] || '').replace(/^./, (c) => c.toUpperCase())
-                  if (friendlyLabel) {
-                    srcCfg = { label: friendlyLabel, color: sourceConfig.form.color }
-                  }
+                let subSource = ''
+                if (formType) {
+                  subSource =
+                    subSourceLabels[formType] ||
+                    formType
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (source === 'meta_forms') {
+                  subSource = 'Lead Form'
+                } else if (source === 'facebook') {
+                  subSource = 'Ads'
+                } else if (source === 'google') {
+                  subSource = 'Ads'
+                } else if (source === 'whatsapp') {
+                  subSource = 'Direct'
+                } else if (source === 'voice') {
+                  subSource = 'Call'
+                } else if (source === 'web' || source === 'form') {
+                  subSource = 'Web Form'
                 }
 
                 // Score pill colors
@@ -802,7 +825,7 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - small badge */}
+                    {/* SOURCE - 2 lines: medium badge + sub-source */}
                     <td className="px-3 py-2">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
@@ -810,6 +833,15 @@ export default function LeadsTable({
                       >
                         {srcCfg.label}
                       </span>
+                      {subSource && (
+                        <div
+                          className="text-[10px] mt-0.5 truncate"
+                          style={{ color: '#9ca3af' }}
+                          title={subSource}
+                        >
+                          {subSource}
+                        </div>
+                      )}
                     </td>
 
                     {/* SCORE - colored pill */}
