@@ -2407,7 +2407,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
            lowerText.includes('schedule') ||
            lowerText.includes('meeting') ||
            lowerText.includes('appointment') ||
-           lowerText.includes('audit');
+           lowerText.includes('audit') ||
+           lowerText.includes('counsellor') ||
+           lowerText.includes('counselor');
   };
 
   const handleSend = () => {
@@ -2438,6 +2440,19 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (requestNameBeforeProceed(message, usedButtons)) return;
     if (requestEmailBeforeProceed(message, usedButtons)) return;
     if (requestPhoneBeforeProceed(message, usedButtons)) return;
+
+    // Parent flow: if the user just typed contact info in response to
+    // 'Send me the cost guide' / 'Send me the roadmap', show the
+    // post-capture rail buttons after the bot's "Sent" reply.
+    const lastClick = usedButtons[usedButtons.length - 1]?.toLowerCase() ?? '';
+    if (
+      lastClick === 'send me the cost guide' ||
+      lastClick === 'send me the roadmap'
+    ) {
+      setPendingFlowOverrideState({
+        followUpButtons: ['Talk to a counsellor', 'Ask another question', 'Not right now'],
+      });
+    }
 
     submitMessage(message, usedButtons);
   };
@@ -2577,31 +2592,72 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         };
       }
 
-      // Parent entry — child-status options.
+      // ── Parent path ────────────────────────────────────────────────────
       if (normalizedButton === 'i am a parent') {
         return {
-          followUpButtons: ['Studying in 12th', 'Completed 12th', 'In college', 'Working', 'Taking a break'],
+          followUpButtons: [
+            'Real cost and timeline',
+            'Is this a real career',
+            'Safety and faculty',
+            'Loan and financing',
+            'Just exploring',
+          ],
         };
       }
-      // Parent child-status acknowledgement (stub flow — full design later).
+      // First-level parent topic answers — every topic ends on the same
+      // 3-button rail so the parent always has the same exits.
       if (
         isParentPath && (
-          normalizedButton === 'studying in 12th' ||
-          normalizedButton === 'completed 12th' ||
-          normalizedButton === 'in college' ||
-          normalizedButton === 'working' ||
-          normalizedButton === 'taking a break'
+          normalizedButton === 'real cost and timeline' ||
+          normalizedButton === 'is this a real career' ||
+          normalizedButton === 'safety and faculty' ||
+          normalizedButton === 'loan and financing'
         )
       ) {
         return {
-          followUpButtons: ['Book a Consultation', 'Send me the cost guide', 'Ask a question first'],
+          followUpButtons: ['Send me the cost guide', 'Talk to a counsellor', 'Ask another question'],
         };
       }
-      // Cost guide — bot replies with the contact-capture ask; no further buttons.
-      if (normalizedButton === 'send me the cost guide') {
+      if (isParentPath && normalizedButton === 'just exploring') {
+        return {
+          followUpButtons: ['Send me the roadmap', 'Ask a question', 'Maybe later'],
+        };
+      }
+      // Cost guide / roadmap — bot asks for contact; suppress buttons during
+      // the contact-capture turn so the user can type their info.
+      if (
+        isParentPath && (
+          normalizedButton === 'send me the cost guide' ||
+          normalizedButton === 'send me the roadmap'
+        )
+      ) {
         return { followUpButtons: [] };
       }
-      // 'ask a question first' returns to free-form; no override.
+      // Post-capture acknowledgement rail — the parent has shared contact
+      // and the bot has acknowledged. Offer counsellor / another question / exit.
+      // (Parent must explicitly click these; "ask another question" / "maybe
+      // later" / "not right now" are handled below.)
+
+      // 'Ask another question' / 'Ask a question' — drop into free-form,
+      // no flow override. Bot responds from KB + prompt context.
+      if (
+        isParentPath && (
+          normalizedButton === 'ask another question' ||
+          normalizedButton === 'ask a question'
+        )
+      ) {
+        return null;
+      }
+      // 'Maybe later' / 'Not right now' — graceful exit; bot says the closing
+      // line and we suppress further buttons.
+      if (
+        isParentPath && (
+          normalizedButton === 'maybe later' ||
+          normalizedButton === 'not right now'
+        )
+      ) {
+        return { followUpButtons: [] };
+      }
 
       return null;
     })();
