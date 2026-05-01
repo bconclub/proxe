@@ -154,9 +154,9 @@ const ICONS = {
   ),
 };
 
-// BCON sequential welcome sequence
-const bconWelcomeSequence = [
-  { text: "Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.", delay: 0 },
+// Windchasers welcome bubble — single Aria intro, audience-split CTA below.
+const windchasersWelcomeSequence = [
+  { text: "Hi, I am Aria. I will help you understand the path to becoming a pilot. Are you the aspiring pilot or a parent looking into this for your child?", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -1808,7 +1808,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
-    for (const item of bconWelcomeSequence) {
+    for (const item of windchasersWelcomeSequence) {
       if (item.delay > 0) {
         await new Promise(resolve => setTimeout(resolve, item.delay));
       }
@@ -2494,8 +2494,39 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setUsedButtons(nextButtons);
 
     const normalizedButton = message.toLowerCase();
+    // Parent path is sticky from the moment the user picks "I am a parent" so
+    // we can disambiguate child-status labels that overlap with the aspirant
+    // activity step (e.g. "Working", "Taking a break").
+    const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
     const flowRule = (() : FlowOverrideRule | null => {
-      if (normalizedButton === 'start pilot training') {
+      // PAT entry — open the assessment in a new tab with chat context attached.
+      if (normalizedButton === 'take the pat') {
+        if (typeof window !== 'undefined') {
+          try {
+            const patUrl = new URL('https://pilot.windchasers.in/assessment');
+            patUrl.searchParams.set('source', 'chat');
+            if (externalSessionId) {
+              patUrl.searchParams.set('conversation_id', externalSessionId);
+            }
+            window.open(patUrl.toString(), '_blank', 'noopener,noreferrer');
+          } catch {
+            /* noop — popup blocker or invalid URL */
+          }
+        }
+        return {
+          followUpButtons: ['I finished the PAT', 'Skip and book consultation'],
+        };
+      }
+      if (normalizedButton === 'i finished the pat') {
+        return {
+          followUpButtons: ['Book a Consultation'],
+        };
+      }
+      // 'skip and book consultation' contains 'book' so the booking-keyword path
+      // in submitMessage will trigger BookingCalendarWidget; no override needed.
+
+      // Aspirant entry
+      if (normalizedButton === 'i want to become a pilot') {
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
       if (normalizedButton === 'airplane' || normalizedButton === 'helicopter') {
@@ -2510,7 +2541,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (FLOW_COUNTRIES.some((country) => country.toLowerCase() === normalizedButton)) {
         return {
-          followUpButtons: ['Book a Consultation'],
+          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
         };
       }
       if (normalizedButton === 'no, starting fresh') {
@@ -2525,7 +2556,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (normalizedButton === 'under 18' || normalizedButton === '18-21') {
         return {
-          followUpButtons: ['Book a Consultation'],
+          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
         };
       }
       if (normalizedButton === '22-25' || normalizedButton === '26+') {
@@ -2533,20 +2564,45 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           followUpButtons: ['Studying', 'Working', 'Taking a Break'],
         };
       }
+      // Aspirant activity acknowledgement — only fires when not on the parent path.
       if (
-        normalizedButton === 'studying' ||
-        normalizedButton === 'working' ||
-        normalizedButton === 'taking a break'
+        !isParentPath && (
+          normalizedButton === 'studying' ||
+          normalizedButton === 'working' ||
+          normalizedButton === 'taking a break'
+        )
       ) {
         return {
-          followUpButtons: ['Book a Consultation'],
+          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
         };
       }
-      if (normalizedButton === 'explore training options') {
+
+      // Parent entry — child-status options.
+      if (normalizedButton === 'i am a parent') {
         return {
-          followUpButtons: config.exploreButtons ?? [],
+          followUpButtons: ['Studying in 12th', 'Completed 12th', 'In college', 'Working', 'Taking a break'],
         };
       }
+      // Parent child-status acknowledgement (stub flow — full design later).
+      if (
+        isParentPath && (
+          normalizedButton === 'studying in 12th' ||
+          normalizedButton === 'completed 12th' ||
+          normalizedButton === 'in college' ||
+          normalizedButton === 'working' ||
+          normalizedButton === 'taking a break'
+        )
+      ) {
+        return {
+          followUpButtons: ['Book a Consultation', 'Send me the cost guide', 'Ask a question first'],
+        };
+      }
+      // Cost guide — bot replies with the contact-capture ask; no further buttons.
+      if (normalizedButton === 'send me the cost guide') {
+        return { followUpButtons: [] };
+      }
+      // 'ask a question first' returns to free-form; no override.
+
       return null;
     })();
     setPendingFlowOverrideState(flowRule);
