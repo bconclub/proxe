@@ -1431,6 +1431,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
+                {/* TYPE / COURSE — pulled up from the old Lead Profile box */}
+                {(() => {
+                  const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
+                  return (
+                    <>
+                      {brandProfileData.user_type && (
+                        <div className="lead-contact-type flex items-center gap-1.5">
+                          <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                            <MdPerson className="text-[var(--text-secondary)]" size={14} />
+                          </div>
+                          <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                            <span className="text-[var(--text-muted)] mr-1.5">Type:</span>
+                            {brandProfileData.user_type}
+                          </span>
+                        </div>
+                      )}
+                      {brandProfileData.course_interest && (
+                        <div className="lead-contact-course flex items-center gap-1.5">
+                          <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                            <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
+                          </div>
+                          <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                            <span className="text-[var(--text-muted)] mr-1.5">Course:</span>
+                            {brandProfileData.course_interest}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
                 {!currentLead.email && !currentLead.phone && (
                   <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
                 )}
@@ -2192,78 +2223,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </div>
                         )}
 
-                        {/* Divider Line */}
-                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
-                          <div className="h-px bg-[var(--border-primary)] w-full" />
-                        )}
-
-                        {/* Lead Profile Group */}
-                        {(() => {
-                          const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
-                          const hasData = Object.keys(brandProfileData).length > 0;
-                          if (!hasData) return null;
-
-                          return (
-                            <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.2em]">
-                                <MdPersonOutline size={12} />
-                                Lead Profile
-                              </h4>
-                              <div className="flex flex-wrap gap-x-8 gap-y-3">
-                                {brandProfileData.user_type && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdPerson size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.user_type}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {brandProfileData.course_interest && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdFlightTakeoff size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.course_interest}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdSchedule size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Timeline</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)]">
-                                        {(() => {
-                                          const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
-                                          const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
-                                          return map[t] || t;
-                                        })()}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                                {brandProfileData.education && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdSchool size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.education.replace('_', ' ')}</p>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
                     </article>
                       )

@@ -2499,7 +2499,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
       if (normalizedButton === 'airplane') {
-        return { followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'] };
+        return {
+          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+        };
       }
       if (normalizedButton === 'yes, completed dgca') {
         return {
@@ -2531,7 +2533,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (normalizedButton === 'helicopter') {
         return {
-          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
         };
       }
       if (normalizedButton === 'explore training options') {
