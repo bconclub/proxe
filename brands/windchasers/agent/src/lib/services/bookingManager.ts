@@ -558,17 +558,18 @@ export async function createCalendarEvent(booking: {
       !booking.email.includes('noemail@') &&
       booking.email.includes('@');
 
+    // Service accounts can only create Hangouts Meet conferences on Google
+    // Workspace calendars (with Domain-Wide Delegation). On a personal Gmail
+    // calendar (CALENDAR_ID ends in @gmail.com) the events.insert call throws
+    // and we lose the whole event. Skip conferenceData for Gmail calendars and
+    // include a Meet link in the description manually if you need one.
+    const isPersonalGmailCalendar = /@gmail\.com$/i.test(CALENDAR_ID || '')
+
     const event: any = {
       summary: eventTitle,
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
-      conferenceData: {
-        createRequest: {
-          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          conferenceSolutionKey: { type: 'hangoutsMeet' },
-        },
-      },
       // No attendees - service account lacks Domain-Wide Delegation; customers get details via WhatsApp
       reminders: {
         useDefault: false,
@@ -579,6 +580,15 @@ export async function createCalendarEvent(booking: {
       },
     };
 
+    if (!isPersonalGmailCalendar) {
+      event.conferenceData = {
+        createRequest: {
+          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      }
+    }
+
     if (booking.sessionType === 'offline') {
       event.location = `${brandName} Facility`;
     } else if (booking.sessionType === 'online') {
@@ -588,7 +598,9 @@ export async function createCalendarEvent(booking: {
     const createdEvent = await calendar.events.insert({
       calendarId: CALENDAR_ID,
       requestBody: event,
-      conferenceDataVersion: 1,
+      // Only request conference creation on Workspace calendars; harmless to
+      // pass on Gmail but keeps the call clean.
+      ...(isPersonalGmailCalendar ? {} : { conferenceDataVersion: 1 }),
     });
 
     if (!createdEvent?.data?.id) return null;
