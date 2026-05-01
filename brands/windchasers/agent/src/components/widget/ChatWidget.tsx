@@ -2498,9 +2498,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       if (normalizedButton === 'start pilot training') {
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
-      if (normalizedButton === 'airplane') {
+      if (normalizedButton === 'airplane' || normalizedButton === 'helicopter') {
         return {
-          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
         };
       }
       if (normalizedButton === 'yes, completed dgca') {
@@ -2515,25 +2515,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (normalizedButton === 'no, starting fresh') {
         return {
-          followUpButtons: ['PPL - Private Pilot License', 'CPL - Commercial Pilot License'],
-        };
-      }
-      if (
-        normalizedButton === 'ppl - private pilot license' ||
-        normalizedButton === 'cpl - commercial pilot license'
-      ) {
-        return {
           followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
         };
       }
       if (normalizedButton === 'yes, completed 12th science') {
         return {
+          followUpButtons: ['Under 18', '18-21', '22-25', '26+'],
+        };
+      }
+      if (normalizedButton === 'under 18' || normalizedButton === '18-21') {
+        return {
           followUpButtons: ['Book a Consultation'],
         };
       }
-      if (normalizedButton === 'helicopter') {
+      if (normalizedButton === '22-25' || normalizedButton === '26+') {
         return {
-          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+          followUpButtons: ['Studying', 'Working', 'Taking a Break'],
+        };
+      }
+      if (
+        normalizedButton === 'studying' ||
+        normalizedButton === 'working' ||
+        normalizedButton === 'taking a break'
+      ) {
+        return {
+          followUpButtons: ['Book a Consultation'],
         };
       }
       if (normalizedButton === 'explore training options') {
