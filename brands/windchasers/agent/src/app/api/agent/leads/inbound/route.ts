@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, getClient, normalizePhone } from '@/lib/services'
+import { getServiceClient, getClient, normalizePhone, createCalendarEvent } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -290,11 +290,121 @@ export async function POST(request: NextRequest) {
       console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
     }
 
+    // ── Demo bookings: also create a Google Calendar event ──────────────────
+    // If this inbound is a demo booking with a date + time, create the actual
+    // calendar event and stamp booking_* on unified_context.web so the
+    // dashboard's BOOKING column populates. Failure to create the calendar
+    // event does NOT fail the inbound — the lead is already saved.
+    const cfields = (custom_fields || {}) as Record<string, any>
+    const isDemoBooking =
+      String(notes || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.event_name || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.form_type || '').toLowerCase() === 'demo_booked'
+
+    const preferredDate = cfields.preferred_date || cfields.preferredDate || null
+    const preferredTime = cfields.preferred_time || cfields.preferredTime || null
+
+    let calendarResult: { eventId: string; eventLink: string } | null = null
+    let calendarError: string | null = null
+
+    if (isDemoBooking && preferredDate && preferredTime) {
+      try {
+        // Dedupe: if the lead already has a booking at this exact slot, skip.
+        const { data: leadRow } = await supabase
+          .from('all_leads')
+          .select('unified_context')
+          .eq('id', leadId)
+          .maybeSingle()
+
+        const existingBooking = leadRow?.unified_context?.web?.booking || {}
+        const sameSlot =
+          existingBooking?.eventId &&
+          existingBooking?.date === preferredDate &&
+          existingBooking?.time === preferredTime
+
+        if (sameSlot) {
+          console.log(`[inbound] Demo already booked for ${leadId} at ${preferredDate} ${preferredTime}, skipping calendar create`)
+          calendarResult = {
+            eventId: existingBooking.eventId,
+            eventLink: existingBooking.eventLink || '',
+          }
+        } else {
+          const event = await createCalendarEvent({
+            date: preferredDate,
+            time: preferredTime,
+            name: leadName,
+            email: email?.trim() || undefined,
+            phone,
+            courseInterest: cfields.interest || cfields.course_interest || undefined,
+            sessionType: cfields.demo_type || 'Demo Session',
+          })
+
+          if (!event) {
+            calendarError = 'createCalendarEvent returned null (likely missing Google credentials)'
+            console.error('[inbound]', calendarError)
+          } else {
+            calendarResult = {
+              eventId: event.eventId,
+              eventLink: event.eventLink,
+            }
+
+            // Re-fetch unified_context (might have changed since the merge above)
+            // and stamp the booking on it.
+            const { data: refreshed } = await supabase
+              .from('all_leads')
+              .select('unified_context')
+              .eq('id', leadId)
+              .maybeSingle()
+            const ctx = refreshed?.unified_context || {}
+            const updatedCtx = {
+              ...ctx,
+              web: {
+                ...(ctx.web || {}),
+                booking_date: preferredDate,
+                booking_time: preferredTime,
+                booking_status: 'confirmed',
+                booking: {
+                  date: preferredDate,
+                  time: preferredTime,
+                  status: 'confirmed',
+                  eventId: event.eventId,
+                  eventLink: event.eventLink,
+                  meetLink: event.meetLink || null,
+                  hasAttendees: event.hasAttendees,
+                  source: 'inbound_demo_form',
+                  created_at: new Date().toISOString(),
+                },
+              },
+            }
+            await supabase
+              .from('all_leads')
+              .update({ unified_context: updatedCtx })
+              .eq('id', leadId)
+          }
+        }
+      } catch (calErr: any) {
+        calendarError = calErr?.message || String(calErr)
+        console.error('[inbound] Calendar event creation failed:', calendarError)
+        // Swallow — lead is already saved.
+      }
+    }
+
     return NextResponse.json({
       success: true,
       lead_id: leadId,
       is_new: isNew,
       task_created: !taskErr,
+      ...(isDemoBooking
+        ? {
+            calendar: calendarResult
+              ? {
+                  event_id: calendarResult.eventId,
+                  event_link: calendarResult.eventLink,
+                }
+              : null,
+            calendar_error: calendarError,
+          }
+        : {}),
     })
   } catch (error: any) {
     const message =
