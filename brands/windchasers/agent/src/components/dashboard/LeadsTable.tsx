@@ -906,8 +906,8 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - 2 lines: medium badge + sub-source */}
-                    <td className="px-3 py-2">
+                    {/* SOURCE - medium badge + sub-source on its own line, no truncate */}
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
                         style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
@@ -916,7 +916,7 @@ export default function LeadsTable({
                       </span>
                       {subSource && (
                         <div
-                          className="text-[10px] mt-0.5 truncate"
+                          className="text-[10px] mt-0.5"
                           style={{ color: '#9ca3af' }}
                           title={subSource}
                         >

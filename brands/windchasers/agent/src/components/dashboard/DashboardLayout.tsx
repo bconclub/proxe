@@ -65,6 +65,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null)
+  // Hover state on the sidebar itself — used to expand the collapsed rail on hover
+  const [isHovered, setIsHovered] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
@@ -225,10 +227,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleSidebarMouseEnter = () => {
     if (isMobile) return
+    setIsHovered(true)
   }
 
   const handleSidebarMouseLeave = () => {
     if (isMobile) return
+    setIsHovered(false)
     setHoveredNavItem(null)
   }
 
@@ -258,8 +262,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     console.log('Logout disabled - authentication is not enabled')
   }
 
-  // showExpanded: sidebar labels show only when pinned open
-  const showExpanded = !isCollapsed
+  // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
+  const showExpanded = !isCollapsed || isHovered
   const sidebarWidth = showExpanded ? '220px' : '56px'
   // Content margin uses only the pinned state so the main area doesn't shift on hover
   const contentMarginWidth = isCollapsed ? '56px' : '220px'
