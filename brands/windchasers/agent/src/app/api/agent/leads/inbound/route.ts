@@ -168,6 +168,46 @@ export async function POST(request: NextRequest) {
       inboundContext.raw_form_fields = custom_fields
     }
 
+    // ── Brand-namespaced context (powers dashboard TYPE / COURSE columns) ───
+    // The dashboard reads unified_context[leadBrand].user_type and
+    // .course_interest — without this the columns stay blank even though we
+    // have the data in custom_fields.
+    const brandCtxData: Record<string, any> = {}
+    const cf2 = (custom_fields || {}) as Record<string, any>
+    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    if (audienceRaw === 'student' || audienceRaw === 'parent' || audienceRaw === 'professional') {
+      brandCtxData.user_type = audienceRaw
+    }
+    if (leadBrand === 'windchasers') {
+      // Map the interest value the form sends to the short course label the
+      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
+      const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
+      const courseMap: Record<string, string> = {
+        dgca_ground: 'DGCA',
+        dgca: 'DGCA',
+        pilot_training_abroad: 'Flight',
+        flight: 'Flight',
+        helicopter_license: 'Heli',
+        helicopter: 'Heli',
+        heli: 'Heli',
+        cabin_crew: 'Cabin',
+        cabin: 'Cabin',
+        drone: 'Drone',
+      }
+      if (interestRaw && courseMap[interestRaw]) {
+        brandCtxData.course_interest = courseMap[interestRaw]
+      } else if (interestRaw && interestRaw !== 'other') {
+        brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
+      }
+      const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
+      if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
+      const educationRaw = String(cf2.education || '').toLowerCase().trim()
+      if (educationRaw) brandCtxData.education = educationRaw
+    }
+    if (Object.keys(brandCtxData).length > 0) {
+      inboundContext[leadBrand] = brandCtxData
+    }
+
     // Check for existing lead — scope to brand because the same phone can
     // exist across brands (e.g. someone is a lead for both bcon and
     // windchasers). Without the brand filter, .maybeSingle() returns null
@@ -197,7 +237,17 @@ export async function POST(request: NextRequest) {
         if (!existingSources.includes(leadSource)) {
           inboundContext.lead_sources = [...existingSources, leadSource]
         }
-        updates.unified_context = { ...existingCtx, ...inboundContext }
+        // Shallow merge would overwrite existingCtx[leadBrand] with the new
+        // brandCtxData, wiping any course/type the chat widget had set.
+        // Deep-merge the brand-namespace object specifically.
+        const mergedBrandCtx = inboundContext[leadBrand]
+          ? { ...(existingCtx[leadBrand] || {}), ...inboundContext[leadBrand] }
+          : existingCtx[leadBrand]
+        updates.unified_context = {
+          ...existingCtx,
+          ...inboundContext,
+          ...(mergedBrandCtx ? { [leadBrand]: mergedBrandCtx } : {}),
+        }
       }
 
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
