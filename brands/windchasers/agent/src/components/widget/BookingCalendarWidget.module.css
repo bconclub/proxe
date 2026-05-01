@@ -12,8 +12,9 @@
   border: 1px solid var(--border-accent, rgba(255, 255, 255, 0.2));
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 16px;
-  min-height: 380px;
   box-sizing: border-box;
+  /* No min-height — let it size to content so the date grid hugs the bottom.
+     Form view keeps its own min-height (see [data-view="form"] below). */
 }
 
 /* Theme integration with parent ChatWidget toggle */
@@ -462,27 +463,27 @@
 
 /* Form View */
 .calendarContainer[data-view="form"] {
-  min-height: 400px;
+  /* No fixed min-height — let it size to content for a compact form */
 }
 
 .formContainer {
-  padding: 20px 0;
+  padding: 8px 0;
   max-height: 600px;
   overflow-y: auto;
 }
 
 .formTitle {
-  font-size: 24px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-primary, #ffffff);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   text-align: center;
 }
 
 .formSubtitle {
-  font-size: 16px;
+  font-size: 12px;
   color: var(--text-secondary, rgba(255, 255, 255, 0.8));
-  margin-bottom: 32px;
+  margin-bottom: 14px;
   text-align: center;
   text-transform: capitalize;
 }
@@ -490,23 +491,23 @@
 .bookingForm {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .formGroup input {
-  padding: 14px 16px;
+  padding: 10px 12px;
   background: var(--bg-primary, rgba(255, 255, 255, 0.1));
   backdrop-filter: blur(10px);
-  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
-  border-radius: 12px;
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 10px;
   color: var(--text-primary, #ffffff);
-  font-size: 16px;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
@@ -522,19 +523,19 @@
 
 .formActions {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .backButton {
   flex: 1;
-  padding: 14px;
+  padding: 10px 12px;
   background: var(--bg-primary, rgba(255, 255, 255, 0.1));
   backdrop-filter: blur(10px);
-  border: 2px solid var(--border-light, rgba(255, 255, 255, 0.2));
-  border-radius: 12px;
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
+  border-radius: 10px;
   color: var(--text-primary, #ffffff);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -552,12 +553,12 @@
 
 .submitButton {
   flex: 2;
-  padding: 14px;
+  padding: 10px 12px;
   background: var(--primary-color, #5B1A8C);
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--white, #ffffff);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -577,7 +578,7 @@
 
 /* Confirmation View */
 .calendarContainer[data-view="confirmation"] {
-  min-height: 400px;
+  /* No fixed min-height — let it size naturally */
 }
 
 .confirmationContainer {
@@ -585,44 +586,41 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 40px;
+  padding: 18px 16px;
   text-align: center;
-  min-height: 400px;
-  gap: 16px;
+  gap: 10px;
 }
 
 .confirmationIcon {
-  width: 80px;
-  height: 80px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--greenSuccess, #10b981);
   color: #ffffff;
-  font-size: 48px;
+  font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 0;
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   flex-shrink: 0;
 }
 
 .confirmationTitle {
-  font-size: 28px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-primary, #ffffff);
   margin: 0;
-  margin-bottom: 0;
 }
 
 .confirmationText {
-  font-size: 18px;
+  font-size: 13px;
   color: var(--text-secondary, rgba(255, 255, 255, 0.9));
   margin: 0;
-  margin-bottom: 0;
-  line-height: 1.6;
+  line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   align-items: center;
 }
 
@@ -633,29 +631,28 @@
 .confirmationText strong {
   color: var(--text-primary, #ffffff);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 14px;
   display: block;
 }
 
 .confirmationDetails {
-  font-size: 16px;
+  font-size: 12px;
   color: var(--text-muted, rgba(255, 255, 255, 0.7));
   margin: 0;
-  margin-top: 0;
-  line-height: 1.6;
+  line-height: 1.45;
 }
 
 .confirmationDetails strong {
   color: var(--text-primary, #ffffff);
   font-weight: 500;
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .calendarActions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   max-width: 400px;
   margin-top: 4px;
@@ -666,10 +663,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 14px 20px;
-  border-radius: 12px;
-  font-size: 16px;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
