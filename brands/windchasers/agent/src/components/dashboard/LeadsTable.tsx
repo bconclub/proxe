@@ -718,9 +718,50 @@ export default function LeadsTable({
                   whatsapp: { label: 'WA', color: '#22C55E' },
                   voice: { label: 'Voice', color: '#8B5CF6' },
                   social: { label: 'Social', color: '#EC4899' },
+                  facebook: { label: 'FB', color: '#1877F2' },
+                  meta_forms: { label: 'Meta', color: '#1877F2' },
+                  google: { label: 'Google', color: '#EA4335' },
+                  ads: { label: 'Ads', color: '#F97316' },
+                  pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                  referral: { label: 'Ref', color: '#10B981' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  manual: { label: 'Manual', color: '#6B7280' },
+                  form: { label: 'Form', color: '#A855F7' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
-                const srcCfg = sourceConfig[source] || sourceConfig.unknown
+                // For 'form' touchpoint, surface a more specific label from
+                // raw_form_fields.form_type (e.g. PAT, Demo) — the original
+                // source string lives there because the channel_type enum
+                // forces unknown sources down to 'form'.
+                const formTypeRaw =
+                  uc?.raw_form_fields?.form_type ||
+                  uc?.web?.form_submission?.form_type ||
+                  uc?.landing_page?.form_name ||
+                  ''
+                const formType = String(formTypeRaw).toLowerCase()
+                const formTypeLabels: Record<string, string> = {
+                  pilot_aptitude_test: 'PAT',
+                  pat: 'PAT',
+                  demo_booked: 'Demo',
+                  demo: 'Demo',
+                  visit_booked: 'Visit',
+                  visit: 'Visit',
+                  eligibility: 'Eligibility',
+                  guide_download: 'Guide',
+                  guide: 'Guide',
+                  contact: 'Contact',
+                  newsletter: 'News',
+                }
+                let srcCfg = sourceConfig[source] || sourceConfig.unknown
+                if (source === 'form' && formType) {
+                  const friendlyLabel =
+                    formTypeLabels[formType] ||
+                    // Fallback: take everything before the first '_' / '-' and capitalise
+                    (formType.split(/[_-]/)[0] || '').replace(/^./, (c) => c.toUpperCase())
+                  if (friendlyLabel) {
+                    srcCfg = { label: friendlyLabel, color: sourceConfig.form.color }
+                  }
+                }
 
                 // Score pill colors
                 // Score pill classes - using CSS variables for consistency
