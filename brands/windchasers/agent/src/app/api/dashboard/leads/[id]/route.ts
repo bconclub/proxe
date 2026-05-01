@@ -58,62 +58,33 @@ export async function DELETE(
 
     console.log('[DELETE] Attempting to delete lead:', id)
 
-    // CASCADE DELETE: Delete child records first to avoid FK constraints
-    
-    // 1. Delete conversations (messages)
-    console.log('[DELETE] Step 1: Deleting conversations...')
-    const { error: convError } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('lead_id', id)
-    
-    if (convError) {
-      console.error('[DELETE] Error deleting conversations:', convError)
-    } else {
-      console.log('[DELETE] Deleted conversations')
+    // CASCADE DELETE: clear every child table that has a FK -> all_leads(id)
+    // before deleting the parent row. Missing any table here causes the final
+    // delete to fail silently with a 23503 FK constraint and the dashboard
+    // "Delete Lead" button to look broken.
+    const childTables = [
+      'conversations',
+      'messages',
+      'activities',
+      'agent_tasks',
+      'lead_stage_changes',
+      'lead_stage_overrides',
+      'web_sessions',
+      'whatsapp_sessions',
+      'voice_sessions',
+      'social_sessions',
+    ] as const
+
+    for (const table of childTables) {
+      const { error: childErr } = await supabase.from(table).delete().eq('lead_id', id)
+      if (childErr) {
+        console.error(`[DELETE] Error deleting from ${table}:`, childErr)
+      } else {
+        console.log(`[DELETE] Cleared ${table}`)
+      }
     }
 
-    // 2. Delete activities
-    console.log('[DELETE] Step 2: Deleting activities...')
-    const { error: actError } = await supabase
-      .from('activities')
-      .delete()
-      .eq('lead_id', id)
-    
-    if (actError) {
-      console.error('[DELETE] Error deleting activities:', actError)
-    } else {
-      console.log('[DELETE] Deleted activities')
-    }
-
-    // 3. Delete agent_tasks
-    console.log('[DELETE] Step 3: Deleting agent_tasks...')
-    const { error: taskError } = await supabase
-      .from('agent_tasks')
-      .delete()
-      .eq('lead_id', id)
-    
-    if (taskError) {
-      console.error('[DELETE] Error deleting tasks:', taskError)
-    } else {
-      console.log('[DELETE] Deleted tasks')
-    }
-
-    // 4. Delete lead_stage_changes history
-    console.log('[DELETE] Step 4: Deleting lead_stage_changes...')
-    const { error: stageError } = await supabase
-      .from('lead_stage_changes')
-      .delete()
-      .eq('lead_id', id)
-    
-    if (stageError) {
-      console.error('[DELETE] Error deleting stage changes:', stageError)
-    } else {
-      console.log('[DELETE] Deleted stage changes')
-    }
-
-    // 5. Finally delete the lead
-    console.log('[DELETE] Step 5: Deleting lead from all_leads...')
+    console.log('[DELETE] Deleting lead from all_leads...')
     const { data, error } = await supabase
       .from('all_leads')
       .delete()
