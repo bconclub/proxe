@@ -2973,7 +2973,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         {showCloseConfirm && (
           <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
             <div className={styles.closeConfirmCard}>
-              <p className={styles.closeConfirmMessage}>Do you want to end this chat?</p>
+              <p className={styles.closeConfirmMessage}>End this chat?</p>
               <div className={styles.closeConfirmActions}>
                 <button className={styles.closeConfirmEndBtn} onClick={handleConfirmCloseChat}>
                   End Chat

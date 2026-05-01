@@ -1918,60 +1918,58 @@
 
 .closeConfirmCard {
   width: 100%;
-  max-width: 320px;
-  background: #0A0A0B;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
+  max-width: 280px;
+  background: #1E1E1E;
+  border: 1px solid rgba(77, 70, 59, 0.5);
+  border-radius: 12px;
+  padding: 18px;
   text-align: center;
-  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.35);
 }
 
 .closeConfirmMessage {
-  margin: 0 0 16px;
-  color: #E0D4FC;
-  font-size: 16px;
-  font-weight: 600;
+  margin: 0 0 14px;
+  color: var(--text-primary, #e5e2e1);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .closeConfirmActions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
 }
 
 .closeConfirmEndBtn {
-  padding: 10px 16px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary-vibrant) 0%, var(--primary-color) 100%);
-  color: #FFFFFF;
+  border-radius: 8px;
+  background: #C5A572;
+  color: #1A1A1A;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition: filter 0.15s ease;
 }
 
 .closeConfirmEndBtn:hover {
   filter: brightness(1.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
 }
 
 .closeConfirmContinueBtn {
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 70, 59, 0.6);
   background: transparent;
-  color: #E0D4FC;
-  font-weight: 600;
+  color: var(--text-primary, #e5e2e1);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .closeConfirmContinueBtn:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(197, 165, 114, 0.5);
+  background: rgba(197, 165, 114, 0.06);
 }
 
 .chatInputWrapper {
