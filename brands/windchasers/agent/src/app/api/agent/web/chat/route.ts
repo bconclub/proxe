@@ -112,18 +112,28 @@ export async function POST(request: NextRequest) {
 
           const responseTimeMs = Date.now() - requestStartTime;
 
-          // ── Post-streaming: business logic (fire-and-forget) ──────────
-
-          // Run all post-processing in parallel, don't block the stream
-          postProcess(
-            externalSessionId,
-            message,
-            fullResponse,
-            userProfile,
-            agentInput,
-            supabase,
-            responseTimeMs,
-          ).catch(err => console.error('[agent/web/chat] Post-processing error:', err));
+          // ── Post-streaming: business logic ─────────────────────────────
+          // MUST be awaited. On Vercel serverless the lambda is terminated
+          // as soon as the Response stream closes, so any unawaited
+          // postProcess promise is silently killed mid-flight — that's why
+          // web_sessions / conversations were never being persisted.
+          // The client has already received the 'done' SSE event and
+          // rendered the AI response, so this extra await only delays the
+          // connection close (typically < 1s for the DB writes; the slow
+          // summary generation is internally fire-and-forget).
+          try {
+            await postProcess(
+              externalSessionId,
+              message,
+              fullResponse,
+              userProfile,
+              agentInput,
+              supabase,
+              responseTimeMs,
+            );
+          } catch (err) {
+            console.error('[agent/web/chat] Post-processing error:', err);
+          }
 
         } catch (error: any) {
           console.error('[agent/web/chat] Streaming error:', error);
