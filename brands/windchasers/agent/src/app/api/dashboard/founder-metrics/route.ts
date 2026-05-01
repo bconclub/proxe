@@ -50,27 +50,27 @@ export async function GET(request: NextRequest) {
       { data: conversationsData, error: conversationsError },
       { data: stageChanges },
     ] = await Promise.all([
-      // 1. all_leads - core lead data
+      // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
       supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint, booking_date, booking_time')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
         .order('lead_score', { ascending: false }),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       supabase
         .from('web_sessions')
         .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
-      // 3. whatsapp_sessions - ONE query for bookings + conversation counting + booking events
+      // 3. whatsapp_sessions - conversation counting only (no booking columns on this table)
       supabase
         .from('whatsapp_sessions')
-        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
-      // 4. voice_sessions - booking data only
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name'),
+      // 4. voice_sessions - lead linkage only (no booking columns on this table)
       supabase
         .from('voice_sessions')
-        .select('lead_id, booking_date, booking_time'),
-      // 5. social_sessions - booking data only
+        .select('lead_id'),
+      // 5. social_sessions - lead linkage only (no booking columns on this table)
       supabase
         .from('social_sessions')
-        .select('lead_id, booking_date, booking_time'),
+        .select('lead_id'),
       // 6. conversations - messages for response time + activity (ONE query)
       supabase
         .from('conversations')
