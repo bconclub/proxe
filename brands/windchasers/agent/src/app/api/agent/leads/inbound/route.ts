@@ -168,11 +168,16 @@ export async function POST(request: NextRequest) {
       inboundContext.raw_form_fields = custom_fields
     }
 
-    // Check for existing lead
+    // Check for existing lead — scope to brand because the same phone can
+    // exist across brands (e.g. someone is a lead for both bcon and
+    // windchasers). Without the brand filter, .maybeSingle() returns null
+    // when multiple brands have this phone, sending us into the insert path
+    // and tripping the (phone, brand) unique constraint.
     const { data: existing } = await supabase
       .from('all_leads')
       .select('id, customer_name, unified_context')
       .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', leadBrand)
       .maybeSingle()
 
     if (existing) {
@@ -217,15 +222,34 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createErr) {
-        // Duplicate race condition - fetch existing
+        // Duplicate race condition or pre-existing row the first lookup
+        // missed - the unique constraint is on (phone, brand) so look up by
+        // exactly that shape. Fall back to (customer_phone_normalized, brand)
+        // in case the existing row's raw `phone` column was stored in a
+        // different format.
         if (createErr.code === '23505' || createErr.message?.includes('duplicate')) {
-          const { data: dup } = await supabase
+          let dupId: string | null = null
+
+          const { data: dupByPhone } = await supabase
             .from('all_leads')
             .select('id')
-            .eq('customer_phone_normalized', normalizedPhone)
+            .eq('phone', phone)
+            .eq('brand', leadBrand)
             .maybeSingle()
-          if (dup) {
-            leadId = dup.id
+          if (dupByPhone) dupId = dupByPhone.id
+
+          if (!dupId) {
+            const { data: dupByNormalized } = await supabase
+              .from('all_leads')
+              .select('id')
+              .eq('customer_phone_normalized', normalizedPhone)
+              .eq('brand', leadBrand)
+              .maybeSingle()
+            if (dupByNormalized) dupId = dupByNormalized.id
+          }
+
+          if (dupId) {
+            leadId = dupId
           } else {
             throw createErr
           }
