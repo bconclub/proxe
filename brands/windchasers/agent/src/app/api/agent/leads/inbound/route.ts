@@ -115,7 +115,11 @@ export async function POST(request: NextRequest) {
       organic: 'organic',
     }
     const normalizedSource = (source || '').toString().trim().toLowerCase()
-    const leadSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
+    const VALID_TOUCHPOINTS = new Set(['web','whatsapp','voice','social','facebook','google','form','manual','pabbly','ads','referral','organic','meta_forms'])
+    const mappedSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
+    // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
+    // The original raw source is preserved in agent_tasks.metadata.source below.
+    const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
     const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND || 'bcon'
 
     const supabase = getServiceClient() || getClient()
@@ -246,6 +250,7 @@ export async function POST(request: NextRequest) {
       scheduled_at: now,
       metadata: {
         source: leadSource,
+        original_source: normalizedSource || null,
         campaign: campaign || null,
         notes: notes || null,
         inbound: true,
