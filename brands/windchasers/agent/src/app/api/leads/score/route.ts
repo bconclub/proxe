@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +11,12 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Prefer service-role client so server-to-server callers (the
+    // message-created webhook) can read/update all_leads regardless of
+    // authenticated session. Falls back to the cookie-based client for
+    // direct dashboard calls.
+    const supabase = getServiceClient() || (await createClient())
 
-    // Allow service role or authenticated users
     const body = await request.json()
     const { lead_id } = body
 
@@ -25,10 +26,10 @@ export async function POST(request: NextRequest) {
 
     console.log('Scoring lead:', lead_id)
 
-    // Fetch lead data
+    // Fetch lead data (booking lives in unified_context, not a column on all_leads)
     const { data: lead, error: leadError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, booking_date, booking_time, is_manual_override')
+      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, unified_context, is_manual_override')
       .eq('id', lead_id)
       .single()
 
@@ -36,6 +37,10 @@ export async function POST(request: NextRequest) {
       console.error('Error fetching lead:', leadError)
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
+
+    const leadUc = lead.unified_context || {}
+    const bookingDate = leadUc?.web?.booking_date || leadUc?.whatsapp?.booking_date || null
+    const bookingTime = leadUc?.web?.booking_time || leadUc?.whatsapp?.booking_time || null
 
     // Check if manual override is active - if so, skip scoring
     if (lead.is_manual_override) {
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
     const touchpoints = activities?.length || 0
 
     // Check for booking
-    const hasBooking = !!(lead.booking_date && lead.booking_time)
+    const hasBooking = !!(bookingDate && bookingTime)
 
     // Check if re-engaged after being cold (was inactive > 7 days, now has new message)
     const lastInteraction = lead.last_interaction_at || lead.created_at

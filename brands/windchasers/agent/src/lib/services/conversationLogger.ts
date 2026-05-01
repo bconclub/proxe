@@ -307,16 +307,20 @@ export async function logMessage(
   };
 
   try {
-    // Verify lead exists (foreign key constraint)
-    const { data: leadCheck } = await client
-      .from('all_leads')
-      .select('id')
-      .eq('id', leadId)
-      .maybeSingle();
+    // Verify lead exists when leadId is provided. Anonymous chats (leadId=null)
+    // skip the check — the conversations.lead_id column is nullable and the FK
+    // only fires for non-null values.
+    if (leadId) {
+      const { data: leadCheck } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('id', leadId)
+        .maybeSingle();
 
-    if (!leadCheck) {
-      console.error('[conversationLogger] Lead does not exist', { leadId });
-      return null;
+      if (!leadCheck) {
+        console.error('[conversationLogger] Lead does not exist', { leadId });
+        return null;
+      }
     }
 
     const { data, error } = await client

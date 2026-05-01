@@ -500,7 +500,7 @@ export default function InboxPage() {
         console.log('Attempting fallback: fetching leads with recent activity...')
         const { data: activeLeads, error: leadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage, booking_date, booking_time')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage')
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
@@ -543,8 +543,8 @@ export default function InboxPage() {
               lead_score: lead.lead_score ?? null,
               lead_stage: lead.lead_stage ?? null,
               city: fbUc?.whatsapp?.profile?.city || fbUc?.web?.profile?.city || null,
-              booking_date: lead.booking_date ?? null,
-              booking_time: lead.booking_time ?? null,
+              booking_date: fbUc?.web?.booking_date || fbUc?.whatsapp?.booking_date || null,
+              booking_time: fbUc?.web?.booking_time || fbUc?.whatsapp?.booking_time || null,
               next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
               form_data: fbUc?.form_data || null,
               first_touchpoint: lead.first_touchpoint || null,
@@ -613,7 +613,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score, first_touchpoint')
+        .select('id, customer_name, email, phone, unified_context, lead_stage, lead_score, first_touchpoint')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -650,8 +650,6 @@ export default function InboxPage() {
         email?: string | null
         phone?: string | null
         unified_context?: any
-        booking_date?: string | null
-        booking_time?: string | null
         lead_stage?: string | null
         lead_score?: number | null
       }>
@@ -669,9 +667,11 @@ export default function InboxPage() {
           continue;
         }
 
-        // Extract booking status: check direct columns first, then unified_context
+        // Extract booking status from unified_context (booking_date/time live there, not on all_leads)
         const ctx = lead?.unified_context || {};
-        const bookingStatus = (lead?.booking_date ? 'Call Booked' : null)
+        const bookingDateFromCtx = ctx?.web?.booking_date || ctx?.whatsapp?.booking_date || null;
+        const bookingTimeFromCtx = ctx?.web?.booking_time || ctx?.whatsapp?.booking_time || null;
+        const bookingStatus = (bookingDateFromCtx ? 'Call Booked' : null)
           || (lead?.lead_stage === 'Booking Made' ? 'Call Booked' : null)
           || ctx?.whatsapp?.booking_status
           || ctx?.web?.booking_status
@@ -725,8 +725,8 @@ export default function InboxPage() {
           lead_score: lead?.lead_score ?? null,
           lead_stage: lead?.lead_stage ?? null,
           city: cityValue,
-          booking_date: lead?.booking_date ?? null,
-          booking_time: lead?.booking_time ?? null,
+          booking_date: bookingDateFromCtx,
+          booking_time: bookingTimeFromCtx,
           next_touchpoint: nextTouchpoint,
           form_data: uc?.form_data || null,
           first_touchpoint: (lead as any)?.first_touchpoint || null,

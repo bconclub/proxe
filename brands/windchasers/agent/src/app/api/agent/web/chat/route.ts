@@ -57,6 +57,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Capture this request's origin so post-process self-callbacks (scoring
+    // webhook) hit the *current* server in dev as well as prod, instead of
+    // the static NEXT_PUBLIC_APP_URL which always points at the deployed URL.
+    const requestOrigin = new URL(request.url).origin;
+
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
@@ -130,6 +135,7 @@ export async function POST(request: NextRequest) {
               agentInput,
               supabase,
               responseTimeMs,
+              requestOrigin,
             );
           } catch (err) {
             console.error('[agent/web/chat] Post-processing error:', err);
@@ -172,6 +178,7 @@ async function postProcess(
   agentInput: AgentInput,
   supabase: any,
   responseTimeMs?: number,
+  requestOrigin?: string,
 ): Promise<void> {
   try {
     // 1. Check for existing lead from session first
@@ -288,6 +295,20 @@ async function postProcess(
       } catch (summaryError) {
         console.error('[agent/web/chat] Summary generation failed:', summaryError);
       }
+    }
+
+    // 5. Trigger AI scoring for this lead (fire-and-forget, non-blocking).
+    // Use the current request's origin so the call hits this same server in
+    // dev — NEXT_PUBLIC_APP_URL is the static prod URL and would 404 locally.
+    if (leadId) {
+      const appUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4002';
+      fetch(`${appUrl}/api/webhooks/message-created`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: leadId }),
+      }).catch((scoringError) => {
+        console.error('[agent/web/chat] Scoring webhook failed:', scoringError);
+      });
     }
   } catch (error) {
     console.error('[agent/web/chat] Post-processing failed:', error);
