@@ -3151,3 +3151,159 @@
   }
 }
 */
+
+/* =============================================================================
+   Windchasers brand color overrides — aligned to docs/DESIGN_SYSTEM.md
+   Legacy gold #C5A572, dark #1A1A1A, accent-dark #0D0D0D, soft-black #1E1E1E
+   Stitch on-surface #e5e2e1, outline-variant #4d463b, surface-container #20201f
+   ============================================================================= */
+
+/* User bubble: gold pill with dark text (Legacy CTA pattern) */
+[data-brand="windchasers"] .message.user .bubble,
+[data-theme="aviation-gold"] .message.user .bubble,
+[data-brand="windchasers"] .message.user.accent-0 .bubble,
+[data-brand="windchasers"] .message.user.accent-1 .bubble,
+[data-brand="windchasers"] .message.user.accent-2 .bubble,
+[data-brand="windchasers"] .message.user.accent-3 .bubble,
+[data-brand="windchasers"] .message.user.accent-4 .bubble,
+[data-brand="windchasers"] .message.user.accent-5 .bubble,
+[data-brand="windchasers"] .message.user.accent-6 .bubble {
+  background: #C5A572 !important;
+  border: 1px solid rgba(197, 165, 114, 0.9) !important;
+  color: #1A1A1A !important;
+  box-shadow: 0 4px 12px rgba(197, 165, 114, 0.25) !important;
+}
+
+[data-brand="windchasers"] .message.user .messageText,
+[data-theme="aviation-gold"] .message.user .messageText,
+[data-brand="windchasers"] .message.user .messageText * {
+  color: #1A1A1A !important;
+}
+
+/* AI bubble: dark legacy soft-black with stitch on-surface text */
+[data-brand="windchasers"] .message.ai .bubble,
+[data-theme="aviation-gold"] .message.ai .bubble {
+  background: #1E1E1E !important;
+  border: 1px solid rgba(77, 70, 59, 0.5) !important;
+  color: #e5e2e1 !important;
+  box-shadow: none !important;
+}
+
+[data-brand="windchasers"] .message.ai .messageText,
+[data-theme="aviation-gold"] .message.ai .messageText,
+[data-brand="windchasers"] .message.ai .messageText * {
+  color: #e5e2e1 !important;
+  opacity: 1 !important;
+}
+
+/* themeDark mode under windchasers — overrides .themeDark hardcoded purple/lavender */
+.themeDark[data-brand="windchasers"] .message.user .bubble,
+[data-brand="windchasers"] .themeDark .message.user .bubble {
+  background: #C5A572 !important;
+  border: 1px solid rgba(197, 165, 114, 0.9) !important;
+  color: #1A1A1A !important;
+}
+
+.themeDark[data-brand="windchasers"] .message.user .messageText,
+.themeDark[data-brand="windchasers"] .message.user .messageText *,
+[data-brand="windchasers"] .themeDark .message.user .messageText,
+[data-brand="windchasers"] .themeDark .message.user .messageText * {
+  color: #1A1A1A !important;
+}
+
+.themeDark[data-brand="windchasers"] .message.ai .bubble,
+[data-brand="windchasers"] .themeDark .message.ai .bubble {
+  background: #1E1E1E !important;
+  border: 1px solid rgba(77, 70, 59, 0.5) !important;
+  color: #e5e2e1 !important;
+}
+
+.themeDark[data-brand="windchasers"] .message.ai .messageText,
+.themeDark[data-brand="windchasers"] .message.ai .messageText *,
+.themeDark[data-brand="windchasers"] .message.ai .bubble strong,
+.themeDark[data-brand="windchasers"] .message.ai .bubble em,
+.themeDark[data-brand="windchasers"] .message.ai .bubble a,
+[data-brand="windchasers"] .themeDark .message.ai .messageText,
+[data-brand="windchasers"] .themeDark .message.ai .messageText * {
+  color: #e5e2e1 !important;
+}
+
+.themeDark[data-brand="windchasers"] .messageText,
+.themeDark[data-brand="windchasers"] .messageText *,
+[data-brand="windchasers"] .themeDark .messageText,
+[data-brand="windchasers"] .themeDark .messageText * {
+  color: #e5e2e1;
+}
+
+/* Quick reply / mobile action buttons in dark mode — gold-tinted on dark */
+.themeDark[data-brand="windchasers"] .welcomeQuickButtonsContainer .quickBtn,
+.themeDark[data-brand="windchasers"] .mobileQuickActions .quickBtn,
+[data-brand="windchasers"] .themeDark .welcomeQuickButtonsContainer .quickBtn,
+[data-brand="windchasers"] .themeDark .mobileQuickActions .quickBtn {
+  background: rgba(197, 165, 114, 0.12) !important;
+  border: 1px solid rgba(197, 165, 114, 0.3) !important;
+  color: #e5e2e1 !important;
+}
+
+.themeDark[data-brand="windchasers"] .welcomeQuickButtonsContainer .quickBtn:hover,
+.themeDark[data-brand="windchasers"] .mobileQuickActions .quickBtn:hover,
+[data-brand="windchasers"] .themeDark .welcomeQuickButtonsContainer .quickBtn:hover,
+[data-brand="windchasers"] .themeDark .mobileQuickActions .quickBtn:hover {
+  background: rgba(197, 165, 114, 0.2) !important;
+  border-color: rgba(197, 165, 114, 0.5) !important;
+  color: #1A1A1A !important;
+}
+
+/* Light mode user bubble — gold pill instead of purple */
+.themeLight[data-brand="windchasers"] .message.user .bubble,
+[data-brand="windchasers"] .themeLight .message.user .bubble {
+  background: #C5A572 !important;
+  border: 1px solid rgba(197, 165, 114, 0.9) !important;
+  color: #1A1A1A !important;
+}
+
+/* Container surfaces in dark mode — accent-dark page bg */
+.themeDark[data-brand="windchasers"],
+[data-brand="windchasers"] .themeDark {
+  background: #0D0D0D !important;
+}
+
+.themeDark[data-brand="windchasers"]::before,
+[data-brand="windchasers"] .themeDark::before {
+  background: #0D0D0D !important;
+}
+
+.themeDark[data-brand="windchasers"] .messagesArea,
+.themeDark[data-brand="windchasers"] .inputArea,
+.themeDark[data-brand="windchasers"] .chatFooter,
+[data-brand="windchasers"] .themeDark .messagesArea,
+[data-brand="windchasers"] .themeDark .inputArea,
+[data-brand="windchasers"] .themeDark .chatFooter {
+  background: #0D0D0D !important;
+}
+
+.themeDark[data-brand="windchasers"] .welcomeQuickButtons,
+.themeDark[data-brand="windchasers"] .mobileQuickActions,
+[data-brand="windchasers"] .themeDark .welcomeQuickButtons,
+[data-brand="windchasers"] .themeDark .mobileQuickActions {
+  background: #0D0D0D !important;
+  border-top: 1px solid rgba(77, 70, 59, 0.3) !important;
+}
+
+/* Chat input + privacy text in dark mode — Stitch on-surface text */
+.themeDark[data-brand="windchasers"] .chatInput,
+[data-brand="windchasers"] .themeDark .chatInput {
+  background: #1E1E1E !important;
+  border: 1px solid rgba(77, 70, 59, 0.5) !important;
+  color: #e5e2e1 !important;
+}
+
+.themeDark[data-brand="windchasers"] .chatInput::placeholder,
+[data-brand="windchasers"] .themeDark .chatInput::placeholder {
+  color: rgba(209, 197, 182, 0.5) !important;
+}
+
+.themeDark[data-brand="windchasers"] .privacyNotice,
+[data-brand="windchasers"] .themeDark .privacyNotice {
+  color: rgba(209, 197, 182, 0.7) !important;
+}

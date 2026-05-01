@@ -20,64 +20,65 @@ export const windchasersConfig: BrandConfig = {
     },
   },
   colors: {
-    // Primary Colors - Gold/Brown/Cream Palette
-    primary: '#C9A961',              // Main gold
-    primaryLight: '#E8D5B7',          // Cream (light text/background)
-    primaryDark: '#1A0F0A',           // Dark brown
-    primaryVibrant: '#D4AF37',         // Vibrant gold accent
+    // Aligned to docs/DESIGN_SYSTEM.md — Legacy gold #C5A572 / dark #1A1A1A
+    // + Stitch on-surface tokens for text and outline-variant for borders
+    primary: '#C5A572',              // Legacy gold
+    primaryLight: '#e5e2e1',          // Stitch on-surface
+    primaryDark: '#1A1A1A',           // Legacy dark
+    primaryVibrant: '#C5A572',        // Same as primary (no separate vibrant in legacy)
 
     // Gradient
-    gradientStart: '#1A0F0A',
-    gradientMid: '#C9A961',
-    gradientEnd: '#D4AF37',
+    gradientStart: '#1A1A1A',
+    gradientMid: '#C5A572',
+    gradientEnd: '#C5A572',
 
     // Backgrounds
-    darkBg: '#0F0A06',
-    darkCard: 'rgba(201, 169, 97, 0.3)',
-    darkSurface: 'rgba(26, 15, 10, 0.4)',
-    glassBg: 'rgba(201, 169, 97, 0.05)',
-    glassBorder: 'rgba(232, 213, 183, 0.1)',
-    glassShadow: 'rgba(201, 169, 97, 0.2)',
+    darkBg: '#1A1A1A',
+    darkCard: '#1E1E1E',              // Legacy soft black (section bg)
+    darkSurface: '#0D0D0D',           // Legacy accent-dark
+    glassBg: 'rgba(197, 165, 114, 0.05)',
+    glassBorder: 'rgba(77, 70, 59, 0.5)',  // Stitch outline-variant
+    glassShadow: 'rgba(197, 165, 114, 0.2)',
 
-    // Text Colors
-    textPrimary: '#E8D5B7',
-    textSecondary: 'rgba(232, 213, 183, 0.7)',
-    textTertiary: 'rgba(232, 213, 183, 0.5)',
-    textMuted: 'rgba(232, 213, 183, 0.4)',
-    white: '#E8D5B7',
+    // Text — Stitch on-surface family
+    textPrimary: '#e5e2e1',
+    textSecondary: '#d1c5b6',
+    textTertiary: 'rgba(209, 197, 182, 0.7)',
+    textMuted: 'rgba(209, 197, 182, 0.5)',
+    white: '#e5e2e1',
 
-    // Borders
-    borderLight: 'rgba(232, 213, 183, 0.08)',
-    borderMedium: 'rgba(232, 213, 183, 0.12)',
-    borderAccent: 'rgba(201, 169, 97, 0.3)',
-    borderGlow: 'rgba(201, 169, 97, 0.4)',
-    borderColor: 'rgba(201, 169, 97, 0.2)',
+    // Borders — Stitch outline-variant + gold accents
+    borderLight: 'rgba(77, 70, 59, 0.3)',
+    borderMedium: 'rgba(77, 70, 59, 0.5)',
+    borderAccent: 'rgba(197, 165, 114, 0.3)',
+    borderGlow: 'rgba(197, 165, 114, 0.4)',
+    borderColor: 'rgba(197, 165, 114, 0.2)',
 
     // Accents
     greenSuccess: '#10B981',
-    cyanAccent: '#D4AF37',            // Gold accent
-    orangeAccent: '#C9A961',          // Gold accent
-    goldAccent: '#D4AF37',            // Vibrant gold
+    cyanAccent: '#C5A572',
+    orangeAccent: '#C5A572',
+    goldAccent: '#C5A572',
 
     // Background Variants
-    bgPrimary: 'rgba(26, 15, 10, 0.05)',
-    bgHeader: 'rgba(26, 15, 10, 0.85)',
-    bgMessageArea: 'rgba(201, 169, 97, 0.03)',
-    bgHover: 'rgba(201, 169, 97, 0.12)',
-    bgActive: 'rgba(201, 169, 97, 0.15)',
+    bgPrimary: 'rgba(26, 26, 26, 0.05)',
+    bgHeader: 'rgba(13, 13, 13, 0.85)',     // Legacy accent-dark
+    bgMessageArea: 'rgba(197, 165, 114, 0.03)',
+    bgHover: 'rgba(197, 165, 114, 0.12)',
+    bgActive: 'rgba(197, 165, 114, 0.15)',
 
-    // Chat Bubbles
-    bubbleUserBg: 'rgba(201, 169, 97, 0.25)',
-    bubbleUserBorder: 'rgba(201, 169, 97, 0.7)',
-    bubbleUserShadow: '0 8px 32px rgba(201, 169, 97, 0.25)',
-    bubbleAiBg: 'rgba(26, 15, 10, 0.3)',
-    bubbleAiBorder: 'rgba(26, 15, 10, 0.7)',
-    bubbleAiShadow: '0 8px 32px rgba(26, 15, 10, 0.25)',
+    // Chat Bubbles — gold tint user, soft-black AI
+    bubbleUserBg: 'rgba(197, 165, 114, 0.25)',
+    bubbleUserBorder: 'rgba(197, 165, 114, 0.7)',
+    bubbleUserShadow: '0 8px 32px rgba(197, 165, 114, 0.25)',
+    bubbleAiBg: '#1E1E1E',
+    bubbleAiBorder: 'rgba(77, 70, 59, 0.5)',
+    bubbleAiShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
 
     // Buttons
-    buttonBg: 'rgba(201, 169, 97, 0.12)',
-    buttonHover: 'rgba(201, 169, 97, 0.2)',
-    buttonActive: 'rgba(201, 169, 97, 0.3)',
+    buttonBg: 'rgba(197, 165, 114, 0.15)',
+    buttonHover: 'rgba(197, 165, 114, 0.25)',
+    buttonActive: 'rgba(197, 165, 114, 0.35)',
   },
   // Quick Actions: 3 buttons shown when chat opens
   quickButtons: [

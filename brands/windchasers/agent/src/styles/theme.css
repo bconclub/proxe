@@ -1,70 +1,70 @@
-/* Windchasers Theme CSS Variables */
+/* Windchasers Theme CSS Variables — aligned to docs/DESIGN_SYSTEM.md */
 [data-brand="windchasers"],
 [data-theme="aviation-gold"] {
-  /* Main Colors - Gold/Brown/Cream Palette */
-  --chatbox-bg: #0F0A06;
-  --accent-1: #C9A961; /* Main Gold */
-  --accent-2: #1A0F0A; /* Dark Brown */
-  --accent-3: #D4AF37; /* Vibrant Gold */
-  --accent-4: #E8D5B7; /* Cream */
-  --accent-5: #C9A961; /* Main Gold */
-  --accent-6: #D4AF37; /* Vibrant Gold */
-  --accent-7: #E8D5B7; /* Cream */
+  /* Legacy palette: gold #C5A572 + dark #1A1A1A / accent-dark #0D0D0D / soft-black #1E1E1E
+     Stitch palette (text/surface tiers): on-surface #e5e2e1, on-surface-variant #d1c5b6,
+     surface-container #20201f, surface-container-high #2a2a2a, outline-variant #4d463b */
+  --chatbox-bg: #1A1A1A;
+  --accent-1: #C5A572; /* Legacy gold */
+  --accent-2: #1A1A1A; /* Legacy dark */
+  --accent-3: #C5A572; /* Legacy gold (hover anchor) */
+  --accent-4: #e5e2e1; /* Stitch on-surface (body text) */
+  --accent-5: #C5A572;
+  --accent-6: #C5A572;
+  --accent-7: #e5e2e1;
 
   /* Theme Colors */
-  --primary-color: #C9A961;
-  --primary-light: #E8D5B7;
-  --primary-dark: #1A0F0A;
-  --primary-vibrant: #D4AF37;
+  --primary-color: #C5A572;
+  --primary-light: #e5e2e1;
+  --primary-dark: #1A1A1A;
+  --primary-vibrant: #C5A572;
 
   /* Backgrounds */
-  --dark-bg: #0F0A06;
-  --dark-card: rgba(201, 169, 97, 0.3);
-  --dark-surface: rgba(26, 15, 10, 0.4);
-  --glass-bg: rgba(201, 169, 97, 0.05);
-  --glass-border: rgba(232, 213, 183, 0.1);
-  --glass-shadow: rgba(201, 169, 97, 0.2);
+  --dark-bg: #1A1A1A;
+  --dark-card: #1E1E1E; /* Legacy soft black — section bg */
+  --dark-surface: #0D0D0D; /* Legacy accent-dark */
+  --glass-bg: rgba(197, 165, 114, 0.05);
+  --glass-border: rgba(77, 70, 59, 0.5); /* Stitch outline-variant */
+  --glass-shadow: rgba(197, 165, 114, 0.2);
 
-  /* Text */
-  --text-primary: #E8D5B7;
-  --text-secondary: rgba(232, 213, 183, 0.7);
-  --text-tertiary: rgba(232, 213, 183, 0.5);
-  --text-muted: rgba(232, 213, 183, 0.4);
-  --white: #E8D5B7;
+  /* Text — Stitch on-surface family */
+  --text-primary: #e5e2e1;
+  --text-secondary: #d1c5b6;
+  --text-tertiary: rgba(209, 197, 182, 0.7);
+  --text-muted: rgba(209, 197, 182, 0.5);
+  --white: #e5e2e1;
 
-  /* Borders */
-  --border-light: rgba(232, 213, 183, 0.08);
-  --border-medium: rgba(232, 213, 183, 0.12);
-  --border-accent: rgba(201, 169, 97, 0.3);
-  --border-glow: rgba(201, 169, 97, 0.4);
-  --border-color: rgba(201, 169, 97, 0.2);
-  --chat-border-color: rgba(201, 169, 97, 0.4);
+  /* Borders — Stitch outline-variant + gold accents */
+  --border-light: rgba(77, 70, 59, 0.3);
+  --border-medium: rgba(77, 70, 59, 0.5);
+  --border-accent: rgba(197, 165, 114, 0.3);
+  --border-glow: rgba(197, 165, 114, 0.4);
+  --border-color: rgba(197, 165, 114, 0.2);
+  --chat-border-color: rgba(197, 165, 114, 0.4);
 
   /* Other */
   --green-success: #10B981;
-  --cyan-accent: #D4AF37;
-  --bg-header: rgba(26, 15, 10, 0.85);
-  --bg-message-area: rgba(201, 169, 97, 0.03);
-  --bg-primary: rgba(26, 15, 10, 0.05);
-  --bg-hover: rgba(201, 169, 97, 0.12);
-  --bg-active: rgba(201, 169, 97, 0.15);
+  --cyan-accent: #C5A572;
+  --bg-header: rgba(13, 13, 13, 0.85); /* Legacy accent-dark */
+  --bg-message-area: rgba(197, 165, 114, 0.03);
+  --bg-primary: rgba(26, 26, 26, 0.05);
+  --bg-hover: rgba(197, 165, 114, 0.12);
+  --bg-active: rgba(197, 165, 114, 0.15);
 
-  /* Bubble backgrounds - Differentiated tints with higher opacity for visibility */
-  /* User bubble: Gold tint (#C9A961) - more visible with definitive borders */
-  --bubble-user-bg: rgba(201, 169, 97, 0.25);
-  --bubble-user-border: rgba(201, 169, 97, 0.7);
-  --bubble-user-shadow: 0 8px 32px rgba(201, 169, 97, 0.25);
+  /* Bubbles: user = gold tint, AI = surface-container */
+  --bubble-user-bg: rgba(197, 165, 114, 0.25);
+  --bubble-user-border: rgba(197, 165, 114, 0.7);
+  --bubble-user-shadow: 0 8px 32px rgba(197, 165, 114, 0.25);
 
-  /* AI bubble: Dark brown tint (#1A0F0A) - more visible with definitive borders */
-  --bubble-ai-bg: rgba(26, 15, 10, 0.3);
-  --bubble-ai-border: rgba(26, 15, 10, 0.7);
-  --bubble-ai-shadow: 0 8px 32px rgba(26, 15, 10, 0.25);
+  --bubble-ai-bg: #1E1E1E; /* Legacy soft black */
+  --bubble-ai-border: rgba(77, 70, 59, 0.5);
+  --bubble-ai-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
 
-  /* Buttons */
-  --button-bg: rgba(201, 169, 97, 0.25);
-  --button-hover: rgba(201, 169, 97, 0.35);
-  --button-active: rgba(201, 169, 97, 0.45);
-  --text-button: #FFFFFF;
+  /* Buttons — gold pill, dark text on gold per legacy CTA pattern */
+  --button-bg: rgba(197, 165, 114, 0.15);
+  --button-hover: rgba(197, 165, 114, 0.25);
+  --button-active: rgba(197, 165, 114, 0.35);
+  --text-button: #1A1A1A;
 
   /* Blur */
   --blur-sm: blur(8px);
