@@ -469,27 +469,23 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-vibrant) 100%);
-  color: var(--text-primary);
+  background: var(--primary-color, #C5A572);
+  color: var(--text-button, #1A1A1A);
   border: none;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: filter 0.15s ease, transform 0.15s ease;
   flex-shrink: 0;
-  box-shadow: 
-    0 0 16px var(--primary-color),
-    0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .sendBtn:hover {
-  background: linear-gradient(135deg, var(--primary-vibrant) 0%, var(--primary-color) 100%);
+  filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 
-    0 0 20px var(--primary-vibrant),
-    0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
 .sendBtn:disabled {
