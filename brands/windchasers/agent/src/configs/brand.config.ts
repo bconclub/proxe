@@ -80,10 +80,18 @@ export const windchasersConfig: BrandConfig = {
     buttonHover: 'rgba(197, 165, 114, 0.25)',
     buttonActive: 'rgba(197, 165, 114, 0.35)',
   },
-  // Quick Actions: 2 buttons shown when chat opens (audience split)
+  // Quick Actions: audience split + program explorer
   quickButtons: [
     'I want to become a pilot',
-    'I am a parent'
+    'I am a parent',
+    'Explore Training Options'
+  ],
+  // Explore Buttons: 4 program tiles shown when "Explore Training Options" is clicked
+  exploreButtons: [
+    'Pilot Training',
+    'Flight Schools',
+    'Helicopter Pilot',
+    'Cabin Crew'
   ],
   // Follow-up Buttons: fallback whitelist when Claude generates contextual buttons.
   // Includes parent-flow exits so post-capture / free-form parent turns can
@@ -91,7 +99,7 @@ export const windchasersConfig: BrandConfig = {
   // override hasn't pinned them.
   followUpButtons: [
     'Book a Consultation',
-    'Take the PAT',
+    'Take Pilot Assessment',
     'Talk to a counsellor',
     'Ask another question',
     'Not right now',

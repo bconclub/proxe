@@ -2514,25 +2514,33 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // activity step (e.g. "Working", "Taking a break").
     const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
     const flowRule = (() : FlowOverrideRule | null => {
-      // PAT entry — open the assessment in a new tab with chat context attached.
-      if (normalizedButton === 'take the pat') {
+      // Pilot Assessment entry — open the assessment in a new tab with chat
+      // context attached. Accept the legacy "take the pat" label as well so
+      // older chat states (mid-session) still route correctly.
+      if (
+        normalizedButton === 'take pilot assessment' ||
+        normalizedButton === 'take the pat'
+      ) {
         if (typeof window !== 'undefined') {
           try {
-            const patUrl = new URL('https://pilot.windchasers.in/assessment');
-            patUrl.searchParams.set('source', 'chat');
+            const assessmentUrl = new URL('https://pilot.windchasers.in/assessment');
+            assessmentUrl.searchParams.set('source', 'chat');
             if (externalSessionId) {
-              patUrl.searchParams.set('conversation_id', externalSessionId);
+              assessmentUrl.searchParams.set('conversation_id', externalSessionId);
             }
-            window.open(patUrl.toString(), '_blank', 'noopener,noreferrer');
+            window.open(assessmentUrl.toString(), '_blank', 'noopener,noreferrer');
           } catch {
             /* noop — popup blocker or invalid URL */
           }
         }
         return {
-          followUpButtons: ['I finished the PAT', 'Skip and book consultation'],
+          followUpButtons: ['I finished the assessment', 'Skip and book consultation'],
         };
       }
-      if (normalizedButton === 'i finished the pat') {
+      if (
+        normalizedButton === 'i finished the assessment' ||
+        normalizedButton === 'i finished the pat'
+      ) {
         return {
           followUpButtons: ['Book a Consultation'],
         };
@@ -2556,7 +2564,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (FLOW_COUNTRIES.some((country) => country.toLowerCase() === normalizedButton)) {
         return {
-          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
         };
       }
       if (normalizedButton === 'no, starting fresh') {
@@ -2571,7 +2579,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       if (normalizedButton === 'under 18' || normalizedButton === '18-21') {
         return {
-          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
         };
       }
       if (normalizedButton === '22-25' || normalizedButton === '26+') {
@@ -2588,7 +2596,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )
       ) {
         return {
-          followUpButtons: ['Take the PAT', 'Skip and book consultation'],
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
         };
       }
 
@@ -2657,6 +2665,35 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )
       ) {
         return { followUpButtons: [] };
+      }
+
+      // ── Explore Training Options ──────────────────────────────────────
+      // Each sub-program funnels into an existing flow rather than
+      // dead-ending in LLM-improv, fixing the "Cabin Crew got stuck" bug.
+      if (normalizedButton === 'explore training options') {
+        return {
+          followUpButtons: config.exploreButtons ?? [],
+        };
+      }
+      if (normalizedButton === 'pilot training') {
+        // Same downstream as the Aspirant entry.
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'helicopter pilot') {
+        // Skip the airplane/helicopter pick — they already chose helicopter.
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (
+        normalizedButton === 'flight schools' ||
+        normalizedButton === 'cabin crew'
+      ) {
+        // Info-only programs — bot answers from KB, then offers a counsellor
+        // call or a follow-up question. Prevents the "stuck on Yes" bug.
+        return {
+          followUpButtons: ['Talk to a counsellor', 'Ask a question'],
+        };
       }
 
       return null;

@@ -813,8 +813,9 @@ export default function LeadsTable({
                   ''
                 const formType = String(formTypeRaw).toLowerCase().trim()
                 const subSourceLabels: Record<string, string> = {
-                  pilot_aptitude_test: 'PAT',
-                  pat: 'PAT',
+                  pilot_aptitude_test: 'Assessment',
+                  pat: 'Assessment',
+                  pilot_assessment: 'Assessment',
                   demo_booked: 'Demo Booked',
                   demo: 'Demo',
                   visit_booked: 'Visit Booked',
