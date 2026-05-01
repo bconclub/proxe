@@ -2590,7 +2590,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
                 
                 try {
-                  const response = await fetch(`/api/dashboard/leads?id=${lead.id}`, {
+                  // Use the per-lead path-param route — it cascades through
+                  // conversations, activities, agent_tasks, and
+                  // lead_stage_changes before deleting the lead itself.
+                  // The collection-route DELETE doesn't cascade and trips
+                  // FK constraints with a generic 500.
+                  const response = await fetch(`/api/dashboard/leads/${lead.id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                   });
