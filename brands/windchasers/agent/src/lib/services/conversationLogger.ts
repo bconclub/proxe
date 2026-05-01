@@ -267,7 +267,7 @@ export async function fetchSummary(
  * Requires leadId - use leadManager.ensureOrUpdateLead() first
  */
 export async function logMessage(
-  leadId: string,
+  leadId: string | null,
   channel: Channel,
   sender: 'customer' | 'agent' | 'system',
   content: string,
@@ -275,8 +275,12 @@ export async function logMessage(
   metadata: any = {},
   supabase?: SupabaseClient | null,
 ): Promise<any | null> {
-  if (!leadId || !content) {
-    console.log('[conversationLogger] Missing leadId or content, skipping');
+  // leadId is optional — anonymous web-chat sessions log conversations
+  // without a lead until the visitor identifies themselves. The
+  // conversations.lead_id column is nullable; the session_id stored in
+  // metadata is the linking key for those rows.
+  if (!content) {
+    console.log('[conversationLogger] Missing content, skipping');
     return null;
   }
 
