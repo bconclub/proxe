@@ -283,7 +283,10 @@ export async function* processStream(
       yield { type: 'chunk', text: finalResponse };
     }
 
-    // 5. Generate follow-ups (runs after text is already streaming to client)
+    // 5. Signal completion immediately so the client can show buttons right away.
+    //    Follow-ups are generated after and arrive as a late SSE event.
+    yield { type: 'done' };
+
     const followUps = await generateFollowUps({
       channel: input.channel,
       userMessage: input.message,
@@ -296,7 +299,6 @@ export async function* processStream(
     });
 
     yield { type: 'followUps', followUps };
-    yield { type: 'done' };
 
     // Schedule flow tasks (non-blocking — fires after response is sent)
     scheduleFlowTasks(supabase, input, finalResponse).catch(err => {
