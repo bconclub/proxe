@@ -30,6 +30,8 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   const withoutGenericGreeting = rawText
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    .replace(/[—–]/g, '-')
     .trim();
 
   const normalized = withoutGenericGreeting

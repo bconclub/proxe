@@ -7,7 +7,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AgentInput, AgentOutput, KnowledgeResult, StreamChunk } from './types';
 import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
-import { generateResponse, generateResponseWithTools, isConfigured, getErrorMessage } from './claudeClient';
+import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
 import { extractIntent, isBookingIntent, extractPainPoint, detectObjection } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
@@ -188,22 +188,22 @@ export async function* processStream(
     const brandId = getCurrentBrandId();
     const brandConfig = getBrandConfig(brandId);
 
-    // 1. Extract intent
+    // 1. Extract intent — determines which DB calls to make
     const intent = extractIntent(input.message, input.usedButtons);
+    const hasBookingIntent = isBookingIntent(input.message);
 
-    // 2. Search knowledge base
-    const relevantDocs = await searchKnowledgeBase(supabase, input.message, 3);
+    // 2. Parallelize DB calls: KB search always runs; booking check only when needed
+    const [relevantDocs, existingBookingMessage] = await Promise.all([
+      searchKnowledgeBase(supabase, input.message, 3),
+      hasBookingIntent ? checkBooking(supabase, input) : Promise.resolve(null),
+    ]);
     const knowledgeContext = formatKnowledgeContext(relevantDocs);
 
-    // 3. Check for existing booking
-    const existingBookingMessage = await checkBooking(supabase, input);
-
-    // 4. Build prompt (brand-aware)
+    // 3. Build prompt (brand-aware)
     const finalMessage = existingBookingMessage
       ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
       : input.message;
 
-    // Build admin notes context
     let crossChannelContext = '';
     if (input.adminNotes && input.adminNotes.length > 0) {
       const recentNotes = input.adminNotes.slice(-10);
@@ -211,9 +211,9 @@ export async function* processStream(
       crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
     }
 
-    // Fetch form data from unified_context if available
+    // Form data is only needed for booking context
     let formData: Record<string, any> | null = null;
-    if (input.userProfile.phone) {
+    if (hasBookingIntent && input.userProfile.phone) {
       try {
         const normalizedPhone = input.userProfile.phone.replace(/\D/g, '').slice(-10);
         const { data: leadCtx } = await supabase
@@ -241,41 +241,53 @@ export async function* processStream(
       formData,
     });
 
-    // 5. Generate response with tools (same as WhatsApp - enables booking flow)
-    const { tools, toolHandlers } = buildBookingTools(input, supabase);
-    let rawResponse: string;
+    // 4. Generate response — true streaming for conversational messages,
+    //    tool-loop for booking messages (tools need a complete back-and-forth)
+    let finalResponse = '';
 
-    try {
-      rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
-        tools,
-        toolHandlers,
-        maxToolRounds: 3,
-      }, 768);
-    } catch (firstError: any) {
-      console.error('[Engine] Web AI generation failed (attempt 1):', firstError?.message || firstError);
+    if (!hasBookingIntent) {
+      // True SSE streaming: first Claude token reaches client in ~300-600ms.
+      // Greeting strips and em-dash replacements are handled by sanitizeAssistantText
+      // in the client after the stream completes.
+      for await (const textChunk of streamResponse(systemPrompt, userPrompt, 512)) {
+        finalResponse += textChunk;
+        yield { type: 'chunk', text: textChunk };
+      }
+    } else {
+      // Booking flow: needs tool loop (check_availability → book_consultation)
+      const { tools, toolHandlers } = buildBookingTools(input, supabase);
+      let rawResponse: string;
+
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
         rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
           tools,
           toolHandlers,
-          maxToolRounds: 2,
-        }, 512);
-      } catch (retryError: any) {
-        console.error('[Engine] Web AI generation failed (attempt 2):', retryError?.message || retryError);
-        rawResponse = "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
+          maxToolRounds: 3,
+        }, 768);
+      } catch (firstError: any) {
+        console.error('[Engine] Web AI generation failed (attempt 1):', firstError?.message || firstError);
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
+            tools,
+            toolHandlers,
+            maxToolRounds: 2,
+          }, 512);
+        } catch (retryError: any) {
+          console.error('[Engine] Web AI generation failed (attempt 2):', retryError?.message || retryError);
+          rawResponse = "Let me connect you with the team directly. They'll reach out shortly.";
+        }
       }
+
+      finalResponse = cleanResponse(rawResponse);
+      yield { type: 'chunk', text: finalResponse };
     }
 
-    const cleanedResponse = cleanResponse(rawResponse);
-
-    // Yield the cleaned response as a single chunk
-    yield { type: 'chunk', text: cleanedResponse };
-
-    // 6. Generate follow-ups
+    // 5. Generate follow-ups (runs after text is already streaming to client)
     const followUps = await generateFollowUps({
       channel: input.channel,
       userMessage: input.message,
-      assistantMessage: cleanedResponse,
+      assistantMessage: finalResponse,
       messageCount: input.messageCount,
       usedButtons: input.usedButtons || [],
       hasExistingBooking: !!existingBookingMessage,
@@ -286,8 +298,8 @@ export async function* processStream(
     yield { type: 'followUps', followUps };
     yield { type: 'done' };
 
-    // Schedule flow tasks (non-blocking - fires after response sent to client)
-    scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
+    // Schedule flow tasks (non-blocking — fires after response is sent)
+    scheduleFlowTasks(supabase, input, finalResponse).catch(err => {
       console.error('[Engine] Flow task scheduling failed:', err?.message);
     });
 
