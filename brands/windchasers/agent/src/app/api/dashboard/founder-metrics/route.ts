@@ -220,8 +220,18 @@ export async function GET(request: NextRequest) {
         !!session.conversation_summary
       )
     }
-    const safeWebSessions = (webSessions || []).filter(hasActivity)
-    const safeWhatsappSessions = (whatsappSessions || []).filter(hasActivity)
+    // Only count sessions tied to a lead that still exists. This drops
+    // anonymous test chats (lead_id null) and orphans pointing at a
+    // deleted lead, so the Conversations tile mirrors the leads list.
+    const leadIdSet = new Set(safeLeads.map((lead: any) => lead.id))
+    const isLinkedToActiveLead = (session: any) =>
+      !!session?.lead_id && leadIdSet.has(session.lead_id)
+    const safeWebSessions = (webSessions || []).filter(
+      (session: any) => hasActivity(session) && isLinkedToActiveLead(session)
+    )
+    const safeWhatsappSessions = (whatsappSessions || []).filter(
+      (session: any) => hasActivity(session) && isLinkedToActiveLead(session)
+    )
     
     // Helper function to count unique sessions within a date range
     const countSessionsInRange = (sessions: any[], startDate: Date, endDate?: Date) => {
