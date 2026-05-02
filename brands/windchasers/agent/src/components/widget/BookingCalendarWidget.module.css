@@ -1,32 +1,21 @@
-/* Calendar Container - Uses brand CSS variables */
+/* Calendar Container — transparent, no extra chrome, lives inside the chat bubble */
 .calendarContainer {
   position: relative;
   width: 100%;
   max-width: 100%;
-  margin-top: 16px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--dark-card, rgba(0, 0, 0, 0.4));
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border: 1px solid var(--border-accent, rgba(255, 255, 255, 0.2));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  padding: 16px;
+  padding: 4px 0 0;
   box-sizing: border-box;
-  /* Uniform min-height across all 4 views (date / time / form / confirmation)
-     so the booking card doesn't reflow as the user clicks through steps. */
-  min-height: 380px;
   display: flex;
   flex-direction: column;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* Theme integration with parent ChatWidget toggle */
 :global(.themeLight) .calendarContainer {
-  background: #E5E7EB;
-  border: 1px solid #D1D5DB;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
+  background: transparent;
+  border: none;
 }
 
 :global(.themeLight) .monthYear,
@@ -67,8 +56,8 @@
 }
 
 :global(.themeDark) .calendarContainer {
-  background: rgba(20, 20, 24, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  border: none;
 }
 
 :global(.themeDark) .monthYear,
@@ -89,25 +78,33 @@
   color: #F4EEFF;
 }
 
-:global(.themeDark) .monthDateButton,
 :global(.themeDark) .timeSlot,
 :global(.themeDark) .navButton,
 :global(.themeDark) .formGroup input,
 :global(.themeDark) .backButton,
 :global(.themeDark) .downloadICSButton,
 :global(.themeDark) .closeButton {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.24) !important;
-  color: #F4EEFF !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #e5e2e1 !important;
 }
 
-:global(.themeDark) .monthDateButton:hover:not(:disabled),
+:global(.themeDark) .monthDateButton {
+  background: transparent !important;
+  border: none !important;
+  color: #e5e2e1 !important;
+}
+
+:global(.themeDark) .monthDateButton:hover:not(:disabled) {
+  background: rgba(197, 165, 114, 0.18) !important;
+}
+
 :global(.themeDark) .timeSlot:hover:not(:disabled),
 :global(.themeDark) .navButton:hover,
 :global(.themeDark) .backButton:hover,
 :global(.themeDark) .downloadICSButton:hover {
-  background: rgba(255, 255, 255, 0.18) !important;
-  border-color: rgba(255, 255, 255, 0.32) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
 }
 
 :global(.themeDark) .monthDateOther,
@@ -182,16 +179,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   width: 100%;
   box-sizing: border-box;
-  gap: 12px;
+  gap: 8px;
 }
 
 .monthYear {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary, #e5e2e1);
   text-transform: capitalize;
   flex: 1;
   text-align: center;
@@ -199,29 +196,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .navButton {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.2));
-  border-radius: 8px;
-  color: var(--text-primary, #ffffff);
-  font-size: 18px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary, rgba(229, 226, 225, 0.7));
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
 }
 
 .navButton:hover {
-  background: var(--bg-active, rgba(255, 255, 255, 0.2));
-  border-color: var(--border-accent, rgba(255, 255, 255, 0.3));
+  background: rgba(197, 165, 114, 0.15);
+  color: #C5A572;
 }
 
 .navButton:focus-visible {
@@ -271,14 +268,13 @@
 .monthDateButton {
   aspect-ratio: 1;
   border: none;
-  background: var(--bg-primary, rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
-  color: var(--text-primary, #ffffff);
+  background: transparent;
+  border-radius: 50%;
+  color: var(--text-primary, #e5e2e1);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -286,12 +282,10 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .monthDateButton:hover:not(:disabled) {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.2));
+  background: rgba(197, 165, 114, 0.18);
   color: var(--text-primary, #ffffff);
 }
 
@@ -306,17 +300,16 @@
 }
 
 .dateToday {
-  background: var(--primary-color, rgba(91, 26, 140, 0.3));
-  border: 2px solid var(--primary-color, rgba(91, 26, 140, 0.5));
-  color: var(--text-primary, #ffffff);
+  background: rgba(197, 165, 114, 0.12);
+  color: #C5A572;
+  font-weight: 600;
 }
 
 .dateSelected {
-  background: var(--primary-color, #5B1A8C);
-  color: var(--white, #ffffff);
-  font-weight: 600;
-  border: 2px solid var(--accent);
-  box-shadow: none;
+  background: #C5A572 !important;
+  color: #1A1A1A !important;
+  font-weight: 700;
+  border: none;
 }
 
 .datePast {
@@ -468,7 +461,7 @@
 /* Per-view overrides removed — uniform min-height now lives on .calendarContainer. */
 
 .formContainer {
-  padding: 8px 0;
+  padding: 0;
   max-height: 600px;
   overflow-y: auto;
 }
@@ -577,20 +570,16 @@
   box-shadow: 0 0 0 2px var(--white, #ffffff), 0 0 0 4px var(--primary-color, rgba(91, 26, 140, 0.5));
 }
 
-/* Confirmation View — same min-height as form view for visual continuity */
-.calendarContainer[data-view="confirmation"] {
-  min-height: 360px;
-}
+/* Confirmation view: no min-height, content drives the height */
 
 .confirmationContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px;
+  padding: 16px 8px;
   text-align: center;
   gap: 12px;
-  min-height: 320px;
 }
 
 .confirmationIcon {

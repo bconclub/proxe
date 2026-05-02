@@ -3131,9 +3131,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             )}
 
             {showCalendly && calendarAnchorId === message.id && (
-              <div 
+              <div
                 key={showCalendly}
-                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']} ${styles.calendarMessage}`}
                 onClick={(e) => e.stopPropagation()}
                 ref={(el) => {
                   if (el) {

@@ -376,6 +376,12 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                 const checkAndComplete = () => {
                   // Check if queue is empty and no characters are being streamed
                   if (streamingQueueRef.current.length === 0 && !isStreamingCharsRef.current) {
+                    // Capture the completed message OUTSIDE the setMessages updater
+                    // so onMessageComplete can safely call other state setters.
+                    // Calling setState from inside a setState updater is a React
+                    // anti-pattern that silently drops the nested update.
+                    let completedMessageForCallback: Message | null = null;
+
                     setMessages((prev) => {
                       const updated = prev.map((msg) => {
                         if (msg.id === streamingMessage.id) {
@@ -397,10 +403,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                             text: finalText,
                           };
 
-                          if (onMessageComplete) {
-                            onMessageComplete(completedMessage);
-                          }
-
+                          completedMessageForCallback = completedMessage;
                           return completedMessage;
                         }
                         return msg;
@@ -409,6 +412,12 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                       streamingMessageRef.current = null;
                       return updated;
                     });
+
+                    // Call onMessageComplete AFTER setMessages so any state
+                    // updates it triggers are properly batched with setIsLoading.
+                    if (completedMessageForCallback && onMessageComplete) {
+                      onMessageComplete(completedMessageForCallback);
+                    }
                     setIsLoading(false);
                   } else {
                     // Queue still processing, check again

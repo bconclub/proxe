@@ -2117,6 +2117,15 @@
   opacity: 0.9;
 }
 
+/* Calendar message wrapper — remove bubble chrome so the calendar floats cleanly */
+.calendarMessage .bubble {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+}
+
 /* Deploy Form Styles */
 .deployFormContainer {
   margin-top: 16px;
@@ -3204,6 +3213,16 @@
 [data-brand="windchasers"] .message.ai .messageText * {
   color: #e5e2e1 !important;
   opacity: 1 !important;
+  font-size: 14.5px;
+  line-height: 1.65;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+[data-brand="windchasers"] .message.ai .messageText strong,
+[data-theme="aviation-gold"] .message.ai .messageText strong {
+  color: #C5A572 !important;
+  font-weight: 600;
 }
 
 /* themeDark mode under windchasers — overrides .themeDark hardcoded purple/lavender */
@@ -3230,12 +3249,21 @@
 
 .themeDark[data-brand="windchasers"] .message.ai .messageText,
 .themeDark[data-brand="windchasers"] .message.ai .messageText *,
-.themeDark[data-brand="windchasers"] .message.ai .bubble strong,
 .themeDark[data-brand="windchasers"] .message.ai .bubble em,
 .themeDark[data-brand="windchasers"] .message.ai .bubble a,
 [data-brand="windchasers"] .themeDark .message.ai .messageText,
 [data-brand="windchasers"] .themeDark .message.ai .messageText * {
   color: #e5e2e1 !important;
+  font-size: 14.5px;
+  line-height: 1.65;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.themeDark[data-brand="windchasers"] .message.ai .bubble strong,
+[data-brand="windchasers"] .themeDark .message.ai .bubble strong {
+  color: #C5A572 !important;
+  font-weight: 600;
 }
 
 .themeDark[data-brand="windchasers"] .messageText,
