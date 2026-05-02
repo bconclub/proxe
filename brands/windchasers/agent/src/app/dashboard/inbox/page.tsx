@@ -17,6 +17,10 @@ import {
   MdBusiness,
   MdNotes,
   MdLanguage,
+  MdPerson,
+  MdFlightTakeoff,
+  MdMessage,
+  MdSchedule,
 } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
@@ -1940,33 +1944,95 @@ export default function InboxPage() {
             </a>
           </div>
 
-          {/* 4. Business Info - label: value pairs */}
+          {/* 4. Contact Info */}
+          {(leadDetails.email || leadDetails.phone) && (
+            <div className="px-4 py-3 border-b space-y-1.5" style={{ borderColor: 'var(--border-primary)' }}>
+              {leadDetails.email && (
+                <div className="flex items-center gap-2">
+                  <MdEmail size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <a href={`mailto:${leadDetails.email}`} className="text-[11px] truncate hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                    {leadDetails.email}
+                  </a>
+                </div>
+              )}
+              {leadDetails.phone && (
+                <div className="flex items-center gap-2">
+                  <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <a href={`tel:${leadDetails.phone}`} className="text-[11px] hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                    {leadDetails.phone}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5. Lead Info - Windchasers cliff notes */}
           {(() => {
-            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-            const fields: { label: string; value: string | undefined }[] = [
-              { label: 'Business Type', value: ctx.type || ctx.business_type },
-              { label: 'Urgency', value: ctx.urgency || ctx.timeline },
-              { label: 'Volume', value: ctx.volume || ctx.team_size || ctx.scale },
-              { label: 'Website', value: ctx.website || ctx.url },
-              { label: 'AI Systems', value: ctx.ai_systems || ctx.current_tools || ctx.existing_ai },
-            ].filter(f => f.value)
-            if (fields.length === 0) return null
+            const uc = leadDetails.unified_context || {}
+            const wc = uc.windchasers || uc.web || uc.whatsapp || {}
+            const profile = uc.web?.profile || uc.whatsapp?.profile || {}
+            const userType = wc.user_type || profile.user_type
+            const courseInterest = wc.course_interest || uc.web?.course_interest || uc.whatsapp?.course_interest
+            const age = wc.age || uc.web?.age || uc.whatsapp?.age || profile.age
+            const city = wc.city || uc.web?.city || uc.whatsapp?.city || profile.city
+            const source = leadDetails.first_touchpoint || leadDetails.last_touchpoint
+            const intent = wc.student_intent || uc.web?.student_intent || uc.whatsapp?.student_intent
+            const painPoint = wc.pain_point || uc.web?.pain_point || uc.whatsapp?.pain_point
+
+            const daysInPipeline = leadDetails.created_at
+              ? Math.floor((Date.now() - new Date(leadDetails.created_at).getTime()) / 86400000)
+              : null
+
+            const agentMsgs = messages.filter(m => m.sender === 'agent').length
+            const customerMsgs = messages.filter(m => m.sender === 'customer').length
+            const responseRate = customerMsgs > 0 ? Math.round((agentMsgs / customerMsgs) * 100) : null
+
+            const rows: { label: string; value: string; icon?: React.ReactNode }[] = []
+            if (userType) rows.push({ label: 'Type', value: String(userType), icon: <MdPerson size={11} /> })
+            if (courseInterest) rows.push({ label: 'Course', value: String(courseInterest), icon: <MdFlightTakeoff size={11} /> })
+            if (age) rows.push({ label: 'Age', value: String(age) })
+            if (city) rows.push({ label: 'City', value: String(city), icon: <MdLocationOn size={11} /> })
+            if (source) rows.push({ label: 'Source', value: String(source).replace(/_/g, ' ') })
+            if (intent) rows.push({ label: 'Intent', value: String(intent) })
+            if (painPoint) rows.push({ label: 'Pain point', value: String(painPoint) })
+
             return (
               <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business Info</p>
-                <div className="space-y-1.5">
-                  {fields.map(f => (
-                    <div key={f.label} className="flex justify-between items-baseline gap-2">
-                      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
-                      <span className="text-[11px] text-right truncate" style={{ color: 'var(--text-secondary)' }}>{f.value}</span>
+                {/* Quick stats strip */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-1">
+                    <MdMessage size={11} style={{ color: 'var(--text-muted)' }} />
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{messages.length} msgs</span>
+                  </div>
+                  {responseRate !== null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{responseRate}% response</span>
                     </div>
-                  ))}
+                  )}
+                  {daysInPipeline !== null && (
+                    <div className="flex items-center gap-1">
+                      <MdSchedule size={11} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{daysInPipeline}d in pipeline</span>
+                    </div>
+                  )}
                 </div>
+                {rows.length > 0 && (
+                  <div className="space-y-1.5">
+                    {rows.map(r => (
+                      <div key={r.label} className="flex items-baseline justify-between gap-2">
+                        <span className="text-[10px] flex-shrink-0 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                          {r.icon}{r.label}
+                        </span>
+                        <span className="text-[11px] text-right truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })()}
 
-          {/* 5. Upcoming Events */}
+          {/* 6. Upcoming Events */}
           {(() => {
             const bd = leadDetails.booking_date
               || leadDetails.unified_context?.web?.booking_date
@@ -2024,10 +2090,10 @@ export default function InboxPage() {
             )
           })()}
 
-          {/* 6. View Full Details - prominent button */}
+          {/* 7. View Full Details */}
           <div className="px-4 py-3 mt-auto">
             <button
-              onClick={() => leadDetails?.id && router.push(`/dashboard/leads?leadId=${leadDetails.id}`)}
+              onClick={() => leadDetails?.id && openLeadModal(leadDetails.id)}
               className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
               style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
             >
