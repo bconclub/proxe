@@ -13,8 +13,11 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 16px;
   box-sizing: border-box;
-  /* No min-height — let it size to content so the date grid hugs the bottom.
-     Form view keeps its own min-height (see [data-view="form"] below). */
+  /* Uniform min-height across all 4 views (date / time / form / confirmation)
+     so the booking card doesn't reflow as the user clicks through steps. */
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Theme integration with parent ChatWidget toggle */
@@ -462,10 +465,7 @@
   stroke: currentColor;
 }
 
-/* Form View — shares min-height with confirmation so views feel uniform */
-.calendarContainer[data-view="form"] {
-  min-height: 360px;
-}
+/* Per-view overrides removed — uniform min-height now lives on .calendarContainer. */
 
 .formContainer {
   padding: 8px 0;

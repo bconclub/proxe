@@ -156,7 +156,7 @@ const ICONS = {
 
 // Windchasers welcome bubble — single Aria intro, audience-split CTA below.
 const windchasersWelcomeSequence = [
-  { text: "Hi, I am Aria. I will help you understand the path to becoming a pilot. Are you the aspiring pilot or a parent looking into this for your child?", delay: 0 },
+  { text: "Hi, I am Aria. I am AI Aviation Counsellor, I'll help you understand the path to becoming a pilot.", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -870,65 +870,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setShowQuickButtons(false);
   };
 
-  const requestNameBeforeProceed = (message: string, buttons: string[]) => {
-    // Ask for name on first message, before AI responds
-    if (
-      !userProfile.name &&
-      !hasAskedName &&
-      !namePromptDismissed &&
-      !showNamePrompt &&
-      messageCount === 0 // First message
-    ) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Requesting name before first AI response');
-      }
-      setHasAskedName(true);
-      
-      // Add user's message to chat immediately so it shows before the name prompt
-      addUserMessage(message);
-      
-      // Queue the message for AI response after name is provided
-      queuePendingMessage(message, buttons, 'name');
-      
-      // Set flag to skip adding user message again when sending to AI
-      setSkipAddingUserMessage(true);
-      
-      // Ensure chat is open to show the name prompt
-      setIsOpen(true);
-      setIsInputActive(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      
-      setShowNamePrompt(true);
-      return true;
-    }
-    return false;
-  };
-
-  const requestEmailBeforeProceed = (message: string, buttons: string[]) => {
-    if (!userProfile.email && !emailPromptDismissed && !hasAskedEmail && interactionCountRef.current >= EMAIL_PROMPT_THRESHOLD) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Requesting email before proceeding');
-      }
-      queuePendingMessage(message, buttons, 'email');
-      applyLocalProfile({ promptedEmail: true });
-      setHasAskedEmail(true);
-      setShowEmailPrompt(true);
-      return true;
-    }
-    return false;
-  };
-
-  const requestPhoneBeforeProceed = (message: string, buttons: string[]) => {
-    if (!userProfile.phone && !phonePromptDismissed && !hasAskedPhone && interactionCountRef.current >= PHONE_PROMPT_THRESHOLD) {
-      queuePendingMessage(message, buttons, 'phone');
-      applyLocalProfile({ promptedPhone: true });
-      setHasAskedPhone(true);
-      setShowPhonePrompt(true);
-      return true;
-    }
-    return false;
-  };
+  // Upfront contact gates disabled: name/email/phone are collected on the
+  // booking form (BookingDetails) or the callback form, not mid-conversation.
+  const requestNameBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestEmailBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestPhoneBeforeProceed = (_message: string, _buttons: string[]) => false;
 
   const submitMessage = async (rawMessage: string, buttons: string[] = usedButtons) => {
     const trimmed = rawMessage.trim();
@@ -1225,29 +1171,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     interactionCountRef.current += 1;
 
     const lastMessageTimestamp = new Date().toISOString();
-
-    const emailThresholdReached =
-      !userProfile.email &&
-      !emailPromptDismissed &&
-      !hasAskedEmail &&
-      interactionCountRef.current >= EMAIL_PROMPT_THRESHOLD;
-    const phoneThresholdReached =
-      !userProfile.phone &&
-      !phonePromptDismissed &&
-      !hasAskedPhone &&
-      interactionCountRef.current >= PHONE_PROMPT_THRESHOLD;
-
-    if (emailThresholdReached) {
-      applyLocalProfile({ promptedEmail: true });
-      setHasAskedEmail(true);
-      setShowEmailPrompt(true);
-    }
-
-    if (phoneThresholdReached) {
-      applyLocalProfile({ promptedPhone: true });
-      setHasAskedPhone(true);
-      setShowPhonePrompt(true);
-    }
 
     const shouldSummarize = interactionCountRef.current > 0 && interactionCountRef.current % 5 === 0;
     if (shouldSummarize) {
@@ -2604,11 +2527,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       if (normalizedButton === 'i am a parent') {
         return {
           followUpButtons: [
-            'Real cost and timeline',
-            'Is this a real career',
-            'Safety and faculty',
-            'Loan and financing',
-            'Just exploring',
+            'Real Cost & Timeline',
+            'Pilot Career Growth',
+            'Financing for Pilots',
+            'Just Exploring',
           ],
         };
       }
@@ -2616,10 +2538,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // 3-button rail so the parent always has the same exits.
       if (
         isParentPath && (
-          normalizedButton === 'real cost and timeline' ||
-          normalizedButton === 'is this a real career' ||
-          normalizedButton === 'safety and faculty' ||
-          normalizedButton === 'loan and financing'
+          normalizedButton === 'real cost & timeline' ||
+          normalizedButton === 'pilot career growth' ||
+          normalizedButton === 'financing for pilots'
         )
       ) {
         return {
@@ -3083,7 +3004,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>Windchasers AI</span>
+          <span>Windchasers</span>
         </div>
         <div className={styles.headerActions}>
           <button
@@ -3127,9 +3048,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           const accentIndex = index % 7;
           const accentClass = `accent-${accentIndex}`;
           
+          // When the booking calendar is anchored to this message, the calendar
+          // widget renders its own AI bubble below — so suppress this empty
+          // anchor bubble to avoid a chrome-only "broken bubble" above it.
+          const calendarAnchoredHere = !!showCalendly && calendarAnchorId === message.id;
           return (
           <React.Fragment key={message.id}>
-            <div 
+            {!calendarAnchoredHere && (
+            <div
               className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
               data-message-id={message.id}
             >
@@ -3145,20 +3071,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       </div>
                     ) : (
                       <>
-                        {/* Message content - hide text when calendar is showing for this message */}
-                        {!(showCalendly && calendarAnchorId === message.id) && (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                            <div
-                              className={styles.messageText}
-                              style={{ flex: '1 1 auto', minWidth: 0 }}
-                              dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                            />
-                            {message.isStreaming && message.text && (
-                              <span className={styles.streamingCursor}>▋</span>
-                            )}
-                          </div>
-                        )}
-                        
+                        <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                          <div
+                            className={styles.messageText}
+                            style={{ flex: '1 1 auto', minWidth: 0 }}
+                            dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                          />
+                          {message.isStreaming && message.text && (
+                            <span className={styles.streamingCursor}>▋</span>
+                          )}
+                        </div>
+
 
                     </>
                   )}
@@ -3166,6 +3089,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 </div>
               </div>
             </div>
+            )}
 
             {showCalendly && calendarAnchorId === message.id && (
               <div 
