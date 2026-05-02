@@ -1431,12 +1431,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* TYPE / COURSE — pulled up from the old Lead Profile box */}
+                {/* TYPE / COURSE — rendered inline on a single row when both
+                    are present so the contact card stays compact. */}
                 {(() => {
                   const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
+                  const hasType = !!brandProfileData.user_type;
+                  const hasCourse = !!brandProfileData.course_interest;
+                  if (!hasType && !hasCourse) return null;
                   return (
-                    <>
-                      {brandProfileData.user_type && (
+                    <div className="lead-contact-type-course flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                      {hasType && (
                         <div className="lead-contact-type flex items-center gap-1.5">
                           <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                             <MdPerson className="text-[var(--text-secondary)]" size={14} />
@@ -1447,7 +1451,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </span>
                         </div>
                       )}
-                      {brandProfileData.course_interest && (
+                      {hasCourse && (
                         <div className="lead-contact-course flex items-center gap-1.5">
                           <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                             <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
@@ -1458,7 +1462,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </span>
                         </div>
                       )}
-                    </>
+                    </div>
                   );
                 })()}
 
