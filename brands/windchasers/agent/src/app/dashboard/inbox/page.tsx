@@ -1427,12 +1427,13 @@ export default function InboxPage() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
+              className="flex-1 overflow-y-auto px-4 py-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
+            <div className="max-w-[700px] mx-auto space-y-3">
               {messagesLoading ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
               ) : filteredMessages.length === 0 ? (
@@ -1708,6 +1709,7 @@ export default function InboxPage() {
                 </>
               )}
             </div>
+            </div>
 
             {/* Message Input - compact */}
             <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
@@ -1794,14 +1796,14 @@ export default function InboxPage() {
             const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
             const channelLabel = selectedChannel === 'whatsapp' ? 'WhatsApp' : selectedChannel === 'web' ? 'Web' : selectedChannel === 'voice' ? 'Voice' : selectedChannel || ''
             return (
-              <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="px-4 pt-4 pb-3 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
                 <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold mb-2"
                   style={{ background: avatarBg, color: 'var(--text-button, #000)' }}
                 >
                   {initials}
                 </div>
-                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                   {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
                 </p>
                 {brand && (
@@ -1875,7 +1877,7 @@ export default function InboxPage() {
           )}
 
           {/* 3. Quick Action Buttons - Call, WhatsApp, Email */}
-          <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
+          <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-primary)' }}>
             <button
               disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
               onClick={async () => {
@@ -1896,39 +1898,45 @@ export default function InboxPage() {
                   setCallingLeadId(null);
                 }
               }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity disabled:opacity-40"
+              title={callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
+              className="w-8 h-8 flex items-center justify-center rounded-full border transition-all disabled:opacity-30 hover:bg-[rgba(34,197,94,0.1)]"
               style={{
-                background: leadDetails.phone ? '#22C55E' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
+                borderColor: leadDetails.phone ? 'rgba(34,197,94,0.4)' : 'var(--border-primary)',
+                color: leadDetails.phone ? '#22C55E' : 'var(--text-muted)',
+                background: 'transparent',
               }}
             >
-              <MdPhone size={14} /> {callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
+              <MdPhone size={15} className={callingLeadId === leadDetails.id ? 'animate-pulse' : ''} />
             </button>
             <a
               href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              title="WhatsApp"
+              className="w-8 h-8 flex items-center justify-center rounded-full border transition-all hover:bg-[rgba(37,211,102,0.1)]"
               style={{
-                background: leadDetails.phone ? '#25D366' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
-                opacity: leadDetails.phone ? 1 : 0.4,
+                borderColor: leadDetails.phone ? 'rgba(37,211,102,0.4)' : 'var(--border-primary)',
+                color: leadDetails.phone ? '#25D366' : 'var(--text-muted)',
+                background: 'transparent',
+                opacity: leadDetails.phone ? 1 : 0.3,
                 pointerEvents: leadDetails.phone ? 'auto' : 'none',
               }}
             >
-              <FaWhatsapp size={14} /> WhatsApp
+              <FaWhatsapp size={14} />
             </a>
             <a
               href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              title="Email"
+              className="w-8 h-8 flex items-center justify-center rounded-full border transition-all hover:bg-[rgba(139,92,246,0.1)]"
               style={{
-                background: leadDetails.email ? '#8B5CF6' : 'var(--bg-tertiary)',
-                color: leadDetails.email ? '#fff' : 'var(--text-muted)',
-                opacity: leadDetails.email ? 1 : 0.4,
+                borderColor: leadDetails.email ? 'rgba(139,92,246,0.4)' : 'var(--border-primary)',
+                color: leadDetails.email ? '#8B5CF6' : 'var(--text-muted)',
+                background: 'transparent',
+                opacity: leadDetails.email ? 1 : 0.3,
                 pointerEvents: leadDetails.email ? 'auto' : 'none',
               }}
             >
-              <MdEmail size={14} /> Email
+              <MdEmail size={15} />
             </a>
           </div>
 
