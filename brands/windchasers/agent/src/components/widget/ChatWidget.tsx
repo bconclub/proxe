@@ -930,6 +930,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
     }
 
+    // Age input detection: user typed their age after the "how old are you?" question
+    const lastAiText = [...messages].reverse().find(m => m.type === 'ai')?.text?.toLowerCase() || '';
+    const isAgeQuestion = lastAiText.includes('how old are you') || (lastAiText.includes('quick question') && lastAiText.includes('old'));
+    const ageMatch = trimmed.match(/^(\d{1,2})$/);
+    if (isAgeQuestion && ageMatch) {
+      const age = parseInt(ageMatch[1]);
+      if (age >= 10 && age <= 65) {
+        contextualMessage = `[User's age is ${age}] ${trimmed}`;
+        if (age <= 21) {
+          setPendingFlowOverrideState({ followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'] });
+        } else {
+          setPendingFlowOverrideState({ followUpButtons: ['Studying', 'Working', 'Taking a Break'] });
+        }
+      }
+    }
+
     const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
     if (isBookingRepeat) {
       setInputValue('');
@@ -2532,19 +2548,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         };
       }
       if (normalizedButton === 'yes, completed 12th science') {
-        return {
-          followUpButtons: ['Under 18', '18-21', '22-25', '26+'],
-        };
-      }
-      if (normalizedButton === 'under 18' || normalizedButton === '18-21') {
-        return {
-          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
-        };
-      }
-      if (normalizedButton === '22-25' || normalizedButton === '26+') {
-        return {
-          followUpButtons: ['Studying', 'Working', 'Taking a Break'],
-        };
+        // No buttons — user types their age freely, submitMessage detects it and routes
+        return { followUpButtons: [] };
       }
       // Aspirant activity acknowledgement — only fires when not on the parent path.
       if (
