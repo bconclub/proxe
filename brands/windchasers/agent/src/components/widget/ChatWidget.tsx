@@ -6,6 +6,7 @@ import type { Message } from '@/hooks/useChatStream';
 
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import { CostGuideFormInline } from '@/components/widget/CostGuideFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import type { BrandConfig } from '@/configs';
 import { useDeployModal } from '@/contexts/DeployModalContext';
@@ -187,6 +188,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [forceCalendarFromBookButton, setForceCalendarFromBookButton] = useState(false);
   const [showDeployForm, setShowDeployForm] = useState<string | null>(null);
   const [bookingCompleted, setBookingCompleted] = useState(false);
+  const [bookedSummary, setBookedSummary] = useState<string>('');
+  const [showCostGuideForm, setShowCostGuideForm] = useState<string | null>(null);
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
@@ -929,8 +932,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
     if (isBookingRepeat) {
-      contextualMessage = `[Booking already scheduled] ${trimmed}`;
-      // Don't add prefix to display message for booking repeat
+      setInputValue('');
+      addUserMessage(trimmed);
+      const rebookMsg = bookedSummary
+        ? `You already have a call booked for ${bookedSummary}. Would you like to reschedule?`
+        : 'You already have a call booked. Would you like to reschedule?';
+      addAIMessage(rebookMsg);
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+      return;
     }
 
     // Add name context to AI message only (not displayed to user)
@@ -2182,7 +2191,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         });
         const formattedTime = bookingData.time; // Already in "11:00 AM" format
 
-        // Add system message to chat
+        setBookedSummary(`${formattedDate} at ${formattedTime}`);
         const bookingMessage = `Your call is scheduled for ${formattedDate} at ${formattedTime}.`;
         addAIMessage(bookingMessage);
 
@@ -2217,13 +2226,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // Format time (assuming it's in "HH:MM AM/PM" format)
       const formattedTime = existingBooking.bookingTime;
       
-      // Show message about existing booking
-      const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-      
-      // Add as AI message using addAIMessage from hook
+      setBookedSummary(`${formattedDate} at ${formattedTime}`);
+      const bookingMessage = `You already have a call booked for ${formattedDate} at ${formattedTime}. Would you like to reschedule?`;
       addAIMessage(bookingMessage);
       setBookingCompleted(true);
-      
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+
       return false; // Don't show calendar
     }
     
@@ -2432,6 +2440,34 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setUsedButtons(nextButtons);
 
     const normalizedButton = message.toLowerCase();
+
+    // Rebook flow — intercept before AI
+    if (normalizedButton === 'yes, reschedule') {
+      setBookingCompleted(false);
+      setBookedSummary('');
+      addUserMessage(buttonText);
+      addAIMessage('No problem. Pick a new date and time below.');
+      const calId = `calendar-${Date.now()}`;
+      setShowCalendly(calId);
+      setCalendarAnchorId(calId);
+      return;
+    }
+    if (normalizedButton === 'keep my booking') {
+      addUserMessage(buttonText);
+      addAIMessage(bookedSummary ? `Your call is confirmed for ${bookedSummary}. Anything else I can help with?` : 'Your booking is confirmed. Anything else?');
+      setFlowOverrideButtons([]);
+      return;
+    }
+
+    // Cost guide / roadmap — show inline WhatsApp contact form, skip AI
+    if (normalizedButton === 'send me the cost guide' || normalizedButton === 'send me the roadmap') {
+      addUserMessage(buttonText);
+      const formId = `cost-guide-${Date.now()}`;
+      setShowCostGuideForm(formId);
+      setFlowOverrideButtons([]);
+      return;
+    }
+
     // Parent path is sticky from the moment the user picks "I am a parent" so
     // we can disambiguate child-status labels that overlap with the aspirant
     // activity step (e.g. "Working", "Taking a break").
@@ -2529,7 +2565,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           followUpButtons: [
             'Real Cost & Timeline',
             'Pilot Career Growth',
-            'Financing for Pilots',
             'Just Exploring',
           ],
         };
@@ -2539,8 +2574,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       if (
         isParentPath && (
           normalizedButton === 'real cost & timeline' ||
-          normalizedButton === 'pilot career growth' ||
-          normalizedButton === 'financing for pilots'
+          normalizedButton === 'pilot career growth'
         )
       ) {
         return {
@@ -3330,6 +3364,25 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )}
 
 
+
+        {/* Cost Guide / Roadmap WhatsApp Form */}
+        {showCostGuideForm && (
+          <CostGuideFormInline
+            key={showCostGuideForm}
+            prefillName={userProfile.name || ''}
+            prefillPhone={userProfile.phone || ''}
+            waNumber="918046733388"
+            onContactDraft={handleContactDraft}
+            onSubmit={async (name, phone) => {
+              await handleContactPersist({ name, phone });
+              addAIMessage('Sending the guide now on WhatsApp. Anything else?');
+              setShowCostGuideForm(null);
+            }}
+            onClose={() => setShowCostGuideForm(null)}
+            config={config}
+            brand={brand}
+          />
+        )}
 
         {/* Inline Name Prompt Card */}
         {showNamePrompt && !showCalendly && !showDeployForm && (

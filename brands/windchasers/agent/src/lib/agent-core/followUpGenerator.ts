@@ -38,7 +38,7 @@ AVAILABLE BUTTON TYPES:
 - Exploration: "Explore Training Options", "See Programs"
 - Booking: "Book a Demo Session", "Book 1:1 Consultation", "Schedule Call"
 - Next Steps: "Get Cost Breakdown", "Financing Options", "Course Timeline"`,
-    exploreKeywords: ['explore training options', 'explore training'],
+    exploreKeywords: ['explore training options', 'explore training', 'what courses', 'other course', 'which course', 'what program', 'other program', 'which program', 'what do you offer', 'what do you provide', 'courses do you', 'programs do you'],
   },
   bcon: {
     firstMessage: ['Explore AI Solutions', 'Book a Strategy Call', 'See Our Work', 'How It Works', 'Learn More'],
