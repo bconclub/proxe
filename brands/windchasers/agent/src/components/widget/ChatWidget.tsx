@@ -1666,6 +1666,26 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     onMessageComplete: handleAssistantMessageComplete,
   });
 
+  // Safety net: apply pending flow-override buttons when the AI message
+  // finishes streaming. handleAssistantMessageComplete is the primary path;
+  // this effect fires after every render so it catches any case where the
+  // callback chain misses the override (stale closure, timing race, etc.).
+  useEffect(() => {
+    if (isLoading) return;
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    const pendingOverride = pendingFlowOverrideRef.current;
+    if (!pendingOverride) return;
+
+    pendingFlowOverrideRef.current = null;
+    setPendingFlowOverride(null);
+    if (pendingOverride.responseText && lastMsg.id) {
+      updateMessageText(lastMsg.id, pendingOverride.responseText);
+    }
+    setFlowOverrideButtons(pendingOverride.followUpButtons);
+    setDynamicQuickButtons(null);
+  }, [isLoading, messages, updateMessageText]);
+
   const resetChatState = useCallback(() => {
     closeCalendarWidget();
     closeVideoWidget();
