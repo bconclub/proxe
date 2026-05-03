@@ -130,10 +130,8 @@ const ICONS = {
     </svg>
   ),
   mic: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 19v3M12 1a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-      <line x1="12" y1="19" x2="12" y2="22"/>
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.32.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
     </svg>
   ),
   sun: (
@@ -1789,34 +1787,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
-    const WORD_MS = 68;
-    const BUBBLE_GAP = 380;
-
+    // Instant bubbles — CSS messageIn handles the fade-up animation
     for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
       if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, BUBBLE_GAP));
+        await new Promise(resolve => setTimeout(resolve, 120));
       }
-      const words = windchasersWelcomeSequence[i].text.split(' ');
-      const msg = addStreamingAIMessage('');
-      // Show typing dots briefly before first word
-      await new Promise(resolve => setTimeout(resolve, 130));
-      // Reveal word by word
-      for (let w = 0; w < words.length; w++) {
-        updateMessageText(msg.id, words.slice(0, w + 1).join(' '));
-        if (w === 0) {
-          window.dispatchEvent(new Event('message-updated'));
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-        if (w < words.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, WORD_MS));
-        }
-      }
-      finishMessage(msg.id);
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      addAIMessage(windchasersWelcomeSequence[i].text);
+      window.dispatchEvent(new Event('message-updated'));
     }
-
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addStreamingAIMessage, updateMessageText, finishMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -2451,12 +2432,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
   // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
   // grant mic permission correctly, especially on iOS Safari and Android Chrome.
+  // We also silently request mic permission here so it's already granted by the
+  // time the user clicks the call button, cutting connection latency significantly.
   const startVapiPrewarm = () => {
     if (vapiPrewarmedRef.current) return;
     vapiPrewarmedRef.current = true;
     const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
     vapiRef.current = vapi;
     attachVapiListeners(vapi);
+    // Silent mic permission probe — releases the stream immediately, just warms the permission
+    navigator.mediaDevices?.getUserMedia({ audio: true })
+      .then(stream => stream.getTracks().forEach(t => t.stop()))
+      .catch(() => {});
   };
 
   const handleVoiceToggle = () => {
@@ -3738,7 +3725,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         <div className={styles.chatInputRow}>
           <button
             className={`${styles.micCta} ${isVapiActive ? styles.micCtaActive : ''}`}
-            aria-label={isVapiActive ? 'End voice call' : 'Talk to Avia'}
+            aria-label={isVapiActive ? 'End call' : 'Call Avia'}
             type="button"
             onClick={handleVoiceToggle}
           >
