@@ -156,9 +156,9 @@ const ICONS = {
   ),
 };
 
-// Windchasers welcome bubble — three-part Aria intro sequence.
+// Windchasers welcome bubble — three-part Avia intro sequence.
 const windchasersWelcomeSequence = [
-  { text: "Hi, I am Aria,", delay: 0 },
+  { text: "Hi, I am Avia,", delay: 0 },
   { text: "I am Windchasers AI Aviation Counsellor.", delay: 800 },
   { text: "I am here to help you with your Pilot Career Path. What's on your mind?", delay: 1600 },
 ];
@@ -3077,7 +3077,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={`${styles.voiceOrb} ${vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
           </div>
           <div className={styles.voiceMeta}>
-            <p className={styles.voiceName}>Aria</p>
+            <p className={styles.voiceName}>Avia</p>
             <p className={styles.voiceStatus}>
               {vapiConnecting ? 'Connecting…' : vapiSpeaker === 'assistant' ? 'Speaking…' : vapiSpeaker === 'user' ? 'Listening…' : 'Connected'}
             </p>
@@ -3085,7 +3085,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           {vapiTranscript.length > 0 && (
             <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
               {vapiTranscript.map((m, i) => (
-                <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAria}>
+                <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAvia}>
                   {m.text}
                 </p>
               ))}
@@ -3668,7 +3668,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         <div className={styles.chatInputRow}>
           <button
             className={`${styles.micCta} ${isVapiActive ? styles.micCtaActive : ''}`}
-            aria-label={isVapiActive ? 'End voice call' : 'Talk to Aria'}
+            aria-label={isVapiActive ? 'End voice call' : 'Talk to Avia'}
             type="button"
             onClick={handleVoiceToggle}
           >

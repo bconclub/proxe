@@ -2375,6 +2375,12 @@
   max-width: 100% !important;
 }
 
+/* When showing confirmation, no need for a tall scroll container */
+.calendarScrollArea:has([data-view="confirmation"]) {
+  max-height: none;
+  overflow: visible;
+}
+
 /* Deploy Form Styles */
 .deployFormContainer {
   margin-top: 16px;

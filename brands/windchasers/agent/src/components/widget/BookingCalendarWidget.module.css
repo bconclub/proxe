@@ -576,37 +576,40 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 16px 8px;
+  padding: 20px 16px 24px;
   text-align: center;
-  gap: 12px;
+  gap: 10px;
+  background: rgba(197, 165, 114, 0.06);
+  border: 1px solid rgba(197, 165, 114, 0.18);
+  border-radius: 16px;
 }
 
 .confirmationIcon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: var(--greenSuccess, #10b981);
-  color: #ffffff;
-  font-size: 24px;
+  background: rgba(197, 165, 114, 0.15);
+  border: 2px solid rgba(197, 165, 114, 0.5);
+  color: #C5A572;
+  font-size: 22px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   flex-shrink: 0;
 }
 
 .confirmationTitle {
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--text-primary, #ffffff);
-  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #e5e2e1);
+  margin: 4px 0 0;
+  letter-spacing: 0.01em;
 }
 
 .confirmationText {
-  font-size: 14px;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.9));
+  font-size: 13px;
+  color: rgba(209, 197, 182, 0.8);
   margin: 0;
   line-height: 1.5;
   display: flex;
@@ -620,9 +623,9 @@
 }
 
 .confirmationText strong {
-  color: var(--text-primary, #ffffff);
+  color: #C5A572;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
   display: block;
 }
 
@@ -666,15 +669,18 @@
 }
 
 .addToCalendarButton {
-  background: var(--primary-color, #5B1A8C);
-  color: var(--text-button, #1A1A1A);
-  box-shadow: var(--bubble-user-shadow, 0 4px 16px rgba(0, 0, 0, 0.18));
+  background: rgba(197, 165, 114, 0.15);
+  color: #C5A572;
+  border: 1px solid rgba(197, 165, 114, 0.4) !important;
+  box-shadow: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .addToCalendarButton:hover {
-  background: var(--primary-vibrant, #A03BA8);
+  background: rgba(197, 165, 114, 0.25);
+  border-color: rgba(197, 165, 114, 0.6) !important;
   transform: translateY(-1px);
-  box-shadow: var(--bubble-user-shadow, 0 6px 20px rgba(0, 0, 0, 0.24));
 }
 
 .addToCalendarButton:focus-visible {
