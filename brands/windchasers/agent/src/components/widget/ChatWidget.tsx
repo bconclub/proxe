@@ -3666,8 +3666,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         <div className={styles.chatInputRow}>
-          <button className={styles.inputIconBtn} aria-label="Attach file" type="button">
-            {ICONS.attachment}
+          <button
+            className={`${styles.micCta} ${isVapiActive ? styles.micCtaActive : ''}`}
+            aria-label={isVapiActive ? 'End voice call' : 'Talk to Aria'}
+            type="button"
+            onClick={handleVoiceToggle}
+          >
+            {ICONS.mic}
           </button>
           <div className={styles.chatInputWrapper}>
             <input
@@ -3734,14 +3739,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             }}
           />
         </div>
-          <button
-            className={`${styles.inputIconBtn} ${isVapiActive ? styles.inputIconBtnActive : ''}`}
-            aria-label={isVapiActive ? 'End voice call' : 'Start voice call'}
-            type="button"
-            onClick={handleVoiceToggle}
-          >
-            {ICONS.mic}
-          </button>
         <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
           {ICONS.send}
         </button>

@@ -1875,6 +1875,51 @@
   50%       { box-shadow: 0 0 0 6px rgba(197, 165, 114, 0); }
 }
 
+/* Prominent mic CTA — left of input, replaces attachment */
+.micCta {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(197, 165, 114, 0.12);
+  color: #C5A572;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease, transform 0.15s ease;
+  animation: micGlow 2.4s ease-in-out infinite;
+}
+
+.micCta svg {
+  width: 22px;
+  height: 22px;
+}
+
+.micCta:hover {
+  background: rgba(197, 165, 114, 0.22);
+  transform: scale(1.08);
+}
+
+@keyframes micGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(197, 165, 114, 0.0),
+                0 0 8px rgba(197, 165, 114, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(197, 165, 114, 0.08),
+                0 0 14px rgba(197, 165, 114, 0.3);
+  }
+}
+
+/* Active (call in progress) — suppress idle glow, show solid state */
+.micCtaActive {
+  background: rgba(197, 165, 114, 0.2);
+  animation: micPulse 1.5s ease-in-out infinite;
+}
+
 /* ─────────────────────────────────────────
    Voice Overlay — full chat-box takeover
 ───────────────────────────────────────── */
