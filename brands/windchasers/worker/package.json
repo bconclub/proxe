@@ -1,0 +1,17 @@
+{
+  "name": "windchasers-tasks",
+  "version": "1.0.0",
+  "main": "task-worker.js",
+  "scripts": {
+    "start": "node task-worker.js",
+    "dev": "nodemon task-worker.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "form-data": "^4.0.0",
+    "ws": "^8.16.0"
+  }
+}

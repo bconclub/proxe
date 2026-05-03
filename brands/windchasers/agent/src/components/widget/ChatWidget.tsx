@@ -35,6 +35,7 @@ import {
   type StorageBrandKey,
 } from '@/lib/chatLocalStorage';
 import { createClient } from '@/lib/supabase/client';
+import Vapi from '@vapi-ai/web';
 
 interface ChatWidgetProps {
   apiUrl?: string;
@@ -243,6 +244,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const chatInputRef = useRef<HTMLInputElement>(null);
   const quickButtonsRef = useRef<HTMLDivElement>(null);
   const hasEverOpenedRef = useRef(false);
+  const vapiRef = useRef<Vapi | null>(null);
+  const [isVapiActive, setIsVapiActive] = useState(false);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -2379,6 +2382,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
            lowerText.includes('counselor');
   };
 
+  const handleVoiceToggle = () => {
+    if (isVapiActive) {
+      vapiRef.current?.stop();
+      setIsVapiActive(false);
+    } else {
+      if (!vapiRef.current) {
+        vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+        vapiRef.current.on('call-end', () => setIsVapiActive(false));
+        vapiRef.current.on('error', () => setIsVapiActive(false));
+      }
+      vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      setIsVapiActive(true);
+    }
+  };
+
   const handleSend = () => {
     const message = inputValue.trim();
     if (!message) return;
@@ -3663,7 +3681,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             }}
           />
         </div>
-          <button className={styles.inputIconBtn} aria-label="Voice message" type="button">
+          <button
+            className={`${styles.inputIconBtn} ${isVapiActive ? styles.inputIconBtnActive : ''}`}
+            aria-label={isVapiActive ? 'End voice call' : 'Start voice call'}
+            type="button"
+            onClick={handleVoiceToggle}
+          >
             {ICONS.mic}
           </button>
         <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>

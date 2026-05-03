@@ -1,0 +1,35 @@
+name: Deploy Windchasers Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brands/windchasers/worker/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.WINDCHASERS_VPS_HOST }}
+          username: ${{ secrets.WINDCHASERS_VPS_USER }}
+          key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
+          source: "brands/windchasers/worker/*"
+          target: "/var/www/windchasers-proxe/worker"
+          strip_components: 3
+
+      - name: Start/Restart on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.WINDCHASERS_VPS_HOST }}
+          username: ${{ secrets.WINDCHASERS_VPS_USER }}
+          key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
+          script: |
+            cd /var/www/windchasers-proxe/worker
+            npm install --production
+            pm2 startOrRestart ecosystem.config.js
+            pm2 save

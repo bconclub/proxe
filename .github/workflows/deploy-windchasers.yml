@@ -58,6 +58,8 @@ jobs:
             --exclude='.git' \
             --exclude='*.log' \
             --exclude='.DS_Store' \
+            --exclude='voice/' \
+            --exclude='worker/' \
             -e "ssh -o StrictHostKeyChecking=no" \
             brands/windchasers/agent/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/
