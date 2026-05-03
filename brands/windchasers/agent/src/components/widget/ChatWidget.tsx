@@ -252,6 +252,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
   const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const vapiTranscriptRef = useRef<HTMLDivElement>(null);
+  const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -2415,13 +2416,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         vapiRef.current.on('speech-start', () => { setVapiConnecting(false); setVapiSpeaker('assistant'); });
         vapiRef.current.on('speech-end', () => setVapiSpeaker('idle'));
         vapiRef.current.on('message', (msg: any) => {
+          if (msg.type === 'transcript' && msg.role === 'user') {
+            // Partial transcripts = user is actively speaking
+            setVapiSpeaker('user');
+            if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
+            userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
+          }
           if (msg.type === 'transcript' && msg.transcriptType === 'final') {
             setVapiTranscript(prev => [...prev, { role: msg.role, text: msg.transcript }]);
             setTimeout(() => {
               vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
             }, 50);
           }
-          if (msg.type === 'transcript' && msg.role === 'user') setVapiSpeaker('user');
         });
       }
       setVapiTranscript([]);
@@ -3082,7 +3088,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          <div className={`${styles.voiceOrbRing} ${vapiConnecting ? styles.voiceOrbRingConnecting : ''}`}>
+          <div className={`${styles.voiceOrbRing} ${vapiConnecting ? styles.voiceOrbRingConnecting : styles.voiceOrbRingConnected}`}>
             <div className={`${styles.voiceOrb} ${vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
           </div>
           <div className={styles.voiceMeta}>

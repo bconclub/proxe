@@ -1907,9 +1907,9 @@
   );
   box-shadow:
     inset -10px -14px 28px rgba(0, 0, 0, 0.55),
-    inset 7px 7px 20px rgba(255, 220, 150, 0.22),
-    0 0 55px rgba(197, 165, 114, 0.35),
-    0 0 110px rgba(197, 165, 114, 0.15);
+    inset 7px 7px 20px rgba(255, 220, 150, 0.18),
+    0 0 18px rgba(197, 165, 114, 0.1),
+    0 0 36px rgba(197, 165, 114, 0.05);
   transition: box-shadow 0.5s ease;
 }
 
@@ -1938,27 +1938,34 @@
   position: relative;
 }
 
-/* Connecting — spinning gold arc sweeping around the ring */
+/* Connecting — large arc (270°) spinning, feels like nearly complete */
 .voiceOrbRingConnecting::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
   background: conic-gradient(
-    rgba(197, 165, 114, 0.95) 0deg,
-    rgba(197, 165, 114, 0.6)  80deg,
-    rgba(197, 165, 114, 0.15) 150deg,
-    transparent               150deg 360deg
+    transparent                 0deg,
+    rgba(197, 165, 114, 0.25)  30deg,
+    rgba(197, 165, 114, 0.75) 120deg,
+    rgba(197, 165, 114, 0.95) 270deg,
+    transparent                270deg 360deg
   );
-  animation: voiceRingSpin 1.6s linear infinite;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: voiceRingSpin 2.2s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
   z-index: 1;
 }
 
 @keyframes voiceRingSpin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from { transform: rotate(-90deg); }
+  to   { transform: rotate(270deg); }
+}
+
+/* Connected — solid thin gold ring */
+.voiceOrbRingConnected {
+  border: 2px solid rgba(197, 165, 114, 0.55);
+  box-shadow: 0 0 10px rgba(197, 165, 114, 0.1);
 }
 
 /* Speaking — pulsing gold */
@@ -1968,12 +1975,12 @@
 
 @keyframes voiceSpeakPulse {
   0%, 100% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.22),
-      0 0 60px rgba(197,165,114,0.5), 0 0 120px rgba(197,165,114,0.2);
+    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.2),
+      0 0 24px rgba(197,165,114,0.2), 0 0 48px rgba(197,165,114,0.08);
   }
   50% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.3),
-      0 0 90px rgba(197,165,114,0.75), 0 0 180px rgba(197,165,114,0.35);
+    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.26),
+      0 0 36px rgba(197,165,114,0.3), 0 0 70px rgba(197,165,114,0.12);
   }
 }
 
