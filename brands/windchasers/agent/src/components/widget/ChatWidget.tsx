@@ -3070,7 +3070,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          <div className={`${styles.voiceOrb} ${vapiConnecting ? styles.voiceOrbConnecting : vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
+          <div className={`${styles.voiceOrbRing} ${vapiConnecting ? styles.voiceOrbRingConnecting : ''}`}>
+            <div className={`${styles.voiceOrb} ${vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
+          </div>
           <div className={styles.voiceMeta}>
             <p className={styles.voiceName}>Aria</p>
             <p className={styles.voiceStatus}>

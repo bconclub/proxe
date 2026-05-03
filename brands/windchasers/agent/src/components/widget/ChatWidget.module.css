@@ -1896,7 +1896,6 @@
   height: 160px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-bottom: 32px;
   position: relative;
   background: radial-gradient(
     circle at 38% 32%,
@@ -1926,24 +1925,33 @@
   filter: blur(4px);
 }
 
-/* Connecting — green glow */
-.voiceOrbConnecting {
-  box-shadow:
-    inset -10px -14px 28px rgba(0, 0, 0, 0.55),
-    inset 7px 7px 20px rgba(80, 255, 130, 0.12),
-    0 0 60px rgba(46, 213, 115, 0.55),
-    0 0 130px rgba(46, 213, 115, 0.25);
-  animation: voiceConnectPulse 1.4s ease-in-out infinite;
+/* Ring wrapper — sits around the orb */
+.voiceOrbRing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 184px;
+  height: 184px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  margin-bottom: 28px;
 }
 
-@keyframes voiceConnectPulse {
+/* Connecting — thin green border ring, ambient breathing */
+.voiceOrbRingConnecting {
+  border-color: rgba(46, 213, 115, 0.65);
+  box-shadow: 0 0 14px rgba(46, 213, 115, 0.25), 0 0 32px rgba(46, 213, 115, 0.1);
+  animation: voiceRingBreath 2.5s ease-in-out infinite;
+}
+
+@keyframes voiceRingBreath {
   0%, 100% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(80,255,130,0.12),
-      0 0 50px rgba(46,213,115,0.45), 0 0 110px rgba(46,213,115,0.2);
+    box-shadow: 0 0 10px rgba(46, 213, 115, 0.2), 0 0 24px rgba(46, 213, 115, 0.08);
+    border-color: rgba(46, 213, 115, 0.55);
   }
   50% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(80,255,130,0.18),
-      0 0 80px rgba(46,213,115,0.7), 0 0 160px rgba(46,213,115,0.35);
+    box-shadow: 0 0 20px rgba(46, 213, 115, 0.35), 0 0 42px rgba(46, 213, 115, 0.15);
+    border-color: rgba(46, 213, 115, 0.8);
   }
 }
 
@@ -2030,7 +2038,7 @@
   color: #fff;
   flex-shrink: 0;
   transition: background 0.2s ease, transform 0.15s ease;
-  margin-top: auto;
+  margin-top: 32px;
   box-shadow: 0 4px 20px rgba(192, 57, 43, 0.5);
 }
 .voiceEndBtn:hover { background: #e74c3c; transform: scale(1.08); }
