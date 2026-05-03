@@ -945,12 +945,18 @@
   background: rgba(255,255,255,0.25);
 }
 
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .message {
   display: flex;
   flex-direction: column;
   gap: 4px;
   position: relative;
   z-index: 10;
+  animation: messageIn 0.32s ease forwards;
 }
 
 .message.user {
