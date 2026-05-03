@@ -1786,16 +1786,26 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
 
     for (const item of windchasersWelcomeSequence) {
-      if (item.delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, item.delay));
+      const msg = addStreamingAIMessage('');
+      if (!msg) continue;
+      setTimeout(() => {
+        window.dispatchEvent(new Event('message-updated'));
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 30);
+      const words = item.text.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        updateMessageText(msg.id, words.slice(0, i + 1).join(' '));
+        window.dispatchEvent(new Event('message-updated'));
+        await new Promise(resolve => setTimeout(resolve, 110));
       }
-      addAIMessage(item.text);
+      finishMessage(msg.id);
       window.dispatchEvent(new Event('message-updated'));
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      await new Promise(resolve => setTimeout(resolve, 380));
     }
 
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addStreamingAIMessage, updateMessageText, finishMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
