@@ -248,6 +248,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const quickButtonsRef = useRef<HTMLDivElement>(null);
   const hasEverOpenedRef = useRef(false);
   const vapiRef = useRef<Vapi | null>(null);
+  const vapiPrewarmedRef = useRef(false);
+  const vapiCallReadyRef = useRef(false);
   const [isVapiActive, setIsVapiActive] = useState(false);
   const [vapiConnecting, setVapiConnecting] = useState(false);
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
@@ -2387,40 +2389,69 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
            lowerText.includes('counselor');
   };
 
-  const handleVoiceToggle = () => {
-    if (isVapiActive) {
-      vapiRef.current?.stop();
+  const startVapiPrewarm = () => {
+    if (vapiPrewarmedRef.current) return;
+    vapiPrewarmedRef.current = true;
+
+    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+    vapiRef.current = vapi;
+
+    vapi.on('call-start', () => {
+      vapiCallReadyRef.current = true;
+      setVapiConnecting(false);
+    });
+    vapi.on('call-end', () => {
+      vapiCallReadyRef.current = false;
       setIsVapiActive(false);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
-    } else {
-      if (!vapiRef.current) {
-        vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
-        vapiRef.current.on('call-start', () => setVapiConnecting(false));
-        vapiRef.current.on('call-end', () => { setIsVapiActive(false); setVapiConnecting(false); setVapiSpeaker('idle'); });
-        vapiRef.current.on('error', () => { setIsVapiActive(false); setVapiConnecting(false); setVapiSpeaker('idle'); });
-        vapiRef.current.on('speech-start', () => { setVapiConnecting(false); setVapiSpeaker('assistant'); });
-        vapiRef.current.on('speech-end', () => setVapiSpeaker('idle'));
-        vapiRef.current.on('message', (msg: any) => {
-          if (msg.type === 'transcript' && msg.role === 'user') {
-            // Partial transcripts = user is actively speaking
-            setVapiSpeaker('user');
-            if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
-            userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
-          }
-          if (msg.type === 'transcript' && msg.transcriptType === 'final') {
-            setVapiTranscript(prev => [...prev, { role: msg.role, text: msg.transcript }]);
-            setTimeout(() => {
-              vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
-            }, 50);
-          }
-        });
-      }
-      setVapiTranscript([]);
-      setVapiConnecting(true);
-      vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
-      setIsVapiActive(true);
+    });
+    vapi.on('error', () => {
+      vapiCallReadyRef.current = false;
+      setIsVapiActive(false);
+      setVapiConnecting(false);
       setVapiSpeaker('idle');
+    });
+    vapi.on('speech-start', () => {
+      setVapiConnecting(false);
+      setVapiSpeaker('assistant');
+    });
+    vapi.on('speech-end', () => setVapiSpeaker('idle'));
+    vapi.on('message', (msg: any) => {
+      if (msg.type === 'transcript' && msg.role === 'user') {
+        setVapiSpeaker('user');
+        if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
+        userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
+      }
+      if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+        setVapiTranscript(prev => [...prev, { role: msg.role, text: msg.transcript }]);
+        setTimeout(() => {
+          vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
+        }, 50);
+      }
+    });
+
+    vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+  };
+
+  const handleVoiceToggle = () => {
+    if (isVapiActive) {
+      vapiRef.current?.stop();
+      vapiRef.current = null;
+      vapiPrewarmedRef.current = false;
+      vapiCallReadyRef.current = false;
+      setIsVapiActive(false);
+      setVapiConnecting(false);
+      setVapiSpeaker('idle');
+      // Re-warm immediately so the next mic click is instant
+      setTimeout(() => startVapiPrewarm(), 500);
+    } else {
+      setVapiTranscript([]);
+      setIsVapiActive(true);
+      // If pre-warm already connected, skip spinner; otherwise show it briefly
+      if (!vapiCallReadyRef.current) {
+        setVapiConnecting(true);
+      }
     }
   };
 
@@ -2936,6 +2967,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       hasEverOpenedRef.current = true;
     }
   }, [isOpen]);
+
+  // Pre-warm Vapi the moment the widget opens so mic click is instant
+  useEffect(() => {
+    if (!isOpen) return;
+    startVapiPrewarm();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const hasConversation = messages.length > 0;
   const hasExistingConversation = 
