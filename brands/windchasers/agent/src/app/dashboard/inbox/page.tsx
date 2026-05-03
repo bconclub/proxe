@@ -25,6 +25,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 // Channel Icons using custom SVGs with colored backgrounds
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
@@ -122,6 +123,11 @@ interface Conversation {
   next_touchpoint: string | null
   form_data: Record<string, any> | null
   first_touchpoint: string | null
+  // Carried so the conversation list can re-calculate the lead score
+  // client-side (the DB lead_score is often stale or 0).
+  unified_context?: Record<string, any> | null
+  last_interaction_at?: string | null
+  timestamp?: string | null
 }
 
 interface Message {
@@ -310,6 +316,10 @@ export default function InboxPage() {
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [calculatedLeadScore, setCalculatedLeadScore] = useState<number | null>(null)
+  // Map of lead_id → calculated score for the conversation list. The DB
+  // lead_score is often null/0; this lets the list reflect real engagement.
+  const [calculatedConvScores, setCalculatedConvScores] = useState<Record<string, number>>({})
   const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
 
   // Handle URL parameters to open specific conversation
@@ -397,6 +407,62 @@ export default function InboxPage() {
     fetchLeadDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
+
+  // Recalculate lead score client-side whenever lead details change
+  // (DB lead_score is often stale/0 — calculator looks at messages + context)
+  useEffect(() => {
+    if (!leadDetails?.id) { setCalculatedLeadScore(null); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await calculateLeadScore(leadDetails)
+        if (!cancelled) setCalculatedLeadScore(result.score)
+      } catch (err) {
+        console.error('[RIGHT PANEL] calculateLeadScore failed:', err)
+        if (!cancelled) setCalculatedLeadScore(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [leadDetails])
+
+  // Calculate scores for every conversation in the list. The DB lead_score
+  // is often null or stale (set to 0 when never recomputed) — without this
+  // the conversation list shows missing or zero scores even for engaged
+  // leads. Runs once per conversations refresh.
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) {
+      setCalculatedConvScores({})
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, number> = {}
+      // Run in parallel — each call queries conversations for the lead.
+      // For dozens of leads this is acceptable; if it grows, batch later.
+      await Promise.all(conversations.map(async (conv) => {
+        try {
+          const leadShape: any = {
+            id: conv.lead_id,
+            email: conv.lead_email,
+            phone: conv.lead_phone,
+            unified_context: conv.unified_context || {},
+            last_interaction_at: conv.last_interaction_at || conv.last_message_at,
+            booking_date: conv.booking_date,
+            booking_time: conv.booking_time,
+            timestamp: conv.timestamp || conv.last_message_at,
+            lead_score: conv.lead_score,
+          }
+          const result = await calculateLeadScore(leadShape)
+          next[conv.lead_id] = result.score
+        } catch {
+          // Fall back to whatever the DB has on failure.
+          next[conv.lead_id] = conv.lead_score ?? 0
+        }
+      }))
+      if (!cancelled) setCalculatedConvScores(next)
+    })()
+    return () => { cancelled = true }
+  }, [conversations])
 
   // Fetch messages when conversation selected or channel changes
   useEffect(() => {
@@ -552,6 +618,9 @@ export default function InboxPage() {
               next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
               form_data: fbUc?.form_data || null,
               first_touchpoint: lead.first_touchpoint || null,
+              unified_context: fbUc || null,
+              last_interaction_at: lead.last_interaction_at || null,
+              timestamp: lead.last_interaction_at || null,
             }
           })
 
@@ -734,6 +803,9 @@ export default function InboxPage() {
           next_touchpoint: nextTouchpoint,
           form_data: uc?.form_data || null,
           first_touchpoint: (lead as any)?.first_touchpoint || null,
+          unified_context: uc || null,
+          last_interaction_at: (lead as any)?.last_interaction_at || null,
+          timestamp: (lead as any)?.last_interaction_at || null,
         }
 
         console.log('Adding conversation:', {
@@ -1219,9 +1291,15 @@ export default function InboxPage() {
               const isSelected = selectedLeadId === conv.lead_id;
               const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
+              // Prefer the live-calculated score over the DB value (which is
+              // frequently null/0). Fall back to whichever is non-null.
+              const calcScore = calculatedConvScores[conv.lead_id]
+              const displayScore: number | null = calcScore != null
+                ? Math.max(calcScore, conv.lead_score ?? 0)
+                : conv.lead_score
               // Temperature helpers
-              const scoreColor = conv.lead_score != null
-                ? (conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444')
+              const scoreColor = displayScore != null
+                ? (displayScore >= 70 ? '#22c55e' : displayScore >= 40 ? '#f59e0b' : displayScore >= 20 ? '#3b82f6' : '#ef4444')
                 : null;
 
               if (isSelected) {
@@ -1248,7 +1326,7 @@ export default function InboxPage() {
                     <div className="px-3 py-2 pl-4">
                       {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
-                        <ScoreRing score={conv.lead_score} size={28} />
+                        <ScoreRing score={displayScore} size={28} />
                         <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                           {conv.channels.map((ch) => (
                             <ChannelIcon key={ch} channel={ch} size={14} active={true} />
@@ -1322,8 +1400,9 @@ export default function InboxPage() {
                   }}
                 >
                   <div className="px-3 py-2.5">
-                    {/* Line 1: Channel icons + Name + Timestamp */}
+                    {/* Line 1: Score + Channel icons + Name + Timestamp */}
                     <div className="flex items-center gap-1.5">
+                      <ScoreRing score={displayScore} size={22} />
                       <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                         {conv.channels.map((ch) => (
                           <ChannelIcon key={ch} channel={ch} size={13} active={true} />
@@ -1806,7 +1885,13 @@ export default function InboxPage() {
             }
             const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
             const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
-            const score = leadDetails.lead_score ?? 0
+            // Prefer client-calculated score (live signal from messages + context)
+            // and fall back to the stored lead_score so we never show 0 when a
+            // calculation is still in flight.
+            const dbScore = leadDetails.lead_score ?? 0
+            const score = calculatedLeadScore != null
+              ? Math.max(calculatedLeadScore, dbScore)
+              : dbScore
             const scoreColor = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : score >= 20 ? '#3b82f6' : '#ef4444'
             const scoreLabel = score >= 70 ? 'Warm' : score >= 40 ? 'Lukewarm' : score >= 20 ? 'Cold' : 'Very Cold'
 
@@ -1850,9 +1935,19 @@ export default function InboxPage() {
             if (intent) profileRows.push({ label: 'Intent', value: String(intent) })
             if (painPoint) profileRows.push({ label: 'Pain point', value: String(painPoint) })
 
-            const bd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
-            const bt = leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time
-            const ml = webCtx.booking_meet_link || waCtx.booking_meet_link
+            // Booking is written to multiple shapes depending on the path that
+            // created it: top-level columns (storeBooking), flat keys under the
+            // channel (web.booking_date), or a nested booking object (web.booking.date,
+            // used by the inbound demo form). Check all of them so a booked lead
+            // never shows as "No upcoming events".
+            const bd = leadDetails.booking_date
+              || webCtx.booking_date || webCtx.booking?.date
+              || waCtx.booking_date || waCtx.booking?.date
+            const bt = leadDetails.booking_time
+              || webCtx.booking_time || webCtx.booking?.time
+              || waCtx.booking_time || waCtx.booking?.time
+            const ml = webCtx.booking_meet_link || webCtx.booking?.meetLink
+              || waCtx.booking_meet_link || waCtx.booking?.meetLink
             const today = new Date().toISOString().split('T')[0]
             const isUpcoming = bd && bd >= today
 
@@ -1892,7 +1987,7 @@ export default function InboxPage() {
                 </div>
 
                 {/* Score bar */}
-                {leadDetails.lead_score != null && (
+                {(leadDetails.lead_score != null || calculatedLeadScore != null) && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Lead Score</span>
@@ -1998,7 +2093,8 @@ export default function InboxPage() {
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
-                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{messages.length}</p>
+                    {/* Only count customer-sent messages, not agent/PROXe replies */}
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{customerMsgs}</p>
                     <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Messages</p>
                   </div>
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
