@@ -158,7 +158,7 @@ const ICONS = {
 
 // Windchasers welcome bubble — single Aria intro, audience-split CTA below.
 const windchasersWelcomeSequence = [
-  { text: "Hi, I am Aria, Your AI Aviation Counsellor.", delay: 0 },
+  { text: "Hi, I am Aria, Your AI Aviation Counsellor. I am here to help you with your Pilot Career Path.", delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
