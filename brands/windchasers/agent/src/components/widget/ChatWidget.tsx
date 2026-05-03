@@ -246,6 +246,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasEverOpenedRef = useRef(false);
   const vapiRef = useRef<Vapi | null>(null);
   const [isVapiActive, setIsVapiActive] = useState(false);
+  const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
+  const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const vapiTranscriptRef = useRef<HTMLDivElement>(null);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -2386,14 +2389,28 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (isVapiActive) {
       vapiRef.current?.stop();
       setIsVapiActive(false);
+      setVapiSpeaker('idle');
     } else {
       if (!vapiRef.current) {
         vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
-        vapiRef.current.on('call-end', () => setIsVapiActive(false));
-        vapiRef.current.on('error', () => setIsVapiActive(false));
+        vapiRef.current.on('call-end', () => { setIsVapiActive(false); setVapiSpeaker('idle'); });
+        vapiRef.current.on('error', () => { setIsVapiActive(false); setVapiSpeaker('idle'); });
+        vapiRef.current.on('speech-start', () => setVapiSpeaker('assistant'));
+        vapiRef.current.on('speech-end', () => setVapiSpeaker('idle'));
+        vapiRef.current.on('message', (msg: any) => {
+          if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+            setVapiTranscript(prev => [...prev, { role: msg.role, text: msg.transcript }]);
+            setTimeout(() => {
+              vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
+            }, 50);
+          }
+          if (msg.type === 'transcript' && msg.role === 'user') setVapiSpeaker('user');
+        });
       }
+      setVapiTranscript([]);
       vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
       setIsVapiActive(true);
+      setVapiSpeaker('idle');
     }
   };
 
@@ -3045,7 +3062,39 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
-          <div className={styles.chatContent}>
+          {isVapiActive && (
+        <div className={styles.voiceOverlay}>
+          <div className={styles.voiceOrbWrapper}>
+            <div className={`${styles.voiceRing} ${styles.voiceRing1} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
+            <div className={`${styles.voiceRing} ${styles.voiceRing2} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
+            <div className={`${styles.voiceRing} ${styles.voiceRing3} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
+            <div className={styles.voiceOrbCore}>
+              {ICONS.mic}
+            </div>
+          </div>
+          <div className={styles.voiceMeta}>
+            <p className={styles.voiceName}>Aria</p>
+            <p className={styles.voiceStatus}>
+              {vapiSpeaker === 'assistant' ? 'Speaking…' : vapiSpeaker === 'user' ? 'Listening…' : 'Connected'}
+            </p>
+          </div>
+          {vapiTranscript.length > 0 && (
+            <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
+              {vapiTranscript.map((m, i) => (
+                <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAria}>
+                  {m.text}
+                </p>
+              ))}
+            </div>
+          )}
+          <button className={styles.voiceEndBtn} onClick={handleVoiceToggle} aria-label="End call">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className={styles.chatContent}>
         {showResetConfirm && (
           <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
             <div className={styles.closeConfirmCard}>
