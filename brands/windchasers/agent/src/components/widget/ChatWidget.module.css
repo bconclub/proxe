@@ -200,6 +200,17 @@
   }
 }
 
+@keyframes btnEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .quickBtn {
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.05);
@@ -226,6 +237,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: btnEntrance 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .quickBtn:hover {

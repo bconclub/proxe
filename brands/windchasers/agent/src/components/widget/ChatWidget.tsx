@@ -1789,15 +1789,34 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
-    for (const item of windchasersWelcomeSequence) {
-      await new Promise(resolve => setTimeout(resolve, item.delay === 0 ? 0 : 500));
-      addAIMessage(item.text);
-      window.dispatchEvent(new Event('message-updated'));
+    const WORD_MS = 68;
+    const BUBBLE_GAP = 380;
+
+    for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, BUBBLE_GAP));
+      }
+      const words = windchasersWelcomeSequence[i].text.split(' ');
+      const msg = addStreamingAIMessage('');
+      // Show typing dots briefly before first word
+      await new Promise(resolve => setTimeout(resolve, 130));
+      // Reveal word by word
+      for (let w = 0; w < words.length; w++) {
+        updateMessageText(msg.id, words.slice(0, w + 1).join(' '));
+        if (w === 0) {
+          window.dispatchEvent(new Event('message-updated'));
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (w < words.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, WORD_MS));
+        }
+      }
+      finishMessage(msg.id);
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addStreamingAIMessage, updateMessageText, finishMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -2771,6 +2790,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <button
                 key={buttonText}
                 className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
                 onClick={(e) => handleQuickButtonClick(buttonText, e)}
               >
                 {buttonText}
@@ -2792,6 +2812,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <button
                 key={buttonText}
                 className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
                 onClick={(e) => handleQuickButtonClick(buttonText, e)}
               >
                 {buttonText}
@@ -2813,6 +2834,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <button
                 key={buttonText}
                 className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
                 onClick={(e) => handleQuickButtonClick(buttonText, e)}
               >
                 {buttonText}
@@ -2834,6 +2856,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <button
                 key={buttonText}
                 className={`${styles.quickBtn} ${styles.flowOverrideBtn} ${styles[`accent-${index % 7}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
                 onClick={(e) => handleQuickButtonClick(buttonText, e)}
               >
                 {buttonText}
