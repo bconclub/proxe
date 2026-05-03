@@ -2408,25 +2408,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
            lowerText.includes('counselor');
   };
 
-  const startVapiPrewarm = () => {
-    if (vapiPrewarmedRef.current) return;
-    vapiPrewarmedRef.current = true;
-
-    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
-    vapiRef.current = vapi;
-
+  const attachVapiListeners = (vapi: Vapi) => {
     vapi.on('call-start', () => {
       vapiCallReadyRef.current = true;
       setVapiConnecting(false);
     });
     vapi.on('call-end', () => {
       vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
       setIsVapiActive(false);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
     });
-    vapi.on('error', () => {
+    vapi.on('error', (e: any) => {
+      console.error('[Vapi] error', e);
       vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
       setIsVapiActive(false);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
@@ -2449,8 +2446,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         }, 50);
       }
     });
+  };
 
-    vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+  // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
+  // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
+  // grant mic permission correctly, especially on iOS Safari and Android Chrome.
+  const startVapiPrewarm = () => {
+    if (vapiPrewarmedRef.current) return;
+    vapiPrewarmedRef.current = true;
+    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+    vapiRef.current = vapi;
+    attachVapiListeners(vapi);
   };
 
   const handleVoiceToggle = () => {
@@ -2462,15 +2468,19 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setIsVapiActive(false);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
-      // Re-warm immediately so the next mic click is instant
-      setTimeout(() => startVapiPrewarm(), 500);
     } else {
       setVapiTranscript([]);
       setIsVapiActive(true);
-      // If pre-warm already connected, skip spinner; otherwise show it briefly
-      if (!vapiCallReadyRef.current) {
-        setVapiConnecting(true);
+      setVapiConnecting(true);
+      // Ensure instance exists (pre-warm may have already created it)
+      if (!vapiRef.current) {
+        const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+        vapiRef.current = vapi;
+        attachVapiListeners(vapi);
       }
+      // .start() is called here — inside the click handler (user gesture) —
+      // so browsers show the mic permission prompt and grant access.
+      vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
     }
   };
 
