@@ -156,9 +156,11 @@ const ICONS = {
   ),
 };
 
-// Windchasers welcome bubble — single Aria intro, audience-split CTA below.
+// Windchasers welcome bubble — three-part Aria intro sequence.
 const windchasersWelcomeSequence = [
-  { text: "Hi, I am Aria, Your AI Aviation Counsellor. I am here to help you with your Pilot Career Path.", delay: 0 },
+  { text: "Hi, I am Aria,", delay: 0 },
+  { text: "I am Windchasers AI Aviation Counsellor.", delay: 800 },
+  { text: "I am here to help you with your Pilot Career Path. What's on your mind?", delay: 1600 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
