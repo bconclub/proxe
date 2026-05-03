@@ -1412,9 +1412,11 @@ export default function InboxPage() {
                   }}
                 >
                   <div className="px-3 py-2.5">
-                    {/* Line 1: Score + Channel icons + Name + Timestamp */}
-                    <div className="flex items-center gap-2">
-                      <ScoreRing score={displayScore} size={28} />
+                    {/* Line 1: Channel icons + Name + Timestamp
+                        (Per design: only the SELECTED row shows a ScoreRing —
+                        unselected rows just show the name to keep the list
+                        scannable.) */}
+                    <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                         {conv.channels.map((ch) => (
                           <ChannelIcon key={ch} channel={ch} size={13} active={true} />
