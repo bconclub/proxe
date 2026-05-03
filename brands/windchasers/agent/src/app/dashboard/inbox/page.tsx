@@ -81,9 +81,21 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 const ALL_CHANNELS = ['web', 'whatsapp'];
 
 // Score Ring - circular progress indicator with score inside
+// Score color/label scheme — kept in sync with LeadDetailsModal.getHealthColor
+// so a "Warm" lead reads the same color everywhere in the dashboard.
+//   90+   Hot   green
+//   70-89 Warm  orange
+//   0-69  Cold  blue
+const scoreVisual = (score: number | null) => {
+  const s = score ?? 0;
+  if (s >= 90) return { color: '#22C55E', label: 'Hot' };
+  if (s >= 70) return { color: '#F97316', label: 'Warm' };
+  return { color: '#3B82F6', label: 'Cold' };
+};
+
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
   const s = score ?? 0;
-  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
+  const { color } = scoreVisual(score);
   const r = (size / 2) - 2.5;
   const circumference = 2 * Math.PI * r;
   const dashLen = (s / 100) * circumference;
@@ -1297,10 +1309,10 @@ export default function InboxPage() {
               const displayScore: number | null = calcScore != null
                 ? Math.max(calcScore, conv.lead_score ?? 0)
                 : conv.lead_score
-              // Temperature helpers
-              const scoreColor = displayScore != null
-                ? (displayScore >= 70 ? '#22c55e' : displayScore >= 40 ? '#f59e0b' : displayScore >= 20 ? '#3b82f6' : '#ef4444')
-                : null;
+              // Temperature helpers — use the shared scoreVisual so the
+              // conversation list, the right panel, and the lead modal all
+              // agree on what "Warm" looks like.
+              const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
 
               if (isSelected) {
                 // ── SELECTED CARD (minimal) ──
@@ -1401,8 +1413,8 @@ export default function InboxPage() {
                 >
                   <div className="px-3 py-2.5">
                     {/* Line 1: Score + Channel icons + Name + Timestamp */}
-                    <div className="flex items-center gap-1.5">
-                      <ScoreRing score={displayScore} size={22} />
+                    <div className="flex items-center gap-2">
+                      <ScoreRing score={displayScore} size={28} />
                       <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                         {conv.channels.map((ch) => (
                           <ChannelIcon key={ch} channel={ch} size={13} active={true} />
@@ -1892,8 +1904,9 @@ export default function InboxPage() {
             const score = calculatedLeadScore != null
               ? Math.max(calculatedLeadScore, dbScore)
               : dbScore
-            const scoreColor = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : score >= 20 ? '#3b82f6' : '#ef4444'
-            const scoreLabel = score >= 70 ? 'Warm' : score >= 40 ? 'Lukewarm' : score >= 20 ? 'Cold' : 'Very Cold'
+            // Same Hot/Warm/Cold scheme as the lead modal — Warm is orange,
+            // not green, regardless of how high the score is below 90.
+            const { color: scoreColor, label: scoreLabel } = scoreVisual(score)
 
             const lastActiveStr = (() => {
               const d = leadDetails.last_message_at || leadDetails.updated_at

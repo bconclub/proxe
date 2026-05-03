@@ -631,15 +631,18 @@ export default function LeadsTable({
       <div className="overflow-x-auto overflow-y-auto flex-1 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '27%' }} />  {/* Lead */}
-            <col style={{ width: '20%' }} />  {/* Contact */}
-            <col style={{ width: '6%' }} />   {/* Source */}
-            <col style={{ width: '7%' }} />   {/* Score */}
-            <col style={{ width: '13%' }} />  {/* Stage */}
-            <col style={{ width: '9%' }} />   {/* Active */}
-            <col style={{ width: '16%' }} />  {/* Booking */}
-            {showAviationColumns && <col style={{ width: '7%' }} />}
-            {showAviationColumns && <col style={{ width: '8%' }} />}
+            {/* Tightened column widths: Lead/Contact were oversized,
+                Booking was a wide text column (now a compact chip),
+                Type/Course are narrow chip columns. */}
+            <col style={{ width: '18%' }} />  {/* Lead */}
+            <col style={{ width: '18%' }} />  {/* Contact */}
+            <col style={{ width: '9%' }} />   {/* Source */}
+            <col style={{ width: '6%' }} />   {/* Score */}
+            <col style={{ width: '11%' }} />  {/* Stage */}
+            <col style={{ width: '8%' }} />   {/* Active */}
+            <col style={{ width: '12%' }} />  {/* Booking (chip) */}
+            {showAviationColumns && <col style={{ width: '9%' }} />}
+            {showAviationColumns && <col style={{ width: '9%' }} />}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
@@ -954,15 +957,16 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING - green if booked, empty if not */}
+                    {/* BOOKING - compact chip with calendar icon, "—" when none */}
                     <td className="px-3 py-2 text-xs">
                       {bookingDate ? (
                         <Link
                           href="/dashboard/bookings"
-                          className="hover:underline"
-                          style={{ color: '#22c55e' }}
                           onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
+                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
                         >
+                          <span aria-hidden="true">📅</span>
                           {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           {bookingTime ? (() => {
                             const tp = bookingTime.toString().split(':');
@@ -972,18 +976,39 @@ export default function LeadsTable({
                             return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
                           })() : ''}
                         </Link>
-                      ) : null}
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
                     </td>
 
-                    {/* Aviation columns */}
+                    {/* Aviation columns — chip styling so the row reads as a
+                        scannable set of tags rather than mixed text + chips */}
                     {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {lead.unified_context?.[brandId]?.user_type || ''}
+                      <td className="px-3 py-2 text-xs">
+                        {lead.unified_context?.[brandId]?.user_type ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].user_type}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
                       </td>
                     )}
                     {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {lead.unified_context?.[brandId]?.course_interest || ''}
+                      <td className="px-3 py-2 text-xs">
+                        {lead.unified_context?.[brandId]?.course_interest ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(14,165,233,0.15)', color: '#7dd3fc', border: '1px solid rgba(14,165,233,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].course_interest}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
                       </td>
                     )}
                   </tr>

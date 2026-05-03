@@ -1284,12 +1284,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       >
         <dialog
           open={isOpen}
-          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg shadow-xl z-50 flex flex-col border border-[var(--border-primary)]"
+          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg z-50 flex flex-col"
           style={{
             width: '54vw',
             maxWidth: '720px',
             height: '88vh',
-            maxHeight: '88vh'
+            maxHeight: '88vh',
+            // Faded outline so the modal lifts off the black backdrop —
+            // the var(--border-primary) alone disappears in dark mode.
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow:
+              '0 0 0 1px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 8px 24px -8px rgba(0, 0, 0, 0.5)',
           }}
           onClick={(e) => e.stopPropagation()}
           aria-labelledby="lead-modal-title"
