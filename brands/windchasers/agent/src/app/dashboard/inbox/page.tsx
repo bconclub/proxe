@@ -1524,13 +1524,17 @@ export default function InboxPage() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-4 py-3 relative"
+              className="flex-1 overflow-y-auto px-6 py-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
-            <div className="max-w-[700px] mx-auto space-y-3">
+            {/* Messages were capped at 700px — too narrow for the chat panel,
+                producing dead space on both sides. Cap raised to 1100px and
+                outer padding bumped to px-6 so messages breathe but don't
+                stretch into long unreadable lines. */}
+            <div className="max-w-[1100px] mx-auto space-y-3">
               {messagesLoading ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
               ) : filteredMessages.length === 0 ? (
