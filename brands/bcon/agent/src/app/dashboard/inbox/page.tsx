@@ -75,10 +75,22 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 
 const ALL_CHANNELS = ['web', 'whatsapp'];
 
+// Score color/label scheme — kept in sync with LeadDetailsModal.getHealthColor
+// so a "Warm" lead reads the same color everywhere in the dashboard.
+//   90+   Hot   green
+//   70-89 Warm  orange
+//   0-69  Cold  blue
+const scoreVisual = (score: number | null) => {
+  const s = score ?? 0;
+  if (s >= 90) return { color: '#22C55E', label: 'Hot' };
+  if (s >= 70) return { color: '#F97316', label: 'Warm' };
+  return { color: '#3B82F6', label: 'Cold' };
+};
+
 // Score Ring - circular progress indicator with score inside
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
   const s = score ?? 0;
-  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
+  const { color } = scoreVisual(score);
   const r = (size / 2) - 2.5;
   const circumference = 2 * Math.PI * r;
   const dashLen = (s / 100) * circumference;

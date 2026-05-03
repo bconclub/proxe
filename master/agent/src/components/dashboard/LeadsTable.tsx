@@ -998,15 +998,16 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* Booking */}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {/* Booking — compact chip with calendar icon */}
+                    <td className="px-3 py-2 whitespace-nowrap text-xs">
                       {bookingDate || bookingTime ? (
                         <Link
                           href="/dashboard/bookings"
-                          className="hover:underline"
-                          style={{ color: 'var(--accent-primary)' }}
                           onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
+                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
                         >
+                          <span aria-hidden="true">📅</span>
                           {bookingDate ? formatDateTime(bookingDate).split(',')[0] : ''}
                           {bookingDate && bookingTime ? ', ' : ''}
                           {bookingTime ? (() => {
@@ -1020,7 +1021,9 @@ export default function LeadsTable({
                             return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
                           })() : ''}
                         </Link>
-                      ) : '-'}
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
                     </td>
                   </tr>
                 )
