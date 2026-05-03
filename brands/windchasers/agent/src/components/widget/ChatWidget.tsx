@@ -189,6 +189,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [calendarAnchorId, setCalendarAnchorId] = useState<string | null>(null);
   const [pendingCalendar, setPendingCalendar] = useState(false);
   const [forceCalendarFromBookButton, setForceCalendarFromBookButton] = useState(false);
+  const [skipBookingCheck, setSkipBookingCheck] = useState(false);
   const [showDeployForm, setShowDeployForm] = useState<string | null>(null);
   const [bookingCompleted, setBookingCompleted] = useState(false);
   const [bookedSummary, setBookedSummary] = useState<string>('');
@@ -1787,26 +1788,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
 
     for (const item of windchasersWelcomeSequence) {
-      const msg = addStreamingAIMessage('');
-      if (!msg) continue;
-      setTimeout(() => {
-        window.dispatchEvent(new Event('message-updated'));
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 30);
-      const words = item.text.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        updateMessageText(msg.id, words.slice(0, i + 1).join(' '));
-        window.dispatchEvent(new Event('message-updated'));
-        await new Promise(resolve => setTimeout(resolve, 110));
-      }
-      finishMessage(msg.id);
+      await new Promise(resolve => setTimeout(resolve, item.delay === 0 ? 0 : 500));
+      addAIMessage(item.text);
       window.dispatchEvent(new Event('message-updated'));
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      await new Promise(resolve => setTimeout(resolve, 380));
     }
 
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addStreamingAIMessage, updateMessageText, finishMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -2152,38 +2141,35 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         const timer = setTimeout(async () => {
           setPendingCalendar(false);
           setForceCalendarFromBookButton(false);
-          
-          // Check for existing booking before showing calendar
-          const phone = userProfile.phone;
-          const email = userProfile.email;
-          
-          if (phone || email) {
-            const existingBooking = await checkExistingBookingClient(phone, email);
-            
-            if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
-              // Format date and time for display
-              const date = new Date(existingBooking.bookingDate);
-              const formattedDate = date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              });
-              
-              // Format time (assuming it's in "HH:MM AM/PM" format)
-              const formattedTime = existingBooking.bookingTime;
-              
-              // Show message about existing booking
-              const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-              
-              // Add as AI message using addAIMessage from hook
-              addAIMessage(bookingMessage);
-              setBookingCompleted(true);
-              return; // Don't show calendar
+
+          // Skip booking check when user explicitly chose to reschedule
+          if (!skipBookingCheck) {
+            const phone = userProfile.phone;
+            const email = userProfile.email;
+
+            if (phone || email) {
+              const existingBooking = await checkExistingBookingClient(phone, email);
+
+              if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
+                const date = new Date(existingBooking.bookingDate);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                const formattedTime = existingBooking.bookingTime;
+                const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
+                addAIMessage(bookingMessage);
+                setBookingCompleted(true);
+                return;
+              }
             }
           }
-          
-          // No existing booking, show calendar
+
+          setSkipBookingCheck(false);
+
+          // Show calendar anchored to last message
           const calendarMessageId = `calendar-${Date.now()}`;
           setShowCalendly(calendarMessageId);
           if (lastMessage?.id) {
@@ -2197,7 +2183,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
     }
     
-  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton]);
+  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton, skipBookingCheck]);
 
   // Handle booking completion
   const handleBookingComplete = useCallback(async (bookingData: any) => {
@@ -2540,11 +2526,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (normalizedButton === 'yes, reschedule') {
       setBookingCompleted(false);
       setBookedSummary('');
+      setSkipBookingCheck(true);
       addUserMessage(buttonText);
       addAIMessage('No problem. Pick a new date and time below.');
-      const calId = `calendar-${Date.now()}`;
-      setShowCalendly(calId);
-      setCalendarAnchorId(calId);
+      setPendingCalendar(true);
       return;
     }
     if (normalizedButton === 'keep my booking') {
