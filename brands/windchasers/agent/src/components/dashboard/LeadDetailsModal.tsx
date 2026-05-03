@@ -396,6 +396,56 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           unifiedContext?.social?.booking?.time ||
           null
 
+        // ── Session-table fallback ─────────────────────────────────────────
+        // If neither all_leads nor unified_context carries a booking but the
+        // lead actually booked, the booking is sitting in web_sessions or
+        // whatsapp_sessions (storeBooking writes there first, then syncs to
+        // all_leads — when that sync fails the channel session is the only
+        // surviving source). Pull it from there so Key Event renders.
+        let resolvedBookingDate: string | null = bookingDate
+        let resolvedBookingTime: string | null = bookingTime
+        if (!resolvedBookingDate || !resolvedBookingTime) {
+          try {
+            const sessionTables = ['web_sessions', 'whatsapp_sessions']
+            const phone = typedData.phone || lead.phone
+            const email = typedData.email || lead.email
+            for (const tbl of sessionTables) {
+              if (resolvedBookingDate && resolvedBookingTime) break
+              let row: any = null
+              if (phone) {
+                const { data } = await supabase
+                  .from(tbl)
+                  .select('booking_date, booking_time, booking_created_at')
+                  .eq('customer_phone', phone)
+                  .not('booking_date', 'is', null)
+                  .not('booking_time', 'is', null)
+                  .order('booking_created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle()
+                row = data
+              }
+              if (!row && email) {
+                const { data } = await supabase
+                  .from(tbl)
+                  .select('booking_date, booking_time, booking_created_at')
+                  .eq('customer_email', email)
+                  .not('booking_date', 'is', null)
+                  .not('booking_time', 'is', null)
+                  .order('booking_created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle()
+                row = data
+              }
+              if (row?.booking_date) {
+                resolvedBookingDate = resolvedBookingDate || row.booking_date
+                resolvedBookingTime = resolvedBookingTime || row.booking_time
+              }
+            }
+          } catch (sessionFetchErr) {
+            console.warn('[LeadDetailsModal] session-table booking fallback failed', sessionFetchErr)
+          }
+        }
+
         // Merge fresh data with existing lead prop
         const mergedLead: Lead = {
           ...lead,
@@ -404,8 +454,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           phone: typedData.phone || lead.phone,
           timestamp: typedData.created_at || lead.timestamp,
           last_interaction_at: typedData.last_interaction_at || lead.last_interaction_at || null,
-          booking_date: bookingDate,
-          booking_time: bookingTime,
+          booking_date: resolvedBookingDate,
+          booking_time: resolvedBookingTime,
           lead_score: typedData.lead_score ?? lead.lead_score ?? null,
           lead_stage: typedData.lead_stage || lead.lead_stage || null,
           sub_stage: typedData.sub_stage || lead.sub_stage || null,
