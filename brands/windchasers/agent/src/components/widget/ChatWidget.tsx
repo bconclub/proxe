@@ -246,6 +246,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasEverOpenedRef = useRef(false);
   const vapiRef = useRef<Vapi | null>(null);
   const [isVapiActive, setIsVapiActive] = useState(false);
+  const [vapiConnecting, setVapiConnecting] = useState(false);
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
   const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const vapiTranscriptRef = useRef<HTMLDivElement>(null);
@@ -2389,13 +2390,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (isVapiActive) {
       vapiRef.current?.stop();
       setIsVapiActive(false);
+      setVapiConnecting(false);
       setVapiSpeaker('idle');
     } else {
       if (!vapiRef.current) {
         vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
-        vapiRef.current.on('call-end', () => { setIsVapiActive(false); setVapiSpeaker('idle'); });
-        vapiRef.current.on('error', () => { setIsVapiActive(false); setVapiSpeaker('idle'); });
-        vapiRef.current.on('speech-start', () => setVapiSpeaker('assistant'));
+        vapiRef.current.on('call-start', () => setVapiConnecting(false));
+        vapiRef.current.on('call-end', () => { setIsVapiActive(false); setVapiConnecting(false); setVapiSpeaker('idle'); });
+        vapiRef.current.on('error', () => { setIsVapiActive(false); setVapiConnecting(false); setVapiSpeaker('idle'); });
+        vapiRef.current.on('speech-start', () => { setVapiConnecting(false); setVapiSpeaker('assistant'); });
         vapiRef.current.on('speech-end', () => setVapiSpeaker('idle'));
         vapiRef.current.on('message', (msg: any) => {
           if (msg.type === 'transcript' && msg.transcriptType === 'final') {
@@ -2408,6 +2411,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         });
       }
       setVapiTranscript([]);
+      setVapiConnecting(true);
       vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
       setIsVapiActive(true);
       setVapiSpeaker('idle');
@@ -3064,18 +3068,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          <div className={styles.voiceOrbWrapper}>
-            <div className={`${styles.voiceRing} ${styles.voiceRing1} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
-            <div className={`${styles.voiceRing} ${styles.voiceRing2} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
-            <div className={`${styles.voiceRing} ${styles.voiceRing3} ${vapiSpeaker !== 'idle' ? styles.voiceRingActive : ''}`} />
-            <div className={styles.voiceOrbCore}>
-              {ICONS.mic}
-            </div>
-          </div>
+          <div className={`${styles.voiceOrb} ${vapiConnecting ? styles.voiceOrbConnecting : vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
           <div className={styles.voiceMeta}>
             <p className={styles.voiceName}>Aria</p>
             <p className={styles.voiceStatus}>
-              {vapiSpeaker === 'assistant' ? 'Speaking…' : vapiSpeaker === 'user' ? 'Listening…' : 'Connected'}
+              {vapiConnecting ? 'Connecting…' : vapiSpeaker === 'assistant' ? 'Speaking…' : vapiSpeaker === 'user' ? 'Listening…' : 'Connected'}
             </p>
           </div>
           {vapiTranscript.length > 0 && (
