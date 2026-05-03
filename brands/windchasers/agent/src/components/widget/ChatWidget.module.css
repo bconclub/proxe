@@ -1905,22 +1905,22 @@
   transition: color 0.2s ease;
 }
 
-/* Near-full comet arc — 300° visible, bright head fading into a tail */
+/* Light beam — short ~60° arc, slow drift, very subtle */
 .micCta::before {
   content: '';
   position: absolute;
-  inset: -6px;
+  inset: -5px;
   border-radius: 50%;
   background: conic-gradient(
-    rgba(197, 165, 114, 0.0) 0deg,
-    rgba(197, 165, 114, 0.55) 60deg,
-    rgba(197, 165, 114, 0.85) 240deg,
-    rgba(197, 165, 114, 1.0) 300deg,
-    rgba(197, 165, 114, 0.0) 360deg
+    transparent 0deg,
+    transparent 300deg,
+    rgba(197, 165, 114, 0.08) 320deg,
+    rgba(197, 165, 114, 0.55) 352deg,
+    transparent 360deg
   );
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-  animation: micRingSpin 1.4s linear infinite;
+  animation: micRingSpin 3s linear infinite;
   pointer-events: none;
 }
 

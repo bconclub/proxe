@@ -2432,18 +2432,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
   // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
   // grant mic permission correctly, especially on iOS Safari and Android Chrome.
-  // We also silently request mic permission here so it's already granted by the
-  // time the user clicks the call button, cutting connection latency significantly.
+  // Do NOT pre-request getUserMedia here — claiming and releasing the mic before
+  // Vapi grabs it causes the device to reject Vapi's subsequent capture on mobile.
   const startVapiPrewarm = () => {
     if (vapiPrewarmedRef.current) return;
     vapiPrewarmedRef.current = true;
     const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
     vapiRef.current = vapi;
     attachVapiListeners(vapi);
-    // Silent mic permission probe — releases the stream immediately, just warms the permission
-    navigator.mediaDevices?.getUserMedia({ audio: true })
-      .then(stream => stream.getTracks().forEach(t => t.stop()))
-      .catch(() => {});
   };
 
   const handleVoiceToggle = () => {
