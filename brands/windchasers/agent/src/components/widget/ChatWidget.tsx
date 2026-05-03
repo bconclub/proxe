@@ -1789,11 +1789,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       if (item.delay > 0) {
         await new Promise(resolve => setTimeout(resolve, item.delay));
       }
-      await streamWelcomeMessage(item.text, 5);
+      addAIMessage(item.text);
+      window.dispatchEvent(new Event('message-updated'));
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
