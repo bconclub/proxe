@@ -75,7 +75,7 @@ When user clicks "Skip and book consultation":
 PARENT PATH
 
 When user clicks "I am a parent":
-- Say exactly: "You are likely the one doing the heavy lifting on this decision. What is the biggest thing on your mind right now?"
+- Say exactly: "Happy to help. What is the biggest question on your mind?"
 
 When user (parent) clicks "Real Cost & Timeline":
 - Say exactly: "Pilot training costs up to ₹80 lakh. That covers tuition, exams, medicals, and license. Living and conversion are extra."
