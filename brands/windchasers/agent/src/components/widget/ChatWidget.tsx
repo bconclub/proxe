@@ -2459,7 +2459,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     attachVapiListeners(vapi);
   };
 
-  const handleVoiceToggle = () => {
+  const handleVoiceToggle = async () => {
     if (isVapiActive) {
       vapiRef.current?.stop();
       vapiRef.current = null;
@@ -2468,20 +2468,43 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setIsVapiActive(false);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
-    } else {
-      setVapiTranscript([]);
-      setIsVapiActive(true);
-      setVapiConnecting(true);
-      // Ensure instance exists (pre-warm may have already created it)
-      if (!vapiRef.current) {
-        const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
-        vapiRef.current = vapi;
-        attachVapiListeners(vapi);
-      }
-      // .start() is called here — inside the click handler (user gesture) —
-      // so browsers show the mic permission prompt and grant access.
-      vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      return;
     }
+
+    setVapiTranscript([]);
+    setVapiDebugLog([]);
+    setIsVapiActive(true);
+    setVapiConnecting(true);
+
+    // Explicitly request mic permission here — inside the user gesture (button click).
+    // This ensures the browser permission prompt fires now, and the mic hardware
+    // is fully initialised before Vapi's internal getUserMedia call.
+    try {
+      vapiLog('requesting mic…');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      vapiLog(`mic granted — tracks: ${stream.getAudioTracks().length}`);
+      setMicPermission('granted');
+      // Release the stream; give the hardware 300 ms to fully close
+      // before Vapi re-opens it internally.
+      stream.getTracks().forEach(t => t.stop());
+      await new Promise(r => setTimeout(r, 300));
+      vapiLog('mic released → starting Vapi');
+    } catch (err: any) {
+      vapiLog(`mic denied ❌ ${err.message}`);
+      setMicPermission('denied');
+      setIsVapiActive(false);
+      setVapiConnecting(false);
+      return;
+    }
+
+    // Ensure Vapi instance (pre-warm may have already created it)
+    if (!vapiRef.current) {
+      const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+      vapiRef.current = vapi;
+      attachVapiListeners(vapi);
+    }
+
+    vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
   };
 
   const handleSend = () => {
