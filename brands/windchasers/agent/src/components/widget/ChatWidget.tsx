@@ -114,12 +114,12 @@ const ICONS = {
         return <PROXELogo />;
       }
       if (avatarType === 'image' && config.chatStructure.avatar.source) {
-        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
+        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '80%', height: '80%', objectFit: 'contain', objectPosition: 'center', display: 'block' }} />;
       }
     }
     // Fallback: Use image logo for Windchasers, infinity symbol for others
     if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
-      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
+      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '80%', height: '80%', objectFit: 'contain', objectPosition: 'center', display: 'block' }} />;
     }
     return <InfinitySymbol />;
   },
