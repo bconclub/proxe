@@ -209,18 +209,22 @@ async function postProcess(
       );
       isNewLead = true;
       
-      // 2b. Backfill previous conversations for this session with the new lead_id
+      // 2b. Backfill previous anonymous conversations for this session with the new lead_id.
+      // These rows were logged before the visitor provided phone/email; they carry
+      // session_id in their JSONB metadata column. Use .filter() for explicit JSON
+      // path matching (more reliable than .eq() with arrow operators in Supabase JS).
       if (leadId) {
-        const { error: backfillError } = await supabase
+        const { error: backfillError, count: backfillCount } = await supabase
           .from('conversations')
           .update({ lead_id: leadId })
-          .eq('metadata->>session_id', externalSessionId)
-          .is('lead_id', null);
-        
+          .filter('metadata->>session_id', 'eq', externalSessionId)
+          .is('lead_id', null)
+          .select('id', { count: 'exact', head: true });
+
         if (backfillError) {
           console.error('[agent/web/chat] Failed to backfill conversations:', backfillError);
         } else {
-          console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId);
+          console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId, '| rows updated:', backfillCount ?? 'unknown');
         }
       }
     }

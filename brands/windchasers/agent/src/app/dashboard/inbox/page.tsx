@@ -857,8 +857,8 @@ export default function InboxPage() {
     try {
       console.log('Fetching all messages for lead:', leadId)
 
-      // Always fetch ALL messages for this lead (channel filtering is done client-side)
-      const { data, error } = await supabase
+      // 1. Fetch messages directly linked to this lead
+      const { data: leadMessages, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('lead_id', leadId)
@@ -870,7 +870,55 @@ export default function InboxPage() {
         throw error
       }
 
-      const messagesData = (data ?? []).map((msg: any): Message => ({
+      let allRaw: any[] = leadMessages ?? []
+
+      // 2. Also fetch anonymous messages that were logged before a lead was created.
+      //    These rows have lead_id = null but carry session_id in their metadata.
+      //    Look up every web_session linked to this lead and pull those rows too.
+      try {
+        const { data: sessions } = await supabase
+          .from('web_sessions')
+          .select('external_session_id')
+          .eq('lead_id', leadId)
+
+        const sessionIds = (sessions ?? [])
+          .map((s: any) => s.external_session_id)
+          .filter(Boolean)
+
+        if (sessionIds.length > 0) {
+          for (const sid of sessionIds) {
+            const { data: anonMsgs } = await supabase
+              .from('conversations')
+              .select('*')
+              .is('lead_id', null)
+              .filter('metadata->>session_id', 'eq', sid)
+              .order('created_at', { ascending: true })
+
+            if (anonMsgs && anonMsgs.length > 0) {
+              console.log(`[fetchMessages] Found ${anonMsgs.length} anonymous messages for session ${sid}`)
+              allRaw = [...allRaw, ...anonMsgs]
+            }
+          }
+
+          // Deduplicate by id and sort chronologically
+          const seen = new Set<string>()
+          allRaw = allRaw
+            .filter((msg: any) => {
+              const key = String(msg.id)
+              if (seen.has(key)) return false
+              seen.add(key)
+              return true
+            })
+            .sort((a: any, b: any) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+        }
+      } catch (anonErr) {
+        console.warn('[fetchMessages] Could not fetch anonymous messages:', anonErr)
+        // Non-fatal — we still show the lead messages fetched above
+      }
+
+      const messagesData = allRaw.map((msg: any): Message => ({
         id: String(msg?.id ?? ''),
         lead_id: String(msg?.lead_id ?? ''),
         channel: String(msg?.channel ?? ''),
