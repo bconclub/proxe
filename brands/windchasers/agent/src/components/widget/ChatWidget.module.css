@@ -2319,11 +2319,11 @@
 
 /* Calendar container styles */
 .calendarContainer {
-  margin-top: 8px;
+  margin-top: 0;
   width: 100%;
-  min-height: 600px;
-  max-height: 800px;
-  overflow: hidden;
+  min-height: unset;
+  max-height: none;
+  overflow: visible;
   position: relative;
 }
 
@@ -2395,10 +2395,26 @@
   max-width: 100% !important;
 }
 
-/* When showing confirmation, no need for a tall scroll container */
+/* Remove top margin/padding from calendar message so there's no dead space */
+.calendarMessage {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.calendarMessage .bubbleContent {
+  padding-top: 0 !important;
+}
+
+/* Confirmation view: let content drive height, no scroll clipping */
 .calendarScrollArea:has([data-view="confirmation"]) {
-  max-height: none;
-  overflow: visible;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Confirmation must not overflow the bubble */
+.calendarScrollArea [data-view="confirmation"] {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Deploy Form Styles */

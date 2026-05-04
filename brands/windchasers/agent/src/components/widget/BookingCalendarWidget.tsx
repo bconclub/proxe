@@ -64,6 +64,7 @@ export function BookingCalendarWidget({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [showTimeSlots, setShowTimeSlots] = useState(false);
+  const timeSlotsRef = useRef<HTMLDivElement>(null);
   const [showForm, setShowForm] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -119,6 +120,15 @@ export function BookingCalendarWidget({
       checkAvailability();
     }
   }, [selectedDate]);
+
+  // Auto-scroll time slots into view when they appear
+  useEffect(() => {
+    if (showTimeSlots && timeSlotsRef.current) {
+      setTimeout(() => {
+        timeSlotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
+    }
+  }, [showTimeSlots, selectedDate]);
 
   const checkAvailability = async () => {
     if (!selectedDate) return;
@@ -621,7 +631,7 @@ export function BookingCalendarWidget({
         </div>
 
         {selectedDate && (
-          <div className={styles.timeSlotsSection}>
+          <div className={styles.timeSlotsSection} ref={timeSlotsRef}>
             <h3 className={styles.timeSlotsTitle}>
               {selectedDate.toLocaleDateString('en-US', {
                 weekday: 'long',
