@@ -252,6 +252,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [vapiConnecting, setVapiConnecting] = useState(false);
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
   const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const [vapiDebugLog, setVapiDebugLog] = useState<string[]>([]);
+  const [micPermission, setMicPermission] = useState<string>('unknown');
   const vapiTranscriptRef = useRef<HTMLDivElement>(null);
   const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
@@ -2389,12 +2391,25 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
            lowerText.includes('counselor');
   };
 
+  const vapiLog = (event: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    const entry = `${ts} ${event}`;
+    console.log('[Vapi]', entry);
+    setVapiDebugLog(prev => [...prev.slice(-20), entry]);
+  };
+
   const attachVapiListeners = (vapi: Vapi) => {
     vapi.on('call-start', () => {
+      vapiLog('call-start ✅');
       vapiCallReadyRef.current = true;
       setVapiConnecting(false);
+      // Check mic permission state when call starts
+      navigator.permissions?.query({ name: 'microphone' as PermissionName })
+        .then(r => { vapiLog(`mic-permission: ${r.state}`); setMicPermission(r.state); })
+        .catch(() => setMicPermission('api-unavailable'));
     });
     vapi.on('call-end', () => {
+      vapiLog('call-end');
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
       setIsVapiActive(false);
@@ -2402,7 +2417,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setVapiSpeaker('idle');
     });
     vapi.on('error', (e: any) => {
-      console.error('[Vapi] error', e);
+      vapiLog(`error ❌ ${JSON.stringify(e)}`);
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
       setIsVapiActive(false);
@@ -2410,11 +2425,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setVapiSpeaker('idle');
     });
     vapi.on('speech-start', () => {
+      vapiLog('speech-start (assistant)');
       setVapiConnecting(false);
       setVapiSpeaker('assistant');
     });
-    vapi.on('speech-end', () => setVapiSpeaker('idle'));
+    vapi.on('speech-end', () => { vapiLog('speech-end'); setVapiSpeaker('idle'); });
     vapi.on('message', (msg: any) => {
+      vapiLog(`msg type=${msg.type} role=${msg.role} txType=${msg.transcriptType ?? '-'}`);
       if (msg.type === 'transcript' && msg.role === 'user') {
         setVapiSpeaker('user');
         if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
@@ -3144,6 +3161,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               ))}
             </div>
           )}
+          {/* DEBUG PANEL — remove after mic issue is resolved */}
+          <div style={{
+            width: '100%', background: 'rgba(0,0,0,0.6)', borderRadius: 8,
+            padding: '8px 10px', fontSize: 10, color: '#aaa', fontFamily: 'monospace',
+            maxHeight: 120, overflowY: 'auto', boxSizing: 'border-box',
+          }}>
+            <div style={{ color: micPermission === 'granted' ? '#4ade80' : '#f87171', marginBottom: 4 }}>
+              mic: {micPermission} | spkr: {vapiSpeaker} | txCount: {vapiTranscript.length}
+            </div>
+            {vapiDebugLog.slice(-8).map((l, i) => <div key={i}>{l}</div>)}
+          </div>
           <button className={styles.voiceEndBtn} onClick={handleVoiceToggle} aria-label="End call">
             <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
               <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
