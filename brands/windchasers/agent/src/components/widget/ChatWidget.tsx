@@ -2020,70 +2020,61 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [isOpen, externalSessionId, messages.length, addUserMessage, addAIMessage, brandKey]);
 
-  // Re-fetch and restore conversations when chat reopens (if messages were cleared)
+  // Show welcome + optionally restore prior conversation when widget opens
   useEffect(() => {
-    if (isOpen && messages.length === 0 && !hasRestoredMessagesRef.current && !hasShownWelcomeRef.current && externalSessionId) {
-      // Re-fetch conversations when chat reopens and there are no messages
-      const fetchConversationsOnReopen = async () => {
+    if (!isOpen || messages.length !== 0 || hasShownWelcomeRef.current) return;
+
+    // ── Show welcome immediately — never block on an async DB check ──────────
+    // This removes the ~500 ms round-trip delay that was visible on first open.
+    playWelcomeSequence();
+
+    // ── Background: restore prior conversation for returning users ───────────
+    // If the session has a linked lead with past messages, swap the welcome
+    // content out (typically < 1 s, invisible to first-time visitors).
+    if (!hasRestoredMessagesRef.current && externalSessionId) {
+      (async () => {
         try {
           const supabase = createClient();
-          if (supabase && externalSessionId) {
-            const { data: sessionData, error: sessionError } = await supabase
-              .from('web_sessions')
-              .select('lead_id')
-              .eq('external_session_id', externalSessionId)
-              .maybeSingle();
-            
-            if (!sessionError && sessionData?.lead_id) {
-              const conversations = await fetchConversations(sessionData.lead_id);
-              if (conversations.length > 0 && addUserMessage && addAIMessage) {
-                // Store conversations to restore
-                conversationsToRestoreRef.current = conversations.map((conv) => ({
-                  id: conv.id,
-                  type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
-                  text: conv.content,
-                  created_at: conv.created_at
-                }));
-                
-                // Restore messages
-                conversations.forEach((conv) => {
-                  if (conv.sender === 'customer') {
-                    addUserMessage(conv.content);
-                  } else {
-                    addAIMessage(conv.content);
-                  }
-                });
-                
-                hasRestoredMessagesRef.current = true;
-                hasShownWelcomeRef.current = true;
-                
-                // Scroll to bottom after restoring
-                setTimeout(() => {
-                  if (messagesEndRef.current) {
-                    messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
-                  }
-                }, 100);
-                
-                return; // Don't show welcome message
-              }
+          if (!supabase) return;
+
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('web_sessions')
+            .select('lead_id')
+            .eq('external_session_id', externalSessionId)
+            .maybeSingle();
+
+          if (sessionError || !sessionData?.lead_id) return;
+
+          const conversations = await fetchConversations(sessionData.lead_id);
+          if (conversations.length === 0) return;
+
+          // Replace welcome with the restored conversation history
+          conversationsToRestoreRef.current = conversations.map((conv) => ({
+            id: conv.id,
+            type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+            text: conv.content,
+            created_at: conv.created_at,
+          }));
+          clearMessages();
+          hasShownWelcomeRef.current = true;
+          hasRestoredMessagesRef.current = true;
+          conversations.forEach((conv) => {
+            if (conv.sender === 'customer') {
+              addUserMessage?.(conv.content);
+            } else {
+              addAIMessage?.(conv.content);
             }
-          }
-          
-          // No conversations found, show welcome message
-          playWelcomeSequence();
+          });
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+          }, 80);
         } catch (err) {
-          console.error('[ChatWidget] Error fetching conversations on reopen:', err);
-          // On error, show welcome message
-          playWelcomeSequence();
+          // Non-fatal — welcome is already visible
+          console.error('[ChatWidget] Background conversation restore failed:', err);
         }
-      };
-      
-      fetchConversationsOnReopen();
-    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0) {
-      // Show welcome message if no conversations to restore
-      playWelcomeSequence();
+      })();
     }
-  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, brandKey, preLoadedLeadContext, playWelcomeSequence]);
+  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, playWelcomeSequence]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
@@ -3197,17 +3188,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               ))}
             </div>
           )}
-          {/* DEBUG PANEL — remove after mic issue is resolved */}
-          <div style={{
-            width: '100%', background: 'rgba(0,0,0,0.6)', borderRadius: 8,
-            padding: '8px 10px', fontSize: 10, color: '#aaa', fontFamily: 'monospace',
-            maxHeight: 120, overflowY: 'auto', boxSizing: 'border-box',
-          }}>
-            <div style={{ color: micPermission === 'granted' ? '#4ade80' : '#f87171', marginBottom: 4 }}>
-              mic: {micPermission} | spkr: {vapiSpeaker} | txCount: {vapiTranscript.length}
-            </div>
-            {vapiDebugLog.slice(-8).map((l, i) => <div key={i}>{l}</div>)}
-          </div>
           <button className={styles.voiceEndBtn} onClick={handleVoiceToggle} aria-label="End call">
             <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
               <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
