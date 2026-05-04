@@ -2460,8 +2460,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleVoiceToggle = async () => {
+    // ── End call ──────────────────────────────────────────────────────────────
     if (isVapiActive) {
-      vapiRef.current?.stop();
+      try { vapiRef.current?.stop(); } catch {}
       vapiRef.current = null;
       vapiPrewarmedRef.current = false;
       vapiCallReadyRef.current = false;
@@ -2471,40 +2472,52 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
+    // ── Start call ─────────────────────────────────────────────────────────────
     setVapiTranscript([]);
     setVapiDebugLog([]);
     setIsVapiActive(true);
     setVapiConnecting(true);
 
-    // Explicitly request mic permission here — inside the user gesture (button click).
-    // This ensures the browser permission prompt fires now, and the mic hardware
-    // is fully initialised before Vapi's internal getUserMedia call.
     try {
-      vapiLog('requesting mic…');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      vapiLog(`mic granted — tracks: ${stream.getAudioTracks().length}`);
-      setMicPermission('granted');
-      // Release the stream; give the hardware 300 ms to fully close
-      // before Vapi re-opens it internally.
-      stream.getTracks().forEach(t => t.stop());
-      await new Promise(r => setTimeout(r, 300));
-      vapiLog('mic released → starting Vapi');
-    } catch (err: any) {
-      vapiLog(`mic denied ❌ ${err.message}`);
-      setMicPermission('denied');
-      setIsVapiActive(false);
-      setVapiConnecting(false);
-      return;
-    }
+      // Guard: env key must be present
+      const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
+      if (!publicKey) {
+        vapiLog('error ❌ NEXT_PUBLIC_VAPI_PUBLIC_KEY not set');
+        setIsVapiActive(false);
+        setVapiConnecting(false);
+        return;
+      }
 
-    // Ensure Vapi instance (pre-warm may have already created it)
-    if (!vapiRef.current) {
-      const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+      // Always create a fresh instance — reusing a pre-warmed or stale instance
+      // can cause silent failures on mobile browsers.
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+      vapiPrewarmedRef.current = true;
+
+      // Do NOT pre-request getUserMedia here. The manual acquire→release→wait
+      // pattern breaks iOS Safari's user-gesture chain (any timer yield after
+      // the click causes iOS to revoke the gesture context). Let Vapi handle
+      // mic access internally — vapi.start() is called directly in the gesture
+      // handler, keeping the permission chain intact.
+      const vapi = new Vapi(publicKey);
       vapiRef.current = vapi;
       attachVapiListeners(vapi);
-    }
 
-    vapiRef.current.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      vapiLog('calling vapi.start…');
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      vapiLog('vapi.start() resolved');
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      vapiLog(`start failed ❌ ${msg}`);
+      setIsVapiActive(false);
+      setVapiConnecting(false);
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+    }
   };
 
   const handleSend = () => {
