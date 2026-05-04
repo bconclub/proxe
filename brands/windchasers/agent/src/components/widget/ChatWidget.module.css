@@ -1963,97 +1963,156 @@
   to   { clip-path: circle(200% at calc(100% - 62px) calc(100% - 30px)); opacity: 1; }
 }
 
-/* 3-D glossy sphere */
-.voiceOrb {
-  width: 160px;
-  height: 160px;
+/* ── Glass orb (mirrors bcon VapiOrb architecture) ──────────────── */
+
+/* Outer wrapper — positions all layers, drives speaker halo via data-speaker */
+.voiceOrbWrap {
+  position: relative;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   flex-shrink: 0;
-  position: relative;
-  z-index: 2;
-  background: radial-gradient(
-    circle at 38% 32%,
-    rgba(255, 235, 185, 0.6) 0%,
-    rgba(197, 165, 114, 0.95) 28%,
-    rgba(120, 85, 38, 0.97) 62%,
-    rgba(50, 28, 8, 1) 100%
-  );
-  box-shadow:
-    inset -10px -14px 28px rgba(0, 0, 0, 0.55),
-    inset 7px 7px 20px rgba(255, 220, 150, 0.18),
-    0 0 18px rgba(197, 165, 114, 0.1),
-    0 0 36px rgba(197, 165, 114, 0.05);
-  transition: box-shadow 0.5s ease;
-}
-
-/* specular highlight */
-.voiceOrb::after {
-  content: '';
-  position: absolute;
-  top: 16%;
-  left: 22%;
-  width: 32%;
-  height: 20%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(255, 245, 210, 0.55) 0%, transparent 70%);
-  filter: blur(4px);
-}
-
-/* Ring wrapper — sits around the orb */
-.voiceOrbRing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 184px;
-  height: 184px;
-  border-radius: 50%;
   margin-bottom: 28px;
-  position: relative;
 }
 
-/* Connecting — large arc (270°) spinning, feels like nearly complete */
-.voiceOrbRingConnecting::before {
-  content: '';
+/* Soft ambient halo — idle: deep purple glow */
+.voiceOrbRingHalo {
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(124, 58, 237, 0.5) 0%, transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(76, 29, 149, 0.45) 0%, transparent 60%);
+  filter: blur(16px);
+  animation: voiceOrbHaloPulse 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Assistant speaking — warm magenta halo */
+.voiceOrbWrap[data-speaker='assistant'] .voiceOrbRingHalo {
+  inset: -50px;
+  animation: voiceOrbHaloPulseLoud 0.85s ease-in-out infinite;
+  background:
+    radial-gradient(circle, rgba(255, 80, 200, 0.85) 0%, rgba(255, 80, 200, 0) 60%),
+    radial-gradient(circle, rgba(180, 90, 255, 0.7) 20%, transparent 70%);
+  filter: blur(28px);
+}
+
+/* User speaking — cool cyan halo */
+.voiceOrbWrap[data-speaker='user'] .voiceOrbRingHalo {
+  inset: -50px;
+  animation: voiceOrbHaloPulseLoud 1s ease-in-out infinite;
+  background:
+    radial-gradient(circle, rgba(40, 200, 255, 0.78) 0%, rgba(40, 200, 255, 0) 60%),
+    radial-gradient(circle, rgba(110, 200, 255, 0.55) 20%, transparent 70%);
+  filter: blur(26px);
+}
+
+@keyframes voiceOrbHaloPulse {
+  0%, 100% { transform: scale(1); opacity: 0.75; }
+  50%       { transform: scale(1.1); opacity: 1; }
+}
+@keyframes voiceOrbHaloPulseLoud {
+  0%, 100% { transform: scale(0.95); opacity: 0.85; }
+  50%       { transform: scale(1.35); opacity: 1; }
+}
+
+/* Glass sphere interior — animated conic gradient (replaces Grainient) */
+.voiceOrbInner {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  overflow: hidden;
   background: conic-gradient(
-    transparent                 0deg,
-    rgba(197, 165, 114, 0.25)  30deg,
-    rgba(197, 165, 114, 0.75) 120deg,
-    rgba(197, 165, 114, 0.95) 270deg,
-    transparent                270deg 360deg
+    from 180deg at 40% 40%,
+    #7c3aed 0deg,
+    #4c1d95 90deg,
+    #1e1b4b 180deg,
+    #4c1d95 270deg,
+    #7c3aed 360deg
   );
-  animation: voiceRingSpin 2.2s linear infinite;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  box-shadow:
+    inset 0 -30px 50px rgba(30, 27, 75, 0.7),
+    inset 0 30px 50px rgba(255, 255, 255, 0.18),
+    0 30px 80px -20px rgba(76, 29, 149, 0.55);
+  animation: voiceOrbInnerSpin 24s linear infinite;
+}
+
+/* Assistant speaking — inner gets pink tint */
+.voiceOrbWrap[data-speaker='assistant'] .voiceOrbInner {
+  animation-duration: 6s;
+  box-shadow:
+    inset 0 -30px 50px rgba(60, 0, 90, 0.7),
+    inset 0 30px 50px rgba(255, 200, 240, 0.32),
+    0 0 80px rgba(255, 110, 199, 0.55),
+    0 30px 100px -10px rgba(180, 60, 220, 0.75);
+}
+
+@keyframes voiceOrbInnerSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Specular top-left highlight — sells the sphere depth */
+.voiceOrbShine {
+  position: absolute;
+  top: 10%;
+  left: 18%;
+  width: 38%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0) 62%
+  );
+  pointer-events: none;
+  filter: blur(6px);
+  z-index: 2;
+}
+
+/* Rim — thin inner shadow to crisp up sphere edge */
+.voiceOrbRim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+    inset 0 0 40px rgba(30, 27, 75, 0.5);
   z-index: 1;
 }
 
-@keyframes voiceRingSpin {
-  from { transform: rotate(-90deg); }
-  to   { transform: rotate(270deg); }
+/* Connecting arc SVG — lime-green arc fills 0→100% over 2.4s */
+.voiceConnectingRing {
+  position: absolute;
+  inset: -10px;
+  width: calc(100% + 20px);
+  height: calc(100% + 20px);
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 0 12px rgba(74, 222, 128, 0.55));
+  animation: voiceConnectingPulse 1.8s ease-in-out 2.4s infinite;
+}
+.voiceConnectingArc {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: voiceConnectingFill 2.4s linear forwards;
 }
 
-/* Connected — solid green ring */
-.voiceOrbRingConnected {
-  border: 2px solid rgba(74, 222, 128, 0.7);
-  box-shadow: 0 0 12px rgba(74, 222, 128, 0.25), 0 0 24px rgba(74, 222, 128, 0.1);
-  transition: border 0.4s ease, box-shadow 0.4s ease;
+@keyframes voiceConnectingFill {
+  0%   { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
 }
-
-/* Error / issue — amber ring */
-.voiceOrbRingError {
-  border: 2px solid rgba(251, 191, 36, 0.8);
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3), 0 0 24px rgba(251, 191, 36, 0.12);
-  transition: border 0.4s ease, box-shadow 0.4s ease;
-}
-
-/* Ending — red ring flash before overlay closes */
-.voiceOrbRingEnding {
-  border: 2px solid rgba(248, 113, 113, 0.8);
-  box-shadow: 0 0 12px rgba(248, 113, 113, 0.3), 0 0 24px rgba(248, 113, 113, 0.12);
-  transition: border 0.3s ease, box-shadow 0.3s ease;
+@keyframes voiceConnectingPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(74, 222, 128, 0.45));
+    opacity: 0.95;
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(74, 222, 128, 0.85));
+    opacity: 1;
+  }
 }
 
 /* Mic volume bar — thin bar below status showing live mic amplitude */
@@ -2074,21 +2133,8 @@
   min-width: 0;
 }
 
-/* Speaking — pulsing gold */
-.voiceOrbSpeaking {
-  animation: voiceSpeakPulse 0.9s ease-in-out infinite;
-}
-
-@keyframes voiceSpeakPulse {
-  0%, 100% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.2),
-      0 0 24px rgba(197,165,114,0.2), 0 0 48px rgba(197,165,114,0.08);
-  }
-  50% {
-    box-shadow: inset -10px -14px 28px rgba(0,0,0,0.55), inset 7px 7px 20px rgba(255,220,150,0.26),
-      0 0 36px rgba(197,165,114,0.3), 0 0 70px rgba(197,165,114,0.12);
-  }
-}
+/* voiceOrbSpeaking retained for back-compat but superseded by data-speaker halo */
+.voiceOrbSpeaking { /* no-op — halo handled by voiceOrbWrap[data-speaker] */ }
 
 /* Name + status */
 .voiceMeta { text-align: center; margin-bottom: 20px; }
@@ -2103,7 +2149,7 @@
 
 .voiceStatus {
   font-size: 11px;
-  color: rgba(197, 165, 114, 0.75);
+  color: rgba(255, 255, 255, 0.55);
   margin: 0;
   min-height: 16px;
   letter-spacing: 0.07em;

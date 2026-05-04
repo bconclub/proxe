@@ -64,6 +64,28 @@ const InfinitySymbol = () => (
 );
 
 
+// Connecting ring — lime-green arc that fills 0→100% over 2.4s (mirrors bcon VapiOrb)
+const ConnectingRingOrb = () => (
+  <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
+    <circle
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="rgba(74, 222, 128, 0.18)"
+      strokeWidth="3"
+    />
+    <circle
+      className={styles.voiceConnectingArc}
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="#4ade80"
+      strokeWidth="3"
+      strokeLinecap="round"
+      pathLength={100}
+      transform="rotate(-90 120 120)"
+    />
+  </svg>
+);
+
 const ICONS = {
   search: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
@@ -2528,24 +2550,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       attachVapiListeners(vapi);
 
       vapiLog('calling vapi.start…');
-      // IMPORTANT: Only pass fields that exist in AssistantOverrides — any
-      // unknown field causes Vapi's server to reject the ENTIRE override
-      // payload (schema validation failure), silently falling back to the
-      // dashboard config. Removed silenceTimeoutSeconds and
-      // backgroundDenoisingEnabled which are NOT valid AssistantOverrides fields.
-      const overrides = {
-        transcriber: {
-          provider: 'deepgram',
-          model: 'nova-2',
-          language: 'en',
-          smartFormat: false,
-          endpointing: 300,
-          confidenceThreshold: 0.1, // Low threshold — don't filter out speech
-        },
-        firstMessage: "Hi! This is Avia, Windchasers' AI aviation counsellor. What's on your mind?",
-        maxDurationSeconds: 600,
-      };
-      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059', overrides);
+      // No client-side overrides — all config lives in the Vapi dashboard.
+      // Passing overrides risks schema-validation rejection on the server side
+      // which silently drops firstMessage and transcriber settings. Match the
+      // bcon VapiOrb pattern: just pass the assistant ID, nothing else.
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
       vapiLog('vapi.start() resolved');
     } catch (err: any) {
       const msg = err?.message ?? String(err);
@@ -3218,13 +3227,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          <div className={`${styles.voiceOrbRing} ${
-            vapiConnecting ? styles.voiceOrbRingConnecting
-            : vapiEnding ? styles.voiceOrbRingEnding
-            : vapiError ? styles.voiceOrbRingError
-            : styles.voiceOrbRingConnected
-          }`}>
-            <div className={`${styles.voiceOrb} ${vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
+          {/* Glass orb — speaker state drives halo colour via data-speaker */}
+          <div
+            className={styles.voiceOrbWrap}
+            data-speaker={vapiSpeaker}
+            data-state={vapiConnecting ? 'connecting' : vapiEnding ? 'ending' : vapiError ? 'error' : 'connected'}
+          >
+            {vapiConnecting && <ConnectingRingOrb />}
+            <span className={styles.voiceOrbRingHalo} aria-hidden="true" />
+            <span className={styles.voiceOrbInner} aria-hidden="true" />
+            <span className={styles.voiceOrbShine} aria-hidden="true" />
+            <span className={styles.voiceOrbRim} aria-hidden="true" />
           </div>
           <div className={styles.voiceMeta}>
             <p className={styles.voiceName}>Avia</p>
