@@ -250,6 +250,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const vapiCallReadyRef = useRef(false);
   const [isVapiActive, setIsVapiActive] = useState(false);
   const [vapiConnecting, setVapiConnecting] = useState(false);
+  const [vapiEnding, setVapiEnding] = useState(false);
+  const [vapiError, setVapiError] = useState(false);
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
   const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [vapiDebugLog, setVapiDebugLog] = useState<string[]>([]);
@@ -2410,17 +2412,28 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       vapiLog('call-end');
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
-      setIsVapiActive(false);
-      setVapiConnecting(false);
       setVapiSpeaker('idle');
+      // Flash red ring for 700ms before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
     });
     vapi.on('error', (e: any) => {
       vapiLog(`error ❌ ${JSON.stringify(e)}`);
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
-      setIsVapiActive(false);
-      setVapiConnecting(false);
       setVapiSpeaker('idle');
+      // Flash amber ring for 1.2s before overlay unmounts
+      setVapiError(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiError(false);
+        setVapiConnecting(false);
+      }, 1200);
     });
     vapi.on('speech-start', () => {
       vapiLog('speech-start (assistant)');
@@ -2465,13 +2478,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const handleVoiceToggle = async () => {
     // ── End call ──────────────────────────────────────────────────────────────
     if (isVapiActive) {
+      // Flash red ring briefly before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setVapiSpeaker('idle');
       try { vapiRef.current?.stop(); } catch {}
       vapiRef.current = null;
       vapiPrewarmedRef.current = false;
       vapiCallReadyRef.current = false;
-      setIsVapiActive(false);
-      setVapiConnecting(false);
-      setVapiSpeaker('idle');
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
       return;
     }
 
@@ -2509,17 +2527,24 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       attachVapiListeners(vapi);
 
       vapiLog('calling vapi.start…');
-      // Pass overrides to ensure:
-      // 1. Deepgram transcriber is active (so user mic input is captured)
-      // 2. First message uses the correct brand name "Windchasers"
-      // These override whatever is configured in the Vapi dashboard.
+      // Assistant overrides: force Deepgram transcriber so user voice is
+      // captured, extend silence timeout to prevent premature call-end,
+      // and correct the brand name in the first message.
+      // NOTE: If the Vapi dashboard assistant has no transcriber configured,
+      // add Deepgram in the dashboard too (Settings → Transcriber → Deepgram,
+      // nova-2, English). The override is belt-and-suspenders.
       await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059', {
         transcriber: {
           provider: 'deepgram',
           model: 'nova-2',
           language: 'en',
+          smartFormat: false,
+          endpointing: 300,
         },
-        firstMessage: "Hi! This is Avia, Windchasers' AI aviation counsellor. I'm here to help you find the right career path — what's on your mind?",
+        firstMessage: "Hi! This is Avia, Windchasers' AI aviation counsellor. What's on your mind?",
+        silenceTimeoutSeconds: 60,
+        maxDurationSeconds: 600,
+        backgroundDenoisingEnabled: false,
       } as any);
       vapiLog('vapi.start() resolved');
     } catch (err: any) {
@@ -3193,13 +3218,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          <div className={`${styles.voiceOrbRing} ${vapiConnecting ? styles.voiceOrbRingConnecting : styles.voiceOrbRingConnected}`}>
+          <div className={`${styles.voiceOrbRing} ${
+            vapiConnecting ? styles.voiceOrbRingConnecting
+            : vapiEnding ? styles.voiceOrbRingEnding
+            : vapiError ? styles.voiceOrbRingError
+            : styles.voiceOrbRingConnected
+          }`}>
             <div className={`${styles.voiceOrb} ${vapiSpeaker === 'assistant' ? styles.voiceOrbSpeaking : ''}`} />
           </div>
           <div className={styles.voiceMeta}>
             <p className={styles.voiceName}>Avia</p>
             <p className={styles.voiceStatus}>
-              {vapiConnecting ? 'Connecting…' : vapiSpeaker === 'assistant' ? 'Speaking…' : vapiSpeaker === 'user' ? 'Listening…' : 'Connected'}
+              {vapiConnecting ? 'Connecting…'
+                : vapiEnding ? 'Ending…'
+                : vapiError ? 'Connection issue'
+                : vapiSpeaker === 'assistant' ? 'Speaking…'
+                : vapiSpeaker === 'user' ? 'Listening…'
+                : 'Connected'}
             </p>
           </div>
           {vapiTranscript.length > 0 && (
