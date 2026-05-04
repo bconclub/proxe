@@ -2394,10 +2394,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       vapiLog('call-start ✅');
       vapiCallReadyRef.current = true;
       setVapiConnecting(false);
-      // Check mic permission state when call starts
-      navigator.permissions?.query({ name: 'microphone' as PermissionName })
-        .then(r => { vapiLog(`mic-permission: ${r.state}`); setMicPermission(r.state); })
-        .catch(() => setMicPermission('api-unavailable'));
+      // Ensure mic is unmuted — some environments start calls muted by default
+      try {
+        if (vapi.isMuted()) {
+          vapi.setMuted(false);
+          vapiLog('mic was muted → unmuted');
+        } else {
+          vapiLog('mic already unmuted ✅');
+        }
+      } catch {
+        vapiLog('isMuted/setMuted not available on this SDK version');
+      }
     });
     vapi.on('call-end', () => {
       vapiLog('call-end');
@@ -2421,6 +2428,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setVapiSpeaker('assistant');
     });
     vapi.on('speech-end', () => { vapiLog('speech-end'); setVapiSpeaker('idle'); });
+    // Volume-level fires continuously with user mic amplitude (0–1).
+    // Logging to console only — confirms whether mic audio reaches Vapi.
+    vapi.on('volume-level', (level: number) => {
+      if (level > 0.02) console.log('[Vapi] vol:', level.toFixed(3));
+    });
     vapi.on('message', (msg: any) => {
       vapiLog(`msg type=${msg.type} role=${msg.role} txType=${msg.transcriptType ?? '-'}`);
       if (msg.type === 'transcript' && msg.role === 'user') {
@@ -2497,7 +2509,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       attachVapiListeners(vapi);
 
       vapiLog('calling vapi.start…');
-      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      // Pass overrides to ensure:
+      // 1. Deepgram transcriber is active (so user mic input is captured)
+      // 2. First message uses the correct brand name "Windchasers"
+      // These override whatever is configured in the Vapi dashboard.
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059', {
+        transcriber: {
+          provider: 'deepgram',
+          model: 'nova-2',
+          language: 'en',
+        },
+        firstMessage: "Hi! This is Avia, Windchasers' AI aviation counsellor. I'm here to help you find the right career path — what's on your mind?",
+      } as any);
       vapiLog('vapi.start() resolved');
     } catch (err: any) {
       const msg = err?.message ?? String(err);
