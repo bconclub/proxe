@@ -1662,13 +1662,6 @@ export default function InboxPage() {
                     return (
                       <React.Fragment key={msg.id}>
                       {dateSeparator}
-                      {msgIdx > 0 && formGapMs > 60000 && !showDateSeparator && (
-                        <div className="flex justify-center my-0.5">
-                          <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(formGapMs), background: 'rgba(255,255,255,0.03)' }}>
-                            {formatGap(formGapMs)} gap
-                          </span>
-                        </div>
-                      )}
                       <div className="flex justify-start">
                         <div
                           className="max-w-[90%] rounded-lg px-3 py-2 border"
@@ -1722,13 +1715,6 @@ export default function InboxPage() {
                   return (
                     <React.Fragment key={msg.id}>
                     {dateSeparator}
-                    {msgIdx > 0 && gapMs > 60000 && !showDateSeparator && (
-                      <div className="flex justify-center my-0.5">
-                        <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(gapMs), background: 'rgba(255,255,255,0.03)' }}>
-                          {formatGap(gapMs)} gap
-                        </span>
-                      </div>
-                    )}
                     <div
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
