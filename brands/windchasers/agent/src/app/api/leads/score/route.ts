@@ -153,7 +153,7 @@ Respond with ONLY a JSON object in this exact format:
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
             max_tokens: 300,
             messages: [
               {
@@ -273,6 +273,7 @@ Respond with ONLY a JSON object in this exact format:
       .update({
         lead_score: aiScore,
         lead_stage: newStage,
+        last_scored_at: new Date().toISOString(),
         last_interaction_at: new Date().toISOString(),
         response_count: responseCount,
         total_touchpoints: touchpoints,
@@ -298,9 +299,6 @@ Respond with ONLY a JSON object in this exact format:
           change_reason: 'PROXe AI scoring',
         })
     }
-
-    // Update metrics
-    await supabase.rpc('update_lead_metrics', { lead_uuid: lead_id })
 
     return NextResponse.json({
       success: true,

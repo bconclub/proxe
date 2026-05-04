@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userProfile = session.user || {};
 
+    // Skip all DB writes for deploy health-check sessions (deploy_ready_*)
+    // These are synthetic pings that create noise in sessions + conversations tables.
+    const isHealthCheck = externalSessionId.startsWith('deploy_ready');
+
     // Get Supabase client
     const supabase = getServiceClient() || getClient();
     if (!supabase) {
@@ -77,8 +81,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure session exists
-    await ensureSession(externalSessionId, 'web', supabase);
+    // Ensure session exists (skip for health checks)
+    if (!isHealthCheck) {
+      await ensureSession(externalSessionId, 'web', supabase);
+    }
 
     // Build AgentInput
     const agentInput: AgentInput = {
@@ -126,19 +132,22 @@ export async function POST(request: NextRequest) {
           // rendered the AI response, so this extra await only delays the
           // connection close (typically < 1s for the DB writes; the slow
           // summary generation is internally fire-and-forget).
-          try {
-            await postProcess(
-              externalSessionId,
-              message,
-              fullResponse,
-              userProfile,
-              agentInput,
-              supabase,
-              responseTimeMs,
-              requestOrigin,
-            );
-          } catch (err) {
-            console.error('[agent/web/chat] Post-processing error:', err);
+          // Skip all DB writes for health-check sessions
+          if (!isHealthCheck) {
+            try {
+              await postProcess(
+                externalSessionId,
+                message,
+                fullResponse,
+                userProfile,
+                agentInput,
+                supabase,
+                responseTimeMs,
+                requestOrigin,
+              );
+            } catch (err) {
+              console.error('[agent/web/chat] Post-processing error:', err);
+            }
           }
 
         } catch (error: any) {
@@ -213,18 +222,19 @@ async function postProcess(
       // These rows were logged before the visitor provided phone/email; they carry
       // session_id in their JSONB metadata column. Use .filter() for explicit JSON
       // path matching (more reliable than .eq() with arrow operators in Supabase JS).
+      // NOTE: Do NOT chain .select({ head: true }) after .update() — it converts
+      // the request to a HEAD which prevents the update from executing.
       if (leadId) {
-        const { error: backfillError, count: backfillCount } = await supabase
+        const { error: backfillError } = await supabase
           .from('conversations')
           .update({ lead_id: leadId })
           .filter('metadata->>session_id', 'eq', externalSessionId)
-          .is('lead_id', null)
-          .select('id', { count: 'exact', head: true });
+          .is('lead_id', null);
 
         if (backfillError) {
           console.error('[agent/web/chat] Failed to backfill conversations:', backfillError);
         } else {
-          console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId, '| rows updated:', backfillCount ?? 'unknown');
+          console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId);
         }
       }
     }
@@ -301,18 +311,22 @@ async function postProcess(
       }
     }
 
-    // 5. Trigger AI scoring for this lead (fire-and-forget, non-blocking).
-    // Use the current request's origin so the call hits this same server in
-    // dev — NEXT_PUBLIC_APP_URL is the static prod URL and would 404 locally.
+    // 5. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
+    // when the Vercel serverless function exits after the stream closes).
     if (leadId) {
       const appUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4002';
-      fetch(`${appUrl}/api/webhooks/message-created`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: leadId }),
-      }).catch((scoringError) => {
+      try {
+        const scoreRes = await fetch(`${appUrl}/api/webhooks/message-created`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: leadId }),
+        });
+        if (!scoreRes.ok) {
+          console.error('[agent/web/chat] Scoring webhook returned', scoreRes.status);
+        }
+      } catch (scoringError) {
         console.error('[agent/web/chat] Scoring webhook failed:', scoringError);
-      });
+      }
     }
   } catch (error) {
     console.error('[agent/web/chat] Post-processing failed:', error);
