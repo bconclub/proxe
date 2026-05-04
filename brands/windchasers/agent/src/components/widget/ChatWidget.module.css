@@ -1887,90 +1887,57 @@
   50%       { box-shadow: 0 0 0 6px rgba(197, 165, 114, 0); }
 }
 
-/* Call button */
+/* Call button — matches send button style */
 .micCta {
   width: 36px;
   height: 36px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: transparent;
-  color: #C5A572;
+  background: var(--primary-color, #C5A572);
+  color: var(--text-button, #1A1A1A);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   position: relative;
-  transition: color 0.2s ease;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25),
+    0 0 0 3px rgba(255, 255, 255, 0.12),
+    0 0 10px 3px rgba(255, 255, 255, 0.08);
+  animation: micGlowPulse 2.4s ease-in-out infinite;
 }
 
-/* Eclipse corona — ~320° bright ring, 40° gap, slow rotation */
-.micCta::before {
-  content: '';
-  position: absolute;
-  inset: -7px;
-  border-radius: 50%;
-  background: conic-gradient(
-    rgba(197, 165, 114, 0.0)   0deg,
-    rgba(197, 165, 114, 0.0)  30deg,
-    rgba(197, 165, 114, 0.5)  55deg,
-    rgba(197, 165, 114, 0.9) 120deg,
-    rgba(197, 165, 114, 1.0) 200deg,
-    rgba(197, 165, 114, 1.0) 310deg,
-    rgba(197, 165, 114, 0.3) 340deg,
-    rgba(197, 165, 114, 0.0) 360deg
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
-  animation: micRingSpin 3.5s linear infinite;
-  pointer-events: none;
-}
-
-/* Soft outer corona glow */
-.micCta::after {
-  content: '';
-  position: absolute;
-  inset: -9px;
-  border-radius: 50%;
-  background: conic-gradient(
-    rgba(197, 165, 114, 0.0)   0deg,
-    rgba(197, 165, 114, 0.0)  30deg,
-    rgba(197, 165, 114, 0.2)  55deg,
-    rgba(197, 165, 114, 0.4) 120deg,
-    rgba(197, 165, 114, 0.45) 310deg,
-    rgba(197, 165, 114, 0.1) 340deg,
-    rgba(197, 165, 114, 0.0) 360deg
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
-  filter: blur(3px);
-  animation: micRingSpin 3.5s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes micRingSpin {
-  to { transform: rotate(360deg); }
+@keyframes micGlowPulse {
+  0%, 100% {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      0 0 0 3px rgba(255, 255, 255, 0.12),
+      0 0 10px 3px rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      0 0 0 3px rgba(255, 255, 255, 0.22),
+      0 0 16px 5px rgba(255, 255, 255, 0.12);
+  }
 }
 
 .micCta svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
 }
 
 .micCta:hover {
-  color: #e8c98a;
+  filter: brightness(1.1);
+  transform: translateY(-1px);
 }
 
-/* Active: call in progress — gold pulse, hide arc */
+/* Active: call in progress */
 .micCtaActive {
-  color: #C5A572;
   animation: micPulse 1.5s ease-in-out infinite;
-}
-
-.micCtaActive::before,
-.micCtaActive::after {
-  display: none;
 }
 
 /* ─────────────────────────────────────────
