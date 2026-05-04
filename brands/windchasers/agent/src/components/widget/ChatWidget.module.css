@@ -2056,6 +2056,24 @@
   transition: border 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Mic volume bar — thin bar below status showing live mic amplitude */
+.voiceMicBar {
+  width: 140px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: -4px;
+}
+
+.voiceMicBarFill {
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(74, 222, 128, 0.8);
+  transition: width 0.08s ease;
+  min-width: 0;
+}
+
 /* Speaking — pulsing gold */
 .voiceOrbSpeaking {
   animation: voiceSpeakPulse 0.9s ease-in-out infinite;

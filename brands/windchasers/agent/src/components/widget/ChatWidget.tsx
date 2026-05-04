@@ -253,6 +253,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [vapiEnding, setVapiEnding] = useState(false);
   const [vapiError, setVapiError] = useState(false);
   const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
+  const [vapiVolume, setVapiVolume] = useState(0);
   const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
   const [vapiDebugLog, setVapiDebugLog] = useState<string[]>([]);
   const [micPermission, setMicPermission] = useState<string>('unknown');
@@ -2442,9 +2443,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     });
     vapi.on('speech-end', () => { vapiLog('speech-end'); setVapiSpeaker('idle'); });
     // Volume-level fires continuously with user mic amplitude (0–1).
-    // Logging to console only — confirms whether mic audio reaches Vapi.
+    // Drive the on-screen mic bar so we can visually confirm audio capture.
     vapi.on('volume-level', (level: number) => {
-      if (level > 0.02) console.log('[Vapi] vol:', level.toFixed(3));
+      setVapiVolume(level);
     });
     vapi.on('message', (msg: any) => {
       vapiLog(`msg type=${msg.type} role=${msg.role} txType=${msg.transcriptType ?? '-'}`);
@@ -2527,25 +2528,24 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       attachVapiListeners(vapi);
 
       vapiLog('calling vapi.start…');
-      // Assistant overrides: force Deepgram transcriber so user voice is
-      // captured, extend silence timeout to prevent premature call-end,
-      // and correct the brand name in the first message.
-      // NOTE: If the Vapi dashboard assistant has no transcriber configured,
-      // add Deepgram in the dashboard too (Settings → Transcriber → Deepgram,
-      // nova-2, English). The override is belt-and-suspenders.
-      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059', {
+      // IMPORTANT: Only pass fields that exist in AssistantOverrides — any
+      // unknown field causes Vapi's server to reject the ENTIRE override
+      // payload (schema validation failure), silently falling back to the
+      // dashboard config. Removed silenceTimeoutSeconds and
+      // backgroundDenoisingEnabled which are NOT valid AssistantOverrides fields.
+      const overrides = {
         transcriber: {
           provider: 'deepgram',
           model: 'nova-2',
           language: 'en',
           smartFormat: false,
           endpointing: 300,
+          confidenceThreshold: 0.1, // Low threshold — don't filter out speech
         },
         firstMessage: "Hi! This is Avia, Windchasers' AI aviation counsellor. What's on your mind?",
-        silenceTimeoutSeconds: 60,
         maxDurationSeconds: 600,
-        backgroundDenoisingEnabled: false,
-      } as any);
+      };
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059', overrides);
       vapiLog('vapi.start() resolved');
     } catch (err: any) {
       const msg = err?.message ?? String(err);
@@ -3237,6 +3237,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 : 'Connected'}
             </p>
           </div>
+          {/* Mic volume bar — shows live amplitude from user's mic.
+              If this bar never moves when speaking, mic audio isn't reaching Vapi. */}
+          {!vapiConnecting && !vapiEnding && (
+            <div className={styles.voiceMicBar}>
+              <div
+                className={styles.voiceMicBarFill}
+                style={{ width: `${Math.min(100, vapiVolume * 400)}%` }}
+              />
+            </div>
+          )}
           {vapiTranscript.length > 0 && (
             <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
               {vapiTranscript.map((m, i) => (
