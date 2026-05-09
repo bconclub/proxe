@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './BookingCalendarWidget.module.css';
 import type { BrandConfig } from '@/configs';
 
