@@ -166,12 +166,7 @@ export default function LoginPage() {
       setRateLimited(false)
       setRateLimitUntil(null)
       setAttemptCount(0)
-    }
-
-    // Client-side rate limiting: prevent too many rapid attempts
-    if (lastAttemptTime && now - lastAttemptTime < 3000) {
-      setError('Please wait a moment before trying again.')
-      return
+      localStorage.removeItem('rateLimitUntil')
     }
 
     setLastAttemptTime(now)
@@ -214,14 +209,7 @@ export default function LoginPage() {
           }, 60 * 1000)
         } else if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please check your credentials and try again.')
-          setAttemptCount(prev => {
-            const newCount = prev + 1
-            if (newCount >= 3) {
-              setError('Multiple failed attempts. Please wait a moment before trying again.')
-              setLastAttemptTime(now + 10000)
-            }
-            return newCount
-          })
+          setAttemptCount(prev => prev + 1)
         } else if (error.message.includes('Email not confirmed')) {
           setError('Please verify your email address before signing in.')
         } else {
