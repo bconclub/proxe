@@ -579,6 +579,9 @@
   padding: 10px 16px 20px;
   text-align: center;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background: rgba(197, 165, 114, 0.06);
   border: 1px solid rgba(197, 165, 114, 0.18);
   border-radius: 16px;
@@ -648,7 +651,6 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
-  max-width: 400px;
   margin-top: 4px;
 }
 

@@ -64,20 +64,20 @@ const InfinitySymbol = () => (
 );
 
 
-// Connecting ring — lime-green arc that fills 0→100% over 2.4s (mirrors bcon VapiOrb)
+// Connecting ring — gold arc that fills 0→100% over 2.4s (Windchasers brand)
 const ConnectingRingOrb = () => (
   <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
     <circle
       cx="120" cy="120" r="112"
       fill="none"
-      stroke="rgba(74, 222, 128, 0.18)"
+      stroke="rgba(197, 165, 114, 0.18)"
       strokeWidth="3"
     />
     <circle
       className={styles.voiceConnectingArc}
       cx="120" cy="120" r="112"
       fill="none"
-      stroke="#4ade80"
+      stroke="#C5A572"
       strokeWidth="3"
       strokeLinecap="round"
       pathLength={100}
