@@ -34,13 +34,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  // Initialise darkMode synchronously to avoid a flash on first paint
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true
-    const saved = localStorage.getItem('theme')
-    if (saved) return saved === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
+  // Start false on both server and client to avoid hydration mismatch.
+  // The first useEffect below sets the real value instantly on mount.
+  const [darkMode, setDarkMode] = useState(false)
   const [checking, setChecking] = useState(true) // hide form until session check done
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -50,15 +46,18 @@ export default function LoginPage() {
   const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
 
+  // Effect 1: resolve dark mode from storage on mount (runs once, client-only)
   useEffect(() => {
-    // Apply theme class without causing a re-render flash
-    if (darkMode) {
+    const saved = localStorage.getItem('theme')
+    const prefersDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+    setDarkMode(prefersDark)
+    if (prefersDark) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
     }
 
-    // Check for saved rate limit state
+    // Also restore any persisted rate-limit state
     const savedRateLimit = localStorage.getItem('rateLimitUntil')
     if (savedRateLimit) {
       const until = parseInt(savedRateLimit)
@@ -69,22 +68,32 @@ export default function LoginPage() {
         localStorage.removeItem('rateLimitUntil')
       }
     }
+  }, [])
 
-    // Check if user is already logged in — hide the form until we know.
+  // Effect 2: keep the <html> class in sync when darkMode is toggled manually
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [darkMode])
+
+  // Effect 3: check for an existing session once; hide form until resolved
+  useEffect(() => {
     const checkExistingSession = async () => {
       try {
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user && session?.access_token) {
           router.replace('/dashboard')
-          return // stay in checking=true; redirect will unmount
+          return // stay checking=true while redirect fires; component unmounts
         }
       } catch {}
       setChecking(false) // no session → show the form
     }
-
     checkExistingSession()
-  }, [router, darkMode])
+  }, [router])
 
   // Countdown timer for rate limit
   useEffect(() => {
@@ -204,113 +213,23 @@ export default function LoginPage() {
 
         setLoading(false)
       } else {
-        // Reset everything on success
+        // Reset rate-limit counters on success
         setAttemptCount(0)
         setLastAttemptTime(null)
         setRateLimited(false)
         setRateLimitUntil(null)
 
-          // Verify session is available
-          if (data?.user && data?.session) {
-            console.log('✅ Login successful, user:', data.user.email)
-
-            // Wait a moment to ensure session is fully established
-            await new Promise(resolve => setTimeout(resolve, 300))
-
-            // Send session to API to set cookies on server
-            try {
-              const syncResponse = await fetch('/api/auth/sync-session', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  access_token: data.session.access_token,
-                  refresh_token: data.session.refresh_token,
-                  expires_at: data.session.expires_at,
-                  expires_in: data.session.expires_in,
-                  token_type: data.session.token_type,
-                  user: data.session.user,
-                }),
-                credentials: 'include',
-              })
-
-              if (!syncResponse.ok) {
-                const errorText = await syncResponse.text()
-                let errorData
-                try {
-                  errorData = JSON.parse(errorText)
-                } catch {
-                  errorData = { error: errorText || 'Unknown error' }
-                }
-                console.error('❌ Sync failed:', {
-                  status: syncResponse.status,
-                  error: errorData,
-                })
-                throw new Error(`Sync failed: ${errorData.error || syncResponse.statusText}`)
-              }
-
-              const result = await syncResponse.json()
-
-              if (syncResponse.ok && result.success) {
-                // Verify session is still available on client
-                const { data: { user: verifyUser } } = await supabase.auth.getUser()
-                if (!verifyUser) {
-                  console.error('❌ Session lost after sync, retrying...')
-                  try {
-                    const retryResponse = await fetch('/api/auth/sync-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        access_token: data.session.access_token,
-                        refresh_token: data.session.refresh_token,
-                        expires_at: data.session.expires_at,
-                        expires_in: data.session.expires_in,
-                        token_type: data.session.token_type,
-                        user: data.session.user,
-                      }),
-                      credentials: 'include',
-                    })
-                    if (retryResponse.ok) {
-                      console.log('✅ Retry sync successful')
-                    }
-                  } catch (retryError) {
-                    console.error('❌ Retry sync failed:', retryError)
-                  }
-                }
-
-                // Wait for cookies to propagate
-                await new Promise(resolve => setTimeout(resolve, 1000))
-
-                // Final verification before redirect
-                const { data: { user: finalVerify } } = await supabase.auth.getUser()
-                if (finalVerify) {
-                  window.location.href = '/dashboard'
-                } else {
-                  console.error('❌ Session verification failed')
-                  setError('Login successful but session not established. Please try again.')
-                  setLoading(false)
-                }
-              } else {
-                const errorMsg = result.error || 'Failed to sync session'
-                setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
-                setLoading(false)
-              }
-            } catch (error: any) {
-              console.error('❌ Sync error:', error)
-              const errorMsg = error?.message || 'Failed to sync session to server'
-              setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
-              setLoading(false)
-            }
-          } else if (data?.user) {
-            console.warn('⚠️ User exists but session not immediately available, redirecting...')
-            router.push('/dashboard')
-            router.refresh()
-          } else {
-            console.error('❌ Login successful but user data not available')
-            setError('Login successful but user data not available. Please try again.')
-            setLoading(false)
-          }
+        if (data?.user && data?.session) {
+          console.log('✅ Login successful, user:', data.user.email)
+          // createBrowserClient automatically wrote the session to cookies —
+          // the server-side createServerClient will see it on the next request.
+          // A full page navigation flushes the in-flight React state cleanly.
+          window.location.href = '/dashboard'
+        } else {
+          console.error('❌ Login successful but session not available')
+          setError('Login successful but session not established. Please try again.')
+          setLoading(false)
+        }
       }
     } catch (err) {
       console.error('Login error:', err)

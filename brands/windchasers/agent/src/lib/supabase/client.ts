@@ -1,14 +1,14 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.types'
 
-// Singleton pattern to prevent multiple client instances
-let supabaseClient: ReturnType<typeof createSupabaseClient<Database>> | null = null
+// Singleton pattern to prevent multiple client instances.
+// createBrowserClient stores the session in cookies (not just localStorage)
+// so the Next.js server-side createServerClient can read it without any
+// manual sync-session dance.
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 export function createClient() {
-  // Return existing client if already created
-  if (supabaseClient) {
-    return supabaseClient
-  }
+  if (supabaseClient) return supabaseClient
 
   // IMPORTANT: Next.js requires static string access for NEXT_PUBLIC_* env vars.
   // Dynamic access like process.env[`NEXT_PUBLIC_${brand}_...`] does NOT work client-side.
@@ -28,17 +28,6 @@ export function createClient() {
     console.error('   Please configure NEXT_PUBLIC_BCON_SUPABASE_URL and NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY')
   }
 
-  supabaseClient = createSupabaseClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
-      }
-    }
-  )
-
+  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
   return supabaseClient
 }
