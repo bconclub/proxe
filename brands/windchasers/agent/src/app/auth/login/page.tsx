@@ -393,6 +393,7 @@ export default function LoginPage() {
                 placeholder="email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                suppressHydrationWarning
                 onFocus={(e) => {
                   e.target.style.borderColor = colors.primary
                   e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`
@@ -433,6 +434,7 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  suppressHydrationWarning
                   onFocus={(e) => {
                     e.target.style.borderColor = colors.primary
                     e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`
