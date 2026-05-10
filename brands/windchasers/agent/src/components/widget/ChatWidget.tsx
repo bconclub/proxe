@@ -3942,6 +3942,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         data-brand={brand}
+        data-open={isOpen ? "true" : undefined}
       >
         <div className={styles.bubbleIcon}>
           {isOpen ? ICONS.chevronUp : ICONS.chevronDown}

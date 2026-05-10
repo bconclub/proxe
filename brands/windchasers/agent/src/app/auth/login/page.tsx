@@ -34,7 +34,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [darkMode, setDarkMode] = useState(true)
+  // Initialise darkMode synchronously to avoid a flash on first paint
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+  const [checking, setChecking] = useState(true) // hide form until session check done
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
@@ -44,12 +51,8 @@ export default function LoginPage() {
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
 
   useEffect(() => {
-    // Check system preference or saved preference
-    const savedTheme = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const shouldBeDark = savedTheme ? savedTheme === 'dark' : prefersDark
-    setDarkMode(shouldBeDark)
-    if (shouldBeDark) {
+    // Apply theme class without causing a re-render flash
+    if (darkMode) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
@@ -67,24 +70,21 @@ export default function LoginPage() {
       }
     }
 
-    // Check if user is already logged in and redirect to dashboard.
-    // Use getSession() (cached, no network) to avoid triggering another
-    // Supabase auth request and to prevent redirect loops with stale tokens.
+    // Check if user is already logged in — hide the form until we know.
     const checkExistingSession = async () => {
       try {
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user && session?.access_token) {
-          console.log('✅ Active session found, redirecting to dashboard')
           router.replace('/dashboard')
+          return // stay in checking=true; redirect will unmount
         }
-      } catch (err) {
-        console.log('ℹ️ No existing session found, staying on login page')
-      }
+      } catch {}
+      setChecking(false) // no session → show the form
     }
 
     checkExistingSession()
-  }, [router])
+  }, [router, darkMode])
 
   // Countdown timer for rate limit
   useEffect(() => {
@@ -318,6 +318,10 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  // Don't render anything until we've confirmed there's no active session.
+  // This prevents the login form from flashing before the redirect fires.
+  if (checking) return null
 
   return (
     <div

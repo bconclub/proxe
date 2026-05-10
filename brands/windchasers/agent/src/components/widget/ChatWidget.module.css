@@ -2897,8 +2897,8 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 70px;
-  height: 70px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: #0A0A0B;
   border: 2px solid #8B5CF6;
@@ -3002,6 +3002,12 @@
     0 0 10px rgba(197, 165, 114, 0.3) !important;
 }
 
+/* Windchasers closed-state (logo) button is larger than the open toggle */
+.bubbleButton[data-brand="windchasers"]:not([data-open="true"]) {
+  width: 64px !important;
+  height: 64px !important;
+}
+
 .bubbleButton[data-brand="windchasers"]:hover,
 [data-brand="windchasers"] .bubbleButton:hover {
   box-shadow:
@@ -3039,7 +3045,7 @@
 /* Chatbox container for bubble style - matches agent.windchasers.in */
 .chatboxBubble {
   position: fixed !important;
-  bottom: 80px !important;
+  bottom: 100px !important;
   right: 20px !important;
   top: auto !important;
   left: auto !important;
@@ -3047,22 +3053,22 @@
   -webkit-transform: none !important;
   width: 400px !important;
   max-width: calc(100vw - 40px) !important;
-  height: 68vh !important;
-  min-height: 540px !important;
-  max-height: 680px !important;
+  height: 78vh !important;
+  min-height: 560px !important;
+  max-height: 780px !important;
   z-index: 2147483000 !important;
   pointer-events: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: #FFFFFF !important;
   border: 1px solid rgba(0, 0, 0, 0.08) !important;
   border-radius: 16px !important;
-  box-shadow: 0 14px 50px rgba(0,0,0,0.12) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.10) !important;
 }
 
 .chatboxBubble.themeDark {
   background: #0A0A0B !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow: 0 14px 50px rgba(0,0,0,0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important;
 }
 
 /* Show header in bubble mode for close button access */
