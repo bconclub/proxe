@@ -136,6 +136,23 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
 
+    // Browser autofill (Chrome, Safari, etc.) doesn't always fire React's
+    // onChange handler on controlled inputs. Read directly from the DOM so
+    // autofilled credentials are captured even when React state is still empty.
+    const emailEl = document.getElementById('email') as HTMLInputElement | null
+    const passwordEl = document.getElementById('password') as HTMLInputElement | null
+    const emailValue = emailEl?.value?.trim() || email
+    const passwordValue = passwordEl?.value || password
+
+    // Sync state in case autofill populated the DOM but not state
+    if (emailValue && !email) setEmail(emailValue)
+    if (passwordValue && !password) setPassword(passwordValue)
+
+    if (!emailValue || !passwordValue) {
+      setError('Please enter your email and password.')
+      return
+    }
+
     // Check if we're still rate limited
     const now = Date.now()
     if (rateLimitUntil && now < rateLimitUntil) {
@@ -164,8 +181,8 @@ export default function LoginPage() {
       const supabase = createClient()
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: emailValue,
+        password: passwordValue,
       })
 
       if (error) {
