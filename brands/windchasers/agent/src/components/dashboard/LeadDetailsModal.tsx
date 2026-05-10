@@ -1485,35 +1485,69 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* TYPE / COURSE — rendered inline on a single row when both
-                    are present so the contact card stays compact. */}
+                {/* TYPE / COURSE / EDUCATION / TIMELINE — extracted profile fields */}
                 {(() => {
                   const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
                   const hasType = !!brandProfileData.user_type;
                   const hasCourse = !!brandProfileData.course_interest;
-                  if (!hasType && !hasCourse) return null;
+                  const hasEducation = !!brandProfileData.education;
+                  const hasTimeline = !!(brandProfileData.timeline || brandProfileData.plan_to_fly);
+                  if (!hasType && !hasCourse && !hasEducation && !hasTimeline) return null;
+                  const timeline = brandProfileData.timeline || brandProfileData.plan_to_fly;
                   return (
-                    <div className="lead-contact-type-course flex items-center flex-wrap gap-x-3 gap-y-1.5">
-                      {hasType && (
-                        <div className="lead-contact-type flex items-center gap-1.5">
-                          <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                            <MdPerson className="text-[var(--text-secondary)]" size={14} />
-                          </div>
-                          <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
-                            <span className="text-[var(--text-muted)] mr-1.5">Type:</span>
-                            {brandProfileData.user_type}
-                          </span>
+                    <div className="lead-contact-profile flex flex-col gap-y-1.5">
+                      {/* Row 1: Type + Course */}
+                      {(hasType || hasCourse) && (
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                          {hasType && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdPerson className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Type:</span>
+                                {brandProfileData.user_type}
+                              </span>
+                            </div>
+                          )}
+                          {hasCourse && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Goal:</span>
+                                {brandProfileData.course_interest}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
-                      {hasCourse && (
-                        <div className="lead-contact-course flex items-center gap-1.5">
-                          <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                            <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
-                          </div>
-                          <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
-                            <span className="text-[var(--text-muted)] mr-1.5">Course:</span>
-                            {brandProfileData.course_interest}
-                          </span>
+                      {/* Row 2: Education + Timeline */}
+                      {(hasEducation || hasTimeline) && (
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                          {hasEducation && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdSchool className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Edu:</span>
+                                {brandProfileData.education}
+                              </span>
+                            </div>
+                          )}
+                          {hasTimeline && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdSchedule className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">When:</span>
+                                {timeline}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

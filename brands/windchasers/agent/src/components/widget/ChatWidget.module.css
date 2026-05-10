@@ -2140,37 +2140,45 @@
   text-transform: uppercase;
 }
 
-/* Live transcript — compact single-line caption area */
+/* Live transcript — slim streaming caption */
 .voiceTranscript {
   width: 100%;
-  max-height: 60px;
-  overflow-y: auto;
+  max-height: 44px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-bottom: 16px;
-  padding: 0 4px;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 0 8px;
   scrollbar-width: none;
 }
 .voiceTranscript::-webkit-scrollbar { display: none; }
 
-.voiceTxAria {
-  font-size: 11px;
-  line-height: 1.4;
-  color: rgba(229, 226, 225, 0.75);
+/* assistant line — visible white */
+.voiceTxAvia {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(229, 226, 225, 0.8);
   text-align: center;
   padding: 0;
   background: none;
-  border-radius: 0;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/* user line — dimmer */
 .voiceTxUser {
-  font-size: 11px;
-  line-height: 1.4;
-  color: rgba(229, 226, 225, 0.4);
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(229, 226, 225, 0.38);
   text-align: center;
   padding: 0;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* End call button */
@@ -2889,8 +2897,8 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 56px;
-  height: 56px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: #0A0A0B;
   border: 2px solid #8B5CF6;
@@ -3015,8 +3023,8 @@
 }
 
 .bubbleIcon {
-  width: 39px;
-  height: 39px;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

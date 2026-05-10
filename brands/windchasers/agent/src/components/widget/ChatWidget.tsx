@@ -136,12 +136,12 @@ const ICONS = {
         return <PROXELogo />;
       }
       if (avatarType === 'image' && config.chatStructure.avatar.source) {
-        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '80%', height: '80%', objectFit: 'contain', objectPosition: 'center', display: 'block' }} />;
+        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
       }
     }
     // Fallback: Use image logo for Windchasers, infinity symbol for others
     if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
-      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '80%', height: '80%', objectFit: 'contain', objectPosition: 'center', display: 'block' }} />;
+      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
     }
     return <InfinitySymbol />;
   },
@@ -281,6 +281,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [micPermission, setMicPermission] = useState<string>('unknown');
   const vapiTranscriptRef = useRef<HTMLDivElement>(null);
   const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vapiMicHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -2415,26 +2416,30 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const attachVapiListeners = (vapi: Vapi) => {
+    const ensureMicLive = () => {
+      try {
+        if (vapi.isMuted()) {
+          vapi.setMuted(false);
+          vapiLog('mic was muted → force-unmuted');
+        }
+      } catch { /* older SDK versions don't expose isMuted */ }
+    };
+
     vapi.on('call-start', () => {
       vapiLog('call-start ✅');
       vapiCallReadyRef.current = true;
       setVapiConnecting(false);
-      // Ensure mic is unmuted — some environments start calls muted by default
-      try {
-        if (vapi.isMuted()) {
-          vapi.setMuted(false);
-          vapiLog('mic was muted → unmuted');
-        } else {
-          vapiLog('mic already unmuted ✅');
-        }
-      } catch {
-        vapiLog('isMuted/setMuted not available on this SDK version');
-      }
+      ensureMicLive();
+      // Periodic health-check: re-unmute every 3 s in case the browser
+      // or Daily.co mutes the track after assistant speech turns.
+      if (vapiMicHealthRef.current) clearInterval(vapiMicHealthRef.current);
+      vapiMicHealthRef.current = setInterval(ensureMicLive, 3000);
     });
     vapi.on('call-end', () => {
       vapiLog('call-end');
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
       setVapiSpeaker('idle');
       // Flash red ring for 700ms before overlay unmounts
       setVapiEnding(true);
@@ -2463,7 +2468,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setVapiConnecting(false);
       setVapiSpeaker('assistant');
     });
-    vapi.on('speech-end', () => { vapiLog('speech-end'); setVapiSpeaker('idle'); });
+    vapi.on('speech-end', () => {
+      vapiLog('speech-end');
+      setVapiSpeaker('idle');
+      // Re-confirm mic is live every time the assistant finishes speaking.
+      // Some browsers/Daily.co silently mute the user track during assistant audio.
+      setTimeout(ensureMicLive, 150);
+    });
     // Volume-level fires continuously with user mic amplitude (0–1).
     // Drive the on-screen mic bar so we can visually confirm audio capture.
     vapi.on('volume-level', (level: number) => {
@@ -2505,6 +2516,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setVapiEnding(true);
       setVapiConnecting(false);
       setVapiSpeaker('idle');
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
       try { vapiRef.current?.stop(); } catch {}
       vapiRef.current = null;
       vapiPrewarmedRef.current = false;
@@ -3262,7 +3274,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           )}
           {vapiTranscript.length > 0 && (
             <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
-              {vapiTranscript.map((m, i) => (
+              {vapiTranscript.slice(-2).map((m, i) => (
                 <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAvia}>
                   {m.text}
                 </p>

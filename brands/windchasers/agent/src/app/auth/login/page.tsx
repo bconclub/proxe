@@ -67,16 +67,16 @@ export default function LoginPage() {
       }
     }
 
-    // Check if user is already logged in and redirect to dashboard
+    // Check if user is already logged in and redirect to dashboard.
+    // Use getSession() (cached, no network) to avoid triggering another
+    // Supabase auth request and to prevent redirect loops with stale tokens.
     const checkExistingSession = async () => {
       try {
         const supabase = createClient()
-        const { data: { user }, error } = await supabase.auth.getUser()
-
-        if (user && !error) {
-          console.log('✅ User already logged in, redirecting to dashboard')
-          router.push('/dashboard')
-          router.refresh()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user && session?.access_token) {
+          console.log('✅ Active session found, redirecting to dashboard')
+          router.replace('/dashboard')
         }
       } catch (err) {
         console.log('ℹ️ No existing session found, staying on login page')
@@ -174,18 +174,18 @@ export default function LoginPage() {
           (error as any).status === 429
 
         if (isRateLimit) {
-          const limitUntil = now + 10 * 60 * 1000
+          const limitUntil = now + 60 * 1000 // 60s cooldown
           setRateLimited(true)
           setRateLimitUntil(limitUntil)
           localStorage.setItem('rateLimitUntil', limitUntil.toString())
-          setError('Rate limited by Supabase. Please wait 10 minutes before trying again.')
+          setError('Too many attempts. Please wait 60 seconds before trying again.')
 
           setTimeout(() => {
             setRateLimited(false)
             setRateLimitUntil(null)
             setAttemptCount(0)
             localStorage.removeItem('rateLimitUntil')
-          }, 10 * 60 * 1000)
+          }, 60 * 1000)
         } else if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please check your credentials and try again.')
           setAttemptCount(prev => {
@@ -412,11 +412,26 @@ export default function LoginPage() {
                     )}
                   </div>
                 </div>
-                {(error.includes('wait') || error.includes('Rate limited')) && (
-                  <div className={`login-page-error-tip mt-2 text-xs ${
+                {(error.includes('wait') || error.includes('Rate limited') || error.includes('attempts')) && (
+                  <div className={`login-page-error-tip mt-2 text-xs flex items-center gap-2 ${
                     darkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
                     💡 <strong>Tip:</strong> Please wait before trying again.
+                    <button
+                      type="button"
+                      className="underline hover:no-underline ml-1"
+                      style={{ color: colors.primary }}
+                      onClick={() => {
+                        localStorage.removeItem('rateLimitUntil')
+                        setRateLimited(false)
+                        setRateLimitUntil(null)
+                        setRateLimitCountdown(null)
+                        setAttemptCount(0)
+                        setError(null)
+                      }}
+                    >
+                      Clear &amp; retry
+                    </button>
                   </div>
                 )}
               </div>
