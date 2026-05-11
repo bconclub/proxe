@@ -203,5 +203,15 @@ export function isBookingIntent(message: string): boolean {
     lowerText.includes('book') ||
     lowerText.includes('schedule') ||
     lowerText.includes('meeting') ||
-    lowerText.includes('appointment');
+    lowerText.includes('appointment') ||
+    lowerText.includes('consultation') ||
+    lowerText.includes('slot') ||
+    lowerText.includes('reschedule') ||
+    lowerText.includes('cancel') ||
+    lowerText.includes('when is it') ||
+    lowerText.includes('what time') ||
+    lowerText.includes('when is my') ||
+    lowerText.includes('already booked') ||
+    lowerText.includes('have a booking') ||
+    lowerText.includes('have booked');
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, getClient, normalizePhone } from '@/lib/services'
+import { getServiceClient, getClient, normalizePhone, createCalendarEvent } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +115,11 @@ export async function POST(request: NextRequest) {
       organic: 'organic',
     }
     const normalizedSource = (source || '').toString().trim().toLowerCase()
-    const leadSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
+    const VALID_TOUCHPOINTS = new Set(['web','whatsapp','voice','social','facebook','google','form','manual','pabbly','ads','referral','organic','meta_forms'])
+    const mappedSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
+    // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
+    // The original raw source is preserved in agent_tasks.metadata.source below.
+    const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
     const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND || 'bcon'
 
     const supabase = getServiceClient() || getClient()
@@ -164,11 +168,56 @@ export async function POST(request: NextRequest) {
       inboundContext.raw_form_fields = custom_fields
     }
 
-    // Check for existing lead
+    // ── Brand-namespaced context (powers dashboard TYPE / COURSE columns) ───
+    // The dashboard reads unified_context[leadBrand].user_type and
+    // .course_interest — without this the columns stay blank even though we
+    // have the data in custom_fields.
+    const brandCtxData: Record<string, any> = {}
+    const cf2 = (custom_fields || {}) as Record<string, any>
+    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    if (audienceRaw === 'student' || audienceRaw === 'parent' || audienceRaw === 'professional') {
+      brandCtxData.user_type = audienceRaw
+    }
+    if (leadBrand === 'windchasers') {
+      // Map the interest value the form sends to the short course label the
+      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
+      const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
+      const courseMap: Record<string, string> = {
+        dgca_ground: 'DGCA',
+        dgca: 'DGCA',
+        pilot_training_abroad: 'Flight',
+        flight: 'Flight',
+        helicopter_license: 'Heli',
+        helicopter: 'Heli',
+        heli: 'Heli',
+        cabin_crew: 'Cabin',
+        cabin: 'Cabin',
+        drone: 'Drone',
+      }
+      if (interestRaw && courseMap[interestRaw]) {
+        brandCtxData.course_interest = courseMap[interestRaw]
+      } else if (interestRaw && interestRaw !== 'other') {
+        brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
+      }
+      const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
+      if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
+      const educationRaw = String(cf2.education || '').toLowerCase().trim()
+      if (educationRaw) brandCtxData.education = educationRaw
+    }
+    if (Object.keys(brandCtxData).length > 0) {
+      inboundContext[leadBrand] = brandCtxData
+    }
+
+    // Check for existing lead — scope to brand because the same phone can
+    // exist across brands (e.g. someone is a lead for both bcon and
+    // windchasers). Without the brand filter, .maybeSingle() returns null
+    // when multiple brands have this phone, sending us into the insert path
+    // and tripping the (phone, brand) unique constraint.
     const { data: existing } = await supabase
       .from('all_leads')
       .select('id, customer_name, unified_context')
       .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', leadBrand)
       .maybeSingle()
 
     if (existing) {
@@ -188,7 +237,17 @@ export async function POST(request: NextRequest) {
         if (!existingSources.includes(leadSource)) {
           inboundContext.lead_sources = [...existingSources, leadSource]
         }
-        updates.unified_context = { ...existingCtx, ...inboundContext }
+        // Shallow merge would overwrite existingCtx[leadBrand] with the new
+        // brandCtxData, wiping any course/type the chat widget had set.
+        // Deep-merge the brand-namespace object specifically.
+        const mergedBrandCtx = inboundContext[leadBrand]
+          ? { ...(existingCtx[leadBrand] || {}), ...inboundContext[leadBrand] }
+          : existingCtx[leadBrand]
+        updates.unified_context = {
+          ...existingCtx,
+          ...inboundContext,
+          ...(mergedBrandCtx ? { [leadBrand]: mergedBrandCtx } : {}),
+        }
       }
 
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
@@ -213,15 +272,34 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createErr) {
-        // Duplicate race condition - fetch existing
+        // Duplicate race condition or pre-existing row the first lookup
+        // missed - the unique constraint is on (phone, brand) so look up by
+        // exactly that shape. Fall back to (customer_phone_normalized, brand)
+        // in case the existing row's raw `phone` column was stored in a
+        // different format.
         if (createErr.code === '23505' || createErr.message?.includes('duplicate')) {
-          const { data: dup } = await supabase
+          let dupId: string | null = null
+
+          const { data: dupByPhone } = await supabase
             .from('all_leads')
             .select('id')
-            .eq('customer_phone_normalized', normalizedPhone)
+            .eq('phone', phone)
+            .eq('brand', leadBrand)
             .maybeSingle()
-          if (dup) {
-            leadId = dup.id
+          if (dupByPhone) dupId = dupByPhone.id
+
+          if (!dupId) {
+            const { data: dupByNormalized } = await supabase
+              .from('all_leads')
+              .select('id')
+              .eq('customer_phone_normalized', normalizedPhone)
+              .eq('brand', leadBrand)
+              .maybeSingle()
+            if (dupByNormalized) dupId = dupByNormalized.id
+          }
+
+          if (dupId) {
+            leadId = dupId
           } else {
             throw createErr
           }
@@ -246,6 +324,7 @@ export async function POST(request: NextRequest) {
       scheduled_at: now,
       metadata: {
         source: leadSource,
+        original_source: normalizedSource || null,
         campaign: campaign || null,
         notes: notes || null,
         inbound: true,
@@ -261,11 +340,121 @@ export async function POST(request: NextRequest) {
       console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
     }
 
+    // ── Demo bookings: also create a Google Calendar event ──────────────────
+    // If this inbound is a demo booking with a date + time, create the actual
+    // calendar event and stamp booking_* on unified_context.web so the
+    // dashboard's BOOKING column populates. Failure to create the calendar
+    // event does NOT fail the inbound — the lead is already saved.
+    const cfields = (custom_fields || {}) as Record<string, any>
+    const isDemoBooking =
+      String(notes || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.event_name || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.form_type || '').toLowerCase() === 'demo_booked'
+
+    const preferredDate = cfields.preferred_date || cfields.preferredDate || null
+    const preferredTime = cfields.preferred_time || cfields.preferredTime || null
+
+    let calendarResult: { eventId: string; eventLink: string } | null = null
+    let calendarError: string | null = null
+
+    if (isDemoBooking && preferredDate && preferredTime) {
+      try {
+        // Dedupe: if the lead already has a booking at this exact slot, skip.
+        const { data: leadRow } = await supabase
+          .from('all_leads')
+          .select('unified_context')
+          .eq('id', leadId)
+          .maybeSingle()
+
+        const existingBooking = leadRow?.unified_context?.web?.booking || {}
+        const sameSlot =
+          existingBooking?.eventId &&
+          existingBooking?.date === preferredDate &&
+          existingBooking?.time === preferredTime
+
+        if (sameSlot) {
+          console.log(`[inbound] Demo already booked for ${leadId} at ${preferredDate} ${preferredTime}, skipping calendar create`)
+          calendarResult = {
+            eventId: existingBooking.eventId,
+            eventLink: existingBooking.eventLink || '',
+          }
+        } else {
+          const event = await createCalendarEvent({
+            date: preferredDate,
+            time: preferredTime,
+            name: leadName,
+            email: email?.trim() || undefined,
+            phone,
+            courseInterest: cfields.interest || cfields.course_interest || undefined,
+            sessionType: cfields.demo_type || 'Demo Session',
+          })
+
+          if (!event) {
+            calendarError = 'createCalendarEvent returned null (likely missing Google credentials)'
+            console.error('[inbound]', calendarError)
+          } else {
+            calendarResult = {
+              eventId: event.eventId,
+              eventLink: event.eventLink,
+            }
+
+            // Re-fetch unified_context (might have changed since the merge above)
+            // and stamp the booking on it.
+            const { data: refreshed } = await supabase
+              .from('all_leads')
+              .select('unified_context')
+              .eq('id', leadId)
+              .maybeSingle()
+            const ctx = refreshed?.unified_context || {}
+            const updatedCtx = {
+              ...ctx,
+              web: {
+                ...(ctx.web || {}),
+                booking_date: preferredDate,
+                booking_time: preferredTime,
+                booking_status: 'confirmed',
+                booking: {
+                  date: preferredDate,
+                  time: preferredTime,
+                  status: 'confirmed',
+                  eventId: event.eventId,
+                  eventLink: event.eventLink,
+                  meetLink: event.meetLink || null,
+                  hasAttendees: event.hasAttendees,
+                  source: 'inbound_demo_form',
+                  created_at: new Date().toISOString(),
+                },
+              },
+            }
+            await supabase
+              .from('all_leads')
+              .update({ unified_context: updatedCtx })
+              .eq('id', leadId)
+          }
+        }
+      } catch (calErr: any) {
+        calendarError = calErr?.message || String(calErr)
+        console.error('[inbound] Calendar event creation failed:', calendarError)
+        // Swallow — lead is already saved.
+      }
+    }
+
     return NextResponse.json({
       success: true,
       lead_id: leadId,
       is_new: isNew,
       task_created: !taskErr,
+      ...(isDemoBooking
+        ? {
+            calendar: calendarResult
+              ? {
+                  event_id: calendarResult.eventId,
+                  event_link: calendarResult.eventLink,
+                }
+              : null,
+            calendar_error: calendarError,
+          }
+        : {}),
     })
   } catch (error: any) {
     const message =

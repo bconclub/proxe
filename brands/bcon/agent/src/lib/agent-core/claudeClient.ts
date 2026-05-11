@@ -13,9 +13,16 @@ function getClient(): Anthropic {
     if (!apiKey) {
       throw new Error('CLAUDE_API_KEY environment variable is not set');
     }
-    anthropicInstance = new Anthropic({ apiKey });
+    anthropicInstance = new Anthropic({
+      apiKey,
+      defaultHeaders: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
+    });
   }
   return anthropicInstance;
+}
+
+function cacheable(text: string): any[] {
+  return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
 function getModel(): string {
@@ -47,10 +54,10 @@ export async function* streamResponse(
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
 
-      stream = await anthropic.messages.stream({
+      stream = await (anthropic.messages.stream as any)({
         model,
         max_tokens: maxTokens,
-        system: systemPrompt,
+        system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
       break; // Success
@@ -104,10 +111,10 @@ export async function generateResponse(
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
 
-      const response = await anthropic.messages.create({
+      const response = await (anthropic.messages.create as any)({
         model,
         max_tokens: maxTokens,
-        system: systemPrompt,
+        system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
 
@@ -180,10 +187,10 @@ export async function generateResponseWithTools(
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
 
-        response = await anthropic.messages.create({
+        response = await (anthropic.messages.create as any)({
           model,
           max_tokens: maxTokens,
-          system: systemPrompt,
+          system: cacheable(systemPrompt),
           messages,
           tools: tools as any,
         });

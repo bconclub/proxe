@@ -57,11 +57,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Capture this request's origin so post-process self-callbacks (scoring
+    // webhook) hit the *current* server in dev as well as prod, instead of
+    // the static NEXT_PUBLIC_APP_URL which always points at the deployed URL.
+    const requestOrigin = new URL(request.url).origin;
+
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userProfile = session.user || {};
+
+    // Skip all DB writes for deploy health-check sessions (deploy_ready_*)
+    // These are synthetic pings that create noise in sessions + conversations tables.
+    const isHealthCheck = externalSessionId.startsWith('deploy_ready');
 
     // Get Supabase client
     const supabase = getServiceClient() || getClient();
@@ -72,8 +81,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure session exists
-    await ensureSession(externalSessionId, 'web', supabase);
+    // Ensure session exists (skip for health checks)
+    if (!isHealthCheck) {
+      await ensureSession(externalSessionId, 'web', supabase);
+    }
 
     // Build AgentInput
     const agentInput: AgentInput = {
@@ -112,18 +123,32 @@ export async function POST(request: NextRequest) {
 
           const responseTimeMs = Date.now() - requestStartTime;
 
-          // ── Post-streaming: business logic (fire-and-forget) ──────────
-
-          // Run all post-processing in parallel, don't block the stream
-          postProcess(
-            externalSessionId,
-            message,
-            fullResponse,
-            userProfile,
-            agentInput,
-            supabase,
-            responseTimeMs,
-          ).catch(err => console.error('[agent/web/chat] Post-processing error:', err));
+          // ── Post-streaming: business logic ─────────────────────────────
+          // MUST be awaited. On Vercel serverless the lambda is terminated
+          // as soon as the Response stream closes, so any unawaited
+          // postProcess promise is silently killed mid-flight — that's why
+          // web_sessions / conversations were never being persisted.
+          // The client has already received the 'done' SSE event and
+          // rendered the AI response, so this extra await only delays the
+          // connection close (typically < 1s for the DB writes; the slow
+          // summary generation is internally fire-and-forget).
+          // Skip all DB writes for health-check sessions
+          if (!isHealthCheck) {
+            try {
+              await postProcess(
+                externalSessionId,
+                message,
+                fullResponse,
+                userProfile,
+                agentInput,
+                supabase,
+                responseTimeMs,
+                requestOrigin,
+              );
+            } catch (err) {
+              console.error('[agent/web/chat] Post-processing error:', err);
+            }
+          }
 
         } catch (error: any) {
           console.error('[agent/web/chat] Streaming error:', error);
@@ -162,6 +187,7 @@ async function postProcess(
   agentInput: AgentInput,
   supabase: any,
   responseTimeMs?: number,
+  requestOrigin?: string,
 ): Promise<void> {
   try {
     // 1. Check for existing lead from session first
@@ -192,14 +218,19 @@ async function postProcess(
       );
       isNewLead = true;
       
-      // 2b. Backfill previous conversations for this session with the new lead_id
+      // 2b. Backfill previous anonymous conversations for this session with the new lead_id.
+      // These rows were logged before the visitor provided phone/email; they carry
+      // session_id in their JSONB metadata column. Use .filter() for explicit JSON
+      // path matching (more reliable than .eq() with arrow operators in Supabase JS).
+      // NOTE: Do NOT chain .select({ head: true }) after .update() — it converts
+      // the request to a HEAD which prevents the update from executing.
       if (leadId) {
         const { error: backfillError } = await supabase
           .from('conversations')
           .update({ lead_id: leadId })
-          .eq('metadata->>session_id', externalSessionId)
+          .filter('metadata->>session_id', 'eq', externalSessionId)
           .is('lead_id', null);
-        
+
         if (backfillError) {
           console.error('[agent/web/chat] Failed to backfill conversations:', backfillError);
         } else {
@@ -277,6 +308,24 @@ async function postProcess(
         }
       } catch (summaryError) {
         console.error('[agent/web/chat] Summary generation failed:', summaryError);
+      }
+    }
+
+    // 5. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
+    // when the Vercel serverless function exits after the stream closes).
+    if (leadId) {
+      const appUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4002';
+      try {
+        const scoreRes = await fetch(`${appUrl}/api/webhooks/message-created`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: leadId }),
+        });
+        if (!scoreRes.ok) {
+          console.error('[agent/web/chat] Scoring webhook returned', scoreRes.status);
+        }
+      } catch (scoringError) {
+        console.error('[agent/web/chat] Scoring webhook failed:', scoringError);
       }
     }
   } catch (error) {

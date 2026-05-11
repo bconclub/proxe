@@ -17,6 +17,7 @@ export async function searchKnowledgeBase(
   query: string,
   limit: number = 3
 ): Promise<KnowledgeResult[]> {
+  console.log('[kb-search] query:', query);
   try {
     const allResults: KnowledgeResult[] = [];
 
@@ -32,7 +33,7 @@ export async function searchKnowledgeBase(
 
       if (!kbError && kbResults && Array.isArray(kbResults)) {
         kbResults.forEach((item: any) => {
-          const content = item.content || '';
+          const content = item.content || item.answer || item.question || '';
           if (content.trim()) {
             allResults.push({
               id: item.id,
@@ -61,7 +62,7 @@ export async function searchKnowledgeBase(
 
         if (fallbackResults && Array.isArray(fallbackResults)) {
           fallbackResults.forEach((item: any) => {
-            const content = item.content || item.title || '';
+            const content = item.content || item.answer || item.question || item.title || '';
             if (content.trim()) {
               allResults.push({
                 id: item.id,
@@ -100,7 +101,11 @@ export async function searchKnowledgeBase(
       return (b.metadata.relevance || 0) - (a.metadata.relevance || 0);
     });
 
-    return sortedResults.slice(0, limit * 3);
+    const hits = sortedResults.slice(0, limit * 3);
+    console.log('[kb-search] hits:', hits.length, hits.map(h => ({ title: (h.content.match(/^\[([^\]]+)\]/) || [])[1] || '?', table: h.metadata?.table, relevance: h.metadata?.relevance })));
+    const context = hits.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
+    console.log('[kb-search] context returned to prompt:', context.slice(0, 500));
+    return hits;
   } catch (error) {
     console.error('[KnowledgeSearch] Error:', error);
     return [];
