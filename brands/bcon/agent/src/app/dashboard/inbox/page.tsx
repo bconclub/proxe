@@ -17,10 +17,15 @@ import {
   MdBusiness,
   MdNotes,
   MdLanguage,
+  MdPerson,
+  MdFlightTakeoff,
+  MdMessage,
+  MdSchedule,
 } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 // Channel Icons using custom SVGs with colored backgrounds
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
@@ -75,6 +80,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 
 const ALL_CHANNELS = ['web', 'whatsapp'];
 
+// Score Ring - circular progress indicator with score inside
 // Score color/label scheme — kept in sync with LeadDetailsModal.getHealthColor
 // so a "Warm" lead reads the same color everywhere in the dashboard.
 //   90+   Hot   green
@@ -87,7 +93,6 @@ const scoreVisual = (score: number | null) => {
   return { color: '#3B82F6', label: 'Cold' };
 };
 
-// Score Ring - circular progress indicator with score inside
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
   const s = score ?? 0;
   const { color } = scoreVisual(score);
@@ -130,6 +135,11 @@ interface Conversation {
   next_touchpoint: string | null
   form_data: Record<string, any> | null
   first_touchpoint: string | null
+  // Carried so the conversation list can re-calculate the lead score
+  // client-side (the DB lead_score is often stale or 0).
+  unified_context?: Record<string, any> | null
+  last_interaction_at?: string | null
+  timestamp?: string | null
 }
 
 interface Message {
@@ -318,6 +328,10 @@ export default function InboxPage() {
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [calculatedLeadScore, setCalculatedLeadScore] = useState<number | null>(null)
+  // Map of lead_id → calculated score for the conversation list. The DB
+  // lead_score is often null/0; this lets the list reflect real engagement.
+  const [calculatedConvScores, setCalculatedConvScores] = useState<Record<string, number>>({})
   const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
 
   // Handle URL parameters to open specific conversation
@@ -405,6 +419,62 @@ export default function InboxPage() {
     fetchLeadDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
+
+  // Recalculate lead score client-side whenever lead details change
+  // (DB lead_score is often stale/0 — calculator looks at messages + context)
+  useEffect(() => {
+    if (!leadDetails?.id) { setCalculatedLeadScore(null); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const result = await calculateLeadScore(leadDetails)
+        if (!cancelled) setCalculatedLeadScore(result.score)
+      } catch (err) {
+        console.error('[RIGHT PANEL] calculateLeadScore failed:', err)
+        if (!cancelled) setCalculatedLeadScore(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [leadDetails])
+
+  // Calculate scores for every conversation in the list. The DB lead_score
+  // is often null or stale (set to 0 when never recomputed) — without this
+  // the conversation list shows missing or zero scores even for engaged
+  // leads. Runs once per conversations refresh.
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) {
+      setCalculatedConvScores({})
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, number> = {}
+      // Run in parallel — each call queries conversations for the lead.
+      // For dozens of leads this is acceptable; if it grows, batch later.
+      await Promise.all(conversations.map(async (conv) => {
+        try {
+          const leadShape: any = {
+            id: conv.lead_id,
+            email: conv.lead_email,
+            phone: conv.lead_phone,
+            unified_context: conv.unified_context || {},
+            last_interaction_at: conv.last_interaction_at || conv.last_message_at,
+            booking_date: conv.booking_date,
+            booking_time: conv.booking_time,
+            timestamp: conv.timestamp || conv.last_message_at,
+            lead_score: conv.lead_score,
+          }
+          const result = await calculateLeadScore(leadShape)
+          next[conv.lead_id] = result.score
+        } catch {
+          // Fall back to whatever the DB has on failure.
+          next[conv.lead_id] = conv.lead_score ?? 0
+        }
+      }))
+      if (!cancelled) setCalculatedConvScores(next)
+    })()
+    return () => { cancelled = true }
+  }, [conversations])
 
   // Fetch messages when conversation selected or channel changes
   useEffect(() => {
@@ -512,7 +582,7 @@ export default function InboxPage() {
         console.log('Attempting fallback: fetching leads with recent activity...')
         const { data: activeLeads, error: leadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage, booking_date, booking_time')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage')
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
@@ -555,11 +625,14 @@ export default function InboxPage() {
               lead_score: lead.lead_score ?? null,
               lead_stage: lead.lead_stage ?? null,
               city: fbUc?.whatsapp?.profile?.city || fbUc?.web?.profile?.city || null,
-              booking_date: lead.booking_date ?? null,
-              booking_time: lead.booking_time ?? null,
+              booking_date: fbUc?.web?.booking_date || fbUc?.whatsapp?.booking_date || null,
+              booking_time: fbUc?.web?.booking_time || fbUc?.whatsapp?.booking_time || null,
               next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
               form_data: fbUc?.form_data || null,
               first_touchpoint: lead.first_touchpoint || null,
+              unified_context: fbUc || null,
+              last_interaction_at: lead.last_interaction_at || null,
+              timestamp: lead.last_interaction_at || null,
             }
           })
 
@@ -625,7 +698,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score, first_touchpoint')
+        .select('id, customer_name, email, phone, unified_context, lead_stage, lead_score, first_touchpoint')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -662,8 +735,6 @@ export default function InboxPage() {
         email?: string | null
         phone?: string | null
         unified_context?: any
-        booking_date?: string | null
-        booking_time?: string | null
         lead_stage?: string | null
         lead_score?: number | null
       }>
@@ -681,9 +752,11 @@ export default function InboxPage() {
           continue;
         }
 
-        // Extract booking status: check direct columns first, then unified_context
+        // Extract booking status from unified_context (booking_date/time live there, not on all_leads)
         const ctx = lead?.unified_context || {};
-        const bookingStatus = (lead?.booking_date ? 'Call Booked' : null)
+        const bookingDateFromCtx = ctx?.web?.booking_date || ctx?.whatsapp?.booking_date || null;
+        const bookingTimeFromCtx = ctx?.web?.booking_time || ctx?.whatsapp?.booking_time || null;
+        const bookingStatus = (bookingDateFromCtx ? 'Call Booked' : null)
           || (lead?.lead_stage === 'Booking Made' ? 'Call Booked' : null)
           || ctx?.whatsapp?.booking_status
           || ctx?.web?.booking_status
@@ -737,11 +810,14 @@ export default function InboxPage() {
           lead_score: lead?.lead_score ?? null,
           lead_stage: lead?.lead_stage ?? null,
           city: cityValue,
-          booking_date: lead?.booking_date ?? null,
-          booking_time: lead?.booking_time ?? null,
+          booking_date: bookingDateFromCtx,
+          booking_time: bookingTimeFromCtx,
           next_touchpoint: nextTouchpoint,
           form_data: uc?.form_data || null,
           first_touchpoint: (lead as any)?.first_touchpoint || null,
+          unified_context: uc || null,
+          last_interaction_at: (lead as any)?.last_interaction_at || null,
+          timestamp: (lead as any)?.last_interaction_at || null,
         }
 
         console.log('Adding conversation:', {
@@ -781,8 +857,8 @@ export default function InboxPage() {
     try {
       console.log('Fetching all messages for lead:', leadId)
 
-      // Always fetch ALL messages for this lead (channel filtering is done client-side)
-      const { data, error } = await supabase
+      // 1. Fetch messages directly linked to this lead
+      const { data: leadMessages, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('lead_id', leadId)
@@ -794,7 +870,55 @@ export default function InboxPage() {
         throw error
       }
 
-      const messagesData = (data ?? []).map((msg: any): Message => ({
+      let allRaw: any[] = leadMessages ?? []
+
+      // 2. Also fetch anonymous messages that were logged before a lead was created.
+      //    These rows have lead_id = null but carry session_id in their metadata.
+      //    Look up every web_session linked to this lead and pull those rows too.
+      try {
+        const { data: sessions } = await supabase
+          .from('web_sessions')
+          .select('external_session_id')
+          .eq('lead_id', leadId)
+
+        const sessionIds = (sessions ?? [])
+          .map((s: any) => s.external_session_id)
+          .filter(Boolean)
+
+        if (sessionIds.length > 0) {
+          for (const sid of sessionIds) {
+            const { data: anonMsgs } = await supabase
+              .from('conversations')
+              .select('*')
+              .is('lead_id', null)
+              .filter('metadata->>session_id', 'eq', sid)
+              .order('created_at', { ascending: true })
+
+            if (anonMsgs && anonMsgs.length > 0) {
+              console.log(`[fetchMessages] Found ${anonMsgs.length} anonymous messages for session ${sid}`)
+              allRaw = [...allRaw, ...anonMsgs]
+            }
+          }
+
+          // Deduplicate by id and sort chronologically
+          const seen = new Set<string>()
+          allRaw = allRaw
+            .filter((msg: any) => {
+              const key = String(msg.id)
+              if (seen.has(key)) return false
+              seen.add(key)
+              return true
+            })
+            .sort((a: any, b: any) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+        }
+      } catch (anonErr) {
+        console.warn('[fetchMessages] Could not fetch anonymous messages:', anonErr)
+        // Non-fatal — we still show the lead messages fetched above
+      }
+
+      const messagesData = allRaw.map((msg: any): Message => ({
         id: String(msg?.id ?? ''),
         lead_id: String(msg?.lead_id ?? ''),
         channel: String(msg?.channel ?? ''),
@@ -1227,10 +1351,16 @@ export default function InboxPage() {
               const isSelected = selectedLeadId === conv.lead_id;
               const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-              // Temperature helpers
-              const scoreColor = conv.lead_score != null
-                ? (conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444')
-                : null;
+              // Prefer the live-calculated score over the DB value (which is
+              // frequently null/0). Fall back to whichever is non-null.
+              const calcScore = calculatedConvScores[conv.lead_id]
+              const displayScore: number | null = calcScore != null
+                ? Math.max(calcScore, conv.lead_score ?? 0)
+                : conv.lead_score
+              // Temperature helpers — use the shared scoreVisual so the
+              // conversation list, the right panel, and the lead modal all
+              // agree on what "Warm" looks like.
+              const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
 
               if (isSelected) {
                 // ── SELECTED CARD (minimal) ──
@@ -1256,7 +1386,7 @@ export default function InboxPage() {
                     <div className="px-3 py-2 pl-4">
                       {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
-                        <ScoreRing score={conv.lead_score} size={28} />
+                        <ScoreRing score={displayScore} size={28} />
                         <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                           {conv.channels.map((ch) => (
                             <ChannelIcon key={ch} channel={ch} size={14} active={true} />
@@ -1330,7 +1460,10 @@ export default function InboxPage() {
                   }}
                 >
                   <div className="px-3 py-2.5">
-                    {/* Line 1: Channel icons + Name + Timestamp */}
+                    {/* Line 1: Channel icons + Name + Timestamp
+                        (Per design: only the SELECTED row shows a ScoreRing —
+                        unselected rows just show the name to keep the list
+                        scannable.) */}
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-0.5 flex-shrink-0">
                         {conv.channels.map((ch) => (
@@ -1439,12 +1572,17 @@ export default function InboxPage() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
+              className="flex-1 overflow-y-auto px-6 py-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
+            {/* Messages were capped at 700px — too narrow for the chat panel,
+                producing dead space on both sides. Cap raised to 1100px and
+                outer padding bumped to px-6 so messages breathe but don't
+                stretch into long unreadable lines. */}
+            <div className="max-w-[1100px] mx-auto space-y-3">
               {messagesLoading ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
               ) : filteredMessages.length === 0 ? (
@@ -1524,13 +1662,6 @@ export default function InboxPage() {
                     return (
                       <React.Fragment key={msg.id}>
                       {dateSeparator}
-                      {msgIdx > 0 && formGapMs > 60000 && !showDateSeparator && (
-                        <div className="flex justify-center my-0.5">
-                          <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(formGapMs), background: 'rgba(255,255,255,0.03)' }}>
-                            {formatGap(formGapMs)} gap
-                          </span>
-                        </div>
-                      )}
                       <div className="flex justify-start">
                         <div
                           className="max-w-[90%] rounded-lg px-3 py-2 border"
@@ -1584,13 +1715,6 @@ export default function InboxPage() {
                   return (
                     <React.Fragment key={msg.id}>
                     {dateSeparator}
-                    {msgIdx > 0 && gapMs > 60000 && !showDateSeparator && (
-                      <div className="flex justify-center my-0.5">
-                        <span className="text-[9px] font-medium px-2 py-0.5 rounded-full" style={{ color: gapColor(gapMs), background: 'rgba(255,255,255,0.03)' }}>
-                          {formatGap(gapMs)} gap
-                        </span>
-                      </div>
-                    )}
                     <div
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
@@ -1720,6 +1844,7 @@ export default function InboxPage() {
                 </>
               )}
             </div>
+            </div>
 
             {/* Message Input - compact */}
             <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
@@ -1780,243 +1905,311 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
-          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+          className="flex w-[380px] flex-col border-l overflow-y-auto flex-shrink-0"
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
           {!leadDetails ? (
             <div className="p-4 text-center">
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
             </div>
-          ) : (
-          <>
-          {/* 1. Header - Avatar, Name, Company, City + Channel */}
-          {(() => {
-            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-            const city = ctx.city || ctx.location || ''
-            const brand = ctx.brand || ctx.brand_name || ctx.company || ''
+          ) : (() => {
+            const uc = leadDetails.unified_context || {}
+            const wc = uc.bcon || uc.windchasers || {}
+            const webCtx = uc.web || {}
+            const waCtx = uc.whatsapp || {}
+            const profile = webCtx.profile || waCtx.profile || {}
             const initials = (leadDetails.customer_name || leadDetails.phone || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const stageColors: Record<string, { bg: string; text: string }> = {
+              'New':          { bg: '#3266ad', text: '#E6F1FB' },
+              'Engaged':      { bg: '#3d5fa0', text: '#E6F1FB' },
+              'Qualified':    { bg: '#485693', text: '#F1EFE8' },
+              'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
+              'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
+              'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
+              'Converted':    { bg: '#639922', text: '#EAF3DE' },
+              'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
+              'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
+              'Cold':         { bg: '#993C1D', text: '#FAECE7' },
+            }
             const stageAvatarColors: Record<string, string> = {
-              'Converted': '#22c55e',
-              'Booking Made': '#60a5fa',
-              'High Intent': '#f59e0b',
-              'Qualified': '#a855f7',
-              'Engaged': '#6b7280',
-              'In Sequence': '#8b5cf6',
+              'Converted': '#22c55e', 'Booking Made': '#60a5fa', 'High Intent': '#f59e0b',
+              'Qualified': '#a855f7', 'Engaged': '#6b7280', 'In Sequence': '#8b5cf6',
             }
             const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
-            const channelLabel = selectedChannel === 'whatsapp' ? 'WhatsApp' : selectedChannel === 'web' ? 'Web' : selectedChannel === 'voice' ? 'Voice' : selectedChannel || ''
+            const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
+            // Prefer client-calculated score (live signal from messages + context)
+            // and fall back to the stored lead_score so we never show 0 when a
+            // calculation is still in flight.
+            const dbScore = leadDetails.lead_score ?? 0
+            const score = calculatedLeadScore != null
+              ? Math.max(calculatedLeadScore, dbScore)
+              : dbScore
+            // Same Hot/Warm/Cold scheme as the lead modal — Warm is orange,
+            // not green, regardless of how high the score is below 90.
+            const { color: scoreColor, label: scoreLabel } = scoreVisual(score)
+
+            const lastActiveStr = (() => {
+              const d = leadDetails.last_message_at || leadDetails.updated_at
+              if (!d) return null
+              const diff = Date.now() - new Date(d).getTime()
+              const mins = Math.floor(diff / 60000)
+              if (mins < 1) return 'Just now'
+              if (mins < 60) return `${mins}m ago`
+              const hrs = Math.floor(mins / 60)
+              if (hrs < 24) return `${hrs}h ago`
+              return `${Math.floor(hrs / 24)}d ago`
+            })()
+
+            const userType = wc.user_type || webCtx.user_type || waCtx.user_type || profile.user_type
+            const courseInterest = wc.course_interest || webCtx.course_interest || waCtx.course_interest
+            const age = wc.age || webCtx.age || waCtx.age || profile.age
+            const city = wc.city || webCtx.city || waCtx.city || profile.city
+            const source = leadDetails.first_touchpoint || leadDetails.last_touchpoint
+            const intent = wc.student_intent || webCtx.student_intent || waCtx.student_intent
+            const painPoint = wc.pain_point || webCtx.pain_point || waCtx.pain_point
+            const examStatus = wc.exam_status || webCtx.exam_status || waCtx.exam_status
+            const budget = wc.budget || webCtx.budget || waCtx.budget
+
+            const daysInPipeline = leadDetails.created_at
+              ? Math.floor((Date.now() - new Date(leadDetails.created_at).getTime()) / 86400000)
+              : null
+            const agentMsgs = messages.filter(m => m.sender === 'agent').length
+            const customerMsgs = messages.filter(m => m.sender === 'customer').length
+            const responseRate = customerMsgs > 0 ? Math.round((agentMsgs / customerMsgs) * 100) : null
+
+            const profileRows: { label: string; value: string }[] = []
+            if (userType) profileRows.push({ label: 'Type', value: String(userType) })
+            if (courseInterest) profileRows.push({ label: 'Course', value: String(courseInterest) })
+            if (age) profileRows.push({ label: 'Age', value: String(age) })
+            if (city) profileRows.push({ label: 'City', value: String(city) })
+            if (source) profileRows.push({ label: 'Source', value: String(source).replace(/_/g, ' ') })
+            if (examStatus) profileRows.push({ label: 'Exams', value: String(examStatus) })
+            if (budget) profileRows.push({ label: 'Budget', value: String(budget) })
+            if (intent) profileRows.push({ label: 'Intent', value: String(intent) })
+            if (painPoint) profileRows.push({ label: 'Pain point', value: String(painPoint) })
+
+            // Booking is written to multiple shapes depending on the path that
+            // created it: top-level columns (storeBooking), flat keys under the
+            // channel (web.booking_date), or a nested booking object (web.booking.date,
+            // used by the inbound demo form). Check all of them so a booked lead
+            // never shows as "No upcoming events".
+            const bd = leadDetails.booking_date
+              || webCtx.booking_date || webCtx.booking?.date
+              || waCtx.booking_date || waCtx.booking?.date
+            const bt = leadDetails.booking_time
+              || webCtx.booking_time || webCtx.booking?.time
+              || waCtx.booking_time || waCtx.booking?.time
+            const ml = webCtx.booking_meet_link || webCtx.booking?.meetLink
+              || waCtx.booking_meet_link || waCtx.booking?.meetLink
+            const today = new Date().toISOString().split('T')[0]
+            const isUpcoming = bd && bd >= today
+
             return (
-              <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
-                  style={{ background: avatarBg, color: 'var(--text-button, #000)' }}
-                >
-                  {initials}
+              <>
+              {/* ── HERO HEADER ── */}
+              <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
+                {/* Avatar row */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    style={{ background: avatarBg, color: '#fff' }}
+                  >
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                        {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
+                      </p>
+                      {lastActiveStr && (
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{lastActiveStr}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {leadDetails.lead_stage && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: sc.bg, color: sc.text }}>
+                          {leadDetails.lead_stage}
+                        </span>
+                      )}
+                      {selectedConversation?.channels?.map(ch => (
+                        <ChannelIcon key={ch} channel={ch} size={12} active={true} />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
-                </p>
-                {brand && (
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{brand}</p>
-                )}
-                {(city || channelLabel) && (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    {city && <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{city}</span>}
-                    {city && channelLabel && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>·</span>}
-                    {channelLabel && (
-                      <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                        {selectedChannel === 'whatsapp' ? <FaWhatsapp size={10} style={{ color: '#25D366' }} /> :
-                         selectedChannel === 'web' ? <MdLanguage size={11} style={{ color: 'var(--text-muted)' }} /> :
-                         selectedChannel === 'voice' ? <MdPhone size={11} style={{ color: 'var(--text-muted)' }} /> : null}
-                        {channelLabel}
+
+                {/* Score bar */}
+                {(leadDetails.lead_score != null || calculatedLeadScore != null) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Lead Score</span>
+                      <span className="text-[11px] font-bold" style={{ color: scoreColor }}>
+                        {score} <span className="font-normal text-[10px]">{scoreLabel}</span>
                       </span>
-                    )}
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${score}%`, background: scoreColor }}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
-            )
-          })()}
 
-          {/* 2. Score + Stage + Last Active */}
-          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
-            <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-primary)' }}>
-              {leadDetails.lead_score != null && (
-                <span className="text-sm font-bold px-2 py-0.5 rounded-md" style={{
-                  background: leadDetails.lead_score >= 60 ? 'rgba(34,197,94,0.15)' : leadDetails.lead_score >= 30 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                  color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444',
-                }}>
-                  {leadDetails.lead_score}
-                </span>
-              )}
-              {leadDetails.lead_stage && (() => {
-                const stageColors: Record<string, { bg: string; text: string }> = {
-                  'New':          { bg: '#3266ad', text: '#E6F1FB' },
-                  'Engaged':      { bg: '#3d5fa0', text: '#E6F1FB' },
-                  'Qualified':    { bg: '#485693', text: '#F1EFE8' },
-                  'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
-                  'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
-                  'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
-                  'Converted':    { bg: '#639922', text: '#EAF3DE' },
-                  'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
-                  'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
-                  'Cold':         { bg: '#993C1D', text: '#FAECE7' },
-                }
-                const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
-                return (
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                    style={{ background: sc.bg, color: sc.text }}>
-                    {leadDetails.lead_stage}
-                  </span>
-                )
-              })()}
-              {leadDetails.last_message_at && (
-                <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
-                  {(() => {
-                    const diff = Date.now() - new Date(leadDetails.last_message_at || leadDetails.updated_at || '').getTime()
-                    const mins = Math.floor(diff / 60000)
-                    if (mins < 1) return 'Just now'
-                    if (mins < 60) return `${mins}m ago`
-                    const hrs = Math.floor(mins / 60)
-                    if (hrs < 24) return `${hrs}h ago`
-                    const days = Math.floor(hrs / 24)
-                    return `${days}d ago`
-                  })()}
-                </span>
-              )}
-            </div>
-          )}
+              {/* ── ACTION BUTTONS ── */}
+              <div className="px-5 py-3 flex gap-2 border-b border-t" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                <button
+                  disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
+                  onClick={async () => {
+                    if (!leadDetails.phone) return;
+                    setCallingLeadId(leadDetails.id);
+                    try {
+                      const res = await fetch('/api/agent/voice/test-call', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone: leadDetails.phone, leadName: leadDetails.customer_name }),
+                      });
+                      const data = await res.json();
+                      if (data.success) alert(`Calling ${leadDetails.customer_name || leadDetails.phone}...`);
+                      else alert(`Call failed: ${JSON.stringify(data.error)}`);
+                    } catch (e: any) {
+                      alert(`Error: ${e.message}`);
+                    } finally {
+                      setCallingLeadId(null);
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all disabled:opacity-30 hover:bg-[rgba(34,197,94,0.08)]"
+                  style={{
+                    borderColor: leadDetails.phone ? 'rgba(34,197,94,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.phone ? '#22C55E' : 'var(--text-muted)',
+                    background: 'transparent',
+                  }}
+                >
+                  <MdPhone size={14} className={callingLeadId === leadDetails.id ? 'animate-pulse' : ''} />
+                  {callingLeadId === leadDetails.id ? 'Calling…' : 'Call'}
+                </button>
+                <a
+                  href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all hover:bg-[rgba(37,211,102,0.08)]"
+                  style={{
+                    borderColor: leadDetails.phone ? 'rgba(37,211,102,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.phone ? '#25D366' : 'var(--text-muted)',
+                    background: 'transparent',
+                    opacity: leadDetails.phone ? 1 : 0.3,
+                    pointerEvents: leadDetails.phone ? 'auto' : 'none',
+                  }}
+                >
+                  <FaWhatsapp size={13} /> WhatsApp
+                </a>
+                <a
+                  href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all hover:bg-[rgba(139,92,246,0.08)]"
+                  style={{
+                    borderColor: leadDetails.email ? 'rgba(139,92,246,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.email ? '#8B5CF6' : 'var(--text-muted)',
+                    background: 'transparent',
+                    opacity: leadDetails.email ? 1 : 0.3,
+                    pointerEvents: leadDetails.email ? 'auto' : 'none',
+                  }}
+                >
+                  <MdEmail size={14} /> Email
+                </a>
+              </div>
 
-          {/* 3. Quick Action Buttons - Call, WhatsApp, Email */}
-          <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
-            <button
-              disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
-              onClick={async () => {
-                if (!leadDetails.phone) return;
-                setCallingLeadId(leadDetails.id);
-                try {
-                  const res = await fetch('/api/agent/voice/test-call', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: leadDetails.phone, leadName: leadDetails.customer_name }),
-                  });
-                  const data = await res.json();
-                  if (data.success) alert(`Calling ${leadDetails.customer_name || leadDetails.phone}...`);
-                  else alert(`Call failed: ${JSON.stringify(data.error)}`);
-                } catch (e: any) {
-                  alert(`Error: ${e.message}`);
-                } finally {
-                  setCallingLeadId(null);
-                }
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity disabled:opacity-40"
-              style={{
-                background: leadDetails.phone ? '#22C55E' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
-              }}
-            >
-              <MdPhone size={14} /> {callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
-            </button>
-            <a
-              href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
-              style={{
-                background: leadDetails.phone ? '#25D366' : 'var(--bg-tertiary)',
-                color: leadDetails.phone ? '#fff' : 'var(--text-muted)',
-                opacity: leadDetails.phone ? 1 : 0.4,
-                pointerEvents: leadDetails.phone ? 'auto' : 'none',
-              }}
-            >
-              <FaWhatsapp size={14} /> WhatsApp
-            </a>
-            <a
-              href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
-              style={{
-                background: leadDetails.email ? '#8B5CF6' : 'var(--bg-tertiary)',
-                color: leadDetails.email ? '#fff' : 'var(--text-muted)',
-                opacity: leadDetails.email ? 1 : 0.4,
-                pointerEvents: leadDetails.email ? 'auto' : 'none',
-              }}
-            >
-              <MdEmail size={14} /> Email
-            </a>
-          </div>
-
-          {/* 4. Business Info - label: value pairs */}
-          {(() => {
-            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-            const fields: { label: string; value: string | undefined }[] = [
-              { label: 'Business Type', value: ctx.type || ctx.business_type },
-              { label: 'Urgency', value: ctx.urgency || ctx.timeline },
-              { label: 'Volume', value: ctx.volume || ctx.team_size || ctx.scale },
-              { label: 'Website', value: ctx.website || ctx.url },
-              { label: 'AI Systems', value: ctx.ai_systems || ctx.current_tools || ctx.existing_ai },
-            ].filter(f => f.value)
-            if (fields.length === 0) return null
-            return (
-              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business Info</p>
-                <div className="space-y-1.5">
-                  {fields.map(f => (
-                    <div key={f.label} className="flex justify-between items-baseline gap-2">
-                      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
-                      <span className="text-[11px] text-right truncate" style={{ color: 'var(--text-secondary)' }}>{f.value}</span>
+              {/* ── CONTACT INFO ── */}
+              {(leadDetails.email || leadDetails.phone) && (
+                <div className="px-5 py-3 border-b space-y-2" style={{ borderColor: 'var(--border-primary)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Contact</p>
+                  {leadDetails.email && (
+                    <div className="flex items-center gap-2">
+                      <MdEmail size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <a href={`mailto:${leadDetails.email}`} className="text-[12px] truncate hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                        {leadDetails.email}
+                      </a>
                     </div>
-                  ))}
+                  )}
+                  {leadDetails.phone && (
+                    <div className="flex items-center gap-2">
+                      <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <a href={`tel:${leadDetails.phone}`} className="text-[12px] hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                        {leadDetails.phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── QUICK STATS ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    {/* Only count customer-sent messages, not agent/PROXe replies */}
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{customerMsgs}</p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Messages</p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {responseRate !== null ? `${responseRate}%` : '—'}
+                    </p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Response</p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {daysInPipeline !== null ? `${daysInPipeline}d` : '—'}
+                    </p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Pipeline</p>
+                  </div>
                 </div>
               </div>
-            )
-          })()}
 
-          {/* 5. Upcoming Events */}
-          {(() => {
-            const bd = leadDetails.booking_date
-              || leadDetails.unified_context?.web?.booking_date
-              || leadDetails.unified_context?.whatsapp?.booking_date
-            const bt = leadDetails.booking_time
-              || leadDetails.unified_context?.web?.booking_time
-              || leadDetails.unified_context?.whatsapp?.booking_time
-            const ml = leadDetails.unified_context?.web?.booking_meet_link
-              || leadDetails.unified_context?.whatsapp?.booking_meet_link
-            // Filter: only show if booking date is today or in the future
-            const today = new Date().toISOString().split('T')[0]
-            const isUpcoming = bd && bd >= today
-            return (
-              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
+              {/* ── LEAD PROFILE ── */}
+              {profileRows.length > 0 && (
+                <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Profile</p>
+                  <div className="space-y-2">
+                    {profileRows.map(r => (
+                      <div key={r.label} className="flex items-start justify-between gap-3">
+                        <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                        <span className="text-[12px] text-right capitalize font-medium" style={{ color: 'var(--text-primary)' }}>{r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── UPCOMING / BOOKING ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming</p>
                 {isUpcoming ? (
-                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid #22c55e' }}>
-                    <div className="flex items-center gap-1.5">
-                      <MdEvent size={14} style={{ color: '#22c55e' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <div className="rounded-xl p-3 border" style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.25)' }}>
+                    <div className="flex items-center gap-2">
+                      <MdEvent size={15} style={{ color: '#22c55e' }} />
+                      <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
                         {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {bt && (() => {
+                          const tp = bt.toString().split(':')
+                          if (tp.length < 2) return ` · ${bt}`
+                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                          if (isNaN(h) || isNaN(m)) return ` · ${bt}`
+                          return ` · ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                        })()}
                       </span>
                     </div>
-                    {bt && (
-                      <p className="text-[11px] mt-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
-                        {(() => {
-                          const tp = bt.toString().split(':')
-                          if (tp.length < 2) return bt
-                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
-                          if (isNaN(h) || isNaN(m)) return bt
-                          return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                        })()}
-                      </p>
-                    )}
                     {ml && (
                       <a href={ml} target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] mt-1.5 pl-5 inline-block hover:underline" style={{ color: 'var(--accent-primary)' }}>
-                        Join Meeting →
+                        className="mt-2 text-[11px] flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+                        <MdOpenInNew size={11} /> Join Meeting
                       </a>
                     )}
                   </div>
                 ) : bd ? (
-                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid var(--text-muted)', opacity: 0.6 }}>
-                    <div className="flex items-center gap-1.5">
+                  <div className="rounded-xl p-3 border" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', opacity: 0.6 }}>
+                    <div className="flex items-center gap-2">
                       <MdEvent size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                         {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} (past)
                       </span>
                     </div>
@@ -2025,21 +2218,20 @@ export default function InboxPage() {
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
                 )}
               </div>
+
+              {/* ── VIEW FULL DETAILS ── */}
+              <div className="px-5 py-4 mt-auto">
+                <button
+                  onClick={() => leadDetails?.id && openLeadModal(leadDetails.id)}
+                  className="w-full text-xs font-semibold py-2.5 rounded-xl transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
+                  style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
+                >
+                  <MdOpenInNew size={14} /> View Full Details
+                </button>
+              </div>
+              </>
             )
           })()}
-
-          {/* 6. View Full Details - prominent button */}
-          <div className="px-4 py-3 mt-auto">
-            <button
-              onClick={() => leadDetails?.id && router.push(`/dashboard/leads?leadId=${leadDetails.id}`)}
-              className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
-              style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
-            >
-              <MdOpenInNew size={14} /> View Full Details
-            </button>
-          </div>
-          </>
-          )}
         </div>
       )}
 
