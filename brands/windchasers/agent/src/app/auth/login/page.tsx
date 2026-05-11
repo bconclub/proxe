@@ -15,7 +15,7 @@ const brandWebsites: Record<string, string> = {
 /** Brand taglines for login subtitle */
 const brandTaglines: Record<string, string> = {
   windchasers: 'WindChasers Aviation Academy',
-  bcon: 'Windchasers',
+  bcon: 'BCON Club',
   proxe: 'PROXe AI Platform',
 }
 

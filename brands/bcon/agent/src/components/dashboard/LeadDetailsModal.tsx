@@ -1340,11 +1340,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             maxWidth: '720px',
             height: '88vh',
             maxHeight: '88vh',
-            // Faded outline so the modal lifts off the black backdrop —
-            // the var(--border-primary) alone disappears in dark mode.
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            // Visible outline so the modal lifts off the dark backdrop.
+            border: '1px solid rgba(255, 255, 255, 0.22)',
             boxShadow:
-              '0 0 0 1px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 8px 24px -8px rgba(0, 0, 0, 0.5)',
+              '0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 32px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 8px 24px -8px rgba(0, 0, 0, 0.5)',
           }}
           onClick={(e) => e.stopPropagation()}
           aria-labelledby="lead-modal-title"
@@ -1485,6 +1484,75 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </a>
                   </div>
                 )}
+
+                {/* TYPE / COURSE / EDUCATION / TIMELINE — extracted profile fields */}
+                {(() => {
+                  const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
+                  const hasType = !!brandProfileData.user_type;
+                  const hasCourse = !!brandProfileData.course_interest;
+                  const hasEducation = !!brandProfileData.education;
+                  const hasTimeline = !!(brandProfileData.timeline || brandProfileData.plan_to_fly);
+                  if (!hasType && !hasCourse && !hasEducation && !hasTimeline) return null;
+                  const timeline = brandProfileData.timeline || brandProfileData.plan_to_fly;
+                  return (
+                    <div className="lead-contact-profile flex flex-col gap-y-1.5">
+                      {/* Row 1: Type + Course */}
+                      {(hasType || hasCourse) && (
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                          {hasType && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdPerson className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Type:</span>
+                                {brandProfileData.user_type}
+                              </span>
+                            </div>
+                          )}
+                          {hasCourse && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Goal:</span>
+                                {brandProfileData.course_interest}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Row 2: Education + Timeline */}
+                      {(hasEducation || hasTimeline) && (
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+                          {hasEducation && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdSchool className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">Edu:</span>
+                                {brandProfileData.education}
+                              </span>
+                            </div>
+                          )}
+                          {hasTimeline && (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                                <MdSchedule className="text-[var(--text-secondary)]" size={14} />
+                              </div>
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                                <span className="text-[var(--text-muted)] mr-1.5">When:</span>
+                                {timeline}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {!currentLead.email && !currentLead.phone && (
                   <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
@@ -2247,78 +2315,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </div>
                         )}
 
-                        {/* Divider Line */}
-                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
-                          <div className="h-px bg-[var(--border-primary)] w-full" />
-                        )}
-
-                        {/* Lead Profile Group */}
-                        {(() => {
-                          const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
-                          const hasData = Object.keys(brandProfileData).length > 0;
-                          if (!hasData) return null;
-
-                          return (
-                            <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.2em]">
-                                <MdPersonOutline size={12} />
-                                Lead Profile
-                              </h4>
-                              <div className="flex flex-wrap gap-x-8 gap-y-3">
-                                {brandProfileData.user_type && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdPerson size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.user_type}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {brandProfileData.course_interest && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdFlightTakeoff size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.course_interest}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdSchedule size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Timeline</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)]">
-                                        {(() => {
-                                          const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
-                                          const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
-                                          return map[t] || t;
-                                        })()}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                                {brandProfileData.education && (
-                                  <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
-                                      <MdSchool size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.education.replace('_', ' ')}</p>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
                     </article>
                       )
@@ -2645,7 +2641,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
                 
                 try {
-                  const response = await fetch(`/api/dashboard/leads?id=${lead.id}`, {
+                  // Use the per-lead path-param route — it cascades through
+                  // conversations, activities, agent_tasks, and
+                  // lead_stage_changes before deleting the lead itself.
+                  // The collection-route DELETE doesn't cascade and trips
+                  // FK constraints with a generic 500.
+                  const response = await fetch(`/api/dashboard/leads/${lead.id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                   });
