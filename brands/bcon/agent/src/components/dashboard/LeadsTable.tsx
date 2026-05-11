@@ -723,7 +723,29 @@ export default function LeadsTable({
                   social: { label: 'Social', color: '#EC4899' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
-                const srcCfg = sourceConfig[source] || sourceConfig.unknown
+
+                // Prefer utm_source over channel medium so an Instagram ad
+                // shows "Coaching PROXe" instead of generic "Web". Custom
+                // labels for bcon's owned channels.
+                const utmSourceRaw = String(
+                  uc?.raw_form_fields?.utm_source ||
+                  uc?.web?.utm?.source ||
+                  uc?.landing_page?.utm_source ||
+                  ''
+                ).trim().toLowerCase()
+                const utmSourceConfig: Record<string, { label: string; color: string }> = {
+                  instagram:     { label: 'Coaching PROXe', color: '#E4405F' },
+                  ig:            { label: 'Coaching PROXe', color: '#E4405F' },
+                  coachingproxe: { label: 'Coaching PROXe', color: '#E4405F' },
+                  google:        { label: 'Google', color: '#EA4335' },
+                  facebook:      { label: 'Facebook', color: '#1877F2' },
+                  meta:          { label: 'Meta', color: '#1877F2' },
+                  youtube:       { label: 'YouTube', color: '#FF0000' },
+                  linkedin:      { label: 'LinkedIn', color: '#0A66C2' },
+                }
+                const srcCfg = (utmSourceRaw && utmSourceConfig[utmSourceRaw])
+                  || sourceConfig[source]
+                  || sourceConfig.unknown
 
                 // Score pill colors
                 // Score pill classes - using CSS variables for consistency
