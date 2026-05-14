@@ -454,7 +454,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     if (recentAgentMsg?.created_at) {
       const agentMsgAge = Date.now() - new Date(recentAgentMsg.created_at).getTime();
-      if (agentMsgAge < 10_000) {
+      if (agentMsgAge < 3_000) {
         console.log(`[meta/webhook] DEDUP: Agent responded ${agentMsgAge}ms ago for lead ${leadId}, skipping`);
         return;
       }
