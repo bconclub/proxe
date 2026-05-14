@@ -20,7 +20,7 @@ let anonClient: SupabaseClient | null = null;
 
 /** Return the BRAND slug uppercased, e.g. "BCON", "WINDCHASERS" */
 function brandPrefix(): string {
-  return (process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase();
+  return (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase();
 }
 
 /** Resolve a Supabase env var with brand-specific → generic → legacy fallback */
@@ -55,12 +55,10 @@ export function getServiceClient(): SupabaseClient | null {
   );
 
   if (!supabaseUrl || !serviceKey) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[services/supabase] Missing URL or service key (brand=${bp})`, {
-        hasUrl: !!supabaseUrl,
-        hasServiceKey: !!serviceKey,
-      });
-    }
+    console.error(`[services/supabase] Missing URL or service key (brand=${bp})`, {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!serviceKey,
+    });
     return null;
   }
 
@@ -97,12 +95,10 @@ export function getAnonClient(): SupabaseClient | null {
   );
 
   if (!supabaseUrl || !anonKey) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[services/supabase] Missing URL or anon key (brand=${bp})`, {
-        hasUrl: !!supabaseUrl,
-        hasAnonKey: !!anonKey,
-      });
-    }
+    console.error(`[services/supabase] Missing URL or anon key (brand=${bp})`, {
+      hasUrl: !!supabaseUrl,
+      hasAnonKey: !!anonKey,
+    });
     return null;
   }
 

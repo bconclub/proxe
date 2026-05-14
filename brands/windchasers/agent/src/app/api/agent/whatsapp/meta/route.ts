@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contacts = value.contacts || [];
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
     // Process each message (usually just one)
     for (const msg of messages) {

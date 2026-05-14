@@ -146,7 +146,7 @@ export async function ensureOrUpdateLead(
     // 6. Only INSERT if nothing matches
     // 7. On unique constraint violation: catch and UPDATE instead
 
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
     let existingLead: any = null;
 
     // 2. Check by normalized_phone + brand first
