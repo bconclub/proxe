@@ -298,6 +298,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
   const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
+  const bookingConfirmedRef = useRef(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
 
@@ -1030,6 +1031,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     appendHistory({ role: 'user', content: displayMessage });
     // Note: User input is saved server-side in /api/agent/web/chat route to avoid duplicates
 
+    // For forced calendar opens (book buttons like "Skip and book consultation"), skip the AI.
+    // The calendar widget collects name/email/phone directly, so sending to the AI causes it to
+    // ask for contact info (redundant) and/or generate a conflicting booking confirmation.
+    if (shouldForceCalendarFromBookButton) {
+      addUserMessage(displayMessage);
+      addAIMessage('Let me pull up available slots for you.');
+      appendHistory({ role: 'assistant', content: 'Let me pull up available slots for you.' });
+      return;
+    }
+
     // Send contextual message (with name context) to AI, but display original message in chat
     sendMessage(contextualMessage, nextCount, buttons, buildRequestPayload(), skipAddingUserMessage, displayMessage);
     
@@ -1733,6 +1744,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setShowDeployForm(null);
     deployFormScrolledRef.current = false;
     setBookingCompleted(false);
+    bookingConfirmedRef.current = false;
     setUsedButtons([]);
     setMessageCount(0);
     clearMessages();
@@ -2208,6 +2220,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   // Handle booking completion
   const handleBookingComplete = useCallback(async (bookingData: any) => {
+    if (bookingConfirmedRef.current) return;
+    bookingConfirmedRef.current = true;
     setBookingCompleted(true);
     if (bookingData) {
       // Close any open prompts immediately
@@ -2681,6 +2695,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // Rebook flow — intercept before AI
     if (normalizedButton === 'yes, reschedule') {
       setBookingCompleted(false);
+      bookingConfirmedRef.current = false;
       setBookedSummary('');
       setSkipBookingCheck(true);
       addUserMessage(buttonText);
