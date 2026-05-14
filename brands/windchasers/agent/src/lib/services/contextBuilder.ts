@@ -153,14 +153,42 @@ export async function fetchCustomerContext(
     adminNotes: (lead.unified_context?.admin_notes as any[]) || null,
   };
 
-  // Fetch web conversation summary
-  const { data: webSession } = await client
-    .from('web_sessions')
-    .select('conversation_summary, last_message_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Fetch all channel summaries in parallel
+  const [
+    { data: webSession },
+    { data: waSession },
+    { data: voiceSession },
+    { data: socialSession },
+  ] = await Promise.all([
+    client
+      .from('web_sessions')
+      .select('conversation_summary, last_message_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('whatsapp_sessions')
+      .select('conversation_summary, last_message_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('voice_sessions')
+      .select('call_summary, updated_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('social_sessions')
+      .select('conversation_summary, last_engagement_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (webSession?.conversation_summary) {
     context.webSummary = {
@@ -168,22 +196,12 @@ export async function fetchCustomerContext(
       lastInteraction: webSession.last_message_at,
     };
   }
-  // Also check unified_context.web
   if (context.unifiedContext?.web?.conversation_summary) {
     context.webSummary = {
       summary: context.unifiedContext.web.conversation_summary,
       lastInteraction: context.unifiedContext.web.last_interaction,
     };
   }
-
-  // Fetch WhatsApp conversation summary
-  const { data: waSession } = await client
-    .from('whatsapp_sessions')
-    .select('conversation_summary, last_message_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (waSession?.conversation_summary) {
     context.whatsappSummary = {
@@ -198,15 +216,6 @@ export async function fetchCustomerContext(
     };
   }
 
-  // Fetch voice conversation summary
-  const { data: voiceSession } = await client
-    .from('voice_sessions')
-    .select('call_summary, updated_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   if (voiceSession?.call_summary) {
     context.voiceSummary = {
       summary: voiceSession.call_summary,
@@ -219,15 +228,6 @@ export async function fetchCustomerContext(
       lastInteraction: context.unifiedContext.voice.last_interaction,
     };
   }
-
-  // Fetch social conversation summary
-  const { data: socialSession } = await client
-    .from('social_sessions')
-    .select('conversation_summary, last_engagement_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (socialSession?.conversation_summary) {
     context.socialSummary = {

@@ -417,88 +417,93 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 1b. DB-level dedup: check if agent already responded in the last 10 seconds
-    const { data: recentAgentMsg } = await supabase
-      .from('conversations')
-      .select('created_at')
-      .eq('lead_id', leadId)
-      .eq('channel', 'whatsapp')
-      .eq('sender', 'agent')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 1b–4. Parallelize: dedup checks + session creation + cross-channel context
+    const dedupCutoff30s = new Date(Date.now() - 30_000).toISOString();
+    const [
+      { data: recentAgentMsg },
+      { data: recentDuplicateMsg },
+      ,                          // ensureSession returns void
+      customerContext,
+    ] = await Promise.all([
+      // Dedup: has agent replied in last 10s?
+      supabase
+        .from('conversations')
+        .select('created_at')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'agent')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Dedup: identical customer message in last 30s?
+      supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'customer')
+        .eq('content', messageText)
+        .gte('created_at', dedupCutoff30s)
+        .limit(1)
+        .maybeSingle(),
+      // Ensure whatsapp session exists
+      ensureSession(sessionId, 'whatsapp', supabase),
+      // Fetch cross-channel context (only needs phone, no leadId dependency)
+      fetchCustomerContext(customerPhone, customerName, supabase),
+    ]);
 
     if (recentAgentMsg?.created_at) {
       const agentMsgAge = Date.now() - new Date(recentAgentMsg.created_at).getTime();
-      if (agentMsgAge < 10_000) { // 10 seconds
+      if (agentMsgAge < 10_000) {
         console.log(`[meta/webhook] DEDUP: Agent responded ${agentMsgAge}ms ago for lead ${leadId}, skipping`);
         return;
       }
     }
-
-    // 1c. Content-based dedup: catch retries after server restart or on different serverless instances
-    // (in-memory Set is lost on restart; this catches cross-instance duplicates)
-    const { data: recentDuplicateMsg } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('lead_id', leadId)
-      .eq('channel', 'whatsapp')
-      .eq('sender', 'customer')
-      .eq('content', messageText)
-      .gte('created_at', new Date(Date.now() - 30_000).toISOString())
-      .limit(1)
-      .maybeSingle();
 
     if (recentDuplicateMsg) {
       console.log(`[meta/webhook] CONTENT-DEDUP: Identical message from lead ${leadId} within 30s, skipping`);
       return;
     }
 
-    // 2. Ensure whatsapp session exists and increment message_count
-    await ensureSession(sessionId, 'whatsapp', supabase);
-    await addUserInput(
-      sessionId,
-      messageText,
-      'whatsapp',
-      undefined,
-      { source: 'meta_cloud_api', whatsapp_message_id: whatsappMessageId },
-      supabase,
-    );
+    // 2–6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
+    const [, , conversationHistory, summaryResult] = await Promise.all([
+      addUserInput(
+        sessionId,
+        messageText,
+        'whatsapp',
+        undefined,
+        { source: 'meta_cloud_api', whatsapp_message_id: whatsappMessageId },
+        supabase,
+      ),
+      logMessage(
+        leadId,
+        'whatsapp',
+        'customer',
+        messageText,
+        'text',
+        {
+          whatsapp_message_id: whatsappMessageId,
+          timestamp,
+          session_id: sessionId,
+          source: 'meta_cloud_api',
+        },
+        supabase,
+      ),
+      fetchRecentHistory(leadId, supabase),
+      fetchSummary(sessionId, 'whatsapp', supabase),
+    ]);
 
-    // 3. Log customer message to conversations table
-    await logMessage(
-      leadId,
-      'whatsapp',
-      'customer',
-      messageText,
-      'text',
-      {
-        whatsapp_message_id: whatsappMessageId,
-        timestamp,
-        session_id: sessionId,
-        source: 'meta_cloud_api',
-      },
-      supabase,
-    );
-
-    // Track channel performance: customer responded on WhatsApp
+    // Track channel performance (fire and forget)
     updateChannelPerformance(supabase, leadId, 'whatsapp', 'response').catch(() => {});
 
-    // 4. Fetch cross-channel context
-    const customerContext = await fetchCustomerContext(customerPhone, customerName, supabase);
-
-    // 5. Fetch existing summary
+    // Resolve summary: session summary → web summary fallback
     let existingSummary = '';
-    const summaryResult = await fetchSummary(sessionId, 'whatsapp', supabase);
     if (summaryResult) {
       existingSummary = summaryResult.summary;
     }
     if (!existingSummary && customerContext?.webSummary) {
       existingSummary = customerContext.webSummary.summary;
     }
-
-    // 6. Fetch recent conversation history for context
-    const conversationHistory = await fetchRecentHistory(leadId, supabase);
 
     // messageCount = number of USER messages in this conversation
     // conversationHistory includes the message we just logged above, so count user messages directly
