@@ -1506,7 +1506,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                               <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
                                 <span className="text-[var(--text-muted)] mr-1.5">Type:</span>
-                                {brandProfileData.user_type}
+                                {brandProfileData.user_type?.replace(/_/g, ' ')}
                               </span>
                             </div>
                           )}
@@ -1517,7 +1517,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                               <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
                                 <span className="text-[var(--text-muted)] mr-1.5">Goal:</span>
-                                {brandProfileData.course_interest}
+                                {brandProfileData.course_interest?.replace(/_/g, ' ')}
                               </span>
                             </div>
                           )}
@@ -1533,7 +1533,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                               <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
                                 <span className="text-[var(--text-muted)] mr-1.5">Edu:</span>
-                                {brandProfileData.education}
+                                {brandProfileData.education?.replace(/_/g, ' ')}
                               </span>
                             </div>
                           )}
@@ -1544,7 +1544,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                               <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
                                 <span className="text-[var(--text-muted)] mr-1.5">When:</span>
-                                {timeline}
+                                {timeline?.replace(/_/g, ' ')}
                               </span>
                             </div>
                           )}

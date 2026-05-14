@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-14 · fix(bcon): replace underscores with spaces in lead profile display fields
+
+- `LeadDetailsModal.tsx`: Applied `.replace(/_/g, ' ')` to `user_type`, `course_interest`, `education`, and `timeline` display values — raw enum-style strings like `full_time` now render as `full time` in the lead details panel.
+- User-facing: Lead profile cards in the BCON dashboard inbox no longer show underscored slugs.
+
 ## 2026-05-14 · fix(windchasers): preflight getUserMedia to beat Chrome's transient activation expiry
 
 - `ChatWidget.tsx` (`handleVoiceToggle`): Added a preflight `navigator.mediaDevices.getUserMedia({ audio: true })` call immediately after the env-key guard, before creating the Vapi instance. Root cause: in cross-origin iframes Chrome's transient user-activation window is ~1 second; Vapi's `vapi.start()` fires a server network request before calling `getUserMedia()` internally, so the window expires before the mic dialog can appear. The preflight call happens synchronously in the click handler, firing the permission prompt while the activation is still valid. Once the user grants access the permission is stored and Vapi's own internal `getUserMedia()` succeeds.
