@@ -14,7 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp } from './utils';
 import { ensureSession, getChannelTable, type Channel, type UserInput } from './sessionManager';
-import { ensureOrUpdateLead } from './leadManager';
+import { ensureOrUpdateLead, normalizePhone } from './leadManager';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -127,7 +127,8 @@ export async function fetchCustomerContext(
   const client = supabase || getServiceClient() || getClient();
   if (!client) return null;
 
-  const normalizedPhone = phone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) return null;
 
   // Fetch lead from all_leads
   const { data: lead, error: leadError } = await client

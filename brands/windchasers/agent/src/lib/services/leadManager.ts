@@ -157,9 +157,12 @@ export async function ensureOrUpdateLead(
       .eq('brand', brand)
       .maybeSingle();
 
-    if (phoneErr && phoneErr.code === '42P01') {
-      console.log('[leadManager] all_leads table not found');
-      return null;
+    if (phoneErr) {
+      if (phoneErr.code === '42P01') {
+        console.log('[leadManager] all_leads table not found');
+        return null;
+      }
+      console.error('[leadManager] Error querying by phone', { code: phoneErr.code, msg: phoneErr.message, normalizedPhone, brand });
     }
 
     existingLead = byPhone;
@@ -297,7 +300,7 @@ export async function ensureOrUpdateLead(
     console.log('[leadManager] New lead created', { leadId: created.id });
     return created.id;
   } catch (error) {
-    console.warn('[leadManager] Error in ensureOrUpdateLead', error);
+    console.error('[leadManager] Exception in ensureOrUpdateLead', { error: String(error), phone, normalizedPhone: normalizePhone(phone), brand: process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers' });
     return null;
   }
 }
