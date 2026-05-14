@@ -2566,11 +2566,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       vapiPrewarmedRef.current = true;
 
-      // Do NOT pre-request getUserMedia here. The manual acquire→release→wait
-      // pattern breaks iOS Safari's user-gesture chain (any timer yield after
-      // the click causes iOS to revoke the gesture context). Let Vapi handle
-      // mic access internally — vapi.start() is called directly in the gesture
-      // handler, keeping the permission chain intact.
+      // Preflight getUserMedia — must happen BEFORE Vapi's network handshake.
+      // In cross-origin iframes Chrome's transient user-activation window is
+      // ~1 second. Vapi.start() fires a server request before calling
+      // getUserMedia() internally; by then the activation expires and Chrome
+      // silently rejects the mic request with no dialog. Calling getUserMedia()
+      // here, immediately in the click handler, fires the permission dialog
+      // within the activation window. Once the user taps Allow the permission
+      // is stored for this origin and Vapi's own internal getUserMedia() works.
+      // iOS Safari note: iOS 16.4+ also requires the call to stay in the
+      // synchronous part of the user-gesture stack — await here is fine because
+      // we're still inside the same event-loop task initiated by the click.
+      if (navigator.mediaDevices?.getUserMedia) {
+        try {
+          const preflightStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          preflightStream.getTracks().forEach(track => track.stop());
+          vapiLog('mic preflight ✅ permission granted');
+        } catch (micErr: any) {
+          vapiLog(`mic preflight ❌ ${micErr?.message ?? micErr}`);
+          setIsVapiActive(false);
+          setVapiConnecting(false);
+          vapiPrewarmedRef.current = false;
+          return;
+        }
+      }
+
       const vapi = new Vapi(publicKey);
       vapiRef.current = vapi;
       attachVapiListeners(vapi);
