@@ -52,7 +52,7 @@ export const LOCKED_ANSWERS = {
       'Eligibility → DGCA Ground Classes + Theory Exams → Flight Training → Final Certifications → CPL Issued',
     detailed: [
       'Eligibility: 12th pass with Physics and Maths, Class 1 medical from DGCA-approved centre, Computer Number from DGCA',
-      'Ground Classes and Theory Exams: 5 DGCA theory papers, in-house at our Bengaluru campus',
+      'Ground Classes and Theory Exams: 6 DGCA theory papers (Air Navigation, Aviation Meteorology, Air Regulations, Aircraft & Engines (Technical General), Aircraft Specific (Technical Specific), Radio Telephony / Communication), in-house at our Bengaluru campus',
       'Flight Training: Starts ONLY AFTER theory exams are cleared. 200 hours minimum at DGCA-approved partner FTOs',
       'Final Certifications: RTR(A), English Language Proficiency, CPL flight test',
       'DGCA issues the Commercial Pilot License at the end',
@@ -93,7 +93,7 @@ export const PROGRAMS = {
     {
       id: 'dgca-ground',
       name: 'DGCA Ground Classes',
-      shortDescription: 'Theory training for the 5 DGCA papers, conducted at our Bengaluru campus.',
+      shortDescription: 'Theory training for the 6 DGCA papers, conducted at our Bengaluru campus.',
       whereGround: 'in-house at Bengaluru',
       whereFlight: null,
     },
