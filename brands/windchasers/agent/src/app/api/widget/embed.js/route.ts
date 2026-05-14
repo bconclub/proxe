@@ -26,6 +26,7 @@ export async function GET() {
   var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
   iframe.src = baseUrl + '/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
+  iframe.setAttribute('allow', 'microphone; camera');
 
   // Widget shows immediately on page load
   iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
