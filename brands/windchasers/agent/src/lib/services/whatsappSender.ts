@@ -278,6 +278,26 @@ export async function sendBookingReminder(
 }
 
 /**
+ * Send the first outreach message to a brand-new inbound lead.
+ * Always uses a template — we're initiating contact, not replying.
+ *
+ * Template: windchasers_followup
+ *   {{1}} = first name
+ */
+export async function sendFirstOutreach(
+  to: string,
+  name: string,
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = (name || 'there').split(' ')[0];
+  return sendWhatsAppTemplate(to, 'windchasers_followup', [
+    {
+      type: 'body',
+      parameters: [{ type: 'text', text: firstName }],
+    },
+  ]);
+}
+
+/**
  * Send a missed call follow-up message (R&R = Rang, No Reply).
  * Tries free-form text first (within 24h window), falls back to template.
  *

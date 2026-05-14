@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, getClient, normalizePhone, createCalendarEvent } from '@/lib/services'
+import { getServiceClient, getClient, normalizePhone, createCalendarEvent, sendFirstOutreach } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -338,6 +338,29 @@ export async function POST(request: NextRequest) {
 
     if (taskErr) {
       console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
+    }
+
+    // ── Initial WhatsApp outreach ─────────────────────────────────────────────
+    // Send the windchasers_followup template to every new inbound lead.
+    // Fire-and-forget — lead is already saved regardless of WA success.
+    if (isNew && phone) {
+      sendFirstOutreach(phone, leadName)
+        .then((result) => {
+          if (result.success) {
+            supabase.from('conversations').insert({
+              lead_id: leadId,
+              channel: 'whatsapp',
+              sender: 'agent',
+              content: `[Template: windchasers_followup] Hi ${leadName.split(' ')[0]}!`,
+              message_type: 'template',
+              metadata: { template_name: 'windchasers_followup', auto_sent: true, trigger: 'inbound_first_outreach' },
+            }).catch(() => {})
+            console.log(`[inbound] First outreach WA sent to ${phone} (lead: ${leadId})`)
+          } else {
+            console.error(`[inbound] First outreach WA failed for ${phone}:`, result.error)
+          }
+        })
+        .catch((err) => console.error('[inbound] First outreach WA error:', err))
     }
 
     // ── Demo bookings: also create a Google Calendar event ──────────────────
