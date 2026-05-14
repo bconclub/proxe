@@ -95,9 +95,12 @@ export async function process(
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
+  // Only use booking tools when the message has booking intent or user has an existing booking
+  const needsBookingTools = input.channel === 'whatsapp' &&
+    (isBookingIntent(input.message) || !!existingBookingMessage);
+
   try {
-    if (input.channel === 'whatsapp') {
-      // WhatsApp always gets tool-enabled response (even with existing booking - for rescheduling)
+    if (needsBookingTools) {
       const { tools, toolHandlers } = buildBookingTools(input, supabase);
       rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
         tools,
@@ -105,8 +108,8 @@ export async function process(
         maxToolRounds: 3,
       }, 512);
     } else {
-      // All other channels keep existing behavior
-      rawResponse = await generateResponse(systemPrompt, userPrompt);
+      // Non-booking WhatsApp messages and all other channels: simple response
+      rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
     }
   } catch (firstError: any) {
     console.error('[Engine] AI generation failed (attempt 1):', firstError?.message || firstError);
@@ -115,12 +118,12 @@ export async function process(
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (input.channel === 'whatsapp') {
+      if (needsBookingTools) {
         const { tools, toolHandlers } = buildBookingTools(input, supabase);
         rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
           tools,
           toolHandlers,
-          maxToolRounds: 2, // Reduced rounds for retry
+          maxToolRounds: 2,
         }, 512);
       } else {
         rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
@@ -141,7 +144,7 @@ export async function process(
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
   }
 
-  const cleanedResponse = cleanResponse(rawResponse, input.channel);
+  const cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
