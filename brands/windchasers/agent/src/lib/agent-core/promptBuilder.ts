@@ -108,7 +108,12 @@ function buildSystemPrompt(
   userEmail?: string | null,
   userPhone?: string | null,
 ): string {
-  const nameLine = userName
+  // Guard: never inject brand/system names as the user's name
+  const BRAND_NAMES = new Set(['bcon', 'windchasers', 'proxe', 'nidaan', 'alpha', 'arc']);
+  const isRealPersonName = (n?: string | null): n is string =>
+    !!(n && n.trim() && !BRAND_NAMES.has(n.trim().toLowerCase()));
+
+  const nameLine = isRealPersonName(userName)
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
     : '';
 

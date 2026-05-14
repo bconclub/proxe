@@ -104,6 +104,14 @@ export async function POST(request: NextRequest) {
     const result = await processMessage(agentInput, supabase);
     const responseTimeMs = Date.now() - aiStartTime;
 
+    // Sanitize response for WhatsApp: convert **bold** → *bold*, strip HTML tags
+    if (result.response) {
+      result.response = result.response
+        .replace(/\*\*(.+?)\*\*/gs, '*$1*')      // **text** → *text*
+        .replace(/<br\s*\/?>/gi, '\n')            // <br> → newline
+        .replace(/<[^>]+>/g, '');                 // strip remaining HTML
+    }
+
     // Log messages to conversations table if we have a lead
     const responseMetadata = {
       session_id: sessionId,
