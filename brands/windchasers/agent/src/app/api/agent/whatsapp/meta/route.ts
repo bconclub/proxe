@@ -566,17 +566,19 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       })
       .eq('id', leadId);
 
-    // 11. Link lead_id + phone to whatsapp session
+    // 11. Link lead_id + phone to whatsapp session record (keyed by phone)
     const normalizedSessionPhone = normalizePhone(customerPhone);
-    await supabase
-      .from('whatsapp_sessions')
-      .update({
-        lead_id: leadId,
-        customer_phone: customerPhone,
-        customer_phone_normalized: normalizedSessionPhone,
-        customer_name: customerName !== 'WhatsApp User' ? customerName : undefined,
-      })
-      .eq('external_session_id', sessionId);
+    if (normalizedSessionPhone) {
+      await supabase
+        .from('whatsapp_sessions')
+        .update({
+          lead_id: leadId,
+          customer_phone: customerPhone,
+          customer_name: customerName !== 'WhatsApp User' ? customerName : undefined,
+        })
+        .eq('customer_phone_normalized', normalizedSessionPhone)
+        .eq('brand', brand);
+    }
 
     // 12. Fire-and-forget: trigger AI scoring
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
