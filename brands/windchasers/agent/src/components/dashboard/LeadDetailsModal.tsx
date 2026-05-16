@@ -1531,9 +1531,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               <div className="w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                                 <MdSchool className="text-[var(--text-secondary)]" size={14} />
                               </div>
-                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
+                              <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight">
                                 <span className="text-[var(--text-muted)] mr-1.5">Edu:</span>
-                                {brandProfileData.education}
+                                {String(brandProfileData.education).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                               </span>
                             </div>
                           )}

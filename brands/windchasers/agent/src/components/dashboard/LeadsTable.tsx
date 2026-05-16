@@ -634,15 +634,16 @@ export default function LeadsTable({
             {/* Tightened column widths: Lead/Contact were oversized,
                 Booking was a wide text column (now a compact chip),
                 Type/Course are narrow chip columns. */}
-            <col style={{ width: '18%' }} />  {/* Lead */}
-            <col style={{ width: '18%' }} />  {/* Contact */}
+            <col style={{ width: '15%' }} />  {/* Lead */}
+            <col style={{ width: '15%' }} />  {/* Contact */}
             <col style={{ width: '9%' }} />   {/* Source */}
             <col style={{ width: '6%' }} />   {/* Score */}
             <col style={{ width: '11%' }} />  {/* Stage */}
             <col style={{ width: '8%' }} />   {/* Active */}
             <col style={{ width: '12%' }} />  {/* Booking (chip) */}
-            {showAviationColumns && <col style={{ width: '9%' }} />}
-            {showAviationColumns && <col style={{ width: '9%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
@@ -654,7 +655,7 @@ export default function LeadsTable({
                 'Stage',
                 'Active',
                 'Booking',
-                ...(showAviationColumns ? ['Type', 'Course'] : []),
+                ...(showAviationColumns ? ['Type', 'Course', 'PAT'] : []),
               ].map((h) => (
                 <th
                   key={h}
@@ -670,7 +671,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 9 : 7}
+                  colSpan={showAviationColumns ? 10 : 7}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -1011,6 +1012,28 @@ export default function LeadsTable({
                         )}
                       </td>
                     )}
+                    {showAviationColumns && (() => {
+                      const patScore = lead.unified_context?.[brandId]?.pat_score ??
+                        lead.unified_context?.windchasers?.pat_score ?? null
+                      const patColor = patScore === null ? 'var(--text-muted)'
+                        : patScore >= 70 ? '#22C55E'
+                        : patScore >= 40 ? '#F59E0B'
+                        : '#EF4444'
+                      return (
+                        <td className="px-3 py-2 text-xs">
+                          {patScore !== null ? (
+                            <span
+                              className="inline-block px-2 py-0.5 rounded text-[11px] font-bold tabular-nums"
+                              style={{ color: patColor, background: `${patColor}18` }}
+                            >
+                              {patScore}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      )
+                    })()}
                   </tr>
                 )
               })
