@@ -911,11 +911,11 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - badge + sub-source, vertically centered */}
-                    <td className="px-3 py-2" style={{ verticalAlign: 'middle' }}>
-                      <div className="flex flex-col gap-0.5">
+                    {/* SOURCE - badge + sub-source, horizontally + vertically centered */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                      <div className="flex flex-col items-center gap-0.5">
                         <span
-                          className="inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                          className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
                           style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
                         >
                           {srcCfg.label}
