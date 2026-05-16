@@ -203,6 +203,30 @@ export async function POST(request: NextRequest) {
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
       const educationRaw = String(cf2.education || '').toLowerCase().trim()
       if (educationRaw) brandCtxData.education = educationRaw
+
+      // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
+      // PAT lands here with source='pat' and form_type='pilot_aptitude_test'.
+      // total_score is 0–150. Tier and sub-scores are pre-computed by the form.
+      const isPat =
+        normalizedSource === 'pat' ||
+        String(cf2.form_type || '').toLowerCase() === 'pilot_aptitude_test'
+      if (isPat) {
+        const total = Number(cf2.total_score)
+        if (!isNaN(total)) brandCtxData.pat_score = total
+        const tier = String(cf2.tier || '').toLowerCase().trim()
+        if (tier) brandCtxData.pat_tier = tier
+        const qual = Number(cf2.qualification_score)
+        if (!isNaN(qual)) brandCtxData.pat_qualification_score = qual
+        const apt = Number(cf2.aptitude_score)
+        if (!isNaN(apt)) brandCtxData.pat_aptitude_score = apt
+        const rdy = Number(cf2.readiness_score)
+        if (!isNaN(rdy)) brandCtxData.pat_readiness_score = rdy
+        if (cf2.eligible_class_12_pass != null) {
+          brandCtxData.pat_eligible_class_12_pass = !!cf2.eligible_class_12_pass
+        }
+        brandCtxData.pat_max_score = 150
+        brandCtxData.pat_completed_at = now
+      }
     }
     if (Object.keys(brandCtxData).length > 0) {
       inboundContext[leadBrand] = brandCtxData
