@@ -1022,34 +1022,44 @@ export default function LeadsTable({
                       const uc = lead.unified_context || {}
                       const wc = uc[brandId] || uc.windchasers || {}
                       const rawScore = wc.pat_score ?? uc.raw_form_fields?.total_score ?? null
-                      const patScore = rawScore != null ? Number(rawScore) : null
-                      const tier = String(
+                      const patRaw = rawScore != null ? Number(rawScore) : null
+                      // Display as /100 — see docs/pat-scoring.md
+                      const patScore100 = patRaw != null && !isNaN(patRaw)
+                        ? (wc.pat_score_100 ?? Math.round((patRaw * 100) / 150))
+                        : null
+                      // Tier — derive from raw if not stored (e.g. legacy raw_form_fields)
+                      const storedTier = String(
                         wc.pat_tier || uc.raw_form_fields?.tier || ''
-                      ).toLowerCase()
-                      // Color by tier when available, else by score (out of 150)
+                      ).toLowerCase().trim()
+                      const derivedTier = patRaw == null || isNaN(patRaw) ? ''
+                        : patRaw >= 140 ? 'premium'
+                        : patRaw >= 120 ? 'strong'
+                        : patRaw >= 90  ? 'moderate'
+                        : 'not-ready'
+                      const tier = storedTier || derivedTier
                       const tierColors: Record<string, string> = {
-                        excellent: '#22C55E',
-                        good: '#3B82F6',
-                        moderate: '#F59E0B',
-                        early: '#EF4444',
+                        premium:     '#EAB308', // gold
+                        strong:      '#22C55E', // green
+                        moderate:    '#F59E0B', // yellow / amber
+                        'not-ready': '#EF4444', // red
                       }
-                      const patColor = tier && tierColors[tier]
-                        ? tierColors[tier]
-                        : patScore == null ? 'var(--text-muted)'
-                        : patScore >= 105 ? '#22C55E'
-                        : patScore >= 75 ? '#3B82F6'
-                        : patScore >= 45 ? '#F59E0B'
-                        : '#EF4444'
+                      const tierLabels: Record<string, string> = {
+                        premium: 'Premium',
+                        strong: 'Strong',
+                        moderate: 'Moderate',
+                        'not-ready': 'Not Ready',
+                      }
+                      const patColor = tierColors[tier] || 'var(--text-muted)'
                       return (
                         <td className="px-3 py-2 text-xs text-center">
-                          {patScore !== null && !isNaN(patScore) ? (
+                          {patScore100 !== null ? (
                             <span
                               className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums"
                               style={{ color: patColor, background: `${patColor}18` }}
-                              title={tier ? `Tier: ${tier}` : undefined}
+                              title={tier ? `Tier: ${tierLabels[tier] || tier} (raw ${patRaw}/150)` : undefined}
                             >
-                              {patScore}
-                              <span className="text-[9px] opacity-70">/150</span>
+                              {patScore100}
+                              <span className="text-[9px] opacity-70">/100</span>
                             </span>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>—</span>

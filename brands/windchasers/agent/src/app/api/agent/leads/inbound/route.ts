@@ -183,7 +183,12 @@ export async function POST(request: NextRequest) {
     const brandCtxData: Record<string, any> = {}
     const cf2 = (custom_fields || {}) as Record<string, any>
     const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
-    if (audienceRaw === 'student' || audienceRaw === 'parent' || audienceRaw === 'professional') {
+    if (
+      audienceRaw === 'student' ||
+      audienceRaw === 'parent' ||
+      audienceRaw === 'professional' ||
+      audienceRaw === 'early_stage'
+    ) {
       brandCtxData.user_type = audienceRaw
     }
     if (leadBrand === 'windchasers') {
@@ -213,16 +218,31 @@ export async function POST(request: NextRequest) {
       if (educationRaw) brandCtxData.education = educationRaw
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
-      // PAT lands here with source='pat' and form_type='pilot_aptitude_test'.
-      // total_score is 0–150. Tier and sub-scores are pre-computed by the form.
+      // total_score is 0–150. Tier is RE-DERIVED on the server from total_score
+      // (never trust the client) using the official cutoffs:
+      //   140+ premium · 120+ strong · 90+ moderate · 0+ not-ready
+      // See docs/pat-scoring.md for the full spec.
       const isPat =
         normalizedSource === 'pat' ||
         String(cf2.form_type || '').toLowerCase() === 'pilot_aptitude_test'
       if (isPat) {
         const total = Number(cf2.total_score)
-        if (!isNaN(total)) brandCtxData.pat_score = total
-        const tier = String(cf2.tier || '').toLowerCase().trim()
-        if (tier) brandCtxData.pat_tier = tier
+        if (!isNaN(total)) {
+          brandCtxData.pat_score = total
+          brandCtxData.pat_score_100 = Math.round((total * 100) / 150)
+          // Server-derived tier — authoritative
+          const derivedTier =
+            total >= 140 ? 'premium' :
+            total >= 120 ? 'strong' :
+            total >= 90  ? 'moderate' :
+                           'not-ready'
+          brandCtxData.pat_tier = derivedTier
+          // Log client-sent tier for comparison (not stored on lead)
+          const clientTier = String(cf2.tier || '').toLowerCase().trim()
+          if (clientTier && clientTier !== derivedTier) {
+            console.warn(`[inbound/pat] Tier mismatch: client="${clientTier}" derived="${derivedTier}" score=${total}`)
+          }
+        }
         const qual = Number(cf2.qualification_score)
         if (!isNaN(qual)) brandCtxData.pat_qualification_score = qual
         const apt = Number(cf2.aptitude_score)

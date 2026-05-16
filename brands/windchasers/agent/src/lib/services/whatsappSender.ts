@@ -342,27 +342,36 @@ export async function sendDemoBookedConfirmation(
  *
  * Template: windchasers_pat_result
  *   {{1}} = first name
- *   {{2}} = score (e.g. "87")
- *   {{3}} = tier (capitalized, e.g. "Good", "Excellent", "Moderate", "Early")
+ *   {{2}} = score displayed as /100 (e.g. "58") — converted from raw /150
+ *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Not Ready Yet")
  */
+const TIER_LABELS: Record<string, string> = {
+  premium:     'Premium',
+  strong:      'Strong',
+  moderate:    'Moderate',
+  'not-ready': 'Not Ready Yet',
+};
+
 export async function sendPATResult(
   to: string,
   name: string,
-  score: number,
+  rawScore: number,
   tier: string,
 ): Promise<{ success: boolean; error?: string }> {
   const firstName = (name || 'there').split(' ')[0];
-  const tierClean = (tier || '').trim();
-  const tierCap = tierClean
-    ? tierClean.charAt(0).toUpperCase() + tierClean.slice(1).toLowerCase()
-    : 'Pending';
+  const score100 = Math.round((Number(rawScore) * 100) / 150);
+  const tierKey = (tier || '').toLowerCase().trim();
+  const tierLabel = TIER_LABELS[tierKey] || tierKey
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Pending';
+
   return sendWhatsAppTemplate(to, 'windchasers_pat_result', [
     {
       type: 'body',
       parameters: [
         { type: 'text', text: firstName },
-        { type: 'text', text: String(score) },
-        { type: 'text', text: tierCap },
+        { type: 'text', text: String(score100) },
+        { type: 'text', text: tierLabel },
       ],
     },
   ]);

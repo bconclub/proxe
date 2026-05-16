@@ -1554,6 +1554,102 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
+                {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
+                {(() => {
+                  const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};
+                  const rff = currentLead.unified_context?.raw_form_fields || {};
+                  const rawScore = wc.pat_score ?? rff.total_score ?? null;
+                  if (rawScore == null) return null;
+                  const raw = Number(rawScore);
+                  if (isNaN(raw)) return null;
+                  const score100 = wc.pat_score_100 ?? Math.round((raw * 100) / 150);
+                  const qual = wc.pat_qualification_score ?? rff.qualification_score ?? null;
+                  const apt = wc.pat_aptitude_score ?? rff.aptitude_score ?? null;
+                  const rdy = wc.pat_readiness_score ?? rff.readiness_score ?? null;
+                  const elig = wc.pat_eligible_class_12_pass ?? rff.eligible_class_12_pass ?? null;
+                  const storedTier = String(wc.pat_tier || rff.tier || '').toLowerCase().trim();
+                  const derivedTier = raw >= 140 ? 'premium' : raw >= 120 ? 'strong' : raw >= 90 ? 'moderate' : 'not-ready';
+                  const tier = storedTier || derivedTier;
+                  const tierColors: Record<string, string> = {
+                    premium: '#EAB308',
+                    strong: '#22C55E',
+                    moderate: '#F59E0B',
+                    'not-ready': '#EF4444',
+                  };
+                  const tierLabels: Record<string, string> = {
+                    premium: 'Premium',
+                    strong: 'Strong',
+                    moderate: 'Moderate',
+                    'not-ready': 'Not Ready Yet',
+                  };
+                  const color = tierColors[tier] || '#6B7280';
+                  return (
+                    <div
+                      className="lead-pat-card mt-2 p-3 rounded-lg border"
+                      style={{
+                        borderColor: `${color}55`,
+                        background: `${color}10`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">
+                            PAT Result
+                          </span>
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                            style={{ color, background: `${color}25` }}
+                          >
+                            {tierLabels[tier] || tier}
+                          </span>
+                        </div>
+                        <span
+                          className="text-base font-black tabular-nums"
+                          style={{ color }}
+                          title={`Raw: ${raw}/150`}
+                        >
+                          {score100}
+                          <span className="text-[10px] font-bold opacity-70 ml-0.5">/100</span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                        {qual != null && (
+                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Qual</div>
+                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                              {Number(qual).toFixed(qual % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                            </div>
+                          </div>
+                        )}
+                        {apt != null && (
+                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Apt</div>
+                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                              {Number(apt).toFixed(apt % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                            </div>
+                          </div>
+                        )}
+                        {rdy != null && (
+                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Rdy</div>
+                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                              {Number(rdy).toFixed(rdy % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {elig !== null && (
+                        <div className="mt-2 text-[10px] text-[var(--text-muted)]">
+                          12th eligibility:{' '}
+                          <span className={elig ? 'text-green-500 font-semibold' : 'text-red-500 font-semibold'}>
+                            {elig ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {!currentLead.email && !currentLead.phone && (
                   <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
                 )}
