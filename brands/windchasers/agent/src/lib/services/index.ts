@@ -77,6 +77,8 @@ export {
   sendBookingReminder,
   sendMissedCallMessage,
   sendFirstOutreach,
+  sendDemoBookedConfirmation,
+  sendPATResult,
 } from './whatsappSender';
 
 // Cross-channel context

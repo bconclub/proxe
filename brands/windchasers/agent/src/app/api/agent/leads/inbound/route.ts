@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, getClient, normalizePhone, createCalendarEvent, sendFirstOutreach } from '@/lib/services'
+import {
+  getServiceClient,
+  getClient,
+  normalizePhone,
+  createCalendarEvent,
+  sendFirstOutreach,
+  sendDemoBookedConfirmation,
+  sendPATResult,
+} from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -364,10 +372,44 @@ export async function POST(request: NextRequest) {
       console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
     }
 
-    // ── Initial WhatsApp outreach ─────────────────────────────────────────────
-    // Send the windchasers_followup template to every new inbound lead.
-    // Fire-and-forget — lead is already saved regardless of WA success.
-    if (isNew && phone) {
+    // ── Detect submission type for routing the right template ────────────────
+    const cfields = (custom_fields || {}) as Record<string, any>
+    const isDemoBooking =
+      String(notes || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.event_name || '').toLowerCase() === 'demo_booked' ||
+      String(cfields.form_type || '').toLowerCase() === 'demo_booked'
+    const isPatSubmission =
+      normalizedSource === 'pat' ||
+      String(cfields.form_type || '').toLowerCase() === 'pilot_aptitude_test'
+
+    // ── PAT result → fires immediately (no calendar dependency) ──────────────
+    // Demo confirmations are sent AFTER the calendar event below so we have
+    // the meet link. Generic outreach is sent only for new leads that are
+    // NEITHER a PAT submission NOR a demo booking.
+    if (phone && isPatSubmission) {
+      const score = Number(cfields.total_score)
+      const tier = String(cfields.tier || '')
+      if (!isNaN(score)) {
+        sendPATResult(phone, leadName, score, tier)
+          .then((result) => {
+            if (result.success) {
+              supabase.from('conversations').insert({
+                lead_id: leadId,
+                channel: 'whatsapp',
+                sender: 'agent',
+                content: `[Template: windchasers_pat_result] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`,
+                message_type: 'template',
+                metadata: { template_name: 'windchasers_pat_result', auto_sent: true, trigger: 'pat_completed', score, tier },
+              }).catch(() => {})
+              console.log(`[inbound] PAT result WA sent to ${phone} (lead: ${leadId}) score=${score} tier=${tier}`)
+            } else {
+              console.error(`[inbound] PAT result WA failed for ${phone}:`, result.error)
+            }
+          })
+          .catch((err) => console.error('[inbound] PAT result WA error:', err))
+      }
+    } else if (isNew && phone && !isDemoBooking) {
+      // Generic welcome — only for brand-new leads that aren't a demo/PAT.
       sendFirstOutreach(phone, leadName)
         .then((result) => {
           if (result.success) {
@@ -387,22 +429,12 @@ export async function POST(request: NextRequest) {
         .catch((err) => console.error('[inbound] First outreach WA error:', err))
     }
 
-    // ── Demo bookings: also create a Google Calendar event ──────────────────
-    // If this inbound is a demo booking with a date + time, create the actual
-    // calendar event and stamp booking_* on unified_context.web so the
-    // dashboard's BOOKING column populates. Failure to create the calendar
-    // event does NOT fail the inbound — the lead is already saved.
-    const cfields = (custom_fields || {}) as Record<string, any>
-    const isDemoBooking =
-      String(notes || '').toLowerCase() === 'demo_booked' ||
-      String(cfields.event_name || '').toLowerCase() === 'demo_booked' ||
-      String(cfields.form_type || '').toLowerCase() === 'demo_booked'
-
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
     const preferredTime = cfields.preferred_time || cfields.preferredTime || null
 
     let calendarResult: { eventId: string; eventLink: string } | null = null
     let calendarError: string | null = null
+    let demoMeetLink: string | null = null
 
     if (isDemoBooking && preferredDate && preferredTime) {
       try {
@@ -425,6 +457,7 @@ export async function POST(request: NextRequest) {
             eventId: existingBooking.eventId,
             eventLink: existingBooking.eventLink || '',
           }
+          demoMeetLink = existingBooking.meetLink || null
         } else {
           const event = await createCalendarEvent({
             date: preferredDate,
@@ -444,6 +477,7 @@ export async function POST(request: NextRequest) {
               eventId: event.eventId,
               eventLink: event.eventLink,
             }
+            demoMeetLink = event.meetLink || null
 
             // Re-fetch unified_context (might have changed since the merge above)
             // and stamp the booking on it.
@@ -483,6 +517,49 @@ export async function POST(request: NextRequest) {
         calendarError = calErr?.message || String(calErr)
         console.error('[inbound] Calendar event creation failed:', calendarError)
         // Swallow — lead is already saved.
+      }
+    }
+
+    // ── Demo booking confirmation WhatsApp ───────────────────────────────────
+    // Sent AFTER the calendar event so we have the meet link for the URL button.
+    // Fires for every demo booking (new or returning lead).
+    if (isDemoBooking && phone && preferredDate && preferredTime) {
+      try {
+        const dateObj = new Date(`${preferredDate}T${preferredTime}+05:30`)
+        const dateDisplay = dateObj.toLocaleDateString('en-IN', {
+          weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata',
+        })
+        const [h, m] = preferredTime.toString().split(':').map(Number)
+        const period = h >= 12 ? 'PM' : 'AM'
+        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+        const timeDisplay = `${hour12}:${(m || 0).toString().padStart(2, '0')} ${period} IST`
+
+        sendDemoBookedConfirmation(phone, leadName, dateDisplay, timeDisplay, demoMeetLink)
+          .then((result) => {
+            if (result.success) {
+              supabase.from('conversations').insert({
+                lead_id: leadId,
+                channel: 'whatsapp',
+                sender: 'agent',
+                content: `[Template: windchasers_demo_booked] Demo confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`,
+                message_type: 'template',
+                metadata: {
+                  template_name: 'windchasers_demo_booked',
+                  auto_sent: true,
+                  trigger: 'demo_booked',
+                  date: preferredDate,
+                  time: preferredTime,
+                  meet_link: demoMeetLink,
+                },
+              }).catch(() => {})
+              console.log(`[inbound] Demo confirmation WA sent to ${phone} (lead: ${leadId})`)
+            } else {
+              console.error(`[inbound] Demo confirmation WA failed for ${phone}:`, result.error)
+            }
+          })
+          .catch((err) => console.error('[inbound] Demo confirmation WA error:', err))
+      } catch (waErr: any) {
+        console.error('[inbound] Demo confirmation prep failed:', waErr?.message || waErr)
       }
     }
 

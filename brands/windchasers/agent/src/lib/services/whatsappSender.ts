@@ -298,6 +298,77 @@ export async function sendFirstOutreach(
 }
 
 /**
+ * Send a demo booking confirmation message.
+ * Fires when a lead books a demo through the website / inbound endpoint.
+ *
+ * Template: windchasers_demo_booked
+ *   {{1}} = first name
+ *   {{2}} = formatted date (e.g. "Mon, May 19")
+ *   {{3}} = formatted time (e.g. "12:00 PM IST")
+ *   Button (URL, idx 0) = Google Meet code suffix (e.g. "abc-defg-hij")
+ */
+export async function sendDemoBookedConfirmation(
+  to: string,
+  name: string,
+  dateDisplay: string,
+  timeDisplay: string,
+  meetLink?: string | null,
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = (name || 'there').split(' ')[0];
+  const components: Array<any> = [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: firstName },
+        { type: 'text', text: dateDisplay },
+        { type: 'text', text: timeDisplay },
+      ],
+    },
+  ];
+  // Meta requires the button param even when meet link is unset
+  components.push({
+    type: 'button',
+    sub_type: 'url',
+    index: 0,
+    parameters: [
+      { type: 'text', text: meetLink ? extractUrlSuffix(meetLink) : 'windchasers.in' },
+    ],
+  });
+  return sendWhatsAppTemplate(to, 'windchasers_demo_booked', components);
+}
+
+/**
+ * Send a PAT (Pilot Aptitude Test) result message after the lead completes the test.
+ *
+ * Template: windchasers_pat_result
+ *   {{1}} = first name
+ *   {{2}} = score (e.g. "87")
+ *   {{3}} = tier (capitalized, e.g. "Good", "Excellent", "Moderate", "Early")
+ */
+export async function sendPATResult(
+  to: string,
+  name: string,
+  score: number,
+  tier: string,
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = (name || 'there').split(' ')[0];
+  const tierClean = (tier || '').trim();
+  const tierCap = tierClean
+    ? tierClean.charAt(0).toUpperCase() + tierClean.slice(1).toLowerCase()
+    : 'Pending';
+  return sendWhatsAppTemplate(to, 'windchasers_pat_result', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: firstName },
+        { type: 'text', text: String(score) },
+        { type: 'text', text: tierCap },
+      ],
+    },
+  ]);
+}
+
+/**
  * Send a missed call follow-up message (R&R = Rang, No Reply).
  * Tries free-form text first (within 24h window), falls back to template.
  *
