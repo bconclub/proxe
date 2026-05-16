@@ -648,21 +648,25 @@ export default function LeadsTable({
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
-                'Lead',
-                'Contact',
-                'Source',
-                'Score',
-                'Stage',
-                'Active',
-                'Booking',
-                ...(showAviationColumns ? ['Type', 'Course', 'PAT'] : []),
-              ].map((h) => (
+                { label: 'Lead',    align: 'left'   as const },
+                { label: 'Contact', align: 'left'   as const },
+                { label: 'Source',  align: 'center' as const },
+                { label: 'Score',   align: 'center' as const },
+                { label: 'Stage',   align: 'center' as const },
+                { label: 'Active',  align: 'left'   as const },
+                { label: 'Booking', align: 'center' as const },
+                ...(showAviationColumns ? [
+                  { label: 'Type',   align: 'center' as const },
+                  { label: 'Course', align: 'center' as const },
+                  { label: 'PAT',    align: 'center' as const },
+                ] : []),
+              ].map(({ label, align }) => (
                 <th
-                  key={h}
-                  className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider"
+                  key={label}
+                  className={`px-3 py-2.5 text-${align} text-[10px] font-semibold uppercase tracking-wider`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {h}
+                  {label}
                 </th>
               ))}
             </tr>
@@ -946,7 +950,7 @@ export default function LeadsTable({
                     </td>
 
                     {/* STAGE - badge */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
                         style={stageColor.style || {}}
@@ -961,7 +965,7 @@ export default function LeadsTable({
                     </td>
 
                     {/* BOOKING - compact chip with calendar icon, "—" when none */}
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-3 py-2 text-xs text-center">
                       {bookingDate ? (
                         <Link
                           href="/dashboard/bookings"
@@ -987,7 +991,7 @@ export default function LeadsTable({
                     {/* Aviation columns — chip styling so the row reads as a
                         scannable set of tags rather than mixed text + chips */}
                     {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-xs text-center">
                         {lead.unified_context?.[brandId]?.user_type ? (
                           <span
                             className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
@@ -1001,7 +1005,7 @@ export default function LeadsTable({
                       </td>
                     )}
                     {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-xs text-center">
                         {lead.unified_context?.[brandId]?.course_interest ? (
                           <span
                             className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
@@ -1037,7 +1041,7 @@ export default function LeadsTable({
                         : patScore >= 45 ? '#F59E0B'
                         : '#EF4444'
                       return (
-                        <td className="px-3 py-2 text-xs">
+                        <td className="px-3 py-2 text-xs text-center">
                           {patScore !== null && !isNaN(patScore) ? (
                             <span
                               className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums"
