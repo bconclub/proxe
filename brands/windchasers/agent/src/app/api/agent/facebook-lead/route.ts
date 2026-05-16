@@ -2,28 +2,21 @@
  * POST /api/agent/facebook-lead
  *
  * Receives Facebook Lead Ad data from Pabbly Connect and:
- *   1. Creates / deduplicates the lead in all_leads
+ *   1. Creates / deduplicates the lead in all_leads (source: facebook_lead)
  *   2. Fires the windchasers_followup WhatsApp template immediately
  *   3. Logs the outbound message to conversations
  *
- * Auth: x-api-key header (same WHATSAPP_API_KEY used by other webhooks)
- *
- * Pabbly field mapping (accept both Facebook defaults and custom names):
- *   name / full_name / customer_name → customer name
- *   phone / phone_number / mobile   → WhatsApp number (required)
- *   email / email_address           → email (optional)
- *   ad_name / adset_name / campaign_name / form_name → stored in facebook metadata
+ * Pabbly field mapping:
+ *   name / full_name            → customer name
+ *   phone / phone_number        → WhatsApp number (required)
+ *   email                       → email (optional)
+ *   education / education_level → education level
+ *   city                        → city
+ *   utm_source/medium/campaign/content → ad attribution
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getServiceClient,
-  ensureOrUpdateLead,
-  ensureSession,
-  logMessage,
-  normalizePhone,
-  sendFirstOutreach,
-} from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendFirstOutreach } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // ── Flexible field parsing ────────────────────────────────────────────────
-    // Pabbly maps Facebook form fields — accept several common field names
+    // ── Field parsing ─────────────────────────────────────────────────────────
     const name: string =
       body.name || body.full_name || body.customer_name || body.Name || '';
     const phone: string =
@@ -44,28 +36,28 @@ export async function POST(request: NextRequest) {
     const city: string | null =
       body.city || body.City || body.location || null;
 
-    // Facebook/campaign metadata (nice-to-have, stored for context & scoring)
+    // UTM attribution from Facebook Ads
+    const utmData = {
+      utm_source:   body.utm_source   || null,
+      utm_medium:   body.utm_medium   || null,
+      utm_campaign: body.utm_campaign || null,
+      utm_content:  body.utm_content  || null,
+    };
+
+    // Facebook campaign metadata
     const facebookMeta = {
-      ad_name: body.ad_name || body.adset_name || null,
+      ad_name:       body.ad_name || body.adset_name || null,
       campaign_name: body.campaign_name || body.campaign || null,
-      form_name: body.form_name || body.leadgen_form_name || null,
-      lead_id: body.lead_id || body.fb_lead_id || null,
-      page_id: body.page_id || null,
-      ad_id: body.ad_id || null,
+      form_name:     body.form_name || body.leadgen_form_name || null,
+      lead_id:       body.lead_id || body.fb_lead_id || null,
+      ...utmData,
     };
 
     if (!phone) {
-      return NextResponse.json(
-        { error: 'Missing required field: phone' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Missing required field: phone' }, { status: 400 });
     }
-
     if (!name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
 
     const supabase = getServiceClient();
@@ -75,94 +67,91 @@ export async function POST(request: NextRequest) {
 
     const normalizedPhone = normalizePhone(phone);
     if (!normalizedPhone) {
-      return NextResponse.json(
-        { error: 'Invalid phone number format' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    const sessionId = `wa_meta_${normalizedPhone}`;
+    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
-    // ── 1. Create / deduplicate lead ─────────────────────────────────────────
-    const leadId = await ensureOrUpdateLead(
-      name,
-      email,
-      phone,
-      'whatsapp',
-      sessionId,
-      supabase,
-    );
+    // ── 1. Deduplicate by phone ───────────────────────────────────────────────
+    const { data: existing } = await supabase
+      .from('all_leads')
+      .select('id, unified_context, follow_up_cooldown_until')
+      .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', brand)
+      .maybeSingle();
 
-    if (!leadId) {
-      return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
-    }
+    const now = new Date().toISOString();
+    let leadId: string;
 
-    // Store Facebook metadata in unified_context.facebook
-    try {
-      const { data: lead } = await supabase
-        .from('all_leads')
-        .select('unified_context')
-        .eq('id', leadId)
-        .maybeSingle();
+    const windchasersProfile: Record<string, string> = {};
+    if (education) windchasersProfile.education = education;
+    if (city) windchasersProfile.city = city;
 
-      const existingCtx = lead?.unified_context || {};
-      const isNewFacebookLead = !existingCtx.facebook;
-      const existingWindchasers = existingCtx.windchasers || {};
+    if (existing) {
+      leadId = existing.id;
+      const existingCtx = existing.unified_context || {};
+
       await supabase
         .from('all_leads')
         .update({
+          customer_name: name,
+          ...(email ? { email } : {}),
+          phone,
+          customer_phone_normalized: normalizedPhone,
+          last_touchpoint: 'facebook_lead',
+          last_interaction_at: now,
           unified_context: {
             ...existingCtx,
             facebook: {
               ...(existingCtx.facebook || {}),
               ...facebookMeta,
-              lead_created_at: new Date().toISOString(),
+              last_lead_at: now,
             },
             windchasers: {
-              ...existingWindchasers,
-              ...(education ? { education } : {}),
-              ...(city ? { city } : {}),
+              ...(existingCtx.windchasers || {}),
+              ...windchasersProfile,
             },
           },
-          last_touchpoint: 'facebook_lead',
-          ...(isNewFacebookLead ? { first_touchpoint: 'facebook_lead' } : {}),
         })
         .eq('id', leadId);
-    } catch (ctxErr) {
-      console.error('[facebook-lead] Failed to write facebook metadata:', ctxErr);
+    } else {
+      // Brand-new lead — set first_touchpoint: facebook_lead directly
+      const { data: created, error: insertError } = await supabase
+        .from('all_leads')
+        .insert({
+          customer_name: name,
+          email,
+          phone,
+          customer_phone_normalized: normalizedPhone,
+          brand,
+          first_touchpoint: 'facebook_lead',
+          last_touchpoint: 'facebook_lead',
+          last_interaction_at: now,
+          unified_context: {
+            facebook: { ...facebookMeta, lead_created_at: now },
+            windchasers: windchasersProfile,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !created) {
+        console.error('[facebook-lead] Insert failed:', insertError);
+        return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 });
+      }
+      leadId = created.id;
     }
 
-    // ── 2. Ensure WhatsApp session ──────────────────────────────────────────
-    await ensureSession(sessionId, 'whatsapp', supabase);
-
-    // Link name + phone to the session
-    await supabase
-      .from('whatsapp_sessions')
-      .update({
-        lead_id: leadId,
-        customer_name: name,
-        customer_phone: phone,
-        customer_phone_normalized: normalizedPhone,
-        channel_data: { source: 'facebook_lead', ...facebookMeta },
-      })
-      .eq('external_session_id', sessionId);
-
-    // ── 3. Check cooldown — don't spam an existing active lead ───────────────
-    const { data: leadRow } = await supabase
-      .from('all_leads')
-      .select('follow_up_cooldown_until')
-      .eq('id', leadId)
-      .maybeSingle();
-
-    const cooldownUntil = leadRow?.follow_up_cooldown_until;
+    // ── 2. Cooldown check — don't re-message an active lead ──────────────────
+    const cooldownUntil = existing?.follow_up_cooldown_until;
     const inCooldown = cooldownUntil && new Date(cooldownUntil) > new Date();
 
     let whatsappSent = false;
 
     if (inCooldown) {
-      console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp send`);
+      console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
     } else {
-      // ── 4. Send first outreach via windchasers_followup template ────────────
+      // ── 3. Fire windchasers_followup template ────────────────────────────────
       const sendResult = await sendFirstOutreach(phone, name);
       whatsappSent = sendResult.success;
 
@@ -170,25 +159,20 @@ export async function POST(request: NextRequest) {
         console.error('[facebook-lead] WhatsApp send failed:', sendResult.error);
       }
 
-      // ── 5. Log the outbound message ─────────────────────────────────────────
+      // ── 4. Log the outbound message ──────────────────────────────────────────
       if (whatsappSent) {
         await logMessage(
           leadId,
           'whatsapp',
           'agent',
-          `Hey ${name.split(' ')[0]}! 👋 (windchasers_followup template)`,
+          `Hey ${name.split(' ')[0]}! (windchasers_followup template)`,
           'template',
-          {
-            source: 'facebook_lead',
-            template_name: 'windchasers_followup',
-            session_id: sessionId,
-            ...facebookMeta,
-          },
+          { source: 'facebook_lead', template_name: 'windchasers_followup', ...facebookMeta },
           supabase,
         );
       }
 
-      // ── 6. Trigger AI scoring ────────────────────────────────────────────────
+      // ── 5. Trigger AI scoring (fire-and-forget) ──────────────────────────────
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
       fetch(`${appUrl}/api/webhooks/message-created`, {
         method: 'POST',
@@ -197,7 +181,7 @@ export async function POST(request: NextRequest) {
       }).catch((err) => console.error('[facebook-lead] Scoring trigger failed:', err));
     }
 
-    console.log(`[facebook-lead] Processed: lead=${leadId} phone=${normalizedPhone} whatsapp_sent=${whatsappSent} cooldown=${inCooldown}`);
+    console.log(`[facebook-lead] lead=${leadId} phone=${normalizedPhone} sent=${whatsappSent} cooldown=${!!inCooldown}`);
 
     return NextResponse.json({
       success: true,
