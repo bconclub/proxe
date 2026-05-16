@@ -45,6 +45,10 @@ export async function POST(request: NextRequest) {
       body.phone || body.phone_number || body.mobile || body.Phone || body.whatsapp || '';
     const email: string | null =
       body.email || body.email_address || body.Email || null;
+    const education: string | null =
+      body.education || body.education_level || body.qualification || null;
+    const city: string | null =
+      body.city || body.City || body.location || null;
 
     // Facebook/campaign metadata (nice-to-have, stored for context & scoring)
     const facebookMeta = {
@@ -109,6 +113,7 @@ export async function POST(request: NextRequest) {
 
       const existingCtx = lead?.unified_context || {};
       const isNewFacebookLead = !existingCtx.facebook;
+      const existingWindchasers = existingCtx.windchasers || {};
       await supabase
         .from('all_leads')
         .update({
@@ -118,6 +123,11 @@ export async function POST(request: NextRequest) {
               ...(existingCtx.facebook || {}),
               ...facebookMeta,
               lead_created_at: new Date().toISOString(),
+            },
+            windchasers: {
+              ...existingWindchasers,
+              ...(education ? { education } : {}),
+              ...(city ? { city } : {}),
             },
           },
           last_touchpoint: 'facebook_lead',
