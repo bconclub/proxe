@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       utm_term,
       page_url,
       form_name,
+      pat_score,
       brand = 'windchasers',
     } = body
 
@@ -92,6 +93,11 @@ export async function POST(request: NextRequest) {
 
     let leadId: string
 
+    const parsedPatScore = pat_score != null ? Number(pat_score) : null
+    const windchasersUpdate = parsedPatScore !== null && !isNaN(parsedPatScore)
+      ? { pat_score: parsedPatScore, pat_completed_at: now }
+      : {}
+
     if (!existingLead?.id) {
       // New lead
       const { data: newLead, error: insertError } = await supabase
@@ -107,6 +113,7 @@ export async function POST(request: NextRequest) {
           brand,
           unified_context: {
             landing_page: landingPageContext,
+            ...(Object.keys(windchasersUpdate).length ? { windchasers: windchasersUpdate } : {}),
           },
         })
         .select('id')
@@ -123,7 +130,6 @@ export async function POST(request: NextRequest) {
         .update({
           last_touchpoint: 'landing_page',
           last_interaction_at: now,
-          // Update name/email if provided and not already set
           ...(name ? { customer_name: name } : {}),
           ...(email ? { email } : {}),
           unified_context: {
@@ -131,6 +137,10 @@ export async function POST(request: NextRequest) {
             landing_page: {
               ...(existing.landing_page || {}),
               ...landingPageContext,
+            },
+            windchasers: {
+              ...(existing.windchasers || {}),
+              ...windchasersUpdate,
             },
           },
         })
