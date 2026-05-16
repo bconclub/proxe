@@ -911,23 +911,25 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - medium badge + sub-source on its own line, no truncate */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                        style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
-                      >
-                        {srcCfg.label}
-                      </span>
-                      {subSource && (
-                        <div
-                          className="text-[10px] mt-0.5"
-                          style={{ color: '#9ca3af' }}
-                          title={subSource}
+                    {/* SOURCE - badge + sub-source, vertically centered */}
+                    <td className="px-3 py-2" style={{ verticalAlign: 'middle' }}>
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className="inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                          style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
                         >
-                          {subSource}
-                        </div>
-                      )}
+                          {srcCfg.label}
+                        </span>
+                        {subSource && (
+                          <span
+                            className="text-[10px] whitespace-nowrap"
+                            style={{ color: '#9ca3af' }}
+                            title={subSource}
+                          >
+                            {subSource}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* SCORE - colored pill */}
