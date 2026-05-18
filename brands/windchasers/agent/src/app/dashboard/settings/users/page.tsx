@@ -169,8 +169,8 @@ export default function UserManagementPage() {
             </button>
             <button
               onClick={() => { setShowInviteModal(true); setInviteResult(null); setError(null) }}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#1A1A1A' }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: '#C9A961', color: '#1A1A1A' }}
             >
               <MdPersonAdd size={16} />
               Invite User
@@ -332,8 +332,8 @@ export default function UserManagementPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleCopy(inviteResult.url)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold"
-                      style={{ background: 'var(--accent-primary)', color: '#1A1A1A' }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                      style={{ background: '#C9A961', color: '#1A1A1A' }}
                     >
                       {copied ? <><MdCheck size={16} /> Copied</> : <><MdContentCopy size={16} /> Copy link</>}
                     </button>
@@ -374,8 +374,8 @@ export default function UserManagementPage() {
                     <button
                       type="submit"
                       disabled={inviting || !inviteEmail.trim()}
-                      className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-                      style={{ background: 'var(--accent-primary)', color: '#1A1A1A' }}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity"
+                      style={{ background: '#C9A961', color: '#1A1A1A' }}
                     >
                       {inviting ? 'Creating…' : 'Create invitation'}
                     </button>
