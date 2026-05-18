@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { process as processMessage } from '@/lib/agent-core/engine';
 import { AgentInput } from '@/lib/agent-core/types';
+import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
 import {
   getServiceClient,
   getClient,
@@ -562,13 +563,58 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       supabase,
     );
 
-    // 10. Update lead context
+    // 10. Update lead context — merge extracted intent into brand namespace
+    //
+    //   user_type      = student / parent / professional
+    //   course_interest = DGCA / Flight / Heli / Cabin / Drone (mapped from intent)
+    //   timeline       = asap / 1-3mo / 6+mo / 1yr+
+    //
+    // The dashboard's TYPE / COURSE columns read from unified_context[brand],
+    // so without this step they stay empty for every WhatsApp lead.
+    const courseMap: Record<string, string> = {
+      pilot: 'DGCA',         // generic "pilot training" → DGCA (most common path)
+      dgca: 'DGCA',
+      cpl: 'DGCA',
+      flight: 'Flight',
+      flying: 'Flight',
+      helicopter: 'Heli',
+      heli: 'Heli',
+      drone: 'Drone',
+      cabin: 'Cabin',
+    };
+    const intentUpdate: Record<string, string> = {};
+    if (result.intent?.userType) intentUpdate.user_type = result.intent.userType;
+    if (result.intent?.courseInterest) {
+      const raw = String(result.intent.courseInterest).toLowerCase();
+      intentUpdate.course_interest = courseMap[raw] || result.intent.courseInterest;
+    }
+    if (result.intent?.timeline) {
+      intentUpdate.timeline = result.intent.timeline;
+      intentUpdate.plan_to_fly = result.intent.timeline;
+    }
+
+    const { data: leadCtxRow } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    const existingCtxV2 = leadCtxRow?.unified_context || {};
+    const existingBrandCtxV2 = existingCtxV2[brand] || existingCtxV2.bcon || existingCtxV2.windchasers || {};
+
+    const leadUpdate: Record<string, any> = {
+      last_touchpoint: 'whatsapp',
+      last_interaction_at: new Date().toISOString(),
+    };
+    if (Object.keys(intentUpdate).length > 0) {
+      leadUpdate.unified_context = {
+        ...existingCtxV2,
+        [brand]: { ...existingBrandCtxV2, ...intentUpdate },
+      };
+    }
+
     await supabase
       .from('all_leads')
-      .update({
-        last_touchpoint: 'whatsapp',
-        last_interaction_at: new Date().toISOString(),
-      })
+      .update(leadUpdate)
       .eq('id', leadId);
 
     // 11. Link lead_id + phone to whatsapp session record (keyed by phone)
@@ -585,7 +631,43 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         .eq('brand', brand);
     }
 
-    // 12. Fire-and-forget: trigger AI scoring
+    // 12. AI-based profile extraction from the full conversation
+    //
+    // Runs every 2nd customer message (so it learns more as the chat progresses
+    // without burning Haiku on every single ping). Picks up casual phrasing the
+    // keyword extractor misses ("I wanna fly planes", "my son is in 12th", etc.)
+    // Fire-and-forget — never block the response.
+    const customerMsgCount = userMessageCount; // we computed this earlier
+    if (customerMsgCount >= 2 && customerMsgCount % 2 === 0) {
+      (async () => {
+        try {
+          const profile = await extractProfileFromConversation(conversationHistory);
+          if (!profile || Object.keys(profile).length === 0) return;
+
+          const { data: ctxRow } = await supabase
+            .from('all_leads')
+            .select('unified_context')
+            .eq('id', leadId)
+            .maybeSingle();
+          const ctx = ctxRow?.unified_context || {};
+          const existingBrandCtx = ctx[brand] || ctx.windchasers || ctx.bcon || {};
+          const mergedBrandCtx = mergeProfile(existingBrandCtx, profile);
+
+          await supabase
+            .from('all_leads')
+            .update({
+              unified_context: { ...ctx, [brand]: mergedBrandCtx },
+            })
+            .eq('id', leadId);
+
+          console.log(`[meta/webhook/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
+        } catch (err) {
+          console.error('[meta/webhook/ai-intent] Extraction failed:', err);
+        }
+      })();
+    }
+
+    // 13. Fire-and-forget: trigger AI scoring
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     fetch(`${appUrl}/api/webhooks/message-created`, {
       method: 'POST',

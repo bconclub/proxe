@@ -13,6 +13,7 @@ import { NextRequest } from 'next/server';
 import { processStream } from '@/lib/agent-core/engine';
 import { generateSummary } from '@/lib/agent-core/summarizer';
 import { AgentInput } from '@/lib/agent-core/types';
+import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
 import {
   getServiceClient,
   getClient,
@@ -313,7 +314,41 @@ async function postProcess(
       }
     }
 
-    // 5. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
+    // 5. AI profile extraction — picks up user_type, course_interest, timeline,
+    //    education, city from the conversation (catches phrasing the keyword
+    //    extractor misses). Runs every 2nd message, fire-and-forget.
+    if (leadId && messageCount >= 2 && messageCount % 2 === 0) {
+      (async () => {
+        try {
+          const history = [
+            ...agentInput.conversationHistory,
+            { role: 'user' as const, content: userMessage },
+            { role: 'assistant' as const, content: assistantResponse },
+          ];
+          const profile = await extractProfileFromConversation(history);
+          if (!profile || Object.keys(profile).length === 0) return;
+
+          const brandId = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+          const { data: ctxRow } = await supabase
+            .from('all_leads')
+            .select('unified_context')
+            .eq('id', leadId)
+            .maybeSingle();
+          const ctx = ctxRow?.unified_context || {};
+          const existingBrandCtx = ctx[brandId] || ctx.windchasers || ctx.bcon || {};
+          const mergedBrandCtx = mergeProfile(existingBrandCtx, profile);
+          await supabase
+            .from('all_leads')
+            .update({ unified_context: { ...ctx, [brandId]: mergedBrandCtx } })
+            .eq('id', leadId);
+          console.log(`[agent/web/chat/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
+        } catch (err) {
+          console.error('[agent/web/chat/ai-intent] failed:', err);
+        }
+      })();
+    }
+
+    // 6. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
     // when the Vercel serverless function exits after the stream closes).
     if (leadId) {
       const appUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4002';
