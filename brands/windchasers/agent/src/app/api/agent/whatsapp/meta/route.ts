@@ -167,25 +167,50 @@ export async function POST(request: NextRequest) {
     const contacts = value.contacts || [];
     const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
-    // Process each message (usually just one)
+    // Process each message (usually just one). We accept:
+    //   - 'text'        → normal typed message
+    //   - 'button'      → tap on a template Quick Reply (e.g. "Book a Demo Class")
+    //   - 'interactive' → tap on an interactive button or list (button_reply / list_reply)
+    // For button/interactive types we extract the visible label and treat it as
+    // a text message — the agent then handles it via normal conversation flow.
     for (const msg of messages) {
-      // Only handle text messages for now
-      if (msg.type !== 'text') {
-        console.log(`[meta/webhook] Skipping non-text message type: ${msg.type}`);
+      const customerPhone = msg.from;
+      const whatsappMessageId = msg.id;
+      const timestamp = msg.timestamp;
+
+      let messageText: string | undefined;
+      let triggerKind: 'text' | 'button' | 'interactive_button' | 'interactive_list' = 'text';
+
+      if (msg.type === 'text') {
+        messageText = msg.text?.body;
+      } else if (msg.type === 'button') {
+        // Template Quick Reply tap: { button: { payload, text } }
+        messageText = msg.button?.text || msg.button?.payload;
+        triggerKind = 'button';
+      } else if (msg.type === 'interactive') {
+        const inter = msg.interactive || {};
+        if (inter.type === 'button_reply') {
+          messageText = inter.button_reply?.title;
+          triggerKind = 'interactive_button';
+        } else if (inter.type === 'list_reply') {
+          messageText = inter.list_reply?.title;
+          triggerKind = 'interactive_list';
+        }
+      } else {
+        console.log(`[meta/webhook] Skipping unsupported message type: ${msg.type}`);
         continue;
       }
 
-      const customerPhone = msg.from; // e.g. "919876543210"
-      const messageText = msg.text?.body;
-      const whatsappMessageId = msg.id;
-      const timestamp = msg.timestamp;
+      if (!messageText) {
+        console.log(`[meta/webhook] No text payload for type=${msg.type}, skipping`);
+        continue;
+      }
+
       // Pull profile name from WhatsApp contact metadata. Only trust it if
       // it looks like a real person name — otherwise leave blank so we
       // don't store "WhatsApp User" or other placeholders on the lead.
       const rawWaName = contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || '';
       const customerName = isLikelyRealPersonName(rawWaName) ? rawWaName.trim() : '';
-
-      if (!messageText) continue;
 
       // ── Deduplication: skip if this exact message was already processed ──
       if (isMessageAlreadyProcessed(whatsappMessageId)) {
@@ -193,7 +218,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      console.log(`[meta/webhook] Message from ${customerPhone}: "${messageText.substring(0, 50)}..."`);
+      console.log(`[meta/webhook] ${triggerKind} from ${customerPhone}: "${messageText.substring(0, 50)}..."`);
 
       // Mark message as read (fire and forget)
       markAsRead(whatsappMessageId);
@@ -206,6 +231,7 @@ export async function POST(request: NextRequest) {
         whatsappMessageId,
         timestamp,
         brand,
+        triggerKind,
       });
     }
 
@@ -385,6 +411,7 @@ interface IncomingMessage {
   whatsappMessageId: string;
   timestamp: string;
   brand: string;
+  triggerKind?: 'text' | 'button' | 'interactive_button' | 'interactive_list';
 }
 
 async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
@@ -395,6 +422,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     whatsappMessageId,
     timestamp,
     brand,
+    triggerKind = 'text',
   } = msg;
 
   const supabase = getServiceClient() || getClient();
@@ -491,6 +519,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
           timestamp,
           session_id: sessionId,
           source: 'meta_cloud_api',
+          trigger_kind: triggerKind,
         },
         supabase,
       ),
