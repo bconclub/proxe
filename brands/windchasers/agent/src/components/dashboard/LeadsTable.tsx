@@ -1075,24 +1075,27 @@ export default function LeadsTable({
                           return <span style={{ color: 'var(--text-muted)' }}>—</span>
                         }
 
+                        // Channel is the primary signal (which surface the
+                        // last touch landed on); the actor — if any — is a
+                        // sub-line "@username" beneath it.
                         return (
                           <div className="flex flex-col items-center gap-0.5">
-                            {actorBadge && (
-                              <span
-                                className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                                style={{ backgroundColor: actorBadge.bg, color: actorBadge.color }}
-                                title={actorBadge.tooltip}
-                              >
-                                {actorBadge.label}
-                              </span>
-                            )}
                             {channelCfg && (
                               <span
-                                className="text-[10px] whitespace-nowrap"
-                                style={{ color: actorBadge ? '#9ca3af' : channelCfg.color }}
+                                className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{ backgroundColor: `${channelCfg.color}22`, color: channelCfg.color }}
                                 title={`Channel: ${channelCfg.label}`}
                               >
                                 {channelCfg.label}
+                              </span>
+                            )}
+                            {actorBadge && (
+                              <span
+                                className="text-[10px] whitespace-nowrap"
+                                style={{ color: '#9ca3af' }}
+                                title={actorBadge.tooltip}
+                              >
+                                @{actorBadge.label.toLowerCase().replace(/\s+/g, '')}
                               </span>
                             )}
                           </div>
