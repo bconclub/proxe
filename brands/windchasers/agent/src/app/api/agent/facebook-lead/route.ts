@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendFirstOutreach } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendFirstOutreach, buildAttribution } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +87,22 @@ export async function POST(request: NextRequest) {
     if (education) windchasersProfile.education = education;
     if (city) windchasersProfile.city = city;
 
+    // Attribution: Facebook Lead Form is always Meta paid. UTM (if Pabbly passes it)
+    // can refine the source; otherwise default to meta_ads.
+    const attribution = buildAttribution({
+      utmSource: facebookMeta.utm_source || 'meta_ads',
+      formType: 'meta_lead_form',
+      channel: 'meta_forms',
+      utm: {
+        source:   facebookMeta.utm_source   || null,
+        medium:   facebookMeta.utm_medium   || null,
+        campaign: facebookMeta.utm_campaign || null,
+        content:  facebookMeta.utm_content  || null,
+        term:     null,
+      },
+      pageUrl: null,
+    });
+
     if (existing) {
       leadId = existing.id;
       const existingCtx = existing.unified_context || {};
@@ -111,6 +127,8 @@ export async function POST(request: NextRequest) {
               ...(existingCtx.windchasers || {}),
               ...windchasersProfile,
             },
+            // Attribution is immutable — keep existing if already set
+            attribution: existingCtx.attribution ?? attribution,
           },
         })
         .eq('id', leadId);
@@ -130,6 +148,7 @@ export async function POST(request: NextRequest) {
           unified_context: {
             facebook: { ...facebookMeta, lead_created_at: now },
             windchasers: windchasersProfile,
+            attribution,
           },
         })
         .select('id')

@@ -91,3 +91,11 @@ export {
   fetchCustomerContext,
   updateBrandProfile,
 } from './contextBuilder';
+
+// Attribution (Source / First Touch / Last Touch)
+export {
+  type AttributionPayload,
+  deriveSource,
+  deriveFirstTouch,
+  buildAttribution,
+} from './attribution';

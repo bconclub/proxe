@@ -7,6 +7,7 @@ import {
   sendFirstOutreach,
   sendDemoBookedConfirmation,
   sendPATResult,
+  buildAttribution,
 } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
@@ -260,6 +261,23 @@ export async function POST(request: NextRequest) {
       inboundContext[leadBrand] = brandCtxData
     }
 
+    // ── Build attribution payload (Source / First Touch) ────────────────────
+    // Source = utm_source (Instagram / Google / Direct). First touch = form_type.
+    // Channel fallback is `leadSource` — for legacy/no-UTM cases.
+    const attribution = buildAttribution({
+      utmSource: cf2.utm_source || null,
+      formType: (cf2.form_type || cf2.event_name || body.source || '').toString() || null,
+      channel: leadSource,
+      utm: {
+        source:   cf2.utm_source   || null,
+        medium:   cf2.utm_medium   || null,
+        campaign: cf2.utm_campaign || campaign || null,
+        content:  cf2.utm_content  || null,
+        term:     cf2.utm_term     || null,
+      },
+      pageUrl: cf2.page_url || null,
+    })
+
     // Check for existing lead — scope to brand because the same phone can
     // exist across brands (e.g. someone is a lead for both bcon and
     // windchasers). Without the brand filter, .maybeSingle() returns null
@@ -295,17 +313,21 @@ export async function POST(request: NextRequest) {
         const mergedBrandCtx = inboundContext[leadBrand]
           ? { ...(existingCtx[leadBrand] || {}), ...inboundContext[leadBrand] }
           : existingCtx[leadBrand]
+        // Attribution is IMMUTABLE — never overwrite existing source/first_touch.
+        // Only write it if the lead doesn't already have attribution data.
+        const mergedAttribution = existingCtx.attribution ?? attribution
         updates.unified_context = {
           ...existingCtx,
           ...inboundContext,
           ...(mergedBrandCtx ? { [leadBrand]: mergedBrandCtx } : {}),
+          attribution: mergedAttribution,
         }
       }
 
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
       leadId = existing.id
     } else {
-      // Create new lead
+      // Create new lead — attribution is set ONCE at creation
       const { data: created, error: createErr } = await supabase
         .from('all_leads')
         .insert({
@@ -318,7 +340,11 @@ export async function POST(request: NextRequest) {
           last_touchpoint: leadSource,
           last_interaction_at: now,
           lead_stage: 'New',
-          ...(Object.keys(inboundContext).length > 0 ? { unified_context: { ...inboundContext, lead_sources: [leadSource] } } : { unified_context: { lead_sources: [leadSource] } }),
+          unified_context: {
+            ...inboundContext,
+            lead_sources: [leadSource],
+            attribution,
+          },
         })
         .select('id')
         .single()

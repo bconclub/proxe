@@ -20,7 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone } from '@/lib/services';
+import { getServiceClient, normalizePhone, buildAttribution } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,28 +85,21 @@ export async function POST(request: NextRequest) {
     const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
     const now = new Date().toISOString();
 
-    // Determine readable source label from utm_source
-    const utmSourceClean = (utm.utm_source || '').toLowerCase().trim();
-    const sourceLabelMap: Record<string, string> = {
-      instagram: 'Instagram',
-      ig: 'Instagram',
-      facebook: 'Facebook',
-      fb: 'Facebook',
-      meta: 'Meta',
-      google: 'Google',
-      youtube: 'YouTube',
-      linkedin: 'LinkedIn',
-      twitter: 'X',
-      x: 'X',
-      organic: 'Organic',
-      direct: 'Direct',
-      referral: 'Referral',
-      email: 'Email',
-    };
-    const sourceLabel = utmSourceClean
-      ? (sourceLabelMap[utmSourceClean] ||
-         utmSourceClean.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
-      : 'Direct';
+    // Build standardized attribution payload
+    const attributionPayload = buildAttribution({
+      utmSource: utm.utm_source || null,
+      formType: 'whatsapp_button',
+      channel: 'whatsapp',
+      utm: {
+        source:   utm.utm_source,
+        medium:   utm.utm_medium,
+        campaign: utm.utm_campaign,
+        content:  utm.utm_content,
+        term:     utm.utm_term,
+      },
+      pageUrl,
+    });
+    const sourceLabel = attributionPayload.source_label;
 
     // ── Dedup by phone + brand ──────────────────────────────────────────────
     const { data: existing } = await supabase
@@ -118,15 +111,6 @@ export async function POST(request: NextRequest) {
 
     let leadId: string;
     let isNew = false;
-
-    const attributionPayload = {
-      source: utmSourceClean || 'direct',
-      source_label: sourceLabel,
-      first_touch: 'whatsapp_button',
-      utm: { ...utm },
-      page_url: pageUrl,
-      captured_at: now,
-    };
 
     if (existing) {
       leadId = existing.id;

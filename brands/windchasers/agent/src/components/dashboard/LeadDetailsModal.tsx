@@ -1554,6 +1554,46 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
+                {/* ATTRIBUTION — Source / First Touch / Last Touch */}
+                {(() => {
+                  const attribution = currentLead.unified_context?.attribution || {};
+                  const sourceLabel = attribution.source_label
+                    || (attribution.source ? String(attribution.source).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                  const firstTouchLabel = attribution.first_touch_label
+                    || (attribution.first_touch ? String(attribution.first_touch).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                  // Fallback to legacy fields for older leads
+                  const legacyFirst = (currentLead as any).first_touchpoint;
+                  const legacyLast = (currentLead as any).last_touchpoint;
+                  const finalSource = sourceLabel || 'Direct';
+                  const finalFirstTouch = firstTouchLabel
+                    || (legacyFirst ? String(legacyFirst).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                  const finalLastTouch = legacyLast
+                    ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                    : null;
+                  if (!sourceLabel && !finalFirstTouch && !finalLastTouch) return null;
+                  return (
+                    <div className="lead-attribution mt-2 p-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                        Attribution
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[10px]">
+                        <div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Source</div>
+                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalSource}>{finalSource}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">First Touch</div>
+                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalFirstTouch || '—'}>{finalFirstTouch || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Last Touch</div>
+                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalLastTouch || '—'}>{finalLastTouch || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
                 {(() => {
                   const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};

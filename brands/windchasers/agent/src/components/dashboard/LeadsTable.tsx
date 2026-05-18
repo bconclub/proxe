@@ -740,10 +740,20 @@ export default function LeadsTable({
                 //   back to utm_medium (cpc, social, organic) so the line
                 //   still tells you HOW they got here.
 
+                // ── ATTRIBUTION (canonical) ────────────────────────────────
+                // New leads have unified_context.attribution = { source, source_label,
+                // first_touch, first_touch_label }. Use that as the canonical source
+                // of truth, falling back to the legacy UTM/channel logic below for
+                // older leads.
+                const attribution = uc?.attribution || null
+                const attrSource = String(attribution?.source || '').toLowerCase().trim()
+                const attrSourceLabel = String(attribution?.source_label || '').trim()
+                const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
+
                 // Pull UTM info — website's /api/leads stuffs UTM into
                 // custom_fields, which PROXe stores under raw_form_fields.
                 // Older leads have it under web.utm.
-                const utmSourceRaw = String(
+                const utmSourceRaw = attrSource || String(
                   uc?.raw_form_fields?.utm_source ||
                   uc?.web?.utm?.source ||
                   uc?.landing_page?.utm_source ||
@@ -798,12 +808,19 @@ export default function LeadsTable({
                   referral: { label: 'Referral', color: '#10B981' },
                 }
 
-                // Resolve the top badge: utm_source wins, then channel.
+                // Resolve the top badge:
+                //   1. attribution.source_label (canonical, new leads)
+                //   2. utm_source from raw_form_fields (legacy)
+                //   3. Channel fallback
                 let srcCfg: { label: string; color: string }
                 if (utmSourceRaw && utmSourceConfig[utmSourceRaw]) {
                   srcCfg = utmSourceConfig[utmSourceRaw]
+                  // Override label with the prettier server-side label if present
+                  if (attrSourceLabel) srcCfg = { ...srcCfg, label: attrSourceLabel }
+                } else if (attrSourceLabel) {
+                  // Attribution present with an unmapped source — use the label as-is
+                  srcCfg = { label: attrSourceLabel, color: '#6366F1' }
                 } else if (utmSourceRaw) {
-                  // Unknown utm_source — title-case it and use a neutral colour.
                   srcCfg = {
                     label: utmSourceRaw
                       .replace(/[_-]+/g, ' ')
@@ -853,7 +870,10 @@ export default function LeadsTable({
                   affiliate: 'Affiliate',
                 }
                 let subSource = ''
-                if (formType) {
+                if (attrFirstTouchLabel) {
+                  // Canonical: first_touch from attribution
+                  subSource = attrFirstTouchLabel
+                } else if (formType) {
                   subSource =
                     subSourceLabels[formType] ||
                     formType
