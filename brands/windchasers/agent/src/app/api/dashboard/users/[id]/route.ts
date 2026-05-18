@@ -1,30 +1,38 @@
 /**
- * Per-user mutations:
- *   PATCH  /api/dashboard/users/[id] → update role / is_active
- *   DELETE /api/dashboard/users/[id] → soft-delete (sets is_active = false)
+ * Per-user mutations (admin only):
+ *   PATCH  /api/dashboard/users/[id] → update role / is_active / full_name
+ *   DELETE /api/dashboard/users/[id] → soft-deactivate
  *
- * Admin-only. An admin cannot demote / deactivate themselves to avoid lockout.
+ * An admin cannot demote / deactivate themselves to avoid lockout.
+ * Service-role client used for DB writes (bypasses RLS); identity comes
+ * from the user's own session cookie.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
-async function requireAdmin(supabase: any) {
+async function requireAdmin(userSupabase: any) {
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await userSupabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', status: 401 as const }
-  const { data: dashboardUser } = await supabase
+
+  const service = getServiceClient()
+  if (!service) return { error: 'Service client unavailable', status: 500 as const }
+
+  const { data: dashboardUser } = await service
     .from('dashboard_users')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
-    .single()
-  if (!dashboardUser || dashboardUser.role !== 'admin') {
-    return { error: 'Forbidden — admins only', status: 403 as const }
-  }
-  return { user, role: dashboardUser.role, status: 200 as const }
+    .maybeSingle()
+
+  if (!dashboardUser) return { error: 'Not provisioned', status: 403 as const }
+  if (dashboardUser.is_active === false) return { error: 'Account deactivated', status: 403 as const }
+  if (dashboardUser.role !== 'admin') return { error: 'Forbidden — admins only', status: 403 as const }
+  return { user, role: dashboardUser.role, service, status: 200 as const }
 }
 
 export async function PATCH(
@@ -32,11 +40,12 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient()
-    const auth = await requireAdmin(supabase)
+    const userSupabase = await createClient()
+    const auth = await requireAdmin(userSupabase)
     if (auth.status !== 200) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
+    const service = (auth as any).service
 
     const targetUserId = params.id
     if ((auth as any).user.id === targetUserId) {
@@ -54,12 +63,8 @@ export async function PATCH(
       }
       updates.role = body.role
     }
-    if (body.is_active !== undefined) {
-      updates.is_active = !!body.is_active
-    }
-    if (body.full_name !== undefined) {
-      updates.full_name = String(body.full_name).trim() || null
-    }
+    if (body.is_active !== undefined) updates.is_active = !!body.is_active
+    if (body.full_name !== undefined) updates.full_name = String(body.full_name).trim() || null
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -67,7 +72,7 @@ export async function PATCH(
 
     updates.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabase
+    const { data, error } = await service
       .from('dashboard_users')
       .update(updates)
       .eq('id', targetUserId)
@@ -90,11 +95,12 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient()
-    const auth = await requireAdmin(supabase)
+    const userSupabase = await createClient()
+    const auth = await requireAdmin(userSupabase)
     if (auth.status !== 200) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
+    const service = (auth as any).service
 
     const targetUserId = params.id
     if ((auth as any).user.id === targetUserId) {
@@ -104,7 +110,7 @@ export async function DELETE(
       )
     }
 
-    const { error } = await supabase
+    const { error } = await service
       .from('dashboard_users')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', targetUserId)

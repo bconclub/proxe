@@ -7,26 +7,44 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-async function requireAdmin(supabase: any) {
+/**
+ * Get the logged-in user from the cookie client, then read their role with
+ * the SERVICE-ROLE client. The service-role lookup bypasses any RLS quirks
+ * on dashboard_users — we still trust the auth.getUser() identity from the
+ * user's own session cookie.
+ */
+async function requireAdmin(userSupabase: any) {
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await userSupabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', status: 401 as const }
 
-  const { data: dashboardUser } = await supabase
-    .from('dashboard_users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const service = getServiceClient()
+  if (!service) {
+    return { error: 'Service client unavailable', status: 500 as const }
+  }
 
-  if (!dashboardUser || dashboardUser.role !== 'admin') {
+  const { data: dashboardUser } = await service
+    .from('dashboard_users')
+    .select('role, is_active')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!dashboardUser) {
+    return { error: 'Your account is not provisioned in dashboard_users. Ask another admin to add you.', status: 403 as const }
+  }
+  if (dashboardUser.is_active === false) {
+    return { error: 'Your account is deactivated', status: 403 as const }
+  }
+  if (dashboardUser.role !== 'admin') {
     return { error: 'Forbidden — admins only', status: 403 as const }
   }
-  return { user, role: dashboardUser.role, status: 200 as const }
+  return { user, role: dashboardUser.role, status: 200 as const, service }
 }
 
 // ── GET — list users + pending invitations ────────────────────────────────────
@@ -37,13 +55,14 @@ export async function GET() {
     if (auth.status !== 200) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
+    const service = (auth as any).service
 
     const [usersRes, invitesRes] = await Promise.all([
-      supabase
+      service
         .from('dashboard_users')
         .select('id, email, full_name, role, is_active, created_at, last_login')
         .order('created_at', { ascending: false }),
-      supabase
+      service
         .from('user_invitations')
         .select('id, email, token, role, invited_by, expires_at, accepted_at, created_at')
         .is('accepted_at', null)
@@ -91,9 +110,10 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmedEmail = email.trim().toLowerCase()
+    const service = (auth as any).service
 
     // Already an active user?
-    const { data: existing } = await supabase
+    const { data: existing } = await service
       .from('dashboard_users')
       .select('id, email')
       .eq('email', trimmedEmail)
@@ -106,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cancel any older still-pending invites for this email
-    await supabase
+    await service
       .from('user_invitations')
       .delete()
       .eq('email', trimmedEmail)
@@ -116,7 +136,7 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
-    const { data: invitation, error: inviteError } = await supabase
+    const { data: invitation, error: inviteError } = await service
       .from('user_invitations')
       .insert({
         email: trimmedEmail,
