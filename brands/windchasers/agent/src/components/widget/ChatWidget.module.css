@@ -3758,23 +3758,28 @@
   color: rgba(209, 197, 182, 0.7) !important;
 }
 
-/* ── Windchasers: full-width card buttons ──────────────────────────────────
-   Quick-reply and flow-override buttons render as full-width cards so the
-   entire card area is the click target, not just the text label.          */
+/* ── Windchasers: compact chip buttons ─────────────────────────────────────
+   Quick-reply and flow-override buttons render as inline chips that hug
+   their text and wrap onto multiple lines when needed.                    */
 [data-brand="windchasers"] .welcomeQuickButtonRow {
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 [data-brand="windchasers"] .welcomeQuickButtonsContainer .quickBtn,
 [data-brand="windchasers"] .welcomeQuickButtonRow .quickBtn {
-  width: 100% !important;
-  flex: 1 0 auto !important;
-  padding: 13px 18px !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  min-height: 52px !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  padding: 8px 14px !important;
+  text-align: center !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+  height: auto !important;
   font-size: 13px !important;
-  border-radius: 10px !important;
-  white-space: normal !important;
+  line-height: 1.2 !important;
+  border-radius: 9999px !important;
+  white-space: nowrap !important;
 }
