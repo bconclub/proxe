@@ -360,16 +360,28 @@ export async function sendDemoBookedConfirmation(
 /**
  * Send a PAT (Pilot Aptitude Test) result message after the lead completes the test.
  *
- * Template: windchasers_pat_result
+ * Template: windchasers_pat_result_v1
  *   {{1}} = first name
  *   {{2}} = score displayed as /100 (e.g. "58") — converted from raw /150
- *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Not Ready Yet")
+ *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Early Stage")
+ *   {{4}} = tier-specific next-step message
  */
 const TIER_LABELS: Record<string, string> = {
   premium:     'Premium',
   strong:      'Strong',
   moderate:    'Moderate',
-  'not-ready': 'Not Ready Yet',
+  'not-ready': 'Early Stage',
+};
+
+const TIER_MESSAGES: Record<string, string> = {
+  premium:
+    'Strong fit for CPL track. A counsellor can walk you through timeline and next steps.',
+  strong:
+    "You're well-positioned. Worth a 1:1 to map your training path.",
+  moderate:
+    'Good foundation. A counsellor can map out the right program for your goals.',
+  'not-ready':
+    'Strong foundation matters more than first score. Talk to a counsellor about prep options.',
 };
 
 export async function sendPATResult(
@@ -384,14 +396,16 @@ export async function sendPATResult(
   const tierLabel = TIER_LABELS[tierKey] || tierKey
     .replace(/-/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Pending';
+  const tierMessage = TIER_MESSAGES[tierKey] || 'A counsellor can walk you through the next steps.';
 
-  return sendWhatsAppTemplate(to, 'windchasers_pat_result', [
+  return sendWhatsAppTemplate(to, 'windchasers_pat_result_v1', [
     {
       type: 'body',
       parameters: [
         { type: 'text', text: firstName },
         { type: 'text', text: String(score100) },
         { type: 'text', text: tierLabel },
+        { type: 'text', text: tierMessage },
       ],
     },
   ]);

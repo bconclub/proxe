@@ -450,7 +450,15 @@ export async function POST(request: NextRequest) {
     // NEITHER a PAT submission NOR a demo booking.
     if (phone && isPatSubmission) {
       const score = Number(cfields.total_score)
-      const tier = String(cfields.tier || '')
+      // Re-derive tier from total_score (don't trust client payload).
+      // Same cutoffs as the canonical block above + docs/pat-scoring.md.
+      const derivedTier = isNaN(score)
+        ? ''
+        : score >= 140 ? 'premium'
+          : score >= 120 ? 'strong'
+            : score >= 90 ? 'moderate'
+              : 'not-ready'
+      const tier = derivedTier
       if (!isNaN(score)) {
         sendPATResult(phone, leadName, score, tier)
           .then((result) => {

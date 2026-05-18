@@ -1233,7 +1233,7 @@ export default function LeadsTable({
                         premium: 'Premium',
                         strong: 'Strong',
                         moderate: 'Moderate',
-                        'not-ready': 'Not Ready',
+                        'not-ready': 'Early Stage',
                       }
                       const patColor = tierColors[tier] || 'var(--text-muted)'
                       return (

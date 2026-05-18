@@ -1888,7 +1888,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     premium: 'Premium',
                     strong: 'Strong',
                     moderate: 'Moderate',
-                    'not-ready': 'Not Ready Yet',
+                    'not-ready': 'Early Stage',
                   };
                   const color = tierColors[tier] || '#6B7280';
                   return (
