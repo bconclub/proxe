@@ -397,6 +397,11 @@ export async function POST(request: NextRequest) {
     // form after the lead form). Without this guard, every submission appends
     // a duplicate "First Outreach to X" task to the dashboard.
     const leadName = name?.trim() || existing?.customer_name || 'Lead'
+    // Track whether we have a first_outreach in flight for the response payload.
+    // Hoisted out of the else block so it's in scope at the return below
+    // (this was a latent ReferenceError once the function actually got called).
+    let taskCreated = false
+
     const { data: existingOutreach } = await supabase
       .from('agent_tasks')
       .select('id')
@@ -407,6 +412,7 @@ export async function POST(request: NextRequest) {
 
     if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
+      taskCreated = true // a task already exists for this lead
     } else {
       const { error: taskErr } = await supabase.from('agent_tasks').insert({
         task_type: 'first_outreach',
@@ -432,6 +438,8 @@ export async function POST(request: NextRequest) {
 
       if (taskErr) {
         console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
+      } else {
+        taskCreated = true
       }
     }
 
@@ -655,7 +663,7 @@ export async function POST(request: NextRequest) {
       success: true,
       lead_id: leadId,
       is_new: isNew,
-      task_created: !taskErr,
+      task_created: taskCreated,
       ...(isDemoBooking
         ? {
             calendar: calendarResult
