@@ -324,6 +324,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // AI classification progress state
   const [noteProgress, setNoteProgress] = useState<{ steps: { text: string; done: boolean }[]; visible: boolean }>({ steps: [], visible: false })
 
+  // Inline name edit
+  const [editingName, setEditingName] = useState(false)
+  const [editingNameValue, setEditingNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
+
   // Log a Call state
   const [showLogCallForm, setShowLogCallForm] = useState(false)
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
@@ -1422,14 +1427,72 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <div className="group flex items-center gap-1.5 flex-1 min-w-0">
-                    <h2
-                      id="lead-modal-title"
-                      className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
-                    >
-                      {currentLead.name || 'Unknown Lead'}
-                    </h2>
-                    {currentLead.name && (
-                      <CopyIconButton value={currentLead.name} label="name" />
+                    {editingName ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter') {
+                              const newName = editingNameValue.trim()
+                              if (!newName) { setEditingName(false); return }
+                              setSavingName(true)
+                              try {
+                                const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ customer_name: newName }),
+                                })
+                                if (!r.ok) {
+                                  const d = await r.json()
+                                  console.error('Name save failed:', d.error)
+                                }
+                                setEditingName(false)
+                                loadFreshLeadData()
+                              } finally {
+                                setSavingName(false)
+                              }
+                            } else if (e.key === 'Escape') {
+                              setEditingName(false)
+                            }
+                          }}
+                          disabled={savingName}
+                          placeholder="Enter name…"
+                          className="text-xl font-bold flex-1 min-w-0 bg-transparent border-b border-[var(--accent-primary)] outline-none text-[var(--text-primary)]"
+                        />
+                        <button
+                          onClick={() => setEditingName(false)}
+                          className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          title="Cancel (Esc)"
+                          disabled={savingName}
+                        >
+                          <MdClose size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <h2
+                          id="lead-modal-title"
+                          className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
+                        >
+                          {currentLead.name || 'Unknown Lead'}
+                        </h2>
+                        <button
+                          onClick={() => {
+                            setEditingNameValue(currentLead.name || '')
+                            setEditingName(true)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          title={currentLead.name ? 'Edit name' : 'Add a name'}
+                        >
+                          <MdEdit size={14} />
+                        </button>
+                        {currentLead.name && (
+                          <CopyIconButton value={currentLead.name} label="name" />
+                        )}
+                      </>
                     )}
                   </div>
 

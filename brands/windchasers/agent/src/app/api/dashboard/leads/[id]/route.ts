@@ -34,6 +34,107 @@ export async function GET(
   }
 }
 
+// PATCH handler — update editable lead fields from the dashboard
+//
+// Supported body fields:
+//   customer_name → renames the lead
+//   email         → updates email
+//   city          → unified_context.<brand>.city
+//   session_type  → unified_context.<brand>.session_type (online | offline)
+//
+// Stamps last_actor with the editor's identity so LAST TOUCH shows who
+// made the change.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const userSupabase = await createClient()
+    const {
+      data: { user },
+    } = await userSupabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const service = getServiceClient()
+    if (!service) {
+      return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 })
+    }
+
+    const leadId = params.id
+    const body = await request.json()
+
+    const { data: lead, error: fetchErr } = await service
+      .from('all_leads')
+      .select('id, customer_name, email, unified_context, brand')
+      .eq('id', leadId)
+      .maybeSingle()
+    if (fetchErr || !lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const updates: Record<string, any> = {}
+    const ctx = lead.unified_context || {}
+    const brand = lead.brand || 'windchasers'
+    const brandCtx = ctx[brand] || ctx.windchasers || ctx.bcon || {}
+    const newBrandCtx: Record<string, any> = { ...brandCtx }
+    let ctxChanged = false
+
+    if (body.customer_name !== undefined) {
+      const name = String(body.customer_name || '').trim()
+      updates.customer_name = name || null
+    }
+    if (body.email !== undefined) {
+      const email = String(body.email || '').trim().toLowerCase() || null
+      updates.email = email
+    }
+    if (body.city !== undefined) {
+      const city = String(body.city || '').trim() || null
+      newBrandCtx.city = city
+      ctxChanged = true
+    }
+    if (body.session_type !== undefined) {
+      const t = String(body.session_type || '').trim().toLowerCase()
+      newBrandCtx.session_type = ['online', 'offline'].includes(t) ? t : null
+      ctxChanged = true
+    }
+
+    if (Object.keys(updates).length === 0 && !ctxChanged) {
+      return NextResponse.json({ error: 'No supported fields to update' }, { status: 400 })
+    }
+
+    const editorName = (user.email || 'User').split('@')[0]
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+    const newCtx = {
+      ...ctx,
+      ...(ctxChanged ? { [brand]: newBrandCtx } : {}),
+      last_actor: {
+        type: 'user',
+        email: user.email,
+        name: editorName,
+        at: new Date().toISOString(),
+        source: 'lead_edit',
+      },
+    }
+    updates.unified_context = newCtx
+    updates.last_interaction_at = new Date().toISOString()
+
+    const { error: upErr } = await service
+      .from('all_leads')
+      .update(updates)
+      .eq('id', leadId)
+    if (upErr) throw upErr
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[leads/PATCH] error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update lead' },
+      { status: 500 },
+    )
+  }
+}
+
 // DELETE handler for /api/dashboard/leads/[id]
 export async function DELETE(
   request: NextRequest,

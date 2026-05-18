@@ -26,6 +26,7 @@ import {
   fetchCustomerContext,
   fetchSummary,
   normalizePhone,
+  isLikelyRealPersonName,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -178,8 +179,11 @@ export async function POST(request: NextRequest) {
       const messageText = msg.text?.body;
       const whatsappMessageId = msg.id;
       const timestamp = msg.timestamp;
-      const customerName =
-        contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || 'WhatsApp User';
+      // Pull profile name from WhatsApp contact metadata. Only trust it if
+      // it looks like a real person name — otherwise leave blank so we
+      // don't store "WhatsApp User" or other placeholders on the lead.
+      const rawWaName = contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || '';
+      const customerName = isLikelyRealPersonName(rawWaName) ? rawWaName.trim() : '';
 
       if (!messageText) continue;
 
@@ -625,7 +629,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         .update({
           lead_id: leadId,
           customer_phone: customerPhone,
-          customer_name: customerName !== 'WhatsApp User' ? customerName : undefined,
+          customer_name: customerName || undefined,
         })
         .eq('customer_phone_normalized', normalizedSessionPhone)
         .eq('brand', brand);

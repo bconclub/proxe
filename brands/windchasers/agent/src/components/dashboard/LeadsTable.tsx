@@ -708,9 +708,20 @@ export default function LeadsTable({
                   uc?.whatsapp?.what_is_your_brand_name ||
                   uc?.whatsapp?.profile?.company ||
                   uc?.web?.profile?.company || ''
+                // City — check every known location:
+                //   brand-namespaced (set by inbound endpoint + AI extractor)
+                //   channel profile blocks (legacy)
+                //   raw_form_fields (from website form submissions)
+                //   landing_page.city (from /api/integrations/landing-pages)
                 const city =
+                  uc?.[brandId]?.city ||
+                  uc?.windchasers?.city ||
+                  uc?.bcon?.city ||
                   uc?.whatsapp?.profile?.city ||
-                  uc?.web?.profile?.city || ''
+                  uc?.web?.profile?.city ||
+                  uc?.raw_form_fields?.city ||
+                  uc?.landing_page?.city ||
+                  ''
 
                 // If no name, use email as primary identifier
                 const displayName = resolvedName || lead.email || lead.phone || '-'
@@ -1117,26 +1128,45 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING - compact chip with calendar icon, "—" when none */}
+                    {/* BOOKING - compact chip with calendar icon + online/offline subtext */}
                     <td className="px-3 py-2 text-xs text-center">
-                      {bookingDate ? (
-                        <Link
-                          href="/dashboard/bookings"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
-                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
-                        >
-                          <span aria-hidden="true">📅</span>
-                          {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {bookingTime ? (() => {
-                            const tp = bookingTime.toString().split(':');
-                            if (tp.length < 2) return `, ${bookingTime}`;
-                            const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
-                            if (isNaN(h) || isNaN(m)) return `, ${bookingTime}`;
-                            return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                          })() : ''}
-                        </Link>
-                      ) : (
+                      {bookingDate ? (() => {
+                        // Resolve session type: explicit field wins, else infer from meet link presence.
+                        const brandCtx = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
+                        const explicit = String(brandCtx.session_type || brandCtx.demo_type || uc?.raw_form_fields?.demo_type || '').toLowerCase()
+                        const meetLink = uc?.web?.booking?.meetLink || uc?.web?.booking?.meet_link || null
+                        let sessionType: 'online' | 'offline' | null = null
+                        if (explicit === 'online' || explicit === 'offline') sessionType = explicit as 'online' | 'offline'
+                        else if (meetLink) sessionType = 'online'
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Link
+                              href="/dashboard/bookings"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
+                              style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+                            >
+                              <span aria-hidden="true">📅</span>
+                              {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {bookingTime ? (() => {
+                                const tp = bookingTime.toString().split(':');
+                                if (tp.length < 2) return `, ${bookingTime}`;
+                                const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                                if (isNaN(h) || isNaN(m)) return `, ${bookingTime}`;
+                                return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                              })() : ''}
+                            </Link>
+                            {sessionType && (
+                              <span
+                                className="text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                                style={{ color: sessionType === 'online' ? '#3B82F6' : '#F59E0B' }}
+                              >
+                                {sessionType === 'online' ? 'Online' : 'Offline'}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })() : (
                         <span style={{ color: 'var(--text-muted)' }}>—</span>
                       )}
                     </td>
