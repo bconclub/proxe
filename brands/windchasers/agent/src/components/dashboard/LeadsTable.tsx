@@ -1012,36 +1012,10 @@ export default function LeadsTable({
                       </div>
                     </td>
 
-                    {/* LAST TOUCH - who handled most recently: User / PROXe / channel */}
+                    {/* LAST TOUCH - actor (top) + channel (bottom) */}
                     <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       {(() => {
-                        // Priority 1: unified_context.last_actor (canonical actor record)
                         const actor = uc?.last_actor || null
-                        if (actor?.type === 'user' && (actor.name || actor.email)) {
-                          const name = String(actor.name || actor.email.split('@')[0] || 'User').trim()
-                          return (
-                            <span
-                              className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                              style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}
-                              title={`Last touched by ${actor.email || name}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`}
-                            >
-                              {name}
-                            </span>
-                          )
-                        }
-                        if (actor?.type === 'proxe') {
-                          return (
-                            <span
-                              className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                              style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#8B5CF6' }}
-                              title={`PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`}
-                            >
-                              PROXe
-                            </span>
-                          )
-                        }
-                        // Priority 2: channel-based fallback (no actor recorded yet)
-                        if (!lastTouch) return <span style={{ color: 'var(--text-muted)' }}>—</span>
                         const lastTouchConfig: Record<string, { label: string; color: string }> = {
                           web: { label: 'Web', color: '#3B82F6' },
                           form: { label: 'Form', color: '#3B82F6' },
@@ -1060,18 +1034,57 @@ export default function LeadsTable({
                           landing_page: { label: 'Landing', color: '#3B82F6' },
                           email: { label: 'Email', color: '#0EA5E9' },
                         }
-                        const cfg = lastTouchConfig[lastTouch] || {
-                          label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-                          color: '#6B7280',
+                        const channelCfg = lastTouch
+                          ? (lastTouchConfig[lastTouch] || {
+                              label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                              color: '#6B7280',
+                            })
+                          : null
+
+                        // Resolve actor badge config
+                        let actorBadge: { label: string; color: string; bg: string; tooltip: string } | null = null
+                        if (actor?.type === 'user' && (actor.name || actor.email)) {
+                          const name = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                          actorBadge = {
+                            label: name,
+                            color: '#F59E0B',
+                            bg: 'rgba(245,158,11,0.15)',
+                            tooltip: `Last touched by ${actor.email || name}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
+                        } else if (actor?.type === 'proxe') {
+                          actorBadge = {
+                            label: 'PROXe',
+                            color: '#8B5CF6',
+                            bg: 'rgba(139,92,246,0.15)',
+                            tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
                         }
+
+                        if (!actorBadge && !channelCfg) {
+                          return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        }
+
                         return (
-                          <span
-                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                            style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
-                            title={`Last touched via ${cfg.label}`}
-                          >
-                            {cfg.label}
-                          </span>
+                          <div className="flex flex-col items-center gap-0.5">
+                            {actorBadge && (
+                              <span
+                                className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                                style={{ backgroundColor: actorBadge.bg, color: actorBadge.color }}
+                                title={actorBadge.tooltip}
+                              >
+                                {actorBadge.label}
+                              </span>
+                            )}
+                            {channelCfg && (
+                              <span
+                                className="text-[10px] whitespace-nowrap"
+                                style={{ color: actorBadge ? '#9ca3af' : channelCfg.color }}
+                                title={`Channel: ${channelCfg.label}`}
+                              >
+                                {channelCfg.label}
+                              </span>
+                            )}
+                          </div>
                         )
                       })()}
                     </td>
