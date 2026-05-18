@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose, MdContentCopy, MdExpandMore } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
@@ -232,11 +232,37 @@ const STAGE_PROGRESSION = [
   { stage: 'Converted', order: 5 },
 ]
 
+function CopyIconButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!value) return
+    navigator.clipboard?.writeText(value).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    }).catch(() => {})
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="lead-copy-btn opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0 focus:outline-none focus:opacity-100"
+      title={copied ? 'Copied!' : `Copy ${label}`}
+      aria-label={`Copy ${label}`}
+    >
+      {copied ? <MdCheck size={12} className="text-green-500" /> : <MdContentCopy size={12} />}
+    </button>
+  )
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showAttribution, setShowAttribution] = useState(false)
+  const [showPATResult, setShowPATResult] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below')
   const [pendingStageChange, setPendingStageChange] = useState<{
@@ -1357,12 +1383,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               <div className="lead-contact-card-header">
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
-                  <h2
-                    id="lead-modal-title"
-                    className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight flex-1 min-w-0 truncate"
-                  >
-                    {currentLead.name || 'Unknown Lead'}
-                  </h2>
+                  <div className="group flex items-center gap-1.5 flex-1 min-w-0">
+                    <h2
+                      id="lead-modal-title"
+                      className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
+                    >
+                      {currentLead.name || 'Unknown Lead'}
+                    </h2>
+                    {currentLead.name && (
+                      <CopyIconButton value={currentLead.name} label="name" />
+                    )}
+                  </div>
 
                   {/* Lead Health Score - Right aligned */}
                   <div
@@ -1457,7 +1488,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               <address className="lead-contact-info space-y-1 mt-auto not-italic">
                 {/* Email with icon */}
                 {currentLead.email && (
-                  <div className="lead-contact-email flex items-center gap-1.5">
+                  <div className="lead-contact-email group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdEmail className="text-[var(--text-secondary)]" size={14} />
                     </div>
@@ -1467,12 +1498,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       {currentLead.email}
                     </a>
+                    <CopyIconButton value={currentLead.email} label="email" />
                   </div>
                 )}
 
                 {/* Phone with icon */}
                 {currentLead.phone && (
-                  <div className="lead-contact-phone flex items-center gap-1.5">
+                  <div className="lead-contact-phone group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdPhone className="text-[var(--text-secondary)]" size={14} />
                     </div>
@@ -1482,6 +1514,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       {currentLead.phone}
                     </a>
+                    <CopyIconButton value={currentLead.phone} label="phone" />
                   </div>
                 )}
 
@@ -1516,7 +1549,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 <MdFlightTakeoff className="text-[var(--text-secondary)]" size={14} />
                               </div>
                               <span className="text-sm font-medium text-[var(--text-secondary)] leading-tight capitalize">
-                                <span className="text-[var(--text-muted)] mr-1.5">Goal:</span>
+                                <span className="text-[var(--text-muted)] mr-1.5">Path:</span>
                                 {brandProfileData.course_interest}
                               </span>
                             </div>
@@ -1572,24 +1605,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     : null;
                   if (!sourceLabel && !finalFirstTouch && !finalLastTouch) return null;
                   return (
-                    <div className="lead-attribution mt-2 p-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                        Attribution
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[10px]">
-                        <div>
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Source</div>
-                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalSource}>{finalSource}</div>
+                    <div className="lead-attribution mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                      <button
+                        type="button"
+                        onClick={() => setShowAttribution((v) => !v)}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors focus:outline-none"
+                        aria-expanded={showAttribution}
+                        aria-controls="lead-attribution-content"
+                      >
+                        <span>Attribution</span>
+                        <MdExpandMore
+                          size={14}
+                          className="transition-transform"
+                          style={{ transform: showAttribution ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        />
+                      </button>
+                      {showAttribution && (
+                        <div id="lead-attribution-content" className="grid grid-cols-3 gap-2 text-[10px] px-2.5 pb-2.5">
+                          <div>
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Source</div>
+                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalSource}>{finalSource}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">First Touch</div>
+                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalFirstTouch || '—'}>{finalFirstTouch || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Last Touch</div>
+                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalLastTouch || '—'}>{finalLastTouch || '—'}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">First Touch</div>
-                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalFirstTouch || '—'}>{finalFirstTouch || '—'}</div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Last Touch</div>
-                          <div className="font-semibold text-[var(--text-primary)] truncate" title={finalLastTouch || '—'}>{finalLastTouch || '—'}</div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1625,13 +1671,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   const color = tierColors[tier] || '#6B7280';
                   return (
                     <div
-                      className="lead-pat-card mt-2 p-3 rounded-lg border"
+                      className="lead-pat-card mt-2 rounded-lg border"
                       style={{
                         borderColor: `${color}55`,
                         background: `${color}10`,
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowPATResult((v) => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/[0.02] transition-colors focus:outline-none rounded-lg"
+                        aria-expanded={showPATResult}
+                        aria-controls="lead-pat-content"
+                      >
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">
                             PAT Result
@@ -1643,47 +1695,58 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             {tierLabels[tier] || tier}
                           </span>
                         </div>
-                        <span
-                          className="text-base font-black tabular-nums"
-                          style={{ color }}
-                          title={`Raw: ${raw}/150`}
-                        >
-                          {score100}
-                          <span className="text-[10px] font-bold opacity-70 ml-0.5">/100</span>
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                        {qual != null && (
-                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Qual</div>
-                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
-                              {Number(qual).toFixed(qual % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
-                            </div>
-                          </div>
-                        )}
-                        {apt != null && (
-                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Apt</div>
-                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
-                              {Number(apt).toFixed(apt % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
-                            </div>
-                          </div>
-                        )}
-                        {rdy != null && (
-                          <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Rdy</div>
-                            <div className="font-bold tabular-nums text-[var(--text-primary)]">
-                              {Number(rdy).toFixed(rdy % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      {elig !== null && (
-                        <div className="mt-2 text-[10px] text-[var(--text-muted)]">
-                          12th eligibility:{' '}
-                          <span className={elig ? 'text-green-500 font-semibold' : 'text-red-500 font-semibold'}>
-                            {elig ? 'Yes' : 'No'}
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-base font-black tabular-nums"
+                            style={{ color }}
+                            title={`Raw: ${raw}/150`}
+                          >
+                            {score100}
+                            <span className="text-[10px] font-bold opacity-70 ml-0.5">/100</span>
                           </span>
+                          <MdExpandMore
+                            size={14}
+                            className="text-[var(--text-muted)] transition-transform"
+                            style={{ transform: showPATResult ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                          />
+                        </div>
+                      </button>
+                      {showPATResult && (
+                        <div id="lead-pat-content" className="px-3 pb-3">
+                          <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                            {qual != null && (
+                              <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                                <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Qual</div>
+                                <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                                  {Number(qual).toFixed(qual % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                                </div>
+                              </div>
+                            )}
+                            {apt != null && (
+                              <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                                <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Apt</div>
+                                <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                                  {Number(apt).toFixed(apt % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                                </div>
+                              </div>
+                            )}
+                            {rdy != null && (
+                              <div className="rounded bg-[var(--bg-secondary)] px-2 py-1">
+                                <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Rdy</div>
+                                <div className="font-bold tabular-nums text-[var(--text-primary)]">
+                                  {Number(rdy).toFixed(rdy % 1 ? 2 : 0)}<span className="opacity-50">/50</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {elig !== null && (
+                            <div className="mt-2 text-[10px] text-[var(--text-muted)]">
+                              12th eligibility:{' '}
+                              <span className={elig ? 'text-green-500 font-semibold' : 'text-red-500 font-semibold'}>
+                                {elig ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
