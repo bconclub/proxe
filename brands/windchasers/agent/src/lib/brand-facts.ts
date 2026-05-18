@@ -79,6 +79,11 @@ export const LOCKED_ANSWERS = {
     display: 'HDFC Credila, Avanse, Auxilo',
     coverage: 'up to ₹40 lakh',
   },
+  community: {
+    whatsappLink: 'https://chat.whatsapp.com/B7nQhU9J5IFEWMmC6qLd8V',
+    description: 'WindChasers aviation aspirants community',
+    rule: 'Share the community link when the user explicitly asks to join the community, asks if there is a group/community, taps a "Join Community" button, or shows interest after a counsellor recommends it. Do not push the link unsolicited in every message.',
+  },
   internationalPartners: {
     display: 'USA, Canada, New Zealand, Australia, South Africa',
     rule: 'Flight training abroad happens at DGCA-recognized partner schools in these countries. Mention only when the user asks about international or abroad training.',
@@ -240,6 +245,7 @@ FACULTY: ${LOCKED_ANSWERS.faculty.display}. ${LOCKED_ANSWERS.faculty.rule}
 ELIGIBILITY: ${LOCKED_ANSWERS.eligibility.academic} Age: ${LOCKED_ANSWERS.eligibility.age} Medical: ${LOCKED_ANSWERS.eligibility.medical} ${LOCKED_ANSWERS.eligibility.rule}
 LOAN PARTNERS: ${LOCKED_ANSWERS.loanPartners.display}. Coverage ${LOCKED_ANSWERS.loanPartners.coverage}.
 INTERNATIONAL: ${LOCKED_ANSWERS.internationalPartners.display}. ${LOCKED_ANSWERS.internationalPartners.rule}
+COMMUNITY: ${LOCKED_ANSWERS.community.description} — share the link ${LOCKED_ANSWERS.community.whatsappLink} ${LOCKED_ANSWERS.community.rule}
 FOUNDER: ${BRAND_IDENTITY.founder.name}, ${BRAND_IDENTITY.founder.role}. Founded ${BRAND_IDENTITY.founded}.
 LOCATION: ${BRAND_IDENTITY.location.fullAddress}.
 PROGRAMS OFFERED: ${PROGRAMS.offered.map(p => p.name).join(', ')}.
