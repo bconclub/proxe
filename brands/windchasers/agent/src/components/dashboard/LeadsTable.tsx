@@ -748,6 +748,7 @@ export default function LeadsTable({
                 const attribution = uc?.attribution || null
                 const attrSource = String(attribution?.source || '').toLowerCase().trim()
                 const attrSourceLabel = String(attribution?.source_label || '').trim()
+                const attrFirstTouchKey = String(attribution?.first_touch || '').toLowerCase().trim()
                 const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
 
                 // Pull UTM info — website's /api/leads stuffs UTM into
@@ -841,11 +842,25 @@ export default function LeadsTable({
                   ''
                 const formType = String(formTypeRaw).toLowerCase().trim()
                 const subSourceLabels: Record<string, string> = {
-                  pilot_aptitude_test: 'Assessment',
-                  pat: 'Assessment',
-                  pilot_assessment: 'Assessment',
-                  demo_booked: 'Demo Booked',
+                  pilot_aptitude_test: 'PAT Assessment',
+                  pat_assessment: 'PAT Assessment',
+                  pat: 'PAT Assessment',
+                  pilot_assessment: 'PAT Assessment',
+                  demo_booked: 'Demo Form',
+                  demo_form: 'Demo Form',
                   demo: 'Demo',
+                  whatsapp_button: 'WhatsApp Popup',
+                  whatsapp_prelaunch: 'WhatsApp Popup',
+                  whatsapp: 'WhatsApp',
+                  web: 'Web Chat',
+                  web_chat: 'Web Chat',
+                  chat_widget: 'Web Chat',
+                  meta_lead_form: 'Meta Lead Form',
+                  facebook_lead: 'Meta Lead Form',
+                  voice_call: 'Voice Call',
+                  voice: 'Voice Call',
+                  manual: 'Manual Entry',
+                  landing_page: 'Landing Page',
                   visit_booked: 'Visit Booked',
                   visit: 'Visit',
                   eligibility: 'Eligibility',
@@ -870,8 +885,14 @@ export default function LeadsTable({
                   affiliate: 'Affiliate',
                 }
                 let subSource = ''
-                if (attrFirstTouchLabel) {
-                  // Canonical: first_touch from attribution
+                // Priority order:
+                //   1. attribution.first_touch (key) → fresh label from subSourceLabels
+                //      so renames take effect without re-backfill
+                //   2. attribution.first_touch_label (stored, may be stale)
+                //   3. raw_form_fields.form_type fallback
+                if (attrFirstTouchKey && subSourceLabels[attrFirstTouchKey]) {
+                  subSource = subSourceLabels[attrFirstTouchKey]
+                } else if (attrFirstTouchLabel) {
                   subSource = attrFirstTouchLabel
                 } else if (formType) {
                   subSource =
@@ -964,13 +985,14 @@ export default function LeadsTable({
                             ''
                           ).trim()
                           if (!pageUrl) return null
-                          // Extract just the path (e.g. /pilot-training) for compact display
-                          let pathOnly = pageUrl
+                          // Show only the path — strip any query string (utm_*, etc.)
+                          // regardless of whether the URL is absolute or relative.
+                          let pathOnly = pageUrl.split('?')[0].split('#')[0]
                           try {
                             const u = new URL(pageUrl)
-                            pathOnly = u.pathname || pageUrl
+                            pathOnly = u.pathname || pathOnly
                           } catch {
-                            // not a valid URL — show as-is (truncated)
+                            // already stripped above for relative URLs
                           }
                           if (pathOnly.length > 28) pathOnly = pathOnly.slice(0, 26) + '…'
                           return (
