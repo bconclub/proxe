@@ -78,7 +78,9 @@ export {
   sendBookingReminder,
   sendMissedCallMessage,
   sendFirstOutreach,
-  sendDemoBookedConfirmation,
+  sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
+  sendDemoConfirmation,
+  type DemoFormat,
   sendPATResult,
   sendFacebookLeadWelcome,
 } from './whatsappSender';

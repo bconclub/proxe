@@ -5,10 +5,11 @@ import {
   normalizePhone,
   createCalendarEvent,
   sendFirstOutreach,
-  sendDemoBookedConfirmation,
+  sendDemoConfirmation,
   sendPATResult,
   buildAttribution,
 } from '@/lib/services'
+import type { DemoFormat } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -467,9 +468,9 @@ export async function POST(request: NextRequest) {
                 lead_id: leadId,
                 channel: 'whatsapp',
                 sender: 'agent',
-                content: `[Template: windchasers_pat_result] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`,
+                content: `[Template: windchasers_pat_result_v1] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`,
                 message_type: 'template',
-                metadata: { template_name: 'windchasers_pat_result', auto_sent: true, trigger: 'pat_completed', score, tier },
+                metadata: { template_name: 'windchasers_pat_result_v1', auto_sent: true, trigger: 'pat_completed', score, tier },
               }).catch(() => {})
               console.log(`[inbound] PAT result WA sent to ${phone} (lead: ${leadId}) score=${score} tier=${tier}`)
             } else {
@@ -604,25 +605,42 @@ export async function POST(request: NextRequest) {
         const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
         const timeDisplay = `${hour12}:${(m || 0).toString().padStart(2, '0')} ${period} IST`
 
-        sendDemoBookedConfirmation(phone, leadName, dateDisplay, timeDisplay, demoMeetLink)
+        // Resolve demo format. demo_type comes from the website form (or
+        // sessionType inside legacy payloads). Default to 'offline' when
+        // unknown — safer than assuming online without a calendar event.
+        const rawDemoType = String(
+          cfields.demo_type ||
+          cfields.session_type ||
+          cfields.sessionType ||
+          ''
+        ).toLowerCase().trim()
+        const demoFormat: DemoFormat = rawDemoType === 'online' ? 'online' : 'offline'
+        const eventIdForButton = calendarResult?.eventId || null
+        const templateName = demoFormat === 'online'
+          ? 'windchasers_demo_online_v1'
+          : 'windchasers_demo_offline_v1'
+
+        sendDemoConfirmation(phone, leadName, dateDisplay, timeDisplay, demoFormat, eventIdForButton)
           .then((result) => {
             if (result.success) {
               supabase.from('conversations').insert({
                 lead_id: leadId,
                 channel: 'whatsapp',
                 sender: 'agent',
-                content: `[Template: windchasers_demo_booked] Demo confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`,
+                content: `[Template: ${templateName}] Demo (${demoFormat}) confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`,
                 message_type: 'template',
                 metadata: {
-                  template_name: 'windchasers_demo_booked',
+                  template_name: templateName,
                   auto_sent: true,
                   trigger: 'demo_booked',
+                  format: demoFormat,
                   date: preferredDate,
                   time: preferredTime,
-                  meet_link: demoMeetLink,
+                  calendar_event_id: eventIdForButton,
+                  meet_link: demoMeetLink, // kept for downstream consumers — null for offline
                 },
               }).catch(() => {})
-              console.log(`[inbound] Demo confirmation WA sent to ${phone} (lead: ${leadId})`)
+              console.log(`[inbound] Demo confirmation WA sent to ${phone} (lead: ${leadId}, format: ${demoFormat})`)
             } else {
               console.error(`[inbound] Demo confirmation WA failed for ${phone}:`, result.error)
             }

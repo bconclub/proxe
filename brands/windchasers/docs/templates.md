@@ -30,7 +30,7 @@ This keeps templates self-describing in the Meta dashboard so anyone scanning th
 
 # Templates in production / pending
 
-## 1. `windchasers_pat_welcome` 🟡 PENDING
+## 1. `windchasers_pat_result_v1` 🟢 LIVE
 
 **Trigger:** Customer completes the Pilot Aptitude Test on the website.
 **Endpoint:** `POST /api/agent/leads/inbound` with `source: "pat"` or `form_type: "pilot_aptitude_test"`.
@@ -42,14 +42,16 @@ This keeps templates self-describing in the Meta dashboard so anyone scanning th
 | Language | English |
 | Header | — |
 
-**Body:**
+**Body (4 variables):**
 ```
 Hi {{1}}! Your Pilot Aptitude Test result is in.
 
 Score: {{2}}/100
 Tier: {{3}}
 
-Our counsellor will reach out shortly with personalised next steps. Excited to chat soon!
+{{4}}
+
+A counsellor will be in touch shortly.
 
 - Team Windchasers
 ```
@@ -59,23 +61,28 @@ Our counsellor will reach out shortly with personalised next steps. Excited to c
 |---|---|---|
 | `{{1}}` | First name | `Yalamati` |
 | `{{2}}` | Score on 0–100 scale | `58` |
-| `{{3}}` | Tier label | `Moderate` |
+| `{{3}}` | Tier label (`Premium` / `Strong` / `Moderate` / `Early Stage`) | `Early Stage` |
+| `{{4}}` | Tier-specific next-step message (from `TIER_MESSAGES`) | `Strong foundation matters more than first score. Talk to a counsellor about prep options.` |
+
+**Tier → {{3}} + {{4}} mapping (source of truth: `TIER_LABELS` + `TIER_MESSAGES` in `whatsappSender.ts`):**
+
+| Internal key | {{3}} label | {{4}} message |
+|---|---|---|
+| `premium`   | Premium     | Strong fit for CPL track. A counsellor can walk you through timeline and next steps. |
+| `strong`    | Strong      | You're well-positioned. Worth a 1:1 to map your training path. |
+| `moderate`  | Moderate    | Good foundation. A counsellor can map out the right program for your goals. |
+| `not-ready` | Early Stage | Strong foundation matters more than first score. Talk to a counsellor about prep options. |
 
 **Buttons:** none.
-**Footer:** optional, e.g. `Powered by Windchasers Aviation Academy`.
-
-> Note: template was originally named `windchasers_pat_result` in code.
-> If you prefer that name in Meta, register as `windchasers_pat_result`
-> and update the `sendPATResult` template name to match. Either name
-> works as long as it matches what's registered.
+**Footer:** optional.
 
 ---
 
-## 2. `windchasers_demo_confirmed` 🟡 PENDING
+## 2. `windchasers_demo_offline_v1` 🟡 PENDING
 
-**Trigger:** Customer books a demo session on the website.
-**Endpoint:** `POST /api/agent/leads/inbound` with `notes: "demo_booked"` or `form_type: "demo_booked"`. Calendar event is created first; this message fires after with the meet link.
-**Sender:** `sendDemoBookedConfirmation()` in `src/lib/services/whatsappSender.ts`.
+**Trigger:** Customer books an **offline (in-facility)** demo on the website.
+**Endpoint:** `POST /api/agent/leads/inbound` with `notes: "demo_booked"` or `form_type: "demo_booked"` AND `custom_fields.demo_type: "offline"` (or unset — offline is the default).
+**Sender:** `sendDemoConfirmation(..., format: 'offline')` in `src/lib/services/whatsappSender.ts`.
 
 | Field | Value |
 |---|---|
@@ -83,14 +90,50 @@ Our counsellor will reach out shortly with personalised next steps. Excited to c
 | Language | English |
 | Header | — |
 
-**Body:**
+**Body (3 variables):**
 ```
-Hi {{1}}, your demo session with Windchasers is confirmed.
+Hi {{1}}, your demo at the Windchasers facility is confirmed.
 
 Date: {{2}}
 Time: {{3}}
 
-You'll receive the meeting link 30 minutes before the session. Reply here if you need to reschedule.
+Address details and what to bring will follow shortly. Reply here if you need to reschedule.
+
+- Team Windchasers
+```
+
+**Variables:**
+| Var | Meaning | Sample |
+|---|---|---|
+| `{{1}}` | First name | `Priya` |
+| `{{2}}` | Formatted date | `Mon, May 19` |
+| `{{3}}` | Formatted time | `12:00 PM IST` |
+
+**Buttons:** none (offline — no calendar/Meet link needed in this message).
+**Footer:** optional.
+
+---
+
+## 3. `windchasers_demo_online_v1` 🟡 PENDING
+
+**Trigger:** Customer books an **online** demo on the website.
+**Endpoint:** `POST /api/agent/leads/inbound` with `notes: "demo_booked"` or `form_type: "demo_booked"` AND `custom_fields.demo_type: "online"`. The calendar event is created BEFORE the WA send so its `eventId` is available for the button URL.
+**Sender:** `sendDemoConfirmation(..., format: 'online', calendarEventId)` in `src/lib/services/whatsappSender.ts`.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY |
+| Language | English |
+| Header | — |
+
+**Body (3 variables):**
+```
+Hi {{1}}, your online demo with Windchasers is confirmed.
+
+Date: {{2}}
+Time: {{3}}
+
+The Meet link will arrive 30 minutes before the session. Tap "Add to Calendar" below so you don't miss it.
 
 - Team Windchasers
 ```
@@ -104,12 +147,11 @@ You'll receive the meeting link 30 minutes before the session. Reply here if you
 
 **Button (URL, dynamic):**
 - Type: Visit Website → Dynamic URL
-- Text: `Join Meeting`
-- URL pattern: `https://meet.google.com/{{1}}`
-- Button `{{1}}` sample: `abc-defg-hij` (the Google Meet code suffix)
+- Text: `Add to Calendar`
+- URL pattern (must match exactly what Meta has): `https://calendar.google.com/calendar/event?eid={{1}}`
+- Button `{{1}}` sample: `MTk0MDQ1MzU2NjAg` (the base64 Google Calendar `eventId`)
 
-> Note: code currently uses `windchasers_demo_booked`. Pick one name and
-> stay consistent across Meta + code.
+> If Meta has a different domain (e.g. `www.google.com/calendar/event`), use whatever Meta has — they must match exactly.
 
 ---
 
@@ -236,8 +278,9 @@ Once a template shows **Approved (green)** in Meta:
 
 | Sender | File | Template name |
 |---|---|---|
-| `sendPATResult` | `src/lib/services/whatsappSender.ts` | `windchasers_pat_result` |
-| `sendDemoBookedConfirmation` | `src/lib/services/whatsappSender.ts` | `windchasers_demo_booked` |
+| `sendPATResult` | `src/lib/services/whatsappSender.ts` | `windchasers_pat_result_v1` |
+| `sendDemoConfirmation` | `src/lib/services/whatsappSender.ts` | `windchasers_demo_offline_v1` · `windchasers_demo_online_v1` (format-aware) |
+| `sendDemoBookedConfirmation` *(deprecated)* | `src/lib/services/whatsappSender.ts` | wraps `sendDemoConfirmation(..., 'offline')` |
 | `sendFacebookLeadWelcome` | `src/lib/services/whatsappSender.ts` | `windchasers_facebook_welcome` |
 | `sendFirstOutreach` | `src/lib/services/whatsappSender.ts` | `windchasers_followup` |
 | `sendBookingConfirmation` | `src/lib/services/whatsappSender.ts` | `booking_confirmation` |

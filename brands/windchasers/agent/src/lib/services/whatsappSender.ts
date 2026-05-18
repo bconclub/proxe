@@ -319,42 +319,67 @@ export async function sendFirstOutreach(
 
 /**
  * Send a demo booking confirmation message.
- * Fires when a lead books a demo through the website / inbound endpoint.
  *
- * Template: windchasers_demo_booked
- *   {{1}} = first name
- *   {{2}} = formatted date (e.g. "Mon, May 19")
- *   {{3}} = formatted time (e.g. "12:00 PM IST")
- *   Button (URL, idx 0) = Google Meet code suffix (e.g. "abc-defg-hij")
+ * Two templates depending on format:
+ *
+ * OFFLINE — windchasers_demo_offline_v1
+ *   {{1}} = first name · {{2}} = date · {{3}} = time
+ *   No buttons (no Meet link, no Add to Calendar — user comes to the facility).
+ *
+ * ONLINE — windchasers_demo_online_v1
+ *   {{1}} = first name · {{2}} = date · {{3}} = time
+ *   Button 0 (URL, dynamic): base64 Google Calendar eventId.
+ *   URL pattern registered in Meta: https://calendar.google.com/calendar/event?eid={{1}}
+ *   The Meet link itself arrives via booking_reminder 30 mins before the session.
+ */
+export type DemoFormat = 'online' | 'offline';
+
+export async function sendDemoConfirmation(
+  to: string,
+  name: string,
+  dateDisplay: string,
+  timeDisplay: string,
+  format: DemoFormat,
+  _calendarEventId?: string | null,
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = (name || 'there').split(' ')[0];
+  // Both demo templates use the same 3 NAMED body params and have STATIC buttons
+  // (Get Directions link / Quick Reply buttons). No button component is needed
+  // in the send call.
+  // The `_calendarEventId` arg is kept on the signature for backward compat /
+  // future use if the online template ever switches to a dynamic Add-to-Cal URL.
+  const components: Array<any> = [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'date',          text: dateDisplay },
+        { type: 'text', parameter_name: 'time',          text: timeDisplay },
+      ],
+    },
+  ];
+  const templateName = format === 'offline'
+    ? 'windchasers_demo_offline_v1'
+    : 'windchasers_demo_online_v1';
+  return sendWhatsAppTemplate(to, templateName, components);
+}
+
+/**
+ * @deprecated Use sendDemoConfirmation(... format, calendarEventId) directly.
+ * Kept for backward compatibility with existing callers that haven't been
+ * migrated yet. Defaults to offline format (safe — no Meet link assumed).
+ *
+ * The legacy parameter `meetLink` is intentionally unused: the new templates
+ * don't take a Meet code in the body and the offline template has no button.
  */
 export async function sendDemoBookedConfirmation(
   to: string,
   name: string,
   dateDisplay: string,
   timeDisplay: string,
-  meetLink?: string | null,
+  _meetLink?: string | null,
 ): Promise<{ success: boolean; error?: string }> {
-  const firstName = (name || 'there').split(' ')[0];
-  const components: Array<any> = [
-    {
-      type: 'body',
-      parameters: [
-        { type: 'text', text: firstName },
-        { type: 'text', text: dateDisplay },
-        { type: 'text', text: timeDisplay },
-      ],
-    },
-  ];
-  // Meta requires the button param even when meet link is unset
-  components.push({
-    type: 'button',
-    sub_type: 'url',
-    index: 0,
-    parameters: [
-      { type: 'text', text: meetLink ? extractUrlSuffix(meetLink) : 'windchasers.in' },
-    ],
-  });
-  return sendWhatsAppTemplate(to, 'windchasers_demo_booked', components);
+  return sendDemoConfirmation(to, name, dateDisplay, timeDisplay, 'offline');
 }
 
 /**
@@ -398,17 +423,20 @@ export async function sendPATResult(
     .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Pending';
   const tierMessage = TIER_MESSAGES[tierKey] || 'A counsellor can walk you through the next steps.';
 
-  return sendWhatsAppTemplate(to, 'windchasers_pat_result_v1', [
+  // Meta template uses NAMED params (customer_name / score / tier / tier_message).
+  // Quick-reply buttons are static — no button component needed in the send call.
+  const components: Array<any> = [
     {
       type: 'body',
       parameters: [
-        { type: 'text', text: firstName },
-        { type: 'text', text: String(score100) },
-        { type: 'text', text: tierLabel },
-        { type: 'text', text: tierMessage },
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'score', text: String(score100) },
+        { type: 'text', parameter_name: 'tier', text: tierLabel },
+        { type: 'text', parameter_name: 'tier_message', text: tierMessage },
       ],
     },
-  ]);
+  ];
+  return sendWhatsAppTemplate(to, 'windchasers_pat_result_v1', components);
 }
 
 /**
