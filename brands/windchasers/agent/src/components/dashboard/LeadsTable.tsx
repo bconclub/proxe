@@ -634,27 +634,29 @@ export default function LeadsTable({
             {/* Tightened column widths: Lead/Contact were oversized,
                 Booking was a wide text column (now a compact chip),
                 Type/Course are narrow chip columns. */}
-            <col style={{ width: '15%' }} />  {/* Lead */}
-            <col style={{ width: '15%' }} />  {/* Contact */}
-            <col style={{ width: '9%' }} />   {/* Source */}
+            <col style={{ width: '14%' }} />  {/* Lead */}
+            <col style={{ width: '14%' }} />  {/* Contact */}
+            <col style={{ width: '8%' }} />   {/* Source (origin, immutable) */}
+            <col style={{ width: '7%' }} />   {/* Last Touch */}
             <col style={{ width: '6%' }} />   {/* Score */}
-            <col style={{ width: '11%' }} />  {/* Stage */}
-            <col style={{ width: '8%' }} />   {/* Active */}
-            <col style={{ width: '12%' }} />  {/* Booking (chip) */}
-            {showAviationColumns && <col style={{ width: '8%' }} />}
+            <col style={{ width: '10%' }} />  {/* Stage */}
+            <col style={{ width: '7%' }} />   {/* Active */}
+            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
+            {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
-                { label: 'Lead',    align: 'left'   as const },
-                { label: 'Contact', align: 'left'   as const },
-                { label: 'Source',  align: 'center' as const },
-                { label: 'Score',   align: 'center' as const },
-                { label: 'Stage',   align: 'center' as const },
-                { label: 'Active',  align: 'left'   as const },
-                { label: 'Booking', align: 'center' as const },
+                { label: 'Lead',       align: 'left'   as const },
+                { label: 'Contact',    align: 'left'   as const },
+                { label: 'Source',     align: 'center' as const },
+                { label: 'Last Touch', align: 'center' as const },
+                { label: 'Score',      align: 'center' as const },
+                { label: 'Stage',      align: 'center' as const },
+                { label: 'Active',     align: 'left'   as const },
+                { label: 'Booking',    align: 'center' as const },
                 ...(showAviationColumns ? [
                   { label: 'Type',   align: 'center' as const },
                   { label: 'Course', align: 'center' as const },
@@ -675,7 +677,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 10 : 7}
+                  colSpan={showAviationColumns ? 11 : 8}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -689,10 +691,11 @@ export default function LeadsTable({
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 const displayStage = stage || 'New'
                 const stageColor = getStageColor(displayStage)
-                // SOURCE = the most recent medium the lead came through.
-                // Falls back to first_touchpoint and the legacy `source` field
-                // so older leads still render something.
-                const source = (lead.last_touchpoint || lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
+                // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
+                // first — never the last_touchpoint, since that gets overwritten
+                // by any later interaction (e.g. a logged call flips to 'voice').
+                const source = (lead.first_touchpoint || lead.source || lead.last_touchpoint || 'unknown').toLowerCase()
+                const lastTouch = (lead.last_touchpoint || '').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
                 const uc = lead.unified_context || {}
@@ -934,6 +937,44 @@ export default function LeadsTable({
                           </span>
                         )}
                       </div>
+                    </td>
+
+                    {/* LAST TOUCH - which channel was used most recently */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                      {(() => {
+                        if (!lastTouch) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        const lastTouchConfig: Record<string, { label: string; color: string }> = {
+                          web: { label: 'Web', color: '#3B82F6' },
+                          form: { label: 'Form', color: '#3B82F6' },
+                          whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                          voice: { label: 'Voice', color: '#8B5CF6' },
+                          social: { label: 'Social', color: '#EC4899' },
+                          facebook: { label: 'Facebook', color: '#1877F2' },
+                          facebook_lead: { label: 'Facebook', color: '#1877F2' },
+                          meta_forms: { label: 'Meta', color: '#1877F2' },
+                          google: { label: 'Google', color: '#EA4335' },
+                          ads: { label: 'Ads', color: '#F97316' },
+                          pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                          referral: { label: 'Referral', color: '#10B981' },
+                          organic: { label: 'Organic', color: '#84CC16' },
+                          manual: { label: 'Manual', color: '#6B7280' },
+                          landing_page: { label: 'Landing', color: '#3B82F6' },
+                          email: { label: 'Email', color: '#0EA5E9' },
+                        }
+                        const cfg = lastTouchConfig[lastTouch] || {
+                          label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                          color: '#6B7280',
+                        }
+                        return (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                            style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                            title={`Last touched via ${cfg.label}`}
+                          >
+                            {cfg.label}
+                          </span>
+                        )
+                      })()}
                     </td>
 
                     {/* SCORE - colored pill */}
