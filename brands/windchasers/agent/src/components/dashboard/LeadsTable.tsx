@@ -1012,9 +1012,35 @@ export default function LeadsTable({
                       </div>
                     </td>
 
-                    {/* LAST TOUCH - which channel was used most recently */}
+                    {/* LAST TOUCH - who handled most recently: User / PROXe / channel */}
                     <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       {(() => {
+                        // Priority 1: unified_context.last_actor (canonical actor record)
+                        const actor = uc?.last_actor || null
+                        if (actor?.type === 'user' && (actor.name || actor.email)) {
+                          const name = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                          return (
+                            <span
+                              className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                              style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#F59E0B' }}
+                              title={`Last touched by ${actor.email || name}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`}
+                            >
+                              {name}
+                            </span>
+                          )
+                        }
+                        if (actor?.type === 'proxe') {
+                          return (
+                            <span
+                              className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                              style={{ backgroundColor: 'rgba(139,92,246,0.15)', color: '#8B5CF6' }}
+                              title={`PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`}
+                            >
+                              PROXe
+                            </span>
+                          )
+                        }
+                        // Priority 2: channel-based fallback (no actor recorded yet)
                         if (!lastTouch) return <span style={{ color: 'var(--text-muted)' }}>—</span>
                         const lastTouchConfig: Record<string, { label: string; color: string }> = {
                           web: { label: 'Web', color: '#3B82F6' },

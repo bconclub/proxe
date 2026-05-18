@@ -741,24 +741,48 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     });
   }
 
-  // ── Invalidate cached summary so the new state surfaces ─────────────────
-  if (classification.category !== 'INFO_ONLY') {
-    const { data: freshLead } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', leadId)
-      .single();
+  // ── Record actor (who did this) + invalidate cached summary ──────────────
+  // last_actor surfaces in the LAST TOUCH column so the team can see who
+  // handled this lead most recently — a specific user or PROXe AI.
+  const actorEmail = (input.createdBy || 'system').trim();
+  const actorIsSystem = actorEmail === 'system' || actorEmail === 'PROXe AI' || actorEmail.toLowerCase() === 'proxe';
+  const actorName = actorIsSystem
+    ? null
+    : actorEmail.includes('@')
+      ? actorEmail.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      : actorEmail;
+  const lastActor = {
+    type: actorIsSystem ? 'proxe' : 'user',
+    email: actorIsSystem ? null : actorEmail,
+    name: actorIsSystem ? 'PROXe' : actorName,
+    at: now.toISOString(),
+    source: outcome ? `call:${outcome}` : 'note',
+  };
 
-    if (freshLead) {
-      const ctx = freshLead.unified_context || {};
-      const { error: summaryErr } = await supabase
-        .from('all_leads')
-        .update({ unified_context: { ...ctx, unified_summary: null } })
-        .eq('id', leadId);
-      if (!summaryErr) {
-        summaryRefreshed = true;
-        actionsTaken.push(`Summary refresh triggered`);
-      }
+  const { data: freshLead } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .single();
+
+  if (freshLead) {
+    const ctx = freshLead.unified_context || {};
+    // Wipe the cached summary so the next dashboard view regenerates it with
+    // the new state. Always update last_actor.
+    const shouldInvalidateSummary = classification.category !== 'INFO_ONLY';
+    const { error: summaryErr } = await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...ctx,
+          last_actor: lastActor,
+          ...(shouldInvalidateSummary ? { unified_summary: null } : {}),
+        },
+      })
+      .eq('id', leadId);
+    if (!summaryErr && shouldInvalidateSummary) {
+      summaryRefreshed = true;
+      actionsTaken.push(`Summary refresh triggered`);
     }
   }
 
