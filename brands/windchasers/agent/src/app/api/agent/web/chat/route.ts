@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
                 supabase,
                 responseTimeMs,
                 requestOrigin,
+                messageCount,
               );
             } catch (err) {
               console.error('[agent/web/chat] Post-processing error:', err);
@@ -188,6 +189,7 @@ async function postProcess(
   supabase: any,
   responseTimeMs?: number,
   requestOrigin?: string,
+  messageCount: number = 0,
 ): Promise<void> {
   try {
     // 1. Check for existing lead from session first
