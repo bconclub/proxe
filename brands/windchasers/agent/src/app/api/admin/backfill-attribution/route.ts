@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const dryRun: boolean = !!body.dryRun;
+    const force: boolean = !!body.force;
     const limit: number = Number.isFinite(body.limit) && body.limit > 0 ? body.limit : 10000;
     const brand = body.brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     for (const lead of leads || []) {
       const ctx = lead.unified_context || {};
 
-      if (ctx.attribution?.source) {
+      if (ctx.attribution?.source && !force) {
         report.already_set += 1;
         continue;
       }
