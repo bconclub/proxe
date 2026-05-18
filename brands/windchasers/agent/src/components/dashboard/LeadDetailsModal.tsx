@@ -1793,13 +1793,26 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <select
                       value={logCallOutcome}
                       onChange={(e) => setLogCallOutcome(e.target.value)}
-                      className="text-xs bg-transparent border border-[var(--border-primary)] rounded px-1.5 py-1 text-[var(--text-primary)] outline-none"
+                      className="text-xs border border-[var(--border-primary)] rounded px-1.5 py-1 outline-none"
+                      style={{
+                        // colorScheme tells the browser to render the native dropdown
+                        // popup with theme-aware (dark-aware) UI, fixing the white
+                        // dropdown-on-dark-mode bug.
+                        colorScheme: 'light dark',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                      }}
                       disabled={savingLogCall}
                     >
-                      <option value="Connected">Connected</option>
-                      <option value="No Answer">No Answer</option>
-                      <option value="Busy">Busy</option>
-                      <option value="Voicemail">Voicemail</option>
+                      {['Connected', 'No Answer', 'Busy', 'Voicemail'].map((opt) => (
+                        <option
+                          key={opt}
+                          value={opt}
+                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                        >
+                          {opt}
+                        </option>
+                      ))}
                     </select>
                     <input
                       type="text"
