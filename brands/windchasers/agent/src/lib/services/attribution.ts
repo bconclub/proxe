@@ -46,8 +46,14 @@ const FIRST_TOUCH_LABELS: Record<string, string> = {
   pat_assessment: 'PAT Assessment',
   pilot_aptitude_test: 'PAT Assessment',
   pat: 'PAT Assessment',
-  whatsapp_prelaunch: 'WhatsApp Popup',
-  whatsapp_button: 'WhatsApp Popup',
+  whatsapp_prelaunch: 'WhatsApp Pop-Up',
+  whatsapp_button: 'WhatsApp Pop-Up',
+  // Accept the space-separated form_type the website actually sends
+  // (e.g. "WhatsApp Prelaunch" → "whatsapp prelaunch" after lowercase)
+  'whatsapp prelaunch': 'WhatsApp Pop-Up',
+  'whatsapp popup': 'WhatsApp Pop-Up',
+  'whatsapp pop-up': 'WhatsApp Pop-Up',
+  'whatsapp pop up': 'WhatsApp Pop-Up',
   meta_lead_form: 'Meta Lead Form',
   facebook_lead: 'Meta Lead Form',
   newsletter: 'Newsletter',
