@@ -97,6 +97,25 @@ export async function PATCH(
       newBrandCtx.session_type = ['online', 'offline'].includes(t) ? t : null
       ctxChanged = true
     }
+    if (body.application_status !== undefined) {
+      const s = String(body.application_status || '').trim().toLowerCase()
+      const allowed = [
+        'demo_booked',
+        'demo_done_online',
+        'demo_done_offline',
+        'registration_pending',
+        'registration_done',
+        'joined',
+      ]
+      newBrandCtx.application_status = allowed.includes(s) ? s : null
+      ctxChanged = true
+    }
+    if (body.class_12_pcm !== undefined) {
+      const c = String(body.class_12_pcm || '').trim().toLowerCase()
+      const allowed = ['12th_pcm', '12th_non_pcm', 'pursuing_12_pcm', 'below_12th', 'unknown']
+      newBrandCtx.class_12_pcm = allowed.includes(c) ? c : null
+      ctxChanged = true
+    }
 
     if (Object.keys(updates).length === 0 && !ctxChanged) {
       return NextResponse.json({ error: 'No supported fields to update' }, { status: 400 })

@@ -1862,6 +1862,105 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
+                {/* APPLICATION STATUS + 12th PCM (Windchasers enrollment journey) */}
+                {(() => {
+                  const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};
+                  const currentAppStatus = wc.application_status || ''
+                  const currentPcm = wc.class_12_pcm || ''
+                  const appStatusOptions: Array<{ value: string; label: string; color: string }> = [
+                    { value: '',                       label: 'Not set',              color: '#6B7280' },
+                    { value: 'demo_booked',            label: 'Demo Booked',          color: '#3B82F6' },
+                    { value: 'demo_done_online',       label: 'Demo Done (Online)',   color: '#10B981' },
+                    { value: 'demo_done_offline',      label: 'Demo Done (Offline)',  color: '#10B981' },
+                    { value: 'registration_pending',   label: 'Registration Pending', color: '#F59E0B' },
+                    { value: 'registration_done',      label: 'Registration Done',    color: '#A855F7' },
+                    { value: 'joined',                 label: 'Joined',               color: '#EAB308' },
+                  ]
+                  const pcmOptions: Array<{ value: string; label: string }> = [
+                    { value: '',                  label: 'Not set' },
+                    { value: '12th_pcm',          label: '12th PCM ✓' },
+                    { value: '12th_non_pcm',      label: '12th (non-PCM)' },
+                    { value: 'pursuing_12_pcm',   label: 'Pursuing 12 PCM' },
+                    { value: 'below_12th',        label: 'Below 12th' },
+                    { value: 'unknown',           label: 'Unknown' },
+                  ]
+                  const persist = async (patch: Record<string, any>) => {
+                    try {
+                      const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patch),
+                      })
+                      if (!r.ok) {
+                        const d = await r.json()
+                        console.error('App status / PCM save failed:', d.error)
+                      }
+                      loadFreshLeadData()
+                    } catch (e) {
+                      console.error(e)
+                    }
+                  }
+                  const currentAppCfg = appStatusOptions.find((o) => o.value === currentAppStatus) || appStatusOptions[0]
+                  return (
+                    <div className="lead-app-status mt-2 p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                        Enrollment
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Application Status */}
+                        <div>
+                          <label className="block text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                            Application Status
+                          </label>
+                          <select
+                            value={currentAppStatus}
+                            onChange={(e) => persist({ application_status: e.target.value || null })}
+                            className="w-full text-xs border border-[var(--border-primary)] rounded px-2 py-1 outline-none"
+                            style={{
+                              colorScheme: 'light dark',
+                              background: 'var(--bg-primary)',
+                              color: currentAppCfg.color,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {appStatusOptions.map((opt) => (
+                              <option
+                                key={opt.value}
+                                value={opt.value}
+                                style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                              >
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* 12th PCM */}
+                        <div>
+                          <label className="block text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)] mb-1">
+                            12th Education
+                          </label>
+                          <select
+                            value={currentPcm}
+                            onChange={(e) => persist({ class_12_pcm: e.target.value || null })}
+                            className="w-full text-xs border border-[var(--border-primary)] rounded px-2 py-1 outline-none text-[var(--text-primary)]"
+                            style={{ colorScheme: 'light dark', background: 'var(--bg-primary)' }}
+                          >
+                            {pcmOptions.map((opt) => (
+                              <option
+                                key={opt.value}
+                                value={opt.value}
+                                style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                              >
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
                 {(() => {
                   const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};
@@ -2260,6 +2359,63 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setShowActionDropdown(false)
+                        const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {}
+                        const rff = currentLead.unified_context?.raw_form_fields || {}
+                        const attr = currentLead.unified_context?.attribution || {}
+                        const city = wc.city
+                          || currentLead.unified_context?.whatsapp?.profile?.city
+                          || currentLead.unified_context?.web?.profile?.city
+                          || rff.city || ''
+                        const eduMap: Record<string, string> = {
+                          '12th_pcm': '12th PCM',
+                          '12th_non_pcm': '12th (non-PCM)',
+                          'pursuing_12_pcm': 'Pursuing 12 PCM',
+                          'below_12th': 'Below 12th',
+                          'unknown': 'Unknown',
+                        }
+                        const appStatusMap: Record<string, string> = {
+                          'demo_booked': 'Demo Booked',
+                          'demo_done_online': 'Demo Done (Online)',
+                          'demo_done_offline': 'Demo Done (Offline)',
+                          'registration_pending': 'Registration Pending',
+                          'registration_done': 'Registration Done',
+                          'joined': 'Joined',
+                        }
+                        const patRaw = wc.pat_score ?? rff.total_score
+                        const patScore100 = patRaw != null ? Math.round((Number(patRaw) * 100) / 150) : null
+                        const lines = [
+                          `*Lead Details*`,
+                          `Name: ${currentLead.name || 'Unknown'}`,
+                          `Phone: ${currentLead.phone || '—'}`,
+                          currentLead.email ? `Email: ${currentLead.email}` : null,
+                          city ? `City: ${city}` : null,
+                          wc.user_type ? `Type: ${String(wc.user_type).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}` : null,
+                          wc.course_interest ? `Course: ${wc.course_interest}` : null,
+                          wc.class_12_pcm ? `Education: ${eduMap[wc.class_12_pcm] || wc.class_12_pcm}` : (wc.education ? `Education: ${wc.education}` : null),
+                          wc.timeline ? `Timeline: ${wc.timeline}` : null,
+                          patScore100 != null ? `PAT Score: ${patScore100}/100${wc.pat_tier ? ` (${wc.pat_tier})` : ''}` : null,
+                          `Lead Score: ${(currentLead as any).lead_score ?? '—'}/100`,
+                          `Stage: ${currentLead.lead_stage || 'New'}`,
+                          wc.application_status ? `Application Status: ${appStatusMap[wc.application_status] || wc.application_status}` : null,
+                          attr.source_label ? `Source: ${attr.source_label}${attr.first_touch_label ? ' · ' + attr.first_touch_label : ''}` : null,
+                          (currentLead as any).created_at ? `First seen: ${new Date((currentLead as any).created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : null,
+                        ].filter(Boolean).join('\n')
+
+                        try {
+                          await navigator.clipboard.writeText(lines)
+                          setNoteProgress({ steps: [{ text: 'Lead details copied to clipboard', done: true }], visible: true })
+                          setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
+                        } catch {
+                          window.prompt('Copy lead details:', lines)
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdContentCopy size={16} className="text-amber-500" /> Copy Lead Details
                     </button>
                   </div>
                 </>
