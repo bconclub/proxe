@@ -938,7 +938,7 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - badge + sub-source, horizontally + vertically centered */}
+                    {/* SOURCE - 3 lines: channel · first touch · landing page */}
                     <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       <div className="flex flex-col items-center gap-0.5">
                         <span
@@ -956,6 +956,37 @@ export default function LeadsTable({
                             {subSource}
                           </span>
                         )}
+                        {(() => {
+                          const pageUrl = String(
+                            uc?.attribution?.page_url ||
+                            uc?.raw_form_fields?.page_url ||
+                            uc?.web?.form_submission?.page_url ||
+                            ''
+                          ).trim()
+                          if (!pageUrl) return null
+                          // Extract just the path (e.g. /pilot-training) for compact display
+                          let pathOnly = pageUrl
+                          try {
+                            const u = new URL(pageUrl)
+                            pathOnly = u.pathname || pageUrl
+                          } catch {
+                            // not a valid URL — show as-is (truncated)
+                          }
+                          if (pathOnly.length > 28) pathOnly = pathOnly.slice(0, 26) + '…'
+                          return (
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[9px] whitespace-nowrap hover:underline"
+                              style={{ color: '#6b7280' }}
+                              title={pageUrl}
+                            >
+                              {pathOnly}
+                            </a>
+                          )
+                        })()}
                       </div>
                     </td>
 
