@@ -154,6 +154,30 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
+        {/* Team & Access — link to user management */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Team & Access
+          </h2>
+          <a
+            href="/dashboard/settings/users"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Manage users
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Invite teammates, set roles, and revoke access. Every lead-related action is logged with the user&rsquo;s name.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
         {/* Appearance Section */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
