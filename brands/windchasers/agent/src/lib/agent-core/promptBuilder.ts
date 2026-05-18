@@ -8,6 +8,7 @@ import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-pr
 import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
 import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
+import { isLikelyRealPersonName } from '../services/utils';
 
 interface PromptOptions {
   channel: Channel;
@@ -108,12 +109,10 @@ function buildSystemPrompt(
   userEmail?: string | null,
   userPhone?: string | null,
 ): string {
-  // Guard: never inject brand/system names as the user's name
-  const BRAND_NAMES = new Set(['bcon', 'windchasers', 'proxe', 'nidaan', 'alpha', 'arc']);
-  const isRealPersonName = (n?: string | null): n is string =>
-    !!(n && n.trim() && !BRAND_NAMES.has(n.trim().toLowerCase()));
-
-  const nameLine = isRealPersonName(userName)
+  // Guard: only inject the name when it looks like a real person, not a brand
+  // label, UI string, or other junk that leaked into the customer_name column.
+  // Shared with the wa-prelaunch capture endpoint so both ends agree.
+  const nameLine = isLikelyRealPersonName(userName)
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
     : '';
 
@@ -123,7 +122,9 @@ function buildSystemPrompt(
   // state of the lead row instead of a static "name and email" string.
   const knownContactBlock = (() => {
     const isKnown = (v?: string | null) => !!(v && String(v).trim());
-    const nameKnown = isKnown(userName);
+    // For name specifically, "known" means a real-looking person name, not a
+    // junk value like "Interior" that leaked in from the lead-capture form.
+    const nameKnown = isLikelyRealPersonName(userName);
     const emailKnown = isKnown(userEmail);
     const phoneKnown = isKnown(userPhone);
     const missing: string[] = [];

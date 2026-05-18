@@ -18,6 +18,7 @@ export {
   stripHTML,
   formatTimeForDisplay,
   formatDate,
+  isLikelyRealPersonName,
 } from './utils';
 
 // Supabase clients

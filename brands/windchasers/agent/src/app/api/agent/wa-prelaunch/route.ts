@@ -20,7 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, buildAttribution } from '@/lib/services';
+import { getServiceClient, normalizePhone, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +38,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const name: string = body.name || body.full_name || '';
+    const rawName: string = body.name || body.full_name || '';
+    // Drop garbage names ("Interior", "Submit", "Test") so the agent never
+    // greets a lead by a meaningless label. Real-looking names pass through.
+    const name: string = isLikelyRealPersonName(rawName) ? rawName.trim() : '';
+    if (rawName && !name) {
+      console.log(`[wa-prelaunch] Discarding suspicious name="${rawName}"`);
+    }
     const phone: string = body.phone || body.phone_number || '';
     const email: string | null = body.email || null;
 
@@ -59,12 +65,11 @@ export async function POST(request: NextRequest) {
         { status: 400, headers: CORS_HEADERS },
       );
     }
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400, headers: CORS_HEADERS },
-      );
-    }
+    // We used to also require `name`, but the field is now optional from the
+    // server's perspective: if the user typed a real name we keep it, if they
+    // typed garbage ("Interior", "Submit", …) we strip it to empty so the
+    // agent doesn't greet them by a junk label. The form on the website
+    // still asks for a name and shows its own client-side validation.
 
     const supabase = getServiceClient();
     if (!supabase) {
@@ -123,7 +128,9 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('all_leads')
         .update({
-          customer_name: name,
+          // Only overwrite customer_name with a real-looking value, so a
+          // bogus second submission doesn't blow away a valid earlier name.
+          ...(name ? { customer_name: name } : {}),
           ...(email ? { email } : {}),
           phone,
           last_touchpoint: 'whatsapp',
@@ -141,7 +148,7 @@ export async function POST(request: NextRequest) {
       const { data: created, error: insertErr } = await supabase
         .from('all_leads')
         .insert({
-          customer_name: name,
+          customer_name: name || null,
           email,
           phone,
           customer_phone_normalized: normalizedPhone,

@@ -95,3 +95,50 @@ export function formatDate(dateString: string): string {
     day: 'numeric',
   });
 }
+
+// ── Name validation ─────────────────────────────────────────────────────────
+// Words that have shown up in customer_name in the wild because the lead-
+// capture modal didn't validate input — usually UI labels, page headers, or
+// stray tokens that the user typed by accident. When the lead row is created
+// the agent then greets them by that "name" ("Interior! Happy to help…") which
+// is embarrassing. Both the capture endpoint and the prompt-builder use
+// isLikelyRealPersonName to decide whether to trust customer_name.
+const JUNK_NAME_DENYLIST = new Set([
+  // Brand / project names
+  'bcon', 'windchasers', 'wind chasers', 'proxe', 'nidaan', 'alpha', 'arc',
+  // Common page/section labels people accidentally typed instead of name
+  'interior', 'exterior', 'home', 'about', 'contact', 'pilot training',
+  'cpl', 'ppl', 'atpl', 'dgca', 'helicopter', 'drone', 'cabin crew',
+  // Form/button labels
+  'name', 'full name', 'phone', 'phone number', 'email', 'message',
+  'submit', 'click', 'click here', 'loading', 'open whatsapp', 'whatsapp',
+  'send', 'next', 'continue', 'start', 'start a chat',
+  // Test / junk / placeholder values
+  'test', 'testing', 'demo', 'asdf', 'qwerty', 'na', 'n/a', 'none', 'null',
+  'undefined', 'unknown', 'lead', 'visitor', 'user', 'customer',
+]);
+
+/**
+ * Decide whether a string is plausibly a real person's first/full name.
+ * Returns false for: empty / brand names / single UI-label words / digits-only
+ * values / things that are clearly not a person ("Interior", "Pilot Training",
+ * "Submit", etc.). Multi-word values that pass the basic shape check are
+ * trusted — we'd rather accept an unusual real name than reject it.
+ */
+export function isLikelyRealPersonName(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (trimmed.length < 2 || trimmed.length > 60) return false;
+
+  // Real names don't contain digits.
+  if (/\d/.test(trimmed)) return false;
+
+  // Must contain at least one letter.
+  if (!/[a-zA-ZÀ-ɏ]/.test(trimmed)) return false;
+
+  // Denylist match (case-insensitive, whitespace-normalized).
+  const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  if (JUNK_NAME_DENYLIST.has(normalized)) return false;
+
+  return true;
+}
