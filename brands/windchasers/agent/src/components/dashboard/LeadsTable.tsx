@@ -1116,40 +1116,14 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* STAGE - badge + application status subtext */}
+                    {/* STAGE - badge */}
                     <td className="px-3 py-2 text-center">
-                      {(() => {
-                        const brandCtx2 = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
-                        const appStatus = brandCtx2.application_status || ''
-                        const appStatusConfig: Record<string, { label: string; color: string }> = {
-                          demo_booked:          { label: 'Demo Booked',          color: '#3B82F6' },
-                          demo_done_online:     { label: 'Demo Done · Online',   color: '#10B981' },
-                          demo_done_offline:    { label: 'Demo Done · Offline',  color: '#10B981' },
-                          registration_pending: { label: 'Reg Pending',          color: '#F59E0B' },
-                          registration_done:    { label: 'Reg Done',             color: '#A855F7' },
-                          joined:               { label: 'Joined',               color: '#EAB308' },
-                        }
-                        const appCfg = appStatus ? appStatusConfig[appStatus] : null
-                        return (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span
-                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
-                              style={stageColor.style || {}}
-                            >
-                              {displayStage}
-                            </span>
-                            {appCfg && (
-                              <span
-                                className="text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap"
-                                style={{ color: appCfg.color }}
-                                title={`Application status: ${appCfg.label}`}
-                              >
-                                {appCfg.label}
-                              </span>
-                            )}
-                          </div>
-                        )
-                      })()}
+                      <span
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                        style={stageColor.style || {}}
+                      >
+                        {displayStage}
+                      </span>
                     </td>
 
                     {/* ACTIVE */}
