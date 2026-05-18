@@ -390,32 +390,48 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create first_outreach task
+    // Create first_outreach task — but skip if one is already pending for this
+    // lead. The inbound endpoint can fire multiple times for the same lead
+    // (e.g. the same Meta form is re-submitted, or the user fills the PAT
+    // form after the lead form). Without this guard, every submission appends
+    // a duplicate "First Outreach to X" task to the dashboard.
     const leadName = name?.trim() || existing?.customer_name || 'Lead'
-    const { error: taskErr } = await supabase.from('agent_tasks').insert({
-      task_type: 'first_outreach',
-      task_description: `First outreach to ${leadName} from ${leadSource}${campaign ? ` (${campaign})` : ''}`,
-      lead_id: leadId,
-      lead_phone: normalizedPhone,
-      lead_name: leadName,
-      status: 'pending',
-      scheduled_at: now,
-      metadata: {
-        source: leadSource,
-        original_source: normalizedSource || null,
-        campaign: campaign || null,
-        notes: notes || null,
-        inbound: true,
-        city: city?.trim() || null,
-        brand_name: brand_name?.trim() || null,
-        urgency: urgency?.trim() || null,
-        custom_fields: custom_fields || null,
-      },
-      created_at: now,
-    })
+    const { data: existingOutreach } = await supabase
+      .from('agent_tasks')
+      .select('id')
+      .eq('task_type', 'first_outreach')
+      .eq('lead_id', leadId)
+      .in('status', ['pending', 'queued', 'awaiting_approval'])
+      .limit(1)
 
-    if (taskErr) {
-      console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
+    if (existingOutreach && existingOutreach.length > 0) {
+      console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
+    } else {
+      const { error: taskErr } = await supabase.from('agent_tasks').insert({
+        task_type: 'first_outreach',
+        task_description: `First outreach to ${leadName} from ${leadSource}${campaign ? ` (${campaign})` : ''}`,
+        lead_id: leadId,
+        lead_phone: normalizedPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: now,
+        metadata: {
+          source: leadSource,
+          original_source: normalizedSource || null,
+          campaign: campaign || null,
+          notes: notes || null,
+          inbound: true,
+          city: city?.trim() || null,
+          brand_name: brand_name?.trim() || null,
+          urgency: urgency?.trim() || null,
+          custom_fields: custom_fields || null,
+        },
+        created_at: now,
+      })
+
+      if (taskErr) {
+        console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
+      }
     }
 
     // ── Detect submission type for routing the right template ────────────────
