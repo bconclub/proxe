@@ -1121,6 +1121,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const handleLogCall = async () => {
     if (!lead) return
     setSavingLogCall(true)
+    setNoteProgress({ steps: [{ text: `Logging call: ${logCallOutcome}...`, done: false }], visible: true })
     try {
       const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
         method: 'POST',
@@ -1131,14 +1132,51 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         const data = await response.json()
         throw new Error(data.error || 'Failed to log call')
       }
+      const result = await response.json()
+
+      const allSteps: { text: string; done: boolean }[] = [
+        { text: `Logged call: ${logCallOutcome}`, done: true },
+      ]
+      const categoryLabels: Record<string, string> = {
+        BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
+        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
+        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Converted', MEETING_REQUEST: 'Meeting Request',
+        SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', DEMO_TAKEN: 'Demo Taken',
+        PROPOSAL_SENT: 'Proposal Sent', INFO_ONLY: 'Info Only',
+      }
+      const categoryLabel = categoryLabels[result.classification?.category] || result.classification?.category || 'Unknown'
+      allSteps.push({ text: `Classified as: ${categoryLabel}`, done: true })
+      if (result.actions_taken) {
+        for (const action of result.actions_taken) {
+          allSteps.push({ text: action, done: true })
+        }
+      }
+      allSteps.push({ text: 'Done', done: true })
+
+      for (let i = 0; i < allSteps.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, i === 0 ? 100 : 400))
+        setNoteProgress({ steps: allSteps.slice(0, i + 1), visible: true })
+      }
+
       setShowLogCallForm(false)
       setLogCallOutcome('Connected')
       setLogCallNotes('')
+
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setNoteProgress((prev) => ({ ...prev, visible: false }))
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      setNoteProgress({ steps: [], visible: false })
+
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
     } catch (err) {
       console.error('Error logging call:', err)
+      setNoteProgress({
+        steps: [{ text: `Logging call: ${logCallOutcome}...`, done: true }, { text: 'Error logging call', done: true }],
+        visible: true,
+      })
+      setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
     } finally {
       setSavingLogCall(false)
     }

@@ -99,3 +99,13 @@ export {
   deriveFirstTouch,
   buildAttribution,
 } from './attribution';
+
+// Note orchestrator (classify + act)
+export {
+  type CallOutcome,
+  type NoteClassification,
+  type ClassifyAndActInput,
+  type OrchestratorResult,
+  classifyAndAct,
+  classifyNote,
+} from './noteOrchestrator';
