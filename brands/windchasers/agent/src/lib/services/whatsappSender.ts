@@ -278,6 +278,26 @@ export async function sendBookingReminder(
 }
 
 /**
+ * Welcome message for leads who came in via a Facebook / Meta Lead Ad form.
+ * Distinct from the generic first-outreach so we can tailor copy to ad context.
+ *
+ * Template: windchasers_facebook_welcome
+ *   {{1}} = first name
+ */
+export async function sendFacebookLeadWelcome(
+  to: string,
+  name: string,
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = (name || 'there').split(' ')[0];
+  return sendWhatsAppTemplate(to, 'windchasers_facebook_welcome', [
+    {
+      type: 'body',
+      parameters: [{ type: 'text', text: firstName }],
+    },
+  ]);
+}
+
+/**
  * Send the first outreach message to a brand-new inbound lead.
  * Always uses a template — we're initiating contact, not replying.
  *

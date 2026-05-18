@@ -80,6 +80,7 @@ export {
   sendFirstOutreach,
   sendDemoBookedConfirmation,
   sendPATResult,
+  sendFacebookLeadWelcome,
 } from './whatsappSender';
 
 // Cross-channel context
