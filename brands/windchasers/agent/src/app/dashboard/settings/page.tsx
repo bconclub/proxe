@@ -34,7 +34,10 @@ export default function SettingsPage() {
   const [widgetStyleError, setWidgetStyleError] = useState<string | null>(null);
   const [loadingWidgetStyle, setLoadingWidgetStyle] = useState(true);
 
-  // Load saved theme on mount
+  // Load saved theme on mount, and re-apply whenever the dashboard mode
+  // (dark/light/brand) changes — otherwise the accent's bg/text overrides
+  // can stomp the freshly-set light/dark vars and produce an unreadable
+  // half-themed state across the rest of the app.
   useEffect(() => {
     const storageKey = 'windchasers-accent-theme';
     const savedTheme = localStorage.getItem(storageKey);
@@ -44,7 +47,8 @@ export default function SettingsPage() {
     } else {
       applyTheme(ACCENT_THEMES[0].id);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
 
   // Load saved widget style on mount
   useEffect(() => {
@@ -66,34 +70,43 @@ export default function SettingsPage() {
     fetchWidgetStyle();
   }, []);
 
-  // Apply theme to CSS variables
+  // Apply theme to CSS variables.
+  // The accent always sets the colour tokens. The Aviation-Gold preset also
+  // ships dark-brown bg/text overrides for the branded dark look, but those
+  // are NEVER applied in light mode — otherwise the light-mode bg/text from
+  // ThemeProvider gets stomped and the app becomes unreadable.
   function applyTheme(themeId: string) {
-    const theme = ACCENT_THEMES.find(t => t.id === themeId);
-    if (theme) {
-      document.documentElement.style.setProperty('--accent-primary', theme.color);
-      document.documentElement.style.setProperty('--accent-light', theme.color);
-      document.documentElement.style.setProperty('--accent-subtle', `${theme.color}20`);
+    const accent = ACCENT_THEMES.find(t => t.id === themeId);
+    if (!accent) return;
+    const root = document.documentElement;
 
-      // Only the Windchasers-specific Aviation Gold preset overrides full UI tokens.
-      if (theme.id === 'aviation-gold') {
-        document.documentElement.style.setProperty('--bg-secondary', theme.bgSecondary);
-        document.documentElement.style.setProperty('--bg-tertiary', theme.bgTertiary);
-        document.documentElement.style.setProperty('--bg-hover', theme.bgHover);
-        document.documentElement.style.setProperty('--border-primary', theme.borderPrimary);
-        document.documentElement.style.setProperty('--text-primary', theme.textPrimary);
-        document.documentElement.style.setProperty('--text-secondary', theme.textSecondary);
-        document.documentElement.style.setProperty('--button-bg', theme.buttonBg);
-        document.documentElement.style.setProperty('--text-button', theme.textButton);
-      } else {
-        document.documentElement.style.removeProperty('--bg-secondary');
-        document.documentElement.style.removeProperty('--bg-tertiary');
-        document.documentElement.style.removeProperty('--bg-hover');
-        document.documentElement.style.removeProperty('--border-primary');
-        document.documentElement.style.removeProperty('--text-primary');
-        document.documentElement.style.removeProperty('--text-secondary');
-        document.documentElement.style.removeProperty('--button-bg');
-        document.documentElement.style.removeProperty('--text-button');
-      }
+    root.style.setProperty('--accent-primary', accent.color);
+    root.style.setProperty('--accent-light', accent.color);
+    root.style.setProperty('--accent-subtle', `${accent.color}20`);
+
+    // Always clear any previously-set Aviation-Gold bg/text overrides first
+    // so switching from gold → another accent (or to light mode) restores
+    // ThemeProvider's bg/text vars.
+    root.style.removeProperty('--bg-secondary');
+    root.style.removeProperty('--bg-tertiary');
+    root.style.removeProperty('--bg-hover');
+    root.style.removeProperty('--border-primary');
+    root.style.removeProperty('--text-primary');
+    root.style.removeProperty('--text-secondary');
+    root.style.removeProperty('--button-bg');
+    root.style.removeProperty('--text-button');
+
+    // Aviation Gold only takes over bg/text when we are NOT in light mode.
+    const isLight = theme === 'bw-light';
+    if (accent.id === 'aviation-gold' && !isLight) {
+      root.style.setProperty('--bg-secondary', accent.bgSecondary!);
+      root.style.setProperty('--bg-tertiary', accent.bgTertiary!);
+      root.style.setProperty('--bg-hover', accent.bgHover!);
+      root.style.setProperty('--border-primary', accent.borderPrimary!);
+      root.style.setProperty('--text-primary', accent.textPrimary!);
+      root.style.setProperty('--text-secondary', accent.textSecondary!);
+      root.style.setProperty('--button-bg', accent.buttonBg!);
+      root.style.setProperty('--text-button', accent.textButton!);
     }
   }
 
