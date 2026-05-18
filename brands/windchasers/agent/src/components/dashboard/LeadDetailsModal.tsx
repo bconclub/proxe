@@ -2462,7 +2462,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       {loadingTasks ? (
                         <div className="text-xs text-[var(--text-muted)] animate-pulse py-2">Loading tasks...</div>
                       ) : (() => {
-                        const pendingTasks = leadTasks.filter(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                        // Treat any task with a completion timestamp as not-pending,
+                        // regardless of what the API reported in `status`.
+                        const pendingTasks = leadTasks.filter(t =>
+                          ['pending', 'queued', 'awaiting_approval'].includes(t.status) &&
+                          !t.completed_at
+                        )
                         if (pendingTasks.length === 0) {
                           return (
                             <p className="text-xs text-[var(--text-muted)] py-2 italic">
@@ -2572,7 +2577,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                     {/* Next step one-liner */}
                     {(() => {
-                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status) && !t.completed_at)
                       if (!firstPending) return null
                       const actionLabel = getTaskActionLabel(firstPending)
                       const countdown = firstPending.scheduled_at ? formatCountdown(firstPending.scheduled_at) : ''

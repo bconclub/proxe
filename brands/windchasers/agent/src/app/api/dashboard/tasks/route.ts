@@ -51,10 +51,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Query 1: pending and in_queue tasks (no date filter)
+    // The explicit `.neq('status','cancelled')` is belt-and-suspenders: we've
+    // seen cancelled rows leak into Next Actions in the wild (suspected
+    // PostgREST/connection caching quirk), so the extra filter guarantees
+    // cancelled tasks never show up here even if .in() misbehaves.
     let pendingQuery = supabase
       .from('agent_tasks')
       .select('*')
       .in('status', ['pending', 'in_queue', 'queued'])
+      .neq('status', 'cancelled')
+      .neq('status', 'completed')
+      .is('completed_at', null)
       .order('scheduled_at', { ascending: true })
 
     if (type) pendingQuery = pendingQuery.eq('task_type', type)
