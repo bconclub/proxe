@@ -328,7 +328,16 @@ function cleanResponse(raw: string, channel?: string): string {
     .trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.
-  cleaned = cleaned.replace(/[—–]/g, '-');
+  // Replace with a sentence break ('. ') rather than a hyphen — using '-'
+  // produced glued-together output like "Happy to help-what aspect..." when
+  // the model wrote "Happy to help — what aspect...". The post-processor
+  // also normalises any accidental " - " spacing left over from old training
+  // habits into a proper sentence break, then collapses any double spaces /
+  // ". ." artefacts the regexes might leave behind.
+  cleaned = cleaned
+    .replace(/\s*[—–]\s*/g, '. ')
+    .replace(/\.\s*\./g, '.')
+    .replace(/\s{2,}/g, ' ');
 
   // Strip HTML tags for non-web channels
   if (channel && channel !== 'web') {

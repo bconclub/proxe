@@ -118,12 +118,34 @@ const JUNK_NAME_DENYLIST = new Set([
   'undefined', 'unknown', 'lead', 'visitor', 'user', 'customer',
 ]);
 
+// WhatsApp profile names are often a business / shop name rather than a real
+// person — usually a single all-caps word ("INTERIOR", "SHOP", "OFFICE") or a
+// multi-word string with a business suffix ("Sharma Enterprises", "Joshi
+// Traders Pvt Ltd"). When the WhatsApp webhook stores those as customer_name,
+// the agent later greets the lead as "Interior!" which looks broken. The
+// helpers below recognise those patterns without rejecting legitimate
+// uncommon names.
+const BUSINESS_SUFFIX_TOKENS = new Set([
+  'enterprises', 'enterprise', 'traders', 'trader', 'trading',
+  'mart', 'store', 'stores', 'shop', 'shops', 'office', 'offices',
+  'services', 'service', 'consultants', 'consultant', 'consulting',
+  'studios', 'studio', 'agency', 'agencies', 'group', 'company',
+  'pvt', 'ltd', 'limited', 'llc', 'inc', 'corp', 'corporation',
+  'co', 'co.', 'and', '&',
+  'solutions', 'systems', 'industries', 'industry',
+]);
+
+const EMOJI_REGEX =
+  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}]/u;
+
 /**
  * Decide whether a string is plausibly a real person's first/full name.
  * Returns false for: empty / brand names / single UI-label words / digits-only
  * values / things that are clearly not a person ("Interior", "Pilot Training",
- * "Submit", etc.). Multi-word values that pass the basic shape check are
- * trusted — we'd rather accept an unusual real name than reject it.
+ * "Submit", etc.), ALL-CAPS single words, multi-word values with business
+ * suffixes ("Sharma Enterprises"), or emoji-heavy strings. Multi-word values
+ * that pass the basic shape check are trusted — we'd rather accept an unusual
+ * real name than reject it.
  */
 export function isLikelyRealPersonName(value: unknown): boolean {
   if (typeof value !== 'string') return false;
@@ -136,9 +158,27 @@ export function isLikelyRealPersonName(value: unknown): boolean {
   // Must contain at least one letter.
   if (!/[a-zA-ZÀ-ɏ]/.test(trimmed)) return false;
 
+  // Strip emoji and re-check — a string that is mostly emoji shouldn't count
+  // as a name even if it has a stray letter.
+  const noEmoji = trimmed.replace(EMOJI_REGEX, '').trim();
+  if (noEmoji.length < 2) return false;
+
   // Denylist match (case-insensitive, whitespace-normalized).
   const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
   if (JUNK_NAME_DENYLIST.has(normalized)) return false;
+
+  // ALL-CAPS single word (>2 letters) → almost always a shop/category label
+  // typed into a profile field (INTERIOR, OFFICE, SHOP).
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length === 1 && /^[A-Z]{3,}$/.test(trimmed)) return false;
+
+  // Business-suffix heuristic: if any token (lowercased, stripped of
+  // punctuation) matches a known business word, treat the whole value as a
+  // business name, not a person.
+  for (const tok of tokens) {
+    const clean = tok.toLowerCase().replace(/[^a-z&.]/g, '');
+    if (BUSINESS_SUFFIX_TOKENS.has(clean)) return false;
+  }
 
   return true;
 }
