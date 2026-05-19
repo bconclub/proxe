@@ -758,16 +758,28 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const existingCtxV2 = leadCtxRow?.unified_context || {};
     const existingBrandCtxV2 = existingCtxV2[brand] || existingCtxV2.bcon || existingCtxV2.windchasers || {};
 
+    // Stamp the PROXe agent as the last actor so the LeadsTable's LAST TOUCH
+    // column can render '@proxe' beneath the channel, distinguishing AI
+    // replies from human-operator messages.
+    const lastActorStamp = {
+      type: 'proxe' as const,
+      at: new Date().toISOString(),
+    };
+
     const leadUpdate: Record<string, any> = {
       last_touchpoint: 'whatsapp',
       last_interaction_at: new Date().toISOString(),
     };
-    if (Object.keys(intentUpdate).length > 0) {
-      leadUpdate.unified_context = {
-        ...existingCtxV2,
-        [brand]: { ...existingBrandCtxV2, ...intentUpdate },
-      };
-    }
+    // Always set unified_context (last_actor needs to land even when there
+    // are no intent updates). Merge over existing context to preserve
+    // attribution, web/whatsapp profile blocks, etc.
+    leadUpdate.unified_context = {
+      ...existingCtxV2,
+      last_actor: lastActorStamp,
+      ...(Object.keys(intentUpdate).length > 0
+        ? { [brand]: { ...existingBrandCtxV2, ...intentUpdate } }
+        : {}),
+    };
 
     await supabase
       .from('all_leads')

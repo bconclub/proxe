@@ -63,14 +63,18 @@ export default function TodaySnapshotButton() {
 
   return (
     <>
-      {/* Trigger — fixed top-right, visible from any dashboard page */}
+      {/* Trigger — small icon-only button, top-right. No text label.
+          User feedback: 'A button is too far away from the actual design.
+          We can just have an eye button.' */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed z-[60] flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shadow-lg hover:opacity-90 transition"
+        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg hover:opacity-90 transition"
         style={{
           top: '14px',
           right: '20px',
+          width: '32px',
+          height: '32px',
           background: 'rgba(201,169,97,0.18)',
           border: '1px solid rgba(201,169,97,0.55)',
           color: '#C9A961',
@@ -79,8 +83,7 @@ export default function TodaySnapshotButton() {
         aria-label="Open today's snapshot"
         title="Today's snapshot"
       >
-        <MdToday size={14} />
-        Today
+        <MdToday size={16} />
       </button>
 
       {!open ? null : (

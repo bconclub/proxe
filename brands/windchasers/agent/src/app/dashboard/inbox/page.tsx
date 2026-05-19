@@ -1325,13 +1325,14 @@ export default function InboxPage() {
         message={loading ? "Loading conversations..." : "Loading messages..."}
       />
 
-      {/* Left Panel - Conversations List */}
+      {/* Left Panel - Conversations List
+          Widened 320 → 352 (~10%) for breathing room per user feedback. */}
       <div
-        className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
+        className="w-[352px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
           borderColor: 'var(--border-primary)',
-          minWidth: '280px',
+          minWidth: '300px',
         }}
       >
         {/* Search + Filters - flush at top */}
@@ -1427,7 +1428,7 @@ export default function InboxPage() {
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
-                    <div className="px-3 py-2 pl-4">
+                    <div className="px-4 py-3 pl-5">
                       {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
                         <ScoreRing score={displayScore} size={28} />
@@ -1503,7 +1504,7 @@ export default function InboxPage() {
                     borderColor: 'var(--border-primary)',
                   }}
                 >
-                  <div className="px-3 py-2.5">
+                  <div className="px-4 py-3">
                     {/* Line 1: Channel icons + Name + Timestamp
                         (Per design: only the SELECTED row shows a ScoreRing —
                         unselected rows just show the name to keep the list
@@ -1942,16 +1943,18 @@ export default function InboxPage() {
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
                           isTemplate ? (
-                            // WhatsApp-style Quick Reply buttons — stacked, full-width-ish, divided by hairlines
-                            <div className="flex flex-col" style={{ borderTop: '1px solid rgba(99,102,241,0.18)' }}>
+                            // WhatsApp-style Quick Reply buttons — stacked, divided by hairlines.
+                            // Theme-aware: uses var(--accent-primary) for label + var(--border-primary)
+                            // for dividers so it renders correctly in light AND dark mode.
+                            <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
                               {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
                                 <div
                                   key={btnIdx}
                                   className="text-[12px] font-medium text-center py-2 px-2"
                                   style={{
-                                    color: '#7c87ff',
-                                    borderTop: btnIdx > 0 ? '1px solid rgba(99,102,241,0.12)' : undefined,
-                                    background: 'rgba(99,102,241,0.04)',
+                                    color: 'var(--accent-primary)',
+                                    borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                    background: 'var(--bg-primary)',
                                   }}
                                   title={`Quick Reply: ${btn}`}
                                 >
@@ -1965,7 +1968,11 @@ export default function InboxPage() {
                                 <span
                                   key={btnIdx}
                                   className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
-                                  style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
+                                  style={{
+                                    borderColor: 'var(--border-primary)',
+                                    color: 'var(--accent-primary)',
+                                    background: 'var(--accent-subtle)',
+                                  }}
                                 >
                                   {btn}
                                 </span>
