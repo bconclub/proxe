@@ -9,6 +9,7 @@ import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
 import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
 import { isLikelyRealPersonName } from '../services/utils';
+import { BRAND_ID } from '@/configs';
 
 interface PromptOptions {
   channel: Channel;
@@ -65,8 +66,8 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     formData,
   } = options;
 
-  // Resolve brand: explicit param > env var > default
-  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+  // Resolve brand: explicit param (kept for cross-brand callers) > BRAND_ID
+  const resolvedBrand = brand || BRAND_ID;
 
   // Build the core system prompt (brand-specific)
   let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);

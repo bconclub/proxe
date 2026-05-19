@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
-import { getBrandConfig } from '@/configs'
+import { getBrandConfig, BRAND_ID } from '@/configs'
 
 /** Brand taglines */
 const brandTaglines: Record<string, string> = {
@@ -18,7 +18,7 @@ function AcceptInviteForm() {
   const token = searchParams.get('token')
 
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'bcon').toLowerCase()
+  const brandId = (brand.brand || BRAND_ID).toLowerCase()
   const colors = brand.colors
   const tagline = brandTaglines[brandId] || brand.name
   const logoLetter = brand.name.charAt(0).toUpperCase()

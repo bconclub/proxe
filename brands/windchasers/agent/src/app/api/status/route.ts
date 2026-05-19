@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorLogger } from '@/lib/errorLogger'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Brand-aware env var resolution
-    const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase()
+    const bp = BRAND_ID.toUpperCase()
     const supabaseUrlKey = `NEXT_PUBLIC_${bp}_SUPABASE_URL`
     const supabaseAnonKeyName = `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`
 

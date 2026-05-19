@@ -5,7 +5,7 @@
 
 import { generateShort } from './claudeClient';
 import { Channel } from './types';
-import { getBrandConfig } from '@/configs';
+import { getBrandConfig, BRAND_ID } from '@/configs';
 
 /** Brand-specific button pools for fallback/static generation */
 const brandButtonPools: Record<string, {
@@ -85,7 +85,7 @@ AVAILABLE BUTTON TYPES:
 };
 
 function getBrandPool(brand?: string) {
-  return brandButtonPools[brand || 'bcon'] || brandButtonPools['bcon'];
+  return brandButtonPools[brand || BRAND_ID] || brandButtonPools[BRAND_ID];
 }
 
 const BANNED_BUTTONS = [

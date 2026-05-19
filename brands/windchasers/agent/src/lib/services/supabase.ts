@@ -1,15 +1,12 @@
 /**
  * services/supabase.ts - Service-role Supabase client for server-side operations
  *
- * Brand-agnostic: resolves env vars using NEXT_PUBLIC_BRAND to find the
- * correct Supabase project for each brand deployment.
+ * This codebase is the windchasers fork. Supabase env vars use the WINDCHASERS_
+ * prefix; the generic NEXT_PUBLIC_SUPABASE_URL is the fallback.
  *
  * Lookup order (URL example):
- *   1. NEXT_PUBLIC_{BRAND}_SUPABASE_URL   (e.g. NEXT_PUBLIC_BCON_SUPABASE_URL)
- *   2. NEXT_PUBLIC_SUPABASE_URL           (generic)
- *   3. NEXT_PUBLIC_BCON_SUPABASE_URL (legacy fallback)
- *
- * Extracted from: web-agent/src/lib/supabase.ts (getSupabaseServiceClient)
+ *   1. NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+ *   2. NEXT_PUBLIC_SUPABASE_URL (generic)
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -18,9 +15,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 let serviceClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
-/** Return the BRAND slug uppercased, e.g. "BCON", "WINDCHASERS" */
+/**
+ * Brand prefix for Supabase env-var lookup. Hard-locked to WINDCHASERS —
+ * this is the windchasers fork; bcon has its own fork with its own constant.
+ */
 function brandPrefix(): string {
-  return (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase();
+  return 'WINDCHASERS';
 }
 
 /** Resolve a Supabase env var with brand-specific → generic → legacy fallback */
@@ -43,15 +43,12 @@ export function getServiceClient(): SupabaseClient | null {
   const supabaseUrl = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
     'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_BCON_SUPABASE_URL',
     `${bp}_SUPABASE_URL`,
-    'BCON_SUPABASE_URL',
   );
 
   const serviceKey = resolveEnv(
     `${bp}_SUPABASE_SERVICE_KEY`,
     'SUPABASE_SERVICE_ROLE_KEY',
-    'BCON_SUPABASE_SERVICE_KEY',
   );
 
   if (!supabaseUrl || !serviceKey) {
@@ -81,17 +78,13 @@ export function getAnonClient(): SupabaseClient | null {
   const supabaseUrl = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
     'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_BCON_SUPABASE_URL',
     `${bp}_SUPABASE_URL`,
-    'BCON_SUPABASE_URL',
   );
 
   const anonKey = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`,
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY',
     `${bp}_SUPABASE_ANON_KEY`,
-    'BCON_SUPABASE_ANON_KEY',
   );
 
   if (!supabaseUrl || !anonKey) {

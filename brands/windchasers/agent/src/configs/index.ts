@@ -1,57 +1,47 @@
 import { proxeConfig } from './proxe.config';
 import { windchasersConfig } from './brand.config';
-import { bconConfig } from './bcon.config';
 import type { BrandConfig } from './proxe.config';
+
+/**
+ * SINGLE SOURCE OF TRUTH for this codebase's brand identity.
+ *
+ * This repo lives at `brands/windchasers/agent/` — it IS the windchasers
+ * deployment. Brand is a compile-time constant, NOT an env var with a
+ * fallback. Other brands (e.g. bcon) have their own forks of this codebase.
+ *
+ * Never read NEXT_PUBLIC_BRAND_ID or NEXT_PUBLIC_BRAND with a `|| 'bcon'` /
+ * `|| 'windchasers'` fallback anywhere. Always import BRAND_ID from here.
+ */
+export const BRAND_ID = 'windchasers' as const;
 
 export const brandConfigs: Record<string, BrandConfig> = {
   proxe: proxeConfig,
   windchasers: windchasersConfig,
-  bcon: bconConfig,
 };
 
 /** Brand → data-theme mapping for CSS selectors */
 export const brandThemeMap: Record<string, string> = {
   windchasers: 'aviation-gold',
   proxe: 'proxe-purple',
-  bcon: 'bcon-electric',
 };
 
 /**
- * Resolve brand ID from env vars.
- * Supports both NEXT_PUBLIC_BRAND_ID and NEXT_PUBLIC_BRAND for backwards compat.
- */
-function getBrandFromEnv(): string | undefined {
-  return process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || undefined;
-}
-
-/**
- * Detect brand from hostname when env var is missing.
- * Runs client-side only (ThemeProvider, etc.).
- */
-function detectBrandFromHostname(): string | null {
-  if (typeof window === 'undefined') return null;
-  const host = window.location.hostname.toLowerCase();
-  if (host.includes('bcon')) return 'bcon';
-  if (host.includes('proxe')) return 'proxe';
-  if (host.includes('windchasers')) return 'windchasers';
-  return null;
-}
-
-/**
- * Get brand config. Checks explicit brand param first, then env vars,
- * then hostname detection, falls back to windchasers.
+ * Get brand config. The `brand` arg only exists for historical call sites
+ * that pass an explicit override (e.g. cross-brand admin scripts). For this
+ * deployment, omitting it always resolves to windchasers.
  */
 export function getBrandConfig(brand?: string): BrandConfig {
-  const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
-  return brandConfigs[brandId.toLowerCase()] || windchasersConfig;
+  const brandId = (brand || BRAND_ID).toLowerCase();
+  return brandConfigs[brandId] || windchasersConfig;
 }
 
 /**
- * Get current brand ID from env vars, hostname detection, or fallback.
+ * Get current brand ID. Always returns BRAND_ID for this deployment.
+ * Function form retained so call sites don't need to change shape.
  */
 export function getCurrentBrandId(): string {
-  return getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
+  return BRAND_ID;
 }
 
-export { proxeConfig, windchasersConfig, bconConfig };
+export { proxeConfig, windchasersConfig };
 export type { BrandConfig };

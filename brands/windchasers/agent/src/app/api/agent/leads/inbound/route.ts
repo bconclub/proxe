@@ -10,6 +10,7 @@ import {
   buildAttribution,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
     // The original raw source is preserved in agent_tasks.metadata.source below.
     const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
-    const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers'
+    const leadBrand = brand || BRAND_ID
 
     const supabase = getServiceClient() || getClient()
     if (!supabase) {

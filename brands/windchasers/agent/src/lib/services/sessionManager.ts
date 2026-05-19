@@ -11,6 +11,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BRAND_ID } from '@/configs';
 import { getClient } from './supabase';
 import { getISTTimestamp, cleanSummary } from './utils';
 
@@ -205,18 +206,13 @@ export async function ensureSession(
   if (data) return mapSession(data);
 
   // Create new session — `brand` is NOT NULL on web_sessions / whatsapp_sessions /
-  // etc., so include it on every insert. Falls back to env in priority order
-  // so dev / multi-brand deploys all behave consistently.
-  const sessionBrand =
-    process.env.NEXT_PUBLIC_BRAND_ID ||
-    process.env.NEXT_PUBLIC_BRAND ||
-    'bcon'
-
+  // etc., so include it on every insert. This codebase is the windchasers fork,
+  // brand is locked to BRAND_ID.
   const insertData: Record<string, any> = {
     external_session_id: externalSessionId,
     session_status: 'active',
     channel_data: {},
-    brand: sessionBrand,
+    brand: BRAND_ID,
   };
 
   const { data: created, error: insertError } = await client
@@ -251,7 +247,7 @@ export async function ensureSession(
           external_session_id: externalSessionId,
           channel: channel,
           channel_data: {},
-          brand: sessionBrand,
+          brand: BRAND_ID,
         })
         .select('*')
         .single();
@@ -268,7 +264,7 @@ export async function ensureSession(
       console.log('[sessionManager] Trying minimal insert');
       const { data: minimalCreated, error: minimalError } = await client
         .from(tableName)
-        .insert({ external_session_id: externalSessionId, brand: sessionBrand })
+        .insert({ external_session_id: externalSessionId, brand: BRAND_ID })
         .select('*')
         .single();
 

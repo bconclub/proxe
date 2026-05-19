@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone, logMessage, sendFacebookLeadWelcome, buildAttribution } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = BRAND_ID;
 
     // ── 1. Deduplicate by phone ───────────────────────────────────────────────
     const { data: existing } = await supabase

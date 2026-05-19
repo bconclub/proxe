@@ -28,6 +28,7 @@ import {
   normalizePhone,
   isLikelyRealPersonName,
 } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contacts = value.contacts || [];
-    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = BRAND_ID;
 
     // Process each message (usually just one). We accept:
     //   - 'text'        → normal typed message

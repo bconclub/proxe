@@ -23,6 +23,7 @@ import {
   logMessage,
   upsertSummary,
 } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -328,7 +329,7 @@ async function postProcess(
           const profile = await extractProfileFromConversation(history);
           if (!profile || Object.keys(profile).length === 0) return;
 
-          const brandId = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+          const brandId = BRAND_ID;
           const { data: ctxRow } = await supabase
             .from('all_leads')
             .select('unified_context')

@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/services';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const dryRun: boolean = !!body.dryRun;
     const limit: number = Number.isFinite(body.limit) && body.limit > 0 ? Math.min(body.limit, 200) : 50;
     const onlyMissing: boolean = body.onlyMissing !== false;
-    const brand = body.brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = body.brand || BRAND_ID;
 
     const supabase = getServiceClient();
     if (!supabase) {

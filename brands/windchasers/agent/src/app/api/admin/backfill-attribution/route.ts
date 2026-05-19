@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, buildAttribution } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     const dryRun: boolean = !!body.dryRun;
     const force: boolean = !!body.force;
     const limit: number = Number.isFinite(body.limit) && body.limit > 0 ? body.limit : 10000;
-    const brand = body.brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = body.brand || BRAND_ID;
 
     const supabase = getServiceClient();
     if (!supabase) {

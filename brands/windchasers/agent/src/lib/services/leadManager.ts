@@ -12,6 +12,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BRAND_ID } from '@/configs';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp, cleanSummary } from './utils';
 import { ensureSession, getChannelTable, type Channel } from './sessionManager';
@@ -146,7 +147,7 @@ export async function ensureOrUpdateLead(
     // 6. Only INSERT if nothing matches
     // 7. On unique constraint violation: catch and UPDATE instead
 
-    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = BRAND_ID;
     let existingLead: any = null;
 
     // 2. Check by normalized_phone + brand first
@@ -300,7 +301,7 @@ export async function ensureOrUpdateLead(
     console.log('[leadManager] New lead created', { leadId: created.id });
     return created.id;
   } catch (error) {
-    console.error('[leadManager] Exception in ensureOrUpdateLead', { error: String(error), phone, normalizedPhone: normalizePhone(phone), brand: process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers' });
+    console.error('[leadManager] Exception in ensureOrUpdateLead', { error: String(error), phone, normalizedPhone: normalizePhone(phone), brand: BRAND_ID });
     return null;
   }
 }

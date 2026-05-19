@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const brand = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+    const brand = BRAND_ID;
     const now = new Date().toISOString();
 
     // Build standardized attribution payload

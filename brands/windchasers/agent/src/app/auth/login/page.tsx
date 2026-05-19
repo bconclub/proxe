@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
-import { getBrandConfig } from '@/configs'
+import { getBrandConfig, BRAND_ID } from '@/configs'
 
 /** Brand website URLs */
 const brandWebsites: Record<string, string> = {
@@ -24,7 +24,7 @@ export default function LoginPage() {
 
   // Brand config - resolved from env var or hostname detection
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'bcon').toLowerCase()
+  const brandId = (brand.brand || BRAND_ID).toLowerCase()
   const colors = brand.colors
   const tagline = brandTaglines[brandId] || brand.name
   const website = brandWebsites[brandId] || '#'
