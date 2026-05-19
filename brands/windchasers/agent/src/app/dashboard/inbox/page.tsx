@@ -28,51 +28,64 @@ import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 import WhatsAppTemplatePicker from '@/components/dashboard/WhatsAppTemplatePicker'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
-// Channel Icons using custom SVGs with colored backgrounds
+// Channel icons — plain SVG, no container. Tinted with the channel brand
+// colour via CSS filter (for img tags) or stroke (for inline SVG). The old
+// version wrapped each icon in a coloured square which looked busy in the
+// conversation list; this version is just the icon at the channel colour.
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
-  const containerStyle: React.CSSProperties = {
-    width: size + 4,
-    height: size + 4,
-    borderRadius: 4,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: active ? 1 : 0.4,
+  const opacity = active ? 1 : 0.45;
+
+  // We tint white SVG line-art assets to the brand colour using a precomputed
+  // CSS filter. (`filter:invert(1)` on its own only makes them white — not the
+  // channel colour we want.) Each filter below was generated to map a black
+  // source SVG to the listed hex; ok-ish approximation, fine at 16px.
+  const TINT: Record<string, string> = {
+    web:      'invert(46%) sepia(86%) saturate(2074%) hue-rotate(206deg) brightness(98%) contrast(94%)',   // #3B82F6
+    whatsapp: 'invert(67%) sepia(78%) saturate(396%) hue-rotate(89deg) brightness(96%) contrast(89%)',     // #25D366
+    social:   'invert(72%) sepia(64%) saturate(539%) hue-rotate(0deg) brightness(99%) contrast(94%)',       // #F59E0B
   };
 
   switch (channel) {
     case 'web':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#3B82F6' }}>
-          <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={{ filter: 'invert(1)' }} title="Website" />
-        </div>
+        <img
+          src="/browser-stroke-rounded.svg"
+          alt="Web" title="Website"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.web, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     case 'whatsapp':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#25D366' }}>
-          <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={{ filter: 'invert(1)' }} title="WhatsApp" />
-        </div>
+        <img
+          src="/whatsapp-business-stroke-rounded.svg"
+          alt="WhatsApp" title="WhatsApp"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.whatsapp, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     case 'voice':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#8B5CF6' }}>
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" title="Voice">
-            <path
-              d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
-              stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            />
-            <path
-              d="M18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6L18 2z"
-              fill="#fff" stroke="#fff" strokeWidth="0.5"
-            />
-          </svg>
-        </div>
+        <svg
+          width={size} height={size} viewBox="0 0 24 24" fill="none"
+          style={{ opacity, flexShrink: 0 }}
+          aria-label="Voice"
+        >
+          <title>Voice</title>
+          <path
+            d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
+            stroke="#8B5CF6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
       );
     case 'social':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#F59E0B' }}>
-          <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={{ filter: 'invert(1)' }} title="Social" />
-        </div>
+        <img
+          src="/video-ai-stroke-rounded.svg"
+          alt="Social" title="Social"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.social, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     default:
       return null;

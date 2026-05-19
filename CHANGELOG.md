@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-19 · fix(windchasers): inbox channel icons — drop coloured container, plain tinted icon
+
+- `app/dashboard/inbox/page.tsx` (`ChannelIcon`): previously each channel rendered as a small white icon inside a coloured square (blue for Web, green for WhatsApp, purple for Voice, orange for Social). In the conversation list that meant a busy row of solid coloured chips next to every name. Replaced with the bare icon, tinted to the channel brand colour via a precomputed CSS filter for the white SVG line-art assets, and stroke-coloured directly for the inline Voice SVG. Icons sit cleanly alongside the lead name without competing for attention
+- User-facing: the inbox conversation list reads as a single column of names and snippets with a small coloured glyph in front of each, instead of a row of coloured squares
+
 ## 2026-05-19 · feat(bcon): port brand-agnostic dashboard UI parity from windchasers
 
 The bcon dashboard had been left behind on three recent visual improvements that landed on windchasers. Brought them across — explicitly scoped to brand-agnostic UI only, no aviation-specific fields (PAT, Type, Course, Path/Goal) crossed over.
