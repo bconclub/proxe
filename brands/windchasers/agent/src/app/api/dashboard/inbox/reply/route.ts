@@ -386,37 +386,40 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Test sends should NOT pollute the lead's conversation log — the lead
-      // never received the message, it went to the operator's test phone.
-      if (!isTest) {
-        // Persist the rendered text into the conversation log so the operator
-        // sees the actual message they sent (not the template name) in the
-        // thread. Falls back to "<template name>" if no rendered text was
-        // supplied by the client.
-        const logBody = (typeof renderedText === 'string' && renderedText.trim())
-          ? renderedText.trim()
-          : `[Template: ${templateName}]`;
+      // Persist the rendered text into the conversation log so the operator
+      // sees the actual message they sent (not the template name) in the
+      // thread. Falls back to "<template name>" if no rendered text was
+      // supplied by the client.
+      //
+      // Test sends are ALSO logged here so the operator can confirm the
+      // send happened. They're tagged with `test_mode: true` + `test_recipient`
+      // so the dashboard renders a yellow "TEST" pill on the row, making it
+      // obvious this didn't go to the lead.
+      const logBody = (typeof renderedText === 'string' && renderedText.trim())
+        ? (isTest ? `[TEST → ${phone}] ${renderedText.trim()}` : renderedText.trim())
+        : `[Template: ${templateName}]`;
 
-        await logMessage(
-          leadId,
-          'whatsapp',
-          'agent',
-          logBody,
-          'text',
-          {
-            source: 'dashboard_inbox',
-            sent_by: 'founder',
-            sent_at: new Date().toISOString(),
-            template_name: templateName,
-            template_language: languageCode || 'en_US',
-            template_params: Array.isArray(bodyParamsNamed)
-              ? bodyParamsNamed
-              : (Array.isArray(bodyParams) ? bodyParams : []),
-            meta_message_id: result.messageId || null,
-          },
-          supabase,
-        );
-      }
+      await logMessage(
+        leadId,
+        'whatsapp',
+        'agent',
+        logBody,
+        'text',
+        {
+          source: 'dashboard_inbox',
+          sent_by: 'founder',
+          sent_at: new Date().toISOString(),
+          template_name: templateName,
+          template_language: languageCode || 'en_US',
+          template_params: Array.isArray(bodyParamsNamed)
+            ? bodyParamsNamed
+            : (Array.isArray(bodyParams) ? bodyParams : []),
+          meta_message_id: result.messageId || null,
+          test_mode: isTest,
+          test_recipient: isTest ? phone : undefined,
+        },
+        supabase,
+      );
 
       return NextResponse.json({
         success: true,

@@ -1792,6 +1792,10 @@ export default function InboxPage() {
                               prettyError = sendError
                             }
                           }
+                          const isTestSend = msg.metadata?.test_mode === true
+                          const testRecipient = typeof msg.metadata?.test_recipient === 'string'
+                            ? msg.metadata.test_recipient
+                            : null
                           return (
                             <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                               <span
@@ -1804,6 +1808,15 @@ export default function InboxPage() {
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {msg.metadata.template_name}
                               </span>
+                              {isTestSend && (
+                                <span
+                                  className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                  style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
+                                  title={testRecipient ? `Test send — went to ${testRecipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                                >
+                                  {testRecipient ? `TEST → ${testRecipient}` : 'TEST'}
+                                </span>
+                              )}
                               {sendFailed && prettyError && (
                                 <span
                                   className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-help"
