@@ -201,6 +201,26 @@ export function renderDemoOfflineBody(
 }
 
 /**
+ * Header text per Meta-approved template. Verified against Graph API on
+ * 2026-05-19. Update if Meta changes the HEADER component on any template.
+ */
+export const TEMPLATE_HEADERS: Record<string, string> = {
+  windchasers_pat_result_v1:    'PAT Result',
+  windchasers_demo_online:      'Demo Session Booked',
+  windchasers_demo_offline_v1:  'Campus Visit Booked',
+};
+
+/**
+ * Quick-reply button labels per Meta-approved template. Order matches the
+ * template (verified against Graph API).
+ */
+export const TEMPLATE_BUTTONS: Record<string, string[]> = {
+  windchasers_pat_result_v1:    ['Book a Demo Class', 'Plan My Pilot Career'],
+  windchasers_demo_online:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
+  windchasers_demo_offline_v1:  ['Get Directions', 'Join Pilot Community'],
+};
+
+/**
  * Send a booking confirmation message.
  * Tries free-form text first (within 24h window), falls back to template.
  *

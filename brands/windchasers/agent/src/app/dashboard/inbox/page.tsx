@@ -184,6 +184,35 @@ function renderMarkdown(text: string) {
   });
 }
 
+/**
+ * Render WhatsApp-style markdown — what Meta's templates use natively:
+ *   *text*  → bold
+ *   _text_  → italic
+ *   ~text~  → strikethrough
+ * Newlines preserved as <br/>. Used for template messages so the inbox shows
+ * what the customer actually sees on WhatsApp (not raw asterisks).
+ */
+function renderWhatsAppMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  // Split on whichever WA marker appears (single * for bold, _ for italic, ~ for strikethrough)
+  // and newlines. Captured groups stay in the result; uncaptured separators don't.
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-semibold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
@@ -1748,21 +1777,32 @@ export default function InboxPage() {
                         }}
                       >
                         {isTemplate && (
-                          // Compact template header strip (channel + timestamp)
-                          <div
-                            className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
-                            style={{ background: 'rgba(99,102,241,0.12)', borderColor: 'rgba(99,102,241,0.20)' }}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <ChannelIcon channel={msg.channel} size={10} active={true} />
-                              <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
-                                Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
+                          <>
+                            {/* Compact template header strip (channel + timestamp) */}
+                            <div
+                              className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
+                              style={{ background: 'rgba(99,102,241,0.12)', borderColor: 'rgba(99,102,241,0.20)' }}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <ChannelIcon channel={msg.channel} size={10} active={true} />
+                                <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
+                                  Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
+                                </span>
+                              </div>
+                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                                {formatTime(msg.created_at)}
                               </span>
                             </div>
-                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                              {formatTime(msg.created_at)}
-                            </span>
-                          </div>
+                            {/* Meta-approved template HEADER text (e.g. "PAT Result" / "Demo Session Booked") */}
+                            {msg.metadata?.template_header && (
+                              <div
+                                className="px-2.5 pt-2 pb-1 text-[13px] font-bold"
+                                style={{ color: 'var(--text-primary)' }}
+                              >
+                                {msg.metadata.template_header}
+                              </div>
+                            )}
+                          </>
                         )}
                         {!isTemplate && (
                           <div className="flex items-center justify-between gap-3 mb-1">
@@ -1784,10 +1824,12 @@ export default function InboxPage() {
                           </div>
                         )}
                         <div
-                          className={isTemplate ? 'text-[12px] leading-snug px-2.5 py-2' : 'text-[13px] leading-relaxed'}
+                          className={isTemplate
+                            ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap'
+                            : 'text-[13px] leading-relaxed'}
                           style={{ color: 'var(--text-primary)' }}
                         >
-                          {renderMarkdown(msg.content)}
+                          {isTemplate ? renderWhatsAppMarkdown(msg.content) : renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
@@ -1873,19 +1915,37 @@ export default function InboxPage() {
                           )
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
-                          <div className={isTemplate ? 'flex flex-wrap gap-1 px-2.5 pb-2' : 'flex flex-wrap gap-1.5 mt-1.5'}>
-                            {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
-                              <span
-                                key={btnIdx}
-                                className={isTemplate
-                                  ? 'inline-block text-[9px] font-medium px-2 py-0.5 rounded-full border'
-                                  : 'inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border'}
-                                style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
-                              >
-                                {btn}
-                              </span>
-                            ))}
-                          </div>
+                          isTemplate ? (
+                            // WhatsApp-style Quick Reply buttons — stacked, full-width-ish, divided by hairlines
+                            <div className="flex flex-col" style={{ borderTop: '1px solid rgba(99,102,241,0.18)' }}>
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <div
+                                  key={btnIdx}
+                                  className="text-[12px] font-medium text-center py-2 px-2"
+                                  style={{
+                                    color: '#7c87ff',
+                                    borderTop: btnIdx > 0 ? '1px solid rgba(99,102,241,0.12)' : undefined,
+                                    background: 'rgba(99,102,241,0.04)',
+                                  }}
+                                  title={`Quick Reply: ${btn}`}
+                                >
+                                  {btn}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <span
+                                  key={btnIdx}
+                                  className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                  style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
+                                >
+                                  {btn}
+                                </span>
+                              ))}
+                            </div>
+                          )
                         )}
                         {!msg.metadata?.template_name && taskTag && (
                           <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>

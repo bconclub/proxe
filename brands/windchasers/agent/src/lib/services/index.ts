@@ -82,6 +82,8 @@ export {
   renderDemoOfflineBody,
   TIER_LABELS,
   TIER_MESSAGES,
+  TEMPLATE_HEADERS,
+  TEMPLATE_BUTTONS,
   sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
   sendDemoConfirmation,
   type DemoFormat,

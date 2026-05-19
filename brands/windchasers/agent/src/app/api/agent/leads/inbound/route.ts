@@ -12,6 +12,8 @@ import {
   renderDemoOfflineBody,
   TIER_LABELS,
   TIER_MESSAGES,
+  TEMPLATE_HEADERS,
+  TEMPLATE_BUTTONS,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -503,6 +505,8 @@ export async function POST(request: NextRequest) {
             metadata: {
               template_name: 'windchasers_pat_result_v1',
               template_language: 'en',
+              template_header: TEMPLATE_HEADERS['windchasers_pat_result_v1'] || null,
+              template_buttons: TEMPLATE_BUTTONS['windchasers_pat_result_v1'] || [],
               auto_sent: true,
               trigger: 'pat_completed',
               sent_by: 'system (inbound webhook)',
@@ -698,6 +702,8 @@ export async function POST(request: NextRequest) {
             metadata: {
               template_name: templateName,
               template_language: 'en',
+              template_header: TEMPLATE_HEADERS[templateName] || null,
+              template_buttons: TEMPLATE_BUTTONS[templateName] || [],
               auto_sent: true,
               trigger: 'demo_booked',
               sent_by: 'system (inbound webhook)',
