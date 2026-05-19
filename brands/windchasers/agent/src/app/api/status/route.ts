@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorLogger } from '@/lib/errorLogger'
 import { BRAND_ID } from '@/configs'
+import pkg from '../../../../package.json'
 
 export const dynamic = 'force-dynamic'
 
-// Get version from env var (set at build time by prebuild script) or fallback
+/**
+ * Version comes from package.json directly so Next.js inlines the current
+ * value at build time. The previous env-var approach (NEXT_PUBLIC_APP_VERSION)
+ * needed Vercel to be manually re-set; it was stuck at 0.0.17 because the
+ * prebuild script only writes to .env.local which Vercel doesn't read.
+ *
+ * The prebuild script still auto-bumps the patch in package.json, so each
+ * Vercel build now reflects the bumped number automatically.
+ */
 function getVersion(): string {
-  return process.env.NEXT_PUBLIC_APP_VERSION || '0.0.1'
+  return (pkg as { version?: string }).version || '0.0.1'
 }
 
 interface StatusResponse {
