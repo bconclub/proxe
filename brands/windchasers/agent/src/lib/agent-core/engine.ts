@@ -449,7 +449,7 @@ function buildBookingTools(
   const tools: ToolDefinition[] = [
     {
       name: 'check_availability',
-      description: 'Check available consultation time slots for a specific date. Returns available times. Use this when the user wants to book and you need to show them open slots.',
+      description: 'Check available consultation time slots for a specific date. Returns only future slots — for "today" any slot earlier than now + 30 minutes is automatically filtered out by the server, so never propose those yourself. If the tool returns an empty list for today, ask the user about tomorrow or another upcoming date rather than silently switching the date.',
       input_schema: {
         type: 'object',
         properties: {
@@ -563,12 +563,33 @@ function buildBookingTools(
       }
 
       const slots = await getAvailableSlots(date);
-      const availableSlots = slots.filter(s => s.available);
+      let availableSlots = slots.filter(s => s.available);
+
+      // For TODAY: drop any slot earlier than (now + 30 min) so we never
+      // offer a time that is already in the past or seconds away.
+      // The slot's `time24` is the start time in IST 24h ("HH:MM").
+      const isToday = date === todayIST;
+      if (isToday) {
+        const nowHHMM_IST = new Date().toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'Asia/Kolkata',
+        });
+        const [nowH, nowM] = nowHHMM_IST.split(':').map(Number);
+        const nowPlus30Mins = nowH * 60 + nowM + 30;
+        availableSlots = availableSlots.filter((s) => {
+          const [sh, sm] = s.time24.split(':').map(Number);
+          return sh * 60 + sm >= nowPlus30Mins;
+        });
+      }
 
       if (availableSlots.length === 0) {
         return JSON.stringify({
           available_slots: [],
-          message: `No slots available on ${date}. Suggest the user try a different date.`,
+          message: isToday
+            ? 'No more slots available today. Ask the user if they would like tomorrow or another upcoming date — do NOT silently switch the date for them.'
+            : `No slots available on ${date}. Suggest the user try a different date.`,
         });
       }
 

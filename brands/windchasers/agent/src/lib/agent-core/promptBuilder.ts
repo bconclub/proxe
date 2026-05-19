@@ -192,7 +192,7 @@ function buildUserPrompt(params: {
 
   // Inject current date so Claude can resolve relative dates ("tomorrow", "next Monday")
   const dateContext = (channel === 'whatsapp' || channel === 'web')
-    ? `Today's date: ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })} (${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })})`
+    ? `Current IST: ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })} on ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })}, ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}. When offering slots for "today", never propose a time earlier than 30 minutes from this moment.`
     : '';
 
   const instructions = [
