@@ -730,8 +730,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Page Transition Loader */}
         <PageTransitionLoader />
 
-        {/* Endpoint health popover (controlled — opened from the sidebar three-dot menu) */}
-        <HealthBarButton open={healthOpen} onClose={() => setHealthOpen(false)} />
+        {/* Endpoint health — uncontrolled (renders its own floating chip top-right) */}
+        <HealthBarButton />
 
         {/* Mobile top bar — only visible on mobile */}
         <div
