@@ -2210,14 +2210,44 @@ export default function InboxPage() {
               <>
               {/* ── HERO HEADER ── */}
               <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
-                {/* Avatar row */}
+                {/* Score ring + name row — the ring REPLACES the old initials-on-coloured-square avatar.
+                    Lead score is shown as the ring fill + number inside; tier label sits with name. */}
                 <div className="flex items-start gap-3 mb-3">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                    style={{ background: avatarBg, color: '#fff' }}
-                  >
-                    {initials}
-                  </div>
+                  {(() => {
+                    // SVG donut. Circumference = 2πr; arc length = circumference * score/100.
+                    const size = 56
+                    const stroke = 4
+                    const r = (size - stroke) / 2
+                    const c = 2 * Math.PI * r
+                    const pct = Math.max(0, Math.min(100, score || 0))
+                    const dash = (c * pct) / 100
+                    const hasScore = (leadDetails.lead_score != null || calculatedLeadScore != null)
+                    return (
+                      <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+                        <svg width={size} height={size} className="-rotate-90">
+                          <circle
+                            cx={size / 2} cy={size / 2} r={r}
+                            fill="none" stroke="var(--border-primary)" strokeWidth={stroke}
+                          />
+                          {hasScore && (
+                            <circle
+                              cx={size / 2} cy={size / 2} r={r}
+                              fill="none" stroke={scoreColor} strokeWidth={stroke}
+                              strokeDasharray={`${dash} ${c - dash}`}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dasharray 500ms ease' }}
+                            />
+                          )}
+                        </svg>
+                        <div
+                          className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
+                          style={{ color: hasScore ? scoreColor : 'var(--text-muted)' }}
+                        >
+                          {hasScore ? score : '—'}
+                        </div>
+                      </div>
+                    )
+                  })()}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
@@ -2228,6 +2258,15 @@ export default function InboxPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {(leadDetails.lead_score != null || calculatedLeadScore != null) && (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: `${scoreColor}22`, color: scoreColor, border: `1px solid ${scoreColor}55` }}
+                          title={`Lead Score: ${score}/100`}
+                        >
+                          {score} · {scoreLabel}
+                        </span>
+                      )}
                       {leadDetails.lead_stage && (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                           style={{ background: sc.bg, color: sc.text }}>
@@ -2240,24 +2279,6 @@ export default function InboxPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Score bar */}
-                {(leadDetails.lead_score != null || calculatedLeadScore != null) && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Lead Score</span>
-                      <span className="text-[11px] font-bold" style={{ color: scoreColor }}>
-                        {score} <span className="font-normal text-[10px]">{scoreLabel}</span>
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${score}%`, background: scoreColor }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* ── ACTION BUTTONS ── */}
