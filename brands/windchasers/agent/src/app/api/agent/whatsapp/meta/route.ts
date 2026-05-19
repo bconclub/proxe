@@ -414,6 +414,66 @@ interface IncomingMessage {
   triggerKind?: 'text' | 'button' | 'interactive_button' | 'interactive_list';
 }
 
+/**
+ * Send a WA reply AND log it to conversations. Always logs — even if the Graph
+ * API send fails — so the dashboard reflects what we *tried* to say. When
+ * isFallback=true, also flips the lead's needs_human_followup flag so the
+ * dashboard surfaces it for a human to pick up.
+ */
+async function sendAndLogReply(
+  supabase: any,
+  leadId: string,
+  customerPhone: string,
+  message: string,
+  opts: {
+    intent?: any;
+    responseTimeMs?: number;
+    sessionId?: string;
+    isFallback?: boolean;
+    fallbackReason?: string;
+  } = {},
+): Promise<string | null> {
+  const waReplyId = await sendWhatsAppReply(customerPhone, message);
+  if (!waReplyId) {
+    console.error('[meta/webhook] Graph API send failed for', customerPhone, '— still logging to DB');
+  } else {
+    updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
+  }
+
+  await logMessage(
+    leadId,
+    'whatsapp',
+    'agent',
+    message,
+    'text',
+    {
+      session_id: opts.sessionId,
+      ai_generated: !opts.isFallback,
+      is_fallback: !!opts.isFallback,
+      fallback_reason: opts.fallbackReason,
+      intent: opts.intent,
+      source: 'meta_cloud_api',
+      input_to_output_gap_ms: opts.responseTimeMs,
+      wa_message_id: waReplyId || undefined,
+      send_succeeded: !!waReplyId,
+    },
+    supabase,
+  ).catch((err: any) => console.error('[meta/webhook] logMessage for agent failed:', err?.message || err));
+
+  if (opts.isFallback) {
+    await supabase
+      .from('all_leads')
+      .update({ needs_human_followup: true })
+      .eq('id', leadId)
+      .then(
+        () => {},
+        (err: any) => console.error('[meta/webhook] needs_human_followup flag failed:', err?.message || err),
+      );
+  }
+
+  return waReplyId;
+}
+
 async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
   const {
     customerPhone,
@@ -432,10 +492,13 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     return;
   }
 
+  // Hoisted so the outer catch can log the fallback against the lead.
+  const sessionId = `wa_meta_${normalizePhone(customerPhone)}`;
+  let leadId: string | null = null;
+
   try {
     // 1. Create/update lead
-    const sessionId = `wa_meta_${normalizePhone(customerPhone)}`;
-    const leadId = await ensureOrUpdateLead(
+    leadId = await ensureOrUpdateLead(
       customerName,
       null,           // no email from WhatsApp
       customerPhone,
@@ -564,36 +627,33 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const responseTimeMs = Date.now() - aiStartTime;
 
     if (!result.response) {
-      console.error('[meta/webhook] Empty AI response');
-      await sendWhatsAppReply(customerPhone, "Hey! Let me connect you with the team, they'll sort this out for you.");
+      console.error('[meta/webhook] Empty AI response — sending fallback');
+      await sendAndLogReply(
+        supabase,
+        leadId,
+        customerPhone,
+        "Hey! Give me a moment, I'll have someone from the team get in touch with you shortly.",
+        {
+          isFallback: true,
+          fallbackReason: 'empty_ai_response',
+          sessionId,
+          responseTimeMs,
+        },
+      );
       return;
     }
 
-    // 8. Send reply via Meta Graph API (send first to get WA message ID)
-    const waReplyId = await sendWhatsAppReply(customerPhone, result.response);
-    if (!waReplyId) {
-      console.error('[meta/webhook] Failed to send reply to', customerPhone);
-    } else {
-      // Track channel performance: agent message sent on WhatsApp
-      updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
-    }
-
-    // 9. Log AI response (with response time + WA message ID for read receipt tracking)
-    await logMessage(
-      leadId,
-      'whatsapp',
-      'agent',
-      result.response,
-      'text',
-      {
-        session_id: sessionId,
-        ai_generated: true,
-        intent: result.intent,
-        source: 'meta_cloud_api',
-        input_to_output_gap_ms: responseTimeMs,
-        wa_message_id: waReplyId || undefined,
-      },
+    // 8 + 9. Send reply via Meta Graph API and log to conversations (atomic helper).
+    await sendAndLogReply(
       supabase,
+      leadId,
+      customerPhone,
+      result.response,
+      {
+        intent: result.intent,
+        responseTimeMs,
+        sessionId,
+      },
     );
 
     // 10. Update lead context — merge extracted intent into brand namespace
@@ -709,12 +769,20 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }).catch((err) => console.error('[meta/webhook] Scoring trigger failed:', err));
 
     console.log(`[meta/webhook] Reply sent to ${customerPhone} (lead: ${leadId})`);
-  } catch (error) {
-    console.error('[meta/webhook] handleIncomingMessage error:', error);
-    await sendWhatsAppReply(
-      customerPhone,
-      "Hey! Let me connect you with the team directly. They'll reach out to you shortly.",
-    ).catch(() => {});
+  } catch (error: any) {
+    console.error('[meta/webhook] handleIncomingMessage error:', error?.message || error);
+    const fallbackMsg = "Hey! Give me a moment, I'll have someone from the team get in touch with you shortly.";
+    if (leadId) {
+      // We know the lead — send + log fallback, flag for human follow-up.
+      await sendAndLogReply(supabase, leadId, customerPhone, fallbackMsg, {
+        isFallback: true,
+        fallbackReason: 'engine_exception',
+        sessionId,
+      }).catch(() => {});
+    } else {
+      // No leadId yet — best-effort send only (can't log without leadId).
+      await sendWhatsAppReply(customerPhone, fallbackMsg).catch(() => {});
+    }
   }
 }
 
