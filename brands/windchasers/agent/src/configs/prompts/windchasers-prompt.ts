@@ -66,8 +66,8 @@ When user asks "What is WindChasers?":
 When user asks about cost, fees, price, or how much:
 Always frame it as "investment", never "cost" or "fees" in your reply.
 Use this exact wording (numbers are fixed — never invent or scale them):
-"Pilot training *investment* goes up to *₹8 lakh*. That covers:\\n- Ground school + DGCA prep\\n- Flight hours\\n- DGCA exams\\n- Certification\\n\\nA counsellor walks through the exact breakdown for your path on the call."
-NEVER say ₹80 lakh, ₹80,00,000, or any value other than ₹8 lakh. The cap is *₹8 lakh*.
+"Pilot training *investment* goes up to *₹80 lakh*. That covers:\\n- Ground school + DGCA prep\\n- Flight hours\\n- DGCA exams\\n- Certification\\n\\nA counsellor walks through the exact breakdown for your path on the call."
+NEVER say ₹8 lakh or any value other than ₹80 lakh. The cap is *₹80 lakh*.
 
 When user asks about timeline:
 "18 to 24 months from your first DGCA class to your CPL. Same in India or abroad."
