@@ -43,9 +43,9 @@ const FIRST_TOUCH_LABELS: Record<string, string> = {
   // Form-based entries
   demo_form: 'Demo Form',
   demo_booked: 'Demo Form',
-  pat_assessment: 'PAT Assessment',
-  pilot_aptitude_test: 'PAT Assessment',
-  pat: 'PAT Assessment',
+  pat_assessment: 'PAT',
+  pilot_aptitude_test: 'PAT',
+  pat: 'PAT',
   whatsapp_prelaunch: 'WA Popup',
   whatsapp_button: 'WA Popup',
   // Accept the space-separated form_type the website actually sends
