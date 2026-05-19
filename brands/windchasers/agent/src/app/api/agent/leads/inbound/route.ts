@@ -475,7 +475,10 @@ export async function POST(request: NextRequest) {
         // success OR failure, so the dashboard reflects reality.
         try {
           const result = await sendPATResult(phone, leadName, score, tier)
-          await supabase.from('conversations').insert({
+          // Check the supabase insert's .error too — we used to swallow it,
+          // which meant a failed conversations write left no trace and the
+          // operator never knew the lead's PAT message went missing.
+          const { error: logErr } = await supabase.from('conversations').insert({
             lead_id: leadId,
             channel: 'whatsapp',
             sender: 'agent',
@@ -485,14 +488,21 @@ export async function POST(request: NextRequest) {
             message_type: 'template',
             metadata: {
               template_name: 'windchasers_pat_result_v1',
+              template_language: 'en',
               auto_sent: true,
               trigger: 'pat_completed',
+              sent_by: 'system (inbound webhook)',
               score,
               tier,
               send_succeeded: !!result.success,
               send_error: result.success ? null : (result.error || 'unknown'),
             },
           })
+          if (logErr) {
+            console.error(`[inbound] PAT result conversation log FAILED for ${phone}:`, logErr.message)
+            // Mark lead for follow-up so the dashboard surfaces the bookkeeping gap.
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          }
           if (result.success) {
             console.log(`[inbound] PAT result WA sent to ${phone} (lead: ${leadId}) score=${score} tier=${tier}`)
           } else {

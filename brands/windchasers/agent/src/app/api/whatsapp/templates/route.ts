@@ -200,7 +200,9 @@ export async function POST(request: NextRequest) {
     const {
       to,
       templateName = 'hello_world',
-      languageCode = 'en_US',
+      // windchasers templates are approved as `en` (not `en_US`). Meta returns
+      // a misleading 132001 "template does not exist in en_US" otherwise.
+      languageCode = 'en',
       bodyParams = [],
       buttonParams = [],
       components: rawComponents,

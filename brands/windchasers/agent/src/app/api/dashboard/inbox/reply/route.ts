@@ -368,7 +368,10 @@ export async function POST(request: NextRequest) {
       const result = await sendWhatsAppTemplate({
         to: phone,
         templateName,
-        languageCode: languageCode || 'en_US',
+        // windchasers templates are approved as `en` (not `en_US`). Meta
+        // returns a misleading 132001 "template does not exist in en_US"
+        // otherwise — the auto-send for PAT/demo silently fails because of it.
+        languageCode: languageCode || 'en',
         bodyParams: !Array.isArray(bodyParamsNamed) && Array.isArray(bodyParams)
           ? bodyParams.map(String)
           : undefined,
@@ -410,7 +413,7 @@ export async function POST(request: NextRequest) {
           sent_by: 'founder',
           sent_at: new Date().toISOString(),
           template_name: templateName,
-          template_language: languageCode || 'en_US',
+          template_language: languageCode || 'en',
           template_params: Array.isArray(bodyParamsNamed)
             ? bodyParamsNamed
             : (Array.isArray(bodyParams) ? bodyParams : []),

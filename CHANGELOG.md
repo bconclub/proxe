@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-05-19 · fix(windchasers): PAT auto-send was failing silently — language code mismatch + swallowed insert error
+
+Diagnosis: when a lead completes the Pilot Aptitude Test, `/api/agent/leads/inbound` is supposed to fire `windchasers_pat_result_v1` to the lead and write a conversation row. Investigating a missing message for **Himadri samadder** (lead `b989eb3c-…`, score 102/150, tier moderate) revealed two compounding bugs:
+
+1. **Three call-sites defaulted `languageCode` to `en_US`** (the new `send_template` route ×2, the legacy `/api/whatsapp/templates` POST), but every windchasers template (`windchasers_demo_online`, `windchasers_demo_offline_v1`, `windchasers_pat_result_v1`) is approved under language code **`en`** on Meta. Meta rejects with the cryptic 132001 "Template name does not exist in the translation" / "does not exist in en_US"
+2. **The PAT-send branch in inbound/route.ts didn't check `.error` on the conversations insert.** So when Meta rejected the send, the insert that should have logged the failure for the operator… also went silently. The lead has `needs_human_followup = false` and no conversations row — the operator had no way to know the PAT message never went out.
+
+Fixes:
+- `api/whatsapp/templates/route.ts`, `api/dashboard/inbox/reply/route.ts` (×2): defaults flipped from `'en_US'` → `'en'`. Comment explains why
+- `api/agent/leads/inbound/route.ts` PAT branch: capture `.error` from the conversations insert. If the log itself failed, flag `needs_human_followup = true` and log to console so the missing message surfaces somewhere
+- Conversation metadata now also stores `sent_by: 'system (inbound webhook)'` and `template_language: 'en'` for audit
+- Companion recovery (out-of-band): manually sent `windchasers_pat_result_v1` to Himadri (+918240894956) using the corrected `en` code — Meta accepted with `wamid.HBgMOTE4MjQwODk0OTU2…`. Wrote the conversation row marking `trigger='manual_recovery'`, `sent_by='operator (Sonnet via Claude Code)'`, and the exact reason
+
+User-facing: PAT auto-send works again for every new submission. Existing leads with missing PAT messages can be recovered via the inbox template picker (which now also defaults to `en`).
+
 ## 2026-05-18 · feat(windchasers): WhatsApp template picker in the inbox reply bar
 
 - New `WhatsAppTemplatePicker` component — popover anchored bottom-right of the inbox that fetches `/api/whatsapp/templates`, filters to APPROVED-only, lists templates with name + category + body preview, and lets the operator pick one to send. Templates with `{{1}}`, `{{2}}` body variables show inline inputs to fill them in, with a live preview of the rendered message before send. Template list is cached in localStorage for 10 min (the Meta API is slow and the list rarely changes; a refresh icon on the header forces a re-fetch).
