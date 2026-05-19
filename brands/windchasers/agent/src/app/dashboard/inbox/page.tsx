@@ -1713,6 +1713,10 @@ export default function InboxPage() {
                   // Regular message bubble
                   const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
                   const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
+                  // Template messages render in a compact "card" — narrower,
+                  // smaller padding, distinct from the big chat bubbles. Matches
+                  // the WhatsApp-style template feel (header strip + body + foot).
+                  const isTemplate = !isCustomer && !!msg.metadata?.template_name
 
                   return (
                     <React.Fragment key={msg.id}>
@@ -1721,40 +1725,68 @@ export default function InboxPage() {
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border"
+                        className={isTemplate
+                          ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
+                          : 'max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
                           background: isCustomer
                             ? 'rgba(255,255,255,0.10)'
-                            : 'rgba(99,102,241,0.28)',
+                            : isTemplate
+                              ? 'rgba(15,23,42,0.55)'
+                              : 'rgba(99,102,241,0.28)',
                           borderColor: isCustomer
                             ? 'rgba(255,255,255,0.18)'
-                            : 'rgba(99,102,241,0.45)',
+                            : isTemplate
+                              ? 'rgba(99,102,241,0.30)'
+                              : 'rgba(99,102,241,0.45)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name
+                          ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
-                            : taskTag
+                            : !isTemplate && taskTag
                             ? { borderLeft: `3px solid ${taskTag.color}` }
                             : {}),
                         }}
                       >
-                        <div className="flex items-center justify-between gap-3 mb-1">
-                          <div className="flex items-center gap-1">
-                            <ChannelIcon channel={msg.channel} size={11} active={true} />
-                            <span
-                              className="text-[9px] font-bold uppercase tracking-wider"
-                              style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
-                            >
-                              {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
-                            </span>
-                            <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
-                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
+                        {isTemplate && (
+                          // Compact template header strip (channel + timestamp)
+                          <div
+                            className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
+                            style={{ background: 'rgba(99,102,241,0.12)', borderColor: 'rgba(99,102,241,0.20)' }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <ChannelIcon channel={msg.channel} size={10} active={true} />
+                              <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
+                                Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
+                              </span>
+                            </div>
+                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                              {formatTime(msg.created_at)}
                             </span>
                           </div>
-                          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                            {formatTime(msg.created_at)}
-                          </span>
-                        </div>
-                        <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                        )}
+                        {!isTemplate && (
+                          <div className="flex items-center justify-between gap-3 mb-1">
+                            <div className="flex items-center gap-1">
+                              <ChannelIcon channel={msg.channel} size={11} active={true} />
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider"
+                                style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                              >
+                                {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                              </span>
+                              <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
+                                {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
+                              </span>
+                            </div>
+                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                              {formatTime(msg.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div
+                          className={isTemplate ? 'text-[12px] leading-snug px-2.5 py-2' : 'text-[13px] leading-relaxed'}
+                          style={{ color: 'var(--text-primary)' }}
+                        >
                           {renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
@@ -1797,7 +1829,12 @@ export default function InboxPage() {
                             ? msg.metadata.test_recipient
                             : null
                           return (
-                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <div
+                              className={isTemplate
+                                ? 'flex items-center gap-1.5 px-2.5 py-1 border-t flex-wrap'
+                                : 'flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap'}
+                              style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                            >
                               <span
                                 className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
                                 style={{ background: statusStyle.bg, color: statusStyle.color }}
@@ -1836,11 +1873,13 @@ export default function InboxPage() {
                           )
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          <div className={isTemplate ? 'flex flex-wrap gap-1 px-2.5 pb-2' : 'flex flex-wrap gap-1.5 mt-1.5'}>
                             {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
                               <span
                                 key={btnIdx}
-                                className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                className={isTemplate
+                                  ? 'inline-block text-[9px] font-medium px-2 py-0.5 rounded-full border'
+                                  : 'inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border'}
                                 style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
                               >
                                 {btn}
