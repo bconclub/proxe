@@ -89,7 +89,15 @@ export {
   type DemoFormat,
   sendPATResult,
   sendFacebookLeadWelcome,
+  sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
+
+// Quick-reply (interactive button) triggers + LLM button extraction
+export {
+  findQuickReplyFor,
+  extractButtonsFromLLMResponse,
+  type QuickReplyConfig,
+} from './quickReplyMap';
 
 // Cross-channel context
 export {

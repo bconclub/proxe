@@ -27,6 +27,9 @@ import {
   fetchSummary,
   normalizePhone,
   isLikelyRealPersonName,
+  sendWhatsAppInteractiveButtons,
+  findQuickReplyFor,
+  extractButtonsFromLLMResponse,
 } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
@@ -432,9 +435,28 @@ async function sendAndLogReply(
     sessionId?: string;
     isFallback?: boolean;
     fallbackReason?: string;
+    /** When present (1-3 labels), send as interactive button message instead of plain text */
+    buttons?: string[];
+    /** When set, records which quick-reply trigger matched (e.g. 'cpl', 'ppl', or 'llm_extracted') */
+    quickReplyTrigger?: string;
   } = {},
 ): Promise<string | null> {
-  const waReplyId = await sendWhatsAppReply(customerPhone, message);
+  let waReplyId: string | null = null;
+
+  if (opts.buttons && opts.buttons.length > 0) {
+    // Interactive (quick-reply buttons) path
+    const result = await sendWhatsAppInteractiveButtons(customerPhone, message, opts.buttons);
+    if (!result.success) {
+      console.error('[meta/webhook] Interactive send failed for', customerPhone, '— falling back to text:', result.error);
+      // Fall back to text-only send so the customer at least gets the message
+      waReplyId = await sendWhatsAppReply(customerPhone, message);
+    } else {
+      waReplyId = result.messageId || null;
+    }
+  } else {
+    waReplyId = await sendWhatsAppReply(customerPhone, message);
+  }
+
   if (!waReplyId) {
     console.error('[meta/webhook] Graph API send failed for', customerPhone, '— still logging to DB');
   } else {
@@ -446,7 +468,7 @@ async function sendAndLogReply(
     'whatsapp',
     'agent',
     message,
-    'text',
+    opts.buttons && opts.buttons.length > 0 ? 'interactive' : 'text',
     {
       session_id: opts.sessionId,
       ai_generated: !opts.isFallback,
@@ -457,6 +479,10 @@ async function sendAndLogReply(
       input_to_output_gap_ms: opts.responseTimeMs,
       wa_message_id: waReplyId || undefined,
       send_succeeded: !!waReplyId,
+      // Mirror the buttons into metadata so the inbox renders them as
+      // tappable chips below the message (existing template_buttons UI path).
+      template_buttons: opts.buttons || undefined,
+      quick_reply_trigger: opts.quickReplyTrigger || undefined,
     },
     supabase,
   ).catch((err: any) => console.error('[meta/webhook] logMessage for agent failed:', err?.message || err));
@@ -608,6 +634,33 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
     console.log(`[meta/webhook] lead=${leadId} messageCount=${userMessageCount} historyLen=${conversationHistory.length}`);
 
+    // 7a. QUICK-REPLY FAST PATH — short customer messages matching a known
+    // keyword (CPL / PPL / helicopter / cost / demo / etc.) get a pre-defined
+    // interactive button reply instantly, no Claude call. Skips on button
+    // taps themselves (triggerKind=button/interactive_*) because those ARE
+    // a button reply — generating ANOTHER button menu would loop.
+    const isCustomerButtonTap = triggerKind === 'button'
+      || triggerKind === 'interactive_button'
+      || triggerKind === 'interactive_list';
+    if (!isCustomerButtonTap) {
+      const quickReply = findQuickReplyFor(messageText);
+      if (quickReply) {
+        console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);
+        await sendAndLogReply(
+          supabase,
+          leadId,
+          customerPhone,
+          quickReply.body,
+          {
+            sessionId,
+            buttons: quickReply.buttons,
+            quickReplyTrigger: quickReply.triggerKey,
+          },
+        );
+        return;
+      }
+    }
+
     // 7. Build AgentInput and generate AI response
     const agentInput: AgentInput = {
       channel: 'whatsapp',
@@ -645,15 +698,25 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 8 + 9. Send reply via Meta Graph API and log to conversations (atomic helper).
+    // Strip any [BTN: X] markers Claude may have appended (prompt teaches it to
+    // emit these when 2-3 distinct options apply). If found, route as
+    // interactive button message. If not, plain text.
+    const { text: cleanedText, buttons: llmButtons } = extractButtonsFromLLMResponse(result.response);
+    const responseTextToSend = cleanedText || result.response;
+    if (llmButtons.length > 0) {
+      console.log(`[meta/webhook] LLM emitted ${llmButtons.length} buttons: [${llmButtons.join(',')}] lead=${leadId}`);
+    }
     await sendAndLogReply(
       supabase,
       leadId,
       customerPhone,
-      result.response,
+      responseTextToSend,
       {
         intent: result.intent,
         responseTimeMs,
         sessionId,
+        buttons: llmButtons.length > 0 ? llmButtons : undefined,
+        quickReplyTrigger: llmButtons.length > 0 ? 'llm_extracted' : undefined,
       },
     );
 
