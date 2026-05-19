@@ -1761,8 +1761,30 @@ export default function InboxPage() {
                           const ds = msg.metadata?.delivery_status
                           const statusStyle = getDeliveryStatusStyle(ds)
                           const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
+                          // Send-side failure (from inbound auto-templates):
+                          //   metadata.send_succeeded === false + metadata.send_error
+                          // Shows a red FAILED pill with the actual Meta error
+                          // as a hover tooltip.
+                          const sendFailed = msg.metadata?.send_succeeded === false
+                          const sendError = typeof msg.metadata?.send_error === 'string'
+                            ? msg.metadata.send_error
+                            : (msg.metadata?.send_error ? JSON.stringify(msg.metadata.send_error) : null)
+                          // Strip any verbose JSON envelope and pull out Meta's
+                          // human-readable error message if present, else fall
+                          // back to the raw string.
+                          let prettyError: string | null = null
+                          if (sendError) {
+                            try {
+                              const parsed = JSON.parse(sendError)
+                              prettyError = parsed?.error?.message
+                                ? `(#${parsed.error.code || '?'}) ${parsed.error.message}`
+                                : sendError
+                            } catch {
+                              prettyError = sendError
+                            }
+                          }
                           return (
-                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                               <span
                                 className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
                                 style={{ background: statusStyle.bg, color: statusStyle.color }}
@@ -1773,9 +1795,21 @@ export default function InboxPage() {
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {msg.metadata.template_name}
                               </span>
-                              <span className="flex items-center" title={ds || 'pending'}>
-                                <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
-                              </span>
+                              {sendFailed && prettyError && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-help"
+                                  style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
+                                  title={prettyError}
+                                  data-tooltip={prettyError}
+                                >
+                                  Send failed — hover for reason
+                                </span>
+                              )}
+                              {!sendFailed && (
+                                <span className="flex items-center" title={ds || 'pending'}>
+                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                                </span>
+                              )}
                             </div>
                           )
                         })()}

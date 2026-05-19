@@ -21,6 +21,14 @@ import { FaWhatsapp } from 'react-icons/fa'
 const TEMPLATE_CACHE_KEY = 'wc-wa-template-cache-v1'
 const TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
+/**
+ * Owner test phone — when "Test mode" is on, every send routes here instead
+ * of the lead's actual number. Avoids accidentally firing tests at real
+ * customers. Override via NEXT_PUBLIC_TEST_WHATSAPP_PHONE if needed.
+ */
+const TEST_WHATSAPP_PHONE =
+  process.env.NEXT_PUBLIC_TEST_WHATSAPP_PHONE || '+919731660933'
+
 interface TemplateComponent {
   type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS' | string
   text?: string
@@ -76,24 +84,62 @@ function saveCache(templates: MetaTemplate[]) {
   }
 }
 
-/** Extract {{N}} placeholders from a template body and return the highest N. */
-function countBodyVariables(template: MetaTemplate): number {
-  const body = template.components.find((c) => c.type === 'BODY')
-  if (!body?.text) return 0
-  const matches = body.text.match(/\{\{(\d+)\}\}/g) || []
-  return matches.reduce((max, m) => {
-    const n = parseInt(m.replace(/\{|\}/g, ''), 10)
-    return Number.isFinite(n) ? Math.max(max, n) : max
-  }, 0)
+/**
+ * Extract every placeholder from a template body. Handles BOTH
+ *   {{1}}, {{2}}, …       (positional)
+ *   {{customer_name}}, …  (named — what Meta's "named params" templates use)
+ *
+ * Returns the ordered, deduped list. Numbered placeholders are kept in numeric
+ * order; named placeholders in first-appearance order. If a template mixes
+ * both styles (shouldn't happen with Meta, but defensive), positional are
+ * listed first.
+ */
+interface TemplateVariable {
+  key: string         // '1' or 'customer_name'
+  isNamed: boolean    // false for {{1}}; true for {{customer_name}}
+  label: string       // what to show in the input label, e.g. '{{1}}' or '{{customer_name}}'
 }
 
-/** Render the body text with {{1}}, {{2}}… replaced by the operator's inputs. */
-function renderBodyPreview(template: MetaTemplate, params: string[]): string {
+function extractBodyVariables(template: MetaTemplate): TemplateVariable[] {
+  const body = template.components.find((c) => c.type === 'BODY')
+  if (!body?.text) return []
+
+  const numbered = new Map<number, TemplateVariable>()
+  const named: TemplateVariable[] = []
+  const seenNamed = new Set<string>()
+
+  const re = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*|\d+)\s*\}\}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(body.text)) !== null) {
+    const raw = m[1]
+    if (/^\d+$/.test(raw)) {
+      const n = parseInt(raw, 10)
+      if (!numbered.has(n)) {
+        numbered.set(n, { key: String(n), isNamed: false, label: `{{${n}}}` })
+      }
+    } else {
+      if (!seenNamed.has(raw)) {
+        seenNamed.add(raw)
+        named.push({ key: raw, isNamed: true, label: `{{${raw}}}` })
+      }
+    }
+  }
+
+  const orderedNumbered = Array.from(numbered.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([, v]) => v)
+  return [...orderedNumbered, ...named]
+}
+
+/** Render the body text with placeholders replaced by the operator's inputs. */
+function renderBodyPreview(
+  template: MetaTemplate,
+  values: Record<string, string>,
+): string {
   const body = template.components.find((c) => c.type === 'BODY')
   if (!body?.text) return '(no body)'
-  return body.text.replace(/\{\{(\d+)\}\}/g, (_match, n) => {
-    const idx = parseInt(n, 10) - 1
-    return params[idx]?.trim() || `{{${n}}}`
+  return body.text.replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*|\d+)\s*\}\}/g, (_match, key) => {
+    return values[key]?.trim() || `{{${key}}}`
   })
 }
 
@@ -108,18 +154,26 @@ export default function WhatsAppTemplatePicker({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<MetaTemplate | null>(null)
-  const [params, setParams] = useState<string[]>([])
+  const [paramValues, setParamValues] = useState<Record<string, string>>({})
   const [sending, setSending] = useState(false)
   const [sentMessage, setSentMessage] = useState<string | null>(null)
+  /**
+   * testMode ON  → route the send to TEST_WHATSAPP_PHONE (owner's number)
+   * testMode OFF → route to the lead's actual number (real customer)
+   *
+   * Default ON so operators don't accidentally fire tests at real customers.
+   */
+  const [testMode, setTestMode] = useState(true)
   const popoverRef = useRef<HTMLDivElement>(null)
 
   // Reset state on every open
   useEffect(() => {
     if (open) {
       setSelectedTemplate(null)
-      setParams([])
+      setParamValues({})
       setError(null)
       setSentMessage(null)
+      setTestMode(true)
     }
   }, [open, leadId])
 
@@ -161,7 +215,10 @@ export default function WhatsAppTemplatePicker({
 
   function handleSelectTemplate(t: MetaTemplate) {
     setSelectedTemplate(t)
-    setParams(new Array(countBodyVariables(t)).fill(''))
+    const vars = extractBodyVariables(t)
+    const initial: Record<string, string> = {}
+    vars.forEach((v) => { initial[v.key] = '' })
+    setParamValues(initial)
     setError(null)
   }
 
@@ -170,7 +227,19 @@ export default function WhatsAppTemplatePicker({
     setSending(true)
     setError(null)
     try {
-      const previewText = renderBodyPreview(selectedTemplate, params)
+      const vars = extractBodyVariables(selectedTemplate)
+      const isNamed = vars.some((v) => v.isNamed)
+      const previewText = renderBodyPreview(selectedTemplate, paramValues)
+
+      // Build the params payload in the format Meta wants for this template
+      // type. Send route accepts EITHER bodyParams (positional) OR
+      // bodyParamsNamed (named), never both.
+      const orderedValues = vars.map((v) => paramValues[v.key] ?? '')
+      const positional = isNamed ? undefined : orderedValues
+      const named = isNamed
+        ? vars.map((v) => ({ name: v.key, value: paramValues[v.key] ?? '' }))
+        : undefined
+
       const res = await fetch('/api/dashboard/inbox/reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +249,10 @@ export default function WhatsAppTemplatePicker({
           action: 'send_template',
           templateName: selectedTemplate.name,
           languageCode: selectedTemplate.language || 'en_US',
-          bodyParams: params.filter((p) => p.length > 0),
+          ...(positional ? { bodyParams: positional } : {}),
+          ...(named ? { bodyParamsNamed: named } : {}),
+          // Override the recipient when test mode is on
+          overrideTo: testMode ? TEST_WHATSAPP_PHONE : undefined,
           // Persist the rendered text so the conversation log reads naturally
           renderedText: previewText,
         }),
@@ -189,10 +261,14 @@ export default function WhatsAppTemplatePicker({
       if (!res.ok || data?.success === false) {
         throw new Error(data?.error || data?.error?.error?.message || `Send failed (${res.status})`)
       }
-      setSentMessage(`Template "${selectedTemplate.name}" sent.`)
+      setSentMessage(
+        testMode
+          ? `Test sent to ${TEST_WHATSAPP_PHONE} — "${selectedTemplate.name}".`
+          : `Template "${selectedTemplate.name}" sent to lead.`,
+      )
       onSent?.()
       // Close after a short confirmation flash
-      window.setTimeout(() => onClose(), 900)
+      window.setTimeout(() => onClose(), 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send template')
     } finally {
@@ -200,13 +276,13 @@ export default function WhatsAppTemplatePicker({
     }
   }
 
-  const variableCount = useMemo(
-    () => (selectedTemplate ? countBodyVariables(selectedTemplate) : 0),
+  const variables = useMemo(
+    () => (selectedTemplate ? extractBodyVariables(selectedTemplate) : []),
     [selectedTemplate],
   )
   const allParamsFilled = useMemo(
-    () => params.slice(0, variableCount).every((p) => p.trim().length > 0),
-    [params, variableCount],
+    () => variables.every((v) => (paramValues[v.key] || '').trim().length > 0),
+    [variables, paramValues],
   )
 
   if (!open) return null
@@ -363,33 +439,34 @@ export default function WhatsAppTemplatePicker({
                 ← back to list
               </button>
 
-              {variableCount > 0 && (
+              {variables.length > 0 && (
                 <div className="mb-3">
                   <div
                     className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
                     style={{ color: 'var(--text-muted)' }}
                   >
-                    Variables ({variableCount})
+                    Variables ({variables.length})
                   </div>
                   <div className="space-y-1.5">
-                    {Array.from({ length: variableCount }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-2">
+                    {variables.map((v, i) => (
+                      <div key={v.key} className="flex items-center gap-2">
                         <span
                           className="text-[10px] font-mono"
-                          style={{ color: 'var(--text-muted)' }}
+                          style={{ color: 'var(--text-muted)', minWidth: '90px' }}
+                          title={v.label}
                         >
-                          {`{{${i + 1}}}`}
+                          {v.label}
                         </span>
                         <input
                           type="text"
-                          value={params[i] || ''}
+                          value={paramValues[v.key] || ''}
                           onChange={(e) => {
-                            const next = [...params]
-                            next[i] = e.target.value
-                            setParams(next)
+                            setParamValues((prev) => ({ ...prev, [v.key]: e.target.value }))
                           }}
                           placeholder={
-                            i === 0 && leadName ? leadName : `Value for {{${i + 1}}}`
+                            (v.key === 'customer_name' || v.key === '1') && leadName
+                              ? leadName
+                              : `Value for ${v.label}`
                           }
                           className="flex-1 text-[12px] px-2 py-1 rounded border outline-none"
                           style={{
@@ -403,6 +480,27 @@ export default function WhatsAppTemplatePicker({
                   </div>
                 </div>
               )}
+
+              {/* Test mode toggle — locks send to TEST_WHATSAPP_PHONE when on */}
+              <div
+                className="mb-3 p-2 rounded-lg border flex items-center gap-2"
+                style={{
+                  background: testMode ? 'rgba(245,158,11,0.10)' : 'var(--bg-primary)',
+                  borderColor: testMode ? 'rgba(245,158,11,0.45)' : 'var(--border-primary)',
+                }}
+              >
+                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <input
+                    type="checkbox"
+                    checked={testMode}
+                    onChange={(e) => setTestMode(e.target.checked)}
+                    className="cursor-pointer"
+                  />
+                  <span className="text-[11px] font-semibold" style={{ color: testMode ? '#f59e0b' : 'var(--text-primary)' }}>
+                    {testMode ? `Test mode — sending to ${TEST_WHATSAPP_PHONE}` : 'Live mode — sending to lead'}
+                  </span>
+                </label>
+              </div>
 
               <div
                 className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
@@ -418,7 +516,7 @@ export default function WhatsAppTemplatePicker({
                   color: 'var(--text-primary)',
                 }}
               >
-                {renderBodyPreview(selectedTemplate, params)}
+                {renderBodyPreview(selectedTemplate, paramValues)}
               </div>
 
               <button

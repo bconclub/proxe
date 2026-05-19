@@ -78,7 +78,8 @@ async function sendWhatsAppTemplate(params: {
   to: string;
   templateName: string;
   languageCode: string;
-  bodyParams: string[];
+  bodyParams?: string[];                              // positional
+  bodyParamsNamed?: { name: string; value: string }[]; // named
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
@@ -86,8 +87,21 @@ async function sendWhatsAppTemplate(params: {
     return { ok: false, error: 'Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN' };
   }
 
+  // Meta requires EITHER positional or named param objects, never both.
+  // Named templates (e.g. windchasers_demo_online with {{customer_name}}) MUST
+  // use { type: 'text', parameter_name: '...', text: '...' }. Positional
+  // templates use { type: 'text', text: '...' } in order.
   const components: any[] = [];
-  if (params.bodyParams.length > 0) {
+  if (params.bodyParamsNamed && params.bodyParamsNamed.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: params.bodyParamsNamed.map((p) => ({
+        type: 'text',
+        parameter_name: p.name,
+        text: p.value,
+      })),
+    });
+  } else if (params.bodyParams && params.bodyParams.length > 0) {
     components.push({
       type: 'body',
       parameters: params.bodyParams.map((p) => ({ type: 'text', text: p })),
@@ -140,7 +154,9 @@ export async function POST(request: NextRequest) {
       // Template-send fields (only used when action === 'send_template')
       templateName,
       languageCode,
-      bodyParams,
+      bodyParams,           // positional, string[]
+      bodyParamsNamed,      // named, [{ name, value }]
+      overrideTo,           // when set, route the send here (test mode) instead of the lead's phone
       renderedText,
     } = body;
 
@@ -330,24 +346,37 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      if (!lead.phone) {
+      // Resolve recipient: overrideTo (test mode) takes priority over lead.phone.
+      const rawRecipient = (typeof overrideTo === 'string' && overrideTo.trim())
+        ? overrideTo.trim()
+        : lead.phone;
+      if (!rawRecipient) {
         return NextResponse.json(
-          { error: 'Lead has no phone number' },
+          { error: 'No recipient phone (lead has no phone and no overrideTo provided)' },
           { status: 400 },
         );
       }
 
       // Normalize phone: digits only, prepend country code if missing.
-      let phone = lead.phone.replace(/\D/g, '');
+      let phone = rawRecipient.replace(/\D/g, '');
       if (phone.startsWith('0')) {
         phone = '91' + phone.substring(1);
       }
+
+      const isTest = !!(typeof overrideTo === 'string' && overrideTo.trim());
 
       const result = await sendWhatsAppTemplate({
         to: phone,
         templateName,
         languageCode: languageCode || 'en_US',
-        bodyParams: Array.isArray(bodyParams) ? bodyParams.map(String) : [],
+        bodyParams: !Array.isArray(bodyParamsNamed) && Array.isArray(bodyParams)
+          ? bodyParams.map(String)
+          : undefined,
+        bodyParamsNamed: Array.isArray(bodyParamsNamed)
+          ? bodyParamsNamed
+              .filter((p: any) => p && typeof p.name === 'string')
+              .map((p: any) => ({ name: String(p.name), value: String(p.value ?? '') }))
+          : undefined,
       });
 
       if (!result.ok) {
@@ -357,35 +386,43 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Persist the rendered text into the conversation log so the operator
-      // sees the actual message they sent (not the template name) in the
-      // thread. Falls back to "<template name>" if no rendered text was
-      // supplied by the client.
-      const logBody = (typeof renderedText === 'string' && renderedText.trim())
-        ? renderedText.trim()
-        : `[Template: ${templateName}]`;
+      // Test sends should NOT pollute the lead's conversation log — the lead
+      // never received the message, it went to the operator's test phone.
+      if (!isTest) {
+        // Persist the rendered text into the conversation log so the operator
+        // sees the actual message they sent (not the template name) in the
+        // thread. Falls back to "<template name>" if no rendered text was
+        // supplied by the client.
+        const logBody = (typeof renderedText === 'string' && renderedText.trim())
+          ? renderedText.trim()
+          : `[Template: ${templateName}]`;
 
-      await logMessage(
-        leadId,
-        'whatsapp',
-        'agent',
-        logBody,
-        'text',
-        {
-          source: 'dashboard_inbox',
-          sent_by: 'founder',
-          sent_at: new Date().toISOString(),
-          template_name: templateName,
-          template_language: languageCode || 'en_US',
-          template_params: Array.isArray(bodyParams) ? bodyParams : [],
-          meta_message_id: result.messageId || null,
-        },
-        supabase,
-      );
+        await logMessage(
+          leadId,
+          'whatsapp',
+          'agent',
+          logBody,
+          'text',
+          {
+            source: 'dashboard_inbox',
+            sent_by: 'founder',
+            sent_at: new Date().toISOString(),
+            template_name: templateName,
+            template_language: languageCode || 'en_US',
+            template_params: Array.isArray(bodyParamsNamed)
+              ? bodyParamsNamed
+              : (Array.isArray(bodyParams) ? bodyParams : []),
+            meta_message_id: result.messageId || null,
+          },
+          supabase,
+        );
+      }
 
       return NextResponse.json({
         success: true,
-        message: 'Template sent',
+        message: isTest ? `Test sent to ${phone}` : 'Template sent',
+        test_mode: isTest,
+        recipient: phone,
         messageId: result.messageId,
         channel: 'whatsapp',
       });
