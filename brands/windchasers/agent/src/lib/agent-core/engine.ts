@@ -102,9 +102,18 @@ User's message: ${input.message}`
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
-  // Only use booking tools when the message has booking intent or user has an existing booking
+  // Wire booking tools when:
+  //   - Current message has booking intent, OR
+  //   - User already has a booking (could be rescheduling), OR
+  //   - ANY of the last 6 messages (either side) had booking intent — this
+  //     keeps tools available across multi-turn booking flows (user said
+  //     "yes book me" 3 turns ago, now sharing email; tools must still be
+  //     wired so the LLM can call check_availability + book_consultation).
+  const recentBookingDiscussion = (input.conversationHistory || [])
+    .slice(-6)
+    .some((m) => isBookingIntent(m.content));
   const needsBookingTools = input.channel === 'whatsapp' &&
-    (isBookingIntent(input.message) || !!existingBookingMessage);
+    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion);
 
   try {
     if (needsBookingTools) {
@@ -200,7 +209,12 @@ export async function* processStream(
 
     // 1. Extract intent — determines which DB calls to make
     const intent = extractIntent(input.message, input.usedButtons);
-    const hasBookingIntent = isBookingIntent(input.message);
+    // Booking intent: current message OR booking discussion in last 6 turns
+    // (web stream variant — same multi-turn flow concern as the WhatsApp path).
+    const recentBookingDiscussion = (input.conversationHistory || [])
+      .slice(-6)
+      .some((m) => isBookingIntent(m.content));
+    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion;
 
     // 2. Parallelize DB calls: KB search always runs; booking check only when needed
     const [relevantDocs, existingBookingMessage] = await Promise.all([
