@@ -1776,9 +1776,18 @@ export default function InboxPage() {
                           if (sendError) {
                             try {
                               const parsed = JSON.parse(sendError)
-                              prettyError = parsed?.error?.message
-                                ? `(#${parsed.error.code || '?'}) ${parsed.error.message}`
-                                : sendError
+                              // Meta's `message` already begins with "(#code)",
+                              // so use it as-is. Only synthesise the prefix when
+                              // the message lacks one.
+                              const msg = parsed?.error?.message
+                              const code = parsed?.error?.code
+                              if (typeof msg === 'string') {
+                                prettyError = /^\(#\d+\)/.test(msg)
+                                  ? msg
+                                  : `(#${code || '?'}) ${msg}`
+                              } else {
+                                prettyError = sendError
+                              }
                             } catch {
                               prettyError = sendError
                             }
