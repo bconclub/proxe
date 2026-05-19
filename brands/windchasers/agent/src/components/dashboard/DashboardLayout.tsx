@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
-import TodaySnapshotButton from '@/components/dashboard/TodaySnapshotButton'
 import { getBuildDate } from '@/lib/buildInfo'
 import {
   MdInbox,
@@ -717,9 +716,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
-
-        {/* Today's Snapshot — fixed top-right, visible from any dashboard page */}
-        <TodaySnapshotButton />
 
         {/* Mobile top bar — only visible on mobile */}
         <div

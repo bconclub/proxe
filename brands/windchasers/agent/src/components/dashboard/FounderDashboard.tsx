@@ -6,6 +6,7 @@ import { createClient } from '../../lib/supabase/client'
 import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
+import TodaySnapshotButton from './TodaySnapshotButton'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -354,6 +355,9 @@ export default function FounderDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+
+      {/* Today's Snapshot — front-dashboard only (fixed top-right button + centered modal) */}
+      <TodaySnapshotButton />
 
       {/* AT A GLANCE - Radial Progress Charts with Trends */}
       {metrics.radialMetrics && (
