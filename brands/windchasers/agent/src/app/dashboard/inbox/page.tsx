@@ -25,6 +25,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import WhatsAppTemplatePicker from '@/components/dashboard/WhatsAppTemplatePicker'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 // Channel Icons using custom SVGs with colored backgrounds
@@ -312,6 +313,7 @@ export default function InboxPage() {
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [messagesLoading, setMessagesLoading] = useState(false)
@@ -1865,6 +1867,25 @@ export default function InboxPage() {
                 >
                   <MdAutoAwesome size={18} className={isGenerating ? 'animate-spin' : ''} />
                 </button>
+                {/* Approved-template picker — WhatsApp only. Lets the operator
+                    bypass the 24h reply window by sending a Meta-approved
+                    template when the auto-reply path is blocked. */}
+                {selectedChannel === 'whatsapp' && (
+                  <button
+                    onClick={() => setTemplatePickerOpen(true)}
+                    disabled={!selectedLeadId}
+                    className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      opacity: !selectedLeadId ? 0.3 : 1,
+                    }}
+                    title="Send WhatsApp template"
+                    aria-label="Send WhatsApp template"
+                  >
+                    <FaWhatsapp size={18} />
+                  </button>
+                )}
                 <input
                   type="text"
                   placeholder={
@@ -2247,6 +2268,18 @@ export default function InboxPage() {
           onStatusUpdate={updateLeadStatus}
         />
       )}
+
+      <WhatsAppTemplatePicker
+        open={templatePickerOpen && !!selectedLeadId && selectedChannel === 'whatsapp'}
+        onClose={() => setTemplatePickerOpen(false)}
+        leadId={selectedLeadId || ''}
+        leadName={leadDetails?.customer_name || null}
+        onSent={() => {
+          // Refresh thread + conversation list so the template appears immediately
+          if (selectedLeadId) fetchMessages(selectedLeadId)
+          fetchConversations()
+        }}
+      />
     </div>
   )
 }

@@ -69,10 +69,80 @@ async function sendWhatsAppMessage(to: string, message: string): Promise<boolean
   }
 }
 
+/**
+ * Send an approved WhatsApp template via Meta Cloud API.
+ * Templates bypass the 24-hour conversation window — this is the legitimate
+ * way to re-engage a lead whose last message is older than 24h.
+ */
+async function sendWhatsAppTemplate(params: {
+  to: string;
+  templateName: string;
+  languageCode: string;
+  bodyParams: string[];
+}): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  if (!phoneNumberId || !accessToken) {
+    return { ok: false, error: 'Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN' };
+  }
+
+  const components: any[] = [];
+  if (params.bodyParams.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: params.bodyParams.map((p) => ({ type: 'text', text: p })),
+    });
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: params.to,
+    type: 'template',
+    template: {
+      name: params.templateName,
+      language: { code: params.languageCode },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  };
+
+  try {
+    const res = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      console.error('[inbox/reply] Template send failed:', res.status, body);
+      const errMsg = body?.error?.message || body?.error || `Template send failed (${res.status})`;
+      return { ok: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) };
+    }
+    return { ok: true, messageId: body?.messages?.[0]?.id };
+  } catch (err) {
+    console.error('[inbox/reply] Template send error:', err);
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { leadId, channel, action, message, conversationHistory } = body;
+    const {
+      leadId,
+      channel,
+      action,
+      message,
+      conversationHistory,
+      // Template-send fields (only used when action === 'send_template')
+      templateName,
+      languageCode,
+      bodyParams,
+      renderedText,
+    } = body;
 
     if (!leadId || !channel || !action) {
       return NextResponse.json(
@@ -81,9 +151,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (action !== 'generate' && action !== 'send') {
+    if (action !== 'generate' && action !== 'send' && action !== 'send_template') {
       return NextResponse.json(
-        { error: 'action must be "generate" or "send"' },
+        { error: 'action must be "generate", "send", or "send_template"' },
         { status: 400 },
       );
     }
@@ -240,6 +310,84 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Message sent successfully',
         channel,
+      });
+    }
+
+    // ── ACTION: SEND_TEMPLATE ────────────────────────────────────────────
+    // Templates are the only sanctioned way to re-open a conversation outside
+    // the 24h window, so we DO NOT enforce the 24h check on this path. The
+    // template content itself must be approved by Meta upstream.
+    if (action === 'send_template') {
+      if (channel !== 'whatsapp') {
+        return NextResponse.json(
+          { error: 'Template sending is only supported on WhatsApp' },
+          { status: 400 },
+        );
+      }
+      if (!templateName || typeof templateName !== 'string') {
+        return NextResponse.json(
+          { error: 'Missing required field: templateName' },
+          { status: 400 },
+        );
+      }
+      if (!lead.phone) {
+        return NextResponse.json(
+          { error: 'Lead has no phone number' },
+          { status: 400 },
+        );
+      }
+
+      // Normalize phone: digits only, prepend country code if missing.
+      let phone = lead.phone.replace(/\D/g, '');
+      if (phone.startsWith('0')) {
+        phone = '91' + phone.substring(1);
+      }
+
+      const result = await sendWhatsAppTemplate({
+        to: phone,
+        templateName,
+        languageCode: languageCode || 'en_US',
+        bodyParams: Array.isArray(bodyParams) ? bodyParams.map(String) : [],
+      });
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { success: false, error: result.error || 'Template send failed' },
+          { status: 502 },
+        );
+      }
+
+      // Persist the rendered text into the conversation log so the operator
+      // sees the actual message they sent (not the template name) in the
+      // thread. Falls back to "<template name>" if no rendered text was
+      // supplied by the client.
+      const logBody = (typeof renderedText === 'string' && renderedText.trim())
+        ? renderedText.trim()
+        : `[Template: ${templateName}]`;
+
+      await logMessage(
+        leadId,
+        'whatsapp',
+        'agent',
+        logBody,
+        'text',
+        {
+          source: 'dashboard_inbox',
+          sent_by: 'founder',
+          sent_at: new Date().toISOString(),
+          template_name: templateName,
+          template_language: languageCode || 'en_US',
+          template_params: Array.isArray(bodyParams) ? bodyParams : [],
+          meta_message_id: result.messageId || null,
+        },
+        supabase,
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Template sent',
+        messageId: result.messageId,
+        channel: 'whatsapp',
       });
     }
   } catch (error) {
