@@ -96,22 +96,59 @@ export async function GET() {
       else scoreHistogram.cold++;
     }
 
-    // ── 3) Activity events: count today's conversation rows by kind ─────────
-    // We bucket by metadata tags:
-    //   pat_submitted   — message_type=template AND template_name LIKE %pat_result%
-    //   demo_booked     — message_type=template AND template_name LIKE %demo_%
-    //   calls_logged    — channel=voice AND sender=agent
-    //   agent_replies   — channel=whatsapp AND sender=agent AND ai_generated=true
+    // ── 3) Activity events — derived from the LEADS, not conversation rows.
+    // Conversation rows only exist if a template send actually logged. Leads
+    // have the canonical signal in unified_context, so use that:
+    //
+    //   pat_submitted — unified_context.windchasers.pat_completed_at falls in window
+    //   demo_booked   — unified_context.web.booking exists AND was created in window
+    //                   (or, fallback, lead created in window with form_type=demo_booked)
+    //   calls_logged  — conversations.channel=voice in window (correct as before)
+    //   agent_replies — conversations.channel=whatsapp + sender=agent + ai_generated in window
+    //
+    // We use the leads we already loaded for "today's leads", AND additionally
+    // pull leads where the PAT or booking timestamp falls inside the window
+    // even if the lead itself was created earlier.
+    const { data: ctxEventLeads } = await supabase
+      .from('all_leads')
+      .select('id, unified_context, created_at');
+
+    const inWindow = (iso: string | null | undefined): boolean => {
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return false;
+      return t >= new Date(startIso).getTime() && t <= new Date(endIso).getTime();
+    };
+
+    let patSubmitted = 0;
+    let demoBooked = 0;
+    for (const l of (ctxEventLeads || [])) {
+      const wc = l?.unified_context?.windchasers || {};
+      const booking = l?.unified_context?.web?.booking;
+      const rawFt = String(l?.unified_context?.raw_form_fields?.form_type || '').toLowerCase();
+      const eventName = String(l?.unified_context?.raw_form_fields?.event_name || '').toLowerCase();
+
+      if (inWindow(wc.pat_completed_at)) patSubmitted++;
+      if (booking && inWindow(booking.created_at)) demoBooked++;
+      else if (inWindow(l.created_at) && (rawFt === 'demo_booked' || eventName === 'demo_booked')) {
+        // Fallback: lead created today with demo_booked form_type but booking
+        // object not (yet) populated.
+        demoBooked++;
+      }
+    }
+
+    // Agent replies + calls — still conversation-based
     const [
       { data: agentMsgsToday },
       { data: voiceCallsToday },
     ] = await Promise.all([
       supabase
         .from('conversations')
-        .select('id, channel, sender, message_type, metadata, created_at')
+        .select('id, channel, metadata, created_at')
         .gte('created_at', startIso)
         .lte('created_at', endIso)
-        .eq('sender', 'agent'),
+        .eq('sender', 'agent')
+        .eq('channel', 'whatsapp'),
       supabase
         .from('conversations')
         .select('id, channel, created_at')
@@ -120,14 +157,17 @@ export async function GET() {
         .eq('channel', 'voice'),
     ]);
 
-    const events = { pat_submitted: 0, demo_booked: 0, calls_logged: 0, agent_replies: 0 };
+    let agentReplies = 0;
     for (const m of (agentMsgsToday || [])) {
-      const tn = String(m?.metadata?.template_name || '').toLowerCase();
-      if (m.message_type === 'template' && /pat_result/.test(tn)) events.pat_submitted++;
-      else if (m.message_type === 'template' && /demo_/.test(tn)) events.demo_booked++;
-      else if (m.channel === 'whatsapp' && m?.metadata?.ai_generated) events.agent_replies++;
+      if (m?.metadata?.ai_generated) agentReplies++;
     }
-    events.calls_logged = (voiceCallsToday || []).length;
+
+    const events = {
+      pat_submitted: patSubmitted,
+      demo_booked: demoBooked,
+      calls_logged: (voiceCallsToday || []).length,
+      agent_replies: agentReplies,
+    };
 
     // ── 4) Top 5 active leads (today's customer messages) ───────────────────
     const { data: custMsgs } = await supabase
