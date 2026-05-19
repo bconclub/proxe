@@ -721,6 +721,7 @@ export default function LeadsTable({
                   uc?.web?.profile?.city ||
                   uc?.raw_form_fields?.city ||
                   uc?.landing_page?.city ||
+                  uc?.city ||                       // top-level (set by /api/agent/leads/inbound)
                   ''
 
                 // If no name, use email as primary identifier

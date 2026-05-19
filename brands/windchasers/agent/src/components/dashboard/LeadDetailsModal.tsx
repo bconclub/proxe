@@ -2270,7 +2270,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         const city = wc.city
                           || currentLead.unified_context?.whatsapp?.profile?.city
                           || currentLead.unified_context?.web?.profile?.city
-                          || rff.city || ''
+                          || rff.city
+                          || currentLead.unified_context?.city
+                          || ''
                         const eduMap: Record<string, string> = {
                           '12th_pcm': '12th PCM',
                           '12th_non_pcm': '12th (non-PCM)',
