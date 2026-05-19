@@ -2264,7 +2264,7 @@ export default function InboxPage() {
                           style={{ background: `${scoreColor}22`, color: scoreColor, border: `1px solid ${scoreColor}55` }}
                           title={`Lead Score: ${score}/100`}
                         >
-                          {score} · {scoreLabel}
+                          {scoreLabel}
                         </span>
                       )}
                       {leadDetails.lead_stage && (
