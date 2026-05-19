@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-19 · style(both brands): sidebar nav — drop hard active border, switch to accent-tinted pill
+
+The dashboard sidebar's active item rendered with a 2px solid left border + filled `--bg-hover` background, which read as "old-school" — hard line on the edge, generic neutral fill. Modernised both brand layouts to a current-pattern sidebar (Linear/Vercel/Notion style):
+
+- `DashboardLayout.tsx` (windchasers + bcon): removed the `borderLeft` on active items entirely. Active background switched from `--bg-hover` (neutral) to `--accent-subtle` (low-opacity brand-accent tint). Active text + icon colour switched from `--text-primary` to `--accent-primary` — picks up the brand's gold/electric accent so the active row pops in brand colour. Border-radius bumped 6px → 8px to match the surrounding card style
+- Inactive font weight bumped 400 → 500 for clearer hierarchy when nothing's active
+- Hover handler now also lifts the inactive text from `--text-secondary` to `--text-primary` so a hovered row feels "ready to click" without competing with the active pill
+- Transition list narrowed to the specific properties that animate (`background-color`, `color`, etc.) instead of the shorthand `background`, so the colour interpolation is smooth across themes
+
+User-facing: cleaner, calmer sidebar. Active item is a soft accent-tinted pill, hover gives a gentle neutral tint, nothing has a hard edge. Same look on windchasers (gold) and bcon (whatever accent the brand resolves to).
+
 ## 2026-05-19 · fix(windchasers): inbox channel icons — drop coloured container, plain tinted icon
 
 - `app/dashboard/inbox/page.tsx` (`ChannelIcon`): previously each channel rendered as a small white icon inside a coloured square (blue for Web, green for WhatsApp, purple for Voice, orange for Social). In the conversation list that meant a busy row of solid coloured chips next to every name. Replaced with the bare icon, tinted to the channel brand colour via a precomputed CSS filter for the white SVG line-art assets, and stroke-coloured directly for the inline Voice SVG. Icons sit cleanly alongside the lead name without competing for attention

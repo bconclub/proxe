@@ -409,19 +409,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
                 const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 
+                // Modern sidebar item styling — no hard borders, no filled
+                // bg-hover for active. Active is an accent-tinted pill with
+                // accent-coloured text+icon (picks up the brand colour).
+                // Hover on inactive items gets a soft neutral tint via the
+                // existing onMouseEnter handlers.
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
-                  fontWeight: itemIsActive ? 600 : 400,
-                  color: itemIsActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  backgroundColor: itemIsActive ? 'var(--bg-hover)' : 'transparent',
-                  borderLeft: itemIsActive && showExpanded ? '2px solid var(--text-primary)' : '2px solid transparent',
+                  fontWeight: itemIsActive ? 600 : 500,
+                  color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
                   margin: !showExpanded ? '2px 6px' : '1px 4px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   padding: !showExpanded ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
                   justifyContent: !showExpanded ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
-                  transition: 'background 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
+                  transition: 'background-color 180ms ease, color 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
                   position: 'relative',
                   overflow: 'hidden',
                   width: !showExpanded ? '44px' : 'auto',
@@ -500,7 +504,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
+                          // Soft neutral tint on hover — sits below the active
+                          // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                          e.currentTarget.style.color = 'var(--text-primary)'
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -509,6 +516,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
                         }
                       }}
                     >
@@ -568,7 +576,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
+                          // Soft neutral tint on hover — sits below the active
+                          // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                          e.currentTarget.style.color = 'var(--text-primary)'
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -577,6 +588,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
                         }
                       }}
                     >
@@ -718,8 +730,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Page Transition Loader */}
         <PageTransitionLoader />
 
-        {/* Health bar — top-right chip on every dashboard page, click to expand */}
-        <HealthBarButton />
+        {/* Endpoint health popover (controlled — opened from the sidebar three-dot menu) */}
+        <HealthBarButton open={healthOpen} onClose={() => setHealthOpen(false)} />
 
         {/* Mobile top bar — only visible on mobile */}
         <div

@@ -408,19 +408,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
                 const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 
+                // Modern sidebar item styling — no hard borders, accent-tinted
+                // active pill, soft hover. Mirrors windchasers DashboardLayout
+                // so the visual language stays in lockstep across brands.
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
-                  fontWeight: itemIsActive ? 600 : 400,
-                  color: itemIsActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  backgroundColor: itemIsActive ? 'var(--bg-hover)' : 'transparent',
-                  borderLeft: itemIsActive && showExpanded ? '2px solid var(--text-primary)' : '2px solid transparent',
+                  fontWeight: itemIsActive ? 600 : 500,
+                  color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
                   margin: !showExpanded ? '2px 6px' : '1px 4px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   padding: !showExpanded ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
                   justifyContent: !showExpanded ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
-                  transition: 'background 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
+                  transition: 'background-color 180ms ease, color 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
                   position: 'relative',
                   overflow: 'hidden',
                   width: !showExpanded ? '44px' : 'auto',
