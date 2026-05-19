@@ -48,7 +48,14 @@ export async function process(
   // 4. Build prompt (brand-aware)
   // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
-    ? `[EXISTING BOOKING INFO: ${existingBookingMessage} - If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly - if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
+    ? `[EXISTING BOOKING INFO (internal — do not echo verbatim to the customer): ${existingBookingMessage}
+
+RULES for this turn:
+- The customer JUST booked. They know when. Do NOT restate the specific date or time back to them unless they explicitly ask "when is my session?" or similar.
+- Acknowledge the booking briefly ("Great, your demo is confirmed." or "All set."), then ask what they need help with.
+- If they give a different date/time in this message, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".]
+
+User's message: ${input.message}`
     : input.message;
 
   // Build admin notes context
@@ -204,7 +211,14 @@ export async function* processStream(
 
     // 3. Build prompt (brand-aware)
     const finalMessage = existingBookingMessage
-      ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
+      ? `[EXISTING BOOKING INFO (internal — do not echo verbatim to the customer): ${existingBookingMessage}
+
+RULES for this turn:
+- The customer JUST booked. They know when. Do NOT restate the specific date or time back to them unless they explicitly ask "when is my session?" or similar.
+- Acknowledge the booking briefly ("Great, your demo is confirmed." or "All set."), then ask what they need help with.
+- If they give a different date/time in this message, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".]
+
+User's message: ${input.message}`
       : input.message;
 
     let crossChannelContext = '';
