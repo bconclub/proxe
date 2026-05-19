@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-19 · feat(bcon): port brand-agnostic dashboard UI parity from windchasers
+
+The bcon dashboard had been left behind on three recent visual improvements that landed on windchasers. Brought them across — explicitly scoped to brand-agnostic UI only, no aviation-specific fields (PAT, Type, Course, Path/Goal) crossed over.
+
+- `LeadDetailsModal.tsx`:
+  - Added the shared `CopyIconButton` helper component. Copy-on-hover icons (12px) now appear on the name (`h2`), email link, and phone link in the contact card. Click copies value with a 1.2s green-check confirmation
+  - Replaced the inline AI orchestrator strip with a centered overlay inside the lead modal — blurred backdrop, card showing the operator's note text in italic quotes, a "Note added" title line, and each AI step animating in (classification → touchpoint update → task creation → stage change → summary refresh). Visible duration extended from 2s to 4.5s so the operator can read what happened. `noteProgress` state widened with `title` and `note` fields; `handleSaveAdminNote` now passes the note text and title
+
+- `LeadsTable.tsx`:
+  - New **LAST TOUCH** column between Source and Score. Channel (Voice / WhatsApp / Web / Form / …) renders as a coloured pill with brand-color tint; the actor — if recorded in `unified_context.last_actor` — renders below as `@username` muted text. Header alignment tightened (Lead/Contact left, everything else centered). Empty-state `colSpan` updated accordingly
+  - `source` resolver now falls back to `last_touchpoint` instead of just `unknown`, matching windchasers behaviour
+
+User-facing on bcon: lead modal now shows a clear "AI is processing your note" overlay with the note quoted back; copy icons on name/email/phone for quick clipboard grabs; new LAST TOUCH column makes it obvious which surface a lead's most recent activity landed on.
+
 ## 2026-05-19 · fix(windchasers): PAT auto-send was failing silently — language code mismatch + swallowed insert error
 
 Diagnosis: when a lead completes the Pilot Aptitude Test, `/api/agent/leads/inbound` is supposed to fire `windchasers_pat_result_v1` to the lead and write a conversation row. Investigating a missing message for **Himadri samadder** (lead `b989eb3c-…`, score 102/150, tier moderate) revealed two compounding bugs:

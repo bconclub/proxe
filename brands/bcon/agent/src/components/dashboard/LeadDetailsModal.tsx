@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose, MdContentCopy, MdExpandMore } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
@@ -232,6 +232,30 @@ const STAGE_PROGRESSION = [
   { stage: 'Converted', order: 5 },
 ]
 
+function CopyIconButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!value) return
+    navigator.clipboard?.writeText(value).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    }).catch(() => {})
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="lead-copy-btn opacity-0 group-hover:opacity-70 hover:!opacity-100 transition-opacity p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0 focus:outline-none focus:opacity-100"
+      title={copied ? 'Copied!' : `Copy ${label}`}
+      aria-label={`Copy ${label}`}
+    >
+      {copied ? <MdCheck size={12} className="text-green-500" /> : <MdContentCopy size={12} />}
+    </button>
+  )
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
@@ -296,7 +320,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showAdminNotes, setShowAdminNotes] = useState(false)
   const recognitionRef = useRef<any>(null)
   // AI classification progress state
-  const [noteProgress, setNoteProgress] = useState<{ steps: { text: string; done: boolean }[]; visible: boolean }>({ steps: [], visible: false })
+  const [noteProgress, setNoteProgress] = useState<{
+    steps: { text: string; done: boolean }[]
+    visible: boolean
+    title?: string  // e.g. "Note added" / "Call logged: No Answer"
+    note?: string   // The actual note text the user typed
+  }>({ steps: [], visible: false })
 
   // Log a Call state
   const [showLogCallForm, setShowLogCallForm] = useState(false)
@@ -1008,9 +1037,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // Admin note handlers
   const handleSaveAdminNote = async () => {
     if (!adminNoteText.trim() || !lead) return
+    const savedNoteText = adminNoteText.trim()
     setSavingAdminNote(true)
-    // Show initial analyzing step
-    setNoteProgress({ steps: [{ text: 'Analyzing note...', done: false }], visible: true })
+    // Show initial analyzing step (with the note text + title visible up top)
+    setNoteProgress({
+      steps: [{ text: 'Analyzing note...', done: false }],
+      visible: true,
+      title: 'Note added',
+      note: savedNoteText,
+    })
     try {
       const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
         method: 'POST',
@@ -1050,14 +1085,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       // Animate steps one by one
       for (let i = 0; i < allSteps.length; i++) {
         await new Promise(resolve => setTimeout(resolve, i === 0 ? 100 : 400))
-        setNoteProgress({ steps: allSteps.slice(0, i + 1), visible: true })
+        setNoteProgress(prev => ({ ...prev, steps: allSteps.slice(0, i + 1), visible: true }))
       }
 
       setAdminNoteText('')
       setShowAdminNoteInput(false)
 
-      // Keep visible for a moment, then fade out and refresh
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Keep visible longer so the user can read what happened + the note text
+      await new Promise(resolve => setTimeout(resolve, 4500))
       setNoteProgress(prev => ({ ...prev, visible: false }))
       await new Promise(resolve => setTimeout(resolve, 300))
       setNoteProgress({ steps: [], visible: false })
@@ -1349,6 +1384,110 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           aria-labelledby="lead-modal-title"
           aria-modal="true"
         >
+          {/* Centered PROXe AI orchestrator overlay — appears while an admin
+              note is being processed, so the operator sees every step the AI
+              takes plus the note they wrote, in real time. */}
+          {noteProgress.steps.length > 0 && (
+            <div
+              className="lead-orchestrator-overlay absolute inset-0 z-[60] flex items-center justify-center pointer-events-none"
+              style={{
+                background: 'rgba(0,0,0,0.55)',
+                backdropFilter: 'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
+                opacity: noteProgress.visible ? 1 : 0,
+                transition: 'opacity 0.3s ease',
+                borderRadius: 'inherit',
+              }}
+              aria-live="polite"
+              role="status"
+            >
+              <div
+                className="pointer-events-auto rounded-xl border shadow-2xl"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  borderColor: 'rgba(99,102,241,0.45)',
+                  padding: '20px 22px',
+                  width: 'min(440px, 88%)',
+                  maxHeight: '78%',
+                  overflowY: 'auto',
+                  boxShadow:
+                    '0 0 0 1px rgba(99,102,241,0.25), 0 24px 48px -12px rgba(0,0,0,0.6)',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <MdAutoAwesome size={16} className="text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-indigo-400">
+                    PROXe AI
+                  </span>
+                  {noteProgress.title && (
+                    <span className="ml-auto text-[11px] font-semibold text-[var(--text-primary)]">
+                      {noteProgress.title}
+                    </span>
+                  )}
+                </div>
+
+                {noteProgress.note && (
+                  <div
+                    className="mb-3 p-2.5 rounded-lg border text-[12px] leading-snug text-[var(--text-primary)] italic"
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      borderColor: 'var(--border-primary)',
+                    }}
+                  >
+                    “{noteProgress.note}”
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  {noteProgress.steps.map((step, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2"
+                      style={{
+                        animation: 'orchFadeIn 0.3s ease forwards',
+                        animationDelay: `${i * 0.05}s`,
+                      }}
+                    >
+                      {step.done ? (
+                        step.text === 'Done' ? (
+                          <MdCheckCircle size={14} className="text-green-400 flex-shrink-0" />
+                        ) : step.text.startsWith('Error') ? (
+                          <MdClose size={14} className="text-red-400 flex-shrink-0" />
+                        ) : (
+                          <MdCheck size={14} className="text-emerald-400 flex-shrink-0" />
+                        )
+                      ) : (
+                        <div className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center">
+                          <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                        </div>
+                      )}
+                      <span
+                        className={`text-[12px] ${
+                          step.text === 'Done'
+                            ? 'font-bold text-green-400'
+                            : step.text.startsWith('Classified as')
+                              ? 'font-semibold text-[var(--text-primary)]'
+                              : step.text.startsWith('Error')
+                                ? 'font-medium text-red-400'
+                                : 'text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {step.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <style>{`
+                  @keyframes orchFadeIn {
+                    from { opacity: 0; transform: translateY(-4px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                  }
+                `}</style>
+              </div>
+            </div>
+          )}
+
           {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
           <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-[var(--border-primary)] flex-shrink-0 relative min-h-[140px]">
             {/* LEFT HALF: Contact Card - Business Card Style */}
@@ -1357,12 +1496,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               <div className="lead-contact-card-header">
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
-                  <h2
-                    id="lead-modal-title"
-                    className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight flex-1 min-w-0 truncate"
-                  >
-                    {currentLead.name || 'Unknown Lead'}
-                  </h2>
+                  <div className="group flex items-center gap-1.5 flex-1 min-w-0">
+                    <h2
+                      id="lead-modal-title"
+                      className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
+                    >
+                      {currentLead.name || 'Unknown Lead'}
+                    </h2>
+                    {currentLead.name && (
+                      <CopyIconButton value={currentLead.name} label="name" />
+                    )}
+                  </div>
 
                   {/* Lead Health Score - Right aligned */}
                   <div
@@ -1457,7 +1601,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               <address className="lead-contact-info space-y-1 mt-auto not-italic">
                 {/* Email with icon */}
                 {currentLead.email && (
-                  <div className="lead-contact-email flex items-center gap-1.5">
+                  <div className="lead-contact-email group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdEmail className="text-[var(--text-secondary)]" size={14} />
                     </div>
@@ -1467,12 +1611,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       {currentLead.email}
                     </a>
+                    <CopyIconButton value={currentLead.email} label="email" />
                   </div>
                 )}
 
                 {/* Phone with icon */}
                 {currentLead.phone && (
-                  <div className="lead-contact-phone flex items-center gap-1.5">
+                  <div className="lead-contact-phone group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdPhone className="text-[var(--text-secondary)]" size={14} />
                     </div>
@@ -1482,6 +1627,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       {currentLead.phone}
                     </a>
+                    <CopyIconButton value={currentLead.phone} label="phone" />
                   </div>
                 )}
 
@@ -1626,68 +1772,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdCheck size={12} />
                     </button>
-                  </div>
-                )}
-
-                {/* AI Classification Progress */}
-                {noteProgress.steps.length > 0 && (
-                  <div
-                    className="mt-2 p-2.5 rounded-lg border border-[var(--border-primary)] overflow-hidden"
-                    style={{
-                      background: 'var(--bg-primary)',
-                      opacity: noteProgress.visible ? 1 : 0,
-                      transition: 'opacity 0.3s ease',
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <MdAutoAwesome size={12} className="text-indigo-400 animate-pulse" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400">PROXe AI</span>
-                    </div>
-                    <div className="space-y-1">
-                      {noteProgress.steps.map((step, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-1.5"
-                          style={{
-                            animation: 'fadeSlideIn 0.3s ease forwards',
-                            animationDelay: `${i * 0.05}s`,
-                          }}
-                        >
-                          {step.done ? (
-                            step.text === 'Done' ? (
-                              <MdCheckCircle size={12} className="text-green-400 flex-shrink-0" />
-                            ) : step.text.startsWith('Error') ? (
-                              <MdClose size={12} className="text-red-400 flex-shrink-0" />
-                            ) : (
-                              <MdCheck size={12} className="text-emerald-400 flex-shrink-0" />
-                            )
-                          ) : (
-                            <div className="w-3 h-3 flex-shrink-0 flex items-center justify-center">
-                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                            </div>
-                          )}
-                          <span
-                            className={`text-[10px] ${
-                              step.text === 'Done'
-                                ? 'font-bold text-green-400'
-                                : step.text.startsWith('Classified as')
-                                  ? 'font-semibold text-[var(--text-primary)]'
-                                  : step.text.startsWith('Error')
-                                    ? 'font-medium text-red-400'
-                                    : 'text-[var(--text-secondary)]'
-                            }`}
-                          >
-                            {step.text}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <style>{`
-                      @keyframes fadeSlideIn {
-                        from { opacity: 0; transform: translateY(-4px); }
-                        to { opacity: 1; transform: translateY(0); }
-                      }
-                    `}</style>
                   </div>
                 )}
 

@@ -634,34 +634,39 @@ export default function LeadsTable({
             {/* Tightened column widths: Lead/Contact were oversized,
                 Booking was a wide text column (now a compact chip),
                 Type/Course are narrow chip columns. */}
-            <col style={{ width: '18%' }} />  {/* Lead */}
-            <col style={{ width: '18%' }} />  {/* Contact */}
-            <col style={{ width: '9%' }} />   {/* Source */}
+            <col style={{ width: '16%' }} />  {/* Lead */}
+            <col style={{ width: '16%' }} />  {/* Contact */}
+            <col style={{ width: '9%' }} />   {/* Source (origin, immutable) */}
+            <col style={{ width: '8%' }} />   {/* Last Touch */}
             <col style={{ width: '6%' }} />   {/* Score */}
-            <col style={{ width: '11%' }} />  {/* Stage */}
-            <col style={{ width: '8%' }} />   {/* Active */}
-            <col style={{ width: '12%' }} />  {/* Booking (chip) */}
+            <col style={{ width: '10%' }} />  {/* Stage */}
+            <col style={{ width: '7%' }} />   {/* Active */}
+            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
             {showAviationColumns && <col style={{ width: '9%' }} />}
             {showAviationColumns && <col style={{ width: '9%' }} />}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
-                'Lead',
-                'Contact',
-                'Source',
-                'Score',
-                'Stage',
-                'Active',
-                'Booking',
-                ...(showAviationColumns ? ['Type', 'Course'] : []),
-              ].map((h) => (
+                { label: 'Lead',       align: 'left'   as const },
+                { label: 'Contact',    align: 'left'   as const },
+                { label: 'Source',     align: 'center' as const },
+                { label: 'Last Touch', align: 'center' as const },
+                { label: 'Score',      align: 'center' as const },
+                { label: 'Stage',      align: 'center' as const },
+                { label: 'Active',     align: 'left'   as const },
+                { label: 'Booking',    align: 'center' as const },
+                ...(showAviationColumns ? [
+                  { label: 'Type',   align: 'center' as const },
+                  { label: 'Course', align: 'center' as const },
+                ] : []),
+              ].map(({ label, align }) => (
                 <th
-                  key={h}
-                  className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider"
+                  key={label}
+                  className={`px-3 py-2.5 text-${align} text-[10px] font-semibold uppercase tracking-wider`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {h}
+                  {label}
                 </th>
               ))}
             </tr>
@@ -670,7 +675,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 9 : 7}
+                  colSpan={showAviationColumns ? 10 : 8}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -684,7 +689,11 @@ export default function LeadsTable({
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 const displayStage = stage || 'New'
                 const stageColor = getStageColor(displayStage)
-                const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
+                // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
+                // first — never last_touchpoint, since that gets overwritten by
+                // any later interaction (e.g. a logged call flips to 'voice').
+                const source = (lead.first_touchpoint || lead.source || lead.last_touchpoint || 'unknown').toLowerCase()
+                const lastTouch = (lead.last_touchpoint || '').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
                 const uc = lead.unified_context || {}
@@ -787,13 +796,89 @@ export default function LeadsTable({
                     </td>
 
                     {/* SOURCE - small badge */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
                         style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
                       >
                         {srcCfg.label}
                       </span>
+                    </td>
+
+                    {/* LAST TOUCH - channel pill (primary) + @actor sub */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                      {(() => {
+                        const actor = (lead.unified_context as any)?.last_actor || null
+                        const lastTouchConfig: Record<string, { label: string; color: string }> = {
+                          web:           { label: 'Web',      color: '#3B82F6' },
+                          form:          { label: 'Form',     color: '#3B82F6' },
+                          whatsapp:      { label: 'WhatsApp', color: '#22C55E' },
+                          voice:         { label: 'Voice',    color: '#8B5CF6' },
+                          social:        { label: 'Social',   color: '#EC4899' },
+                          facebook:      { label: 'Facebook', color: '#1877F2' },
+                          facebook_lead: { label: 'Facebook', color: '#1877F2' },
+                          meta_forms:    { label: 'Meta',     color: '#1877F2' },
+                          google:        { label: 'Google',   color: '#EA4335' },
+                          ads:           { label: 'Ads',      color: '#F97316' },
+                          pabbly:        { label: 'Pabbly',   color: '#F59E0B' },
+                          referral:      { label: 'Referral', color: '#10B981' },
+                          organic:       { label: 'Organic',  color: '#84CC16' },
+                          manual:        { label: 'Manual',   color: '#6B7280' },
+                          landing_page:  { label: 'Landing',  color: '#3B82F6' },
+                          email:         { label: 'Email',    color: '#0EA5E9' },
+                        }
+                        const channelCfg = lastTouch
+                          ? (lastTouchConfig[lastTouch] || {
+                              label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                              color: '#6B7280',
+                            })
+                          : null
+
+                        let actorBadge: { label: string; color: string; bg: string; tooltip: string } | null = null
+                        if (actor?.type === 'user' && (actor.name || actor.email)) {
+                          const aname = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                          actorBadge = {
+                            label: aname,
+                            color: '#F59E0B',
+                            bg: 'rgba(245,158,11,0.15)',
+                            tooltip: `Last touched by ${actor.email || aname}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
+                        } else if (actor?.type === 'proxe') {
+                          actorBadge = {
+                            label: 'PROXe',
+                            color: '#8B5CF6',
+                            bg: 'rgba(139,92,246,0.15)',
+                            tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
+                        }
+
+                        if (!actorBadge && !channelCfg) {
+                          return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        }
+
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            {channelCfg && (
+                              <span
+                                className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{ backgroundColor: `${channelCfg.color}22`, color: channelCfg.color }}
+                                title={`Channel: ${channelCfg.label}`}
+                              >
+                                {channelCfg.label}
+                              </span>
+                            )}
+                            {actorBadge && (
+                              <span
+                                className="text-[10px] whitespace-nowrap"
+                                style={{ color: '#9ca3af' }}
+                                title={actorBadge.tooltip}
+                              >
+                                @{actorBadge.label.toLowerCase().replace(/\s+/g, '')}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </td>
 
                     {/* SCORE - colored pill */}
