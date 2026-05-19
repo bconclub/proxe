@@ -1,28 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MdClose, MdRefresh, MdOpenInNew } from 'react-icons/md'
+import { MdFavorite, MdClose, MdRefresh, MdOpenInNew } from 'react-icons/md'
 import Link from 'next/link'
 
 /**
- * HealthBarButton — popover with full per-service health.
- *
- * Two usage modes:
- *   <HealthBarButton />               — uncontrolled, shows its own trigger
- *                                      chip (legacy, kept for back-compat)
- *   <HealthBarButton open onClose />  — controlled, no trigger chip; you
- *                                      open/close it from elsewhere
- *                                      (e.g. the sidebar three-dot menu)
+ * HealthBarButton — fixed top-right chip on every dashboard page. Click to
+ * open a popover with full per-service health. Replaces the in-Today-snapshot
+ * health strip (per user feedback: 'doesn't need to sit in Today snapshot').
  *
  * Status model is failure-driven (not idle-driven) so we don't false-alarm
  * during quiet hours. See /api/dashboard/health for thresholds.
  */
-
-interface Props {
-  /** When provided, component is controlled. Omit for self-managed chip + popover. */
-  open?: boolean
-  onClose?: () => void
-}
 
 type Status = 'ok' | 'degraded' | 'down' | 'unknown'
 
@@ -75,17 +64,8 @@ function prettyError(raw: any): string {
   return s
 }
 
-export default function HealthBarButton({ open: openProp, onClose }: Props = {}) {
-  const isControlled = openProp !== undefined
-  const [internalOpen, setInternalOpen] = useState(false)
-  const open = isControlled ? !!openProp : internalOpen
-  const setOpen = (next: boolean) => {
-    if (isControlled) {
-      if (!next) onClose?.()
-    } else {
-      setInternalOpen(next)
-    }
-  }
+export default function HealthBarButton() {
+  const [open, setOpen] = useState(false)
   const [data, setData] = useState<HealthResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -118,27 +98,25 @@ export default function HealthBarButton({ open: openProp, onClose }: Props = {})
 
   return (
     <>
-      {/* Trigger chip — only when uncontrolled. Sidebar menu provides its own. */}
-      {!isControlled && (
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
-          style={{
-            top: '14px',
-            right: '20px',
-            background: `${overallColor}1c`,
-            border: `1px solid ${overallColor}55`,
-            color: overallColor,
-            backdropFilter: 'blur(8px)',
-          }}
-          aria-label="System health"
-          title={`System health: ${STATUS_LABEL[overall]} — click for detail`}
-        >
-          <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: overallColor, boxShadow: `0 0 6px ${overallColor}` }} />
-          Health
-        </button>
-      )}
+      {/* Trigger chip — top-right */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
+        style={{
+          top: '14px',
+          right: '20px',
+          background: `${overallColor}1c`,
+          border: `1px solid ${overallColor}55`,
+          color: overallColor,
+          backdropFilter: 'blur(8px)',
+        }}
+        aria-label="System health"
+        title={`System health: ${STATUS_LABEL[overall]} — click for detail`}
+      >
+        <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: overallColor, boxShadow: `0 0 6px ${overallColor}` }} />
+        Health
+      </button>
 
       {open && (
         <>

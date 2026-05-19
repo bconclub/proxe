@@ -77,7 +77,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
-  const [healthOpen, setHealthOpen] = useState(false)
   const moreOptionsRef = React.useRef<HTMLDivElement>(null)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
@@ -673,25 +672,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '180px',
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      setHealthOpen(true)
-                      if (isMobile) {
-                        setMobileSidebarOpen(false)
-                      }
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
-                    Endpoint Health
-                  </button>
                   <Link
-                    href="/dashboard/status"
+                    href="/status"
                     onClick={() => {
                       setMoreOptionsOpen(false)
                       if (isMobile) {
