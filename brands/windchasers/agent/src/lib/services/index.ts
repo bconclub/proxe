@@ -77,6 +77,11 @@ export {
   sendBookingConfirmation,
   sendBookingReminder,
   sendMissedCallMessage,
+  renderPATResultBody,
+  renderDemoOnlineBody,
+  renderDemoOfflineBody,
+  TIER_LABELS,
+  TIER_MESSAGES,
   sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
   sendDemoConfirmation,
   type DemoFormat,

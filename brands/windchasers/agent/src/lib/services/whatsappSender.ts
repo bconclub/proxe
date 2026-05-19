@@ -97,12 +97,17 @@ export async function sendWhatsAppTemplate(
     type: 'body' | 'header' | 'button';
     sub_type?: 'url' | 'quick_reply';
     index?: number;
-    parameters: Array<{ type: 'text'; text: string }>;
+    parameters: Array<any>;
   }>,
   languageCode: string = 'en',
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  messageId?: string;  // Meta's wamid… — needed for delivery status tracking
+  statusCode?: number; // HTTP status from Graph API (200, 400, 401, etc.)
+}> {
   const creds = getCredentials();
-  if (!creds) return { success: false, error: 'Missing credentials' };
+  if (!creds) return { success: false, error: 'Missing credentials (META_WHATSAPP_PHONE_NUMBER_ID / META_WHATSAPP_ACCESS_TOKEN)' };
 
   try {
     const res = await fetch(`${GRAPH_API_BASE}/${creds.phoneNumberId}/messages`, {
@@ -124,17 +129,75 @@ export async function sendWhatsAppTemplate(
       }),
     });
 
+    const statusCode = res.status;
+
     if (!res.ok) {
       const errBody = await res.text();
-      console.error('[whatsappSender] Template send failed:', res.status, errBody);
-      return { success: false, error: errBody };
+      console.error(`[whatsappSender] Template send FAILED status=${statusCode} template=${templateName} to=${normalizePhone(to)}:`, errBody);
+      return { success: false, error: errBody, statusCode };
     }
 
-    return { success: true };
+    const body = await res.json().catch(() => ({}));
+    const messageId = body?.messages?.[0]?.id;
+    console.log(`[whatsappSender] Template send OK status=${statusCode} template=${templateName} to=${normalizePhone(to)} messageId=${messageId}`);
+    return { success: true, messageId, statusCode };
   } catch (err: any) {
-    console.error('[whatsappSender] Template send error:', err.message);
-    return { success: false, error: err.message };
+    console.error(`[whatsappSender] Template send EXCEPTION template=${templateName} to=${normalizePhone(to)}:`, err?.message || err);
+    return { success: false, error: err?.message || String(err) };
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Template-body renderers — match the Meta-approved template strings exactly so
+// what we log to `conversations` is what the customer actually sees on WhatsApp.
+// Update these whenever the corresponding Meta template body changes.
+// ──────────────────────────────────────────────────────────────────────────────
+
+export function renderPATResultBody(
+  firstName: string,
+  score100: number,
+  tierLabel: string,
+  tierMessage: string,
+): string {
+  return `Hi ${firstName}, your Pilot Assessment result is in: *${score100}/100* — Tier: *${tierLabel}*. ${tierMessage}`;
+}
+
+export function renderDemoOnlineBody(
+  firstName: string,
+  dateDisplay: string,
+  timeDisplay: string,
+): string {
+  return [
+    `Hi ${firstName}, your online demo session is confirmed.`,
+    ``,
+    `Date: *${dateDisplay}*`,
+    `Time: *${timeDisplay}*`,
+    ``,
+    `*What to expect:* programs walkthrough, eligibility check, clear next steps.`,
+    ``,
+    `Meeting link arrives 30 minutes before the session.`,
+    ``,
+    `See you online.`,
+    `_Team Windchasers_`,
+  ].join('\n');
+}
+
+export function renderDemoOfflineBody(
+  firstName: string,
+  dateDisplay: string,
+  timeDisplay: string,
+): string {
+  return [
+    `Hi ${firstName}, your demo session is confirmed.`,
+    ``,
+    `Date: *${dateDisplay}*`,
+    `Time: *${timeDisplay}*`,
+    ``,
+    `*What to expect:* programs walkthrough, eligibility check, clear next steps.`,
+    ``,
+    `See you at the academy.`,
+    `_Team Windchasers_`,
+  ].join('\n');
 }
 
 /**
@@ -379,14 +442,14 @@ export async function sendDemoBookedConfirmation(
  *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Early Stage")
  *   {{4}} = tier-specific next-step message
  */
-const TIER_LABELS: Record<string, string> = {
+export const TIER_LABELS: Record<string, string> = {
   premium:     'Premium',
   strong:      'Strong',
   moderate:    'Moderate',
   'not-ready': 'Early Stage',
 };
 
-const TIER_MESSAGES: Record<string, string> = {
+export const TIER_MESSAGES: Record<string, string> = {
   premium:
     'Strong fit for CPL track. A counsellor can walk you through timeline and next steps.',
   strong:
