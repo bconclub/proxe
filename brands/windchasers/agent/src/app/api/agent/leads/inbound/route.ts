@@ -4,7 +4,6 @@ import {
   getClient,
   normalizePhone,
   createCalendarEvent,
-  sendFirstOutreach,
   sendDemoConfirmation,
   sendPATResult,
   buildAttribution,
@@ -505,37 +504,11 @@ export async function POST(request: NextRequest) {
           await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
         }
       }
-    } else if (isNew && phone && !isDemoBooking) {
-      // Generic welcome — only for brand-new leads that aren't a demo/PAT.
-      try {
-        const result = await sendFirstOutreach(phone, leadName)
-        await supabase.from('conversations').insert({
-          lead_id: leadId,
-          channel: 'whatsapp',
-          sender: 'agent',
-          content: result.success
-            ? `[Template: windchasers_followup] Hi ${leadName.split(' ')[0]}!`
-            : `[Template send FAILED: windchasers_followup] Hi ${leadName.split(' ')[0]}!`,
-          message_type: 'template',
-          metadata: {
-            template_name: 'windchasers_followup',
-            auto_sent: true,
-            trigger: 'inbound_first_outreach',
-            send_succeeded: !!result.success,
-            send_error: result.success ? null : (result.error || 'unknown'),
-          },
-        })
-        if (result.success) {
-          console.log(`[inbound] First outreach WA sent to ${phone} (lead: ${leadId})`)
-        } else {
-          console.error(`[inbound] First outreach WA failed for ${phone}:`, result.error)
-          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
-        }
-      } catch (err: any) {
-        console.error('[inbound] First outreach WA exception:', err?.message || err)
-        await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
-      }
     }
+    // NOTE: generic first-outreach for new non-PAT, non-demo leads is DISABLED.
+    // The 'windchasers_followup' template was never approved in Meta, so every
+    // send was failing silently. Path removed until we set up real responses.
+    // Re-enable by approving a template in Meta and restoring the branch.
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
     const preferredTime = cfields.preferred_time || cfields.preferredTime || null

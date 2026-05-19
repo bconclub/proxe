@@ -297,25 +297,13 @@ export async function sendFacebookLeadWelcome(
   ]);
 }
 
-/**
- * Send the first outreach message to a brand-new inbound lead.
- * Always uses a template — we're initiating contact, not replying.
- *
- * Template: windchasers_followup
- *   {{1}} = first name
- */
-export async function sendFirstOutreach(
-  to: string,
-  name: string,
-): Promise<{ success: boolean; error?: string }> {
-  const firstName = (name || 'there').split(' ')[0];
-  return sendWhatsAppTemplate(to, 'windchasers_followup', [
-    {
-      type: 'body',
-      parameters: [{ type: 'text', text: firstName }],
-    },
-  ]);
-}
+// NOTE: sendFirstOutreach() was removed because the 'windchasers_followup'
+// template was never approved in Meta — every call was failing silently.
+// To re-enable a first-outreach flow:
+//   1. Submit a new template in Meta Business Manager and wait for approval
+//   2. Add a new sender here referencing the approved name
+//   3. Wire it back into inbound/route.ts where the disabled branch is
+//      commented out
 
 /**
  * Send a demo booking confirmation message.

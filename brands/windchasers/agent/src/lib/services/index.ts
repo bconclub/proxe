@@ -77,7 +77,6 @@ export {
   sendBookingConfirmation,
   sendBookingReminder,
   sendMissedCallMessage,
-  sendFirstOutreach,
   sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
   sendDemoConfirmation,
   type DemoFormat,
