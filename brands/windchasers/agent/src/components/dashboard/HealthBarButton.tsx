@@ -64,8 +64,23 @@ function prettyError(raw: any): string {
   return s
 }
 
-export default function HealthBarButton() {
-  const [open, setOpen] = useState(false)
+interface HealthBarButtonProps {
+  /** Controlled mode — when defined, component hides its own chip and uses this for open/close */
+  open?: boolean
+  onClose?: () => void
+}
+
+export default function HealthBarButton(props: HealthBarButtonProps = {}) {
+  const isControlled = props.open !== undefined
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = isControlled ? !!props.open : internalOpen
+  const setOpen = (next: boolean) => {
+    if (isControlled) {
+      if (!next) props.onClose?.()
+    } else {
+      setInternalOpen(next)
+    }
+  }
   const [data, setData] = useState<HealthResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -98,25 +113,28 @@ export default function HealthBarButton() {
 
   return (
     <>
-      {/* Trigger chip — top-right */}
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
-        style={{
-          top: '14px',
-          right: '20px',
-          background: `${overallColor}1c`,
-          border: `1px solid ${overallColor}55`,
-          color: overallColor,
-          backdropFilter: 'blur(8px)',
-        }}
-        aria-label="System health"
-        title={`System health: ${STATUS_LABEL[overall]} — click for detail`}
-      >
-        <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: overallColor, boxShadow: `0 0 6px ${overallColor}` }} />
-        Health
-      </button>
+      {/* Trigger chip — only in uncontrolled mode. When parent passes `open`,
+          parent owns the trigger UI (e.g. sidebar three-dot menu item). */}
+      {!isControlled && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
+          style={{
+            top: '14px',
+            right: '20px',
+            background: `${overallColor}1c`,
+            border: `1px solid ${overallColor}55`,
+            color: overallColor,
+            backdropFilter: 'blur(8px)',
+          }}
+          aria-label="System health"
+          title={`System health: ${STATUS_LABEL[overall]} — click for detail`}
+        >
+          <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: overallColor, boxShadow: `0 0 6px ${overallColor}` }} />
+          Health
+        </button>
+      )}
 
       {open && (
         <>
