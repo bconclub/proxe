@@ -399,12 +399,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
-              const isActive = pathname === item.href || (item.children && item.children.some(child => pathname === child.href))
+              // Match the nav item active when pathname matches the href OR
+              // starts with `${href}/` (sub-page case — e.g. /settings/users
+              // should highlight "Configure"). Exclude bare /dashboard to
+              // avoid Overview lighting up on every page.
+              const matchesSubPath = (href?: string) =>
+                !!href && href !== '/dashboard' && pathname.startsWith(href + '/')
+              const isActive = pathname === item.href
+                || matchesSubPath(item.href)
+                || (item.children && item.children.some(child => pathname === child.href || matchesSubPath(child.href)))
               const isInbox = item.name === 'Conversations'
               const hasChildren = item.children && item.children.length > 0
 
               const renderNavItem = (navItem: NavItem, isChild = false) => {
-                const itemIsActive = pathname === navItem.href
+                const itemIsActive = pathname === navItem.href || matchesSubPath(navItem.href)
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
                 const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 

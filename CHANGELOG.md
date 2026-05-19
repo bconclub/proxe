@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-19 · fix(both brands): clear pre-existing TS errors + parent nav-item highlight on sub-pages
+
+Two things in one commit, both related to the `DashboardLayout` active-detection logic.
+
+**Pre-existing TS errors flagged earlier as #31, now killed:**
+- `settings/users/page.tsx:153` (windchasers only — bcon doesn't have this page) passed `<DashboardLayout activeNavItem="settings">`, but the layout's props type never declared `activeNavItem`. The prop was a no-op anyway (layout derives active state from pathname). Removed.
+- `DashboardLayout.tsx:734` referenced `healthOpen` / `setHealthOpen` without declaring them — picked up by a linter pass that added the `useState` for them at the top of the component, so this one resolved itself before commit.
+
+**Bonus UX fix (mirrored to both brands):**
+- The nav-item active matcher only checked `pathname === item.href`. So when on `/dashboard/settings/users` (a sub-page of Configure), NO nav item lit up. Added a `matchesSubPath` helper that also matches `pathname.startsWith(href + '/')`, excluding the bare `/dashboard` to avoid Overview lighting up everywhere. Now sub-pages correctly highlight their parent nav item (Configure for /settings/users, Knowledge for /settings/knowledge-base/*, etc.). Applied to both `windchasers` and `bcon` DashboardLayout for parity.
+
 ## 2026-05-19 · feat(windchasers) + fix(inbox UI): counsellor framing rewrite + booking name/email handling + light-mode bubble parity
 
 Three landed in one commit:
