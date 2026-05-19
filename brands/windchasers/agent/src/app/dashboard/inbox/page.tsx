@@ -1529,8 +1529,8 @@ export default function InboxPage() {
                       {conv.booking_status && (
                         <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                           style={{
-                            background: '#22c55e',
-                            color: '#fff',
+                            background: 'rgba(34,197,94,0.15)',
+                            color: '#16a34a',
                           }}>
                           EVENT
                         </span>
@@ -1771,16 +1771,21 @@ export default function InboxPage() {
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
                           : 'max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
+                          // Theme-aware tokens so the bubbles read correctly
+                          // in BOTH light and dark mode. The previous
+                          // hard-coded rgba(15,23,42,0.55) / (255,255,255,0.10)
+                          // values were tuned for dark mode and rendered as
+                          // washed-out purple over white in light mode.
                           background: isCustomer
-                            ? 'rgba(255,255,255,0.10)'
+                            ? 'var(--bg-hover)'
                             : isTemplate
-                              ? 'rgba(15,23,42,0.55)'
-                              : 'rgba(99,102,241,0.28)',
+                              ? 'var(--bg-secondary)'
+                              : 'var(--accent-subtle)',
                           borderColor: isCustomer
-                            ? 'rgba(255,255,255,0.18)'
+                            ? 'var(--border-primary)'
                             : isTemplate
-                              ? 'rgba(99,102,241,0.30)'
-                              : 'rgba(99,102,241,0.45)',
+                              ? 'var(--border-primary)'
+                              : 'var(--accent-subtle)',
                           borderWidth: '1px',
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
@@ -1794,7 +1799,7 @@ export default function InboxPage() {
                             {/* Compact template header strip (channel + timestamp) */}
                             <div
                               className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
-                              style={{ background: 'rgba(99,102,241,0.12)', borderColor: 'rgba(99,102,241,0.20)' }}
+                              style={{ background: 'var(--accent-subtle)', borderColor: 'var(--border-primary)' }}
                             >
                               <div className="flex items-center gap-1.5">
                                 <ChannelIcon channel={msg.channel} size={10} active={true} />
@@ -1888,15 +1893,23 @@ export default function InboxPage() {
                               className={isTemplate
                                 ? 'flex items-center gap-1.5 px-2.5 py-1 border-t flex-wrap'
                                 : 'flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap'}
-                              style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                              style={{ borderColor: 'var(--border-primary)' }}
                             >
-                              <span
-                                className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
-                                style={{ background: statusStyle.bg, color: statusStyle.color }}
-                                data-tooltip={tooltip}
-                              >
-                                Template
-                              </span>
+                              {/* Footer pill carries delivery STATUS (Sent /
+                                  Delivered / Read / Failed). Drop the
+                                  redundant "Template" word — the template
+                                  header strip already labels the bubble as
+                                  a template, and the template_name shows
+                                  right next to this pill. */}
+                              {!isTemplate && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
+                                  style={{ background: statusStyle.bg, color: statusStyle.color }}
+                                  data-tooltip={tooltip}
+                                >
+                                  Template
+                                </span>
+                              )}
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {msg.metadata.template_name}
                               </span>

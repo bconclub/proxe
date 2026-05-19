@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-05-19 · feat(windchasers) + fix(inbox UI): counsellor framing rewrite + booking name/email handling + light-mode bubble parity
+
+Three landed in one commit:
+
+**#12 — Counsellor framing (windchasers prompts, WA + web):**
+- Cost-answer line rewritten from third-person ("A counsellor walks through the exact breakdown for your path on the call.") to second-person suggestive invitation ("Want me to set up a quick call with a counsellor so they can walk you through specifics?")
+- Same rewrite applied to the web-prompt's parent-cost answer ("The counsellor will share current figures…" → "Want me to set up a quick call with a counsellor who can share current figures…?")
+- New **COUNSELLOR FRAMING** rule block added to both prompts: do NOT mention the counsellor in messages 1 or 2 (user is still warming up); from message 3 onwards, always phrase as a suggestive second-person invitation, NEVER describe what the counsellor does in third person
+
+**#14 — Booking confirmation script (windchasers WhatsApp):**
+- BOOKING FLOW Step 3 rewritten from "Ask for EMAIL if you don't already have it" to a KNOWN-CONTACT-aware branching block:
+  - Phone always KNOWN on WhatsApp — never ask
+  - Name missing → "Got {date} at {time}. Drop your name and I'll lock it in."
+  - Email missing → "Almost done. Drop your email so I can send the calendar invite."
+  - Both missing → ask in ONE message
+  - Both KNOWN → confirm line "Confirming for {first_name} at this number — lock it in?"
+
+**#29 — Inbox bubble + EVENT pill light-mode parity:**
+- Message bubble backgrounds switched from hard-coded `rgba(15,23,42,0.55)` / `rgba(255,255,255,0.10)` / `rgba(99,102,241,0.28)` to theme-aware `var(--bg-secondary)` / `var(--bg-hover)` / `var(--accent-subtle)`. Now reads correctly in BOTH light and dark mode instead of washed-out purple over white
+- Borders on all three bubble types switched to `var(--border-primary)` / `var(--accent-subtle)` for theme adaptation
+- Template card header strip now uses theme-aware accent + border tokens
+- Dropped the redundant "Template" status-tag from the footer when the bubble already has the "Template · WA" header strip — was duplicating the label. Template name still shows beside the (now hidden) tag
+- `EVENT` pill in the conversation list softened from solid `#22c55e` + white text to a low-opacity green tint (`rgba(34,197,94,0.15)` bg, `#16a34a` text) so it doesn't shout against either theme
+
 ## 2026-05-19 · style(both brands): sidebar nav — drop hard active border, switch to accent-tinted pill
 
 The dashboard sidebar's active item rendered with a 2px solid left border + filled `--bg-hover` background, which read as "old-school" — hard line on the edge, generic neutral fill. Modernised both brand layouts to a current-pattern sidebar (Linear/Vercel/Notion style):
