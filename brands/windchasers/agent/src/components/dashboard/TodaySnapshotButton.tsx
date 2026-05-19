@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
+import HealthStrip from './HealthStrip'
 
 /**
  * TodaySnapshotButton — top-right floating button that opens a quick-glance
@@ -161,6 +162,10 @@ export default function TodaySnapshotButton() {
 
               {data && (
                 <>
+                  {/* Endpoint health — at the top so a broken pipeline is the
+                      first thing the founder sees */}
+                  <HealthStrip />
+
                   {/* Top KPI strip — 4 hero numbers across */}
                   <div className="grid grid-cols-4 gap-2 mb-1">
                     <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ErrorLogsModal from '@/components/dashboard/ErrorLogsModal'
+import HealthStrip from '@/components/dashboard/HealthStrip'
+import EndpointHealthDetail from '@/components/dashboard/EndpointHealthDetail'
 
 interface ErrorDetail {
   message: string
@@ -329,6 +331,17 @@ export default function StatusPage() {
             <p className="text-sm" style={{ color: '#ef4444' }}>Error: {error}</p>
           </div>
         )}
+
+        {/* Endpoint health strip — at-a-glance per-service status */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
+            Endpoint Health
+          </h2>
+          <HealthStrip />
+        </div>
+
+        {/* Detailed per-endpoint cards + recent failed sends */}
+        <EndpointHealthDetail />
 
         {/* Status Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
