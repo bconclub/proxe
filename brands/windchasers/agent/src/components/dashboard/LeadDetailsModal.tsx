@@ -1666,7 +1666,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <button
                     ref={stageButtonRef}
                     onClick={() => setShowStageDropdown(!showStageDropdown)}
-                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none"
                     title="Edit stage"
                     aria-label="Edit lead stage"
                     aria-expanded={showStageDropdown}
@@ -1809,58 +1809,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* ATTRIBUTION — Source / First Touch / Last Touch */}
-                {(() => {
-                  const attribution = currentLead.unified_context?.attribution || {};
-                  const sourceLabel = attribution.source_label
-                    || (attribution.source ? String(attribution.source).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
-                  const firstTouchLabel = attribution.first_touch_label
-                    || (attribution.first_touch ? String(attribution.first_touch).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
-                  // Fallback to legacy fields for older leads
-                  const legacyFirst = (currentLead as any).first_touchpoint;
-                  const legacyLast = (currentLead as any).last_touchpoint;
-                  const finalSource = sourceLabel || 'Direct';
-                  const finalFirstTouch = firstTouchLabel
-                    || (legacyFirst ? String(legacyFirst).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
-                  const finalLastTouch = legacyLast
-                    ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-                    : null;
-                  if (!sourceLabel && !finalFirstTouch && !finalLastTouch) return null;
-                  return (
-                    <div className="lead-attribution mt-2 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                      <button
-                        type="button"
-                        onClick={() => setShowAttribution((v) => !v)}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors focus:outline-none"
-                        aria-expanded={showAttribution}
-                        aria-controls="lead-attribution-content"
-                      >
-                        <span>Attribution</span>
-                        <MdExpandMore
-                          size={14}
-                          className="transition-transform"
-                          style={{ transform: showAttribution ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        />
-                      </button>
-                      {showAttribution && (
-                        <div id="lead-attribution-content" className="grid grid-cols-3 gap-2 text-[10px] px-2.5 pb-2.5">
-                          <div>
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Source</div>
-                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalSource}>{finalSource}</div>
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">First Touch</div>
-                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalFirstTouch || '—'}>{finalFirstTouch || '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Last Touch</div>
-                            <div className="font-semibold text-[var(--text-primary)] truncate" title={finalLastTouch || '—'}>{finalLastTouch || '—'}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* ATTRIBUTION moved to the Interaction tab (with expanded
+                    UTM / ad set / ad name / fbclid details). Used to live here
+                    as a collapsible block on the contact card — too noisy on
+                    a card meant for at-a-glance info. */}
 
                 {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
                 {(() => {
@@ -2027,7 +1979,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     />
                     <button
                       onClick={toggleVoiceDictation}
-                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
+                      className="focus:outline-none rounded-full"
                       className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
                         isListening
                           ? 'bg-red-500 text-white animate-pulse'
@@ -2040,7 +1992,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </button>
                     <button
                       onClick={handleSaveAdminNote}
-                      className="focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded-full"
+                      className="focus:outline-none rounded-full"
                       disabled={!adminNoteText.trim() || savingAdminNote}
                       className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
                       title="Save note"
@@ -2091,7 +2043,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <button
                       onClick={handleLogCall}
                       disabled={savingLogCall}
-                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      className="lead-log-call-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none"
                       title="Save call log"
                     >
                       <MdCheck size={12} />
@@ -2118,7 +2070,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <button
                       onClick={handleSendMessage}
                       disabled={!sendMessageText.trim() || sendingMessage}
-                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      className="lead-send-message-save w-6 h-6 flex items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40 transition-colors focus:outline-none"
                       title="Send message"
                     >
                       <MdCheck size={12} />
@@ -2131,7 +2083,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="relative inline-block mt-1">
                     <button
                       onClick={() => setShowAdminNotes(!showAdminNotes)}
-                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded"
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none rounded"
                       title={`${(currentLead.unified_context.admin_notes as any[]).length} admin notes`}
                     >
                       <MdMoreHoriz size={18} />
@@ -2238,7 +2190,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <div className="absolute top-4 right-4">
               <button
                 onClick={() => setShowActionDropdown(!showActionDropdown)}
-                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                className="lead-action-button w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-colors focus:outline-none"
                 aria-label="Quick actions"
                 aria-expanded={showActionDropdown}
                 aria-haspopup="true"
@@ -2251,13 +2203,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="absolute right-0 top-11 z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 w-44">
                     <button
                       onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowLogCallForm(true) }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none"
                     >
                       <MdCall size={16} className="text-green-500" /> Log a Call
                     </button>
                     <button
                       onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowAdminNoteInput(true) }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none"
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
                     </button>
@@ -2316,7 +2268,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           window.prompt('Copy lead details:', lines)
                         }
                       }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none"
                     >
                       <MdContentCopy size={16} className="text-amber-500" /> Copy Lead Details
                     </button>
@@ -2346,7 +2298,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}
-                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${currentStage === stage
+                        className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors focus:outline-none ${currentStage === stage
                           ? getStageBadgeClass(stage) + ' font-semibold'
                           : 'hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
                           }`}
@@ -2370,7 +2322,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'summary'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -2383,7 +2335,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('activity')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'activity'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -2396,7 +2348,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'breakdown'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -2409,7 +2361,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('interaction')}
-              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'interaction'
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
@@ -2418,7 +2370,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               aria-controls="lead-tabpanel-interaction"
               id="lead-tab-interaction"
             >
-              30-Day Interaction
+              Interaction
             </button>
           </nav>
 
@@ -2782,30 +2734,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     {calculatedScore ? (
                       <div className="space-y-4">
-                        {/* Score headline + Temperature badge */}
+                        {/* Score headline — single tier label from the calculated score.
+                            The legacy unified_context.lead_temperature pill was removed because it
+                            was painted from a stale/independent classifier and contradicted the
+                            score-derived label (e.g. "53/100 Cold + WARM"). One source of truth. */}
                         <div>
                           <div className="flex items-baseline gap-2">
                             <span className="text-3xl font-extrabold text-[var(--text-primary)]">{calculatedScore.score}/100</span>
                             <span className="text-sm font-bold" style={{ color: healthColor.text }}>{healthColor.label}</span>
-                            {(() => {
-                              const temp = currentLead.unified_context?.lead_temperature
-                              if (!temp) return null
-                              const tempConfig: Record<string, { color: string; bg: string; label: string }> = {
-                                hot:  { color: '#DC2626', bg: 'rgba(220,38,38,0.12)', label: 'HOT' },
-                                warm: { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'WARM' },
-                                cool: { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'COOL' },
-                                cold: { color: '#6B7280', bg: 'rgba(107,114,128,0.12)', label: 'COLD' },
-                              }
-                              const cfg = tempConfig[temp] || tempConfig.warm
-                              return (
-                                <span
-                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
-                                  style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                                >
-                                  {temp === 'hot' ? '🔥' : temp === 'warm' ? '🟠' : temp === 'cool' ? '🔵' : '⚪'} {cfg.label}
-                                </span>
-                              )
-                            })()}
                           </div>
                           <p className="text-xs text-[var(--text-muted)] mt-1">Based on conversation activity and intent signals</p>
                         </div>
@@ -2869,6 +2805,101 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     aria-labelledby="lead-tab-interaction"
                     className="lead-tabpanel-interaction space-y-4"
                   >
+                    {/* ── ATTRIBUTION (moved here from the contact card) ── */}
+                    {(() => {
+                      const attribution: any = currentLead.unified_context?.attribution || {};
+                      const utm = attribution.utm || {};
+
+                      // Page-URL is a great fallback source for utm + fb fields
+                      // because the website appends every parameter. Try to
+                      // surface ad_id (utm_id) and fbclid even when utm{} is sparse.
+                      let urlParams: Record<string, string> = {};
+                      try {
+                        if (attribution.page_url) {
+                          const fullUrl = attribution.page_url.startsWith('http')
+                            ? attribution.page_url
+                            : `https://example.com${attribution.page_url}`;
+                          const u = new URL(fullUrl);
+                          u.searchParams.forEach((v, k) => { urlParams[k] = v; });
+                        }
+                      } catch { /* malformed URL — skip */ }
+
+                      const sourceLabel = attribution.source_label
+                        || (attribution.source ? String(attribution.source).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const firstTouchLabel = attribution.first_touch_label
+                        || (attribution.first_touch ? String(attribution.first_touch).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const legacyFirst = (currentLead as any).first_touchpoint;
+                      const legacyLast = (currentLead as any).last_touchpoint;
+                      const finalSource = sourceLabel || 'Direct';
+                      const finalFirstTouch = firstTouchLabel
+                        || (legacyFirst ? String(legacyFirst).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const finalLastTouch = legacyLast
+                        ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        : null;
+
+                      // Rich UTM / ad fields — pull from utm{}, fall back to URL params
+                      const utmSource   = utm.source   || urlParams.utm_source   || null;
+                      const utmMedium   = utm.medium   || urlParams.utm_medium   || null;
+                      const utmCampaign = utm.campaign || urlParams.utm_campaign || null;
+                      const utmContent  = utm.content  || urlParams.utm_content  || null;
+                      const utmTerm     = utm.term     || urlParams.utm_term     || null;
+                      const utmId       = utm.id       || utm.utm_id || urlParams.utm_id || null;
+                      const fbclid      = urlParams.fbclid || null;
+                      const brid        = urlParams.brid || null;
+                      const referrer    = attribution.referrer || (currentLead.unified_context as any)?.raw_form_fields?.referrer || null;
+                      const capturedAt  = attribution.captured_at || null;
+
+                      // Show a row only if we have a value worth displaying
+                      const rows: Array<{ label: string; value: string; mono?: boolean }> = [];
+                      if (finalSource)      rows.push({ label: 'Source',      value: finalSource });
+                      if (finalFirstTouch)  rows.push({ label: 'First touch', value: finalFirstTouch });
+                      if (finalLastTouch)   rows.push({ label: 'Last touch',  value: finalLastTouch });
+                      if (utmCampaign)      rows.push({ label: 'Campaign',    value: String(utmCampaign) });
+                      if (utmContent)       rows.push({ label: 'Ad / Content',value: String(utmContent) });
+                      if (utmMedium)        rows.push({ label: 'Medium',      value: String(utmMedium) });
+                      if (utmSource)        rows.push({ label: 'UTM Source',  value: String(utmSource) });
+                      if (utmId)            rows.push({ label: 'Ad set ID',   value: String(utmId), mono: true });
+                      if (utmTerm)          rows.push({ label: 'Term / Ad ID',value: String(utmTerm), mono: true });
+                      if (fbclid)           rows.push({ label: 'Facebook click ID', value: String(fbclid).slice(0, 40) + (String(fbclid).length > 40 ? '…' : ''), mono: true });
+                      if (brid)             rows.push({ label: 'Reel/Branded ID',   value: String(brid).slice(0, 40) + (String(brid).length > 40 ? '…' : ''), mono: true });
+                      if (referrer)         rows.push({ label: 'Referrer',    value: String(referrer) });
+                      if (capturedAt) {
+                        try {
+                          rows.push({ label: 'Captured at', value: new Date(capturedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) });
+                        } catch { /* skip */ }
+                      }
+
+                      if (rows.length === 0) return null;
+                      return (
+                        <article className="lead-attribution-panel p-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)]">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                            Attribution
+                          </h3>
+                          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            {rows.map((r) => (
+                              <div key={r.label} className="flex flex-col">
+                                <dt className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{r.label}</dt>
+                                <dd
+                                  className={`text-[12px] font-medium text-[var(--text-primary)] truncate ${r.mono ? 'font-mono text-[11px]' : ''}`}
+                                  title={r.value}
+                                >
+                                  {r.value}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                          {attribution.page_url && (
+                            <div className="mt-3 pt-3 border-t border-[var(--border-primary)]">
+                              <dt className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1">Landing page</dt>
+                              <dd className="text-[11px] font-mono break-all text-[var(--text-secondary)]" title={attribution.page_url}>
+                                {attribution.page_url}
+                              </dd>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })()}
+
                     {loading30Days ? (
                       <div className="lead-interaction-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                         <div className="animate-pulse">Loading interaction data...</div>
