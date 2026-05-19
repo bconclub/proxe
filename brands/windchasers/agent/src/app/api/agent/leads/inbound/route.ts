@@ -416,6 +416,7 @@ export async function POST(request: NextRequest) {
       taskCreated = true // a task already exists for this lead
     } else {
       const { error: taskErr } = await supabase.from('agent_tasks').insert({
+        brand: BRAND_ID,
         task_type: 'first_outreach',
         task_description: `First outreach to ${leadName} from ${leadSource}${campaign ? ` (${campaign})` : ''}`,
         lead_id: leadId,
@@ -470,43 +471,70 @@ export async function POST(request: NextRequest) {
               : 'not-ready'
       const tier = derivedTier
       if (!isNaN(score)) {
-        sendPATResult(phone, leadName, score, tier)
-          .then((result) => {
-            if (result.success) {
-              supabase.from('conversations').insert({
-                lead_id: leadId,
-                channel: 'whatsapp',
-                sender: 'agent',
-                content: `[Template: windchasers_pat_result_v1] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`,
-                message_type: 'template',
-                metadata: { template_name: 'windchasers_pat_result_v1', auto_sent: true, trigger: 'pat_completed', score, tier },
-              }).catch(() => {})
-              console.log(`[inbound] PAT result WA sent to ${phone} (lead: ${leadId}) score=${score} tier=${tier}`)
-            } else {
-              console.error(`[inbound] PAT result WA failed for ${phone}:`, result.error)
-            }
+        // AWAIT (not fire-and-forget) — Vercel kills in-flight promises after
+        // NextResponse.json() returns. Also always log to conversations,
+        // success OR failure, so the dashboard reflects reality.
+        try {
+          const result = await sendPATResult(phone, leadName, score, tier)
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: result.success
+              ? `[Template: windchasers_pat_result_v1] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`
+              : `[Template send FAILED: windchasers_pat_result_v1] PAT result for ${leadName.split(' ')[0]} — ${score}/150 (${tier})`,
+            message_type: 'template',
+            metadata: {
+              template_name: 'windchasers_pat_result_v1',
+              auto_sent: true,
+              trigger: 'pat_completed',
+              score,
+              tier,
+              send_succeeded: !!result.success,
+              send_error: result.success ? null : (result.error || 'unknown'),
+            },
           })
-          .catch((err) => console.error('[inbound] PAT result WA error:', err))
+          if (result.success) {
+            console.log(`[inbound] PAT result WA sent to ${phone} (lead: ${leadId}) score=${score} tier=${tier}`)
+          } else {
+            console.error(`[inbound] PAT result WA failed for ${phone}:`, result.error)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          }
+        } catch (err: any) {
+          console.error('[inbound] PAT result WA exception:', err?.message || err)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        }
       }
     } else if (isNew && phone && !isDemoBooking) {
       // Generic welcome — only for brand-new leads that aren't a demo/PAT.
-      sendFirstOutreach(phone, leadName)
-        .then((result) => {
-          if (result.success) {
-            supabase.from('conversations').insert({
-              lead_id: leadId,
-              channel: 'whatsapp',
-              sender: 'agent',
-              content: `[Template: windchasers_followup] Hi ${leadName.split(' ')[0]}!`,
-              message_type: 'template',
-              metadata: { template_name: 'windchasers_followup', auto_sent: true, trigger: 'inbound_first_outreach' },
-            }).catch(() => {})
-            console.log(`[inbound] First outreach WA sent to ${phone} (lead: ${leadId})`)
-          } else {
-            console.error(`[inbound] First outreach WA failed for ${phone}:`, result.error)
-          }
+      try {
+        const result = await sendFirstOutreach(phone, leadName)
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: result.success
+            ? `[Template: windchasers_followup] Hi ${leadName.split(' ')[0]}!`
+            : `[Template send FAILED: windchasers_followup] Hi ${leadName.split(' ')[0]}!`,
+          message_type: 'template',
+          metadata: {
+            template_name: 'windchasers_followup',
+            auto_sent: true,
+            trigger: 'inbound_first_outreach',
+            send_succeeded: !!result.success,
+            send_error: result.success ? null : (result.error || 'unknown'),
+          },
         })
-        .catch((err) => console.error('[inbound] First outreach WA error:', err))
+        if (result.success) {
+          console.log(`[inbound] First outreach WA sent to ${phone} (lead: ${leadId})`)
+        } else {
+          console.error(`[inbound] First outreach WA failed for ${phone}:`, result.error)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        }
+      } catch (err: any) {
+        console.error('[inbound] First outreach WA exception:', err?.message || err)
+        await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+      }
     }
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
@@ -629,32 +657,40 @@ export async function POST(request: NextRequest) {
           ? 'windchasers_demo_online_v1'
           : 'windchasers_demo_offline_v1'
 
-        sendDemoConfirmation(phone, leadName, dateDisplay, timeDisplay, demoFormat, eventIdForButton)
-          .then((result) => {
-            if (result.success) {
-              supabase.from('conversations').insert({
-                lead_id: leadId,
-                channel: 'whatsapp',
-                sender: 'agent',
-                content: `[Template: ${templateName}] Demo (${demoFormat}) confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`,
-                message_type: 'template',
-                metadata: {
-                  template_name: templateName,
-                  auto_sent: true,
-                  trigger: 'demo_booked',
-                  format: demoFormat,
-                  date: preferredDate,
-                  time: preferredTime,
-                  calendar_event_id: eventIdForButton,
-                  meet_link: demoMeetLink, // kept for downstream consumers — null for offline
-                },
-              }).catch(() => {})
-              console.log(`[inbound] Demo confirmation WA sent to ${phone} (lead: ${leadId}, format: ${demoFormat})`)
-            } else {
-              console.error(`[inbound] Demo confirmation WA failed for ${phone}:`, result.error)
-            }
+        // AWAIT (not fire-and-forget) — see PAT block above for rationale.
+        try {
+          const result = await sendDemoConfirmation(phone, leadName, dateDisplay, timeDisplay, demoFormat, eventIdForButton)
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: result.success
+              ? `[Template: ${templateName}] Demo (${demoFormat}) confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`
+              : `[Template send FAILED: ${templateName}] Demo (${demoFormat}) confirmed for ${leadName.split(' ')[0]} on ${dateDisplay} at ${timeDisplay}`,
+            message_type: 'template',
+            metadata: {
+              template_name: templateName,
+              auto_sent: true,
+              trigger: 'demo_booked',
+              format: demoFormat,
+              date: preferredDate,
+              time: preferredTime,
+              calendar_event_id: eventIdForButton,
+              meet_link: demoMeetLink, // kept for downstream consumers — null for offline
+              send_succeeded: !!result.success,
+              send_error: result.success ? null : (result.error || 'unknown'),
+            },
           })
-          .catch((err) => console.error('[inbound] Demo confirmation WA error:', err))
+          if (result.success) {
+            console.log(`[inbound] Demo confirmation WA sent to ${phone} (lead: ${leadId}, format: ${demoFormat})`)
+          } else {
+            console.error(`[inbound] Demo confirmation WA failed for ${phone}:`, result.error)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          }
+        } catch (err: any) {
+          console.error('[inbound] Demo confirmation WA exception:', err?.message || err)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        }
       } catch (waErr: any) {
         console.error('[inbound] Demo confirmation prep failed:', waErr?.message || waErr)
       }
