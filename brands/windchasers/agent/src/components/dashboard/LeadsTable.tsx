@@ -757,17 +757,41 @@ export default function LeadsTable({
                 // first_touch, first_touch_label }. Use that as the canonical source
                 // of truth, falling back to the legacy UTM/channel logic below for
                 // older leads.
+                //
+                // Resolved-channel priority chain (per website spec):
+                //   raw_form_fields.channel    → website's pre-resolved channel
+                //                                 (ig, fb, google_ads, facebook_ads, …)
+                //                                 fbclid is already mapped here
+                //   raw_form_fields.utm_source → explicit UTM (when present)
+                //   attribution.source         → already-resolved from inbound endpoint
+                //                                 (covers leads created post-fix)
+                //   'direct'                   → final fallback
+                //
+                // We prefer raw_form_fields.channel FIRST regardless of what's in
+                // attribution.source, so historical leads written before the inbound
+                // fix still render correctly using the raw field the website sent.
                 const attribution = uc?.attribution || null
-                const attrSource = String(attribution?.source || '').toLowerCase().trim()
-                const attrSourceLabel = String(attribution?.source_label || '').trim()
+                const rffChannel = String(uc?.raw_form_fields?.channel || '').toLowerCase().trim()
+                const rffUtmSource = String(uc?.raw_form_fields?.utm_source || '').toLowerCase().trim()
+                const attrSourceStored = String(attribution?.source || '').toLowerCase().trim()
+                const attrSourceLabelStored = String(attribution?.source_label || '').trim()
                 const attrFirstTouchKey = String(attribution?.first_touch || '').toLowerCase().trim()
                 const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
 
-                // Pull UTM info — website's /api/leads stuffs UTM into
-                // custom_fields, which PROXe stores under raw_form_fields.
-                // Older leads have it under web.utm.
+                // attrSource = the EFFECTIVE source we'll surface on the SOURCE column.
+                // Anything non-direct/non-empty in rffChannel wins.
+                const attrSource = (rffChannel && rffChannel !== 'direct' && rffChannel !== 'unknown')
+                  ? rffChannel
+                  : (rffUtmSource && rffUtmSource !== 'direct')
+                    ? rffUtmSource
+                    : attrSourceStored
+                // attrSourceLabel only used as a stored fallback — it may be stale
+                // when rffChannel overrides; the column re-resolves the label from
+                // attrSource via utmSourceConfig further down.
+                const attrSourceLabel = (rffChannel || rffUtmSource) ? '' : attrSourceLabelStored
+
+                // utmSourceRaw drives the SOURCE pill — same priority chain.
                 const utmSourceRaw = attrSource || String(
-                  uc?.raw_form_fields?.utm_source ||
                   uc?.web?.utm?.source ||
                   uc?.landing_page?.utm_source ||
                   ''
@@ -797,22 +821,29 @@ export default function LeadsTable({
                   unknown: { label: '-', color: '#6B7280' },
                 }
 
-                // Friendly label + color per known utm_source.
+                // Friendly label + color per known utm_source / channel.
                 const utmSourceConfig: Record<string, { label: string; color: string }> = {
                   google: { label: 'Google', color: '#EA4335' },
-                  google_ads: { label: 'Google', color: '#EA4335' },
-                  googleads: { label: 'Google', color: '#EA4335' },
+                  google_ads: { label: 'Google Ads', color: '#EA4335' },
+                  googleads: { label: 'Google Ads', color: '#EA4335' },
+                  bing: { label: 'Bing', color: '#008373' },
+                  bing_ads: { label: 'Bing Ads', color: '#008373' },
                   youtube: { label: 'YouTube', color: '#FF0000' },
                   yt: { label: 'YouTube', color: '#FF0000' },
                   meta: { label: 'Meta', color: '#1877F2' },
-                  facebook: { label: 'Meta', color: '#1877F2' },
-                  fb: { label: 'Meta', color: '#1877F2' },
+                  meta_ads: { label: 'Meta Ads', color: '#1877F2' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  facebook_ads: { label: 'Facebook Ads', color: '#1877F2' },
+                  fb: { label: 'Facebook', color: '#1877F2' },
+                  fb_ads: { label: 'Facebook Ads', color: '#1877F2' },
                   instagram: { label: 'Instagram', color: '#E4405F' },
                   ig: { label: 'Instagram', color: '#E4405F' },
                   linkedin: { label: 'LinkedIn', color: '#0A66C2' },
+                  linkedin_ads: { label: 'LinkedIn Ads', color: '#0A66C2' },
                   twitter: { label: 'X', color: '#000000' },
                   x: { label: 'X', color: '#000000' },
                   tiktok: { label: 'TikTok', color: '#000000' },
+                  tiktok_ads: { label: 'TikTok Ads', color: '#000000' },
                   whatsapp: { label: 'WhatsApp', color: '#22C55E' },
                   email: { label: 'Email', color: '#0EA5E9' },
                   newsletter: { label: 'Newsletter', color: '#0EA5E9' },

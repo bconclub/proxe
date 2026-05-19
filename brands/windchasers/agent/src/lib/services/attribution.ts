@@ -20,17 +20,23 @@ const SOURCE_LABELS: Record<string, string> = {
   ig: 'Instagram',
   facebook: 'Facebook',
   fb: 'Facebook',
+  facebook_ads: 'Facebook Ads',
+  fb_ads: 'Facebook Ads',
   meta: 'Meta',
   meta_ads: 'Meta Ads',
   google: 'Google',
-  google_ads: 'Google',
-  googleads: 'Google',
+  google_ads: 'Google Ads',
+  googleads: 'Google Ads',
   youtube: 'YouTube',
   yt: 'YouTube',
   linkedin: 'LinkedIn',
+  linkedin_ads: 'LinkedIn Ads',
   twitter: 'X',
   x: 'X',
   tiktok: 'TikTok',
+  tiktok_ads: 'TikTok Ads',
+  bing: 'Bing',
+  bing_ads: 'Bing Ads',
   whatsapp: 'WhatsApp',
   email: 'Email',
   newsletter: 'Newsletter',
@@ -76,7 +82,22 @@ function titleCase(s: string): string {
 export function deriveSource(
   utmSource: string | null | undefined,
   channelFallback?: string,
+  resolvedChannel?: string | null,
 ): { source: string; source_label: string } {
+  // PRIORITY 1: resolvedChannel — the website's own pre-resolved channel
+  // (custom_fields.channel: ig, fb, google_ads, facebook_ads, …). This is
+  // the most reliable signal because the website has already done the
+  // click-id → channel mapping (e.g. fbclid → facebook_ads) that UTM
+  // tagging alone misses. Meta auto-tags ads with fbclid INSTEAD of UTM,
+  // so reading utm_source first buckets every Meta-ad lead to "Direct".
+  const rc = (resolvedChannel || '').toLowerCase().trim();
+  if (rc && rc !== 'unknown' && rc !== 'direct') {
+    return {
+      source: rc,
+      source_label: SOURCE_LABELS[rc] || titleCase(rc),
+    };
+  }
+  // PRIORITY 2: utm_source (the classic signal, when explicit UTM is present)
   const clean = (utmSource || '').toLowerCase().trim();
   if (clean) {
     return {
@@ -84,7 +105,8 @@ export function deriveSource(
       source_label: SOURCE_LABELS[clean] || titleCase(clean),
     };
   }
-  // No UTM — for web/form/manual fall through to "Direct", else use the channel
+  // PRIORITY 3: channelFallback (legacy — the inbound endpoint's `leadSource`
+  // enum, e.g. 'form', 'pabbly'). Fall through to "Direct" for ambiguous ones.
   const ch = (channelFallback || 'direct').toLowerCase().trim();
   if (!ch || ch === 'web' || ch === 'form' || ch === 'manual' || ch === 'unknown') {
     return { source: 'direct', source_label: 'Direct' };
@@ -134,10 +156,21 @@ export function buildAttribution(input: {
   utmSource?: string | null;
   formType?: string | null;
   channel?: string | null;
+  /**
+   * Website's resolved channel (custom_fields.channel) — takes priority over
+   * utm_source when present. The website resolves fbclid → facebook_ads,
+   * gclid → google_ads, etc., so this catches Meta-ad leads that arrive
+   * without UTM tagging.
+   */
+  resolvedChannel?: string | null;
   utm?: AttributionPayload['utm'];
   pageUrl?: string | null;
 }): AttributionPayload {
-  const { source, source_label } = deriveSource(input.utmSource, input.channel || undefined);
+  const { source, source_label } = deriveSource(
+    input.utmSource,
+    input.channel || undefined,
+    input.resolvedChannel,
+  );
   const { first_touch, first_touch_label } = deriveFirstTouch(input.formType, input.channel || 'web');
   return {
     source,

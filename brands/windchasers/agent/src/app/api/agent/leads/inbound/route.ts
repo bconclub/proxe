@@ -270,9 +270,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Build attribution payload (Source / First Touch) ────────────────────
-    // Source = utm_source (Instagram / Google / Direct). First touch = form_type.
-    // Channel fallback is `leadSource` — for legacy/no-UTM cases.
+    // Source priority: resolvedChannel (custom_fields.channel) > utm_source > fallback.
+    //   custom_fields.channel is the website's own resolved channel — it has
+    //   already mapped fbclid → facebook_ads, gclid → google_ads, etc., which
+    //   catches Meta-ad leads that arrive without UTM tagging (Meta auto-tags
+    //   with fbclid INSTEAD of UTM, so utm-first bucket every Meta lead as
+    //   "Direct"). First touch = form_type.
     const attribution = buildAttribution({
+      resolvedChannel: cf2.channel || null,
       utmSource: cf2.utm_source || null,
       formType: (cf2.form_type || cf2.event_name || body.source || '').toString() || null,
       channel: leadSource,
