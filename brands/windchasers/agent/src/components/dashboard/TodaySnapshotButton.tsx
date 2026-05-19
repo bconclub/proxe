@@ -118,8 +118,7 @@ export default function TodaySnapshotButton() {
               <div className="flex-1">
                 <div className="text-[13px] font-semibold leading-tight">Today's snapshot</div>
                 <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {data?.window?.label || 'Today (IST)'}
-                  {data && ` · midnight → ${formatHHMM(data.window.endIso)}`}
+                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
                 </div>
               </div>
               <button
