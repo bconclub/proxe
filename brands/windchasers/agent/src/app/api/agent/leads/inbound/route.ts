@@ -654,7 +654,7 @@ export async function POST(request: NextRequest) {
         const demoFormat: DemoFormat = rawDemoType === 'online' ? 'online' : 'offline'
         const eventIdForButton = calendarResult?.eventId || null
         const templateName = demoFormat === 'online'
-          ? 'windchasers_demo_online_v1'
+          ? 'windchasers_demo_online'
           : 'windchasers_demo_offline_v1'
 
         // AWAIT (not fire-and-forget) — see PAT block above for rationale.

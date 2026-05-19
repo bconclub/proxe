@@ -326,7 +326,7 @@ export async function sendFirstOutreach(
  *   {{1}} = first name · {{2}} = date · {{3}} = time
  *   No buttons (no Meet link, no Add to Calendar — user comes to the facility).
  *
- * ONLINE — windchasers_demo_online_v1
+ * ONLINE — windchasers_demo_online (note: no _v1 suffix; Meta-approved name)
  *   {{1}} = first name · {{2}} = date · {{3}} = time
  *   Button 0 (URL, dynamic): base64 Google Calendar eventId.
  *   URL pattern registered in Meta: https://calendar.google.com/calendar/event?eid={{1}}
@@ -360,7 +360,7 @@ export async function sendDemoConfirmation(
   ];
   const templateName = format === 'offline'
     ? 'windchasers_demo_offline_v1'
-    : 'windchasers_demo_online_v1';
+    : 'windchasers_demo_online';
   return sendWhatsAppTemplate(to, templateName, components);
 }
 
