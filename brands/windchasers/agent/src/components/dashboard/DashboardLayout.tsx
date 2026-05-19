@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
+import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
 import {
   MdInbox,
@@ -716,6 +717,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
+
+        {/* Health bar — top-right chip on every dashboard page, click to expand */}
+        <HealthBarButton />
 
         {/* Mobile top bar — only visible on mobile */}
         <div
