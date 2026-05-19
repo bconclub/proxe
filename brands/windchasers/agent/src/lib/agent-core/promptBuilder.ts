@@ -5,11 +5,8 @@
 
 import { Channel, HistoryEntry } from './types';
 import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
-import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
-import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
 import { isLikelyRealPersonName } from '../services/utils';
-import { BRAND_ID } from '@/configs';
 
 interface PromptOptions {
   channel: Channel;
@@ -23,27 +20,18 @@ interface PromptOptions {
   bookingAlreadyScheduled?: boolean;
   messageCount?: number;
   crossChannelContext?: string;
+  /** Kept for backward compat with call sites; ignored — this fork is windchasers. */
   brand?: string;
   formData?: Record<string, any> | null;
 }
 
 /**
- * Get brand-specific system prompt
+ * Get system prompt for this brand (windchasers — this is the windchasers fork).
  */
-function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
-  console.log('[promptBuilder] Loading prompt for brand:', brand, 'channel:', channel);
-  switch (brand.toLowerCase()) {
-    case 'bcon':
-      return channel === 'web'
-        ? getBconWebSystemPrompt(context, messageCount)
-        : getBconSystemPrompt(context, messageCount);
-    case 'windchasers':
-      return channel === 'web'
-        ? getWindchasersWebSystemPrompt(context, messageCount)
-        : getWindchasersSystemPrompt(context, messageCount);
-    default:
-      return getBconSystemPrompt(context, messageCount);
-  }
+function getBrandSystemPrompt(context: string, messageCount?: number, channel?: Channel): string {
+  return channel === 'web'
+    ? getWindchasersWebSystemPrompt(context, messageCount)
+    : getWindchasersSystemPrompt(context, messageCount);
 }
 
 /**
@@ -62,15 +50,11 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     bookingAlreadyScheduled,
     messageCount,
     crossChannelContext,
-    brand,
     formData,
   } = options;
 
-  // Resolve brand: explicit param (kept for cross-brand callers) > BRAND_ID
-  const resolvedBrand = brand || BRAND_ID;
-
-  // Build the core system prompt (brand-specific)
-  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
+  // Build the core system prompt (windchasers-only fork)
+  let systemPrompt = buildSystemPrompt(userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -97,10 +81,9 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
 }
 
 /**
- * Build the system prompt with brand personality and knowledge context
+ * Build the system prompt with windchasers personality and knowledge context
  */
 function buildSystemPrompt(
-  brand: string,
   userName?: string | null,
   knowledgeBase?: string,
   messageCount?: number,
@@ -142,7 +125,7 @@ function buildSystemPrompt(
   })();
 
   // Channel-specific adjustments
-  const channelNote = getChannelInstructions(channel, brand);
+  const channelNote = getChannelInstructions(channel);
 
   // Cross-channel context (e.g., "This user previously chatted on web about pilot training")
   const crossChannelNote = crossChannelContext
@@ -165,7 +148,7 @@ function buildSystemPrompt(
     }
   }
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
+  return getBrandSystemPrompt(knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
@@ -228,7 +211,7 @@ function buildUserPrompt(params: {
 /**
  * Get channel-specific prompt instructions
  */
-function getChannelInstructions(channel?: Channel, brand?: string): string {
+function getChannelInstructions(channel?: Channel): string {
   if (channel === 'whatsapp') {
     return `
 
@@ -255,9 +238,7 @@ natural-sounding, and easy to speak aloud. Avoid any formatting, lists, or URLs.
 
   // Web channel
   if (channel === 'web') {
-    const bconLeadNote = brand === 'bcon'
-      ? ''
-      : `- Collect name and email early in conversation - web visitors do not have phone numbers by default.\n- Ask "What's your name?" naturally in the first few messages.\n- Ask "What's the best email to reach you?" before booking.\n- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.`;
+    const webLeadNote = `- Collect name and email early in conversation - web visitors do not have phone numbers by default.\n- Ask "What's your name?" naturally in the first few messages.\n- Ask "What's the best email to reach you?" before booking.\n- Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.`;
 
     return `
 
@@ -267,7 +248,7 @@ WEB CHAT RULES (MUST FOLLOW)
 This conversation is on the web chat widget. You MUST:
 - Responses can be 2-4 sentences (slightly longer than WhatsApp).
 - You can use **bold** for emphasis sparingly.
-${bconLeadNote}
+${webLeadNote}
 - Same booking flow: check_availability → book_consultation.
 - After booking: "You're booked! Check your email for the calendar invite."
 - You have the same booking tools as WhatsApp - use them the same way.

@@ -1,31 +1,21 @@
 /**
  * Follow-Up Button Generator - Claude-powered contextual buttons
- * Brand-aware: uses brand config for button pools and Claude prompt context
+ * Windchasers fork: single button pool for aviation training.
  */
 
 import { generateShort } from './claudeClient';
 import { Channel } from './types';
-import { getBrandConfig, BRAND_ID } from '@/configs';
+import { getBrandConfig } from '@/configs';
 
-/** Brand-specific button pools for fallback/static generation */
-const brandButtonPools: Record<string, {
-  firstMessage: string[];
-  defaultFallback: string;
-  costButtons: string[];
-  interestButtons: string[];
-  genericButtons: string[];
-  bookingAware: string[];
-  claudeContext: string;
-  exploreKeywords: string[];
-}> = {
-  windchasers: {
-    firstMessage: ['Explore Training Options', 'Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Learn More'],
-    defaultFallback: 'Book a Demo Session',
-    costButtons: ['Get Cost Breakdown', 'Financing Options', 'Talk to Counselor'],
-    interestButtons: ['Book 1:1 Consultation', 'Book Demo Online', 'Get Course Timeline'],
-    genericButtons: ['Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Explore Training Options', 'Talk to Counselor'],
-    bookingAware: ['Get Course Details', 'Check Eligibility', 'Financing Options'],
-    claudeContext: `WindChasers aviation training chatbot.
+/** Windchasers button pool for fallback/static generation */
+const windchasersPool = {
+  firstMessage: ['Explore Training Options', 'Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Learn More'],
+  defaultFallback: 'Book a Demo Session',
+  costButtons: ['Get Cost Breakdown', 'Financing Options', 'Talk to Counselor'],
+  interestButtons: ['Book 1:1 Consultation', 'Book Demo Online', 'Get Course Timeline'],
+  genericButtons: ['Book a Demo Session', 'Get Cost Breakdown', 'Check Eligibility', 'Explore Training Options', 'Talk to Counselor'],
+  bookingAware: ['Get Course Details', 'Check Eligibility', 'Financing Options'],
+  claudeContext: `WindChasers aviation training chatbot.
 WindChasers is an honest, transparent aviation training academy offering:
 - Commercial Pilot License (CPL) training
 - Helicopter Pilot Training
@@ -38,54 +28,12 @@ AVAILABLE BUTTON TYPES:
 - Exploration: "Explore Training Options", "See Programs"
 - Booking: "Book a Demo Session", "Book 1:1 Consultation", "Schedule Call"
 - Next Steps: "Get Cost Breakdown", "Financing Options", "Course Timeline"`,
-    exploreKeywords: ['explore training options', 'explore training', 'what courses', 'other course', 'which course', 'what program', 'other program', 'which program', 'what do you offer', 'what do you provide', 'courses do you', 'programs do you'],
-  },
-  bcon: {
-    firstMessage: ['Explore AI Solutions', 'Book a Strategy Call', 'See Our Work', 'How It Works', 'Learn More'],
-    defaultFallback: 'Book a Strategy Call',
-    costButtons: ['Get a Proposal', 'See Pricing', 'Book Strategy Call'],
-    interestButtons: ['Book Strategy Call', 'See Case Studies', 'Start a Project'],
-    genericButtons: ['Book a Strategy Call', 'Get a Proposal', 'See Case Studies'],
-    bookingAware: ['See Case Studies', 'How It Works', 'Get a Proposal'],
-    claudeContext: `BCON AI business solutions chatbot.
-BCON helps businesses understand and implement AI solutions:
-- AI in Business - Custom AI automation, chatbots, workflow optimization
-- Brand Marketing - AI-powered campaigns, content strategy
-- Business Apps - Custom web apps, dashboards, SaaS products
-- PROXe Platform - AI-powered business operating system
-
-AVAILABLE BUTTON TYPES:
-- Information: "Learn More", "See Case Studies", "How It Works"
-- Exploration: "Explore AI Solutions", "See Our Work"
-- Booking: "Book Strategy Call", "Schedule Demo"
-- Next Steps: "Get a Proposal", "Start a Project"`,
-    exploreKeywords: ['explore ai solutions', 'explore ai'],
-  },
-  proxe: {
-    firstMessage: ['Deploy PROXe', 'Book a Demo', 'PROXe Pricing', 'Learn More'],
-    defaultFallback: 'Book a Demo',
-    costButtons: ['PROXe Pricing', 'Compare Plans', 'Book a Demo'],
-    interestButtons: ['Deploy PROXe', 'Book a Demo', 'See Features'],
-    genericButtons: ['Deploy PROXe', 'Book a Demo', 'PROXe Pricing', 'See Features'],
-    bookingAware: ['See Features', 'Compare Plans', 'Deploy PROXe'],
-    claudeContext: `PROXe AI-powered business platform chatbot.
-PROXe is an AI-powered business operating system:
-- Web PROXe - AI chat widget for websites
-- WhatsApp PROXe - WhatsApp AI agent
-- Voice PROXe - Voice AI agent
-- Social PROXe - Social media AI agent
-
-AVAILABLE BUTTON TYPES:
-- Information: "Learn More", "See Features", "Compare Plans"
-- Exploration: "What's PROXe", "See Integrations"
-- Booking: "Book a Demo", "Schedule Call"
-- Next Steps: "Deploy PROXe", "PROXe Pricing"`,
-    exploreKeywords: ['explore proxe', "what's proxe"],
-  },
+  exploreKeywords: ['explore training options', 'explore training', 'what courses', 'other course', 'which course', 'what program', 'other program', 'which program', 'what do you offer', 'what do you provide', 'courses do you', 'programs do you'],
 };
 
-function getBrandPool(brand?: string) {
-  return brandButtonPools[brand || BRAND_ID] || brandButtonPools[BRAND_ID];
+/** Returns the windchasers button pool. The `brand` arg is ignored (kept for back-compat). */
+function getBrandPool(_brand?: string) {
+  return windchasersPool;
 }
 
 const BANNED_BUTTONS = [

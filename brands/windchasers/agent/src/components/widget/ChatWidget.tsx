@@ -309,7 +309,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const savedTheme = window.localStorage.getItem('bcon-widget-theme');
+    const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setWidgetTheme(savedTheme);
     }
@@ -319,7 +319,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setWidgetTheme((prev) => {
       const next = prev === 'light' ? 'dark' : 'light';
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('bcon-widget-theme', next);
+        window.localStorage.setItem('windchasers-widget-theme', next);
       }
       return next;
     });
@@ -2599,7 +2599,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // No client-side overrides — all config lives in the Vapi dashboard.
       // Passing overrides risks schema-validation rejection on the server side
       // which silently drops firstMessage and transcriber settings. Match the
-      // bcon VapiOrb pattern: just pass the assistant ID, nothing else.
+      // VapiOrb pattern: just pass the assistant ID, nothing else.
       await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
       vapiLog('vapi.start() resolved');
     } catch (err: any) {

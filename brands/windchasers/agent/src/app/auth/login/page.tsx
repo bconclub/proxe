@@ -3,31 +3,20 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
-import { getBrandConfig, BRAND_ID } from '@/configs'
+import { getBrandConfig } from '@/configs'
 
-/** Brand website URLs */
-const brandWebsites: Record<string, string> = {
-  windchasers: 'https://windchasers.in',
-  bcon: 'https://bconclub.com',
-  proxe: 'https://proxe.ai',
-}
-
-/** Brand taglines for login subtitle */
-const brandTaglines: Record<string, string> = {
-  windchasers: 'WindChasers Aviation Academy',
-  bcon: 'BCON Club',
-  proxe: 'PROXe AI Platform',
-}
+/** Windchasers website (this fork only serves windchasers — no cross-brand maps). */
+const WINDCHASERS_WEBSITE = 'https://windchasers.in'
+const WINDCHASERS_TAGLINE = 'WindChasers Aviation Academy'
 
 export default function LoginPage() {
   const router = useRouter()
 
-  // Brand config - resolved from env var or hostname detection
+  // Brand config (always windchasers in this fork — kept as call for shape stability).
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || BRAND_ID).toLowerCase()
   const colors = brand.colors
-  const tagline = brandTaglines[brandId] || brand.name
-  const website = brandWebsites[brandId] || '#'
+  const tagline = WINDCHASERS_TAGLINE
+  const website = WINDCHASERS_WEBSITE
   const logoLetter = brand.name.charAt(0).toUpperCase()
   const logoImage = brand.chatStructure?.avatar?.source
 

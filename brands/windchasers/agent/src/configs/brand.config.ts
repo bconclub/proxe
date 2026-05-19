@@ -1,4 +1,4 @@
-import type { BrandConfig } from '@/configs';
+import type { BrandConfig } from './types';
 
 export const windchasersConfig: BrandConfig = {
   name: 'Windchasers',

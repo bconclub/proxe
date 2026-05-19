@@ -3,14 +3,9 @@
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
-import { getBrandConfig, BRAND_ID } from '@/configs'
+import { getBrandConfig } from '@/configs'
 
-/** Brand taglines */
-const brandTaglines: Record<string, string> = {
-  windchasers: 'WindChasers Aviation Academy',
-  bcon: 'Windchasers',
-  proxe: 'PROXe AI Platform',
-}
+const WINDCHASERS_TAGLINE = 'WindChasers Aviation Academy'
 
 function AcceptInviteForm() {
   const router = useRouter()
@@ -18,9 +13,8 @@ function AcceptInviteForm() {
   const token = searchParams.get('token')
 
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || BRAND_ID).toLowerCase()
   const colors = brand.colors
-  const tagline = brandTaglines[brandId] || brand.name
+  const tagline = WINDCHASERS_TAGLINE
   const logoLetter = brand.name.charAt(0).toUpperCase()
   const logoImage = brand.chatStructure?.avatar?.source
 
