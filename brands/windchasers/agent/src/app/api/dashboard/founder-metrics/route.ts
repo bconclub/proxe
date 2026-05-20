@@ -994,9 +994,16 @@ export async function GET(request: NextRequest) {
     let totalScore = 0
     let leadsWithScores = 0
 
-    // Batch-calculate scores for leads with null scores (parallel RPC calls)
+    // Batch-calculate scores for leads with null OR zero scores.
+    // Previously we only refreshed nulls — but ~half of leads have
+    // lead_score stored as literal 0 (calculation crashed mid-flight on an
+    // earlier write, or the lead was created before scoring was wired).
+    // Those need to be re-evaluated too, otherwise the dashboard's Avg Lead
+    // Score is dragged down by phantom zeros for leads that actually have
+    // 10-40+ when the RPC runs. Caught it on 2026-05-20: dashboard showed
+    // 26% but the real average (with RPC backfill on the zero leads) is ~39%.
     const leadsNeedingScores = safeLeads.filter(
-      (lead) => lead.lead_score === null || lead.lead_score === undefined
+      (lead) => !lead.lead_score  // null, undefined, OR 0
     )
 
     if (leadsNeedingScores.length > 0) {
