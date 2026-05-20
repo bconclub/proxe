@@ -22,23 +22,31 @@ export const dynamic = 'force-dynamic';
 
 /** Compute today's IST midnight as a UTC ISO string. */
 function getISTMidnightISO(): string {
-  // Current UTC time
   const now = new Date();
-  // IST = UTC + 5:30
   const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
   const istNow = new Date(now.getTime() + istOffsetMs);
-  // Strip to date in IST (YYYY-MM-DD)
-  const yyyy = istNow.getUTCFullYear();
-  const mm = String(istNow.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(istNow.getUTCDate()).padStart(2, '0');
-  // IST midnight as UTC = that date at 00:00 IST = UTC 18:30 of previous day
-  // Build the IST-midnight Date by treating "YYYY-MM-DDT00:00+05:30" as UTC.
-  const istMidnightUtcMs = Date.UTC(yyyy, istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0) - istOffsetMs;
+  const istMidnightUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0) - istOffsetMs;
   return new Date(istMidnightUtcMs).toISOString();
-  void mm; void dd; // keep markers; we use components above
 }
 
-export async function GET() {
+/** Compute the start of the window (UTC ISO) for the given range key. */
+function getStartIso(range: 'today' | '7d' | '14d' | '28d'): string {
+  if (range === 'today') return getISTMidnightISO();
+  const days = range === '7d' ? 7 : range === '14d' ? 14 : 28;
+  // For multi-day windows, count back N*24h from now (rolling window).
+  // Each "day" boundary doesn't matter for these aggregates — what matters
+  // is the rolling lookback.
+  return new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+}
+
+const RANGE_LABELS: Record<string, string> = {
+  today: 'Today (IST)',
+  '7d':  'Last 7 days',
+  '14d': 'Last 14 days',
+  '28d': 'Last 28 days',
+};
+
+export async function GET(request: Request) {
   try {
     // Auth: require a logged-in dashboard user (Supabase session cookie).
     const userClient = await createClient();
@@ -52,7 +60,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
-    const startIso = getISTMidnightISO();
+    // Parse the ?range= query param. Defaults to 'today' for back-compat.
+    const url = new URL(request.url);
+    const rawRange = (url.searchParams.get('range') || 'today').toLowerCase();
+    const range: 'today' | '7d' | '14d' | '28d' = (
+      ['today', '7d', '14d', '28d'].includes(rawRange) ? rawRange : 'today'
+    ) as any;
+
+    const startIso = getStartIso(range);
     const endIso = new Date().toISOString();
 
     // ── 1) Leads created today + by source ──────────────────────────────────
@@ -207,7 +222,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      window: { startIso, endIso, label: 'Today (IST)' },
+      window: { startIso, endIso, label: RANGE_LABELS[range] || 'Today (IST)', range },
       leads: { total: leads.length, bySource },
       events,
       scoreHistogram,

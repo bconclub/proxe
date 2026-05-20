@@ -11,7 +11,7 @@ import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
  */
 
 interface SnapshotData {
-  window: { startIso: string; endIso: string; label: string }
+  window: { startIso: string; endIso: string; label: string; range?: string }
   leads: { total: number; bySource: Record<string, number> }
   events: {
     pat_submitted: number
@@ -32,18 +32,27 @@ function formatHHMM(iso: string): string {
   }
 }
 
+type RangeKey = 'today' | '7d' | '14d' | '28d'
+const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
+  { key: 'today', label: 'Today' },
+  { key: '7d',    label: '7d' },
+  { key: '14d',   label: '14d' },
+  { key: '28d',   label: '28d' },
+]
+
 export default function TodaySnapshotButton() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<SnapshotData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState<RangeKey>('today')
 
-  async function fetchSnapshot() {
+  async function fetchSnapshot(rangeArg: RangeKey = range) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/dashboard/today-snapshot', { credentials: 'include' })
+      const res = await fetch(`/api/dashboard/today-snapshot?range=${rangeArg}`, { credentials: 'include' })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         throw new Error(j?.error || `Snapshot failed (${res.status})`)
@@ -56,10 +65,11 @@ export default function TodaySnapshotButton() {
     }
   }
 
-  // Fetch on open
+  // Fetch on open + whenever range changes
   useEffect(() => {
-    if (open) void fetchSnapshot()
-  }, [open])
+    if (open) void fetchSnapshot(range)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, range])
 
   return (
     <>
@@ -118,12 +128,48 @@ export default function TodaySnapshotButton() {
               style={{ borderColor: 'var(--border-primary)' }}
             >
               <MdToday size={16} style={{ color: '#C9A961' }} />
-              <div className="flex-1">
-                <div className="text-[13px] font-semibold leading-tight">Today's snapshot</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold leading-tight truncate">
+                  {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
+                </div>
                 <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
+                  {range === 'today'
+                    ? new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
+                    : data?.window?.startIso
+                      ? `Since ${new Date(data.window.startIso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`
+                      : '—'}
                 </div>
               </div>
+
+              {/* Range pills — segmented control */}
+              <div
+                role="tablist"
+                aria-label="Time range"
+                className="flex items-center rounded-full border overflow-hidden shrink-0"
+                style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}
+              >
+                {RANGE_OPTIONS.map((opt) => {
+                  const active = range === opt.key
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setRange(opt.key)}
+                      className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                      style={{
+                        color: active ? '#1a1a1a' : 'var(--text-secondary)',
+                        background: active ? '#C9A961' : 'transparent',
+                      }}
+                      disabled={loading && active}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+
               <button
                 type="button"
                 onClick={() => fetchSnapshot()}
@@ -236,7 +282,7 @@ export default function TodaySnapshotButton() {
                       className="p-3 rounded-lg border"
                       style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
                     >
-                      <SectionLabel>Most active today</SectionLabel>
+                      <SectionLabel>{range === 'today' ? 'Most active today' : 'Most active'}</SectionLabel>
                       {data.topActive.length === 0 ? (
                         <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                           No customer messages yet today.
