@@ -122,12 +122,18 @@ User's message: ${input.message}`
   const needsBookingTools = input.channel === 'whatsapp' &&
     (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion);
 
+  // We capture this OUTSIDE try/catch so the post-generation hallucination
+  // check below can read it. The set is populated by the book_consultation
+  // tool handler when (and only when) the tool actually runs.
+  let bookingsCompletedThisSession: Set<string> | null = null;
+
   try {
     if (needsBookingTools) {
-      const { tools, toolHandlers } = buildBookingTools(input, supabase);
+      const bt = buildBookingTools(input, supabase);
+      bookingsCompletedThisSession = bt.bookingsCompletedThisSession;
       rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
-        tools,
-        toolHandlers,
+        tools: bt.tools,
+        toolHandlers: bt.toolHandlers,
         maxToolRounds: 3,
       }, 512);
     } else {
@@ -142,10 +148,11 @@ User's message: ${input.message}`
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       if (needsBookingTools) {
-        const { tools, toolHandlers } = buildBookingTools(input, supabase);
+        const bt = buildBookingTools(input, supabase);
+        bookingsCompletedThisSession = bt.bookingsCompletedThisSession;
         rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
-          tools,
-          toolHandlers,
+          tools: bt.tools,
+          toolHandlers: bt.toolHandlers,
           maxToolRounds: 2,
         }, 512);
       } else {
@@ -159,6 +166,22 @@ User's message: ${input.message}`
 
       // Return a warm, human-sounding fallback - NEVER expose technical errors
       rawResponse = "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
+    }
+  }
+
+  // ── HALLUCINATED BOOKING GUARD ─────────────────────────────────────────
+  // If the response claims a booking was made but book_consultation never
+  // fired (Claude sometimes types through a flow without invoking the tool),
+  // overwrite the response with a "let me try again" line and flag the lead.
+  // We deliberately do NOT silently keep the false claim — the customer would
+  // expect a calendar invite that never arrives.
+  if (needsBookingTools && bookingsCompletedThisSession && bookingsCompletedThisSession.size === 0) {
+    const claimsBooked = /\b(done\.|is locked|booking confirmed|calendar invite on its way|all set,? .*locked)\b/i
+      .test(rawResponse);
+    if (claimsBooked) {
+      console.error('[Engine] HALLUCINATED BOOKING — response claims booked but book_consultation never ran. Overwriting + flagging lead.');
+      await flagForHumanFollowup(supabase, input, 'Agent hallucinated booking confirmation without firing book_consultation tool');
+      rawResponse = "Hit a snag locking the slot — let me try once more. What date and time work for you?";
     }
   }
 
@@ -487,7 +510,12 @@ async function flagForHumanFollowup(
 function buildBookingTools(
   input: AgentInput,
   supabase: SupabaseClient
-): { tools: ToolDefinition[]; toolHandlers: Record<string, ToolHandler> } {
+): {
+  tools: ToolDefinition[];
+  toolHandlers: Record<string, ToolHandler>;
+  /** Exposed so callers can detect "agent claimed booking without firing tool" hallucinations after generation. */
+  bookingsCompletedThisSession: Set<string>;
+} {
 
   // Track bookings completed in this tool session to prevent re-detection loops
   const bookingsCompletedThisSession = new Set<string>();
@@ -978,7 +1006,7 @@ function buildBookingTools(
     },
   };
 
-  return { tools, toolHandlers };
+  return { tools, toolHandlers, bookingsCompletedThisSession };
 }
 
 // ─── Flow Task Scheduling ──────────────────────────────────────────────────
