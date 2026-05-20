@@ -676,6 +676,31 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       usedButtons: [],
     };
 
+    // FINAL DEDUP CHECK — race protection.
+    // If the customer fires multiple webhook events in quick succession (e.g.
+    // double-tap on a Quick Reply button), the parallel-Promise dedup above
+    // can let both invocations through because neither has finished logging
+    // when the other queried. By the time we get HERE we've finished writing
+    // our customer row, so re-query for any agent message logged in the last
+    // 5 seconds. If a sibling invocation already replied, skip ours.
+    {
+      const fiveSecAgo = new Date(Date.now() - 5_000).toISOString();
+      const { data: siblingAgent } = await supabase
+        .from('conversations')
+        .select('id, created_at')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'agent')
+        .gte('created_at', fiveSecAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (siblingAgent?.id) {
+        console.log(`[meta/webhook] PRE-AI DEDUP: sibling agent reply ${siblingAgent.id} written in last 5s for lead ${leadId}, skipping`);
+        return;
+      }
+    }
+
     const aiStartTime = Date.now();
     const result = await processMessage(agentInput, supabase);
     const responseTimeMs = Date.now() - aiStartTime;
