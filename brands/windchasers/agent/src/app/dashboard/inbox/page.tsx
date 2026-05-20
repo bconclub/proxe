@@ -586,11 +586,14 @@ export default function InboxPage() {
         }
       }
 
-      // Fetch conversations with valid lead_id
+      // Fetch ALL conversations — including anonymous web chats (lead_id=null).
+      // Anonymous web visitors are grouped below by their session_id (in
+      // metadata) so they surface in the inbox even before they share
+      // phone/email. Without this, 100+ web chats can be active and the
+      // inbox stays empty.
       let query = supabase
         .from('conversations')
-        .select('lead_id, channel, content, sender, created_at')
-        .not('lead_id', 'is', null)
+        .select('lead_id, channel, content, sender, created_at, metadata')
         .order('created_at', { ascending: false })
         .limit(1000) // Limit to prevent performance issues
 
@@ -696,27 +699,45 @@ export default function InboxPage() {
         content?: string | null
         created_at?: string | null
         sender?: string | null
+        metadata?: any
       }>
       console.log('Sample message:', messages[0])
 
-      // Group by lead_id and collect ALL channels per lead
+      // Group by lead_id. For anonymous rows (lead_id=null), use a synthetic
+      // key based on session_id from metadata so each unique web session
+      // shows as its own conversation row.
       const conversationMap = new Map<string, any>()
+      // Track which keys are anonymous so the render path knows to skip the
+      // lead lookup and render a placeholder name.
+      const anonymousKeys = new Set<string>()
 
       for (const msg of messages) {
-        if (!msg.lead_id) continue
+        // Determine the grouping key
+        let key: string
+        let isAnonymous = false
+        if (msg.lead_id) {
+          key = String(msg.lead_id)
+        } else {
+          const sessionId = msg.metadata?.session_id
+          if (!sessionId) continue // Can't group an anonymous row without a session
+          key = `session:${sessionId}`
+          isAnonymous = true
+          anonymousKeys.add(key)
+        }
 
-        if (!conversationMap.has(msg.lead_id)) {
-          conversationMap.set(msg.lead_id, {
-            lead_id: msg.lead_id,
+        if (!conversationMap.has(key)) {
+          conversationMap.set(key, {
+            lead_id: key,
+            is_anonymous: isAnonymous,
+            session_id: isAnonymous ? msg.metadata?.session_id : null,
             channels: new Set([msg.channel]),
             last_message: msg.content || '(No content)',
             last_message_at: msg.created_at,
-            message_count: 1
+            message_count: 1,
           })
         } else {
-          const conv = conversationMap.get(msg.lead_id)
+          const conv = conversationMap.get(key)
           conv.channels.add(msg.channel)
-          // Update to most recent message
           const msgCreatedAt = msg.created_at ? new Date(msg.created_at) : null
           const convLastAt = conv.last_message_at ? new Date(conv.last_message_at) : null
           if (!convLastAt || (msgCreatedAt && msgCreatedAt > convLastAt)) {
@@ -729,21 +750,27 @@ export default function InboxPage() {
 
       console.log('Unique conversations:', conversationMap.size)
 
-      // Get lead details for all conversations
-      const leadIds = Array.from(conversationMap.keys())
+      // Get lead details for all conversations — but exclude the synthetic
+      // 'session:*' keys (those have no row in all_leads, they're anonymous
+      // web visitors). Only query Supabase for real lead UUIDs.
+      const leadIds = Array.from(conversationMap.keys()).filter((k) => !k.startsWith('session:'))
 
-      if (leadIds.length === 0) {
+      if (conversationMap.size === 0) {
         setConversations([])
         setLoading(false)
         return
       }
 
-      console.log('Looking up lead IDs:', leadIds.length, 'leads')
+      console.log('Looking up lead IDs:', leadIds.length, 'leads (plus', anonymousKeys.size, 'anonymous sessions)')
 
-      const { data: leadsData, error: leadsError } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, lead_stage, lead_score, first_touchpoint')
-        .in('id', leadIds)
+      // Only query Supabase when there are real lead IDs — empty .in() blows
+      // up some Postgres queries. Anonymous sessions skip the lookup entirely.
+      const { data: leadsData, error: leadsError } = leadIds.length > 0
+        ? await supabase
+            .from('all_leads')
+            .select('id, customer_name, email, phone, unified_context, lead_stage, lead_score, first_touchpoint')
+            .in('id', leadIds)
+        : { data: [], error: null }
 
       if (leadsError) {
         console.error('Error fetching leads:', leadsError)
@@ -784,8 +811,12 @@ export default function InboxPage() {
       }>
 
       for (const [leadId, convData] of conversationMap) {
-        // Find matching lead - ensure we're comparing strings
-        const lead = typedLeads.find((l) => String(l.id) === String(leadId))
+        // Anonymous web session: no all_leads row to match, render a
+        // placeholder conversation so the operator can see it in the inbox.
+        const isAnonymous = !!convData.is_anonymous
+        const lead = isAnonymous
+          ? undefined
+          : typedLeads.find((l) => String(l.id) === String(leadId))
 
         // Clean the last message content
         const cleanedLastMessage = cleanMessageContent(convData.last_message || '');
@@ -833,12 +864,15 @@ export default function InboxPage() {
 
         // Prefer profile full_name (set by save_lead_profile tool) over customer_name
         // customer_name sometimes has the brand name instead of the person's name
-        const resolvedName =
-          uc?.whatsapp?.profile?.full_name ||
-          uc?.web?.profile?.full_name ||
-          lead?.customer_name ||
-          lead?.phone ||
-          'Unknown';
+        // Anonymous sessions show "Web visitor · <short session id>" so operators
+        // can still distinguish multiple concurrent anonymous chats.
+        const resolvedName = isAnonymous
+          ? `Web visitor · ${String(convData.session_id || '').slice(0, 8)}`
+          : (uc?.whatsapp?.profile?.full_name ||
+             uc?.web?.profile?.full_name ||
+             lead?.customer_name ||
+             lead?.phone ||
+             'Unknown');
 
         const conversation: Conversation = {
           lead_id: leadId,
