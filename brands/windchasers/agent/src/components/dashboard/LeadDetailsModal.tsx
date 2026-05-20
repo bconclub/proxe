@@ -349,6 +349,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // "+" action dropdown
   const [showActionDropdown, setShowActionDropdown] = useState(false)
 
+  // Merge-leads state
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [mergeQuery, setMergeQuery] = useState('')
+  const [mergeCandidates, setMergeCandidates] = useState<Array<{
+    id: string; customer_name: string | null; phone: string | null; email: string | null; lead_score: number | null
+  }>>([])
+  const [mergeSearchLoading, setMergeSearchLoading] = useState(false)
+  const [mergeSelected, setMergeSelected] = useState<{
+    id: string; customer_name: string | null; phone: string | null; email: string | null; lead_score: number | null
+  } | null>(null)
+  const [merging, setMerging] = useState(false)
+
   // Next Actions state
   const [leadTasks, setLeadTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
@@ -2313,6 +2325,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdContentCopy size={16} className="text-amber-500" /> Copy Lead Details
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowActionDropdown(false)
+                        setShowMergeDialog(true)
+                        setMergeQuery('')
+                        setMergeCandidates([])
+                        setMergeSelected(null)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none"
+                    >
+                      <MdShare size={16} className="text-purple-500 rotate-90" /> Merge with another lead
+                    </button>
                   </div>
                 </>
               )}
@@ -3264,6 +3288,238 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           }}
         />
       )}
+
+      {/* ── MERGE DIALOG ──────────────────────────────────────────────── */}
+      {showMergeDialog && currentLead && (() => {
+        const currentScore = currentLead.lead_score ?? 0
+        // Compute who'd win/lose based on the selected target
+        let willKeep: typeof mergeSelected | null = null
+        let willDelete: typeof mergeSelected | null = null
+        if (mergeSelected) {
+          const otherScore = mergeSelected.lead_score ?? 0
+          const currentAsCand = {
+            id: String(currentLead.id),
+            customer_name: currentLead.name || null,
+            phone: currentLead.phone || null,
+            email: currentLead.email || null,
+            lead_score: currentScore,
+          }
+          if (currentScore >= otherScore) {
+            willKeep = currentAsCand
+            willDelete = mergeSelected
+          } else {
+            willKeep = mergeSelected
+            willDelete = currentAsCand
+          }
+        }
+
+        async function runSearch(q: string) {
+          setMergeQuery(q)
+          if (!q || q.trim().length < 2) {
+            setMergeCandidates([])
+            return
+          }
+          setMergeSearchLoading(true)
+          try {
+            const r = await fetch(`/api/dashboard/leads?search=${encodeURIComponent(q.trim())}&limit=20`, {
+              credentials: 'include',
+            })
+            const data = await r.json().catch(() => ({}))
+            const list = (data?.leads || data?.data || data || []) as Array<any>
+            // Exclude the current lead from results
+            setMergeCandidates(
+              list
+                .filter((l) => String(l.id) !== String(currentLead.id))
+                .map((l) => ({
+                  id: l.id,
+                  customer_name: l.customer_name || null,
+                  phone: l.phone || null,
+                  email: l.email || null,
+                  lead_score: l.lead_score ?? null,
+                }))
+                .slice(0, 10),
+            )
+          } catch (err) {
+            console.error('Merge search failed:', err)
+            setMergeCandidates([])
+          } finally {
+            setMergeSearchLoading(false)
+          }
+        }
+
+        async function doMerge() {
+          if (!mergeSelected) return
+          setMerging(true)
+          try {
+            const r = await fetch(`/api/dashboard/leads/${currentLead.id}/merge`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ other_lead_id: mergeSelected.id }),
+            })
+            const data = await r.json().catch(() => ({}))
+            if (!r.ok || !data?.success) {
+              console.error('Merge failed:', data)
+              alert(`Merge failed: ${data?.error || r.statusText}`)
+              return
+            }
+            // After merge: close the modal and reload — the loser is gone,
+            // so the dashboard needs to refetch the leads list.
+            setShowMergeDialog(false)
+            onClose()
+            window.location.reload()
+          } catch (err: any) {
+            console.error('Merge exception:', err)
+            alert(`Merge exception: ${err?.message || err}`)
+          } finally {
+            setMerging(false)
+          }
+        }
+
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-[100]"
+              style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}
+              onClick={() => !merging && setShowMergeDialog(false)}
+              aria-hidden="true"
+            />
+            <div
+              role="dialog"
+              aria-label="Merge leads"
+              className="fixed z-[101] rounded-xl border shadow-2xl flex flex-col"
+              style={{
+                top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                width: 'min(520px, 94vw)', maxHeight: '80vh',
+                background: 'var(--bg-secondary)',
+                borderColor: 'var(--border-primary)',
+                color: 'var(--text-primary)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <div>
+                  <div className="text-sm font-semibold">Merge with another lead</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Higher-score lead wins. Other lead will be permanently deleted.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !merging && setShowMergeDialog(false)}
+                  className="p-1 rounded hover:opacity-80"
+                  disabled={merging}
+                  aria-label="Cancel"
+                >
+                  <MdClose size={16} />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-3 overflow-y-auto">
+                {/* Search input */}
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
+                    Find the other lead (name, phone, or email)
+                  </label>
+                  <input
+                    type="text"
+                    value={mergeQuery}
+                    onChange={(e) => runSearch(e.target.value)}
+                    placeholder="Type at least 2 characters…"
+                    className="w-full text-sm px-3 py-2 rounded border outline-none focus:ring-1"
+                    style={{
+                      background: 'var(--bg-primary)',
+                      borderColor: 'var(--border-primary)',
+                      color: 'var(--text-primary)',
+                    }}
+                    autoFocus
+                    disabled={merging}
+                  />
+                </div>
+
+                {/* Results */}
+                {mergeSearchLoading && (
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Searching…</div>
+                )}
+                {!mergeSearchLoading && mergeQuery.trim().length >= 2 && mergeCandidates.length === 0 && (
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No matches.</div>
+                )}
+                {mergeCandidates.length > 0 && !mergeSelected && (
+                  <ul className="space-y-1">
+                    {mergeCandidates.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => setMergeSelected(c)}
+                          className="w-full text-left p-2 rounded-md border hover:opacity-90 transition flex items-center gap-2"
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[12px] font-semibold truncate">
+                              {c.customer_name || c.phone || c.email || c.id.slice(0, 8)}
+                            </div>
+                            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {c.phone || '—'}{c.email ? ` · ${c.email}` : ''} · score {c.lead_score ?? '—'}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Confirm panel */}
+                {mergeSelected && willKeep && willDelete && (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      Confirm merge
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <article className="p-3 rounded-lg border" style={{ background: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.45)' }}>
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 mb-1">Keep</div>
+                        <div className="text-[12px] font-semibold truncate">{willKeep.customer_name || willKeep.phone || '—'}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          {willKeep.phone || '—'} · score {willKeep.lead_score ?? '—'}
+                        </div>
+                      </article>
+                      <article className="p-3 rounded-lg border" style={{ background: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.45)' }}>
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-red-400 mb-1">Delete</div>
+                        <div className="text-[12px] font-semibold truncate">{willDelete.customer_name || willDelete.phone || '—'}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          {willDelete.phone || '—'} · score {willDelete.lead_score ?? '—'}
+                        </div>
+                      </article>
+                    </div>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      All conversations, tasks, and activities from the deleted lead will move to the kept one.
+                      The deleted lead row is removed permanently.
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setMergeSelected(null)}
+                        className="px-3 py-1.5 text-[12px] rounded border hover:opacity-80"
+                        style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+                        disabled={merging}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={doMerge}
+                        className="px-3 py-1.5 text-[12px] rounded font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                        style={{ background: '#dc2626' }}
+                        disabled={merging}
+                      >
+                        {merging ? 'Merging…' : 'Confirm merge'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </>
   )
 }

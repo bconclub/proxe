@@ -25,11 +25,20 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const includeNewsletter = searchParams.get('include_newsletter') === 'true'
+    // Free-text search across customer_name, phone, email — used by the
+    // merge-leads picker in the lead modal.
+    const search = searchParams.get('search')?.trim() || null
 
     let query = supabase
       .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    if (search && search.length >= 2) {
+      // Postgres ILIKE pattern, OR across name/phone/email.
+      const pat = `%${search.replace(/[%_]/g, '')}%`
+      query = query.or(`customer_name.ilike.${pat},phone.ilike.${pat},email.ilike.${pat}`)
+    }
 
     // Exclude newsletter signups by default
     if (!includeNewsletter) {
