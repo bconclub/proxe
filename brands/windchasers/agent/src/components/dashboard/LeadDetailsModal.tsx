@@ -2627,6 +2627,72 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )}
                     </article>
 
+                    {/* Latest note — shows the most recent admin_note inline so
+                        operators can see what they (or a teammate) just added
+                        without clicking the 3-dot menu in the contact card.
+                        Hidden when there are no notes. */}
+                    {(() => {
+                      const notes = (currentLead.unified_context?.admin_notes || []) as Array<{
+                        id?: string; text?: string; created_by?: string; created_at?: string
+                      }>
+                      if (!notes.length) return null
+                      const latest = notes[notes.length - 1]
+                      if (!latest?.text) return null
+                      const when = latest.created_at ? new Date(latest.created_at) : null
+                      const ago = (() => {
+                        if (!when) return ''
+                        const min = Math.floor((Date.now() - when.getTime()) / 60_000)
+                        if (min < 1) return 'just now'
+                        if (min < 60) return `${min}m ago`
+                        const hr = Math.floor(min / 60)
+                        if (hr < 24) return `${hr}h ago`
+                        return `${Math.floor(hr / 24)}d ago`
+                      })()
+                      const author = (latest.created_by || '').split('@')[0] || 'team'
+                      return (
+                        <article
+                          className="lead-latest-note p-3 rounded-lg border"
+                          style={{
+                            borderColor: 'var(--border-primary)',
+                            backgroundColor: 'var(--bg-secondary)',
+                          }}
+                        >
+                          <h3 className="text-xs font-semibold mb-2 flex items-center justify-between text-[var(--text-primary)]">
+                            <div className="flex items-center gap-1.5">
+                              <MdNote size={14} className="text-orange-400" aria-hidden="true" />
+                              Latest note
+                            </div>
+                            {notes.length > 1 && (
+                              <button
+                                onClick={() => setShowAdminNotes(!showAdminNotes)}
+                                className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                                title={`Show all ${notes.length} notes`}
+                              >
+                                {notes.length > 1 ? `+${notes.length - 1} more` : ''}
+                              </button>
+                            )}
+                          </h3>
+                          <p className="text-xs leading-relaxed text-[var(--text-primary)] mb-2 whitespace-pre-wrap">
+                            {latest.text}
+                          </p>
+                          <footer className="text-[10px] pt-2 border-t border-[var(--border-primary)] text-[var(--text-muted)] flex items-center gap-2">
+                            <span>{author}</span>
+                            {ago && <span>· {ago}</span>}
+                            {when && (
+                              <span title={when.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}>
+                                ·{' '}
+                                {when.toLocaleString('en-IN', {
+                                  timeZone: 'Asia/Kolkata',
+                                  day: 'numeric', month: 'short',
+                                  hour: 'numeric', minute: '2-digit', hour12: true,
+                                })}
+                              </span>
+                            )}
+                          </footer>
+                        </article>
+                      )
+                    })()}
+
                     {/* Next Actions */}
                     <section className="lead-next-actions mt-4">
                       <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-[var(--text-primary)]">
