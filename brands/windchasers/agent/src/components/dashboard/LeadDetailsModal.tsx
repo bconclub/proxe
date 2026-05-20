@@ -1549,51 +1549,72 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <div className="group flex items-center gap-1.5 flex-1 min-w-0">
-                    {editingName ? (
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={editingNameValue}
-                          onChange={(e) => setEditingNameValue(e.target.value)}
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
-                              const newName = editingNameValue.trim()
-                              if (!newName) { setEditingName(false); return }
-                              setSavingName(true)
-                              try {
-                                const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ customer_name: newName }),
-                                })
-                                if (!r.ok) {
-                                  const d = await r.json()
-                                  console.error('Name save failed:', d.error)
-                                }
+                    {editingName ? (() => {
+                      // Shared save handler — wired to both ✓ button and Enter key.
+                      // (Enter was relied on alone before; the user didn't realize
+                      // it would save and there was no visible commit affordance.)
+                      const commitName = async () => {
+                        const newName = editingNameValue.trim()
+                        if (!newName) { setEditingName(false); return }
+                        setSavingName(true)
+                        try {
+                          const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ customer_name: newName }),
+                          })
+                          if (!r.ok) {
+                            const d = await r.json().catch(() => ({}))
+                            console.error('Name save failed:', d.error || r.statusText)
+                          }
+                          setEditingName(false)
+                          loadFreshLeadData()
+                        } finally {
+                          setSavingName(false)
+                        }
+                      }
+                      return (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingNameValue}
+                            onChange={(e) => setEditingNameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                void commitName()
+                              } else if (e.key === 'Escape') {
                                 setEditingName(false)
-                                loadFreshLeadData()
-                              } finally {
-                                setSavingName(false)
                               }
-                            } else if (e.key === 'Escape') {
-                              setEditingName(false)
-                            }
-                          }}
-                          disabled={savingName}
-                          placeholder="Enter name…"
-                          className="text-xl font-bold flex-1 min-w-0 bg-transparent border-b border-[var(--accent-primary)] outline-none text-[var(--text-primary)]"
-                        />
-                        <button
-                          onClick={() => setEditingName(false)}
-                          className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                          title="Cancel (Esc)"
-                          disabled={savingName}
-                        >
-                          <MdClose size={16} />
-                        </button>
-                      </div>
-                    ) : (
+                            }}
+                            disabled={savingName}
+                            placeholder="Enter name…"
+                            className="text-xl font-bold flex-1 min-w-0 bg-transparent border-b border-[var(--accent-primary)] outline-none text-[var(--text-primary)]"
+                          />
+                          {/* ✓ Save (green) */}
+                          <button
+                            onClick={() => void commitName()}
+                            className="p-1 rounded text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition"
+                            title="Save (Enter)"
+                            disabled={savingName || !editingNameValue.trim()}
+                            aria-label="Save name"
+                          >
+                            <MdCheck size={16} />
+                          </button>
+                          {/* ✕ Cancel */}
+                          <button
+                            onClick={() => setEditingName(false)}
+                            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                            title="Cancel (Esc)"
+                            disabled={savingName}
+                            aria-label="Cancel"
+                          >
+                            <MdClose size={16} />
+                          </button>
+                        </div>
+                      )
+                    })() : (
                       <>
                         <h2
                           id="lead-modal-title"
