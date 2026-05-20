@@ -105,13 +105,20 @@ User's message: ${input.message}`
   // Wire booking tools when:
   //   - Current message has booking intent, OR
   //   - User already has a booking (could be rescheduling), OR
-  //   - ANY of the last 6 messages (either side) had booking intent — this
-  //     keeps tools available across multi-turn booking flows (user said
-  //     "yes book me" 3 turns ago, now sharing email; tools must still be
-  //     wired so the LLM can call check_availability + book_consultation).
+  //   - Any of the last 6 CUSTOMER messages had booking intent — this keeps
+  //     tools available across multi-turn booking flows (user said "yes book me"
+  //     3 turns ago, now sharing email; tools must still be wired so the LLM
+  //     can call check_availability + book_consultation).
+  //
+  // IMPORTANT: only check role==='user' messages. Agent templates ("Demo
+  // Session Booked", "your online demo session is confirmed") contain
+  // booking keywords by definition — if we counted those, every customer
+  // reply right after a demo confirmation would force-wire booking tools,
+  // which confused Claude when the customer was actually asking about
+  // something unrelated (e.g. "Join Pilot Community" tap → no reply).
   const recentBookingDiscussion = (input.conversationHistory || [])
     .slice(-6)
-    .some((m) => isBookingIntent(m.content));
+    .some((m) => m.role === 'user' && isBookingIntent(m.content));
   const needsBookingTools = input.channel === 'whatsapp' &&
     (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion);
 
@@ -209,11 +216,13 @@ export async function* processStream(
 
     // 1. Extract intent — determines which DB calls to make
     const intent = extractIntent(input.message, input.usedButtons);
-    // Booking intent: current message OR booking discussion in last 6 turns
-    // (web stream variant — same multi-turn flow concern as the WhatsApp path).
+    // Booking intent: current message OR a CUSTOMER message in the last 6 turns
+    // had booking intent. Same scope-down as process() — agent templates
+    // contain booking keywords ("demo session confirmed") and would otherwise
+    // false-trigger booking-tool mode for follow-up customer messages.
     const recentBookingDiscussion = (input.conversationHistory || [])
       .slice(-6)
-      .some((m) => isBookingIntent(m.content));
+      .some((m) => m.role === 'user' && isBookingIntent(m.content));
     const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion;
 
     // 2. Parallelize DB calls: KB search always runs; booking check only when needed
