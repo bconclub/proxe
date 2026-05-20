@@ -13,6 +13,7 @@ import ActivityLoggerModal from './ActivityLoggerModal'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
+import { cleanDisplayName } from '@/lib/services'
 
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
@@ -1610,6 +1611,27 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         >
                           <MdEdit size={14} />
                         </button>
+                        {currentLead.name && (() => {
+                          // Show the "Clean" button only when the cleanup
+                          // ACTUALLY changes the name (avoids noise on already-
+                          // clean names like "John Doe").
+                          const cleaned = cleanDisplayName(currentLead.name)
+                          if (cleaned && cleaned !== currentLead.name) {
+                            return (
+                              <button
+                                onClick={() => {
+                                  setEditingNameValue(cleaned)
+                                  setEditingName(true)
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                title={`Clean up: "${currentLead.name}" → "${cleaned}"`}
+                              >
+                                <MdAutoAwesome size={14} />
+                              </button>
+                            )
+                          }
+                          return null
+                        })()}
                         {currentLead.name && (
                           <CopyIconButton value={currentLead.name} label="name" />
                         )}

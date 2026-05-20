@@ -19,6 +19,7 @@ export {
   formatTimeForDisplay,
   formatDate,
   isLikelyRealPersonName,
+  cleanDisplayName,
 } from './utils';
 
 // Supabase clients

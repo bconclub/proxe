@@ -147,6 +147,60 @@ const EMOJI_REGEX =
  * that pass the basic shape check are trusted — we'd rather accept an unusual
  * real name than reject it.
  */
+/**
+ * Best-effort cleanup of "fancy" Unicode-spoofed display names sourced from
+ * social profiles (Instagram, WhatsApp). Strips combining marks, maps
+ * common letterlike substitutions to ASCII, removes decorative bullets,
+ * collapses whitespace, and title-cases the result.
+ *
+ * Examples:
+ *   "M•#Đ MÀŦĒËÑ ÀÁMÎŘĨ"  → "M D Mateen Aamiri"
+ *   "Ƒ𝒂𝒏𝒄𝒚 𝓝𝓪𝓶𝒆"        → "Fancy Name"
+ *   "  john   doe   "    → "John Doe"
+ *
+ * Never destructive — surfaces the result for the operator to confirm in an
+ * editable field, doesn't auto-save.
+ */
+export function cleanDisplayName(raw: string): string {
+  if (!raw || typeof raw !== 'string') return ''
+  // 1. NFKD normalises stylised letters (mathematical bold, italic, fraktur,
+  //    superscript ligatures, etc.) into their base ASCII + combining marks.
+  let s = raw.normalize('NFKD')
+  // 2. Strip combining diacritical marks (À → A, Ñ → N, Ī → I, …).
+  s = s.replace(/[̀-ͯ]/g, '')
+  // 3. Map letterlike chars that NFKD doesn't decompose to ASCII manually.
+  const replacements: Record<string, string> = {
+    'Đ': 'D', 'đ': 'd', 'Ð': 'D',
+    'Ŧ': 'T', 'ŧ': 't',
+    'Ø': 'O', 'ø': 'o',
+    'Æ': 'AE', 'æ': 'ae',
+    'Œ': 'OE', 'œ': 'oe',
+    'Ł': 'L', 'ł': 'l',
+    'Þ': 'Th', 'þ': 'th',
+    'ß': 'ss',
+  }
+  s = s.replace(/[ĐđÐŦŧØøÆæŒœŁłÞþß]/g, (ch) => replacements[ch] ?? ch)
+  // 4. Strip decorative bullets, hashes, asterisks, common emoji.
+  s = s.replace(/[•·●◦▪▫▶▷►▻♦♥★☆#*~_=+|\\\/]/g, ' ')
+  // 5. Drop anything still non-ASCII (emoji, Devanagari noise, etc.).
+  s = s.replace(/[^\x20-\x7E]/g, ' ')
+  // 6. Collapse whitespace + trim.
+  s = s.replace(/\s+/g, ' ').trim()
+  // 7. Title-case each token. Preserve apostrophe/hyphen segments.
+  s = s.split(' ').map((token) => {
+    if (!token) return token
+    return token
+      .split(/(['-])/)
+      .map((seg, i) =>
+        i % 2 === 1
+          ? seg // separator
+          : seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase(),
+      )
+      .join('')
+  }).join(' ')
+  return s
+}
+
 export function isLikelyRealPersonName(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
