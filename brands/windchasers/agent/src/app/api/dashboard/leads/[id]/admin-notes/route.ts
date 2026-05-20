@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { classifyAndAct } from '@/lib/services'
+import { classifyAndAct, getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,12 +19,18 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-
+    // Auth check via cookie-bound client (so we can capture user.email
+    // for the note's created_by). DB writes use service-role to bypass RLS
+    // — the cookie client occasionally returns 0 affected rows + no error
+    // when RLS quirks (e.g. PostgREST scoping) hit, leaving the note in
+    // limbo. Service-role is consistent with other dashboard routes.
+    const authClient = await createClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
     const createdBy = user?.email || 'system'
+
+    const supabase = getServiceClient() || authClient
 
     const leadId = params.id
     const body = await request.json()
@@ -124,7 +130,9 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient()
+    // Same service-role bypass as POST — RLS occasionally swallows the
+    // update without surfacing an error.
+    const supabase = getServiceClient() || (await createClient())
     const leadId = params.id
     const body = await request.json()
     const { note_id, note_text, note_created_at } = body

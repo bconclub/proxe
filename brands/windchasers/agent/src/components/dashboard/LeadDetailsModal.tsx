@@ -2022,8 +2022,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     />
                     <button
                       onClick={toggleVoiceDictation}
-                      className="focus:outline-none rounded-full"
-                      className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                      className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors focus:outline-none ${
                         isListening
                           ? 'bg-red-500 text-white animate-pulse'
                           : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
@@ -2035,9 +2034,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </button>
                     <button
                       onClick={handleSaveAdminNote}
-                      className="focus:outline-none rounded-full"
                       disabled={!adminNoteText.trim() || savingAdminNote}
-                      className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
+                      className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors focus:outline-none"
                       title="Save note"
                     >
                       <MdCheck size={12} />
