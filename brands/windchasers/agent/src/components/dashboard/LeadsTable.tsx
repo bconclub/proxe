@@ -753,23 +753,36 @@ export default function LeadsTable({
                 //   still tells you HOW they got here.
 
                 // ── ATTRIBUTION (canonical) ────────────────────────────────
-                // New leads have unified_context.attribution = { source, source_label,
-                // first_touch, first_touch_label }. Use that as the canonical source
-                // of truth, falling back to the legacy UTM/channel logic below for
-                // older leads.
+                // SOURCE column = the MARKETING SOURCE that drove the lead to us.
+                // WhatsApp and Web are PLATFORMS (the surface they used to reach
+                // out), not marketing sources, so they are explicitly rejected
+                // from this column. A WA-Popup lead with channel='whatsapp' but
+                // utm_source='ig' should show as Instagram, not WhatsApp.
                 //
-                // Resolved-channel priority chain (per website spec):
-                //   raw_form_fields.channel    → website's pre-resolved channel
-                //                                 (ig, fb, google_ads, facebook_ads, …)
-                //                                 fbclid is already mapped here
-                //   raw_form_fields.utm_source → explicit UTM (when present)
-                //   attribution.source         → already-resolved from inbound endpoint
-                //                                 (covers leads created post-fix)
-                //   'direct'                   → final fallback
+                // Priority chain (matches the server-side deriveSource logic):
+                //   1. utm_source (explicit marketing tracking — gold signal)
+                //   2. raw_form_fields.channel IF it's a marketing channel
+                //      (ig / fb / facebook_ads / google_ads / etc.)
+                //   3. attribution.source IF it's a marketing channel
+                //   4. 'direct'
                 //
-                // We prefer raw_form_fields.channel FIRST regardless of what's in
-                // attribution.source, so historical leads written before the inbound
-                // fix still render correctly using the raw field the website sent.
+                // Channels considered MARKETING (acceptable as source). Platform
+                // values like 'whatsapp', 'web', 'voice' are NOT here.
+                const MARKETING_CHANNELS = new Set([
+                  'ig', 'instagram',
+                  'fb', 'facebook', 'facebook_ads', 'fb_ads',
+                  'meta', 'meta_ads',
+                  'google', 'google_ads', 'googleads',
+                  'bing', 'bing_ads',
+                  'youtube', 'yt',
+                  'linkedin', 'linkedin_ads',
+                  'tiktok', 'tiktok_ads',
+                  'twitter', 'x',
+                  'snapchat', 'pinterest',
+                  'email', 'newsletter',
+                  'referral', 'organic',
+                ])
+
                 const attribution = uc?.attribution || null
                 const rffChannel = String(uc?.raw_form_fields?.channel || '').toLowerCase().trim()
                 const rffUtmSource = String(uc?.raw_form_fields?.utm_source || '').toLowerCase().trim()
@@ -779,19 +792,20 @@ export default function LeadsTable({
                 const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
 
                 // attrSource = the EFFECTIVE source we'll surface on the SOURCE column.
-                // Anything non-direct/non-empty in rffChannel wins.
-                const attrSource = (rffChannel && rffChannel !== 'direct' && rffChannel !== 'unknown')
-                  ? rffChannel
-                  : (rffUtmSource && rffUtmSource !== 'direct')
-                    ? rffUtmSource
-                    : attrSourceStored
-                // attrSourceLabel only used as a stored fallback — it may be stale
-                // when rffChannel overrides; the column re-resolves the label from
-                // attrSource via utmSourceConfig further down.
-                const attrSourceLabel = (rffChannel || rffUtmSource) ? '' : attrSourceLabelStored
+                //   1) utm_source (gold), 2) marketing-channel value, 3) 'direct'
+                const attrSource = (rffUtmSource && rffUtmSource !== 'direct')
+                  ? rffUtmSource
+                  : (rffChannel && MARKETING_CHANNELS.has(rffChannel))
+                    ? rffChannel
+                    : (attrSourceStored && MARKETING_CHANNELS.has(attrSourceStored))
+                      ? attrSourceStored
+                      : 'direct'
+                // attrSourceLabel only used as a stored fallback — re-resolved
+                // below from attrSource via utmSourceConfig.
+                const attrSourceLabel = attrSource === 'direct' ? attrSourceLabelStored : ''
 
                 // utmSourceRaw drives the SOURCE pill — same priority chain.
-                const utmSourceRaw = attrSource || String(
+                const utmSourceRaw = attrSource !== 'direct' ? attrSource : String(
                   uc?.web?.utm?.source ||
                   uc?.landing_page?.utm_source ||
                   ''

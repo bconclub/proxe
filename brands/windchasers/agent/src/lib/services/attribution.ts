@@ -79,42 +79,63 @@ function titleCase(s: string): string {
   return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Channels that represent a marketing source (the place that DROVE the lead
+ * to us). Acceptable as the SOURCE column value.
+ *
+ * Platform channels like 'whatsapp' or 'web' are NOT in this set — they
+ * describe the surface the lead used to message us, not what brought them
+ * here. A WA-Popup lead has channel='whatsapp' but the marketing source
+ * is whatever ad they came from (Instagram, Facebook Ads, etc.).
+ */
+const MARKETING_CHANNELS = new Set([
+  'ig', 'instagram',
+  'fb', 'facebook', 'facebook_ads', 'fb_ads',
+  'meta', 'meta_ads',
+  'google', 'google_ads', 'googleads',
+  'bing', 'bing_ads',
+  'youtube', 'yt',
+  'linkedin', 'linkedin_ads',
+  'tiktok', 'tiktok_ads',
+  'twitter', 'x',
+  'snapchat', 'pinterest',
+  'email', 'newsletter',
+  'referral', 'organic',
+]);
+
 export function deriveSource(
   utmSource: string | null | undefined,
   channelFallback?: string,
   resolvedChannel?: string | null,
 ): { source: string; source_label: string } {
-  // PRIORITY 1: resolvedChannel — the website's own pre-resolved channel
-  // (custom_fields.channel: ig, fb, google_ads, facebook_ads, …). This is
-  // the most reliable signal because the website has already done the
-  // click-id → channel mapping (e.g. fbclid → facebook_ads) that UTM
-  // tagging alone misses. Meta auto-tags ads with fbclid INSTEAD of UTM,
-  // so reading utm_source first buckets every Meta-ad lead to "Direct".
+  // PRIORITY 1: utm_source (explicit marketing tracking — the gold signal).
+  // When a UTM is present the lead came from a tracked campaign and that's
+  // unambiguously the marketing source.
+  const utm = (utmSource || '').toLowerCase().trim();
+  if (utm && utm !== 'direct') {
+    return { source: utm, source_label: SOURCE_LABELS[utm] || titleCase(utm) };
+  }
+
+  // PRIORITY 2: resolvedChannel — but ONLY if it's a marketing channel.
+  // The website's `channel` field also fills in 'whatsapp' / 'web' / 'direct'
+  // for un-tracked traffic; those are platforms, not marketing sources, so
+  // we reject them here. Useful values that DO win: facebook_ads (resolved
+  // from fbclid), google_ads (from gclid), ig/fb/etc. when explicit.
   const rc = (resolvedChannel || '').toLowerCase().trim();
-  if (rc && rc !== 'unknown' && rc !== 'direct') {
-    return {
-      source: rc,
-      source_label: SOURCE_LABELS[rc] || titleCase(rc),
-    };
+  if (rc && MARKETING_CHANNELS.has(rc)) {
+    return { source: rc, source_label: SOURCE_LABELS[rc] || titleCase(rc) };
   }
-  // PRIORITY 2: utm_source (the classic signal, when explicit UTM is present)
-  const clean = (utmSource || '').toLowerCase().trim();
-  if (clean) {
-    return {
-      source: clean,
-      source_label: SOURCE_LABELS[clean] || titleCase(clean),
-    };
+
+  // PRIORITY 3: channelFallback (inbound endpoint's `leadSource` enum, only
+  // for non-ambiguous marketing-ish values like 'facebook' or 'google').
+  const ch = (channelFallback || '').toLowerCase().trim();
+  if (ch && MARKETING_CHANNELS.has(ch)) {
+    return { source: ch, source_label: SOURCE_LABELS[ch] || titleCase(ch) };
   }
-  // PRIORITY 3: channelFallback (legacy — the inbound endpoint's `leadSource`
-  // enum, e.g. 'form', 'pabbly'). Fall through to "Direct" for ambiguous ones.
-  const ch = (channelFallback || 'direct').toLowerCase().trim();
-  if (!ch || ch === 'web' || ch === 'form' || ch === 'manual' || ch === 'unknown') {
-    return { source: 'direct', source_label: 'Direct' };
-  }
-  return {
-    source: ch,
-    source_label: SOURCE_LABELS[ch] || titleCase(ch),
-  };
+
+  // PRIORITY 4: 'direct' — no marketing signal at all. We deliberately do
+  // NOT surface 'whatsapp' / 'web' here as a source value (they're platforms).
+  return { source: 'direct', source_label: 'Direct' };
 }
 
 export function deriveFirstTouch(
