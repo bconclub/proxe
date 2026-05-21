@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-21 16:05 IST · Inbox bubbles: subtle 3-tier tint (customer / AI / template)
+
+- Customer bubbles stay neutral on `var(--bg-secondary)`; PROXe AI free-form bubbles get a faint brand-gold tint (`rgba(201, 169, 97, 0.08)` bg, `0.25` border); template bubbles keep their WhatsApp-green tint.
+- Three subtle but distinguishable tints — customer reads as "incoming", AI reads as "us", template reads as "Meta-approved canned send". Works in both themes.
+- User-facing: glancing at a thread now tells you who said what without reading the header strip.
+
 ## 2026-05-21 15:55 IST · Inbox bubbles: WhatsApp-green templates + kill grid bleed-through
 
 - Inbox chat bubbles got solid opaque backgrounds (`var(--bg-secondary)`) instead of the translucent `--bg-hover` / `--accent-subtle` tokens — the chat pane's dotted grid pattern was visible through every bubble. Added `backdropFilter: blur(8px)` belt-and-braces.

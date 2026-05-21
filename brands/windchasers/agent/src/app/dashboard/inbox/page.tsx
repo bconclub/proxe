@@ -1860,32 +1860,31 @@ export default function InboxPage() {
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
                           : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
-                          // SOLID opaque backgrounds — the previous tokens
-                          // (var(--bg-hover) / --accent-subtle / --bg-secondary)
-                          // are translucent in the dark theme and the chat
-                          // pane's grid pattern bled through every bubble.
-                          // backdropFilter adds a small blur for the few that
-                          // still inherit any transparency. Templates get the
-                          // WhatsApp green tint so they stand out at a glance.
+                          // Three subtle bubble tints so customer / agent /
+                          // template all read as distinct at a glance:
+                          //   Customer      → neutral var(--bg-secondary)
+                          //   PROXe AI      → faint brand-gold tint
+                          //   Template (WA) → WhatsApp-green tint + border
+                          // Opaque + backdropFilter blur(8px) so the chat
+                          // pane's dotted grid pattern doesn't bleed through.
                           background: isCustomer
                             ? 'var(--bg-secondary)'
                             : isTemplate
-                              // WhatsApp-brand subtle green for the body —
-                              // legible in both themes.
                               ? 'rgba(37, 211, 102, 0.10)'
-                              // PROXe AI free-form replies: solid bg so the
-                              // grid pattern doesn't dot through.
-                              : 'var(--bg-secondary)',
+                              // Faint brand-gold tint for free-form AI replies.
+                              // Subtle enough that templates still dominate
+                              // visually, distinct enough that the eye knows
+                              // "this isn't a customer message".
+                              : 'rgba(201, 169, 97, 0.08)',
                           backdropFilter: 'blur(8px)',
                           WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
                             ? 'var(--border-primary)'
                             : isTemplate
-                              // WhatsApp green border so the bubble reads as
-                              // "this is a template" without needing to read
-                              // the header strip.
                               ? 'rgba(37, 211, 102, 0.45)'
-                              : 'var(--border-primary)',
+                              // Matching subtle gold edge so the AI bubble
+                              // has a hint of brand framing.
+                              : 'rgba(201, 169, 97, 0.25)',
                           borderWidth: '1px',
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
