@@ -26,6 +26,7 @@ import {
   MdTimeline,
   MdChecklist,
   MdViewKanban,
+  MdLogout,
 } from 'react-icons/md'
 
 interface DashboardLayoutProps {
@@ -256,12 +257,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }
 
-  // AUTHENTICATION DISABLED - Logout function disabled
+  // Signs the user out of Supabase and bounces them back to the login screen.
+  // Uses a full reload (not router.push) so the SSR layout re-runs its auth
+  // check with no session and renders the login page cleanly without any
+  // stale dashboard state lingering in memory.
   const handleLogout = async () => {
-    // const supabase = createClient()
-    // await supabase.auth.signOut()
-    // window.location.href = '/auth/login'
-    console.log('Logout disabled - authentication is not enabled')
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('[layout] signOut failed:', err)
+      // Continue with redirect anyway — better to land on /auth/login than
+      // stay stuck in a broken authed state.
+    }
+    window.location.href = '/auth/login'
   }
 
   // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
@@ -684,23 +693,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '180px',
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      setHealthOpen(true)
-                      if (isMobile) {
-                        setMobileSidebarOpen(false)
-                      }
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
-                    Endpoint Health
-                  </button>
+                  {/* "Endpoint Health" used to live here as a popover modal,
+                     but System Status (/dashboard/status) already renders
+                     HealthStrip + EndpointHealthDetail on a single page —
+                     one source of truth, no menu duplication. */}
                   <Link
                     href="/status"
                     onClick={() => {
@@ -723,6 +719,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                     System Status
                   </Link>
+
+                  {/* Divider before destructive action */}
+                  <div
+                    style={{
+                      height: '1px',
+                      backgroundColor: 'var(--border-primary)',
+                      margin: '4px 0',
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreOptionsOpen(false)
+                      if (isMobile) {
+                        setMobileSidebarOpen(false)
+                      }
+                      handleLogout()
+                    }}
+                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                    style={{ color: 'var(--text-primary)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <MdLogout size={18} style={{ marginRight: '12px' }} />
+                    Sign out
+                  </button>
                 </div>
               )}
             </div>

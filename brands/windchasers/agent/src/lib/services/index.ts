@@ -128,3 +128,10 @@ export {
   classifyAndAct,
   classifyNote,
 } from './noteOrchestrator';
+
+// Transactional email (Resend)
+export {
+  type SendResult,
+  sendEmail,
+  sendInvitationEmail,
+} from './email';
