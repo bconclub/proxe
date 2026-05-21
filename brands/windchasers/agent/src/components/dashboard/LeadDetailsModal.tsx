@@ -13,7 +13,11 @@ import ActivityLoggerModal from './ActivityLoggerModal'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
-import { cleanDisplayName } from '@/lib/services'
+// Direct path to the source file — NOT the @/lib/services barrel — so this
+// client component doesn't drag bookingManager (googleapis → fs/net/child_process)
+// into the client bundle. Webpack tree-shaking became less generous after the
+// resend import was added to the barrel.
+import { cleanDisplayName } from '@/lib/services/utils'
 
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
