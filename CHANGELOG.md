@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-21 16:25 IST · Booking flow: date quick-reply buttons + kill tool-call leak
+
+- WhatsApp booking flow Step 1 now ends with `[BTN: Today][BTN: Tomorrow][BTN: Pick a date]`. Customers can tap instead of typing — extractButtonsFromLLMResponse already converts those markers into Meta interactive buttons.
+- New HARD RULE in the booking prompt: NEVER type a tool name (check_availability, book_consultation) as text. Either invoke via tool-use mechanism or omit. Customer was seeing literal "check_availability(2026-05-21)" on WhatsApp because Claude described the call instead of firing it.
+- Server-side belt-and-braces in `cleanResponse`: strips `check_availability(...)`, `book_consultation(...)`, bare tool names, and dangling "Let me check today's slots for you." preambles before the message ever leaves the agent.
+- User-facing: booking conversations now show quick-tap date buttons + never leak raw function syntax.
+
 ## 2026-05-21 16:05 IST · Inbox bubbles: subtle 3-tier tint (customer / AI / template)
 
 - Customer bubbles stay neutral on `var(--bg-secondary)`; PROXe AI free-form bubbles get a faint brand-gold tint (`rgba(201, 169, 97, 0.08)` bg, `0.25` border); template bubbles keep their WhatsApp-green tint.

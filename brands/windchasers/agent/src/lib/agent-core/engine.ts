@@ -385,6 +385,16 @@ function cleanResponse(raw: string, channel?: string): string {
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    // Tool-call leak guard: when Claude fails to actually invoke a tool
+    // and instead types the call signature as text (e.g. "Let me check
+    // today's slots for you. check_availability(2026-05-21)"), the
+    // customer sees raw function syntax on WhatsApp. Strip every known
+    // tool name followed by an arg list — and any "Let me check ..."
+    // preamble that's left dangling without a tool result. Add new tool
+    // names here whenever buildBookingTools / future engines gain one.
+    .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)\.?/gi, '')
+    .replace(/\b(check_availability|book_consultation)\b/gi, '')
+    .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
     .trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.
