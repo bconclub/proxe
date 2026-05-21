@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-21 15:55 IST · Inbox bubbles: WhatsApp-green templates + kill grid bleed-through
+
+- Inbox chat bubbles got solid opaque backgrounds (`var(--bg-secondary)`) instead of the translucent `--bg-hover` / `--accent-subtle` tokens — the chat pane's dotted grid pattern was visible through every bubble. Added `backdropFilter: blur(8px)` belt-and-braces.
+- Template bubbles now use the WhatsApp brand-green tint (`rgba(37, 211, 102, 0.10)` body, `0.45` border) with a `rgba(37, 211, 102, 0.18)` header strip + bright green "Template · WA" label. Reads as a Meta-approved template at a glance vs free-form AI replies.
+- User-facing: chat thread looks clean (no dotted bleed-through); templates are unmistakable from regular agent replies via the green tint + header.
+
 ## 2026-05-21 15:35 IST · Today's snapshot: full-layout skeleton + rotating status
 
 - Replaced the tiny "Loading…" stub in `TodaySnapshotButton` with a `SnapshotSkeleton` component that mirrors the final layout (4-KPI strip + 2×2 section grid with pulsing placeholders) so the modal expands into the real data instead of jumping from a small box.

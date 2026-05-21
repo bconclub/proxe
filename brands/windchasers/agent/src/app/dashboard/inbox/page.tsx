@@ -1858,29 +1858,34 @@ export default function InboxPage() {
                       <div
                         className={isTemplate
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
-                          // Match the template width (440px) for ALL chat
-                          // bubbles so PROXe AI replies, customer turns, and
-                          // template cards all share one column. Previously
-                          // non-templates used max-w-[80%] which on desktop is
-                          // visibly WIDER than the template card sitting right
-                          // above it — the column looked ragged.
                           : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
-                          // Theme-aware tokens so the bubbles read correctly
-                          // in BOTH light and dark mode. The previous
-                          // hard-coded rgba(15,23,42,0.55) / (255,255,255,0.10)
-                          // values were tuned for dark mode and rendered as
-                          // washed-out purple over white in light mode.
+                          // SOLID opaque backgrounds — the previous tokens
+                          // (var(--bg-hover) / --accent-subtle / --bg-secondary)
+                          // are translucent in the dark theme and the chat
+                          // pane's grid pattern bled through every bubble.
+                          // backdropFilter adds a small blur for the few that
+                          // still inherit any transparency. Templates get the
+                          // WhatsApp green tint so they stand out at a glance.
                           background: isCustomer
-                            ? 'var(--bg-hover)'
+                            ? 'var(--bg-secondary)'
                             : isTemplate
-                              ? 'var(--bg-secondary)'
-                              : 'var(--accent-subtle)',
+                              // WhatsApp-brand subtle green for the body —
+                              // legible in both themes.
+                              ? 'rgba(37, 211, 102, 0.10)'
+                              // PROXe AI free-form replies: solid bg so the
+                              // grid pattern doesn't dot through.
+                              : 'var(--bg-secondary)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
                             ? 'var(--border-primary)'
                             : isTemplate
-                              ? 'var(--border-primary)'
-                              : 'var(--accent-subtle)',
+                              // WhatsApp green border so the bubble reads as
+                              // "this is a template" without needing to read
+                              // the header strip.
+                              ? 'rgba(37, 211, 102, 0.45)'
+                              : 'var(--border-primary)',
                           borderWidth: '1px',
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
@@ -1891,14 +1896,20 @@ export default function InboxPage() {
                       >
                         {isTemplate && (
                           <>
-                            {/* Compact template header strip (channel + timestamp) */}
+                            {/* WA-green template header strip — uses the
+                               WhatsApp dark-green header colour so the
+                               bubble instantly reads as a Meta-approved
+                               template (vs a free-form AI reply). */}
                             <div
                               className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
-                              style={{ background: 'var(--accent-subtle)', borderColor: 'var(--border-primary)' }}
+                              style={{
+                                background: 'rgba(37, 211, 102, 0.18)',
+                                borderColor: 'rgba(37, 211, 102, 0.35)',
+                              }}
                             >
                               <div className="flex items-center gap-1.5">
                                 <ChannelIcon channel={msg.channel} size={10} active={true} />
-                                <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
+                                <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: '#22c55e' }}>
                                   Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
                                 </span>
                               </div>
