@@ -800,9 +800,29 @@ export default function LeadsTable({
                     : (attrSourceStored && MARKETING_CHANNELS.has(attrSourceStored))
                       ? attrSourceStored
                       : 'direct'
-                // attrSourceLabel only used as a stored fallback — re-resolved
-                // below from attrSource via utmSourceConfig.
-                const attrSourceLabel = attrSource === 'direct' ? attrSourceLabelStored : ''
+                // attrSourceLabel: only honour a STORED label when its STORED
+                // source is also a marketing channel. Legacy rows from the
+                // May-19→May-20 window have attribution.source='whatsapp' +
+                // source_label='WhatsApp' baked in by the old deriveSource;
+                // surfacing that label here would re-leak "WhatsApp" into the
+                // SOURCE column even after we already filtered the platform
+                // out of attrSource above.
+                const attrSourceLabel =
+                  attrSource === 'direct' &&
+                  attrSourceStored &&
+                  MARKETING_CHANNELS.has(attrSourceStored)
+                    ? attrSourceLabelStored
+                    : ''
+
+                // Platform values that arrive as first_touchpoint but should
+                // NEVER render as a source — they describe the surface the
+                // lead used to message us, not the marketing source. When the
+                // resolver falls all the way through to channelConfig[source]
+                // and the source is one of these, show 'Direct' instead so
+                // the SOURCE column stays accurate.
+                const NON_MARKETING_PLATFORMS = new Set([
+                  'whatsapp', 'web', 'form', 'voice', 'social',
+                ])
 
                 // utmSourceRaw drives the SOURCE pill — same priority chain.
                 const utmSourceRaw = attrSource !== 'direct' ? attrSource : String(
@@ -885,6 +905,11 @@ export default function LeadsTable({
                       .replace(/\b\w/g, (c) => c.toUpperCase()),
                     color: '#6366F1',
                   }
+                } else if (source && NON_MARKETING_PLATFORMS.has(source)) {
+                  // Final fallback fired with a platform source (whatsapp/
+                  // web/voice/etc.) — don't render it as a marketing pill.
+                  // These leads simply have no marketing attribution.
+                  srcCfg = { label: 'Direct', color: '#6B7280' }
                 } else {
                   srcCfg = channelConfig[source] || channelConfig.unknown
                 }
