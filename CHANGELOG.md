@@ -1,5 +1,56 @@
 # Changelog
 
+## 2026-05-21 14:50 IST · Inbox WhatsApp formatting + uniform bubble width
+
+- WhatsApp AI free-form replies now render `*bold*`, `_italic_`, `~strike~` properly — previously only template bubbles got the WA-markdown treatment so AI replies (e.g. "Your demo is locked in for *Tuesday, May 26*") showed literal asterisks.
+- All chat bubbles in the inbox capped at `max-w-[440px]` to match the template width — non-template bubbles used to stretch to 80% and ran visibly wider than the template card sitting right above them.
+- User-facing: messages on the WhatsApp channel inside `/dashboard/inbox` now look like they do on WhatsApp itself (bold dates, no stray asterisks); template / AI / customer bubbles all share one column width.
+
+## 2026-05-21 14:30 IST · Link prior chat session to lead on inbound
+
+- `/api/agent/leads/inbound` now extracts `conversation_id` from `custom_fields.conversation_id`, `page_url`, or `referrer` query string (first hit wins).
+- On match, repoints `web_sessions.lead_id` and backfills `conversations.lead_id` for orphan rows tagged with that `session_id`. Soft-fail so lead creation never blocks on the chat-linkage step.
+- Backfilled the only historical orphan (Himadri Samadder — 10 messages from chat session `a625440e…` re-linked to her PAT-submitted lead).
+- User-facing: the inbox no longer shows the same person split between "Web visitor · …" and a separate lead row; the chat → PAT → demo-booked journey reads as one continuous thread. (`731eeaa2`)
+
+## 2026-05-21 14:10 IST · Multi-user dashboard polish
+
+- Lead modal: Attribution split out of the Interaction tab into its own tab; Interaction reverted to just the 30-day calendar + stats grid.
+- Inbox: anonymous web sessions actually show their messages now (was returning 0 rows because the synthetic `session:<sid>` key was being passed as a UUID to `lead_id`); right pane shows a "Anonymous web visitor" stub instead of stuck "Loading details…".
+- Sign-out dropdown shows "Signed in as · <email>" header so testers see which account they're acting as.
+- New `POST /api/auth/touch` heartbeat endpoint; `DashboardLayout` pings it on mount + every 60s while the tab is visible.
+- `/dashboard/settings/users` column renamed `Last Login` → `Last Active`; new helper shows green-dot "Live now" within 2 min, then "X min ago" / "Xh ago" / "Xd ago". Page auto-refreshes every 30s. (`a71daae9`)
+
+## 2026-05-21 14:00 IST · Keep googleapis out of the client bundle
+
+- `LeadDetailsModal.tsx` imports `cleanDisplayName` directly from `@/lib/services/utils` instead of the `@/lib/services` barrel. Adding the `resend` import to the barrel had broken webpack tree-shaking enough to drag `bookingManager → googleapis → fs/net/child_process` into the client bundle and fail the Vercel build. (`c7e02872`)
+
+## 2026-05-21 13:50 IST · Wire Resend into /api/dashboard/users
+
+- The dashboard's invite UI POSTs to `/api/dashboard/users`, not `/api/auth/invite`. The Resend wiring was sitting orphaned in the latter. Mirrored `sendInvitationEmail()` into the users route with the same soft-fail contract.
+- Both endpoints now send real invite emails via Resend from `noreply@pilot.windchasers.in`. (`6689502d`)
+
+## 2026-05-21 13:30 IST · Auto-promote real name from chat
+
+- `conversationIntelligence.ts` now also extracts `full_name` when the customer explicitly states their own name in chat. Defence-in-depth: cleaned via `cleanDisplayName()`, validated via `isLikelyRealPersonName()`.
+- The WhatsApp meta webhook and web chat route promote `profile.full_name` to `customer_name` only when the stored name fails `isLikelyRealPersonName` (asymmetric — easy to upgrade junk → real, impossible to downgrade real → guess).
+- User-facing: `♥⁠╣firru╠⁠♥` → "Firdose" automatically on next AI reply. (`f3ab04b1`)
+
+## 2026-05-21 13:20 IST · SOURCE column never leaks 'WhatsApp' or 'Web'
+
+- `LeadsTable.tsx` no longer surfaces stored attribution.source_label when the stored source is non-marketing (`whatsapp`/`web`/`form`/`voice`/`social`) — fixed the Path A leak where legacy May 19-20 leads kept rendering "WhatsApp" despite the upstream filter.
+- New `NON_MARKETING_PLATFORMS` set short-circuits the final `channelConfig[source]` fallback to "Direct" for those platform values — Path B leak fixed too.
+- DB backfill (out-of-band): 5 stale rows (Preeti, Mateen, Chanki, Basavaraj, Firdose) flipped from `attribution.source='whatsapp'` → `'ig' / Instagram` based on actual `raw_form_fields.utm_source`. (`7e944244`)
+
+## 2026-05-21 13:00 IST · Multi-user readiness
+
+- New `POST /api/auth/redeem-invite` server endpoint — uses service-role `auth.admin.createUser({ email_confirm: true })` so invitees skip Supabase's "verify your email" wall. Idempotent (falls back to `updateUserById` if the user already exists). Role allowlist on top.
+- `accept-invite` page refactored to POST to the new endpoint then `signInWithPassword` to establish the cookie session, then route to `/dashboard`.
+- `/api/auth/invite` now sends a real Resend email (branded HTML + plain-text fallback) — `lib/services/email.ts` new file, exported via the services barrel.
+- `DashboardLayout`: re-enabled `handleLogout`; added "Sign out" item to the three-dot menu with a divider above it; removed the redundant "Endpoint Health" modal item (System Status page already shows it).
+- Re-enabled the auth gate on 13 `/api/dashboard/*` routes that had been commented out. Removed 8 stale `const user = { id: 'system' }` placeholders.
+- User-facing: invitees can log in straight after accepting the invite; admins see which account they're signed in as + can sign out from the sidebar; dashboard APIs no longer leak lead PII to unauthed callers. (`bd4cc381`)
+
 ## 2026-05-19 · fix(both brands): clear pre-existing TS errors + parent nav-item highlight on sub-pages
 
 Two things in one commit, both related to the `DashboardLayout` active-detection logic.

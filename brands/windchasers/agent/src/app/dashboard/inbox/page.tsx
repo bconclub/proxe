@@ -1858,7 +1858,13 @@ export default function InboxPage() {
                       <div
                         className={isTemplate
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
-                          : 'max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border'}
+                          // Match the template width (440px) for ALL chat
+                          // bubbles so PROXe AI replies, customer turns, and
+                          // template cards all share one column. Previously
+                          // non-templates used max-w-[80%] which on desktop is
+                          // visibly WIDER than the template card sitting right
+                          // above it — the column looked ragged.
+                          : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
                           // Theme-aware tokens so the bubbles read correctly
                           // in BOTH light and dark mode. The previous
@@ -1936,7 +1942,16 @@ export default function InboxPage() {
                             : 'text-[13px] leading-relaxed'}
                           style={{ color: 'var(--text-primary)' }}
                         >
-                          {isTemplate ? renderWhatsAppMarkdown(msg.content) : renderMarkdown(msg.content)}
+                          {/* Pick the formatter by what the source platform actually
+                             uses. WhatsApp (both templates AND free-form AI replies)
+                             uses single-asterisk *bold*, _italic_, ~strike~. Web/dashboard
+                             messages use Markdown's double-asterisk **bold**. Picking
+                             solely on isTemplate left WA agent replies showing literal
+                             asterisks ("All set, Punith. Your demo is locked in for
+                             *Tuesday, May 26*."). */}
+                          {(isTemplate || msg.channel === 'whatsapp')
+                            ? renderWhatsAppMarkdown(msg.content)
+                            : renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
