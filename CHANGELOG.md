@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-21 15:10 IST · Lead modal Activity tab: WhatsApp formatting + readability
+
+- Activity tab in `LeadDetailsModal` had the same literal-asterisk issue the inbox did: free-form AI replies on the WhatsApp channel rendered `*Fri, 22 May*` instead of bold. Added the same `renderWhatsAppMarkdown` helper used by the inbox and the bubble now picks the renderer by `activity.channel === 'whatsapp'`.
+- Bumped bubble contrast — was `bg-emerald-50 dark:bg-emerald-900/20` over `text-emerald-900 dark:text-emerald-50` which read as washed-out grey on the dark timeline. Moved to `bg-{c}-100 dark:bg-{c}-900/40` with `text-{c}-950 dark:text-{c}-50` so the message reads cleanly in both themes.
+- Width capped at 440px to match the inbox column convention. `whitespace-pre-wrap` added so multi-line WhatsApp content keeps its line breaks.
+- User-facing: opening the Activity tab on any WhatsApp lead now shows readable bubbles with bold dates/times, not asterisk soup.
+
 ## 2026-05-21 14:50 IST · Inbox WhatsApp formatting + uniform bubble width
 
 - WhatsApp AI free-form replies now render `*bold*`, `_italic_`, `~strike~` properly — previously only template bubbles got the WA-markdown treatment so AI replies (e.g. "Your demo is locked in for *Tuesday, May 26*") showed literal asterisks.

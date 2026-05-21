@@ -133,6 +133,34 @@ function renderMarkdown(text: string) {
   });
 }
 
+/**
+ * Render WhatsApp-style markdown — what Meta's templates use natively:
+ *   *text*  → bold
+ *   _text_  → italic
+ *   ~text~  → strikethrough
+ * Newlines preserved as <br/>. Used for the Activity tab bubbles when the
+ * activity came from the WhatsApp channel — otherwise free-form AI replies
+ * showed literal asterisks (e.g. "Date: *Fri, 22 May* Time: *1:00 PM*").
+ */
+function renderWhatsAppMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-bold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 /** Render summary as plain text - just sentences, no formatting */
 function renderSummary(text: string) {
   if (!text) return null;
@@ -2563,26 +2591,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             )}
                           </div>
                           <article className={`lead-activity-content flex-1 pb-2 min-w-0 ${isCustomer ? 'text-right' : 'text-left'}`}>
-                            {/* Message bubble for customer/PROXe messages */}
+                            {/* Message bubble for customer/PROXe messages.
+                               Width matches the inbox: max 440px on all
+                               bubbles. Renderer picks the WA-markdown
+                               helper for WhatsApp-channel rows so single
+                               asterisks render as bold instead of being
+                               shown literally. Bumped text contrast on
+                               both light + dark so the bubble isn't a
+                               washed-out grey on the activity timeline. */}
                             {activity.content && (isCustomer || isProxe) ? (
                               <div
                                 className={`lead-activity-message rounded-2xl px-4 py-3 mb-2 shadow-sm ${isCustomer
-                                  ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30'
-                                  : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30'
+                                  ? 'bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700/40'
+                                  : 'bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-700/40'
                                   }`}
                                 style={{
-                                  maxWidth: '85%',
+                                  maxWidth: '440px',
                                   marginLeft: isCustomer ? 'auto' : '0',
                                   marginRight: isCustomer ? '0' : 'auto'
                                 }}
                               >
-                                <p className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
-                                  {renderMarkdown(activity.content)}
+                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isCustomer ? 'text-emerald-950 dark:text-emerald-50' : 'text-blue-950 dark:text-blue-50'}`}>
+                                  {activity.channel === 'whatsapp'
+                                    ? renderWhatsAppMarkdown(activity.content)
+                                    : renderMarkdown(activity.content)}
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
-                                {renderMarkdown(activity.content)}
+                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                                {activity.channel === 'whatsapp'
+                                  ? renderWhatsAppMarkdown(activity.content)
+                                  : renderMarkdown(activity.content)}
                               </p>
                             ) : null}
 
