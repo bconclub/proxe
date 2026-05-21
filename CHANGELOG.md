@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-21 15:35 IST · Today's snapshot: full-layout skeleton + rotating status
+
+- Replaced the tiny "Loading…" stub in `TodaySnapshotButton` with a `SnapshotSkeleton` component that mirrors the final layout (4-KPI strip + 2×2 section grid with pulsing placeholders) so the modal expands into the real data instead of jumping from a small box.
+- Added a rotating status line that cycles every 700ms through what's actually being fetched: "Pulling today's leads…" → "Counting PAT submissions & demos booked…" → "Sorting by lead score…" → "Ranking most active conversations…". Range-aware copy (today / 7d / 14d / 28d).
+- User-facing: opening the snapshot no longer shows an empty mini-modal — it immediately shows the full panel shape with placeholders, plus a gold dot + helpful status text telling the user what's loading.
+
 ## 2026-05-21 15:10 IST · Lead modal Activity tab: WhatsApp formatting + readability
 
 - Activity tab in `LeadDetailsModal` had the same literal-asterisk issue the inbox did: free-form AI replies on the WhatsApp channel rendered `*Fri, 22 May*` instead of bold. Added the same `renderWhatsAppMarkdown` helper used by the inbox and the bubble now picks the renderer by `activity.channel === 'whatsapp'`.

@@ -201,11 +201,7 @@ export default function TodaySnapshotButton() {
                 </div>
               )}
 
-              {!data && loading && (
-                <div className="text-[12px] py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-                  Loading…
-                </div>
-              )}
+              {!data && loading && <SnapshotSkeleton range={range} />}
 
               {data && (
                 <>
@@ -388,5 +384,112 @@ function ScorePill({ label, n, color }: { label: string; n: number; color: strin
     >
       {label}: {n}
     </span>
+  )
+}
+
+/**
+ * Full-layout skeleton for the snapshot modal — mirrors the final shape
+ * (4-KPI strip + 2×2 section grid) so the modal "expands into" the real
+ * data instead of jumping from a tiny "Loading…" box. A rotating status
+ * line at the bottom tells the user what's being fetched so the wait
+ * feels intentional rather than stalled.
+ */
+function SnapshotSkeleton({ range }: { range: RangeKey }) {
+  // Status messages cycle every 700ms while loading. Picked to match what
+  // the snapshot endpoint actually does in order — see /api/dashboard/
+  // today-snapshot/route.ts (leads → events → score histogram → top active).
+  const MESSAGES: Record<RangeKey, string[]> = {
+    today: [
+      "Pulling today's leads…",
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '7d': [
+      'Pulling leads from the last 7 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '14d': [
+      'Pulling leads from the last 14 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '28d': [
+      'Pulling leads from the last 28 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+  }
+  const messages = MESSAGES[range] || MESSAGES.today
+  const [msgIdx, setMsgIdx] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % messages.length), 700)
+    return () => clearInterval(id)
+  }, [messages.length])
+
+  // Shared pulse box — uses bg-tokens so it works in both themes.
+  const SkelBox = ({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
+    <div
+      className={`animate-pulse rounded ${className}`}
+      style={{ background: 'rgba(255,255,255,0.06)', ...style }}
+    />
+  )
+
+  return (
+    <>
+      {/* KPI strip — 4 cells matching real layout */}
+      <div className="grid grid-cols-4 gap-2 mb-1">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
+            style={{
+              background: 'rgba(255,255,255,0.02)',
+              borderColor: 'var(--border-primary)',
+            }}
+          >
+            <SkelBox className="h-6 w-10 mb-2" />
+            <SkelBox className="h-2 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* 2×2 section grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {[0, 1, 2, 3].map((sec) => (
+          <section
+            key={sec}
+            className="p-3 rounded-lg border"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+          >
+            <SkelBox className="h-2.5 w-20 mb-3" />
+            <div className="space-y-2">
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} className="flex items-center gap-2">
+                  <SkelBox className="h-2.5 flex-1" />
+                  <SkelBox className="h-2.5 w-6" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* Rotating status line — the "what's happening" hint */}
+      <div className="flex items-center justify-center gap-2 pt-3 pb-1" aria-live="polite">
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{ background: '#C9A961' }}
+          aria-hidden="true"
+        />
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {messages[msgIdx]}
+        </span>
+      </div>
+    </>
   )
 }
