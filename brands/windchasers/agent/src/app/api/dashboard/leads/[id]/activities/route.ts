@@ -92,21 +92,33 @@ export async function GET(
 
     if (!teamError && teamActivities) {
       for (const activity of teamActivities) {
-        // dashboard_users is an array from the relation query, get first element
-        const creator = Array.isArray(activity.dashboard_users) 
-          ? activity.dashboard_users[0] 
+        // `created_by` historically stored an email string (e.g.
+        // "user@example.com") so the dashboard_users join on
+        // `created_by → id` returned nothing. Fall back: if creator
+        // is missing but created_by looks like an email, surface the
+        // local part as the actor name.
+        const creator = Array.isArray(activity.dashboard_users)
+          ? activity.dashboard_users[0]
           : activity.dashboard_users
+        const rawCreatedBy = activity.created_by as string | null | undefined
+        const fallbackActor = rawCreatedBy && typeof rawCreatedBy === 'string' && rawCreatedBy.includes('@')
+          ? rawCreatedBy
+          : null
         activities.push({
           id: activity.id,
           type: 'team',
-          actor: creator?.name || creator?.email || 'Team Member',
-          action: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
+          actor: (creator as any)?.full_name || (creator as any)?.name || (creator as any)?.email || fallbackActor || 'Team Member',
+          // Friendly default; LeadDetailsModal Activity tab overrides this
+          // to "Call · Connected" / "Call · No Answer" / etc. for call logs.
+          action: activity.activity_type === 'manual_call'
+            ? 'Call logged'
+            : activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1).replace(/_/g, ' '),
           content: activity.note,
           duration_minutes: activity.duration_minutes,
           next_followup_date: activity.next_followup_date,
           timestamp: activity.created_at,
           icon: activity.activity_type,
-          color: '#3B82F6', // Blue
+          color: '#F59E0B', // Amber — distinct from PROXe (purple) + Customer (green)
           user_id: activity.created_by,
         })
       }

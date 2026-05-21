@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-21 16:45 IST · Call logs surface properly in Activity tab
+
+- Team-typed activities (manual call logs, manual notes) now get their own amber bubble on the Activity timeline, matching the customer (emerald) / proxe (blue) bubble pattern. Previously fell into a muted-grey `<p>` paragraph under the icon, easy to miss.
+- Pretty action label: `manual_call` → "Call · Connected" / "Call · No Answer" / etc. Outcome prefix `[Connected]` in the note body is parsed out and shown as a small badge in the bubble; the actual note text reads cleanly.
+- Actor fix: `created_by` historically stored an email string and the join to `dashboard_users` (which expects UUID FK) silently returned nothing — actor showed as "Team Member" for every call log. Fallback added: when the join is empty but `created_by` looks like an email, surface the local part as the actor.
+- Color: team activities now amber (`#F59E0B`) — distinct from PROXe (purple) and customer (green) so the timeline is scannable.
+- User-facing: "Spoke to him he wants to jump in tomorrow for a call 2:30" now reads in a proper amber bubble with a `CONNECTED` badge above it and the actor's name below.
+
 ## 2026-05-21 16:25 IST · Booking flow: date quick-reply buttons + kill tool-call leak
 
 - WhatsApp booking flow Step 1 now ends with `[BTN: Today][BTN: Tomorrow][BTN: Pick a date]`. Customers can tap instead of typing — extractButtonsFromLLMResponse already converts those markers into Meta interactive buttons.

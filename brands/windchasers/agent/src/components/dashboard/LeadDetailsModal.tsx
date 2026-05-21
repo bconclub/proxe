@@ -2571,6 +2571,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       const Icon = getActivityIcon()
                       const isCustomer = activity.type === 'customer'
                       const isProxe = activity.type === 'proxe'
+                      const isTeam = activity.type === 'team'
+
+                      // Pretty-print team call logs:
+                      //   raw activity.action = "Manual_call"  →  "Call · Connected"
+                      //   raw activity.content = "[Connected] Spoke to him…"  →  "Spoke to him…"
+                      //   raw activity.actor (email from created_by) → "user-name" before @
+                      let displayAction = activity.action
+                      let displayContent = activity.content
+                      let outcomeBadge: string | null = null
+                      let displayActor = activity.actor
+                      if (isTeam) {
+                        // Extract [Outcome] prefix from the note body
+                        if (typeof activity.content === 'string') {
+                          const m = activity.content.match(/^\[([^\]]+)\]\s*(.*)$/s)
+                          if (m) {
+                            outcomeBadge = m[1]
+                            displayContent = m[2] || null
+                          }
+                        }
+                        // Friendly action label
+                        if (activity.icon === 'manual_call' || activity.icon === 'call') {
+                          displayAction = outcomeBadge ? `Call · ${outcomeBadge}` : 'Call logged'
+                        } else if (typeof activity.action === 'string') {
+                          // "Manual_call" → "Manual call"
+                          displayAction = activity.action.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        }
+                        // Actor: if it's an email string, take the local part
+                        if (typeof displayActor === 'string' && displayActor.includes('@')) {
+                          displayActor = displayActor.split('@')[0]
+                        }
+                      }
 
                       return (
                         <li key={activity.id} className={`lead-activity-item flex gap-3 ${isCustomer ? 'flex-row-reverse' : ''}`}>
@@ -2591,15 +2622,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             )}
                           </div>
                           <article className={`lead-activity-content flex-1 pb-2 min-w-0 ${isCustomer ? 'text-right' : 'text-left'}`}>
-                            {/* Message bubble for customer/PROXe messages.
-                               Width matches the inbox: max 440px on all
-                               bubbles. Renderer picks the WA-markdown
-                               helper for WhatsApp-channel rows so single
-                               asterisks render as bold instead of being
-                               shown literally. Bumped text contrast on
-                               both light + dark so the bubble isn't a
-                               washed-out grey on the activity timeline. */}
-                            {activity.content && (isCustomer || isProxe) ? (
+                            {/* Bubbles by activity type:
+                               - customer  → emerald (incoming)
+                               - proxe     → blue (agent)
+                               - team      → amber (call logs, manual notes)
+                                             previously a tiny grey paragraph
+                                             buried under the icon — easy to
+                                             miss. Now styled like every other
+                                             bubble so the actual call note
+                                             pops on the timeline. */}
+                            {(isCustomer || isProxe) && activity.content ? (
                               <div
                                 className={`lead-activity-message rounded-2xl px-4 py-3 mb-2 shadow-sm ${isCustomer
                                   ? 'bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700/40'
@@ -2617,6 +2649,30 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     : renderMarkdown(activity.content)}
                                 </p>
                               </div>
+                            ) : isTeam && (displayContent || outcomeBadge) ? (
+                              <div
+                                className="lead-activity-team-card rounded-2xl px-4 py-3 mb-2 shadow-sm bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/40"
+                                style={{ maxWidth: '440px' }}
+                              >
+                                {outcomeBadge && (
+                                  <span
+                                    className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mb-1.5"
+                                    style={{ background: 'rgba(180, 83, 9, 0.15)', color: '#92400e' }}
+                                  >
+                                    {outcomeBadge}
+                                  </span>
+                                )}
+                                {displayContent && (
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-amber-950 dark:text-amber-50">
+                                    {displayContent}
+                                  </p>
+                                )}
+                                {!displayContent && outcomeBadge && (
+                                  <p className="text-[12px] italic text-amber-900/70 dark:text-amber-100/60">
+                                    No note added.
+                                  </p>
+                                )}
+                              </div>
                             ) : activity.content ? (
                               <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
                                 {activity.channel === 'whatsapp'
@@ -2628,7 +2684,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                               <div className={`lead-activity-meta flex items-center gap-2 flex-1 min-w-0 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                                 <h4 className="lead-activity-action text-sm font-semibold text-[var(--text-primary)]">
-                                  {activity.action || 'Activity'}
+                                  {displayAction || activity.action || 'Activity'}
                                 </h4>
                                 {activity.channel && (
                                   <span
@@ -2648,7 +2704,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </time>
                             </div>
                             <p className="lead-activity-actor text-xs mt-0.5 font-medium" style={{ color }}>
-                              {activity.actor || 'Unknown'}
+                              {displayActor || activity.actor || 'Unknown'}
                             </p>
                           </article>
                         </li>
