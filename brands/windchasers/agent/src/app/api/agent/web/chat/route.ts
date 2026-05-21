@@ -22,6 +22,7 @@ import {
   addUserInput,
   logMessage,
   upsertSummary,
+  isLikelyRealPersonName,
 } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
@@ -332,16 +333,34 @@ async function postProcess(
           const brandId = BRAND_ID;
           const { data: ctxRow } = await supabase
             .from('all_leads')
-            .select('unified_context')
+            .select('unified_context, customer_name')
             .eq('id', leadId)
             .maybeSingle();
           const ctx = ctxRow?.unified_context || {};
           const existingBrandCtx = ctx[brandId] || ctx.windchasers || ctx.bcon || {};
           const mergedBrandCtx = mergeProfile(existingBrandCtx, profile);
-          await supabase
-            .from('all_leads')
-            .update({ unified_context: { ...ctx, [brandId]: mergedBrandCtx } })
-            .eq('id', leadId);
+
+          // Auto-promote profile.full_name → customer_name when the stored
+          // name is garbled (fails the real-person check). Common cause: web
+          // chat session that started anonymous and got a junk display name
+          // from the form, but the customer later typed their real name in
+          // chat.
+          const storedName = ctxRow?.customer_name as string | null | undefined;
+          const promote =
+            profile.full_name && !isLikelyRealPersonName(storedName);
+
+          const update: Record<string, any> = {
+            unified_context: { ...ctx, [brandId]: mergedBrandCtx },
+          };
+          if (promote) update.customer_name = profile.full_name;
+
+          await supabase.from('all_leads').update(update).eq('id', leadId);
+
+          if (promote) {
+            console.log(
+              `[agent/web/chat/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${profile.full_name}"`,
+            );
+          }
           console.log(`[agent/web/chat/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
         } catch (err) {
           console.error('[agent/web/chat/ai-intent] failed:', err);

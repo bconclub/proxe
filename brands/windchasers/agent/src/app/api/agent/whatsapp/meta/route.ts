@@ -840,20 +840,33 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
           const { data: ctxRow } = await supabase
             .from('all_leads')
-            .select('unified_context')
+            .select('unified_context, customer_name')
             .eq('id', leadId)
             .maybeSingle();
           const ctx = ctxRow?.unified_context || {};
           const existingBrandCtx = ctx[brand] || ctx.windchasers || ctx.bcon || {};
           const mergedBrandCtx = mergeProfile(existingBrandCtx, profile);
 
-          await supabase
-            .from('all_leads')
-            .update({
-              unified_context: { ...ctx, [brand]: mergedBrandCtx },
-            })
-            .eq('id', leadId);
+          // Decide whether to promote profile.full_name → customer_name.
+          // Only do it when the stored name is clearly garbled (fails the
+          // real-person check). We never overwrite an already-good name.
+          const storedName = ctxRow?.customer_name as string | null | undefined;
+          const promote =
+            profile.full_name &&
+            !isLikelyRealPersonName(storedName);
 
+          const update: Record<string, any> = {
+            unified_context: { ...ctx, [brand]: mergedBrandCtx },
+          };
+          if (promote) update.customer_name = profile.full_name;
+
+          await supabase.from('all_leads').update(update).eq('id', leadId);
+
+          if (promote) {
+            console.log(
+              `[meta/webhook/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${profile.full_name}"`,
+            );
+          }
           console.log(`[meta/webhook/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
         } catch (err) {
           console.error('[meta/webhook/ai-intent] Extraction failed:', err);

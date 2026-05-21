@@ -9,6 +9,8 @@
  * Cheap to run: Claude Haiku, ~$0.0001 per extraction.
  */
 
+import { isLikelyRealPersonName, cleanDisplayName } from '@/lib/services/utils';
+
 export type CourseInterest = 'DGCA' | 'Flight' | 'Heli' | 'Cabin' | 'Drone';
 export type UserType = 'student' | 'parent' | 'professional' | 'early_stage';
 export type Timeline = 'asap' | '1-3mo' | '6+mo' | '1yr+';
@@ -21,6 +23,10 @@ export interface ConversationProfile {
   city?: string | null;
   age?: number | null;
   key_interest_signal?: string | null;
+  // Customer's real name when they explicitly state it in chat. Used to fix
+  // garbled WhatsApp/Instagram display names (e.g. "♥⁠╣firru╠⁠♥" → "Firdose").
+  // Auto-promotion to customer_name happens in the webhook handler, NOT here.
+  full_name?: string | null;
 }
 
 interface HistoryMessage {
@@ -39,7 +45,8 @@ Return JSON ONLY (no prose, no markdown, no code fences):
   "education": "string | null",
   "city": "string | null",
   "age": number | null,
-  "key_interest_signal": "1-line summary of their main interest"
+  "key_interest_signal": "1-line summary of their main interest",
+  "full_name": "string | null"
 }
 
 Rules:
@@ -65,6 +72,19 @@ Rules:
 - age: only if explicitly mentioned as a number
 - Set fields to null when the conversation doesn't clearly indicate.
 - key_interest_signal: short sentence describing what they're most interested in.
+- full_name: ONLY set when the customer EXPLICITLY states their own name in
+    their messages. Examples that qualify:
+      "Hi, I'm Firdose Taj"
+      "My name is Rakesh"
+      "This is Anu, looking for info on CPL"
+      "Aamiri here"
+    Examples that DO NOT qualify:
+      "My son's name is Rohan"   (that's not the customer)
+      "I want to be like Sachin" (referring to someone else)
+      "Hi"                       (no name stated)
+    Extract just the person's name (first + last if given), no titles
+    (Mr./Mrs./Dr.), no decorations. If unsure, return null. Null is safer
+    than guessing.
 
 Do NOT invent or guess. Null is better than a wrong value.`;
 
@@ -140,6 +160,16 @@ export async function extractProfileFromConversation(
     if (parsed.key_interest_signal && typeof parsed.key_interest_signal === 'string') {
       out.key_interest_signal = parsed.key_interest_signal.trim() || null;
     }
+    // full_name: Haiku is told to only set this when the customer states their
+    // own name explicitly. Defence-in-depth: clean any decorative junk and
+    // run it through isLikelyRealPersonName so brand/UI labels/business names
+    // don't sneak through.
+    if (parsed.full_name && typeof parsed.full_name === 'string') {
+      const cleaned = cleanDisplayName(parsed.full_name);
+      if (cleaned && isLikelyRealPersonName(cleaned)) {
+        out.full_name = cleaned;
+      }
+    }
 
     return out;
   } catch (err) {
@@ -159,6 +189,10 @@ export function mergeProfile(
 ): Record<string, any> {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(next)) {
+    // full_name is handled separately at the call site (promoted to
+    // customer_name when the stored name is garbled). Don't store it inside
+    // the brand context — that would create a confusing duplicate.
+    if (key === 'full_name') continue;
     if (value !== null && value !== undefined && value !== '') {
       merged[key] = value;
     }
