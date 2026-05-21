@@ -433,9 +433,24 @@ export default function InboxPage() {
     setShowSummary(false)
   }, [selectedLeadId])
 
+  // Anonymous-web-visitor right-panel state. true = no all_leads row to
+  // fetch (synthetic 'session:*' key). Distinct from `leadDetails === null`
+  // which the right pane treats as "still loading."
+  const [isAnonymousSession, setIsAnonymousSession] = useState(false)
+
   // Fetch lead details for right panel
   useEffect(() => {
-    if (!selectedLeadId) { setLeadDetails(null); return }
+    if (!selectedLeadId) { setLeadDetails(null); setIsAnonymousSession(false); return }
+
+    // Anonymous web visitor: no all_leads row exists, so skip the fetch
+    // and flag the panel to render a stub instead of the loading spinner.
+    if (selectedLeadId.startsWith('session:')) {
+      setLeadDetails(null)
+      setIsAnonymousSession(true)
+      return
+    }
+    setIsAnonymousSession(false)
+
     async function fetchLeadDetails() {
       try {
         console.log('[RIGHT PANEL] Fetching lead details for:', selectedLeadId)
@@ -934,6 +949,45 @@ export default function InboxPage() {
     setMessageChannelFilter('all')
     try {
       console.log('Fetching all messages for lead:', leadId)
+
+      // Anonymous web visitor path: the conversation list groups these by
+      // `session:<sid>` synthetic keys because they have no all_leads row.
+      // Skip the lead_id query (it'd be a Postgres UUID parse error on the
+      // 'session:' prefix anyway) and fetch by session_id directly.
+      if (leadId.startsWith('session:')) {
+        const sid = leadId.slice('session:'.length)
+        const { data: anonMsgs, error: anonErr } = await supabase
+          .from('conversations')
+          .select('*')
+          .is('lead_id', null)
+          .filter('metadata->>session_id', 'eq', sid)
+          .order('created_at', { ascending: true })
+
+        if (anonErr) {
+          console.error('[fetchMessages] anonymous session fetch failed:', anonErr)
+          setMessages([])
+          return
+        }
+
+        const messagesData = (anonMsgs || []).map((msg: any): Message => ({
+          id: String(msg?.id ?? ''),
+          lead_id: String(msg?.lead_id ?? ''),
+          channel: String(msg?.channel ?? ''),
+          sender: (msg?.sender ?? 'system') as Message['sender'],
+          content: String(msg?.content ?? ''),
+          message_type: String(msg?.message_type ?? ''),
+          metadata: msg?.metadata ?? null,
+          created_at: String(msg?.created_at ?? ''),
+          delivered_at: msg?.delivered_at ?? null,
+          read_at: msg?.read_at ?? null,
+        }))
+        console.log(`[fetchMessages] anonymous session ${sid}: ${messagesData.length} messages`)
+        if (!selectedChannel && messagesData[0]?.channel) {
+          setSelectedChannel(messagesData[0].channel)
+        }
+        setMessages(messagesData)
+        return
+      }
 
       // 1. Fetch messages directly linked to this lead
       const { data: leadMessages, error } = await supabase
@@ -2151,7 +2205,28 @@ export default function InboxPage() {
           className="flex w-[380px] flex-col border-l overflow-y-auto flex-shrink-0"
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
-          {!leadDetails ? (
+          {isAnonymousSession ? (
+            // Anonymous web visitor — no all_leads row to render. Show a
+            // tiny stub so the panel doesn't sit on "Loading details..."
+            // forever. The session id is in selectedConversation.lead_id
+            // (the synthetic 'session:<sid>' key the conversation list uses).
+            <div className="p-4 space-y-3">
+              <p className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                Anonymous web visitor
+              </p>
+              <p className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
+                This visitor hasn't shared a phone or email yet, so there's no lead record to display.
+              </p>
+              {selectedConversation?.lead_id?.startsWith('session:') && (
+                <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  Session: {selectedConversation.lead_id.slice('session:'.length)}
+                </p>
+              )}
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Once they share contact info in chat, the session will be linked to a real lead automatically.
+              </p>
+            </div>
+          ) : !leadDetails ? (
             <div className="p-4 text-center">
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
             </div>

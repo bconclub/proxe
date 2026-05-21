@@ -61,6 +61,34 @@ export default function UserManagementPage() {
     load()
   }, [load])
 
+  // Auto-refresh every 30s while this page is open so "Live now" /
+  // "Last active" reflect the team's actual activity in near-real time.
+  // The DashboardLayout heartbeats every 60s, so a 30s refresh here gives
+  // us a worst-case ~90s lag from a teammate's last action → us seeing it.
+  // Pause while the tab is hidden — no point polling for a background user.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      load()
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [load])
+
+  // Relative-time formatter for the Last Active column. "Live now" green
+  // dot when seen within 2 minutes (covers the 60s heartbeat + grace).
+  const formatLastActive = (iso: string | null): { label: string; live: boolean } => {
+    if (!iso) return { label: 'Never logged in', live: false }
+    const then = new Date(iso).getTime()
+    if (isNaN(then)) return { label: '—', live: false }
+    const diffSec = Math.floor((Date.now() - then) / 1000)
+    if (diffSec < 120) return { label: 'Live now', live: true }
+    if (diffSec < 60 * 60) return { label: `${Math.floor(diffSec / 60)} min ago`, live: false }
+    if (diffSec < 60 * 60 * 24) return { label: `${Math.floor(diffSec / 3600)}h ago`, live: false }
+    const days = Math.floor(diffSec / 86400)
+    if (days < 7) return { label: `${days}d ago`, live: false }
+    return { label: new Date(iso).toLocaleDateString(), live: false }
+  }
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inviteEmail.trim()) return
@@ -251,7 +279,7 @@ export default function UserManagementPage() {
                 <tr>
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Name / Email</th>
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Role</th>
-                  <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Login</th>
+                  <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
                   <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
                 </tr>
@@ -279,8 +307,30 @@ export default function UserManagementPage() {
                           <option value="viewer" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>viewer</option>
                         </select>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
-                        {u.last_login ? new Date(u.last_login).toLocaleString() : '—'}
+                      <td className="px-4 py-3 text-xs">
+                        {(() => {
+                          const { label, live } = formatLastActive(u.last_login)
+                          if (live) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-green-400 font-semibold">
+                                <span
+                                  className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"
+                                  style={{ boxShadow: '0 0 6px rgba(74,222,128,0.8)' }}
+                                  aria-hidden="true"
+                                />
+                                Live now
+                              </span>
+                            )
+                          }
+                          return (
+                            <span
+                              className={u.last_login ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)] italic'}
+                              title={u.last_login ? new Date(u.last_login).toLocaleString() : undefined}
+                            >
+                              {label}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${

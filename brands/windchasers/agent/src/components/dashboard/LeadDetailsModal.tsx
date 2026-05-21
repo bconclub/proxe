@@ -263,7 +263,7 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showAttribution, setShowAttribution] = useState(false)
@@ -2441,6 +2441,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             >
               Interaction
             </button>
+            <button
+              onClick={() => setActiveTab('attribution')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-attribution px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'attribution'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'attribution'}
+              aria-controls="lead-tabpanel-attribution"
+              id="lead-tab-attribution"
+            >
+              Attribution
+            </button>
           </nav>
 
           {/* TAB CONTENT - Scrollable */}
@@ -2932,15 +2945,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </section>
                 )}
 
-                {/* 30-Day Interaction Tab (from first touchpoint) */}
-                {activeTab === 'interaction' && (
+                {/* Attribution Tab — marketing source + first/last touch +
+                    full UTM/ad-id breakdown + landing page. Split out of the
+                    Interaction tab on 2026-05-21 so the 30-day calendar
+                    has its own dedicated view. */}
+                {activeTab === 'attribution' && (
                   <section
-                    id="lead-tabpanel-interaction"
+                    id="lead-tabpanel-attribution"
                     role="tabpanel"
-                    aria-labelledby="lead-tab-interaction"
-                    className="lead-tabpanel-interaction space-y-4"
+                    aria-labelledby="lead-tab-attribution"
+                    className="lead-tabpanel-attribution px-4 pt-4 pb-2 space-y-4"
                   >
-                    {/* ── ATTRIBUTION (moved here from the contact card) ── */}
                     {(() => {
                       const attribution: any = currentLead.unified_context?.attribution || {};
                       const utm = attribution.utm || {};
@@ -3004,7 +3019,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         } catch { /* skip */ }
                       }
 
-                      if (rows.length === 0) return null;
+                      if (rows.length === 0) {
+                        return (
+                          <div className="lead-attribution-empty text-sm text-center py-8 text-[var(--text-muted)]">
+                            No attribution data captured for this lead.
+                          </div>
+                        );
+                      }
                       return (
                         <article className="lead-attribution-panel p-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)]">
                           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
@@ -3034,7 +3055,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </article>
                       );
                     })()}
+                  </section>
+                )}
 
+                {/* 30-Day Interaction Tab (from first touchpoint) */}
+                {activeTab === 'interaction' && (
+                  <section
+                    id="lead-tabpanel-interaction"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-interaction"
+                    className="lead-tabpanel-interaction space-y-4"
+                  >
                     {loading30Days ? (
                       <div className="lead-interaction-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                         <div className="animate-pulse">Loading interaction data...</div>
