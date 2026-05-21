@@ -403,6 +403,78 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Link prior anonymous web-chat session to this lead ──────────────────
+    // When a visitor takes the PAT (or any inbound form) from the chat
+    // widget, the website appends `?conversation_id=<sid>` to the assessment
+    // URL. Without this block the anonymous chat history would stay orphaned
+    // (lead_id=null), so the inbox would show two unrelated entities:
+    //   - "Web visitor · a625440e" with 10 chat messages
+    //   - "Himadri samadder" lead from the PAT submission
+    // Now we re-point both web_sessions.lead_id AND conversations.lead_id so
+    // the chat → PAT journey reads as one continuous lead.
+    //
+    // Sources we check, in order: explicit cf2.conversation_id, then parse
+    // the conversation_id query param out of cf2.page_url, then cf2.referrer
+    // (some forms only send the referrer).
+    let chatSessionId: string | null = null
+    if (cf2.conversation_id && typeof cf2.conversation_id === 'string') {
+      chatSessionId = cf2.conversation_id.trim() || null
+    }
+    if (!chatSessionId) {
+      for (const candidate of [cf2.page_url, cf2.referrer]) {
+        if (!candidate || typeof candidate !== 'string') continue
+        try {
+          // Coerce relative paths to a parseable URL — the host is throwaway.
+          const u = new URL(candidate.startsWith('http') ? candidate : `https://example.com${candidate}`)
+          const cid = u.searchParams.get('conversation_id')
+          if (cid) {
+            chatSessionId = cid.trim()
+            break
+          }
+        } catch {
+          // Malformed URL — try the next source.
+        }
+      }
+    }
+
+    if (chatSessionId) {
+      try {
+        // Repoint the web_session if it's still unlinked. We deliberately
+        // don't overwrite a different lead_id — if the session was already
+        // attached to someone else, we don't want to steal it.
+        const { data: sessionUpdated, error: sessionErr } = await supabase
+          .from('web_sessions')
+          .update({ lead_id: leadId })
+          .eq('external_session_id', chatSessionId)
+          .is('lead_id', null)
+          .select('id')
+
+        // Backfill anonymous conversations for this session. Same protection:
+        // only rows that are still lead_id=null.
+        const { error: convErr, count: convCount } = await supabase
+          .from('conversations')
+          .update({ lead_id: leadId }, { count: 'exact' })
+          .filter('metadata->>session_id', 'eq', chatSessionId)
+          .is('lead_id', null)
+
+        if (sessionErr || convErr) {
+          console.error('[inbound/chat-link] partial failure:', {
+            sessionErr: sessionErr?.message,
+            convErr: convErr?.message,
+          })
+        } else {
+          console.log(
+            `[inbound/chat-link] lead=${leadId} chatSession=${chatSessionId} ` +
+            `session_updated=${sessionUpdated?.length || 0} conv_backfilled=${convCount ?? 0}`,
+          )
+        }
+      } catch (e: any) {
+        // Non-fatal — the lead has been created, the chat history just
+        // stays orphaned. Better to ship the lead than block on this.
+        console.error('[inbound/chat-link] unexpected:', e?.message || e)
+      }
+    }
+
     // Create first_outreach task — but skip if one is already pending for this
     // lead. The inbound endpoint can fire multiple times for the same lead
     // (e.g. the same Meta form is re-submitted, or the user fills the PAT
