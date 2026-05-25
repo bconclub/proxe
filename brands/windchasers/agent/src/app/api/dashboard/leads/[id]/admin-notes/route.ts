@@ -92,12 +92,13 @@ export async function POST(
     if (updateError) throw updateError
 
     // 4. Insert into activities table
-    await supabase.from('activities').insert({
+    const { error: activityError } = await supabase.from('activities').insert({
       lead_id: leadId,
       activity_type: 'note',
       note: trimmedNote,
       created_by: createdBy,
     })
+    if (activityError) throw activityError
 
     // 5. Run the shared orchestrator (classify + act)
     const result = await classifyAndAct({

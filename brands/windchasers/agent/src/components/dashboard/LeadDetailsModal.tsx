@@ -1110,6 +1110,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       }
       const result = await response.json()
 
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
+
       // Build step-by-step progress from response
       const allSteps: { text: string; done: boolean }[] = [
         { text: 'Analyzing note...', done: true },
@@ -1201,6 +1205,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       }
       const result = await response.json()
 
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
+
       const allSteps: { text: string; done: boolean }[] = [
         { text: `Logged call: ${logCallOutcome}`, done: true },
       ]
@@ -1233,10 +1241,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setNoteProgress((prev) => ({ ...prev, visible: false }))
       await new Promise((resolve) => setTimeout(resolve, 300))
       setNoteProgress({ steps: [], visible: false })
-
-      loadActivities()
-      loadLeadTasks()
-      loadFreshLeadData()
     } catch (err) {
       console.error('Error logging call:', err)
       setNoteProgress({
@@ -2841,7 +2845,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         // Treat any task with a completion timestamp as not-pending,
                         // regardless of what the API reported in `status`.
                         const pendingTasks = leadTasks.filter(t =>
-                          ['pending', 'queued', 'awaiting_approval'].includes(t.status) &&
+                          ['pending', 'queued', 'in_queue', 'awaiting_approval'].includes(t.status) &&
                           !t.completed_at
                         )
                         if (pendingTasks.length === 0) {
@@ -2953,7 +2957,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                     {/* Next step one-liner */}
                     {(() => {
-                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status) && !t.completed_at)
+                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'in_queue', 'awaiting_approval'].includes(t.status) && !t.completed_at)
                       if (!firstPending) return null
                       const actionLabel = getTaskActionLabel(firstPending)
                       const countdown = firstPending.scheduled_at ? formatCountdown(firstPending.scheduled_at) : ''

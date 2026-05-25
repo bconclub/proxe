@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,26 +81,23 @@ export async function GET(
         duration_minutes,
         next_followup_date,
         created_at,
-        created_by,
-        dashboard_users:created_by (
-          id,
-          name,
-          email
-        )
+        created_by
       `)
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
 
-    if (!teamError && teamActivities) {
+    if (teamError) {
+      console.error('Error fetching team activities:', teamError)
+      throw teamError
+    }
+
+    if (teamActivities) {
       for (const activity of teamActivities) {
         // `created_by` historically stored an email string (e.g.
         // "user@example.com") so the dashboard_users join on
         // `created_by → id` returned nothing. Fall back: if creator
         // is missing but created_by looks like an email, surface the
         // local part as the actor name.
-        const creator = Array.isArray(activity.dashboard_users)
-          ? activity.dashboard_users[0]
-          : activity.dashboard_users
         const rawCreatedBy = activity.created_by as string | null | undefined
         const fallbackActor = rawCreatedBy && typeof rawCreatedBy === 'string' && rawCreatedBy.includes('@')
           ? rawCreatedBy
@@ -107,7 +105,7 @@ export async function GET(
         activities.push({
           id: activity.id,
           type: 'team',
-          actor: (creator as any)?.full_name || (creator as any)?.name || (creator as any)?.email || fallbackActor || 'Team Member',
+          actor: fallbackActor || rawCreatedBy || 'Team Member',
           // Friendly default; LeadDetailsModal Activity tab overrides this
           // to "Call · Connected" / "Call · No Answer" / etc. for call logs.
           action: activity.activity_type === 'manual_call'
@@ -194,14 +192,24 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServiceClient() || authClient
     const leadId = params.id
     const body = await request.json()
-    const { activity_type, note, duration_minutes } = body
+    const { activity_type, note, duration_minutes, next_followup_date, next_followup } = body
 
     if (!note?.trim()) {
       return NextResponse.json({ error: 'Note is required' }, { status: 400 })
     }
+
+    const createdBy = user.email || user.id || 'system'
 
     const { data, error } = await supabase
       .from('activities')
@@ -210,7 +218,8 @@ export async function POST(
         activity_type: activity_type || 'note',
         note: note.trim(),
         duration_minutes: duration_minutes || null,
-        created_by: 'system',
+        next_followup_date: next_followup_date || next_followup || null,
+        created_by: createdBy,
       })
       .select()
       .single()
