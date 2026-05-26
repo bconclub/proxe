@@ -1075,7 +1075,14 @@ export async function GET(request: NextRequest) {
       if (bookingDate) return true
       return false
     })
+    const isActiveWithinDays = (lead: any, days: number) => {
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= days * 24 * 60 * 60 * 1000
+    }
     const engagedLeadsCount = engagedLeadsList.length
+    const engagedLeads7D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 7))
+    const engagedLeads14D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 14))
+    const engagedLeads30D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 30))
     const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
     console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
 
@@ -1088,18 +1095,15 @@ export async function GET(request: NextRequest) {
     const warmLeadsList = safeLeads.filter(isWarmLead)
     const warmLeads7D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 7 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 7)
     })
     const warmLeads14D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 14 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 14)
     })
     const warmLeads30D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 30 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 30)
     })
     console.log(`📊 Warm Leads: 7D=${warmLeads7D.length} 14D=${warmLeads14D.length} 30D=${warmLeads30D.length} total=${warmLeadsList.length}`)
 
@@ -1331,6 +1335,118 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime) }) // Round to whole ms
     }
 
+    const periodWindows = {
+      All: null,
+      '7D': 7,
+      '14D': 14,
+      '30D': 30,
+    } as const
+
+    const allTrendDates = [
+      ...safeLeads.map((lead: any) => lead.created_at),
+      ...messages.map((msg: any) => msg.created_at),
+      ...safeWebSessions.map((session: any) => session.last_message_at || session.created_at),
+      ...safeWhatsappSessions.map((session: any) => session.last_message_at || session.created_at),
+    ].filter(Boolean)
+
+    const earliestTrendDate = allTrendDates.length > 0
+      ? new Date(Math.min(...allTrendDates.map((date: string) => new Date(date).getTime())))
+      : now
+
+    const getDayStart = (date: Date) => {
+      const day = new Date(date)
+      day.setHours(0, 0, 0, 0)
+      return day
+    }
+
+    const trendStartForPeriod = (period: keyof typeof periodWindows) => {
+      if (period === 'All') return getDayStart(earliestTrendDate)
+      const start = new Date(now)
+      start.setDate(start.getDate() - ((periodWindows[period] || 1) - 1))
+      return getDayStart(start)
+    }
+
+    const buildDailyTrend = (
+      period: keyof typeof periodWindows,
+      countForDay: (dayStart: Date, dayEnd: Date) => number,
+    ) => {
+      const values: Array<{ value: number }> = []
+      const cursor = trendStartForPeriod(period)
+      const end = getDayStart(now)
+
+      while (cursor <= end) {
+        const dayStart = new Date(cursor)
+        const dayEnd = new Date(cursor)
+        dayEnd.setDate(dayEnd.getDate() + 1)
+        values.push({ value: countForDay(dayStart, dayEnd) })
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      return values
+    }
+
+    const hasConversationMessages = messages.some((msg: any) => msg.lead_id && msg.sender !== 'system')
+    const countConversationsForDay = (dayStart: Date, dayEnd: Date) => {
+      if (hasConversationMessages) {
+        const leadIds = new Set<string>()
+        messages.forEach((msg: any) => {
+          if (!msg.lead_id || msg.sender === 'system') return
+          const msgDate = new Date(msg.created_at)
+          if (msgDate >= dayStart && msgDate < dayEnd) {
+            leadIds.add(msg.lead_id)
+          }
+        })
+        return leadIds.size
+      }
+
+      const countSessions = (sessions: any[]) => sessions.filter((session: any) => {
+        const activityAt = session.last_message_at || session.created_at
+        if (!activityAt) return false
+        const sessionDate = new Date(activityAt)
+        return sessionDate >= dayStart && sessionDate < dayEnd
+      }).length
+
+      return countSessions(safeWebSessions) + countSessions(safeWhatsappSessions)
+    }
+
+    const countLeadsForDay = (leadsForTrend: any[], dateField: 'created_at' | 'lastActive') => (
+      dayStart: Date,
+      dayEnd: Date,
+    ) => leadsForTrend.filter((lead: any) => {
+      const rawDate = dateField === 'created_at'
+        ? lead.created_at
+        : (lead.last_interaction_at || lead.created_at)
+      const leadDate = new Date(rawDate)
+      return leadDate >= dayStart && leadDate < dayEnd
+    }).length
+
+    const trendSeries = {
+      conversations: {
+        All: buildDailyTrend('All', countConversationsForDay),
+        '7D': buildDailyTrend('7D', countConversationsForDay),
+        '14D': buildDailyTrend('14D', countConversationsForDay),
+        '30D': buildDailyTrend('30D', countConversationsForDay),
+      },
+      totalLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(safeLeads, 'created_at')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(safeLeads, 'created_at')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(safeLeads, 'created_at')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(safeLeads, 'created_at')),
+      },
+      engagedLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+      },
+      warmLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(warmLeadsList, 'lastActive')),
+      },
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1356,6 +1472,9 @@ export async function GET(request: NextRequest) {
       },
       engagedLeads: {
         count: engagedLeadsCount,
+        count7D: engagedLeads7D.length,
+        count14D: engagedLeads14D.length,
+        count30D: engagedLeads30D.length,
         total: totalLeadsCount,
         engagementRate: engagementRate,
         leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
@@ -1398,6 +1517,7 @@ export async function GET(request: NextRequest) {
         hotLeads: { data: hotLeadsTrend, change: 0 }, // Daily hot leads count
         responseTime: { data: responseTimeTrend, change: responseTimeChange },
       },
+      trendSeries,
       // Upcoming bookings per day (next 7 days) for sparkline
       upcomingBookingsTrend: (() => {
         const upcomingTrend = []

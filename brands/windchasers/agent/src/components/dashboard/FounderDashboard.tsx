@@ -21,11 +21,14 @@ import {
   MiniBarChart,
 } from './MicroCharts'
 
+type TimeFilter = 'All' | '7D' | '14D' | '30D'
+const TIME_FILTERS: TimeFilter[] = ['All', '7D', '14D', '30D']
+
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
   totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
-  engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
+  engagedLeads: { count: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
@@ -46,6 +49,12 @@ interface FounderMetrics {
     conversations: { data: Array<{ value: number }>; change: number }
     hotLeads: { data: Array<{ value: number }>; change: number }
     responseTime: { data: Array<{ value: number }>; change: number }
+  }
+  trendSeries?: {
+    conversations: Record<TimeFilter, Array<{ value: number }>>
+    totalLeads: Record<TimeFilter, Array<{ value: number }>>
+    engagedLeads: Record<TimeFilter, Array<{ value: number }>>
+    warmLeads: Record<TimeFilter, Array<{ value: number }>>
   }
   upcomingBookingsTrend?: Array<{ value: number }>
   hourlyActivity?: Array<{ time: string; value: number }>
@@ -71,10 +80,10 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [leadsFilter, setLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [hotLeadsFilter, setHotLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<TimeFilter>('7D')
+  const [engagedLeadsFilter, setEngagedLeadsFilter] = useState<TimeFilter>('7D')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<TimeFilter>('7D')
+  const [leadsFilter, setLeadsFilter] = useState<TimeFilter>('7D')
   
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
@@ -298,6 +307,22 @@ export default function FounderDashboard() {
     }
   }
 
+  const periodLabel = (period: TimeFilter) => {
+    if (period === 'All') return 'all time'
+    if (period === '7D') return 'last 7 days'
+    if (period === '14D') return 'last 14 days'
+    return 'last 30 days'
+  }
+
+  const getTrendData = (
+    metric: keyof NonNullable<FounderMetrics['trendSeries']>,
+    period: TimeFilter,
+    fallback?: Array<{ value: number }>,
+  ) => {
+    const data = metrics?.trendSeries?.[metric]?.[period]
+    return data && data.length > 0 ? data : fallback || []
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -412,12 +437,12 @@ export default function FounderDashboard() {
               {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              {metrics.totalConversations.total} all time
+              {conversationTimeFilter === 'All' ? `${metrics.totalConversations.total} all time` : periodLabel(conversationTimeFilter)}
             </p>
           </div>
-          {metrics.trends?.conversations && (
+          {getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data).length > 0 && (
             <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.conversations.data} color="#3B82F6" height={36} />
+              <Sparkline data={getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data)} color="#3B82F6" height={36} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -425,7 +450,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+              {TIME_FILTERS.map((period) => (
                 <button key={period} onClick={() => setConversationTimeFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={conversationTimeFilter === period ? { backgroundColor: '#3B82F6' } : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }}
@@ -449,20 +474,33 @@ export default function FounderDashboard() {
               <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
             </div>
             <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {metrics.engagedLeads?.count ?? 0}
+              {engagedLeadsFilter === 'All' && (metrics.engagedLeads?.count ?? 0)}
+              {engagedLeadsFilter === '7D' && (metrics.engagedLeads?.count7D ?? 0)}
+              {engagedLeadsFilter === '14D' && (metrics.engagedLeads?.count14D ?? 0)}
+              {engagedLeadsFilter === '30D' && (metrics.engagedLeads?.count30D ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#22C55E' }}>
-              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%
+              {engagedLeadsFilter === 'All' ? `${metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%` : periodLabel(engagedLeadsFilter)}
             </p>
           </div>
-          {metrics.trends?.leads && (
+          {getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
             <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="#22C55E" height={36} showGradient={true} />
+              <Sparkline data={getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data)} color="#22C55E" height={36} showGradient={true} />
             </div>
           )}
-          <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline mt-2 sm:mt-0" style={{ color: '#22C55E' }}>
-            View <MdArrowForward size={12} />
-          </button>
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
+            <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#22C55E' }}>
+              View <MdArrowForward size={12} />
+            </button>
+            <div className="hidden sm:flex gap-1">
+              {TIME_FILTERS.map((period) => (
+                <button key={period} onClick={() => setEngagedLeadsFilter(period)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${engagedLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={engagedLeadsFilter === period ? { backgroundColor: '#22C55E' } : { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: 'var(--text-secondary)' }}
+                >{period}</button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Card 3: Warm Leads */}
@@ -485,12 +523,12 @@ export default function FounderDashboard() {
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#F97316' }}>
-              Score 40–69
+              {warmLeadsFilter === 'All' ? 'Score 40-69' : periodLabel(warmLeadsFilter)}
             </p>
           </div>
-          {metrics.trends?.leads && (
+          {getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
             <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="#F97316" height={36} showGradient={true} />
+              <Sparkline data={getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data)} color="#F97316" height={36} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -498,7 +536,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+              {TIME_FILTERS.map((period) => (
                 <button key={period} onClick={() => setWarmLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={warmLeadsFilter === period ? { backgroundColor: '#F97316' } : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }}
@@ -528,12 +566,12 @@ export default function FounderDashboard() {
               {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--accent-primary)' }}>
-              {metrics.totalLeads.count} all time
+              {leadsFilter === 'All' ? `${metrics.totalLeads.count} all time` : periodLabel(leadsFilter)}
             </p>
           </div>
-          {metrics.trends?.leads && (
+          {getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data).length > 0 && (
             <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="var(--accent-primary)" height={36} showGradient={true} />
+              <Sparkline data={getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data)} color="var(--accent-primary)" height={36} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -541,7 +579,7 @@ export default function FounderDashboard() {
               View <MdArrowForward size={12} />
             </button>
             <div className="hidden sm:flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+              {TIME_FILTERS.map((period) => (
                 <button key={period} onClick={() => setLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
                   style={leadsFilter === period ? { backgroundColor: 'var(--button-bg)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}
