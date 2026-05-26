@@ -80,10 +80,10 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<TimeFilter>('7D')
-  const [engagedLeadsFilter, setEngagedLeadsFilter] = useState<TimeFilter>('7D')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<TimeFilter>('7D')
-  const [leadsFilter, setLeadsFilter] = useState<TimeFilter>('7D')
+  const [conversationTimeFilter, setConversationTimeFilter] = useState<TimeFilter>('All')
+  const [engagedLeadsFilter, setEngagedLeadsFilter] = useState<TimeFilter>('All')
+  const [warmLeadsFilter, setWarmLeadsFilter] = useState<TimeFilter>('All')
+  const [leadsFilter, setLeadsFilter] = useState<TimeFilter>('All')
   
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
