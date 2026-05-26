@@ -17,6 +17,9 @@ import {
   getClient,
   formatDate,
   formatTimeForDisplay,
+  getAvailableSlots,
+  isAllowedBookingTime,
+  normalizeBookingSessionType,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -60,6 +63,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedSessionType = normalizeBookingSessionType(sessionType);
+    if (!isAllowedBookingTime(time, normalizedSessionType)) {
+      return NextResponse.json(
+        { error: `Selected time is outside Windchasers ${normalizedSessionType} booking hours.` },
+        { status: 400 },
+      );
+    }
+
     const supabase = getServiceClient() || getClient();
 
     // Check for existing booking
@@ -74,6 +85,19 @@ export async function POST(request: NextRequest) {
         bookingTime: existingBooking.bookingTime,
         bookingStatus: existingBooking.bookingStatus,
       });
+    }
+
+    const slots = await getAvailableSlots(date, normalizedSessionType);
+    const matchingSlot = slots.find((slot) => {
+      const display = formatTimeForDisplay(slot.time24);
+      return slot.time24 === time || display === time;
+    });
+
+    if (!matchingSlot?.available) {
+      return NextResponse.json(
+        { error: 'Selected time is no longer available on Google Calendar.' },
+        { status: 409 },
+      );
     }
 
     // Check credentials
@@ -97,7 +121,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       courseInterest,
-      sessionType,
+      sessionType: normalizedSessionType,
     });
 
     if (!calendarResult) {
@@ -121,7 +145,7 @@ export async function POST(request: NextRequest) {
             email,
             phone,
             courseInterest,
-            sessionType,
+            sessionType: normalizedSessionType,
           },
           'web',
           supabase,

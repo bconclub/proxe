@@ -62,10 +62,14 @@ export {
 // Booking management
 export {
   type BookingData,
+  type BookingSessionType,
   type ExistingBooking,
   type TimeSlot,
+  getAvailableBookingSlotStarts,
   getGoogleCalendarAuth,
   checkExistingBooking,
+  isAllowedBookingTime,
+  normalizeBookingSessionType,
   storeBooking,
   getAvailableSlots,
   createCalendarEvent,

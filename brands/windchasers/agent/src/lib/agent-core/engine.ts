@@ -14,9 +14,11 @@ import { generateFollowUps } from './followUpGenerator';
 import { generateSummary } from './summarizer';
 import {
   getAvailableSlots,
+  isAllowedBookingTime,
   createCalendarEvent,
   storeBooking,
   checkExistingBooking,
+  normalizeBookingSessionType,
 } from '@/lib/services/bookingManager';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
@@ -394,6 +396,7 @@ function cleanResponse(raw: string, channel?: string): string {
     // names here whenever buildBookingTools / future engines gain one.
     .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)\.?/gi, '')
     .replace(/\b(check_availability|book_consultation)\b/gi, '')
+    .replace(/\[?\s*(?:calling|checking)\s+(?:for\s+)?\d{4}-\d{2}-\d{2}\s*\]?\.?/gi, '')
     .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
     .trim();
 
@@ -533,7 +536,7 @@ function buildBookingTools(
   const tools: ToolDefinition[] = [
     {
       name: 'check_availability',
-      description: 'Check available consultation time slots for a specific date. Returns only future slots — for "today" any slot earlier than now + 30 minutes is automatically filtered out by the server, so never propose those yourself. If the tool returns an empty list for today, ask the user about tomorrow or another upcoming date rather than silently switching the date.',
+      description: 'Check available consultation time slots for a specific date. Returns only future slots. For "today", any slot earlier than now + 60 minutes is automatically filtered out by the server, so never propose those yourself. If the tool returns an empty list for today, ask the user about tomorrow or another upcoming date rather than silently switching the date.',
       input_schema: {
         type: 'object',
         properties: {
@@ -541,13 +544,18 @@ function buildBookingTools(
             type: 'string',
             description: 'The date to check in YYYY-MM-DD format. Must be today or a future date.',
           },
+          session_type: {
+            type: 'string',
+            enum: ['online', 'offline'],
+            description: 'Session format. Online slots run Monday-Saturday from 3:00 PM to 6:30 PM. Offline slots run Monday-Saturday from 11:00 AM to 7:00 PM. Default to online unless the user explicitly asks for an offline/facility/campus visit.',
+          },
         },
         required: ['date'],
       },
     },
     {
       name: 'book_consultation',
-      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying slot is available via check_availability. Email is optional. You MUST generate a specific call title based on the conversation context.',
+      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying the exact slot is available via check_availability for the same session_type. Email is optional. You MUST generate a specific call title based on the conversation context.',
       input_schema: {
         type: 'object',
         properties: {
@@ -579,6 +587,11 @@ function buildBookingTools(
             type: 'string',
             enum: ['pilot', 'helicopter', 'drone', 'cabin', 'general'],
             description: 'Which training program they are interested in',
+          },
+          session_type: {
+            type: 'string',
+            enum: ['online', 'offline'],
+            description: 'Use online unless the user explicitly asks for offline, in-person, campus, or facility visit.',
           },
         },
         required: ['date', 'time', 'name', 'phone', 'title'],
@@ -627,6 +640,7 @@ function buildBookingTools(
   const toolHandlers: Record<string, ToolHandler> = {
     check_availability: async (toolInput: Record<string, any>) => {
       const { date } = toolInput;
+      const sessionType = normalizeBookingSessionType(toolInput.session_type);
 
       // Validate date is not in the past (compare YYYY-MM-DD strings - timezone-safe)
       const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -646,11 +660,11 @@ function buildBookingTools(
         });
       }
 
-      const slots = await getAvailableSlots(date);
+      const slots = await getAvailableSlots(date, sessionType);
       let availableSlots = slots.filter(s => s.available);
 
-      // For TODAY: drop any slot earlier than (now + 30 min) so we never
-      // offer a time that is already in the past or seconds away.
+      // For TODAY: drop any slot earlier than (now + 60 min) so we never
+      // offer a slot that feels rushed or operationally unrealistic.
       // The slot's `time24` is the start time in IST 24h ("HH:MM").
       const isToday = date === todayIST;
       if (isToday) {
@@ -661,10 +675,10 @@ function buildBookingTools(
           timeZone: 'Asia/Kolkata',
         });
         const [nowH, nowM] = nowHHMM_IST.split(':').map(Number);
-        const nowPlus30Mins = nowH * 60 + nowM + 30;
+        const nowPlus60Mins = nowH * 60 + nowM + 60;
         availableSlots = availableSlots.filter((s) => {
           const [sh, sm] = s.time24.split(':').map(Number);
-          return sh * 60 + sm >= nowPlus30Mins;
+          return sh * 60 + sm >= nowPlus60Mins;
         });
       }
 
@@ -679,6 +693,10 @@ function buildBookingTools(
 
       return JSON.stringify({
         date,
+        session_type: sessionType,
+        booking_window: sessionType === 'offline'
+          ? 'Offline sessions are available Monday-Saturday, 11:00 AM-7:00 PM IST.'
+          : 'Online sessions are available Monday-Saturday, 3:00 PM-6:30 PM IST.',
         available_slots: availableSlots.map(s => ({
           time: s.time,
           time24: s.time24,
@@ -689,6 +707,7 @@ function buildBookingTools(
 
     book_consultation: async (toolInput: Record<string, any>) => {
       const { date, time, name, email, phone, course_interest, title } = toolInput;
+      const sessionType = normalizeBookingSessionType(toolInput.session_type);
 
       const bookingPhone = phone || input.userProfile.phone || '';
       const bookingName = name || input.userProfile.name || 'Web Visitor';
@@ -700,6 +719,24 @@ function buildBookingTools(
         return JSON.stringify({
           success: false,
           error: 'Cannot lock the slot without a phone number or email address. Use the KNOWN CONTACT block in the system prompt to identify which contact fields are still missing for this user, then ask for ONLY those fields.',
+        });
+      }
+
+      if (!isAllowedBookingTime(time, sessionType)) {
+        return JSON.stringify({
+          success: false,
+          error: sessionType === 'offline'
+            ? 'That time is outside offline booking hours. Offline sessions are Monday-Saturday, 11:00 AM-7:00 PM IST. Check availability again and offer only returned slots.'
+            : 'That time is outside online booking hours. Online sessions are Monday-Saturday, 3:00 PM-6:30 PM IST. Check availability again and offer only returned slots.',
+        });
+      }
+
+      const currentSlots = await getAvailableSlots(date, sessionType);
+      const requestedSlot = currentSlots.find((slot) => slot.time === time || slot.time24 === time);
+      if (!requestedSlot?.available) {
+        return JSON.stringify({
+          success: false,
+          error: 'That slot is not available on Google Calendar. Check availability again and offer only returned slots.',
         });
       }
 
@@ -734,7 +771,7 @@ function buildBookingTools(
           email: bookingEmail || undefined,
           phone: bookingPhone,
           courseInterest: course_interest,
-          sessionType: 'online',
+          sessionType,
           conversationSummary: input.summary || undefined,
           title: bookingTitle,
         });
@@ -755,7 +792,7 @@ function buildBookingTools(
             email: bookingEmail || undefined,
             phone: bookingPhone,
             courseInterest: course_interest,
-            sessionType: 'online',
+            sessionType,
             conversationSummary: input.summary || undefined,
             title: bookingTitle,
             meetLink: calendarResult?.meetLink || undefined,
@@ -877,6 +914,7 @@ function buildBookingTools(
         time,
         name: bookingName,
         title: bookingTitle,
+        session_type: sessionType,
         google_event_created: !!calendarResult,
         meet_link: calendarResult?.meetLink || null,
         message: `Booking confirmed for ${bookingName} on ${date} at ${time}. STOP - do NOT call any more tools. Send ONE confirmation message to the user and end your turn.`,

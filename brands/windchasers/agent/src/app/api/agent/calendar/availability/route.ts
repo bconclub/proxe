@@ -4,7 +4,7 @@
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/calendar/availability/route.ts.
  *
- * Request: { date: string } (YYYY-MM-DD format)
+ * Request: { date: string, sessionType?: 'online' | 'offline' } (YYYY-MM-DD format)
  * Response: { date, slots: TimeSlot[] }
  */
 
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const { date } = await request.json();
+    const { date, sessionType } = await request.json();
 
     if (!date) {
       return NextResponse.json(
@@ -24,10 +24,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const slots = await getAvailableSlots(date);
+    const slots = await getAvailableSlots(date, sessionType);
 
     return NextResponse.json({
       date,
+      sessionType: sessionType === 'offline' ? 'offline' : 'online',
       slots,
       availability: Object.fromEntries(
         slots.map(s => [s.time24, s.available]),

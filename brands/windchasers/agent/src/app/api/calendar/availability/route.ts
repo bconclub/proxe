@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
+import { getAvailableBookingSlotStarts, normalizeBookingSessionType } from '@/lib/services'
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com'
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata'
-
-// Available time slots (in UTC+5:30 / Asia/Kolkata)
-const AVAILABLE_SLOTS = [
-  '11:00', // 11:00 AM
-  '13:00', // 1:00 PM
-  '15:00', // 3:00 PM
-  '16:00', // 4:00 PM
-  '17:00', // 5:00 PM
-  '18:00', // 6:00 PM
-]
 
 async function getAuthClient() {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
@@ -53,7 +44,9 @@ function formatTimeForDisplay(time24: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { date } = await request.json()
+    const { date, sessionType } = await request.json()
+    const normalizedSessionType = normalizeBookingSessionType(sessionType)
+    const availableSlots = getAvailableBookingSlotStarts(normalizedSessionType)
 
     if (!date) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 })
@@ -66,7 +59,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         date,
         availability: {},
-        slots: AVAILABLE_SLOTS.map((slot) => {
+        sessionType: normalizedSessionType,
+        slots: availableSlots.map((slot) => {
           const displayTime = formatTimeForDisplay(slot)
           return {
             time: displayTime,
@@ -83,8 +77,17 @@ export async function POST(request: NextRequest) {
     const calendar = google.calendar({ version: 'v3', auth })
 
     const dateStr = date.split('T')[0]
-    const startOfDay = `${dateStr}T00:00:00+05:30`
-    const endOfDay = `${dateStr}T23:59:59+05:30`
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+    if (dayOfWeek === 0) {
+      return NextResponse.json({
+        date,
+        sessionType: normalizedSessionType,
+        availability: {},
+        slots: [],
+        message: 'No slots available on Sundays. Available Monday through Saturday.',
+      })
+    }
 
     const startOfDayUTC = new Date(`${dateStr}T00:00:00+05:30`).toISOString()
     const endOfDayUTC = new Date(`${dateStr}T23:59:59+05:30`).toISOString()
@@ -101,7 +104,7 @@ export async function POST(request: NextRequest) {
     const events = response.data.items || []
     const availability: Record<string, boolean> = {}
 
-    AVAILABLE_SLOTS.forEach((slot) => {
+    availableSlots.forEach((slot) => {
       const [hour, minute] = slot.split(':').map(Number)
       const slotStart = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
       const slotEndHour = hour + 1
@@ -153,8 +156,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       date,
+      sessionType: normalizedSessionType,
       availability,
-      slots: AVAILABLE_SLOTS.map((slot) => {
+      slots: availableSlots.map((slot) => {
         const displayTime = formatTimeForDisplay(slot)
         return {
           time: displayTime,

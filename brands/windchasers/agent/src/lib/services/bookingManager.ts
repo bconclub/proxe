@@ -22,15 +22,65 @@ import { updateLeadProfile } from './leadManager';
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata';
 
-// Available time slots (Asia/Kolkata)
-const AVAILABLE_SLOTS = [
-  '11:00', // 11:00 AM
-  '13:00', // 1:00 PM
-  '15:00', // 3:00 PM
-  '16:00', // 4:00 PM
-  '17:00', // 5:00 PM
-  '18:00', // 6:00 PM
-];
+export type BookingSessionType = 'online' | 'offline';
+
+const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string }> = {
+  online: { start: '15:00', end: '18:30' },
+  offline: { start: '11:00', end: '19:00' },
+};
+const BOOKING_DURATION_MINUTES = 60;
+
+export function normalizeBookingSessionType(sessionType?: string | null): BookingSessionType {
+  return sessionType === 'offline' ? 'offline' : 'online';
+}
+
+function timeToMinutes(time24: string): number {
+  const [hour, minute] = time24.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function normalizeBookingTime(time: string): string | null {
+  if (!time) return null;
+  const trimmed = time.trim();
+
+  if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    const [hour, minute] = trimmed.split(':').map(Number);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    }
+    return null;
+  }
+
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const period = match[3].toUpperCase();
+
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
+export function getAvailableBookingSlotStarts(sessionType?: string | null): string[] {
+  const { start, end } = BOOKING_WINDOWS[normalizeBookingSessionType(sessionType)];
+  const slots: string[] = [];
+  const lastStart = timeToMinutes(end) - BOOKING_DURATION_MINUTES;
+  for (let minutes = timeToMinutes(start); minutes <= lastStart; minutes += 30) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+  }
+  return slots;
+}
+
+export function isAllowedBookingTime(time: string, sessionType?: string | null): boolean {
+  const normalizedTime = normalizeBookingTime(time);
+  return !!normalizedTime && getAvailableBookingSlotStarts(sessionType).includes(normalizedTime);
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -331,14 +381,20 @@ export async function storeBooking(
  * Check available calendar slots for a given date
  * Returns array of time slots with availability status
  */
-export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
+export async function getAvailableSlots(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
+  const allowedSlots = getAvailableBookingSlotStarts(sessionType);
+  const dateStr = date.split('T')[0];
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  if (dayOfWeek === 0) return [];
+
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!hasCredentials) {
     // Return all slots as available when credentials are not configured
-    return AVAILABLE_SLOTS.map(slot => ({
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: true,
@@ -351,7 +407,6 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
     const auth = await getGoogleCalendarAuth();
     const calendar = google.calendar({ version: 'v3', auth });
 
-    const dateStr = date.split('T')[0];
     const startOfDayUTC = new Date(`${dateStr}T00:00:00+05:30`).toISOString();
     const endOfDayUTC = new Date(`${dateStr}T23:59:59+05:30`).toISOString();
 
@@ -366,7 +421,7 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
 
     const events = response.data.items || [];
 
-    return AVAILABLE_SLOTS.map(slot => {
+    return allowedSlots.map(slot => {
       const [hour, minute] = slot.split(':').map(Number);
       const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
       const slotEnd = new Date(`${dateStr}T${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
@@ -402,20 +457,21 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
   } catch (error) {
     console.error('[bookingManager] Google Calendar check failed, falling back to Supabase', error);
     // Fallback: check Supabase for existing bookings on this date
-    return checkAvailabilityFromSupabase(date);
+    return checkAvailabilityFromSupabase(date, sessionType);
   }
 }
 
 /**
  * Fallback: check availability from Supabase bookings when Google Calendar is unavailable
  */
-async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> {
+async function checkAvailabilityFromSupabase(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
+  const allowedSlots = getAvailableBookingSlotStarts(sessionType);
   try {
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !supabaseKey) {
-      return AVAILABLE_SLOTS.map(slot => ({
+      return allowedSlots.map(slot => ({
         time: formatTimeForDisplay(slot),
         time24: slot,
         available: true,
@@ -452,7 +508,7 @@ async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> 
 
     console.log(`[bookingManager] Supabase fallback: ${bookedTimes.size} booked slots on ${dateStr}:`, Array.from(bookedTimes));
 
-    return AVAILABLE_SLOTS.map(slot => ({
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: !bookedTimes.has(slot),
@@ -460,7 +516,7 @@ async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> 
     }));
   } catch (err) {
     console.error('[bookingManager] Supabase availability check failed', err);
-    return AVAILABLE_SLOTS.map(slot => ({
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: true,
@@ -492,6 +548,7 @@ export async function createCalendarEvent(booking: {
     const calendar = google.calendar({ version: 'v3', auth });
 
     const dateStr = booking.date.split('T')[0];
+    const sessionType = normalizeBookingSessionType(booking.sessionType);
 
     // Parse time
     let hour: number, minute: number;
@@ -502,6 +559,16 @@ export async function createCalendarEvent(booking: {
       minute = m;
     } else {
       [hour, minute] = booking.time.split(':').map(Number);
+    }
+
+    const bookingTime24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    if (!isAllowedBookingTime(bookingTime24, sessionType)) {
+      console.error('[bookingManager] Refusing booking outside allowed window', {
+        date: dateStr,
+        time: bookingTime24,
+        sessionType,
+      });
+      return null;
     }
 
     const eventStart = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`;
@@ -525,10 +592,8 @@ export async function createCalendarEvent(booking: {
       eventTitle = booking.title;
     } else {
       eventTitle = `${booking.name} - ${courseDisplayName}`;
-      if (booking.sessionType) {
-        const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
-        eventTitle += ` [${label}]`;
-      }
+      const label = sessionType === 'offline' ? 'Facility Visit' : 'Online';
+      eventTitle += ` [${label}]`;
     }
 
     // Description - brand-aware
@@ -544,10 +609,8 @@ export async function createCalendarEvent(booking: {
     if (courseDisplayName !== 'Aviation Course Inquiry') {
       description += `Course Interest: ${courseDisplayName}\n\n`;
     }
-    if (booking.sessionType) {
-      const display = booking.sessionType === 'offline' ? 'Offline / Facility Visit' : 'Online Session';
-      description += `Session Type: ${display}\n\n`;
-    }
+    const display = sessionType === 'offline' ? 'Offline / Facility Visit' : 'Online Session';
+    description += `Session Type: ${display}\n\n`;
     if (booking.conversationSummary) {
       description += `Conversation Summary:\n${booking.conversationSummary}\n\n`;
     }
@@ -589,9 +652,9 @@ export async function createCalendarEvent(booking: {
       }
     }
 
-    if (booking.sessionType === 'offline') {
+    if (sessionType === 'offline') {
       event.location = `${brandName} Facility`;
-    } else if (booking.sessionType === 'online') {
+    } else if (sessionType === 'online') {
       event.location = 'Online Session (Video Call)';
     }
 
