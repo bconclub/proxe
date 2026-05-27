@@ -1146,6 +1146,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
       setAdminNoteText('')
       setShowAdminNoteInput(false)
+      setActiveTab('notes')
 
       // Keep visible longer so the user can read what happened + the note text
       await new Promise(resolve => setTimeout(resolve, 4500))
@@ -1236,6 +1237,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowLogCallForm(false)
       setLogCallOutcome('Connected')
       setLogCallNotes('')
+      setActiveTab('notes')
 
       await new Promise((resolve) => setTimeout(resolve, 4500))
       setNoteProgress((prev) => ({ ...prev, visible: false }))
