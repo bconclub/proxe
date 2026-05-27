@@ -73,6 +73,7 @@ export async function PATCH(
     }
 
     const updates: Record<string, any> = {}
+    const auditChanges: string[] = []
     const ctx = lead.unified_context || {}
     const brand = lead.brand || 'windchasers'
     const brandCtx = ctx[brand] || ctx.windchasers || ctx.bcon || {}
@@ -82,22 +83,35 @@ export async function PATCH(
     if (body.customer_name !== undefined) {
       const name = String(body.customer_name || '').trim()
       updates.customer_name = name || null
+      if ((lead.customer_name || null) !== (updates.customer_name || null)) {
+        auditChanges.push(`Name: ${lead.customer_name || 'empty'} -> ${updates.customer_name || 'empty'}`)
+      }
     }
     if (body.email !== undefined) {
       const email = String(body.email || '').trim().toLowerCase() || null
       updates.email = email
+      if ((lead.email || null) !== email) {
+        auditChanges.push(`Email: ${lead.email || 'empty'} -> ${email || 'empty'}`)
+      }
     }
     if (body.city !== undefined) {
+      const previous = brandCtx.city || null
       const city = String(body.city || '').trim() || null
       newBrandCtx.city = city
       ctxChanged = true
+      if (previous !== city) auditChanges.push(`City: ${previous || 'empty'} -> ${city || 'empty'}`)
     }
     if (body.session_type !== undefined) {
+      const previous = brandCtx.session_type || null
       const t = String(body.session_type || '').trim().toLowerCase()
       newBrandCtx.session_type = ['online', 'offline'].includes(t) ? t : null
       ctxChanged = true
+      if (previous !== newBrandCtx.session_type) {
+        auditChanges.push(`Session type: ${previous || 'empty'} -> ${newBrandCtx.session_type || 'empty'}`)
+      }
     }
     if (body.application_status !== undefined) {
+      const previous = brandCtx.application_status || null
       const s = String(body.application_status || '').trim().toLowerCase()
       const allowed = [
         'demo_booked',
@@ -109,12 +123,19 @@ export async function PATCH(
       ]
       newBrandCtx.application_status = allowed.includes(s) ? s : null
       ctxChanged = true
+      if (previous !== newBrandCtx.application_status) {
+        auditChanges.push(`Application status: ${previous || 'empty'} -> ${newBrandCtx.application_status || 'empty'}`)
+      }
     }
     if (body.class_12_pcm !== undefined) {
+      const previous = brandCtx.class_12_pcm || null
       const c = String(body.class_12_pcm || '').trim().toLowerCase()
       const allowed = ['12th_pcm', '12th_non_pcm', 'pursuing_12_pcm', 'below_12th', 'unknown']
       newBrandCtx.class_12_pcm = allowed.includes(c) ? c : null
       ctxChanged = true
+      if (previous !== newBrandCtx.class_12_pcm) {
+        auditChanges.push(`Education: ${previous || 'empty'} -> ${newBrandCtx.class_12_pcm || 'empty'}`)
+      }
     }
 
     if (Object.keys(updates).length === 0 && !ctxChanged) {
@@ -143,6 +164,15 @@ export async function PATCH(
       .update(updates)
       .eq('id', leadId)
     if (upErr) throw upErr
+
+    if (auditChanges.length > 0) {
+      await service.from('activities').insert({
+        lead_id: leadId,
+        activity_type: 'note',
+        note: `Lead updated by ${editorName}: ${auditChanges.join('; ')}`,
+        created_by: user.email || user.id || 'system',
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

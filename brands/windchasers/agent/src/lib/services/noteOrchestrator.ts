@@ -538,6 +538,18 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── NOT_INTERESTED ───────────────────────────────────────────────────────
   if (classification.category === 'NOT_INTERESTED') {
+    const { data: cancelledTasks } = await supabase
+      .from('agent_tasks')
+      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: not interested - "${trimmedNote.substring(0, 50)}"` })
+      .eq('lead_id', leadId)
+      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+      .select('id');
+    const cancelCount = cancelledTasks?.length || 0;
+    if (cancelCount > 0) {
+      actions.push(`cancelled_${cancelCount}_pending_tasks`);
+      actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`);
+    }
+
     newStage = 'Closed Lost';
     await supabase
       .from('all_leads')
@@ -549,6 +561,18 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── CONVERTED ────────────────────────────────────────────────────────────
   if (classification.category === 'CONVERTED') {
+    const { data: cancelledTasks } = await supabase
+      .from('agent_tasks')
+      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Cancelled: lead converted' })
+      .eq('lead_id', leadId)
+      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+      .select('id');
+    const cancelCount = cancelledTasks?.length || 0;
+    if (cancelCount > 0) {
+      actions.push(`cancelled_${cancelCount}_pending_tasks`);
+      actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`);
+    }
+
     newStage = 'Converted';
     await supabase
       .from('all_leads')

@@ -14,13 +14,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
     // No role check here — viewer vs admin enforcement is done at write sites.
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await authClient.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const supabase = getServiceClient() || authClient
     
     const leadId = params.id
 

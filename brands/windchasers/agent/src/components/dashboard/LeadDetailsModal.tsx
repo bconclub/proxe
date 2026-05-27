@@ -291,7 +291,7 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showAttribution, setShowAttribution] = useState(false)
@@ -2448,6 +2448,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               Activity
             </button>
             <button
+              onClick={() => setActiveTab('notes')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-notes px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'notes'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'notes'}
+              aria-controls="lead-tabpanel-notes"
+              id="lead-tab-notes"
+            >
+              Notes
+            </button>
+            <button
               onClick={() => setActiveTab('breakdown')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -2722,6 +2735,121 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             {/* Other Tabs - Full Width */}
             {activeTab !== 'activity' && (
               <div className="lead-tabpanel-container px-4 pt-4 pb-2">
+                {/* Notes Tab - human notes, call logs, edits, and automation decisions */}
+                {activeTab === 'notes' && (
+                  <section
+                    id="lead-tabpanel-notes"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-notes"
+                    className="lead-tabpanel-notes space-y-4"
+                  >
+                    {(() => {
+                      const adminNotes = ((currentLead.unified_context?.admin_notes || []) as Array<{
+                        id?: string
+                        text?: string
+                        created_by?: string
+                        created_at?: string
+                        source?: string
+                        outcome?: string
+                      }>).filter(note => note.text?.trim())
+
+                      const adminNoteKeys = new Set(adminNotes.map(note => `${note.text}|${note.created_at || ''}`))
+                      const timelineItems = [
+                        ...adminNotes.map(note => ({
+                          id: note.id || `admin-note-${note.created_at || note.text}`,
+                          label: note.source === 'log_call' ? 'Call log' : 'Note',
+                          actor: note.created_by || 'team',
+                          content: note.text || '',
+                          timestamp: note.created_at || new Date().toISOString(),
+                          tone: note.source === 'log_call' ? 'call' : 'note',
+                          outcome: note.outcome || null,
+                        })),
+                        ...activities
+                          .filter(activity => {
+                            if (activity.type !== 'team' && activity.type !== 'proxe') return false
+                            if (!activity.content) return false
+                            const key = `${activity.content}|${activity.timestamp || ''}`
+                            return !adminNoteKeys.has(key)
+                          })
+                          .map(activity => ({
+                            id: `activity-${activity.id}`,
+                            label: activity.type === 'proxe' || activity.icon === 'automation' ? 'Automation' : (activity.action || 'Update'),
+                            actor: activity.actor || (activity.type === 'proxe' ? 'PROXe' : 'team'),
+                            content: activity.content,
+                            timestamp: activity.timestamp,
+                            tone: activity.type === 'proxe' || activity.icon === 'automation' ? 'automation' : activity.icon === 'call' ? 'call' : 'update',
+                            outcome: null,
+                          })),
+                      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+                      const pendingTasks = leadTasks.filter(t =>
+                        ['pending', 'queued', 'in_queue', 'awaiting_approval'].includes(t.status) &&
+                        !t.completed_at
+                      )
+                      const cancelledTasks = leadTasks.filter(t => t.status === 'cancelled' || t.completed_at)
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-3 gap-3">
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Logged notes</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{adminNotes.length}</p>
+                            </article>
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Open actions</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{pendingTasks.length}</p>
+                            </article>
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Closed actions</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{cancelledTasks.length}</p>
+                            </article>
+                          </div>
+
+                          {timelineItems.length === 0 ? (
+                            <div className="text-sm text-center py-10 text-[var(--text-muted)] border border-dashed border-[var(--border-primary)] rounded-lg">
+                              No notes or updates logged yet.
+                            </div>
+                          ) : (
+                            <ol className="space-y-3" aria-label="Lead notes and updates">
+                              {timelineItems.map(item => {
+                                const actor = typeof item.actor === 'string' && item.actor.includes('@')
+                                  ? item.actor.split('@')[0]
+                                  : item.actor
+                                const toneClass = item.tone === 'automation'
+                                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/40'
+                                  : item.tone === 'call'
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
+                                    : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                                return (
+                                  <li key={item.id} className={`rounded-lg border p-3 ${toneClass}`}>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-[var(--text-primary)]">{item.label}</span>
+                                          {item.outcome && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 font-bold">
+                                              {item.outcome}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">{item.content}</p>
+                                      </div>
+                                      <time className="text-[10px] whitespace-nowrap text-[var(--text-muted)]" dateTime={item.timestamp}>
+                                        {formatDateTimeIST(item.timestamp)}
+                                      </time>
+                                    </div>
+                                    <p className="mt-2 text-[11px] text-[var(--text-muted)]">{actor || 'team'}</p>
+                                  </li>
+                                )
+                              })}
+                            </ol>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </section>
+                )}
+
                 {/* Summary Tab */}
                 {activeTab === 'summary' && (
                   <section
