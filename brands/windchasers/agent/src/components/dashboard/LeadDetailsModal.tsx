@@ -307,6 +307,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [summaryData, setSummaryData] = useState<any>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [activities, setActivities] = useState<any[]>([])
+  const [conversationActivities, setConversationActivities] = useState<any[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
 
   // 30-Day Interaction data (from first touchpoint)
@@ -729,13 +730,46 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const loadActivities = async () => {
     if (!lead) return
     setLoadingActivities(true)
+    setActivities([])
+    setConversationActivities([])
     try {
-      const response = await fetch(`/api/dashboard/leads/${lead.id}/activities`)
+      const supabase = createClient()
+      const [response, conversationResult] = await Promise.all([
+        fetch(`/api/dashboard/leads/${lead.id}/activities`),
+        supabase
+          .from('conversations')
+          .select('id, content, created_at, channel, sender, metadata')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
+
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.activities) {
           setActivities(data.activities)
         }
+      }
+
+      if (!conversationResult.error && Array.isArray(conversationResult.data)) {
+        setConversationActivities(conversationResult.data.map((msg: any) => {
+          const isCustomer = msg.sender === 'customer'
+          const isAgent = msg.sender === 'agent'
+          return {
+            id: `conversation-${msg.id}`,
+            type: isCustomer ? 'customer' : isAgent ? 'proxe' : 'system',
+            actor: isCustomer ? 'Customer' : isAgent ? 'PROXe' : 'System',
+            action: isCustomer ? 'Replied' : isAgent ? 'Message sent' : 'System update',
+            content: msg.content,
+            channel: msg.channel,
+            timestamp: msg.created_at,
+            icon: isCustomer ? 'reply' : 'message',
+            color: isCustomer ? '#22C55E' : isAgent ? '#8B5CF6' : '#6B7280',
+            _conversationFallback: true,
+          }
+        }))
+      } else if (conversationResult.error) {
+        console.error('Error loading conversation fallback activities:', conversationResult.error)
       }
     } catch (error) {
       console.error('Error loading activities:', error)
@@ -2518,7 +2552,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div className="lead-activity-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                     <div className="animate-pulse">Loading activities...</div>
                   </div>
-                ) : activities.length === 0 ? (
+                ) : activities.length === 0 && conversationActivities.length === 0 && leadTasks.length === 0 ? (
                   <div className="lead-activity-empty text-sm text-center py-8 text-[var(--text-muted)]">
                     No activities yet
                   </div>
@@ -2565,7 +2599,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           })
                         }
                       })
-                      const merged = [...activities, ...taskActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                      const hasMessageActivities = activities.some(activity =>
+                        (activity.type === 'customer' || activity.type === 'proxe') && activity.content
+                      )
+                      const messageFallbackActivities = hasMessageActivities ? [] : conversationActivities
+                      const merged = [...activities, ...messageFallbackActivities, ...taskActivities]
+                        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                       return merged.map((activity, index) => {
                       const getActivityIcon = () => {
                         if (activity._taskIcon === 'completed') return <MdCheckCircle size={18} />
