@@ -30,6 +30,7 @@ export async function POST(
       data: { user },
     } = await authClient.auth.getUser()
     const createdBy = user?.email || 'system'
+    const activityCreatedBy = user?.id || createdBy
     const supabase = getServiceClient() || authClient
 
     const leadId = params.id
@@ -46,12 +47,15 @@ export async function POST(
     const trimmedNotes = (notes || '').trim()
     const activityNote = trimmedNotes ? `[${outcome}] ${trimmedNotes}` : `[${outcome}]`
 
-    // 1. Insert manual_call activity (always, regardless of orchestration outcome)
+    // 1. Insert call activity (always, regardless of orchestration outcome).
+    // Older Windchasers activity schemas constrain activity_type to
+    // call/meeting/message/note, so keep the stored type compatible and use the
+    // note/source metadata for the richer "manual call" semantics.
     const { error: activityError } = await supabase.from('activities').insert({
       lead_id: leadId,
-      activity_type: 'manual_call',
+      activity_type: 'call',
       note: activityNote,
-      created_by: createdBy,
+      created_by: activityCreatedBy,
     })
     if (activityError) throw activityError
 

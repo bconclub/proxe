@@ -282,6 +282,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const vapiTranscriptRef = useRef<HTMLDivElement>(null);
   const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vapiMicHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vapiCallIdRef = useRef<string | null>(null);
+  const vapiTranscriptSeqRef = useRef(0);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -838,6 +840,82 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     },
   });
 
+  const persistWebEvents = useCallback(async (
+    eventMessages: Array<{
+      sender: 'customer' | 'agent' | 'system';
+      content: string;
+      messageType?: string;
+      metadata?: Record<string, any>;
+    }>,
+  ) => {
+    if (!externalSessionId || eventMessages.length === 0) return;
+
+    try {
+      await fetch('/api/agent/web/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+          messages: eventMessages,
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist web event:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
+  const persistVoiceTranscript = useCallback(async (
+    role: 'user' | 'assistant',
+    transcript: string,
+    transcriptType: string = 'final',
+  ) => {
+    const text = transcript.trim();
+    if (!externalSessionId || !text) return;
+
+    try {
+      await fetch('/api/agent/voice/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          callId: vapiCallIdRef.current,
+          role,
+          transcript: text,
+          transcriptType,
+          sequence: vapiTranscriptSeqRef.current,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist voice transcript:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
   const closeCalendarWidget = useCallback(() => {
     setShowCalendly(null);
     setPendingCalendar(false);
@@ -1036,8 +1114,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // ask for contact info (redundant) and/or generate a conflicting booking confirmation.
     if (shouldForceCalendarFromBookButton) {
       addUserMessage(displayMessage);
-      addAIMessage('Let me pull up available slots for you.');
-      appendHistory({ role: 'assistant', content: 'Let me pull up available slots for you.' });
+      const calendarOpenMessage = 'Let me pull up available slots for you.';
+      addAIMessage(calendarOpenMessage);
+      appendHistory({ role: 'assistant', content: calendarOpenMessage });
+      void persistWebEvents([
+        {
+          sender: 'customer',
+          content: displayMessage,
+          messageType: 'text',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+        {
+          sender: 'agent',
+          content: calendarOpenMessage,
+          messageType: 'booking_prompt',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+      ]);
       return;
     }
 
@@ -2247,7 +2340,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       // Store booking details in Supabase (include contact info to ensure it's saved)
       if (externalSessionId && bookingData.date && bookingData.time) {
-        await storeBookingClient(
+        const storedBooking = await storeBookingClient(
           externalSessionId,
           {
             date: bookingData.date,
@@ -2273,12 +2366,37 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         setBookedSummary(`${formattedDate} at ${formattedTime}`);
         const bookingMessage = `Your call is scheduled for ${formattedDate} at ${formattedTime}.`;
         addAIMessage(bookingMessage);
+        await persistWebEvents([
+          {
+            sender: 'system',
+            content: `Booking ${storedBooking ? 'confirmed' : 'attempted'} for ${formattedDate} at ${formattedTime}.`,
+            messageType: 'booking',
+            metadata: {
+              intent: 'booking_complete',
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+          {
+            sender: 'agent',
+            content: bookingMessage,
+            messageType: 'booking_confirmation',
+            metadata: {
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+        ]);
 
         // Note: Booking info will be naturally included in the summary when the AI processes the booking message
         // No need to manually append metadata strings - let the summarize API handle it naturally
       }
     }
-  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary]);
+  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary, persistWebEvents]);
 
   // Check for existing booking before showing calendar
   const checkAndShowBooking = useCallback(async () => {
@@ -2441,6 +2559,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     vapi.on('call-start', () => {
       vapiLog('call-start ✅');
+      if (!vapiCallIdRef.current) {
+        vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
       vapiCallReadyRef.current = true;
       setVapiConnecting(false);
       ensureMicLive();
@@ -2455,6 +2576,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       vapiPrewarmedRef.current = false;
       if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
       setVapiSpeaker('idle');
+      vapiCallIdRef.current = null;
       // Flash red ring for 700ms before overlay unmounts
       setVapiEnding(true);
       setVapiConnecting(false);
@@ -2467,6 +2589,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       vapiLog(`error ❌ ${JSON.stringify(e)}`);
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
+      vapiCallIdRef.current = null;
       setVapiSpeaker('idle');
       // Flash amber ring for 1.2s before overlay unmounts
       setVapiError(true);
@@ -2502,7 +2625,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
       }
       if (msg.type === 'transcript' && msg.transcriptType === 'final') {
-        setVapiTranscript(prev => [...prev, { role: msg.role, text: msg.transcript }]);
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        const transcript = String(msg.transcript || '').trim();
+        vapiTranscriptSeqRef.current += 1;
+        setVapiTranscript(prev => [...prev, { role, text: transcript }]);
+        void persistVoiceTranscript(role, transcript, msg.transcriptType);
         setTimeout(() => {
           vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
         }, 50);
@@ -2545,6 +2672,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // ── Start call ─────────────────────────────────────────────────────────────
     setVapiTranscript([]);
     setVapiDebugLog([]);
+    vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    vapiTranscriptSeqRef.current = 0;
     setIsVapiActive(true);
     setVapiConnecting(true);
 
