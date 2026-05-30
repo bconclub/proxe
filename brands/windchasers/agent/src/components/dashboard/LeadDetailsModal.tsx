@@ -71,6 +71,20 @@ function formatBookingDateShort(dateString: string | null | undefined): string {
   }
 }
 
+// Color for a call-log outcome badge in the Notes tab.
+// Connected-type outcomes read green; no-answer / busy / voicemail read amber
+// so the operator can tell them apart at a glance.
+function getNoteOutcomeClass(outcome: string): string {
+  const o = outcome.toLowerCase()
+  if (/no answer|busy|voicemail|rnr|not reachable|unreachable|switched off|missed|no response|declin|disconnect/.test(o)) {
+    return 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+  }
+  if (/connect|interest|answered|spoke|reachable|booked/.test(o)) {
+    return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+  }
+  return 'bg-slate-500/10 text-slate-600 dark:text-slate-300'
+}
+
 function formatCountdown(scheduledAt: string): string {
   const now = Date.now()
   const target = new Date(scheduledAt).getTime()
@@ -308,6 +322,20 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [activities, setActivities] = useState<any[]>([])
   const [conversationActivities, setConversationActivities] = useState<any[]>([])
+  // Manual refresh for the Notes tab — re-pulls the lead row (fresh admin_notes)
+  // and the activity timeline so a just-logged note/call shows without reopening.
+  const [isRefreshingNotes, setIsRefreshingNotes] = useState(false)
+  const refreshNotes = async () => {
+    if (isRefreshingNotes) return
+    setIsRefreshingNotes(true)
+    try {
+      await Promise.all([loadFreshLeadData(), loadActivities()])
+    } catch (err) {
+      console.error('Error refreshing notes:', err)
+    } finally {
+      setIsRefreshingNotes(false)
+    }
+  }
   const [loadingActivities, setLoadingActivities] = useState(false)
 
   // 30-Day Interaction data (from first touchpoint)
@@ -2784,6 +2812,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     aria-labelledby="lead-tab-notes"
                     className="lead-tabpanel-notes space-y-4"
                   >
+                    <div className="lead-notes-toolbar flex items-center justify-end -mb-1">
+                      <button
+                        type="button"
+                        onClick={refreshNotes}
+                        disabled={isRefreshingNotes}
+                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 focus:outline-none"
+                        style={{ color: 'var(--accent-primary)' }}
+                        title="Refresh notes"
+                      >
+                        <MdRefresh size={12} className={isRefreshingNotes ? 'animate-spin' : ''} />
+                        Refresh
+                      </button>
+                    </div>
                     {(() => {
                       const adminNotes = ((currentLead.unified_context?.admin_notes || []) as Array<{
                         id?: string
@@ -2868,7 +2909,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                         <div className="flex items-center gap-2">
                                           <span className="text-xs font-bold text-[var(--text-primary)]">{item.label}</span>
                                           {item.outcome && (
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 font-bold">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${getNoteOutcomeClass(item.outcome)}`}>
                                               {item.outcome}
                                             </span>
                                           )}
