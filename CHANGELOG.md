@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-30 16:03 IST · Open inbox conversation from lead-modal channel chips
+
+- Lead modal: the Customer Journey channel chips (WhatsApp, web, etc.) were `cursor-pointer` but had no click handler — clicking did nothing. Each chip now deep-links to that contact's inbox thread via `/dashboard/inbox?lead=<id>&channel=<key>` and closes the modal, so one click jumps from a lead straight into their conversation on the channel you clicked.
+- Pairs with the inbox-side `?lead=` / `?channel=` deep-link handling that selects the right thread and pre-sets the channel.
+- Tooltip + aria-label changed to "Open <channel> conversation" (first-touch date + message count kept in the tooltip).
+- User-facing: faster jump from a lead to their chat thread.
+- Scope: Windchasers `LeadDetailsModal.tsx` only; type-check clean for the file. Shipped in commit 0b5b8390.
+- (0b5b8390)
+
 ## 2026-05-30 15:59 IST · Capture customer email from chat, independent of booking
 
 - Gap: a customer's email was only persisted when the book_consultation tool fired (via updateLeadProfile). The AI profile extractor (ConversationProfile) has no email field. So a lead who typed their email but whose booking didn't complete had the email silently dropped — it never showed on the lead modal (e.g. Swapnanil shared swapnanildutta346@gmail.com, no email recorded).
