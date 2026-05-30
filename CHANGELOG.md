@@ -7,7 +7,7 @@
 - `bookingManager.ts`: new `getBookableSlotStartsForDate()` drops slot starts already in the past when the requested date is today (IST). Wired into `getAvailableSlots` (returns no slots once today is fully past) and the Supabase availability fallback, so `check_availability(today)` can never hand back stale already-passed slots.
 - Booking windows are unchanged: online 3:00–6:30 PM IST, offline 11:00 AM–7:00 PM IST, Mon–Sat.
 - User-facing: after hours the bot now offers Tomorrow / Pick a date instead of pretending today is bookable.
-- (6f2d14c1)
+- (908fe92f)
 
 ## 2026-05-21 16:45 IST · Call logs surface properly in Activity tab
 
