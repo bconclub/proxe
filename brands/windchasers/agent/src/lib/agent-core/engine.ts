@@ -9,7 +9,7 @@ import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
 import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
-import { extractIntent, isBookingIntent, extractPainPoint, detectObjection } from './intentExtractor';
+import { extractIntent, isBookingIntent, isBookingFlowStep, extractPainPoint, detectObjection } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
 import { generateSummary } from './summarizer';
 import {
@@ -121,8 +121,16 @@ User's message: ${input.message}`
   const recentBookingDiscussion = (input.conversationHistory || [])
     .slice(-6)
     .some((m) => m.role === 'user' && isBookingIntent(m.content));
+  // Keep tools wired mid-flow: if the LAST assistant turn was a booking step
+  // (asked for date/time/email, offered slots, confirming-before-lock), this
+  // reply continues that flow even if the original "book me" scrolled away.
+  const lastAssistantTurn = (input.conversationHistory || [])
+    .slice(-4)
+    .reverse()
+    .find((m) => m.role === 'assistant');
+  const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
   const needsBookingTools = input.channel === 'whatsapp' &&
-    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion);
+    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
   // check below can read it. The set is populated by the book_consultation
@@ -177,7 +185,13 @@ User's message: ${input.message}`
   // overwrite the response with a "let me try again" line and flag the lead.
   // We deliberately do NOT silently keep the false claim — the customer would
   // expect a calendar invite that never arrives.
-  if (needsBookingTools && bookingsCompletedThisSession && bookingsCompletedThisSession.size === 0) {
+  // Fire whenever NO booking actually completed this turn and there is no
+  // pre-existing booking to legitimately confirm. This now also covers the
+  // case where booking tools were never wired (Claude free-typed a "Done."
+  // confirmation, or printed the tool args as JSON) — previously the guard was
+  // gated on needsBookingTools and silently let those false claims through.
+  const noBookingThisTurn = !bookingsCompletedThisSession || bookingsCompletedThisSession.size === 0;
+  if (input.channel === 'whatsapp' && noBookingThisTurn && !existingBookingMessage) {
     const claimsBooked = /\b(done\.|is locked|booking confirmed|calendar invite on its way|all set,? .*locked)\b/i
       .test(rawResponse);
     if (claimsBooked) {
@@ -248,7 +262,12 @@ export async function* processStream(
     const recentBookingDiscussion = (input.conversationHistory || [])
       .slice(-6)
       .some((m) => m.role === 'user' && isBookingIntent(m.content));
-    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion;
+    const lastAssistantTurn = (input.conversationHistory || [])
+      .slice(-4)
+      .reverse()
+      .find((m) => m.role === 'assistant');
+    const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
+    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow;
 
     // 2. Parallelize DB calls: KB search always runs; booking check only when needed
     const [relevantDocs, existingBookingMessage] = await Promise.all([
@@ -396,6 +415,18 @@ function cleanResponse(raw: string, channel?: string): string {
     // names here whenever buildBookingTools / future engines gain one.
     .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)\.?/gi, '')
     .replace(/\b(check_availability|book_consultation)\b/gi, '')
+    // Tool-arg JSON leak guard: Claude sometimes prints the book_consultation
+    // arguments as a raw JSON blob instead of invoking the tool, e.g.
+    // '{ "date": "2026-06-01", "time": "3:00 PM", "session_type": "online", ... }'.
+    // Strip any {...} object carrying booking-arg keys so the customer never
+    // sees raw JSON in the chat.
+    .replace(/\{[^{}]*"(?:session_type|first_name|course_interest)"[^{}]*\}/gi, '')
+    .replace(/\{[^{}]*"date"\s*:\s*"?\d{4}-\d{2}-\d{2}[^{}]*\}/gi, '')
+    // Bare tool-arg leak: sometimes the args print as plain lines rather than
+    // JSON, e.g. a trailing "2026-05-31\nonline". Strip a standalone ISO-date
+    // line and a standalone session-type line so they never reach the customer.
+    .replace(/^[ \t]*\d{4}-\d{2}-\d{2}[ \t]*$/gim, '')
+    .replace(/^[ \t]*(?:online|offline)[ \t]*$/gim, '')
     .replace(/\[?\s*(?:calling|checking)\s+(?:for\s+)?\d{4}-\d{2}-\d{2}\s*\]?\.?/gi, '')
     .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
     .trim();
@@ -409,8 +440,13 @@ function cleanResponse(raw: string, channel?: string): string {
   // ". ." artefacts the regexes might leave behind.
   cleaned = cleaned
     .replace(/\s*[—–]\s*/g, '. ')
-    .replace(/\.\s*\./g, '.')
-    .replace(/\s{2,}/g, ' ');
+    .replace(/\.[ \t]*\./g, '.')
+    // Collapse runs of spaces/tabs only — do NOT touch newlines, or multi-
+    // paragraph replies (\n\n between paragraphs) get flattened into one block.
+    .replace(/[ \t]{2,}/g, ' ')
+    // Tidy spaces left hanging at line ends after the strips above.
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
 
   // Strip HTML tags for non-web channels
   if (channel && channel !== 'web') {

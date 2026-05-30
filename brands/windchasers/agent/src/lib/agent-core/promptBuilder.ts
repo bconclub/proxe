@@ -187,7 +187,7 @@ function buildUserPrompt(params: {
 
   // Channel-specific formatting (WhatsApp rules are in system prompt + channel instructions)
   const formattingInstructions = channel === 'whatsapp'
-    ? 'Plain text only. Max 2 sentences.'
+    ? 'Plain text. Keep it tight: 1-2 sentences per paragraph. If the answer has multiple parts (e.g. a timeline AND the steps AND a call-to-action), split it into 2-3 short paragraphs separated by a blank line (\\n\\n) instead of one long block. Put any call-to-action ("Want me to set up a quick call?") on its own line as the last paragraph.'
     : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
   // Inject current date + a live "is today still bookable" rule so Claude never
@@ -207,32 +207,51 @@ function buildUserPrompt(params: {
         const isSunday = weekday === 'Sunday';
         const onlineOpenToday = !isSunday && nowMin + 60 <= 17 * 60;
         const offlineOpenToday = !isSunday && nowMin + 60 <= 18 * 60;
-        let todayRule: string;
-        if (isSunday) {
-          todayRule = 'Today is Sunday — we are closed. Do NOT offer a "Today" button and do NOT say you will check today; offer [BTN: Tomorrow][BTN: Pick a date] and note we are closed Sundays.';
-        } else if (!offlineOpenToday) {
-          todayRule = 'Today\'s booking window has already closed. Do NOT offer a "Today" button and do NOT say you will check what\'s open today — offer [BTN: Tomorrow][BTN: Pick a date] instead and briefly mention today\'s slots are done.';
-        } else if (!onlineOpenToday) {
-          todayRule = 'Today\'s online slots are done; only an in-person facility visit may still fit today. Default to offering [BTN: Tomorrow][BTN: Pick a date]; only check today if the user explicitly asks for an in-person visit.';
-        } else {
-          todayRule = 'Today is still bookable. When offering slots for "today", never propose a time earlier than 60 minutes from now.';
-        }
+        const todayOpen = onlineOpenToday || offlineOpenToday;
 
-        // Deterministic upcoming-date map. The model was resolving "next Monday"
-        // by doing calendar math and getting it wrong — give it an exact lookup.
+        // Day axis for choosing which day buttons to show. We are CLOSED Sundays,
+        // so "Tomorrow" must be skipped when tomorrow is a Sunday — offer the next
+        // working day (e.g. Monday) instead.
         const [ty, tmo, td] = isoDate.split('-').map(Number);
         const baseUTC = Date.UTC(ty, tmo - 1, td, 12, 0, 0);
+        const weekdayAt = (i: number) =>
+          new Date(baseUTC + i * 86400000).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+        // Soonest open day at/after tomorrow (skip Sundays).
+        let firstOpen = 1;
+        while (weekdayAt(firstOpen) === 'Sunday') firstOpen++;
+        const firstOpenLabel = firstOpen === 1 ? 'Tomorrow' : weekdayAt(firstOpen);
+
+        // Exact day buttons to render for the "what date works?" question.
+        const dayButtons = todayOpen
+          ? `[BTN: Today][BTN: ${firstOpenLabel}][BTN: Pick a date]`
+          : `[BTN: ${firstOpenLabel}][BTN: Pick a date]`;
+
+        let todayRule: string;
+        if (!todayOpen) {
+          const reason = isSunday ? 'today is Sunday and we are closed' : "today's booking window has already closed";
+          todayRule = `Do NOT offer a "Today" button and do NOT say you will check what's open today — ${reason}. For the date question, offer EXACTLY these buttons: ${dayButtons}, and briefly mention today's slots are done.`;
+        } else if (!onlineOpenToday) {
+          todayRule = `Today's online slots are done; only an in-person facility visit may still fit today. For the date question, offer EXACTLY these buttons: ${dayButtons}; only check today if the user explicitly asks for an in-person visit.`;
+        } else {
+          todayRule = `Today is still bookable. For the date question, offer EXACTLY these buttons: ${dayButtons}. When offering today's times, never propose a slot earlier than 60 minutes from now.`;
+        }
+        const closedRule = 'We are CLOSED on Sundays. NEVER offer, check, or confirm a Sunday date — if "tomorrow" or a requested date lands on a Sunday, use the next working day (Monday) instead.';
+
+        // Deterministic upcoming-date map. The model was resolving "next Monday"
+        // by doing calendar math and getting it wrong — give it an exact lookup,
+        // with Sundays explicitly flagged as closed.
         const upcoming: string[] = [];
         for (let i = 0; i <= 13; i++) {
           const d = new Date(baseUTC + i * 86400000);
           const iso = d.toISOString().slice(0, 10);
-          const wd = d.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+          const wd = weekdayAt(i);
           const tag = i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : '';
-          upcoming.push(`  ${wd} ${iso}${tag}`);
+          const closedTag = wd === 'Sunday' ? ' — CLOSED' : '';
+          upcoming.push(`  ${wd} ${iso}${tag}${closedTag}`);
         }
         const dateRef = `Upcoming dates — resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
-        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule}\n\n${dateRef}`;
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule} ${closedRule}\n\n${dateRef}`;
       })()
     : '';
 
@@ -261,8 +280,12 @@ WHATSAPP CHANNEL RULES (MUST FOLLOW)
 =================================================================================
 This conversation is on WhatsApp. You MUST:
 - PLAIN TEXT only. No HTML, no markdown, no backticks.
-- Simple line breaks for spacing. Dashes (-) for lists.
-- SHORT: 1-2 sentences max. Mobile screens are small.
+- Keep paragraphs to 1-2 sentences each. Mobile screens are small.
+- Do NOT send one long block. When the answer has multiple parts (e.g. a
+  timeline, then the steps, then a call-to-action), split it into 2-3 short
+  paragraphs separated by a BLANK LINE (\n\n). Put any call-to-action
+  ("Want me to set up a quick call?") on its own line as the last paragraph.
+- Dashes (-) for lists.
 - NEVER use em dashes. Use commas or periods instead.
 - Conversational tone, like texting a friend.
 - URLs as plain text on their own line.

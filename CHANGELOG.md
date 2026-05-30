@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-30 15:53 IST · Booking reliability: real bookings, no leaks, Sunday-aware days, paragraphs
+
+- BIGGEST BUG — bookings never completed: in a multi-turn WhatsApp flow the booking tools were only wired when one of the last 6 *user* messages had a booking keyword. By the time the user was just sending their email / "yeah" / "ok", "book a call" had scrolled out of that window, so tools got UNWIRED mid-flow. The model then typed the `book_consultation` args as text and falsely said "Done… locked" while nothing was booked (not in the dashboard, not on Google Calendar). Fix: new `isBookingFlowStep()` keeps tools wired whenever the LAST assistant turn was a booking step (asked for date/time/email, offered slots, "confirming for", "lock it in"). Applied to both the WhatsApp (`process`) and web (`processStream`) paths.
+- Hallucinated-booking guard widened: it was gated on `needsBookingTools`, so the toolless free-typed "Done." slipped through. Now it fires whenever NO booking completed this turn and there's no pre-existing booking — overwrites the false confirmation with "hit a snag, let me try once more" and flags the lead for human follow-up.
+- Tool-arg leaks scrubbed in `cleanResponse`: strips both JSON blobs (`{ "date": …, "session_type": "online", … }`) and bare leaked lines (a standalone `2026-05-31` ISO date and a standalone `online`/`offline`) so customers never see raw tool args.
+- "Today" after hours via quick-reply: the hardcoded `quickReplyMap` "demo/book" trigger ([Today][This week][Pick a date]) bypassed the time-aware LLM flow and kept offering "Today" at 9 PM. Removed it — booking intent now flows into the LLM, which is time-aware and actually wires the tools.
+- Sunday-aware day buttons: "Tomorrow" is no longer offered when tomorrow is a Sunday (we're closed Sundays). `promptBuilder` now computes the exact day buttons per turn — e.g. Sat after close → `[Monday][Pick a date]`, Sat daytime → `[Today][Monday][Pick a date]`. The upcoming-date list flags Sundays as CLOSED and the model is told never to offer/check/confirm a Sunday.
+- Paragraphs on WhatsApp: `cleanResponse` was collapsing ALL whitespace (`\s{2,}`→space), which flattened `\n\n` paragraph breaks into one block. Now collapses spaces/tabs only and keeps newlines; the WhatsApp rules tell the model to split multi-part answers into 2-3 short paragraphs with the call-to-action on its own line.
+- User-facing: calls actually get booked (or the lead is flagged, never a false "Done"); no raw JSON/date/online leaks; never offered a closed day; longer replies read as tidy paragraphs.
+- (PENDING)
+
 ## 2026-05-30 15:41 IST · Lead summary: stop hallucinating, drop BCON "business" language
 
 - Bug: a Windchasers lead with only one outbound outreach message (no reply) got a confident AI summary — "received initial outreach… no information about their business or needs has been shared… continue following up." All invented; there was nothing to summarize.

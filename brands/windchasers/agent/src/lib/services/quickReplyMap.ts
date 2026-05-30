@@ -84,14 +84,13 @@ const TRIGGERS: QuickReplyTrigger[] = [
     },
   },
   // ── Demo / Booking ──────────────────────────────────────────────────────
-  {
-    match: /\b(demo|book|schedule|consultation)\b/i,
-    config: {
-      triggerKey: 'demo',
-      body: "Happy to set up your demo. When works?",
-      buttons: ['Today', 'This week', 'Pick a date'],
-    },
-  },
+  // NO static booking quick-reply. Booking intent ("book a call", "demo",
+  // "schedule") must flow into the LLM booking flow instead — it is time-aware
+  // (won't offer "Today" after the window closes), resolves dates correctly,
+  // offers the real slot buttons, AND wires the check_availability /
+  // book_consultation tools so the call actually gets booked. A hardcoded
+  // "Today / This week / Pick a date" menu here bypassed all of that and kept
+  // offering "Today" at 9 PM.
 ];
 
 /**
