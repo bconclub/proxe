@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-30 15:59 IST · Capture customer email from chat, independent of booking
+
+- Gap: a customer's email was only persisted when the book_consultation tool fired (via updateLeadProfile). The AI profile extractor (ConversationProfile) has no email field. So a lead who typed their email but whose booking didn't complete had the email silently dropped — it never showed on the lead modal (e.g. Swapnanil shared swapnanildutta346@gmail.com, no email recorded).
+- `whatsapp/meta/route.ts` — new step 11b detects any email in the inbound customer message (regex) and persists it immediately via `updateLeadProfile(sessionId, { email }, 'whatsapp')`, which writes session.customer_email and syncs to all_leads.email. Runs on every message, before the booking flow, so email is captured regardless of whether a booking is ever made.
+- User-facing: when a customer sends their email on WhatsApp, it now appears on the lead right away.
+- Note: this is forward-looking — it fires on NEW inbound messages, so it won't retroactively backfill leads whose email was lost under the old code.
+- (PENDING)
+
 ## 2026-05-30 15:53 IST · Booking reliability: real bookings, no leaks, Sunday-aware days, paragraphs
 
 - BIGGEST BUG — bookings never completed: in a multi-turn WhatsApp flow the booking tools were only wired when one of the last 6 *user* messages had a booking keyword. By the time the user was just sending their email / "yeah" / "ok", "book a call" had scrolled out of that window, so tools got UNWIRED mid-flow. The model then typed the `book_consultation` args as text and falsely said "Done… locked" while nothing was booked (not in the dashboard, not on Google Calendar). Fix: new `isBookingFlowStep()` keeps tools wired whenever the LAST assistant turn was a booking step (asked for date/time/email, offered slots, "confirming for", "lock it in"). Applied to both the WhatsApp (`process`) and web (`processStream`) paths.

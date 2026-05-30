@@ -30,6 +30,7 @@ import {
   sendWhatsAppInteractiveButtons,
   findQuickReplyFor,
   extractButtonsFromLLMResponse,
+  updateLeadProfile,
 } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
@@ -823,6 +824,22 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         })
         .eq('customer_phone_normalized', normalizedSessionPhone)
         .eq('brand', brand);
+    }
+
+    // 11b. Capture an email the customer typed in chat — independent of booking.
+    // Email used to be persisted ONLY when book_consultation fired, so a customer
+    // who shared their email but didn't complete a booking had it dropped (it never
+    // showed on the lead). Detect any email in the message and persist it right away
+    // to the session + all_leads.email via updateLeadProfile.
+    const emailMatch = messageText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+    if (emailMatch) {
+      const capturedEmail = emailMatch[0].toLowerCase();
+      try {
+        await updateLeadProfile(sessionId, { email: capturedEmail }, 'whatsapp', supabase);
+        console.log(`[meta/webhook] captured email from chat lead=${leadId} email=${capturedEmail}`);
+      } catch (err) {
+        console.error('[meta/webhook] email capture failed:', err);
+      }
     }
 
     // 12. AI-based profile extraction from the full conversation
