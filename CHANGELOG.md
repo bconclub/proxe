@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-30 15:34 IST · Tint the whole call-log card by outcome
+
+- Notes tab: the entire call-log card is now tinted by outcome, not just the badge — no-answer-type calls (No Answer / Busy / Voicemail / RNR / unreachable) read amber end-to-end, Connected (and outcome-less) calls stay green. Previously every call card was hardcoded green.
+- Refactor: extracted a shared `isNoAnswerOutcome()` classifier used by both the badge (`getNoteOutcomeClass`) and the new card tint (`getCallCardClass`), so the two can never drift.
+- User-facing: operators can scan the notes list and instantly see which calls connected vs didn't, by card color alone.
+- Scope: Windchasers `LeadDetailsModal.tsx` only; type-check clean for the file.
+- (32dac54b)
+
 ## 2026-05-30 15:33 IST · Fix relative-date math + slots as buttons + online = 3/4/5 PM only
 
 - Bug: lead typed "next Monday" (today is Sat May 30) and the bot replied "next Monday (June 2)" — June 2 is a Tuesday; next Monday is June 1. The model was doing calendar arithmetic itself and getting it wrong.
