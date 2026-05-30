@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-30 15:41 IST · Lead summary: stop hallucinating, drop BCON "business" language
+
+- Bug: a Windchasers lead with only one outbound outreach message (no reply) got a confident AI summary — "received initial outreach… no information about their business or needs has been shared… continue following up." All invented; there was nothing to summarize.
+- `leads/[id]/summary/route.ts` — added a STEP 0 hallucination guard that runs BEFORE the cached-summary step: if there's no inbound reply AND no captured profile / key-info / booking, it skips Claude entirely and returns an honest line ("Not enough context yet to summarize {name} … Currently in the {stage} stage."), with `insufficientContext: true` in the payload. Runs ahead of caching so a previously-fabricated cached summary is replaced too.
+- Rewrote the summary prompt for the aviation brand: it was copied from BCON and talked about "runs a furniture business / Meta ads / AI qualification" — that's where "business" leaked in. Now uses pilot-training framing (CPL/PPL/cabin-crew/counselling-call), bans inventing details, and explicitly forbids "haven't shared info about their business" since these aren't businesses. If context is thin, the model is told to reply exactly "Not enough context yet — more interaction needed to summarize this lead."
+- User-facing: low-context leads now read "not enough context yet" instead of a made-up story, and summaries no longer talk about a "business" for pilot-training leads.
+- (PENDING)
+
 ## 2026-05-30 15:34 IST · Tint the whole call-log card by outcome
 
 - Notes tab: the entire call-log card is now tinted by outcome, not just the badge — no-answer-type calls (No Answer / Busy / Voicemail / RNR / unreachable) read amber end-to-end, Connected (and outcome-less) calls stay green. Previously every call card was hardcoded green.
