@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-30 15:22 IST · Differentiate call-log outcomes + Notes refresh button
+
+- Notes tab: the call-log outcome badge is now color-coded by outcome via new `getNoteOutcomeClass()` — Connected/interested/answered/booked read green, No Answer/Busy/Voicemail/RNR/unreachable read amber, anything else neutral slate (previously every outcome was hardcoded green, so No Answer and Connected looked identical).
+- Notes tab: added a small Refresh button (top-right of the panel) that re-pulls the lead row and activity timeline on demand (`loadFreshLeadData()` + `loadActivities()`), so a just-logged note/call shows without closing and reopening the modal.
+- User-facing: operators can tell answered vs unanswered calls apart at a glance, and can manually refresh notes.
+- Scope: Windchasers `LeadDetailsModal.tsx` only; type-check clean for the file.
+- Note: shipped in commit 9c24cfc3; this changelog row was added in a follow-up commit (the entry failed to stage with the original push).
+
 ## 2026-05-30 15:15 IST · Stop offering "Today" after the booking window closes
 
 - Bug: a WhatsApp lead messaging at 8:35 PM was still offered a "Today" button and told "Let me check what's open today" — but online demos only run 3:00–6:30 PM IST, so today was long closed.
