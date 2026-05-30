@@ -8,7 +8,7 @@
 - WhatsApp booking Step 2 now presents open slots as tappable quick-reply BUTTONS (`[BTN: 3:00 PM][BTN: 4:00 PM][BTN: 5:00 PM]`, max 3, exact tool times) instead of a plain "I have 3, 4, or 5 PM" sentence.
 - Window text updated everywhere it was stated: `engine.ts` tool description + both booking-hours error/info messages, and both the WhatsApp and web prompts.
 - User-facing: relative dates resolve correctly, online demo times show as tap buttons, and only 3/4/5 PM are ever offered for online.
-- (PENDING)
+- (06e7b693)
 
 ## 2026-05-30 15:22 IST · Differentiate call-log outcomes + Notes refresh button
 
