@@ -2111,8 +2111,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           <div
                             className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
                             style={{ backgroundColor: channel.color }}
-                            title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
-                            aria-label={`${channel.name} channel`}
+                            title={`Open ${channel.name} conversation — ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                            aria-label={`Open ${channel.name} conversation`}
+                            onClick={() => {
+                              // Jump straight to this contact's inbox thread, pre-selecting the
+                              // clicked channel. Inbox deep-links via ?lead=<id>&channel=<key>.
+                              if (currentLead?.id) {
+                                router.push(`/dashboard/inbox?lead=${currentLead.id}&channel=${channel.key}`)
+                                onClose()
+                              }
+                            }}
                           >
                             <channel.icon size={14} />
                           </div>
