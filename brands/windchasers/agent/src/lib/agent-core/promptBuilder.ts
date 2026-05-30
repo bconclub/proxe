@@ -190,9 +190,34 @@ function buildUserPrompt(params: {
     ? 'Plain text only. Max 2 sentences.'
     : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
-  // Inject current date so Claude can resolve relative dates ("tomorrow", "next Monday")
+  // Inject current date + a live "is today still bookable" rule so Claude never
+  // offers "Today" or says it will check today's slots once the window has closed.
   const dateContext = (channel === 'whatsapp' || channel === 'web')
-    ? `Current IST: ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })} on ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })}, ${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}. When offering slots for "today", never propose a time earlier than 60 minutes from this moment.`
+    ? (() => {
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const isoDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const hm = now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+        const [h, m] = hm.split(':').map(Number);
+        const nowMin = h * 60 + m;
+        // Booking windows IST: online 15:00–18:30 (last start 17:30), offline 11:00–19:00 (last start 18:00).
+        // With the 60-min lead rule, "today" is bookable only while now + 60 ≤ last start.
+        const isSunday = weekday === 'Sunday';
+        const onlineOpenToday = !isSunday && nowMin + 60 <= 17 * 60 + 30;
+        const offlineOpenToday = !isSunday && nowMin + 60 <= 18 * 60;
+        let todayRule: string;
+        if (isSunday) {
+          todayRule = 'Today is Sunday — we are closed. Do NOT offer a "Today" button and do NOT say you will check today; offer [BTN: Tomorrow][BTN: Pick a date] and note we are closed Sundays.';
+        } else if (!offlineOpenToday) {
+          todayRule = 'Today\'s booking window has already closed. Do NOT offer a "Today" button and do NOT say you will check what\'s open today — offer [BTN: Tomorrow][BTN: Pick a date] instead and briefly mention today\'s slots are done.';
+        } else if (!onlineOpenToday) {
+          todayRule = 'Today\'s online slots are done; only an in-person facility visit may still fit today. Default to offering [BTN: Tomorrow][BTN: Pick a date]; only check today if the user explicitly asks for an in-person visit.';
+        } else {
+          todayRule = 'Today is still bookable. When offering slots for "today", never propose a time earlier than 60 minutes from now.';
+        }
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00–6:30 PM, offline 11:00 AM–7:00 PM. ${todayRule}`;
+      })()
     : '';
 
   const instructions = [

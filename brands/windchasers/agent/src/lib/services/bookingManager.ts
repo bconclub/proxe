@@ -82,6 +82,24 @@ export function isAllowedBookingTime(time: string, sessionType?: string | null):
   return !!normalizedTime && getAvailableBookingSlotStarts(sessionType).includes(normalizedTime);
 }
 
+/**
+ * Slot starts that are still bookable for a SPECIFIC date.
+ * For any future date this is the full window. For TODAY (IST) we drop slots
+ * whose start time has already passed — otherwise a customer messaging at
+ * 8:30 PM would be offered (or booked into) a 3:00 PM slot that is long gone.
+ */
+export function getBookableSlotStartsForDate(dateStr: string, sessionType?: string | null): string[] {
+  const all = getAvailableBookingSlotStarts(sessionType);
+  const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+  if (dateStr !== todayIST) return all;
+  const hm = new Date().toLocaleTimeString('en-GB', {
+    hour12: false, hour: '2-digit', minute: '2-digit', timeZone: TIMEZONE,
+  });
+  const [h, m] = hm.split(':').map(Number);
+  const nowMinutes = h * 60 + m;
+  return all.filter(slot => timeToMinutes(slot) > nowMinutes);
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface BookingData {
@@ -382,11 +400,14 @@ export async function storeBooking(
  * Returns array of time slots with availability status
  */
 export async function getAvailableSlots(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
-  const allowedSlots = getAvailableBookingSlotStarts(sessionType);
   const dateStr = date.split('T')[0];
   const [year, month, day] = dateStr.split('-').map(Number);
   const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   if (dayOfWeek === 0) return [];
+
+  // Drop slots already in the past when the requested date is today (IST).
+  const allowedSlots = getBookableSlotStartsForDate(dateStr, sessionType);
+  if (allowedSlots.length === 0) return [];
 
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
@@ -465,7 +486,7 @@ export async function getAvailableSlots(date: string, sessionType?: string | nul
  * Fallback: check availability from Supabase bookings when Google Calendar is unavailable
  */
 async function checkAvailabilityFromSupabase(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
-  const allowedSlots = getAvailableBookingSlotStarts(sessionType);
+  const allowedSlots = getBookableSlotStartsForDate(date.split('T')[0], sessionType);
   try {
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

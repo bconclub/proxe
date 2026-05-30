@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-30 15:15 IST · Stop offering "Today" after the booking window closes
+
+- Bug: a WhatsApp lead messaging at 8:35 PM was still offered a "Today" button and told "Let me check what's open today" — but online demos only run 3:00–6:30 PM IST, so today was long closed.
+- `promptBuilder.ts`: the injected IST time context now computes live whether today is still bookable and tells the model what to do. Past close (or Sunday) → do NOT offer "Today" or say you'll check today; offer `[BTN: Tomorrow][BTN: Pick a date]` and note today's slots are done. Online-done-but-offline-open → default to Tomorrow unless they ask for an in-person visit. Still open → normal 60-min-lead behavior.
+- `bookingManager.ts`: new `getBookableSlotStartsForDate()` drops slot starts already in the past when the requested date is today (IST). Wired into `getAvailableSlots` (returns no slots once today is fully past) and the Supabase availability fallback, so `check_availability(today)` can never hand back stale already-passed slots.
+- Booking windows are unchanged: online 3:00–6:30 PM IST, offline 11:00 AM–7:00 PM IST, Mon–Sat.
+- User-facing: after hours the bot now offers Tomorrow / Pick a date instead of pretending today is bookable.
+- (6f2d14c1)
+
 ## 2026-05-21 16:45 IST · Call logs surface properly in Activity tab
 
 - Team-typed activities (manual call logs, manual notes) now get their own amber bubble on the Activity timeline, matching the customer (emerald) / proxe (blue) bubble pattern. Previously fell into a muted-grey `<p>` paragraph under the icon, easy to miss.
