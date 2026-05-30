@@ -9,7 +9,7 @@
 - Sunday-aware day buttons: "Tomorrow" is no longer offered when tomorrow is a Sunday (we're closed Sundays). `promptBuilder` now computes the exact day buttons per turn — e.g. Sat after close → `[Monday][Pick a date]`, Sat daytime → `[Today][Monday][Pick a date]`. The upcoming-date list flags Sundays as CLOSED and the model is told never to offer/check/confirm a Sunday.
 - Paragraphs on WhatsApp: `cleanResponse` was collapsing ALL whitespace (`\s{2,}`→space), which flattened `\n\n` paragraph breaks into one block. Now collapses spaces/tabs only and keeps newlines; the WhatsApp rules tell the model to split multi-part answers into 2-3 short paragraphs with the call-to-action on its own line.
 - User-facing: calls actually get booked (or the lead is flagged, never a false "Done"); no raw JSON/date/online leaks; never offered a closed day; longer replies read as tidy paragraphs.
-- (PENDING)
+- (d3d14c83)
 
 ## 2026-05-30 15:41 IST · Lead summary: stop hallucinating, drop BCON "business" language
 
