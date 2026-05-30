@@ -71,18 +71,28 @@ function formatBookingDateShort(dateString: string | null | undefined): string {
   }
 }
 
-// Color for a call-log outcome badge in the Notes tab.
-// Connected-type outcomes read green; no-answer / busy / voicemail read amber
-// so the operator can tell them apart at a glance.
+// Shared classifier for call-log outcomes in the Notes tab — true when the
+// call did NOT connect (no answer / busy / voicemail / RNR / unreachable).
+function isNoAnswerOutcome(outcome: string): boolean {
+  return /no answer|busy|voicemail|rnr|not reachable|unreachable|switched off|missed|no response|declin|disconnect/.test(outcome.toLowerCase())
+}
+
+// Color for the small outcome badge next to "Call log".
 function getNoteOutcomeClass(outcome: string): string {
-  const o = outcome.toLowerCase()
-  if (/no answer|busy|voicemail|rnr|not reachable|unreachable|switched off|missed|no response|declin|disconnect/.test(o)) {
-    return 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
-  }
-  if (/connect|interest|answered|spoke|reachable|booked/.test(o)) {
+  if (isNoAnswerOutcome(outcome)) return 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+  if (/connect|interest|answered|spoke|reachable|booked/.test(outcome.toLowerCase())) {
     return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
   }
   return 'bg-slate-500/10 text-slate-600 dark:text-slate-300'
+}
+
+// Tint for the whole call-log card so the outcome is scannable at a glance:
+// no-answer-type calls read amber, connected (and outcome-less) calls stay green.
+function getCallCardClass(outcome: string | null): string {
+  if (outcome && isNoAnswerOutcome(outcome)) {
+    return 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40'
+  }
+  return 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
 }
 
 function formatCountdown(scheduledAt: string): string {
@@ -2900,7 +2910,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 const toneClass = item.tone === 'automation'
                                   ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/40'
                                   : item.tone === 'call'
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
+                                    ? getCallCardClass(item.outcome)
                                     : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
                                 return (
                                   <li key={item.id} className={`rounded-lg border p-3 ${toneClass}`}>
