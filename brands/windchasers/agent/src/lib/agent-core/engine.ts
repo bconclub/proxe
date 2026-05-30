@@ -547,7 +547,7 @@ function buildBookingTools(
           session_type: {
             type: 'string',
             enum: ['online', 'offline'],
-            description: 'Session format. Online slots run Monday-Saturday from 3:00 PM to 6:30 PM. Offline slots run Monday-Saturday from 11:00 AM to 7:00 PM. Default to online unless the user explicitly asks for an offline/facility/campus visit.',
+            description: 'Session format. Online slots are Monday-Saturday at 3:00 PM, 4:00 PM, or 5:00 PM only. Offline slots run Monday-Saturday from 11:00 AM to 7:00 PM. Default to online unless the user explicitly asks for an offline/facility/campus visit.',
           },
         },
         required: ['date'],
@@ -696,7 +696,7 @@ function buildBookingTools(
         session_type: sessionType,
         booking_window: sessionType === 'offline'
           ? 'Offline sessions are available Monday-Saturday, 11:00 AM-7:00 PM IST.'
-          : 'Online sessions are available Monday-Saturday, 3:00 PM-6:30 PM IST.',
+          : 'Online sessions are Monday-Saturday at 3:00 PM, 4:00 PM, or 5:00 PM IST.',
         available_slots: availableSlots.map(s => ({
           time: s.time,
           time24: s.time24,
@@ -727,7 +727,7 @@ function buildBookingTools(
           success: false,
           error: sessionType === 'offline'
             ? 'That time is outside offline booking hours. Offline sessions are Monday-Saturday, 11:00 AM-7:00 PM IST. Check availability again and offer only returned slots.'
-            : 'That time is outside online booking hours. Online sessions are Monday-Saturday, 3:00 PM-6:30 PM IST. Check availability again and offer only returned slots.',
+            : 'That time is outside online booking hours. Online sessions are Monday-Saturday at 3:00 PM, 4:00 PM, or 5:00 PM IST. Check availability again and offer only returned slots.',
         });
       }
 

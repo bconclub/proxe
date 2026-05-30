@@ -24,9 +24,11 @@ const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata';
 
 export type BookingSessionType = 'online' | 'offline';
 
-const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string }> = {
-  online: { start: '15:00', end: '18:30' },
-  offline: { start: '11:00', end: '19:00' },
+// Online runs three fixed start times only — 3:00, 4:00, 5:00 PM (hourly step,
+// last start 5 PM since each session is 60 min). Offline keeps 30-min granularity.
+const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string; stepMinutes: number }> = {
+  online: { start: '15:00', end: '18:00', stepMinutes: 60 },
+  offline: { start: '11:00', end: '19:00', stepMinutes: 30 },
 };
 const BOOKING_DURATION_MINUTES = 60;
 
@@ -66,10 +68,10 @@ function normalizeBookingTime(time: string): string | null {
 }
 
 export function getAvailableBookingSlotStarts(sessionType?: string | null): string[] {
-  const { start, end } = BOOKING_WINDOWS[normalizeBookingSessionType(sessionType)];
+  const { start, end, stepMinutes } = BOOKING_WINDOWS[normalizeBookingSessionType(sessionType)];
   const slots: string[] = [];
   const lastStart = timeToMinutes(end) - BOOKING_DURATION_MINUTES;
-  for (let minutes = timeToMinutes(start); minutes <= lastStart; minutes += 30) {
+  for (let minutes = timeToMinutes(start); minutes <= lastStart; minutes += stepMinutes) {
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
     slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-30 15:33 IST · Fix relative-date math + slots as buttons + online = 3/4/5 PM only
+
+- Bug: lead typed "next Monday" (today is Sat May 30) and the bot replied "next Monday (June 2)" — June 2 is a Tuesday; next Monday is June 1. The model was doing calendar arithmetic itself and getting it wrong.
+- `promptBuilder.ts`: the injected IST context now includes a deterministic 14-day "upcoming dates" lookup (weekday → exact ISO date, today/tomorrow tagged) and instructs the model to resolve EVERY relative date by matching the list — never calculate. "Next <weekday>" = the soonest matching weekday listed.
+- Online booking slots reduced to three fixed start times only — 3:00 PM, 4:00 PM, 5:00 PM IST (was a 30-min grid 3:00–5:30 PM that the bot inconsistently summarized to 3/4/5). `bookingManager.ts`: `BOOKING_WINDOWS.online` now `15:00–18:00` with `stepMinutes: 60`; `getAvailableBookingSlotStarts` honors a per-window step. Offline unchanged (30-min grid).
+- WhatsApp booking Step 2 now presents open slots as tappable quick-reply BUTTONS (`[BTN: 3:00 PM][BTN: 4:00 PM][BTN: 5:00 PM]`, max 3, exact tool times) instead of a plain "I have 3, 4, or 5 PM" sentence.
+- Window text updated everywhere it was stated: `engine.ts` tool description + both booking-hours error/info messages, and both the WhatsApp and web prompts.
+- User-facing: relative dates resolve correctly, online demo times show as tap buttons, and only 3/4/5 PM are ever offered for online.
+- (PENDING)
+
 ## 2026-05-30 15:22 IST · Differentiate call-log outcomes + Notes refresh button
 
 - Notes tab: the call-log outcome badge is now color-coded by outcome via new `getNoteOutcomeClass()` — Connected/interested/answered/booked read green, No Answer/Busy/Voicemail/RNR/unreachable read amber, anything else neutral slate (previously every outcome was hardcoded green, so No Answer and Connected looked identical).

@@ -201,10 +201,11 @@ function buildUserPrompt(params: {
         const hm = now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
         const [h, m] = hm.split(':').map(Number);
         const nowMin = h * 60 + m;
-        // Booking windows IST: online 15:00–18:30 (last start 17:30), offline 11:00–19:00 (last start 18:00).
-        // With the 60-min lead rule, "today" is bookable only while now + 60 ≤ last start.
+        // Booking windows IST: online starts 15:00/16:00/17:00 (last start 17:00),
+        // offline 11:00–19:00 (last start 18:00). With the 60-min lead rule,
+        // "today" is bookable only while now + 60 ≤ last start.
         const isSunday = weekday === 'Sunday';
-        const onlineOpenToday = !isSunday && nowMin + 60 <= 17 * 60 + 30;
+        const onlineOpenToday = !isSunday && nowMin + 60 <= 17 * 60;
         const offlineOpenToday = !isSunday && nowMin + 60 <= 18 * 60;
         let todayRule: string;
         if (isSunday) {
@@ -216,7 +217,22 @@ function buildUserPrompt(params: {
         } else {
           todayRule = 'Today is still bookable. When offering slots for "today", never propose a time earlier than 60 minutes from now.';
         }
-        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00–6:30 PM, offline 11:00 AM–7:00 PM. ${todayRule}`;
+
+        // Deterministic upcoming-date map. The model was resolving "next Monday"
+        // by doing calendar math and getting it wrong — give it an exact lookup.
+        const [ty, tmo, td] = isoDate.split('-').map(Number);
+        const baseUTC = Date.UTC(ty, tmo - 1, td, 12, 0, 0);
+        const upcoming: string[] = [];
+        for (let i = 0; i <= 13; i++) {
+          const d = new Date(baseUTC + i * 86400000);
+          const iso = d.toISOString().slice(0, 10);
+          const wd = d.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+          const tag = i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : '';
+          upcoming.push(`  ${wd} ${iso}${tag}`);
+        }
+        const dateRef = `Upcoming dates — resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
+
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule}\n\n${dateRef}`;
       })()
     : '';
 

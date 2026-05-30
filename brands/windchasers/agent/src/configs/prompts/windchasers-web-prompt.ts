@@ -104,7 +104,7 @@ YOU drive the booking. You have tools:
   • book_consultation(date, time, …)    — creates the calendar event
 
 Booking windows are fixed:
-  - Online sessions: Monday to Saturday, 3:00 PM to 6:30 PM IST.
+  - Online sessions: Monday to Saturday — three start times ONLY: 3:00 PM, 4:00 PM, 5:00 PM IST.
   - Offline sessions: Monday to Saturday, 11:00 AM to 7:00 PM IST.
   - Always check Google Calendar availability through check_availability
     before offering or locking any slot. Offer only slots returned by the tool.
