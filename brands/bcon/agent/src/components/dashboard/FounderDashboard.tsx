@@ -481,18 +481,7 @@ export default function FounderDashboard() {
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#F97316' }}>
-              {(() => {
-                const warmCount = warmLeadsFilter === 'All' ? (metrics.warmLeads?.count ?? 0)
-                  : warmLeadsFilter === '7D' ? (metrics.warmLeads?.count7D ?? 0)
-                  : warmLeadsFilter === '14D' ? (metrics.warmLeads?.count14D ?? 0)
-                  : (metrics.warmLeads?.count30D ?? 0)
-                const total = warmLeadsFilter === 'All' ? (metrics.totalLeads?.count ?? 0)
-                  : warmLeadsFilter === '7D' ? (metrics.totalLeads?.count7D ?? 0)
-                  : warmLeadsFilter === '14D' ? (metrics.totalLeads?.count14D ?? 0)
-                  : (metrics.totalLeads?.count30D ?? 0)
-                const rate = total > 0 ? (warmCount / total) * 100 : 0
-                return `${rate.toFixed(1)}%`
-              })()}
+              Score 40–69
             </p>
           </div>
           {metrics.trends?.leads && (

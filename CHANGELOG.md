@@ -9,14 +9,10 @@
 - Scope: Windchasers brand only.
 - (240de142)
 
-## 2026-05-31 09:54 IST · Dashboard At-a-Glance fixes + leads page 50-cap
+## 2026-05-31 10:20 IST · Revert: bcon At-a-Glance/leads changes (wrong brand)
 
-- `founder-metrics/route.ts` — Avg Lead Score now uses `Math.floor` instead of `Math.round`, so a 40.x average reads 40% (was rounding up to 41%).
-- `FounderDashboard.tsx` — Warm Leads card replaced the static "Score 40–69" caption with a live warm-rate percentage (warm count ÷ total leads, one decimal, matching the Engaged Leads card). It tracks the All/7D/14D/30D filter.
-- `LeadsTable.tsx` — leads page was capped at 50 with no way to see more (data layer already loads up to 1000). Default display bumped 50→100 and the limit selector gained 100 / 250 / All options. Score-trend arrow lookup raised 50→250 to stay consistent with the larger view.
-- User-facing: founders can now see all their leads (not just the first 50), Avg Lead Score reads correctly, and Warm Leads shows a percentage like Engaged Leads.
-- Scope: bcon brand only; type-check clean for all three files.
-- (911da396)
+- Reverted commit 911da396 — those three dashboard fixes were applied to bcon by mistake; the work was scoped to Windchasers (now shipped separately in 240de142). bcon `founder-metrics/route.ts`, `FounderDashboard.tsx`, and `LeadsTable.tsx` restored to their prior state.
+- (SHA below)
 
 ## 2026-05-30 16:03 IST · Open inbox conversation from lead-modal channel chips
 

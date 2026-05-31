@@ -1031,7 +1031,7 @@ export async function GET(request: NextRequest) {
     }
     
     const avgScore = leadsWithScores > 0
-      ? Math.floor(totalScore / leadsWithScores)
+      ? Math.round(totalScore / leadsWithScores)
       : 0
     
     // Debug logging for score calculation
