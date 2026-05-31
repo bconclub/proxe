@@ -523,7 +523,9 @@ export default function FounderDashboard() {
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#F97316' }}>
-              {warmLeadsFilter === 'All' ? 'Score 40-69' : periodLabel(warmLeadsFilter)}
+              {warmLeadsFilter === 'All'
+                ? `${(metrics.totalLeads?.count ? ((metrics.warmLeads?.count ?? 0) / metrics.totalLeads.count) * 100 : 0).toFixed(1)}%`
+                : periodLabel(warmLeadsFilter)}
             </p>
           </div>
           {getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data).length > 0 && (

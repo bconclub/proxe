@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-31 10:10 IST · Windchasers: At-a-Glance fixes + leads page 50-cap
+
+- `founder-metrics/route.ts` — Avg Lead Score now uses `Math.floor` instead of `Math.round`, so a 40.x average reads 40% (was rounding up to 41%).
+- `FounderDashboard.tsx` — Warm Leads card now shows a live warm-rate percentage (warm count ÷ total leads, one decimal) on the 'All' filter, mirroring how the Engaged Leads card shows engagementRate. Period filters still show the period label.
+- `LeadsTable.tsx` — leads page was capped at 50 with no way to see more (data layer already loads up to 1000). Default display bumped 50→100 and the limit selector gained 100 / 250 / All options. Score-trend arrow lookup raised 50→250.
+- User-facing: founders see all their leads (not just the first 50), Avg Lead Score reads correctly, and Warm Leads shows a percentage like Engaged Leads.
+- Scope: Windchasers brand only.
+- (SHA below)
+
 ## 2026-05-31 09:54 IST · Dashboard At-a-Glance fixes + leads page 50-cap
 
 - `founder-metrics/route.ts` — Avg Lead Score now uses `Math.floor` instead of `Math.round`, so a 40.x average reads 40% (was rounding up to 41%).
