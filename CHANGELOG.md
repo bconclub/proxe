@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-31 09:54 IST · Dashboard At-a-Glance fixes + leads page 50-cap
+
+- `founder-metrics/route.ts` — Avg Lead Score now uses `Math.floor` instead of `Math.round`, so a 40.x average reads 40% (was rounding up to 41%).
+- `FounderDashboard.tsx` — Warm Leads card replaced the static "Score 40–69" caption with a live warm-rate percentage (warm count ÷ total leads, one decimal, matching the Engaged Leads card). It tracks the All/7D/14D/30D filter.
+- `LeadsTable.tsx` — leads page was capped at 50 with no way to see more (data layer already loads up to 1000). Default display bumped 50→100 and the limit selector gained 100 / 250 / All options. Score-trend arrow lookup raised 50→250 to stay consistent with the larger view.
+- User-facing: founders can now see all their leads (not just the first 50), Avg Lead Score reads correctly, and Warm Leads shows a percentage like Engaged Leads.
+- Scope: bcon brand only; type-check clean for all three files.
+- (SHA below)
+
 ## 2026-05-30 16:03 IST · Open inbox conversation from lead-modal channel chips
 
 - Lead modal: the Customer Journey channel chips (WhatsApp, web, etc.) were `cursor-pointer` but had no click handler — clicking did nothing. Each chip now deep-links to that contact's inbox thread via `/dashboard/inbox?lead=<id>&channel=<key>` and closes the modal, so one click jumps from a lead straight into their conversation on the channel you clicked.

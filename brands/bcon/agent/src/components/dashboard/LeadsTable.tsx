@@ -140,7 +140,7 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [limit, setLimit] = useState<number>(initialLimit || 50)
+  const [limit, setLimit] = useState<number>(initialLimit || 100)
 
   useEffect(() => {
     if (initialLimit) {
@@ -263,7 +263,7 @@ export default function LeadsTable({
     const fetchTrends = async () => {
       try {
         const supabase = createClient()
-        const leadIds = filteredLeads.slice(0, 50).map(l => l.id)
+        const leadIds = filteredLeads.slice(0, 250).map(l => l.id)
 
         const { data: changes } = await supabase
           .from('lead_stage_changes')
@@ -598,6 +598,9 @@ export default function LeadsTable({
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={0}>All</option>
             </select>
           )}
 
