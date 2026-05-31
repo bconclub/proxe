@@ -12,7 +12,7 @@
 ## 2026-05-31 10:20 IST · Revert: bcon At-a-Glance/leads changes (wrong brand)
 
 - Reverted commit 911da396 — those three dashboard fixes were applied to bcon by mistake; the work was scoped to Windchasers (now shipped separately in 240de142). bcon `founder-metrics/route.ts`, `FounderDashboard.tsx`, and `LeadsTable.tsx` restored to their prior state.
-- (SHA below)
+- (981e626c)
 
 ## 2026-05-30 16:03 IST · Open inbox conversation from lead-modal channel chips
 
