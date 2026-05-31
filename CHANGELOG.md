@@ -7,7 +7,7 @@
 - `LeadsTable.tsx` — leads page was capped at 50 with no way to see more (data layer already loads up to 1000). Default display bumped 50→100 and the limit selector gained 100 / 250 / All options. Score-trend arrow lookup raised 50→250 to stay consistent with the larger view.
 - User-facing: founders can now see all their leads (not just the first 50), Avg Lead Score reads correctly, and Warm Leads shows a percentage like Engaged Leads.
 - Scope: bcon brand only; type-check clean for all three files.
-- (SHA below)
+- (911da396)
 
 ## 2026-05-30 16:03 IST · Open inbox conversation from lead-modal channel chips
 
