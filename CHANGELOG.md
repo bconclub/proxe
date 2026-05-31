@@ -7,7 +7,7 @@
 - `LeadsTable.tsx` — leads page was capped at 50 with no way to see more (data layer already loads up to 1000). Default display bumped 50→100 and the limit selector gained 100 / 250 / All options. Score-trend arrow lookup raised 50→250.
 - User-facing: founders see all their leads (not just the first 50), Avg Lead Score reads correctly, and Warm Leads shows a percentage like Engaged Leads.
 - Scope: Windchasers brand only.
-- (SHA below)
+- (240de142)
 
 ## 2026-05-31 09:54 IST · Dashboard At-a-Glance fixes + leads page 50-cap
 
