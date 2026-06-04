@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 07:55 IST · Windchasers: "when do classes start" must give the batch date, not eligibility
+
+- `windchasers-prompt.ts` / `windchasers-web-prompt.ts` — Hardened the batch-start handling. "When do classes start?" was still being answered with eligibility requirements ("once you're eligible — 12th pass with Physics & Maths, Class 1 medical"). Now any start/begin/next-batch/"when can I join" question is treated strictly as a DATE question → "Our DGCA ground classes start on the 7th of every month — next batch on the 7th of next month." Added an explicit prohibition on answering it with eligibility, and an optional one-line clarifier if which-classes is genuinely ambiguous.
+- (4b84f816)
+
 ## 2026-06-04 07:38 IST · Windchasers: agent behaviour, inbox display, attribution, booking detection
 
 Agent behaviour (`brand-facts.ts`, `windchasers-prompt.ts`, `windchasers-web-prompt.ts`):
