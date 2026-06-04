@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 09:30 IST · Windchasers: pipeline score matches the rest of the dashboard
+
+- `dashboard/pipeline/page.tsx` — The pipeline read the raw stored `lead_score`, which is 0/stale for many leads (AI scoring never ran), while the leads table + lead detail show the client-side `calculateLeadScore` (message-aware). So the pipeline showed 0 for leads that actually have a real score (e.g. Srushthi: stored 0, calculated 72). The pipeline now computes `calculateLeadScore` for its leads (same as the leads table, with stored-score fallback) and uses it for the score dot, sorting, and the lead modal.
+- Note: separately, the stored `lead_score` column itself is stale for many leads — surfaces that read it directly (e.g. founder-metrics Avg Lead Score) will also be affected until leads are re-scored.
+- (21d7639f)
+
 ## 2026-06-04 09:20 IST · Windchasers: Today's snapshot — Parent vs Student lead-type breakdown
 
 - `today-snapshot/route.ts` + `TodaySnapshotButton.tsx` — Added a "Lead type" block to the Today's snapshot quick view showing Parent vs Student counts for the selected window. Type derived from unified_context user_type (+ "child" form fields → Parent). Sits under "By source".
