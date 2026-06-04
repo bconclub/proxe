@@ -774,7 +774,7 @@ export default function LeadsTable({
                 const MARKETING_CHANNELS = new Set([
                   'ig', 'instagram',
                   'fb', 'facebook', 'facebook_ads', 'fb_ads',
-                  'meta', 'meta_ads',
+                  'meta', 'meta_ads', 'meta_forms_clickthrough',
                   'google', 'google_ads', 'googleads',
                   'bing', 'bing_ads',
                   'youtube', 'yt',
@@ -869,6 +869,7 @@ export default function LeadsTable({
                   yt: { label: 'YouTube', color: '#FF0000' },
                   meta: { label: 'Meta', color: '#1877F2' },
                   meta_ads: { label: 'Meta Ads', color: '#1877F2' },
+                  meta_forms_clickthrough: { label: 'Meta Forms Click-through', color: '#1877F2' },
                   facebook: { label: 'Facebook', color: '#1877F2' },
                   facebook_ads: { label: 'Facebook Ads', color: '#1877F2' },
                   fb: { label: 'Facebook', color: '#1877F2' },

@@ -32,6 +32,11 @@ import {
   extractButtonsFromLLMResponse,
   updateLeadProfile,
 } from '@/lib/services';
+import {
+  isMetaFormClickThrough,
+  META_FORM_CLICKTHROUGH_SOURCE,
+  META_FORM_CLICKTHROUGH_LABEL,
+} from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
@@ -502,6 +507,36 @@ async function sendAndLogReply(
   return waReplyId;
 }
 
+/**
+ * Stamp a lead as a Meta-form click-through source (idempotent). Only sets the
+ * attribution when the lead has no marketing source yet, so we never overwrite a
+ * real UTM/ad attribution or re-stamp on later messages.
+ */
+async function tagMetaFormClickThrough(leadId: string, supabase: any): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    const uc = data?.unified_context || {};
+    const existing = String(uc?.attribution?.source || '').toLowerCase().trim();
+    // Don't clobber an existing real marketing source.
+    if (existing && existing !== 'direct') return;
+    uc.attribution = {
+      ...(uc.attribution || {}),
+      source: META_FORM_CLICKTHROUGH_SOURCE,
+      source_label: META_FORM_CLICKTHROUGH_LABEL,
+      first_touch: 'meta_lead_form',
+      first_touch_label: 'Meta Lead Form',
+      captured_at: new Date().toISOString(),
+    };
+    await supabase.from('all_leads').update({ unified_context: uc }).eq('id', leadId);
+  } catch (err: any) {
+    console.error('[meta/webhook] tagMetaFormClickThrough failed:', err?.message || err);
+  }
+}
+
 async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
   const {
     customerPhone,
@@ -539,6 +574,13 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       console.error('[meta/webhook] Failed to create/update lead');
       await sendWhatsAppReply(customerPhone, "Hey! Give me just a moment, I'll get the team to reach out to you directly.");
       return;
+    }
+
+    // Meta lead-form "Chat on WhatsApp" click-through: the first inbound message
+    // is the form prefill. These carry no UTM/marketing channel, so they'd default
+    // to 'Direct'. Stamp a distinct source (once) so attribution reflects the form.
+    if (isMetaFormClickThrough(messageText)) {
+      await tagMetaFormClickThrough(leadId, supabase);
     }
 
     // 1b–4. Parallelize: dedup checks + session creation + cross-channel context

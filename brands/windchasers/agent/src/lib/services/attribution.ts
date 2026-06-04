@@ -24,6 +24,7 @@ const SOURCE_LABELS: Record<string, string> = {
   fb_ads: 'Facebook Ads',
   meta: 'Meta',
   meta_ads: 'Meta Ads',
+  meta_forms_clickthrough: 'Meta Forms Click-through',
   google: 'Google',
   google_ads: 'Google Ads',
   googleads: 'Google Ads',
@@ -91,7 +92,7 @@ function titleCase(s: string): string {
 const MARKETING_CHANNELS = new Set([
   'ig', 'instagram',
   'fb', 'facebook', 'facebook_ads', 'fb_ads',
-  'meta', 'meta_ads',
+  'meta', 'meta_ads', 'meta_forms_clickthrough',
   'google', 'google_ads', 'googleads',
   'bing', 'bing_ads',
   'youtube', 'yt',
@@ -102,6 +103,27 @@ const MARKETING_CHANNELS = new Set([
   'email', 'newsletter',
   'referral', 'organic',
 ]);
+
+export const META_FORM_CLICKTHROUGH_SOURCE = 'meta_forms_clickthrough';
+export const META_FORM_CLICKTHROUGH_LABEL = 'Meta Forms Click-through';
+
+/**
+ * Detects a Meta lead-form "Chat on WhatsApp" click-through. Such leads arrive
+ * as a normal WhatsApp inbound whose FIRST message is the form prefill, e.g.
+ *   "Hello! I filled out your form ... what_is_your_concern?: ... first name: ..."
+ * They carry no UTM and no marketing channel, so without this they get tagged
+ * 'Direct'. We relabel them 'Meta Forms Click-through' (distinct from a native
+ * Meta Lead Form integration).
+ */
+export function isMetaFormClickThrough(text: string | null | undefined): boolean {
+  if (!text) return false;
+  // Meta's prefill copy varies: "filled out your form", "filled in your form",
+  // "filled up the form", "filled your form", etc.
+  if (/filled\s*(in|out|up)?\s*(your|the)?\s*form\b/i.test(text)) return true;
+  // Fallback: 2+ snake_case form-field keys like "what_is_your_x?:"
+  const keys = text.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\??\s*:/gi);
+  return !!keys && keys.length >= 2;
+}
 
 export function deriveSource(
   utmSource: string | null | undefined,
