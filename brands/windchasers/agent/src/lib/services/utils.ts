@@ -67,7 +67,16 @@ export function stripHTML(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'");
-  text = text.replace(/\s+/g, ' ').trim();
+  // Preserve newlines so multi-line WhatsApp messages (lead-in + bullets +
+  // paragraph breaks) render in the inbox EXACTLY as the customer received them.
+  // Previously `\s+ → ' '` collapsed every newline into a space, flattening
+  // formatted replies into one wall of text. Collapse only horizontal whitespace,
+  // tidy spaces around newlines, and cap blank-line runs at one.
+  text = text
+    .replace(/[ \t\f\v]+/g, ' ')   // runs of spaces/tabs → single space
+    .replace(/ *\n */g, '\n')       // strip spaces hugging a newline
+    .replace(/\n{3,}/g, '\n\n')     // at most one blank line between paragraphs
+    .trim();
   return text;
 }
 

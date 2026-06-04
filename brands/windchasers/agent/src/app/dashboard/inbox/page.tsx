@@ -804,6 +804,23 @@ export default function InboxPage() {
         console.error('Error fetching leads:', leadsError)
       }
 
+      // Anonymous web sessions: the visitor has no all_leads row, but the agent
+      // may have captured their NAME in chat (stored on web_sessions.customer_name).
+      // Pull those so the inbox shows "Vivan" instead of "Anonymous Web Visitor".
+      const anonSessionIds = Array.from(conversationMap.values())
+        .filter((c: any) => c.is_anonymous && c.session_id)
+        .map((c: any) => String(c.session_id))
+      const anonNameBySession: Record<string, string> = {}
+      if (anonSessionIds.length > 0) {
+        const { data: sessRows } = await supabase
+          .from('web_sessions')
+          .select('external_session_id, customer_name')
+          .in('external_session_id', anonSessionIds)
+        for (const s of (sessRows || []) as Array<{ external_session_id: string; customer_name: string | null }>) {
+          if (s.customer_name) anonNameBySession[s.external_session_id] = s.customer_name
+        }
+      }
+
       console.log('Leads data returned:', leadsData?.length || 0, 'leads')
 
       // Diagnostic: Check if messages exist for these specific leads
@@ -895,7 +912,8 @@ export default function InboxPage() {
         // Anonymous sessions show "Web visitor · <short session id>" so operators
         // can still distinguish multiple concurrent anonymous chats.
         const resolvedName = isAnonymous
-          ? `Web visitor · ${String(convData.session_id || '').slice(0, 8)}`
+          ? (anonNameBySession[String(convData.session_id || '')]
+             || `Web visitor · ${String(convData.session_id || '').slice(0, 8)}`)
           : (uc?.whatsapp?.profile?.full_name ||
              uc?.web?.profile?.full_name ||
              lead?.customer_name ||
@@ -2251,12 +2269,22 @@ export default function InboxPage() {
             // forever. The session id is in selectedConversation.lead_id
             // (the synthetic 'session:<sid>' key the conversation list uses).
             <div className="p-4 space-y-3">
-              <p className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                Anonymous web visitor
-              </p>
-              <p className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
-                This visitor hasn't shared a phone or email yet, so there's no lead record to display.
-              </p>
+              {(() => {
+                const nm = selectedConversation?.lead_name || ''
+                const hasName = !!nm && !nm.startsWith('Web visitor ·')
+                return (
+                  <>
+                    <p className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                      {hasName ? nm : 'Anonymous web visitor'}
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
+                      {hasName
+                        ? `${nm} shared their name in chat but hasn't given a phone or email yet, so there's no full lead record.`
+                        : "This visitor hasn't shared a phone or email yet, so there's no lead record to display."}
+                    </p>
+                  </>
+                )
+              })()}
               {selectedConversation?.lead_id?.startsWith('session:') && (
                 <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
                   Session: {selectedConversation.lead_id.slice('session:'.length)}

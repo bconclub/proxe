@@ -366,6 +366,33 @@ async function postProcess(
           console.error('[agent/web/chat/ai-intent] failed:', err);
         }
       })();
+    } else if (!leadId && externalSessionId && (messageCount % 2 === 0 || messageCount <= 2)) {
+      // ANONYMOUS web session (no phone/email yet → no all_leads row). The profile
+      // block above is gated on leadId and never runs here, so a name the visitor
+      // typed in chat ("I'm Vivan") was never persisted — the inbox then shows
+      // "Anonymous Web Visitor" even though we know their name. Capture just the
+      // NAME onto web_sessions.customer_name so the inbox can show it. Fire-and-forget.
+      (async () => {
+        try {
+          const history = [
+            ...agentInput.conversationHistory,
+            { role: 'user' as const, content: userMessage },
+            { role: 'assistant' as const, content: assistantResponse },
+          ];
+          const profile = await extractProfileFromConversation(history);
+          const fullName = profile?.full_name;
+          if (fullName && isLikelyRealPersonName(fullName)) {
+            await supabase
+              .from('web_sessions')
+              .update({ customer_name: fullName })
+              .eq('external_session_id', externalSessionId)
+              .is('customer_name', null); // don't overwrite a name we already captured
+            console.log(`[agent/web/chat] anon session ${externalSessionId} name captured: "${fullName}"`);
+          }
+        } catch (err) {
+          console.error('[agent/web/chat] anon name capture failed:', err);
+        }
+      })();
     }
 
     // 6. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
