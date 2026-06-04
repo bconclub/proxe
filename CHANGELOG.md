@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-04 04:02 IST · Windchasers: inbox metrics, form display + agent prompt behavior
+
+Inbox (`inbox/page.tsx`):
+- Contact-panel "Messages" stat now counts AGENT replies across web + whatsapp (relabeled "Agent Msgs"), instead of customer messages.
+- Response rate is now bounded 0–100%: share of customer messages that got an agent reply before the customer spoke again. The old agentMsgs ÷ customerMsgs formula ran over 100% (e.g. 143%) whenever the agent sent more bubbles than the customer.
+- Form Submission card parses Meta lead forms cleanly: splits simple labels (first name/phone/email/city) and apostrophe keys (child's …) that previously mashed into one value, stops truncating labels to 15 chars, and surfaces parent-relevant fields (concern, timeline, child's education) in the visible row.
+
+Dashboard (`founder-metrics/route.ts`):
+- At-a-Glance Response Rate uses the same bounded definition (was 108% → ~94% on live data). Daily trend point capped at 100%.
+
+Agent prompts (`windchasers-prompt.ts`, `windchasers-web-prompt.ts`):
+- Rule #3 extended: don't define/explain ground classes or theory subjects either — acknowledge briefly and ask what they want to know.
+- New commerce/arts/non-PCM handling: instead of "doesn't require a commerce background", surface the real Physics+Maths gate and the NIOS bridge (already in brand-facts).
+- WhatsApp first-message rules: form/ad leads (incl. the "chat on WhatsApp from the form" path) no longer get the academy info-dump — the agent greets by name, acknowledges parent/child or "just researching", reflects their concern, and asks one focused question.
+- User-facing: cleaner inbox, realistic response rates, and better first replies to ad/form leads.
+- (SHAs below)
+
 ## 2026-05-31 10:10 IST · Windchasers: At-a-Glance fixes + leads page 50-cap
 
 - `founder-metrics/route.ts` — Avg Lead Score now uses `Math.floor` instead of `Math.round`, so a 40.x average reads 40% (was rounding up to 41%).

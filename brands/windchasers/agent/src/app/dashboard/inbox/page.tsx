@@ -229,7 +229,12 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
-  const fieldPattern = /\b(\w+(?:_\w+)+\??)\s*:\s*/g;
+  // Meta lead forms arrive flattened as "<label>: <value> <label>: <value> …".
+  // Labels are either snake_case question keys (what_is_your_…?, which may contain
+  // an apostrophe such as child's) OR simple labels Meta appends (first name, phone,
+  // email, city). The old pattern only matched snake_case keys, so the simple labels
+  // mashed into the previous value and an apostrophe split one key into two.
+  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+\??)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -265,7 +270,15 @@ function getFormFieldLabel(key: string): string {
   if (k.includes('website')) return 'Website';
   if (k.includes('leads') || k.includes('handle')) return 'Volume';
   if (k.includes('ai system')) return 'AI Systems';
-  return key.length > 15 ? key.substring(0, 15) + '…' : key;
+  // Windchasers Meta lead-form questions
+  if (k.includes('concern')) return 'Concern';
+  if (k.includes('planning') || k.includes('start the flight') || k.includes('when are you')) return 'Timeline';
+  if (k.includes('education')) return 'Education';
+  if (k.includes('child')) return 'Child';
+  if (k.includes('name')) return 'Name';
+  // Fallback: show the full label (don't hard-truncate to 15 chars — that's what
+  // produced unreadable "WHAT IS YOUR PR…" labels). Cap generously instead.
+  return key.length > 48 ? key.substring(0, 48) + '…' : key;
 }
 
 /** Format a time gap in ms to a human-readable short string */
@@ -1784,9 +1797,11 @@ export default function InboxPage() {
                     // Render as compact form data card
                     const priorityFields = formData.fields.filter(f => {
                       const k = f.key.toLowerCase();
-                      return k.includes('brand') || k.includes('full name') || k.includes('email') ||
+                      return k.includes('brand') || k.includes('name') || k.includes('email') ||
                              k.includes('phone') || k.includes('city') || k.includes('how fast') ||
-                             k.includes('business type');
+                             k.includes('business type') ||
+                             k.includes('concern') || k.includes('planning') || k.includes('when are you') ||
+                             k.includes('education') || k.includes('child');
                     });
                     const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
 
@@ -2318,7 +2333,26 @@ export default function InboxPage() {
               : null
             const agentMsgs = messages.filter(m => m.sender === 'agent').length
             const customerMsgs = messages.filter(m => m.sender === 'customer').length
-            const responseRate = customerMsgs > 0 ? Math.round((agentMsgs / customerMsgs) * 100) : null
+            // Response rate = share of customer messages that got an agent reply
+            // before the customer spoke again (bounded 0–100%). The old formula was
+            // agentMsgs / customerMsgs, which runs over 100% whenever the agent sends
+            // more bubbles than the customer (greetings, follow-ups, split replies) —
+            // a message ratio, not a real "rate".
+            const responseRate = (() => {
+              if (customerMsgs === 0) return null
+              const ordered = [...messages].sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              )
+              let replied = 0
+              for (let i = 0; i < ordered.length; i++) {
+                if (ordered[i].sender !== 'customer') continue
+                for (let j = i + 1; j < ordered.length; j++) {
+                  if (ordered[j].sender === 'customer') break
+                  if (ordered[j].sender === 'agent') { replied++; break }
+                }
+              }
+              return Math.round((replied / customerMsgs) * 100)
+            })()
 
             const profileRows: { label: string; value: string }[] = []
             if (userType) profileRows.push({ label: 'Type', value: String(userType) })
@@ -2510,9 +2544,11 @@ export default function InboxPage() {
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
-                    {/* Only count customer-sent messages, not agent/PROXe replies */}
-                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{customerMsgs}</p>
-                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Messages</p>
+                    {/* Count agent (PROXe) replies across ALL channels — web chat + whatsapp.
+                        `agentMsgs` is derived from the full `messages` thread (both channels),
+                        so every web-chat and whatsapp agent reply is included. */}
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{agentMsgs}</p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Agent Msgs</p>
                   </div>
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
                     <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
