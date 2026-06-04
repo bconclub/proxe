@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 08:30 IST · Windchasers: Meta-form source label wording → "Meta Forms" / "WA Click Through"
+
+- `attribution.ts`, `LeadsTable.tsx` — Source pill copy: top "Meta Forms", bottom "WA Click Through" (was "Meta Form" / "WhatsApp Click-through"). Updated the 9 backfilled leads' stored labels to match.
+- (6e32b61d)
+
 ## 2026-06-04 08:25 IST · Windchasers: booking persistence fix + Meta-form source labels
 
 Booking persistence (`bookingManager.ts`, `windchasers-prompt.ts`):

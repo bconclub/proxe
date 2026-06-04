@@ -24,7 +24,7 @@ const SOURCE_LABELS: Record<string, string> = {
   fb_ads: 'Facebook Ads',
   meta: 'Meta',
   meta_ads: 'Meta Ads',
-  meta_forms_clickthrough: 'Meta Form',
+  meta_forms_clickthrough: 'Meta Forms',
   google: 'Google',
   google_ads: 'Google Ads',
   googleads: 'Google Ads',
@@ -105,11 +105,11 @@ const MARKETING_CHANNELS = new Set([
 ]);
 
 export const META_FORM_CLICKTHROUGH_SOURCE = 'meta_forms_clickthrough';
-export const META_FORM_CLICKTHROUGH_LABEL = 'Meta Form';
+export const META_FORM_CLICKTHROUGH_LABEL = 'Meta Forms';
 // First-touch (the SOURCE sub-line): these leads clicked through from a Meta
-// lead form into WhatsApp, so the sub-line reads "WhatsApp Click-through".
+// lead form into WhatsApp, so the sub-line reads "WA Click Through".
 export const META_FORM_CLICKTHROUGH_FIRST_TOUCH = 'whatsapp_clickthrough';
-export const META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL = 'WhatsApp Click-through';
+export const META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL = 'WA Click Through';
 
 /**
  * Detects a Meta lead-form "Chat on WhatsApp" click-through. Such leads arrive
