@@ -332,14 +332,33 @@ export async function storeBooking(
   // Resolve lead_id from session data, or from profile update, or by looking up the session.
   let leadId = sessionData?.lead_id || currentLeadId;
 
-  // If we don't have a lead_id yet (session update failed), look it up directly
-  if (!leadId) {
+  // If we don't have a lead_id yet, look it up by session.
+  // NOTE: whatsapp_sessions has NO external_session_id column (it's keyed by
+  // id / customer_phone_normalized), so this lookup silently fails for WhatsApp.
+  // Guarded to web_sessions where the column actually exists.
+  if (!leadId && tableName === 'web_sessions') {
     const { data: sessionLookup } = await client
       .from(tableName)
       .select('lead_id')
       .eq('external_session_id', externalSessionId)
       .maybeSingle();
     leadId = sessionLookup?.lead_id || null;
+  }
+
+  // Phone fallback — the reliable resolver for WhatsApp (phone is always known)
+  // and a safety net for any channel where the session lookup didn't resolve a
+  // lead. Without this the booking is silently dropped: leadId stays null, the
+  // all_leads update below is skipped, and nothing is ever saved.
+  if (!leadId && booking.phone) {
+    const normalizedPhone = (booking.phone || '').replace(/\D/g, '').slice(-10);
+    if (normalizedPhone) {
+      const { data: leadByPhone } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .maybeSingle();
+      leadId = leadByPhone?.id || null;
+    }
   }
 
   if (leadId) {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 08:45 IST · Windchasers: booking persistence — resolve lead by phone (WhatsApp fix)
+
+- `bookingManager.ts` — Root cause of WhatsApp bookings never saving: `whatsapp_sessions` has NO `external_session_id` column (keyed by id / customer_phone_normalized), but storeBooking resolved the lead by `external_session_id`. That lookup silently failed for WhatsApp → leadId stayed null → the all_leads update was skipped entirely → booking dropped, while every error was swallowed so the agent still said "recorded". Now: the session lookup is guarded to web_sessions (where the column exists), and a PHONE fallback resolves the lead via all_leads.customer_phone_normalized (reliable on WhatsApp, safety net everywhere). Bookings now persist to unified_context → show in Key Events / UPCOMING.
+- (6da69f25)
+
 ## 2026-06-04 08:30 IST · Windchasers: Meta-form source label wording → "Meta Forms" / "WA Click Through"
 
 - `attribution.ts`, `LeadsTable.tsx` — Source pill copy: top "Meta Forms", bottom "WA Click Through" (was "Meta Form" / "WhatsApp Click-through"). Updated the 9 backfilled leads' stored labels to match.
