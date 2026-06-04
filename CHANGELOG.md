@@ -18,7 +18,7 @@ Attribution (`attribution.ts`, `LeadsTable.tsx`, `whatsapp/meta/route.ts`):
 - New 'meta_forms_clickthrough' source ("Meta Forms Click-through"). Meta lead-form "Chat on WhatsApp" leads are detected from the form-prefill first message and tagged with this source instead of "Direct".
 
 - Note: anonymous-name capture and the newline fix apply to NEW messages/sessions; already-stored data isn't retroactively fixed.
-- (SHAs below)
+- (agent `e3564b88`, inbox `1da7a09c`, staging `732d430d`, attribution `14771a92`)
 
 ## 2026-06-04 05:06 IST · Windchasers: fix empty pipeline + rebuild stage logic
 
