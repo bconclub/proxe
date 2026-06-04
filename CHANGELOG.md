@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 10:10 IST · Windchasers: distinguish Google Organic vs Google Ads in attribution
+
+- `attribution.ts`, `LeadsTable.tsx` — Plain `google` source (a google.com referrer with no gclid/UTM) now labels "Google Organic" instead of "Google"; paid clicks (google_ads/googleads from gclid/utm_medium=cpc) stay "Google Ads". Backfilled the existing google lead's stored source_label to "Google Organic" so the attribution panel reflects it.
+- (f58ef284)
+
 ## 2026-06-04 10:00 IST · Windchasers: stamp Parent vs Student lead-type from Meta form fields
 
 - `whatsapp/meta/route.ts` — Meta form leads are now typed Parent vs Student from the form FIELDS (the form name itself isn't in the message). Parent forms ask about "your child"; student forms ask the person's own age / 12th completion. Stored as unified_context.windchasers.user_type, which the Type column + Today's-snapshot breakdown read. Backfilled existing form leads (12 Student; parent leads already typed).

@@ -25,7 +25,10 @@ const SOURCE_LABELS: Record<string, string> = {
   meta: 'Meta',
   meta_ads: 'Meta Ads',
   meta_forms_clickthrough: 'Meta Forms',
-  google: 'Google',
+  // Plain 'google' = organic (came via a google.com referrer with no gclid/UTM).
+  // Paid clicks resolve to google_ads (gclid/utm_medium=cpc), kept separate.
+  google: 'Google Organic',
+  google_organic: 'Google Organic',
   google_ads: 'Google Ads',
   googleads: 'Google Ads',
   youtube: 'YouTube',
@@ -93,7 +96,7 @@ const MARKETING_CHANNELS = new Set([
   'ig', 'instagram',
   'fb', 'facebook', 'facebook_ads', 'fb_ads',
   'meta', 'meta_ads', 'meta_forms_clickthrough',
-  'google', 'google_ads', 'googleads',
+  'google', 'google_ads', 'googleads', 'google_organic',
   'bing', 'bing_ads',
   'youtube', 'yt',
   'linkedin', 'linkedin_ads',

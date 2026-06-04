@@ -863,7 +863,8 @@ export default function LeadsTable({
 
                 // Friendly label + color per known utm_source / channel.
                 const utmSourceConfig: Record<string, { label: string; color: string }> = {
-                  google: { label: 'Google', color: '#EA4335' },
+                  google: { label: 'Google Organic', color: '#EA4335' },
+                  google_organic: { label: 'Google Organic', color: '#EA4335' },
                   google_ads: { label: 'Google Ads', color: '#EA4335' },
                   googleads: { label: 'Google Ads', color: '#EA4335' },
                   bing: { label: 'Bing', color: '#008373' },
