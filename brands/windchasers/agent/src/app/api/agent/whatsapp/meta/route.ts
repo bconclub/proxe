@@ -452,6 +452,10 @@ async function sendAndLogReply(
     quickReplyTrigger?: string;
   } = {},
 ): Promise<string | null> {
+  // Belt-and-suspenders: strip em/en dashes from EVERY outbound message, even
+  // hardcoded / quick-reply ones that bypass the engine's cleanResponse. The
+  // customer must never see an em dash.
+  message = message.replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').trim();
   let waReplyId: string | null = null;
 
   if (opts.buttons && opts.buttons.length > 0) {
@@ -754,8 +758,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       const firstName = (ff.full_name || ff.name || customerName || 'there').split(' ')[0];
       const isParent = Object.keys(ff).some((k) => k.includes('child'));
       const body = isParent
-        ? `Hi ${firstName}! Great that you're exploring pilot training for your child. To point you the right way — what would you like to understand first?`
-        : `Hi ${firstName}! Great that you're looking into pilot training. To point you the right way — what would you like to sort out first?`;
+        ? `Hi ${firstName}! Great that you're exploring pilot training for your child. To point you the right way, what would you like to understand first?`
+        : `Hi ${firstName}! Great that you're looking into pilot training. To point you the right way, what would you like to sort out first?`;
       console.log(`[meta/webhook] FORM-LEAD deterministic first-response lead=${leadId} parent=${isParent}`);
       await sendAndLogReply(supabase, leadId, customerPhone, body, {
         sessionId,

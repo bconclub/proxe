@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 10:20 IST · Windchasers: no em dashes in any WhatsApp message
+
+- `whatsapp/meta/route.ts` — cleanResponse already strips em/en dashes from LLM replies, but hardcoded/quick-reply messages (e.g. the form-lead opener) bypass it. Added the same strip to sendAndLogReply so EVERY outbound WhatsApp message is dash-free, and reworded the form-lead opener to drop its em dash.
+- (dd62ca53)
+
 ## 2026-06-04 10:10 IST · Windchasers: distinguish Google Organic vs Google Ads in attribution
 
 - `attribution.ts`, `LeadsTable.tsx` — Plain `google` source (a google.com referrer with no gclid/UTM) now labels "Google Organic" instead of "Google"; paid clicks (google_ads/googleads from gclid/utm_medium=cpc) stay "Google Ads". Backfilled the existing google lead's stored source_label to "Google Organic" so the attribution panel reflects it.
