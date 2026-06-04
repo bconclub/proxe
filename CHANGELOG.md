@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 10:00 IST · Windchasers: stamp Parent vs Student lead-type from Meta form fields
+
+- `whatsapp/meta/route.ts` — Meta form leads are now typed Parent vs Student from the form FIELDS (the form name itself isn't in the message). Parent forms ask about "your child"; student forms ask the person's own age / 12th completion. Stored as unified_context.windchasers.user_type, which the Type column + Today's-snapshot breakdown read. Backfilled existing form leads (12 Student; parent leads already typed).
+- (5f2dffba)
+
 ## 2026-06-04 09:50 IST · Windchasers: leads table — sticky header, no active-time bump on edit, came-in date
 
 - `LeadsTable.tsx` — (1) The sticky table header rode away on scroll because the scroll container was a flex child without `min-h-0`, so the page scrolled instead of the container. Added `min-h-0` so it scrolls internally and the header stays put. (2) Added the lead's came-in date under the name in the LEAD column.

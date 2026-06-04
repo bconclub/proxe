@@ -563,8 +563,15 @@ async function tagMetaFormClickThrough(leadId: string, messageText: string, supa
     const formTimeline = f.when_are_you_looking_to_start || f.when_are_you_planning_to_start_the_flight_training || null;
     const formEducation = f.have_you_completed_class_12_with_physics_and_maths || null;
 
+    // Differentiate PARENT vs STUDENT form from the field set (the Meta form
+    // name itself isn't in the message). Parent forms ask about "your child";
+    // student forms ask the person's own age / 12th completion.
+    const isParentForm = Object.keys(f).some((k) => k.includes('child'));
+    const isStudentForm = !isParentForm && !!(f.what_is_your_age || formEducation || f.when_are_you_looking_to_start);
+    const userType = isParentForm ? 'Parent' : isStudentForm ? 'Student' : null;
+
     // Merge form fields into the brand profile (this is what the leads table /
-    // lead modal read for city/age/etc.) + keep the raw fields for reference.
+    // lead modal read for city/age/type/etc.) + keep the raw fields for reference.
     uc.raw_form_fields = { ...(uc.raw_form_fields || {}), ...f };
     uc[BRAND_ID] = {
       ...(uc[BRAND_ID] || {}),
@@ -572,6 +579,7 @@ async function tagMetaFormClickThrough(leadId: string, messageText: string, supa
       ...(formAge ? { age: formAge } : {}),
       ...(formTimeline ? { timeline: formTimeline } : {}),
       ...(formEducation ? { completed_12_pcm: formEducation } : {}),
+      ...(userType ? { user_type: userType } : {}),
     };
 
     const update: Record<string, any> = { unified_context: uc };
