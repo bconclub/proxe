@@ -1125,8 +1125,33 @@ export async function GET(request: NextRequest) {
     // Note: This is NOT the same as "customer response rate" (how often customers reply).
     const customerMessages = messages?.filter(m => m.sender === 'customer').length || 0
     const agentReplies = messages?.filter(m => m.sender === 'agent').length || 0
+    // Response rate = share of customer messages that received an agent reply
+    // in the same conversation before the customer spoke again (bounded 0–100%).
+    // The old formula (agentReplies / customerMessages) exceeded 100% whenever the
+    // agent sent more bubbles than the customer (greetings, follow-ups, split
+    // replies) — that's a message ratio, not a real response rate.
+    // `messages` is already ordered by created_at asc (see query above), so each
+    // conversation group stays chronological. Anonymous web rows (lead_id = null)
+    // are grouped by their session_id from metadata.
+    const convoKeyOf = (m: any) => m.lead_id || m.metadata?.session_id || 'unknown'
+    const messagesByConvo: Record<string, any[]> = {}
+    for (const m of (messages || [])) {
+      const k = convoKeyOf(m)
+      ;(messagesByConvo[k] = messagesByConvo[k] || []).push(m)
+    }
+    let repliedCustomerMessages = 0
+    for (const k of Object.keys(messagesByConvo)) {
+      const ordered = messagesByConvo[k]
+      for (let i = 0; i < ordered.length; i++) {
+        if (ordered[i].sender !== 'customer') continue
+        for (let j = i + 1; j < ordered.length; j++) {
+          if (ordered[j].sender === 'customer') break
+          if (ordered[j].sender === 'agent') { repliedCustomerMessages++; break }
+        }
+      }
+    }
     const responseRate = customerMessages > 0
-      ? Math.round((agentReplies / customerMessages) * 100)
+      ? Math.round((repliedCustomerMessages / customerMessages) * 100)
       : 0
     
     // ----------------------------------------------------------------------------
@@ -1289,8 +1314,10 @@ export async function GET(request: NextRequest) {
       }) || []
       const customerMessages = dailyMessages.filter((m: any) => m.sender === 'customer')
       const agentReplies = dailyMessages.filter((m: any) => m.sender === 'agent')
+      // Daily trend point for the Response Rate sparkline. Bounded to 100% so the
+      // trend line matches the headline metric (which can no longer exceed 100%).
       const dailyResponseRate = customerMessages.length > 0
-        ? (agentReplies.length / customerMessages.length) * 100
+        ? Math.min(100, (agentReplies.length / customerMessages.length) * 100)
         : 0
 
       // Daily booking rate
