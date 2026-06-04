@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 10:35 IST · Windchasers: Meta-form card — normal width + Parent/Student tag
+
+- `inbox/page.tsx` — Dropped the full-width stretch (max-w-78%, sizes to content) and added the form type (Parent/Student) chip next to the "Meta Form" badge, derived from the fields (child question → Parent). The literal Meta form name isn't in the message, so the type is the practical "which form" indicator.
+- (0c16f877)
+
 ## 2026-06-04 10:30 IST · Windchasers: redesign the inbox Meta-form card
 
 - `inbox/page.tsx` — Form Submission card redesigned: blue Meta tint + "Meta Form" badge (so it reads as "from Meta" like agent bubbles read green), fields in a clean vertical order (Name, Email, Phone, City, Timeline) with the rest under "+N more fields". Parser fix: `what_is_your_age?_:` (question mark + stray underscore before the colon) now splits into its own Age field instead of mashing into Timeline.

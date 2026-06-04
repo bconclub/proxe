@@ -1824,6 +1824,8 @@ export default function InboxPage() {
                     const seen = new Set<typeof withLabels[number]>()
                     const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)))
                     const otherOrdered = withLabels.filter(f => !seen.has(f))
+                    // Which form: parent forms ask about "your child"; otherwise student.
+                    const formKind = formData.fields.some(f => f.key.toLowerCase().includes('child')) ? 'Parent' : 'Student'
                     const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
                       <div className="flex items-baseline gap-2">
                         <span className="text-[9px] font-semibold uppercase tracking-wide w-[68px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
@@ -1836,7 +1838,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[92%] w-full rounded-xl px-3.5 py-2.5 border"
+                          className="max-w-[78%] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
@@ -1848,6 +1850,9 @@ export default function InboxPage() {
                               </span>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
                                 Meta Form
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(59,130,246,0.1)', color: '#93b4f5' }}>
+                                {formKind}
                               </span>
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
