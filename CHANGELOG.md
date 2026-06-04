@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 10:30 IST · Windchasers: redesign the inbox Meta-form card
+
+- `inbox/page.tsx` — Form Submission card redesigned: blue Meta tint + "Meta Form" badge (so it reads as "from Meta" like agent bubbles read green), fields in a clean vertical order (Name, Email, Phone, City, Timeline) with the rest under "+N more fields". Parser fix: `what_is_your_age?_:` (question mark + stray underscore before the colon) now splits into its own Age field instead of mashing into Timeline.
+- (86978394)
+
 ## 2026-06-04 10:20 IST · Windchasers: no em dashes in any WhatsApp message
 
 - `whatsapp/meta/route.ts` — cleanResponse already strips em/en dashes from LLM replies, but hardcoded/quick-reply messages (e.g. the form-lead opener) bypass it. Added the same strip to sendAndLogReply so EVERY outbound WhatsApp message is dash-free, and reworded the form-lead opener to drop its em dash.

@@ -234,7 +234,10 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
   // an apostrophe such as child's) OR simple labels Meta appends (first name, phone,
   // email, city). The old pattern only matched snake_case keys, so the simple labels
   // mashed into the previous value and an apostrophe split one key into two.
-  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+\??)\s*:\s*/gi;
+  // Trailing [?_]* handles Meta's "what_is_your_age?_:" shape (question mark AND
+  // a stray underscore before the colon) — otherwise that field mashed into the
+  // previous value.
+  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+[?_]*)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -247,7 +250,7 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
     const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
     const value = content.substring(valueStart, valueEnd).trim();
     const cleanKey = rawKey
-      .replace(/\?$/, '')
+      .replace(/[?_]+$/, '')
       .replace(/_/g, ' ')
       .split(' ')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
@@ -272,7 +275,9 @@ function getFormFieldLabel(key: string): string {
   if (k.includes('ai system')) return 'AI Systems';
   // Windchasers Meta lead-form questions
   if (k.includes('concern')) return 'Concern';
-  if (k.includes('planning') || k.includes('start the flight') || k.includes('when are you')) return 'Timeline';
+  if (k.includes('timeline') || k.includes('planning') || k.includes('start the flight') ||
+      k.includes('when are you') || k.includes('looking to start')) return 'Timeline';
+  if (k.includes('age')) return 'Age';
   if (k.includes('education')) return 'Education';
   if (k.includes('child')) return 'Child';
   if (k.includes('name')) return 'Name';
@@ -1812,59 +1817,50 @@ export default function InboxPage() {
                   ) : null;
 
                   if (formData) {
-                    // Render as compact form data card
-                    const priorityFields = formData.fields.filter(f => {
-                      const k = f.key.toLowerCase();
-                      return k.includes('brand') || k.includes('name') || k.includes('email') ||
-                             k.includes('phone') || k.includes('city') || k.includes('how fast') ||
-                             k.includes('business type') ||
-                             k.includes('concern') || k.includes('planning') || k.includes('when are you') ||
-                             k.includes('education') || k.includes('child');
-                    });
-                    const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
-
-                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+                    // Meta-form card — clean, ordered, blue-tinted (so it reads as
+                    // "came from Meta" the way agent bubbles read green).
+                    const withLabels = formData.fields.map(f => ({ value: f.value, label: getFormFieldLabel(f.key) }))
+                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Timeline']
+                    const seen = new Set<typeof withLabels[number]>()
+                    const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)))
+                    const otherOrdered = withLabels.filter(f => !seen.has(f))
+                    const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide w-[68px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span className="text-[12px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                      </div>
+                    )
 
                     return (
                       <React.Fragment key={msg.id}>
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[90%] rounded-lg px-3 py-2 border"
-                          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                          className="max-w-[92%] w-full rounded-xl px-3.5 py-2.5 border"
+                          style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
                               <ChannelIcon channel={msg.channel} size={10} active={true} />
                               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                                 {selectedConversation?.lead_name || 'Customer'}
                               </span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                                Form Submission
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
+                                Meta Form
                               </span>
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Compact fields grid */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1">
-                            {priorityFields.map((f, i) => (
-                              <div key={i} className="flex items-baseline gap-1">
-                                <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                              </div>
-                            ))}
+                          {/* Ordered fields — one per row */}
+                          <div className="space-y-1">
+                            {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
-                          {otherFields.length > 0 && (
-                            <details className="mt-1">
-                              <summary className="text-[9px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>+{otherFields.length} more fields</summary>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                                {otherFields.map((f, i) => (
-                                  <div key={i} className="flex items-baseline gap-1">
-                                    <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                                  </div>
-                                ))}
+                          {otherOrdered.length > 0 && (
+                            <details className="mt-1.5">
+                              <summary className="text-[10px] cursor-pointer" style={{ color: '#60a5fa' }}>+{otherOrdered.length} more fields</summary>
+                              <div className="space-y-1 mt-1.5">
+                                {otherOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                               </div>
                             </details>
                           )}
