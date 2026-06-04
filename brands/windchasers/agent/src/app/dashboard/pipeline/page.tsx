@@ -31,14 +31,18 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { id: 'new',           dbValues: ['New', ''],          label: 'New',           bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
+  // Auto stages (set by AI scoring): New → Engaged → Qualified → Key Events (booking).
+  // 'High Intent' is a LEGACY auto stage we no longer produce — fold it into Qualified
+  // so existing leads still show until they're re-scored. 'In Sequence' → New.
+  { id: 'new',           dbValues: ['New', '', 'In Sequence'], label: 'New',     bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
   { id: 'engaged',       dbValues: ['Engaged'],          label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
-  { id: 'qualified',     dbValues: ['Qualified'],        label: 'Qualified',     bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
+  { id: 'qualified',     dbValues: ['Qualified', 'High Intent'], label: 'Qualified', bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
   { id: 'key_events',    dbValues: ['Booking Made'],     label: 'Key Events',    bg: '#534AB7', text: '#EEEDFE', sub: '#b0ace0' },
-  { id: 'call_done',     dbValues: ['High Intent'],      label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
+  // Manual-only stages (set by the team — never auto): Call Done, Proposal Sent, Won, Lost.
+  { id: 'call_done',     dbValues: ['Call Done'],        label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
   { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
-  { id: 'won',           dbValues: ['Converted'],        label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
-  { id: 'lost',          dbValues: ['Cold', 'Closed Lost'], label: 'Lost',       bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
+  { id: 'won',           dbValues: ['Converted', 'Won'], label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
+  { id: 'lost',          dbValues: ['Cold', 'Closed Lost', 'Lost', 'Not Qualified'], label: 'Lost', bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
 ]
 
 function mapLeadToStageId(lead: Lead): string {

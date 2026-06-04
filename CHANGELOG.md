@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-04 05:06 IST · Windchasers: fix empty pipeline + rebuild stage logic
+
+- `api/dashboard/leads/route.ts` — FIX: the pipeline showed 0 leads in every column despite 95 staged leads. The default newsletter-exclusion used a PostgREST `.not('…form_type','eq','newsletter')` filter, which generates `form_type <> 'newsletter'` → NULL (excluded) for every lead whose nested form_type is NULL (i.e. all 95). Replaced with a NULL-safe JS `!== 'newsletter'` post-filter. Pipeline now populates.
+- `api/leads/score/route.ts` — Rebuilt auto-staging to a HYBRID (score AND replies) model. Auto only ever sets the behaviour-detectable stages: Booking → 'Booking Made' (Key Events); 3+ customer replies AND score ≥ 50 → 'Qualified'; 1+ reply → 'Engaged'; else 'New'. Removed the old 'High Intent' (score ≥61) and 'Booking Made @ score≥86' auto-assignments. Post-call stages (Call Done, Proposal Sent, Won/Converted, Lost) are now MANUAL-only — already protected by the is_manual_override skip at the top of the handler.
+- `dashboard/pipeline/page.tsx` — Column mapping realigned to the new model: 'Call Done' maps to a real manual 'Call Done' value (was wrongly mapped to 'High Intent'); legacy 'High Intent' folds into the Qualified column; 'In Sequence' → New.
+- User-facing: the Pipeline page works again and stages mean what they say (a high score no longer masquerades as a completed call).
+- Note: thresholds (3 replies / score 50) are intentionally simple and tunable. Existing 'High Intent' leads display under Qualified and re-stage on their next message.
+- (SHA below)
+
 ## 2026-06-04 04:02 IST · Windchasers: inbox metrics, form display + agent prompt behavior
 
 Inbox (`inbox/page.tsx`):

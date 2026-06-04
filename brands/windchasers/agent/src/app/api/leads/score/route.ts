@@ -232,36 +232,27 @@ Respond with ONLY a JSON object in this exact format:
       aiScore = Math.min(100, score)
     }
 
-    // Auto-assign stage based on score
-    let newStage = lead.lead_stage || 'new'
-    
-    // Override: If booking exists, force Booking Made stage
+    // Auto-assign stage — HYBRID (score AND replies).
+    // Auto-staging only ever sets the EARLY, behaviour-detectable stages:
+    //   New → Engaged → Qualified, plus Key Events (Booking Made) when a call is booked.
+    // The post-call stages (Call Done, Proposal Sent, Won/Converted, Lost) are real-world
+    // facts only a human knows — they are MANUAL-only and never set here. Leads in those
+    // stages carry is_manual_override and are skipped at the top of this handler, so we
+    // can never clobber them.
+    //   - Booking exists      → 'Booking Made'  (Key Events — the one event we can detect)
+    //   - 3+ replies AND score ≥ 50 → 'Qualified' (real, sustained interest — both required)
+    //   - 1+ reply            → 'Engaged'        (lead has started replying)
+    //   - otherwise           → 'New'           (form-only / in-sequence / no reply yet)
+    // Thresholds (3 replies, score 50) are intentionally simple — tune as we learn.
+    let newStage: string
     if (hasBooking) {
       newStage = 'Booking Made'
-    } else if (aiScore >= 86) {
-      newStage = 'Booking Made'
-    } else if (aiScore >= 61) {
-      newStage = 'High Intent'
-    } else if (aiScore >= 31) {
+    } else if (responseCount >= 3 && aiScore >= 50) {
       newStage = 'Qualified'
-    } else if (aiScore > 0 || conversationMessages.length > 0) {
-      // First message scoring - don't default to "New"
-      if (conversationMessages.length === 1) {
-        // First message: check for strong intent
-        const firstMessage = conversationMessages[0].content.toLowerCase()
-        const strongIntent = ['book', 'booking', 'schedule', 'interested', 'pricing', 'price'].some(keyword => 
-          firstMessage.includes(keyword)
-        )
-        if (strongIntent && hasBooking) {
-          newStage = 'Booking Made'
-        } else if (strongIntent || aiScore >= 31) {
-          newStage = 'Qualified'
-        } else {
-          newStage = 'New'
-        }
-      } else {
-        newStage = 'New'
-      }
+    } else if (responseCount >= 1) {
+      newStage = 'Engaged'
+    } else {
+      newStage = 'New'
     }
 
     // Get old stage for logging
