@@ -15,7 +15,7 @@ Agent prompts (`windchasers-prompt.ts`, `windchasers-web-prompt.ts`):
 - New commerce/arts/non-PCM handling: instead of "doesn't require a commerce background", surface the real Physics+Maths gate and the NIOS bridge (already in brand-facts).
 - WhatsApp first-message rules: form/ad leads (incl. the "chat on WhatsApp from the form" path) no longer get the academy info-dump — the agent greets by name, acknowledges parent/child or "just researching", reflects their concern, and asks one focused question.
 - User-facing: cleaner inbox, realistic response rates, and better first replies to ad/form leads.
-- (SHAs below)
+- (inbox `247ca036`, dashboard `90099574`, prompts `381e70a4`)
 
 ## 2026-05-31 10:10 IST · Windchasers: At-a-Glance fixes + leads page 50-cap
 
