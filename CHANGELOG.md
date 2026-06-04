@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 12:00 IST · Windchasers: WhatsApp booking no longer blocks on email
+
+- Found while verifying bookings: several flows (Ozzy, and the Thanzeel test) reached the slot-selection step then stalled at the agent's "drop your email to lock it in" ask — the tester never sent an email, so book_consultation never fired and nothing booked. Not a persistence bug; the agent was gating the lock on an email.
+- On WhatsApp the phone is ALWAYS known and book_consultation only needs phone OR email, so the email gate was pure prompt behavior costing completed bookings. Per founder direction (form leads usually already carry the email; phone is guaranteed on WhatsApp), the agent now locks the slot on time-selection using the known phone, uses name/email from the form when present, and asks for a missing email only AFTER booking as an optional add-on.
+- `windchasers-prompt.ts` — Step 3 + the booking hard-rule rewritten: never block the booking waiting for an email; lock first, ask email after.
+
 ## 2026-06-04 11:50 IST · Windchasers: snapshot "Demos booked" was missing WhatsApp/voice bookings
 
 - Symptom: the Today snapshot showed Demos booked = 2 when 6 were booked today. The count only inspected `unified_context.web.booking` — the legacy web-only object shape — so every WhatsApp and voice booking was invisible. storeBooking persists bookings as `unified_context.<channel>.booking_date` (scalar) under web/whatsapp/voice; WhatsApp/voice never get the `web.booking` object the snapshot was reading.
