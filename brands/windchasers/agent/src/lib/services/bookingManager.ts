@@ -377,19 +377,28 @@ export async function storeBooking(
       },
     };
 
-    await client
+    // all_leads has NO scalar booking_date/booking_time columns — the booking
+    // lives in unified_context.<channel>.booking_date (set in mergedCtx above),
+    // which is exactly what the dashboard/pipeline/score routes read. Previously
+    // this update also set booking_date/booking_time, and because those columns
+    // don't exist Supabase rejected the ENTIRE update — so unified_context never
+    // got written and the booking silently vanished (agent said "Done", nothing
+    // saved). The error wasn't even checked. Persist via unified_context only.
+    const { error: leadUpdateError } = await client
       .from('all_leads')
       .update({
         unified_context: mergedCtx,
-        booking_date: booking.date,
-        booking_time: booking.time,
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
         metadata: { ...existingLeadMeta, ...mergedMetadata },
       })
       .eq('id', leadId);
 
-    console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
+    if (leadUpdateError) {
+      console.error('[bookingManager] Failed to persist booking to all_leads', { leadId, error: leadUpdateError });
+    } else {
+      console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
+    }
   } else {
     console.error('[bookingManager] Could not find lead_id to save booking - data may be lost', { externalSessionId, channel });
   }
