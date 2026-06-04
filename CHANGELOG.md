@@ -7,7 +7,7 @@
 - `dashboard/pipeline/page.tsx` — Column mapping realigned to the new model: 'Call Done' maps to a real manual 'Call Done' value (was wrongly mapped to 'High Intent'); legacy 'High Intent' folds into the Qualified column; 'In Sequence' → New.
 - User-facing: the Pipeline page works again and stages mean what they say (a high score no longer masquerades as a completed call).
 - Note: thresholds (3 replies / score 50) are intentionally simple and tunable. Existing 'High Intent' leads display under Qualified and re-stage on their next message.
-- (SHA below)
+- (3ce2bae2)
 
 ## 2026-06-04 04:02 IST · Windchasers: inbox metrics, form display + agent prompt behavior
 
