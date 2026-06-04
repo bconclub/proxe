@@ -734,6 +734,29 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const isCustomerButtonTap = triggerKind === 'button'
       || triggerKind === 'interactive_button'
       || triggerKind === 'interactive_list';
+
+    // 7-pre. FORM / AD LEAD FIRST RESPONSE — DETERMINISTIC, never the LLM.
+    // These leads came from a pilot-training ad, so we must NOT describe the
+    // academy or list programs (helicopter / cabin crew / type rating). The LLM
+    // kept doing exactly that despite prompt rules, so we hard-intercept the
+    // first reply: greet by name and PROBE with tappable buttons. Fires only on
+    // the first inbound (the form prefill), which is detected reliably.
+    if (!isCustomerButtonTap && userMessageCount <= 1 && isMetaFormClickThrough(messageText)) {
+      const ff = parseFormPrefill(messageText);
+      const firstName = (ff.full_name || ff.name || customerName || 'there').split(' ')[0];
+      const isParent = Object.keys(ff).some((k) => k.includes('child'));
+      const body = isParent
+        ? `Hi ${firstName}! Great that you're exploring pilot training for your child. To point you the right way — what would you like to understand first?`
+        : `Hi ${firstName}! Great that you're looking into pilot training. To point you the right way — what would you like to sort out first?`;
+      console.log(`[meta/webhook] FORM-LEAD deterministic first-response lead=${leadId} parent=${isParent}`);
+      await sendAndLogReply(supabase, leadId, customerPhone, body, {
+        sessionId,
+        buttons: ['How to start', 'Timeline', 'Cost'],
+        quickReplyTrigger: 'form_lead_welcome',
+      });
+      return;
+    }
+
     if (!isCustomerButtonTap) {
       const quickReply = findQuickReplyFor(messageText);
       if (quickReply) {

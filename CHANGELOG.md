@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 09:40 IST · Windchasers: form/ad leads get a DETERMINISTIC probing first reply (no academy dump)
+
+- `whatsapp/meta/route.ts` — Despite the prompt rule, the LLM kept answering a form lead's first message with the academy description + full program list ("airline pilot training, helicopter, cabin crew, type rating…") because the form mentions pilot training. Prompt instructions are probabilistic, so this couldn't be guaranteed. Now the first reply to a form/ad lead is HARD-INTERCEPTED before the LLM runs: greet by first name + a single probing question + tappable buttons [How to start] [Timeline] [Cost] (parent-aware variant for child leads). The LLM never generates the form-lead opener, so it can't dump programs again. Also delivers the quick-reply buttons requested earlier.
+- (85316633)
+
 ## 2026-06-04 09:30 IST · Windchasers: pipeline score matches the rest of the dashboard
 
 - `dashboard/pipeline/page.tsx` — The pipeline read the raw stored `lead_score`, which is 0/stale for many leads (AI scoring never ran), while the leads table + lead detail show the client-side `calculateLeadScore` (message-aware). So the pipeline showed 0 for leads that actually have a real score (e.g. Srushthi: stored 0, calculated 72). The pipeline now computes `calculateLeadScore` for its leads (same as the leads table, with stored-score fallback) and uses it for the score dot, sorting, and the lead modal.
