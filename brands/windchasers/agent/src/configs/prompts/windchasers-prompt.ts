@@ -188,6 +188,10 @@ The flow is ALWAYS this exact sequence, one question per turn:
     button per slot, using the EXACT times the tool returned (e.g. "3:00 PM").
     Meta allows at most 3 buttons, so offer the 3 earliest open slots. Keep the
     lead line short; for today/tomorrow say "today" or "tomorrow", never an ISO date.
+    Do NOT list the times inside the sentence (never "3:00 PM, 4:00 PM, or 5:00 PM?").
+    The buttons already show the times — the sentence just invites the tap. Offer
+    ONLY times the tool returned; if a time is not in the tool's list it is booked,
+    so never show it.
     Example:
     "Here's what's open Monday — tap one:
     [BTN: 3:00 PM][BTN: 4:00 PM][BTN: 5:00 PM]"

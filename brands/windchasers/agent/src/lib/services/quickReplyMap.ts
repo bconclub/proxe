@@ -135,3 +135,56 @@ export function extractButtonsFromLLMResponse(raw: string): { text: string; butt
     buttons,
   };
 }
+
+/** Matches a booking time-slot label like "3:00 PM" / "11:30 AM". */
+const TIME_SLOT_LABEL = /^\d{1,2}:\d{2}\s*(AM|PM)$/i;
+const normTime = (s: string) => s.toUpperCase().replace(/\s+/g, '');
+
+/**
+ * Deterministic guard against offering an already-booked slot.
+ *
+ * The LLM is told to offer ONLY the open times check_availability returns, but
+ * it sometimes parrots the prompt's example menu (3:00/4:00/5:00) and offers a
+ * slot that is actually taken. The customer then taps it and gets a "that's
+ * booked" bounce — a bad experience. Given the open times from the tool, this
+ * strips any time-slot [BTN: …] for a slot that is NOT open, and (only when it
+ * actually removed one) scrubs that time from the prose enumeration too.
+ *
+ * Non-time buttons (How to start, Timeline, …) are always preserved. When
+ * `openTimes` is null (check_availability was not called this turn) the text is
+ * returned untouched — we never invent availability.
+ */
+export function stripBookedTimeSlots(raw: string, openTimes: string[] | null): string {
+  if (!raw || openTimes === null) return raw;
+  const open = new Set(openTimes.map(normTime));
+  const bookedOffered: string[] = [];
+
+  let out = raw.replace(/\[BTN:\s*([^\]]+)\]/gi, (marker, label) => {
+    const l = String(label).trim();
+    if (!TIME_SLOT_LABEL.test(l)) return marker; // keep non-time buttons
+    if (open.has(normTime(l))) return marker;     // slot is open — keep
+    bookedOffered.push(l);                         // booked — drop the button
+    return '';
+  });
+
+  // Only touch the prose if we actually removed a booked button — keeps every
+  // normal message byte-identical.
+  for (const bt of bookedOffered) {
+    const esc = bt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\?\s+/g, '\\s*');
+    // Remove the time and any adjacent list separator ("3:00 PM, " / ", or 3:00 PM" / " or 3:00 PM").
+    out = out.replace(new RegExp(`\\s*,?\\s*(?:or\\s+)?${esc}`, 'gi'), '');
+  }
+  if (bookedOffered.length > 0) {
+    out = out
+      .replace(/,\s*,/g, ',')
+      .replace(/([.?!])\s*,/g, '$1')        // "works., 4:00" -> "works. 4:00"
+      .replace(/,\s*(or\b)?\s*\?/gi, '?')
+      .replace(/\bor\s*\?/gi, '?')
+      .replace(/,\s*or\b/gi, ' or')
+      .replace(/\s+([.?!,])/g, '$1')
+      .replace(/([.?!:])\s*([A-Za-z])/g, '$1 $2')  // restore the space the line above may eat
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+  return out;
+}

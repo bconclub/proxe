@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-04 11:30 IST · Windchasers: never offer an already-booked slot
+
+- Symptom: the agent offered 3:00/4:00/5:00 PM, and only after the customer tapped 3:00 PM did it bounce with "3:00 PM is booked." check_availability already returns only open slots, but the LLM sometimes parrots the prompt's example menu instead of the tool's filtered list, so a booked slot leaked into the buttons.
+- `engine.ts` — check_availability now records the open times it returned (date + available display times). After generation, those drive a deterministic strip of any time-slot the LLM still offered that isn't actually open.
+- `quickReplyMap.ts` — new `stripBookedTimeSlots()`: removes `[BTN: <booked time>]` buttons (so a booked slot is never tappable) and, only when it actually removed one, scrubs that time from the prose enumeration too. Non-time buttons preserved; messages with no booked slot are byte-identical; no-ops when check_availability wasn't called (never invents availability). Unit-validated on the screenshot case + middle-slot + clean/no-op cases.
+- `windchasers-prompt.ts` — Step 2 now tells the agent NOT to list times in the sentence (the buttons carry them) and to treat any time not in the tool's list as booked.
+- Net: a booked slot can no longer be offered or tapped; book_consultation's re-check remains the final backstop.
+
 ## 2026-06-04 11:00 IST · Windchasers: storeBooking THROWS on failed persist (no more silent false bookings)
 
 - `bookingManager.ts` — storeBooking previously logged "data may be lost" and returned void when it couldn't resolve a lead or the update failed, so book_consultation assumed success and the agent confirmed "recorded" with nothing saved (the guard couldn't help because the tool reported success). Now storeBooking THROWS on both failure modes → book_consultation returns success:false → the agent gives the honest "team will confirm" message and the lead is flagged, instead of a false confirmation.

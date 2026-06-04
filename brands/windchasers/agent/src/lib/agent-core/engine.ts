@@ -21,6 +21,7 @@ import {
   normalizeBookingSessionType,
 } from '@/lib/services/bookingManager';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
 
 /**
@@ -136,11 +137,15 @@ User's message: ${input.message}`
   // check below can read it. The set is populated by the book_consultation
   // tool handler when (and only when) the tool actually runs.
   let bookingsCompletedThisSession: Set<string> | null = null;
+  // Populated by check_availability so we can strip any booked slot the LLM
+  // still tries to offer as a tappable button (see stripBookedTimeSlots).
+  let availabilityRef: { current: { date: string; availableTimes: string[] } | null } | null = null;
 
   try {
     if (needsBookingTools) {
       const bt = buildBookingTools(input, supabase);
       bookingsCompletedThisSession = bt.bookingsCompletedThisSession;
+      availabilityRef = bt.availabilityRef;
       rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
         tools: bt.tools,
         toolHandlers: bt.toolHandlers,
@@ -160,6 +165,7 @@ User's message: ${input.message}`
       if (needsBookingTools) {
         const bt = buildBookingTools(input, supabase);
         bookingsCompletedThisSession = bt.bookingsCompletedThisSession;
+        availabilityRef = bt.availabilityRef;
         rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
           tools: bt.tools,
           toolHandlers: bt.toolHandlers,
@@ -208,6 +214,13 @@ User's message: ${input.message}`
   // If user explicitly asked for a human, flag for follow-up regardless of AI response
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
+  }
+
+  // Deterministic safety net: never let a booked slot survive as a tappable
+  // button (the LLM occasionally offers the prompt's example 3/4/5 menu instead
+  // of the tool's filtered list). Uses the open times check_availability saw.
+  if (availabilityRef?.current) {
+    rawResponse = stripBookedTimeSlots(rawResponse, availabilityRef.current.availableTimes);
   }
 
   const cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
@@ -568,10 +581,19 @@ function buildBookingTools(
   toolHandlers: Record<string, ToolHandler>;
   /** Exposed so callers can detect "agent claimed booking without firing tool" hallucinations after generation. */
   bookingsCompletedThisSession: Set<string>;
+  /**
+   * The result of the LAST check_availability call this turn. Lets the caller
+   * deterministically strip any time-slot button the LLM offers that is NOT
+   * actually open (the model sometimes parrots the prompt's example menu of
+   * 3:00/4:00/5:00 instead of the tool's filtered list).
+   */
+  availabilityRef: { current: { date: string; availableTimes: string[] } | null };
 } {
 
   // Track bookings completed in this tool session to prevent re-detection loops
   const bookingsCompletedThisSession = new Set<string>();
+  // Last check_availability snapshot (date + display times that are actually open).
+  const availabilityRef: { current: { date: string; availableTimes: string[] } | null } = { current: null };
 
   const tools: ToolDefinition[] = [
     {
@@ -723,6 +745,7 @@ function buildBookingTools(
       }
 
       if (availableSlots.length === 0) {
+        availabilityRef.current = { date, availableTimes: [] };
         return JSON.stringify({
           available_slots: [],
           message: isToday
@@ -730,6 +753,13 @@ function buildBookingTools(
             : `No slots available on ${date}. Suggest the user try a different date.`,
         });
       }
+
+      // Record what's actually open for THIS date so the caller can strip any
+      // booked slot the LLM still tries to offer as a button.
+      availabilityRef.current = {
+        date,
+        availableTimes: availableSlots.map(s => s.time),
+      };
 
       return JSON.stringify({
         date,
@@ -1094,7 +1124,7 @@ function buildBookingTools(
     },
   };
 
-  return { tools, toolHandlers, bookingsCompletedThisSession };
+  return { tools, toolHandlers, bookingsCompletedThisSession, availabilityRef };
 }
 
 // ─── Flow Task Scheduling ──────────────────────────────────────────────────
