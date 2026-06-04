@@ -39,8 +39,21 @@ export async function POST(request: NextRequest) {
     }
 
     const leadUc = lead.unified_context || {}
-    const bookingDate = leadUc?.web?.booking_date || leadUc?.whatsapp?.booking_date || null
-    const bookingTime = leadUc?.web?.booking_time || leadUc?.whatsapp?.booking_time || null
+    // Bookings are written in several shapes depending on the path that created
+    // them: flat keys under the channel (web.booking_date) OR a nested booking
+    // object (web.booking.date), across web / whatsapp / voice. Check all of them
+    // so every booked lead is detected — previously only web/whatsapp flat keys
+    // were checked, so ~2/3 of booked leads never reached Key Events.
+    const bookingDate =
+      leadUc?.web?.booking_date || leadUc?.web?.booking?.date ||
+      leadUc?.whatsapp?.booking_date || leadUc?.whatsapp?.booking?.date ||
+      leadUc?.voice?.booking_date || leadUc?.voice?.booking?.date ||
+      null
+    const bookingTime =
+      leadUc?.web?.booking_time || leadUc?.web?.booking?.time ||
+      leadUc?.whatsapp?.booking_time || leadUc?.whatsapp?.booking?.time ||
+      leadUc?.voice?.booking_time || leadUc?.voice?.booking?.time ||
+      null
 
     // Check if manual override is active - if so, skip scoring
     if (lead.is_manual_override) {
@@ -93,7 +106,9 @@ export async function POST(request: NextRequest) {
     const touchpoints = activities?.length || 0
 
     // Check for booking
-    const hasBooking = !!(bookingDate && bookingTime)
+    // A booking_date alone is enough to count as booked (a key event) — some
+    // bookings store only a date, or the time lives in a different shape.
+    const hasBooking = !!bookingDate
 
     // Check if re-engaged after being cold (was inactive > 7 days, now has new message)
     const lastInteraction = lead.last_interaction_at || lead.created_at
