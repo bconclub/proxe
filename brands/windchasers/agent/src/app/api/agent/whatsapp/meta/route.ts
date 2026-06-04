@@ -40,7 +40,10 @@ import {
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+// 60s (was 30s): long multi-part questions + tool calls were exceeding 30s and
+// getting killed mid-generation, producing the empty-response fallback. The
+// extra headroom also covers the single empty-response retry below.
+export const maxDuration = 60;
 
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -745,11 +748,24 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     const aiStartTime = Date.now();
-    const result = await processMessage(agentInput, supabase);
+    let result = await processMessage(agentInput, supabase);
+
+    // Empty responses are usually a transient LLM hiccup (especially on long,
+    // multi-part questions). Retry ONCE before giving up — a single retry recovers
+    // the large majority of these, so the lead gets a real answer instead of the
+    // dead-end "someone will get in touch" that nothing follows up on.
+    if (!result.response) {
+      console.warn('[meta/webhook] Empty AI response — retrying once before fallback');
+      try {
+        result = await processMessage(agentInput, supabase);
+      } catch (retryErr: any) {
+        console.error('[meta/webhook] Retry threw:', retryErr?.message || retryErr);
+      }
+    }
     const responseTimeMs = Date.now() - aiStartTime;
 
     if (!result.response) {
-      console.error('[meta/webhook] Empty AI response — sending fallback');
+      console.error('[meta/webhook] Empty AI response after retry — sending fallback');
       await sendAndLogReply(
         supabase,
         leadId,

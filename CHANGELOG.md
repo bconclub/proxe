@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 08:10 IST · Windchasers: WhatsApp agent retries empty responses (fewer dead-end fallbacks)
+
+- `whatsapp/meta/route.ts` — Long multi-part questions were producing an empty AI response (or being killed at the 30s function limit), so the agent sent the canned "Hey! Give me a moment, I'll have someone from the team get in touch" fallback — which dead-ends (it only sets needs_human_followup, and no worker acts on it). Now: empty responses RETRY once before falling back, and maxDuration raised 30s → 60s so big prompts + the retry have room.
+- Does NOT change the exception path (e.g. a booking step that throws on "Yes") — that still falls back; retrying a throw risks half-applied side effects. Tracked separately.
+- (01cb3e25)
+
 ## 2026-06-04 07:55 IST · Windchasers: "when do classes start" must give the batch date, not eligibility
 
 - `windchasers-prompt.ts` / `windchasers-web-prompt.ts` — Hardened the batch-start handling. "When do classes start?" was still being answered with eligibility requirements ("once you're eligible — 12th pass with Physics & Maths, Class 1 medical"). Now any start/begin/next-batch/"when can I join" question is treated strictly as a DATE question → "Our DGCA ground classes start on the 7th of every month — next batch on the 7th of next month." Added an explicit prohibition on answering it with eligibility, and an optional one-line clarifier if which-classes is genuinely ambiguous.
