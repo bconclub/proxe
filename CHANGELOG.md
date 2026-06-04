@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 09:05 IST · Windchasers: capture Meta-form profile (name/email/city) onto the lead
+
+- `whatsapp/meta/route.ts` — Meta lead-form click-through leads now parse the prefill ("key: value" per line) and persist the FORM name (full_name), email, city, age, timeline, and education onto the lead. Previously the form data lived only in the message text, so the lead model showed the WhatsApp account display name (e.g. "Saandi Maalik") with no email/city even though the form had name "Rishi", email, and city Bhiwani. Form name now wins over the WhatsApp account name; email filled only if empty; city/age/timeline merged into the brand profile (what the leads table + lead modal read).
+- (e5964e75)
+
 ## 2026-06-04 08:55 IST · Windchasers: prevent double-booking the same slot (DB availability check)
 
 - `bookingManager.ts` — Slot availability was determined ONLY by Google Calendar free/busy; with calendar unconfigured, getAvailableSlots returned every slot as available, so two leads could book the same time (e.g. both Jai + Deb at 4 PM today). Added a DB conflict check: getBookedTime24sForDate scans existing bookings (all_leads.unified_context across web/whatsapp/voice + web_sessions) and marks taken slots unavailable, in both the no-calendar and calendar paths. The engine already re-checks availability at book time, so a taken slot is now rejected and the agent offers another.

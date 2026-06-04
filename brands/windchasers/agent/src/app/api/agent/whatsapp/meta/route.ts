@@ -512,31 +512,75 @@ async function sendAndLogReply(
   return waReplyId;
 }
 
+/** Parse a Meta lead-form prefill ("key: value" per line) into a field map. */
+function parseFormPrefill(text: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const line of (text || '').split(/\n+/)) {
+    const m = line.match(/^\s*([A-Za-z0-9_'’?\- ]+?)\s*:\s*(.+?)\s*$/);
+    if (!m) continue;
+    const key = m[1].trim().toLowerCase().replace(/\?+/g, '').replace(/_+$/, '').replace(/[\s-]+/g, '_');
+    const val = m[2].trim();
+    if (key && val) fields[key] = val;
+  }
+  return fields;
+}
+
 /**
- * Stamp a lead as a Meta-form click-through source (idempotent). Only sets the
- * attribution when the lead has no marketing source yet, so we never overwrite a
- * real UTM/ad attribution or re-stamp on later messages.
+ * Meta-form click-through handler: (1) stamps the click-through attribution and
+ * (2) captures the form fields (NAME, EMAIL, CITY, timeline, age, education) onto
+ * the lead. The form data only arrives in the prefill message, so without this
+ * the lead model shows the WhatsApp account name and no email/city. Idempotent —
+ * never clobbers an existing real marketing source, and only fills empty fields.
  */
-async function tagMetaFormClickThrough(leadId: string, supabase: any): Promise<void> {
+async function tagMetaFormClickThrough(leadId: string, messageText: string, supabase: any): Promise<void> {
   try {
     const { data } = await supabase
       .from('all_leads')
-      .select('unified_context')
+      .select('unified_context, customer_name, email')
       .eq('id', leadId)
       .maybeSingle();
     const uc = data?.unified_context || {};
+
+    // 1. Attribution (only if no real marketing source yet).
     const existing = String(uc?.attribution?.source || '').toLowerCase().trim();
-    // Don't clobber an existing real marketing source.
-    if (existing && existing !== 'direct') return;
-    uc.attribution = {
-      ...(uc.attribution || {}),
-      source: META_FORM_CLICKTHROUGH_SOURCE,
-      source_label: META_FORM_CLICKTHROUGH_LABEL,
-      first_touch: META_FORM_CLICKTHROUGH_FIRST_TOUCH,
-      first_touch_label: META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
-      captured_at: new Date().toISOString(),
+    if (!existing || existing === 'direct') {
+      uc.attribution = {
+        ...(uc.attribution || {}),
+        source: META_FORM_CLICKTHROUGH_SOURCE,
+        source_label: META_FORM_CLICKTHROUGH_LABEL,
+        first_touch: META_FORM_CLICKTHROUGH_FIRST_TOUCH,
+        first_touch_label: META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
+        captured_at: new Date().toISOString(),
+      };
+    }
+
+    // 2. Capture form profile fields from the prefill.
+    const f = parseFormPrefill(messageText);
+    const formName = f.full_name || f.name || f.first_name || null;
+    const formEmail = (f.email || '').trim() || null;
+    const formCity = f.city || null;
+    const formAge = f.what_is_your_age || f.age || null;
+    const formTimeline = f.when_are_you_looking_to_start || f.when_are_you_planning_to_start_the_flight_training || null;
+    const formEducation = f.have_you_completed_class_12_with_physics_and_maths || null;
+
+    // Merge form fields into the brand profile (this is what the leads table /
+    // lead modal read for city/age/etc.) + keep the raw fields for reference.
+    uc.raw_form_fields = { ...(uc.raw_form_fields || {}), ...f };
+    uc[BRAND_ID] = {
+      ...(uc[BRAND_ID] || {}),
+      ...(formCity ? { city: formCity } : {}),
+      ...(formAge ? { age: formAge } : {}),
+      ...(formTimeline ? { timeline: formTimeline } : {}),
+      ...(formEducation ? { completed_12_pcm: formEducation } : {}),
     };
-    await supabase.from('all_leads').update({ unified_context: uc }).eq('id', leadId);
+
+    const update: Record<string, any> = { unified_context: uc };
+    // Prefer the FORM name over the WhatsApp account display name.
+    if (formName && isLikelyRealPersonName(formName)) update.customer_name = formName;
+    // Fill email only if the lead doesn't already have one.
+    if (formEmail && !data?.email) update.email = formEmail;
+
+    await supabase.from('all_leads').update(update).eq('id', leadId);
   } catch (err: any) {
     console.error('[meta/webhook] tagMetaFormClickThrough failed:', err?.message || err);
   }
@@ -585,7 +629,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // is the form prefill. These carry no UTM/marketing channel, so they'd default
     // to 'Direct'. Stamp a distinct source (once) so attribution reflects the form.
     if (isMetaFormClickThrough(messageText)) {
-      await tagMetaFormClickThrough(leadId, supabase);
+      await tagMetaFormClickThrough(leadId, messageText, supabase);
     }
 
     // 1b–4. Parallelize: dedup checks + session creation + cross-channel context
