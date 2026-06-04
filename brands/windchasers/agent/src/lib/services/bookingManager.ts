@@ -429,6 +429,59 @@ export async function storeBooking(
  * Check available calendar slots for a given date
  * Returns array of time slots with availability status
  */
+/** Normalize a stored booking_time ("4:00 PM", "16:00", "16:00:00") to "HH:MM" 24h. */
+function toTime24(t: string): string {
+  const s = (t || '').trim();
+  const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const p = ampm[3].toUpperCase();
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${ampm[2]}`;
+  }
+  const hm = s.match(/^(\d{1,2}):(\d{2})/);
+  return hm ? `${hm[1].padStart(2, '0')}:${hm[2]}` : s;
+}
+
+/**
+ * Slots already taken by an EXISTING booking on this date (any lead, any channel).
+ * Google Calendar free/busy is not a reliable conflict source here (it's often
+ * unconfigured, which made every slot "available" and allowed two leads to book
+ * the same time). We check our own DB instead.
+ */
+async function getBookedTime24sForDate(dateStr: string): Promise<Set<string>> {
+  const taken = new Set<string>();
+  const client = getServiceClient() || getClient();
+  if (!client) return taken;
+  try {
+    const { data: leads } = await client
+      .from('all_leads')
+      .select('unified_context')
+      .not('unified_context', 'is', null);
+    for (const l of (leads || []) as Array<{ unified_context: any }>) {
+      const uc = l.unified_context || {};
+      for (const ch of ['web', 'whatsapp', 'voice']) {
+        const c = uc[ch] || {};
+        const bd = c.booking_date || c.booking?.date;
+        const bt = c.booking_time || c.booking?.time;
+        if (bd === dateStr && bt) taken.add(toTime24(String(bt)));
+      }
+    }
+    const { data: sess } = await client
+      .from('web_sessions')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+    for (const s of (sess || []) as Array<{ booking_time: string | null }>) {
+      if (s.booking_time) taken.add(toTime24(String(s.booking_time)));
+    }
+  } catch (e) {
+    console.error('[bookingManager] getBookedTime24sForDate failed', e);
+  }
+  return taken;
+}
+
 export async function getAvailableSlots(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
   const dateStr = date.split('T')[0];
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -439,16 +492,20 @@ export async function getAvailableSlots(date: string, sessionType?: string | nul
   const allowedSlots = getBookableSlotStartsForDate(dateStr, sessionType);
   if (allowedSlots.length === 0) return [];
 
+  // DB-level conflict check — a slot already booked by ANY lead is unavailable.
+  // This is what prevents two customers being booked into the same time.
+  const bookedTimes = await getBookedTime24sForDate(dateStr);
+
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!hasCredentials) {
-    // Return all slots as available when credentials are not configured
+    // No calendar configured — availability is driven purely by existing DB bookings.
     return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
-      available: true,
+      available: !bookedTimes.has(slot),
       displayTime: formatTimeForDisplay(slot),
     }));
   }
@@ -501,7 +558,7 @@ export async function getAvailableSlots(date: string, sessionType?: string | nul
       return {
         time: formatTimeForDisplay(slot),
         time24: slot,
-        available: !hasConflict,
+        available: !hasConflict && !bookedTimes.has(slot),
         displayTime: formatTimeForDisplay(slot),
       };
     });

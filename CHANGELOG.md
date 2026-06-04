@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 08:55 IST · Windchasers: prevent double-booking the same slot (DB availability check)
+
+- `bookingManager.ts` — Slot availability was determined ONLY by Google Calendar free/busy; with calendar unconfigured, getAvailableSlots returned every slot as available, so two leads could book the same time (e.g. both Jai + Deb at 4 PM today). Added a DB conflict check: getBookedTime24sForDate scans existing bookings (all_leads.unified_context across web/whatsapp/voice + web_sessions) and marks taken slots unavailable, in both the no-calendar and calendar paths. The engine already re-checks availability at book time, so a taken slot is now rejected and the agent offers another.
+- (039a1ad6)
+
 ## 2026-06-04 08:45 IST · Windchasers: booking persistence — resolve lead by phone (WhatsApp fix)
 
 - `bookingManager.ts` — Root cause of WhatsApp bookings never saving: `whatsapp_sessions` has NO `external_session_id` column (keyed by id / customer_phone_normalized), but storeBooking resolved the lead by `external_session_id`. That lookup silently failed for WhatsApp → leadId stayed null → the all_leads update was skipped entirely → booking dropped, while every error was swallowed so the agent still said "recorded". Now: the session lookup is guarded to web_sessions (where the column exists), and a PHONE fallback resolves the lead via all_leads.customer_phone_normalized (reliable on WhatsApp, safety net everywhere). Bookings now persist to unified_context → show in Key Events / UPCOMING.
