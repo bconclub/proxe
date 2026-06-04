@@ -147,7 +147,7 @@ export async function GET(request: Request) {
     // even if the lead itself was created earlier.
     const { data: ctxEventLeads } = await supabase
       .from('all_leads')
-      .select('id, unified_context, created_at');
+      .select('id, unified_context, metadata, created_at');
 
     const inWindow = (iso: string | null | undefined): boolean => {
       if (!iso) return false;
@@ -156,20 +156,43 @@ export async function GET(request: Request) {
       return t >= new Date(startIso).getTime() && t <= new Date(endIso).getTime();
     };
 
+    // A booking lives in unified_context.<channel>.booking_date (scalar, the
+    // shape storeBooking writes for web/whatsapp/voice) OR, for older web
+    // bookings, unified_context.web.booking.date (object). The previous code
+    // only looked at web.booking, so EVERY WhatsApp/voice booking was missed —
+    // the count showed 2 (web only) when 6 were booked. Check all channels and
+    // both shapes, counting each lead once.
+    const BOOKING_CHANNELS = ['web', 'whatsapp', 'voice'] as const;
     let patSubmitted = 0;
     let demoBooked = 0;
     for (const l of (ctxEventLeads || [])) {
-      const wc = l?.unified_context?.windchasers || {};
-      const booking = l?.unified_context?.web?.booking;
-      const rawFt = String(l?.unified_context?.raw_form_fields?.form_type || '').toLowerCase();
-      const eventName = String(l?.unified_context?.raw_form_fields?.event_name || '').toLowerCase();
-
+      const uc = l?.unified_context || {};
+      const wc = uc.windchasers || {};
       if (inWindow(wc.pat_completed_at)) patSubmitted++;
-      if (booking && inWindow(booking.created_at)) demoBooked++;
-      else if (inWindow(l.created_at) && (rawFt === 'demo_booked' || eventName === 'demo_booked')) {
-        // Fallback: lead created today with demo_booked form_type but booking
-        // object not (yet) populated.
-        demoBooked++;
+
+      let hasBooking = false;
+      let bookedAt: string | null = null;   // most recent per-booking timestamp
+      for (const ch of BOOKING_CHANNELS) {
+        const c = uc[ch] || {};
+        const bd = c.booking_date || c?.booking?.date;
+        if (!bd) continue;
+        hasBooking = true;
+        const ts = c.booking_created_at || c?.booking?.created_at || null;
+        if (ts && (!bookedAt || new Date(ts).getTime() > new Date(bookedAt).getTime())) bookedAt = ts;
+      }
+
+      if (hasBooking) {
+        // Window on the booking's own timestamp when we have one; otherwise fall
+        // back to the lead's confirm/creation time (older bookings predate the
+        // booking_created_at stamp). Counts the lead once across channels.
+        const stamp = bookedAt || l?.metadata?.booking_confirmed_at || l.created_at;
+        if (inWindow(stamp)) demoBooked++;
+      } else {
+        const rawFt = String(uc.raw_form_fields?.form_type || '').toLowerCase();
+        const eventName = String(uc.raw_form_fields?.event_name || '').toLowerCase();
+        if (inWindow(l.created_at) && (rawFt === 'demo_booked' || eventName === 'demo_booked')) {
+          demoBooked++;
+        }
       }
     }
 

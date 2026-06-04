@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 11:50 IST · Windchasers: snapshot "Demos booked" was missing WhatsApp/voice bookings
+
+- Symptom: the Today snapshot showed Demos booked = 2 when 6 were booked today. The count only inspected `unified_context.web.booking` — the legacy web-only object shape — so every WhatsApp and voice booking was invisible. storeBooking persists bookings as `unified_context.<channel>.booking_date` (scalar) under web/whatsapp/voice; WhatsApp/voice never get the `web.booking` object the snapshot was reading.
+- `today-snapshot/route.ts` — demo detection now scans all three channels and both shapes (scalar `booking_date` or legacy `booking.date`), counts each lead once, and windows on the booking's own timestamp when present, falling back to `metadata.booking_confirmed_at` then lead `created_at` for older bookings. Verified against the DB: today now resolves to 6 (was 2).
+- `bookingManager.ts` — storeBooking now stamps `booking_created_at` (IST) into `unified_context.<channel>`, so future bookings window precisely instead of relying on the lead-creation fallback.
+
 ## 2026-06-04 11:30 IST · Windchasers: never offer an already-booked slot
 
 - Symptom: the agent offered 3:00/4:00/5:00 PM, and only after the customer tapped 3:00 PM did it bounce with "3:00 PM is booked." check_availability already returns only open slots, but the LLM sometimes parrots the prompt's example menu instead of the tool's filtered list, so a booked slot leaked into the buttons.

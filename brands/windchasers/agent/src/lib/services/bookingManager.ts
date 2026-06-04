@@ -395,6 +395,9 @@ export async function storeBooking(
         booking_status: booking.status ?? 'Call Booked',
         booking_date: booking.date,
         booking_time: booking.time,
+        // When the booking was MADE (IST). Lets the snapshot window "demos
+        // booked today" precisely instead of falling back to lead creation.
+        booking_created_at: getISTTimestamp(),
         booking_meet_link: booking.meetLink || null,
         booking_title: booking.title || null,
         user_inputs: sessionData?.user_inputs_summary || currentSession?.user_inputs_summary || [],
