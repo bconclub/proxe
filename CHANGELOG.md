@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 09:50 IST · Windchasers: leads table — sticky header, no active-time bump on edit, came-in date
+
+- `LeadsTable.tsx` — (1) The sticky table header rode away on scroll because the scroll container was a flex child without `min-h-0`, so the page scrolled instead of the container. Added `min-h-0` so it scrolls internally and the header stays put. (2) Added the lead's came-in date under the name in the LEAD column.
+- `api/dashboard/leads/[id]/route.ts` — Manual dashboard edits (name/email/city) were setting `last_interaction_at = now`, making the "Active" column jump to "now" on every edit. Removed that bump — `last_interaction_at` is the customer's last activity, not an edit timestamp (the edit is already recorded in last_actor + the activities audit).
+- (2c532fe8)
+
 ## 2026-06-04 09:40 IST · Windchasers: form/ad leads get a DETERMINISTIC probing first reply (no academy dump)
 
 - `whatsapp/meta/route.ts` — Despite the prompt rule, the LLM kept answering a form lead's first message with the academy description + full program list ("airline pilot training, helicopter, cabin crew, type rating…") because the form mentions pilot training. Prompt instructions are probabilistic, so this couldn't be guaranteed. Now the first reply to a form/ad lead is HARD-INTERCEPTED before the LLM runs: greet by first name + a single probing question + tappable buttons [How to start] [Timeline] [Cost] (parent-aware variant for child leads). The LLM never generates the form-lead opener, so it can't dump programs again. Also delivers the quick-reply buttons requested earlier.

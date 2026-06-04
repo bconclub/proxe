@@ -630,8 +630,11 @@ export default function LeadsTable({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto flex-1 pb-6">
+      {/* Table — min-h-0 lets this flex child shrink so it scrolls INTERNALLY
+          (instead of the page scrolling), which is what makes the sticky <thead>
+          actually stay put. Without min-h-0 the child grows to content height,
+          the page scrolls, and the "sticky" header rides away with it. */}
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             {/* Tightened column widths: Lead/Contact were oversized,
@@ -1028,6 +1031,12 @@ export default function LeadsTable({
                       {(brandName || city) && !isEmailAsName && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
                           {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                        </div>
+                      )}
+                      {/* Date the lead came in */}
+                      {((lead as any).created_at || lead.timestamp) && (
+                        <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {new Date((lead as any).created_at || lead.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </div>
                       )}
                     </td>

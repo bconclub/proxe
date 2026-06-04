@@ -157,7 +157,11 @@ export async function PATCH(
       },
     }
     updates.unified_context = newCtx
-    updates.last_interaction_at = new Date().toISOString()
+    // NOTE: do NOT touch last_interaction_at here. That column tracks the
+    // CUSTOMER's last activity (the "Active" column / time-ago). A manual
+    // dashboard edit (name/email/city/etc.) is not customer activity — bumping
+    // it made every edited lead jump to "now". The edit is recorded in
+    // unified_context.last_actor + the activities audit instead.
 
     const { error: upErr } = await service
       .from('all_leads')
