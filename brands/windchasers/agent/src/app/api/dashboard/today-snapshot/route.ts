@@ -101,6 +101,27 @@ export async function GET(request: Request) {
       bySource[k] = (bySource[k] || 0) + 1;
     }
 
+    // ── 1b) Lead type breakdown — Parent vs Student ─────────────────────────
+    const leadTypeOf = (l: any): 'Parent' | 'Student' | null => {
+      const uc = l?.unified_context || {};
+      const raw = String(
+        uc?.windchasers?.user_type || uc?.windchasers?.business_type ||
+        uc?.web?.user_type || uc?.whatsapp?.user_type ||
+        uc?.raw_form_fields?.user_type || ''
+      ).toLowerCase();
+      // Meta lead forms for parents ask about "your child's education level".
+      const looksParent = !!(uc?.raw_form_fields?.['what_is_your_child_s_current_education_level'] ||
+        Object.keys(uc?.raw_form_fields || {}).some((k) => k.includes('child')));
+      if (raw.includes('parent') || looksParent) return 'Parent';
+      if (raw.includes('student') || raw.includes('aspirant')) return 'Student';
+      return null;
+    };
+    const byType: Record<string, number> = { Parent: 0, Student: 0 };
+    for (const l of leads) {
+      const t = leadTypeOf(l);
+      if (t) byType[t] = (byType[t] || 0) + 1;
+    }
+
     // ── 2) Score histogram (over leads created today) ───────────────────────
     const scoreHistogram = { hot: 0, warm: 0, cold: 0, unscored: 0 };
     for (const l of leads) {
@@ -223,7 +244,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       window: { startIso, endIso, label: RANGE_LABELS[range] || 'Today (IST)', range },
-      leads: { total: leads.length, bySource },
+      leads: { total: leads.length, bySource, byType },
       events,
       scoreHistogram,
       topActive,

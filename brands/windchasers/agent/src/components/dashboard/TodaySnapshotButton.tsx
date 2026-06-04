@@ -12,7 +12,7 @@ import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
 
 interface SnapshotData {
   window: { startIso: string; endIso: string; label: string; range?: string }
-  leads: { total: number; bySource: Record<string, number> }
+  leads: { total: number; bySource: Record<string, number>; byType?: Record<string, number> }
   events: {
     pat_submitted: number
     demo_booked: number
@@ -242,6 +242,21 @@ export default function TodaySnapshotButton() {
                               )
                             })}
                         </ul>
+                      )}
+
+                      {/* Lead type — Parent vs Student */}
+                      {data.leads.byType && (
+                        <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Lead type</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>Parent</span>
+                            <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#a5b4fc' }}>{data.leads.byType.Parent || 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>Student</span>
+                            <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#22c55e' }}>{data.leads.byType.Student || 0}</span>
+                          </div>
+                        </div>
                       )}
                     </section>
 

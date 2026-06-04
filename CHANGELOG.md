@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 09:20 IST · Windchasers: Today's snapshot — Parent vs Student lead-type breakdown
+
+- `today-snapshot/route.ts` + `TodaySnapshotButton.tsx` — Added a "Lead type" block to the Today's snapshot quick view showing Parent vs Student counts for the selected window. Type derived from unified_context user_type (+ "child" form fields → Parent). Sits under "By source".
+- (e31ca280)
+
 ## 2026-06-04 09:05 IST · Windchasers: capture Meta-form profile (name/email/city) onto the lead
 
 - `whatsapp/meta/route.ts` — Meta lead-form click-through leads now parse the prefill ("key: value" per line) and persist the FORM name (full_name), email, city, age, timeline, and education onto the lead. Previously the form data lived only in the message text, so the lead model showed the WhatsApp account display name (e.g. "Saandi Maalik") with no email/city even though the form had name "Rishi", email, and city Bhiwani. Form name now wins over the WhatsApp account name; email filled only if empty; city/age/timeline merged into the brand profile (what the leads table + lead modal read).
