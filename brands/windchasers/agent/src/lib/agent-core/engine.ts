@@ -192,12 +192,16 @@ User's message: ${input.message}`
   // gated on needsBookingTools and silently let those false claims through.
   const noBookingThisTurn = !bookingsCompletedThisSession || bookingsCompletedThisSession.size === 0;
   if (input.channel === 'whatsapp' && noBookingThisTurn && !existingBookingMessage) {
-    const claimsBooked = /\b(done\.|is locked|booking confirmed|calendar invite on its way|all set,? .*locked)\b/i
+    // Match the CURRENT confirmation wording too. The booking copy changed to
+    // "Your booking is recorded …" / "You're all set …" — the old regex only
+    // caught "is locked" / "booking confirmed", so failed bookings were sailing
+    // through with a false "recorded" claim and nothing saved.
+    const claimsBooked = /\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way)\b/i
       .test(rawResponse);
     if (claimsBooked) {
-      console.error('[Engine] HALLUCINATED BOOKING — response claims booked but book_consultation never ran. Overwriting + flagging lead.');
-      await flagForHumanFollowup(supabase, input, 'Agent hallucinated booking confirmation without firing book_consultation tool');
-      rawResponse = "Hit a snag locking the slot — let me try once more. What date and time work for you?";
+      console.error('[Engine] FALSE BOOKING CLAIM — response confirms a booking but book_consultation did not succeed this turn. Overwriting + flagging lead.');
+      await flagForHumanFollowup(supabase, input, 'Agent claimed a booking that book_consultation did not actually persist');
+      rawResponse = "I could not lock that slot just now, but I have passed your details to our team. They will reach out to confirm your time shortly.";
     }
   }
 

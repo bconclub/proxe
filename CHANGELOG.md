@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-04 10:50 IST · Windchasers: booking — fix false "recorded" + harden persistence
+
+- `engine.ts` — ROOT cause of bookings showing "recorded" but not saving: when the confirmation copy changed to "Your booking is recorded…", the hallucinated-booking guard still only matched the OLD phrases ("is locked", "booking confirmed"), so a book_consultation that didn't actually persist sailed through with a false confirmation. Guard now matches the current wording (booking is recorded / you're all set / looking forward to…). On a failed/unpersisted booking it overwrites with an honest "I couldn't lock that slot, the team will confirm" and flags the lead.
+- `bookingManager.ts` — Hardened storeBooking: wrapped updateLeadProfile + the session fetch (which reference columns whatsapp_sessions lacks) so they can't abort the save; channel-safe session select; added a sessionId-phone fallback (wa_meta_<phone>) and a CRITICAL log when a lead still can't be resolved.
+- Recovered Ryan's lost booking (Fri 2026-06-05 16:00) + email.
+- (54a5b162)
+
 ## 2026-06-04 10:35 IST · Windchasers: Meta-form card — normal width + Parent/Student tag
 
 - `inbox/page.tsx` — Dropped the full-width stretch (max-w-78%, sizes to content) and added the form type (Parent/Student) chip next to the "Meta Form" badge, derived from the fields (child question → Parent). The literal Meta form name isn't in the message, so the type is the practical "which form" indicator.

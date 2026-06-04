@@ -258,23 +258,36 @@ export async function storeBooking(
 
   const tableName = getChannelTable(channel);
 
-  // Update session profile if contact info is provided
+  // Update session profile if contact info is provided. Wrapped — updateLeadProfile
+  // resolves the session by external_session_id, which whatsapp_sessions doesn't
+  // have, so it can fail/throw for WhatsApp; that must NOT abort the booking save.
   let currentLeadId: string | null = null;
   if (booking.name || booking.email || booking.phone) {
     const profileUpdates: { userName?: string; email?: string; phone?: string } = {};
     if (booking.name) profileUpdates.userName = booking.name;
     if (booking.email) profileUpdates.email = booking.email;
     if (booking.phone) profileUpdates.phone = booking.phone;
-
-    currentLeadId = await updateLeadProfile(externalSessionId, profileUpdates, channel, client);
+    try {
+      currentLeadId = await updateLeadProfile(externalSessionId, profileUpdates, channel, client);
+    } catch (e: any) {
+      console.error('[bookingManager] updateLeadProfile failed (non-fatal):', e?.message || e);
+    }
   }
 
-  // Fetch current session for merging
-  const { data: currentSession } = await client
-    .from(tableName)
-    .select('metadata, conversation_summary, lead_id, user_inputs_summary')
-    .eq('external_session_id', externalSessionId)
-    .maybeSingle();
+  // Fetch current session for merging. whatsapp_sessions has neither `metadata`
+  // nor `external_session_id`, so this select errors there — keep it best-effort.
+  let currentSession: any = null;
+  try {
+    const sel = tableName === 'web_sessions'
+      ? 'metadata, conversation_summary, lead_id, user_inputs_summary'
+      : 'conversation_summary, lead_id, user_inputs_summary';
+    const res = tableName === 'web_sessions'
+      ? await client.from(tableName).select(sel).eq('external_session_id', externalSessionId).maybeSingle()
+      : { data: null };
+    currentSession = res.data;
+  } catch (e: any) {
+    console.error('[bookingManager] session fetch failed (non-fatal):', e?.message || e);
+  }
 
   // Build booking metadata
   const bookingMetadata: Record<string, any> = {
@@ -359,6 +372,24 @@ export async function storeBooking(
         .maybeSingle();
       leadId = leadByPhone?.id || null;
     }
+  }
+
+  // Final fallback: WhatsApp session ids encode the phone (wa_meta_<phone>).
+  // Bulletproof resolver when booking.phone is somehow empty.
+  if (!leadId && externalSessionId && externalSessionId.startsWith('wa_')) {
+    const sidPhone = externalSessionId.replace(/\D/g, '').slice(-10);
+    if (sidPhone.length === 10) {
+      const { data: leadBySid } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('customer_phone_normalized', sidPhone)
+        .maybeSingle();
+      leadId = leadBySid?.id || null;
+    }
+  }
+
+  if (!leadId) {
+    console.error('[bookingManager] CRITICAL: could not resolve lead for booking — it will be lost', { externalSessionId, channel, phone: booking.phone });
   }
 
   if (leadId) {
