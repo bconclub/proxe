@@ -36,6 +36,8 @@ import {
   isMetaFormClickThrough,
   META_FORM_CLICKTHROUGH_SOURCE,
   META_FORM_CLICKTHROUGH_LABEL,
+  META_FORM_CLICKTHROUGH_FIRST_TOUCH,
+  META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
 
@@ -530,8 +532,8 @@ async function tagMetaFormClickThrough(leadId: string, supabase: any): Promise<v
       ...(uc.attribution || {}),
       source: META_FORM_CLICKTHROUGH_SOURCE,
       source_label: META_FORM_CLICKTHROUGH_LABEL,
-      first_touch: 'meta_lead_form',
-      first_touch_label: 'Meta Lead Form',
+      first_touch: META_FORM_CLICKTHROUGH_FIRST_TOUCH,
+      first_touch_label: META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
       captured_at: new Date().toISOString(),
     };
     await supabase.from('all_leads').update({ unified_context: uc }).eq('id', leadId);

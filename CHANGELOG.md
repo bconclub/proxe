@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-04 08:25 IST · Windchasers: booking persistence fix + Meta-form source labels
+
+Booking persistence (`bookingManager.ts`, `windchasers-prompt.ts`):
+- FIX: bookings silently saved nothing. storeBooking wrote booking_date/booking_time to all_leads (which has NO such columns — only web_sessions does); Supabase rejected the WHOLE update, including the unified_context write the dashboard reads, and the error wasn't checked. storeBooking returned without throwing, the engine assumed success, and the agent said "Done" while nothing persisted. Now persists via unified_context.<channel> only (what the dashboard/pipeline/score routes read) + logs failures.
+- Prompt: after a successful book_consultation the agent says "Your booking is recorded for {date} at {time}. Someone from our team will get back to you to confirm this." — calendar-invite promises explicitly banned (we don't send them right now); the "team will confirm" line is only ever the post-booking confirmation, never a deflection.
+- Note: existing un-saved bookings aren't recovered; fix applies to new bookings.
+
+Meta-form attribution labels (`attribution.ts`, `whatsapp/meta/route.ts`, `LeadsTable.tsx`):
+- Source pill for Meta lead-form "Chat on WhatsApp" leads now reads top "Meta Form" / bottom "WhatsApp Click-through" (was the long single "Meta Forms Click-through"). first_touch key whatsapp_clickthrough.
+- Backfilled 9 existing form-click-through leads (were wrongly "Direct") to the new attribution.
+- (booking bb3b50ff, labels 6db08b71)
+
 ## 2026-06-04 08:10 IST · Windchasers: WhatsApp agent retries empty responses (fewer dead-end fallbacks)
 
 - `whatsapp/meta/route.ts` — Long multi-part questions were producing an empty AI response (or being killed at the 30s function limit), so the agent sent the canned "Hey! Give me a moment, I'll have someone from the team get in touch" fallback — which dead-ends (it only sets needs_human_followup, and no worker acts on it). Now: empty responses RETRY once before falling back, and maxDuration raised 30s → 60s so big prompts + the retry have room.
