@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 11:00 IST · Windchasers: storeBooking THROWS on failed persist (no more silent false bookings)
+
+- `bookingManager.ts` — storeBooking previously logged "data may be lost" and returned void when it couldn't resolve a lead or the update failed, so book_consultation assumed success and the agent confirmed "recorded" with nothing saved (the guard couldn't help because the tool reported success). Now storeBooking THROWS on both failure modes → book_consultation returns success:false → the agent gives the honest "team will confirm" message and the lead is flagged, instead of a false confirmation.
+- Recovered Samchok's booking (Fri 16:00); flagged it — Samchok + Ryan both requested Fri 4 PM, team to reschedule one.
+- (a40536d0)
+
 ## 2026-06-04 10:50 IST · Windchasers: booking — fix false "recorded" + harden persistence
 
 - `engine.ts` — ROOT cause of bookings showing "recorded" but not saving: when the confirmation copy changed to "Your booking is recorded…", the hallucinated-booking guard still only matched the OLD phrases ("is locked", "booking confirmed"), so a book_consultation that didn't actually persist sailed through with a false confirmation. Guard now matches the current wording (booking is recorded / you're all set / looking forward to…). On a failed/unpersisted booking it overwrites with an honest "I couldn't lock that slot, the team will confirm" and flags the lead.

@@ -388,10 +388,6 @@ export async function storeBooking(
     }
   }
 
-  if (!leadId) {
-    console.error('[bookingManager] CRITICAL: could not resolve lead for booking — it will be lost', { externalSessionId, channel, phone: booking.phone });
-  }
-
   if (leadId) {
     const unifiedContext = {
       [channel]: {
@@ -444,13 +440,19 @@ export async function storeBooking(
       })
       .eq('id', leadId);
 
+    // THROW on a failed persist so the caller (book_consultation) knows the
+    // booking did NOT save and can return success:false — otherwise the agent
+    // confirms "recorded" while nothing was stored.
     if (leadUpdateError) {
       console.error('[bookingManager] Failed to persist booking to all_leads', { leadId, error: leadUpdateError });
-    } else {
-      console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
+      throw new Error(`Failed to persist booking to all_leads: ${leadUpdateError.message || leadUpdateError}`);
     }
+    console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
-    console.error('[bookingManager] Could not find lead_id to save booking - data may be lost', { externalSessionId, channel });
+    // No lead resolved despite phone + sessionId fallbacks — the booking cannot
+    // be saved. THROW so the agent does not falsely confirm it.
+    console.error('[bookingManager] CRITICAL: could not resolve lead for booking', { externalSessionId, channel, phone: booking.phone });
+    throw new Error('Could not resolve a lead to save the booking');
   }
 }
 
