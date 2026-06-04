@@ -46,8 +46,8 @@ interface NavItem {
 const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
-  { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
