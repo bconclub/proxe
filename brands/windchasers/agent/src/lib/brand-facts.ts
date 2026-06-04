@@ -28,7 +28,7 @@ export const BRAND_IDENTITY = {
     phonePrimary: '+91 9591004043',
     phoneWhatsApp: '+91 9035098425',
     email: 'aviators@windchasers.in',
-    website: 'pilot.windchasers.in',
+    website: 'windchasers.in',
   },
 } as const;
 
@@ -46,6 +46,10 @@ export const LOCKED_ANSWERS = {
     display: '18 to 24 months',
     displaySpoken: 'eighteen to twenty four months',
     rule: 'NEVER quote shorter. NEVER quote location-specific shorter timelines (no "12 to 18 months abroad" or "8 to 12 months overseas"). Same timeline whether in India or abroad.',
+  },
+  batchSchedule: {
+    display: 'A new batch starts on the 7th of every month',
+    rule: 'When asked when the next batch / ground classes start, ANSWER DIRECTLY with the fact: a new batch starts on the 7th of every month (e.g. the June batch starts on 7 June, July batch on 7 July). Do NOT say it "depends on readiness/eligibility" and do NOT deflect the batch date to a counsellor — give the 7th-of-the-month answer first, then you may offer the counsellor for enrolment specifics.',
   },
   dgcaSequence: {
     display:
@@ -187,7 +191,7 @@ export const PRIMARY_CTAS = {
     label: 'Book a Demo Session',
     description: 'Come to the Kothanur campus, meet the team, sit in the simulator',
     intent: 'demo_session',
-    url: 'https://pilot.windchasers.in/demo',
+    url: 'https://windchasers.in/demo',
     whenToPush:
       'After 2 to 3 substantive questions, or when the user signals seriousness. Default close for chat conversations.',
   },
@@ -195,7 +199,7 @@ export const PRIMARY_CTAS = {
     label: 'Book a 1-on-1 Consultation',
     description: 'A real conversation with a counsellor about your specific situation',
     intent: 'consultation',
-    url: 'https://pilot.windchasers.in/demo?intent=consultation',
+    url: 'https://windchasers.in/demo?intent=consultation',
     whenToPush:
       'When the user is not ready to visit but wants a deeper conversation. Or as fallback after Demo Session is declined.',
   },
@@ -203,7 +207,7 @@ export const PRIMARY_CTAS = {
     label: 'Take the Pilot Assessment',
     description: '3-minute test that scores aptitude and fit',
     intent: 'assessment',
-    url: 'https://pilot.windchasers.in/assessment',
+    url: 'https://windchasers.in/assessment',
     whenToPush:
       'Lower-commitment alternative for users not ready for any booking. Surface only on second or third exchange.',
   },
@@ -239,6 +243,7 @@ LOCKED FACTS — These take precedence over knowledge base retrieval.
 =================================================================================
 COST: ${LOCKED_ANSWERS.cost.display}. Covers ${LOCKED_ANSWERS.cost.covers}. ${LOCKED_ANSWERS.cost.rule}
 TIMELINE: ${LOCKED_ANSWERS.timeline.display}. ${LOCKED_ANSWERS.timeline.rule}
+BATCH SCHEDULE: ${LOCKED_ANSWERS.batchSchedule.display}. ${LOCKED_ANSWERS.batchSchedule.rule}
 DGCA SEQUENCE: ${LOCKED_ANSWERS.dgcaSequence.display}. ${LOCKED_ANSWERS.dgcaSequence.rule}
 DGCA FRAMING: ${LOCKED_ANSWERS.dgcaFraming.display}. ${LOCKED_ANSWERS.dgcaFraming.rule}
 FACULTY: ${LOCKED_ANSWERS.faculty.display}. ${LOCKED_ANSWERS.faculty.rule}

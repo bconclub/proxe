@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-04 07:38 IST · Windchasers: agent behaviour, inbox display, attribution, booking detection
+
+Agent behaviour (`brand-facts.ts`, `windchasers-prompt.ts`, `windchasers-web-prompt.ts`):
+- BATCH SCHEDULE locked fact: "a new batch starts on the 7th of every month". Agent must answer the batch-start question directly instead of "depends on readiness" / deflecting to a counsellor.
+- NAME HANDLING guard (rule #7, both channels): "NAME and I" / "I'm NAME" / a bare name = ONE person (the sender). Never "you and NAME" or "both of you" — fixes the "you and Vivan" blunder where one person was treated as two.
+- Also carried (pre-existing in brand-facts, part of the domain migration): website + demo/consultation/assessment CTA URLs moved pilot.windchasers.in → windchasers.in.
+
+Inbox / messaging (`web/chat/route.ts`, `inbox/page.tsx`, `services/utils.ts`):
+- Anonymous web sessions now CAPTURE the name the visitor typed in chat onto web_sessions.customer_name (the profile/name extraction was gated on leadId and never ran for anonymous sessions). The inbox list + right panel show that name instead of "Anonymous Web Visitor".
+- stripHTML now PRESERVES newlines (collapses only horizontal whitespace) so formatted WhatsApp replies render with their line breaks / bullets / paragraphs in the inbox instead of one wall of text.
+
+Lead staging (`leads/score/route.ts`):
+- Comprehensive booking detection: checks nested web/whatsapp/voice booking shapes and treats a booking_date alone as booked. Previously ~2/3 of booked leads never reached Key Events.
+
+Attribution (`attribution.ts`, `LeadsTable.tsx`, `whatsapp/meta/route.ts`):
+- New 'meta_forms_clickthrough' source ("Meta Forms Click-through"). Meta lead-form "Chat on WhatsApp" leads are detected from the form-prefill first message and tagged with this source instead of "Direct".
+
+- Note: anonymous-name capture and the newline fix apply to NEW messages/sessions; already-stored data isn't retroactively fixed.
+- (SHAs below)
+
 ## 2026-06-04 05:06 IST · Windchasers: fix empty pipeline + rebuild stage logic
 
 - `api/dashboard/leads/route.ts` — FIX: the pipeline showed 0 leads in every column despite 95 staged leads. The default newsletter-exclusion used a PostgREST `.not('…form_type','eq','newsletter')` filter, which generates `form_type <> 'newsletter'` → NULL (excluded) for every lead whose nested form_type is NULL (i.e. all 95). Replaced with a NULL-safe JS `!== 'newsletter'` post-filter. Pipeline now populates.
