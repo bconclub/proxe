@@ -1,6 +1,6 @@
 'use client'
 
-import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
+import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 
 // Helper to get theme accent color
 const getAccentColor = () => {
@@ -9,16 +9,36 @@ const getAccentColor = () => {
 }
 
 // Sparkline - Minimal line chart for trends
-export function Sparkline({ data, color, height = 40, showGradient = false }: { 
-  data: Array<{ value: number }>, 
-  color?: string, 
+export function Sparkline({ data, color, height = 40, showGradient = false, amplify = 0.85 }: {
+  data: Array<{ value: number }>,
+  color?: string,
   height?: number,
-  showGradient?: boolean 
+  showGradient?: boolean,
+  /**
+   * How much of the chart height the series' own min→max range should fill
+   * (0–1). At 1 the line spans edge-to-edge; lower values leave headroom.
+   * We default below 1 so peaks read as tall *spikes* with a little breathing
+   * room rather than slamming the top edge. Lower this once real volume makes
+   * the series naturally full.
+   */
+  amplify?: number
 }) {
   const defaultColor = color || getAccentColor()
   const chartData = data.map((d, i) => ({ name: i, value: d.value }))
   const gradientId = `gradient-${defaultColor.replace(/[^a-zA-Z0-9]/g, '')}`
-  
+
+  // Pin the Y domain to the series' own range so EVERY day's movement uses the
+  // full height instead of squishing into a thin band under one dominant spike
+  // (which read as "flat and low"). `amplify` pads the domain so the range
+  // fills `amplify` fraction of the height — taller spikes, slight headroom.
+  const vals = data.map((d) => d.value)
+  let lo = vals.length ? Math.min(...vals) : 0
+  let hi = vals.length ? Math.max(...vals) : 1
+  if (lo === hi) { lo -= 1; hi += 1 } // flat series → give it a visible band
+  const span = hi - lo
+  const headroom = span * (1 / Math.max(amplify, 0.2) - 1) / 2
+  const domain: [number, number] = [lo - headroom, hi + headroom]
+
   if (showGradient) {
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -29,8 +49,9 @@ export function Sparkline({ data, color, height = 40, showGradient = false }: {
               <stop offset="100%" stopColor={defaultColor} stopOpacity={0} />
             </linearGradient>
           </defs>
+          <YAxis hide domain={domain} />
           <Area
-            type="basis"
+            type="monotone"
             dataKey="value"
             fill={`url(#${gradientId})`}
             stroke={defaultColor}
@@ -42,12 +63,13 @@ export function Sparkline({ data, color, height = 40, showGradient = false }: {
       </ResponsiveContainer>
     )
   }
-  
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+        <YAxis hide domain={domain} />
         <Line
-          type="basis"
+          type="monotone"
           dataKey="value"
           stroke={defaultColor}
           strokeWidth={2}

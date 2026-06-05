@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 12:50 IST · Windchasers: At-a-Glance sparklines — taller, livelier spikes
+
+- The trend mini-charts read as flat and low ("looks like no movement / not enough leads"). Two causes: `type="basis"` (a smoothing spline that doesn't touch the data points, so a lone spike gets averaged down) and no pinned Y domain (small daily movement squished into a thin band under one dominant spike).
+- `MicroCharts.tsx` (Sparkline) — curve switched to `monotone` so spikes reach their true peak; added a hidden `YAxis` whose domain is pinned to the series' own min→max via a new `amplify` knob (default 0.85) so every day's movement fills most of the height with a little headroom. Flat series get a guaranteed visible band. Lower `amplify` later once real volume makes the lines naturally full.
+- `FounderDashboard.tsx` — the four At-a-Glance card sparklines (Conversations, Engaged, Warm, Total) grew 36px → 48px so the taller spikes have physical room. Only these four use Sparkline, so no other chart changes.
+
 ## 2026-06-04 12:35 IST · Windchasers: sidebar icons no longer shift on hover-expand
 
 - The nav icons jumped ~4px when the rail expanded because three things swapped between collapsed/expanded states at once: nav padding (0→8px horizontal), item margin (6→4px), and the item flipped from `justify-center` + `10px` padding to `justify-start` + `7px 12px` (icon moved from centered to left-aligned).

@@ -441,8 +441,8 @@ export default function FounderDashboard() {
             </p>
           </div>
           {getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data)} color="#3B82F6" height={36} />
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data)} color="#3B82F6" height={48} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -484,8 +484,8 @@ export default function FounderDashboard() {
             </p>
           </div>
           {getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data)} color="#22C55E" height={36} showGradient={true} />
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data)} color="#22C55E" height={48} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -529,8 +529,8 @@ export default function FounderDashboard() {
             </p>
           </div>
           {getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data)} color="#F97316" height={36} showGradient={true} />
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data)} color="#F97316" height={48} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -572,8 +572,8 @@ export default function FounderDashboard() {
             </p>
           </div>
           {getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data)} color="var(--accent-primary)" height={36} showGradient={true} />
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data)} color="var(--accent-primary)" height={48} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
