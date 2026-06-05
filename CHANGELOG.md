@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 16:00 IST · BCON: DB fix — `meta_forms` now allowed on `last_touchpoint` (Meta lead inserts were failing)
+
+- **Campaign-blocking bug found via end-to-end inbound test.** The two touchpoint check-constraints on `all_leads` were out of sync: `first_touchpoint_check` included `'meta_forms'` but `last_touchpoint_check` did **not**. The inbound route maps `source:"facebook"` → touchpoint `meta_forms` and sets BOTH first- and last-touchpoint to it on a new lead, so every Meta lead-form submission was rejected with `all_leads_last_touchpoint_check` violation → the lead was lost. Would have silently 500'd every Meta lead once the campaign went live.
+- Migration `allow_meta_forms_last_touchpoint` (Supabase, BCON prod `yvkauaiyranysldubnqv`): dropped + re-added `all_leads_last_touchpoint_check` with `'meta_forms'` appended so it matches `first_touchpoint_check`. Purely additive (widens allowed values) — cannot affect existing rows. On a fresh lead first==last touchpoint; last-touch only diverges later when the lead switches channel (e.g. replies on WhatsApp).
+- **E2E test PASS:** POSTed a Meta lead-form payload to `/api/agent/leads/inbound` → lead inserts, SOURCE resolves to **Meta Forms**, first touch **Meta Lead Form**, campaign/medium/content/fbclid/landing-page all captured and rendered in both the table SOURCE column and the modal Attribution tab; first-outreach task created. Test lead "ZZ Test Meta Lead" (917411100099) left in place for manual deletion.
+- FOLLOW-UP (other brand, not touched): the PROXE brand DB likely has the same `last_touchpoint_check` gap — should be checked before any Meta campaign there.
+
 ## 2026-06-05 15:40 IST · BCON: lead modal — new Attribution tab (Source / First touch / Last touch + full UTM)
 
 - The lead detail modal had no attribution view — the source/first-touch captured at intake (see 13:33 entry) wasn't surfaced anywhere in the modal. Added a dedicated **Attribution** tab (5th tab, after 30-Day Interaction), ported from Windchasers and brand-neutral (no aviation/student fields).
