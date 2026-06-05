@@ -325,7 +325,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
   const showExpanded = !isCollapsed || isHovered
-  const sidebarWidth = showExpanded ? '220px' : '56px'
+  const sidebarWidth = showExpanded ? '184px' : '56px'
   // Content margin uses only the pinned state so the main area doesn't shift on hover
   const contentMarginWidth = isCollapsed ? '56px' : '220px'
   const sidebarContentMargin = isMobile ? '0' : contentMarginWidth
@@ -383,73 +383,64 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
       >
-        {/* Logo and Toggle */}
+        {/* Logo and Toggle — the logo sits in the SAME 40px leading column as
+            the nav icons below, so it never shifts between collapsed/expanded.
+            Only the brand name reveals beside it. Slimmer, lighter header. */}
         <div
-          className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
-          style={{
-            padding: !showExpanded ? '10px' : '10px 12px',
-            justifyContent: !showExpanded ? 'center' : 'space-between',
-          }}
+          className="dashboard-layout-sidebar-header flex items-center flex-shrink-0"
+          style={{ padding: '6px 8px', minHeight: '44px' }}
         >
+          <div
+            className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
+            onClick={() => {
+              if (!showExpanded && !isMobile) {
+                setIsCollapsed(false)
+                localStorage.setItem('sidebar-collapsed', 'false')
+              }
+            }}
+            title={!showExpanded ? 'Click to expand sidebar' : undefined}
+          >
+            <img
+              src="/logo.png"
+              alt="Windchasers"
+              className="object-contain"
+              style={{ width: '24px', height: '24px' }}
+            />
+          </div>
           {showExpanded && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
+              <h1
+                className="dashboard-layout-sidebar-logo flex-1 truncate"
+                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+              >
+                Windchasers
+              </h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
-                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
+                  className="dashboard-layout-sidebar-toggle-button p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   aria-label="Collapse sidebar"
                 >
-                  <MdChevronLeft size={20} />
+                  <MdChevronLeft size={18} />
                 </button>
               )}
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
-                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
+                  className="dashboard-layout-sidebar-close-button p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   aria-label="Close sidebar"
                 >
-                  <MdClose size={20} />
+                  <MdClose size={18} />
                 </button>
               )}
             </>
-          )}
-          {!showExpanded && (
-            <div
-              className="dashboard-layout-sidebar-logo-collapsed flex items-center justify-center cursor-pointer"
-              style={{
-                width: '32px',
-                height: '32px',
-              }}
-              onClick={() => {
-                if (!isMobile) {
-                  setIsCollapsed(false)
-                  localStorage.setItem('sidebar-collapsed', 'false')
-                }
-              }}
-              title="Click to expand sidebar"
-            >
-              <img
-                src="/logo.png"
-                alt="Windchasers"
-                className="w-full h-full object-contain"
-                style={{ maxWidth: '32px', maxHeight: '32px' }}
-              />
-            </div>
           )}
         </div>
 

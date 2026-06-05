@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-04 13:05 IST · Windchasers: sidebar header simplified + narrower rail + pinned logo
+
+- `DashboardLayout.tsx`:
+  - The header swapped a centered logo (collapsed) for left-aligned bold text (expanded), so the top anchor jumped on expand — which read as "finicky / not exact" even though the nav icons were already pinned. The logo now lives in the SAME 40px leading column as the nav icons (center pinned at 28px), so it never moves; only the brand name reveals beside it.
+  - Header slimmed: padding 10px → 6px 8px, min-height ~44px. Brand name simplified from `text-xl font-black` (20px/900) to 15px / weight 600. Collapse/close buttons toned down (size 20 → 18, muted colour).
+  - Expanded rail narrowed 220px → 184px so labels just fit instead of floating in extra width.
+
 ## 2026-06-04 12:50 IST · Windchasers: At-a-Glance sparklines — taller, livelier spikes
 
 - The trend mini-charts read as flat and low ("looks like no movement / not enough leads"). Two causes: `type="basis"` (a smoothing spline that doesn't touch the data points, so a lone spike gets averaged down) and no pinned Y domain (small daily movement squished into a thin band under one dominant spike).
