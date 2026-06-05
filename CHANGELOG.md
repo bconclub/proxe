@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 15:40 IST · BCON: lead modal — new Attribution tab (Source / First touch / Last touch + full UTM)
+
+- The lead detail modal had no attribution view — the source/first-touch captured at intake (see 13:33 entry) wasn't surfaced anywhere in the modal. Added a dedicated **Attribution** tab (5th tab, after 30-Day Interaction), ported from Windchasers and brand-neutral (no aviation/student fields).
+- `LeadDetailsModal.tsx` — reads `unified_context.attribution`; renders Source, First touch, Last touch, then rich ad fields (Campaign, Ad/Content, Medium, UTM Source, Ad set ID, Term/Ad ID, Facebook click ID, Reel/Branded ID, Referrer, Captured at) — each row shown only when a value exists. Falls back to legacy `first_touchpoint`/`last_touchpoint` and parses `page_url` query params (fbclid, utm_id, …) when the `utm{}` block is sparse. Landing page shown at the bottom.
+- Empty state: "No attribution data captured for this lead." (legacy leads pre-attribution). Type-checks clean (only the 4 pre-existing `template-sync` worker errors remain, not mine).
+
 ## 2026-06-05 15:10 IST · Windchasers: REVERT the score-persistence change (regression — tanked Avg Lead Score)
 
 - The earlier score-persistence change recomputed EVERY lead via the `calculate_lead_score` RPC (all had a null `last_scored_at`) and persisted it, overwriting the previously-higher stored scores with this RPC's lower, decay-applied values. Result: Avg Lead Score ~40% → 14%, warm leads ~21 → 5.

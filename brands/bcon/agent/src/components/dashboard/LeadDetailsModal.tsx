@@ -258,7 +258,7 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -2073,6 +2073,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             >
               30-Day Interaction
             </button>
+            <button
+              onClick={() => setActiveTab('attribution')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-attribution px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'attribution'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'attribution'}
+              aria-controls="lead-tabpanel-attribution"
+              id="lead-tab-attribution"
+            >
+              Attribution
+            </button>
           </nav>
 
           {/* TAB CONTENT - Scrollable */}
@@ -2711,6 +2724,116 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         No interaction data available
                       </div>
                     )}
+                  </section>
+                )}
+
+                {/* Attribution Tab — Source / First touch / Last touch + UTM */}
+                {activeTab === 'attribution' && (
+                  <section
+                    id="lead-tabpanel-attribution"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-attribution"
+                    className="lead-tabpanel-attribution space-y-4"
+                  >
+                    {(() => {
+                      const attribution: any = currentLead.unified_context?.attribution || {};
+                      const utm = attribution.utm || {};
+
+                      // Page-URL is a great fallback source for utm + fb fields
+                      // because the website appends every parameter. Try to
+                      // surface ad_id (utm_id) and fbclid even when utm{} is sparse.
+                      let urlParams: Record<string, string> = {};
+                      try {
+                        if (attribution.page_url) {
+                          const fullUrl = attribution.page_url.startsWith('http')
+                            ? attribution.page_url
+                            : `https://example.com${attribution.page_url}`;
+                          const u = new URL(fullUrl);
+                          u.searchParams.forEach((v, k) => { urlParams[k] = v; });
+                        }
+                      } catch { /* malformed URL — skip */ }
+
+                      const sourceLabel = attribution.source_label
+                        || (attribution.source ? String(attribution.source).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const firstTouchLabel = attribution.first_touch_label
+                        || (attribution.first_touch ? String(attribution.first_touch).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const legacyFirst = (currentLead as any).first_touchpoint;
+                      const legacyLast = (currentLead as any).last_touchpoint;
+                      const finalSource = sourceLabel || 'Direct';
+                      const finalFirstTouch = firstTouchLabel
+                        || (legacyFirst ? String(legacyFirst).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
+                      const finalLastTouch = legacyLast
+                        ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        : null;
+
+                      // Rich UTM / ad fields — pull from utm{}, fall back to URL params
+                      const utmSource   = utm.source   || urlParams.utm_source   || null;
+                      const utmMedium   = utm.medium   || urlParams.utm_medium   || null;
+                      const utmCampaign = utm.campaign || urlParams.utm_campaign || null;
+                      const utmContent  = utm.content  || urlParams.utm_content  || null;
+                      const utmTerm     = utm.term     || urlParams.utm_term     || null;
+                      const utmId       = utm.id       || utm.utm_id || urlParams.utm_id || null;
+                      const fbclid      = urlParams.fbclid || null;
+                      const brid        = urlParams.brid || null;
+                      const referrer    = attribution.referrer || (currentLead.unified_context as any)?.raw_form_fields?.referrer || null;
+                      const capturedAt  = attribution.captured_at || null;
+
+                      // Show a row only if we have a value worth displaying
+                      const rows: Array<{ label: string; value: string; mono?: boolean }> = [];
+                      if (finalSource)      rows.push({ label: 'Source',      value: finalSource });
+                      if (finalFirstTouch)  rows.push({ label: 'First touch', value: finalFirstTouch });
+                      if (finalLastTouch)   rows.push({ label: 'Last touch',  value: finalLastTouch });
+                      if (utmCampaign)      rows.push({ label: 'Campaign',    value: String(utmCampaign) });
+                      if (utmContent)       rows.push({ label: 'Ad / Content',value: String(utmContent) });
+                      if (utmMedium)        rows.push({ label: 'Medium',      value: String(utmMedium) });
+                      if (utmSource)        rows.push({ label: 'UTM Source',  value: String(utmSource) });
+                      if (utmId)            rows.push({ label: 'Ad set ID',   value: String(utmId), mono: true });
+                      if (utmTerm)          rows.push({ label: 'Term / Ad ID',value: String(utmTerm), mono: true });
+                      if (fbclid)           rows.push({ label: 'Facebook click ID', value: String(fbclid).slice(0, 40) + (String(fbclid).length > 40 ? '…' : ''), mono: true });
+                      if (brid)             rows.push({ label: 'Reel/Branded ID',   value: String(brid).slice(0, 40) + (String(brid).length > 40 ? '…' : ''), mono: true });
+                      if (referrer)         rows.push({ label: 'Referrer',    value: String(referrer) });
+                      if (capturedAt) {
+                        try {
+                          rows.push({ label: 'Captured at', value: new Date(capturedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) });
+                        } catch { /* skip */ }
+                      }
+
+                      if (rows.length === 0) {
+                        return (
+                          <div className="lead-attribution-empty text-sm text-center py-8 text-[var(--text-muted)]">
+                            No attribution data captured for this lead.
+                          </div>
+                        );
+                      }
+                      return (
+                        <article className="lead-attribution-panel p-4 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)]">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                            Attribution
+                          </h3>
+                          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            {rows.map((r) => (
+                              <div key={r.label} className="flex flex-col">
+                                <dt className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{r.label}</dt>
+                                <dd
+                                  className={`text-[12px] font-medium text-[var(--text-primary)] truncate ${r.mono ? 'font-mono text-[11px]' : ''}`}
+                                  title={r.value}
+                                >
+                                  {r.value}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                          {attribution.page_url && (
+                            <div className="mt-3 pt-3 border-t border-[var(--border-primary)]">
+                              <dt className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1">Landing page</dt>
+                              <dd className="text-[11px] font-mono break-all text-[var(--text-secondary)]" title={attribution.page_url}>
+                                {attribution.page_url}
+                              </dd>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })()}
                   </section>
                 )}
               </div>
