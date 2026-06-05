@@ -367,7 +367,7 @@ export default function FounderDashboard() {
           <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} />
+              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} valueFormatter={(v) => `${Math.round(v)}`} showPercentage={false} />
               <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
             </div>
             <div className="flex flex-col items-center">
@@ -411,9 +411,9 @@ export default function FounderDashboard() {
               {metrics.totalConversations.total} all time
             </p>
           </div>
-          {metrics.trends?.conversations && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.conversations.data} color="#3B82F6" height={36} />
+          {(metrics.trends?.conversations?.data?.length ?? 0) > 0 && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={metrics.trends!.conversations.data} color="#3B82F6" height={48} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -451,9 +451,9 @@ export default function FounderDashboard() {
               {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%
             </p>
           </div>
-          {metrics.trends?.leads && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="#22C55E" height={36} showGradient={true} />
+          {(metrics.trends?.leads?.data?.length ?? 0) > 0 && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={metrics.trends!.leads.data} color="#22C55E" height={48} showGradient={true} />
             </div>
           )}
           <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline mt-2 sm:mt-0" style={{ color: '#22C55E' }}>
@@ -484,9 +484,9 @@ export default function FounderDashboard() {
               Score 40–69
             </p>
           </div>
-          {metrics.trends?.leads && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="#F97316" height={36} showGradient={true} />
+          {(metrics.trends?.leads?.data?.length ?? 0) > 0 && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={metrics.trends!.leads.data} color="#F97316" height={48} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">
@@ -527,9 +527,9 @@ export default function FounderDashboard() {
               {metrics.totalLeads.count} all time
             </p>
           </div>
-          {metrics.trends?.leads && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
-              <Sparkline data={metrics.trends.leads.data} color="var(--accent-primary)" height={36} showGradient={true} />
+          {(metrics.trends?.leads?.data?.length ?? 0) > 0 && (
+            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+              <Sparkline data={metrics.trends!.leads.data} color="var(--accent-primary)" height={48} showGradient={true} />
             </div>
           )}
           <div className="flex items-center justify-between mt-2 sm:mt-0">

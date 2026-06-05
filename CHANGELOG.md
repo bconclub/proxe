@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 19:10 IST · BCON: Overview dashboard parity (part 1) — Avg Lead Score gauge + taller sparklines
+
+- User-facing (home/Overview): the "At a Glance" Avg Lead Score gauge showed a percentage ("50%"); it's a score out of 100, not a percent. Now renders as a plain number ("50"), matching Windchasers and the per-lead cards.
+- The four trend sparklines (Conversations / Engaged / Warm / Total) were cramped at 36px and could render empty; now 48px (matches WC, ~33% taller/more readable) with empty-data guards so they only render when there's data.
+- `FounderDashboard.tsx` only — pure UI, no metric/backend changes.
+- Part 1 of the Overview parity pass. Part 2 (the "Today's Snapshot" golden button + its endpoint, time-period-aware card subtitles) is next — a larger feature with its own API, done as a separate unit.
+
 ## 2026-06-05 18:45 IST · BCON: Inbox aesthetic ported from Windchasers (channel icons, template card, Meta-form card)
 
 - The Inbox visuals were well behind Windchasers. Ported the full rendering treatment (BCON brand-isolated — no aviation/student concepts).
