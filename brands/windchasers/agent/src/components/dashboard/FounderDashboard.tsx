@@ -396,7 +396,7 @@ export default function FounderDashboard() {
           <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} />
+              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} valueFormatter={(v) => `${Math.round(v)}`} showPercentage={false} />
               <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
             </div>
             <div className="flex flex-col items-center">

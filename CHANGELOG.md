@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 17:30 IST · Windchasers: Avg Lead Score is a score, not a percentage
+
+- The "At a Glance" Avg Lead Score gauge rendered "50%". It's an average of lead scores (sum ÷ count, out of 100), not a percentage.
+- `FounderDashboard.tsx` — the Avg Lead Score RadialProgress now uses a plain-number formatter (`${Math.round(v)}`, showPercentage=false), so it reads "50" instead of "50%". The ring still fills as a 0–100 gauge. Response Rate / Key Event Rate stay as percentages (correct); Avg Response stays "ms".
+- Also restored earlier this turn (direct DB write, no code): all 144 lead scores re-derived from the client calculateLeadScore (the modal value) — avg 14→50, warm 5→81 — so the dashboard matches the per-lead cards.
+
 ## 2026-06-05 17:20 IST · BCON: web chat widget now captures utm attribution (closes the last attribution gap)
 
 - Web-chat leads previously had no marketing signal (web_sessions store no utm) so they always resolved to Direct. Now the chat widget captures the landing-page attribution and feeds it through to the lead.
