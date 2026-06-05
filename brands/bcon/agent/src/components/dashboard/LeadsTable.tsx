@@ -577,16 +577,15 @@ export default function LeadsTable({
       <div className="overflow-x-auto overflow-y-auto flex-1 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            {/* Tightened column widths: Lead/Contact were oversized,
-                Booking was a wide text column (now a compact chip),
-                Type/Course are narrow chip columns. */}
-            <col style={{ width: '16%' }} />  {/* Lead */}
-            <col style={{ width: '16%' }} />  {/* Contact */}
-            <col style={{ width: '9%' }} />   {/* Source (origin, immutable) */}
-            <col style={{ width: '8%' }} />   {/* Last Touch */}
-            <col style={{ width: '6%' }} />   {/* Score */}
-            <col style={{ width: '10%' }} />  {/* Stage */}
-            <col style={{ width: '7%' }} />   {/* Active */}
+            {/* Column widths sum to 100% (table-layout: fixed). Source +
+                Last Touch get extra room for their two-line content. */}
+            <col style={{ width: '18%' }} />  {/* Lead */}
+            <col style={{ width: '17%' }} />  {/* Contact */}
+            <col style={{ width: '14%' }} />  {/* Source (origin + entry point) */}
+            <col style={{ width: '12%' }} />  {/* Last Touch */}
+            <col style={{ width: '7%' }} />   {/* Score */}
+            <col style={{ width: '12%' }} />  {/* Stage */}
+            <col style={{ width: '9%' }} />   {/* Active */}
             <col style={{ width: '11%' }} />  {/* Booking (chip) */}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>

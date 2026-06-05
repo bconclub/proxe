@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-05 13:20 IST · BCON: fix LeadsTable column widths (regression from aviation-column removal)
+
+- Removing the two aviation `<col>` entries earlier left the `colgroup` summing to ~83%, so `table-layout: fixed` stretched the remaining columns and the table looked misaligned.
+- Rebalanced the 8 columns to sum to 100% (Lead 18, Contact 17, Source 14, Last Touch 12, Score 7, Stage 12, Active 9, Booking 11), giving Source + Last Touch extra room for their two-line content.
+
 ## 2026-06-05 13:02 IST · BCON: richer LeadsTable — city+date in Lead, two-layer Source (like Windchasers, no aviation)
 
 - Brought BCON's leads table up to the Windchasers richness the team expected, without any aviation/student content.
