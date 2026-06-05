@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-05 19:40 IST · BCON: Overview parity (part 2) — Today's Snapshot button + endpoint
+
+- The home dashboard was missing Windchasers' "Today's Snapshot" quick-glance — a top-right floating button that opens a modal of recent activity. Ported it, brand-isolated (no aviation PAT / demo / parent-student concepts).
+  - NEW `GET /api/dashboard/today-snapshot` — auth-gated, service-role read. Returns, for a time window (today / 7d / 14d / 28d, IST): leads total + **by source** (uses our attribution `source_label`, falls back to first_touchpoint → Meta/WhatsApp/Google/Form/…), score histogram (hot/warm/cold/unscored), events (**bookings, agent replies, calls logged**), and top-5 most-active leads. All DB columns schema-verified before shipping.
+  - NEW `TodaySnapshotButton.tsx` — floating button + modal: 4-KPI strip (New leads / Bookings / Agent replies / Calls logged), by-source bars, score distribution, activity, most-active leads (click → opens that lead's inbox). Range segmented control (Today/7d/14d/28d), refresh, skeleton loader. Theme-aware accent (`--accent-primary`) instead of WC's brand gold.
+  - Wired into `FounderDashboard.tsx`.
+- Completes the Overview parity pass (part 1 = gauge + sparklines, part 2 = this). Aviation bits from WC (PAT submitted, Demos, Parent/Student type) deliberately excluded.
+
 ## 2026-06-05 19:10 IST · BCON: Overview dashboard parity (part 1) — Avg Lead Score gauge + taller sparklines
 
 - User-facing (home/Overview): the "At a Glance" Avg Lead Score gauge showed a percentage ("50%"); it's a score out of 100, not a percent. Now renders as a plain number ("50"), matching Windchasers and the per-lead cards.

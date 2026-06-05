@@ -1,0 +1,425 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
+
+/**
+ * TodaySnapshotButton — top-right floating button that opens a quick-glance
+ * popup of recent activity (default: today, midnight IST → now). Ported from
+ * Windchasers, trimmed to BCON's business context (no aviation PAT / demo /
+ * parent-student concepts). Theme-aware accent instead of WC's brand gold.
+ */
+
+interface SnapshotData {
+  window: { startIso: string; endIso: string; label: string; range?: string }
+  leads: { total: number; bySource: Record<string, number> }
+  events: {
+    bookings: number
+    calls_logged: number
+    agent_replies: number
+  }
+  scoreHistogram: { hot: number; warm: number; cold: number; unscored: number }
+  topActive: Array<{ id: string; name: string; phone: string | null; score: number | null; messageCount: number }>
+}
+
+type RangeKey = 'today' | '7d' | '14d' | '28d'
+const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
+  { key: 'today', label: 'Today' },
+  { key: '7d',    label: '7d' },
+  { key: '14d',   label: '14d' },
+  { key: '28d',   label: '28d' },
+]
+
+export default function TodaySnapshotButton() {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<SnapshotData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState<RangeKey>('today')
+
+  async function fetchSnapshot(rangeArg: RangeKey = range) {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/dashboard/today-snapshot?range=${rangeArg}`, { credentials: 'include' })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `Snapshot failed (${res.status})`)
+      }
+      setData(await res.json())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load snapshot')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch on open + whenever range changes
+  useEffect(() => {
+    if (open) void fetchSnapshot(range)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, range])
+
+  return (
+    <>
+      {/* Trigger — small icon-only button, top-right. Theme-aware accent. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg hover:opacity-90 transition"
+        style={{
+          top: '14px',
+          right: '20px',
+          width: '32px',
+          height: '32px',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--accent-primary)',
+          color: 'var(--accent-primary)',
+          backdropFilter: 'blur(8px)',
+        }}
+        aria-label="Open today's snapshot"
+        title="Today's snapshot"
+      >
+        <MdToday size={16} />
+      </button>
+
+      {!open ? null : (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[70]"
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Modal — centered */}
+          <div
+            role="dialog"
+            aria-label="Today's snapshot"
+            className="fixed z-[71] rounded-2xl border shadow-2xl flex flex-col"
+            style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(720px, 94vw)',
+              maxHeight: '88vh',
+              background: 'var(--bg-secondary)',
+              borderColor: 'var(--border-primary)',
+              color: 'var(--text-primary)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center gap-2 px-3 py-2.5 border-b"
+              style={{ borderColor: 'var(--border-primary)' }}
+            >
+              <MdToday size={16} style={{ color: 'var(--accent-primary)' }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold leading-tight truncate">
+                  {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
+                </div>
+                <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {range === 'today'
+                    ? new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
+                    : data?.window?.startIso
+                      ? `Since ${new Date(data.window.startIso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`
+                      : '—'}
+                </div>
+              </div>
+
+              {/* Range pills — segmented control */}
+              <div
+                role="tablist"
+                aria-label="Time range"
+                className="flex items-center rounded-full border overflow-hidden shrink-0"
+                style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}
+              >
+                {RANGE_OPTIONS.map((opt) => {
+                  const active = range === opt.key
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setRange(opt.key)}
+                      className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                      style={{
+                        color: active ? '#fff' : 'var(--text-secondary)',
+                        background: active ? 'var(--accent-primary)' : 'transparent',
+                      }}
+                      disabled={loading && active}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => fetchSnapshot()}
+                className="p-1 rounded hover:opacity-80"
+                title="Refresh"
+                disabled={loading}
+              >
+                <MdRefresh size={14} className={loading ? 'animate-spin' : ''} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-1 rounded hover:opacity-80"
+                title="Close"
+                aria-label="Close"
+              >
+                <MdClose size={14} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {error && (
+                <div
+                  className="px-2.5 py-1.5 rounded text-[11px]"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {!data && loading && <SnapshotSkeleton range={range} />}
+
+              {data && (
+                <>
+                  {/* Top KPI strip — 4 hero numbers */}
+                  <div className="grid grid-cols-4 gap-2 mb-1">
+                    <KpiCell label="New leads" value={data.leads.total} accent="#8B5CF6" />
+                    <KpiCell label="Bookings" value={data.events.bookings} accent="#22c55e" />
+                    <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
+                    <KpiCell label="Calls logged" value={data.events.calls_logged} accent="#f59e0b" />
+                  </div>
+
+                  {/* 2-column grid: source + score / events + top active */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Source breakdown */}
+                    <section
+                      className="p-3 rounded-lg border"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                    >
+                      <SectionLabel>By source</SectionLabel>
+                      {Object.keys(data.leads.bySource).length === 0 ? (
+                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          No leads yet in this window.
+                        </div>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {Object.entries(data.leads.bySource)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([src, n]) => {
+                              const pct = data.leads.total > 0 ? Math.round((n / data.leads.total) * 100) : 0
+                              return (
+                                <li key={src} className="flex items-center gap-2">
+                                  <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{src}</span>
+                                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--accent-primary)' }} />
+                                  </div>
+                                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{n}</span>
+                                </li>
+                              )
+                            })}
+                        </ul>
+                      )}
+                    </section>
+
+                    {/* Score histogram */}
+                    <section
+                      className="p-3 rounded-lg border"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                    >
+                      <SectionLabel>Score distribution</SectionLabel>
+                      <div className="space-y-1.5">
+                        <ScoreRow label="Hot 70+" n={data.scoreHistogram.hot} color="#22c55e" total={data.leads.total} />
+                        <ScoreRow label="Warm 40-69" n={data.scoreHistogram.warm} color="#f59e0b" total={data.leads.total} />
+                        <ScoreRow label="Cold <40" n={data.scoreHistogram.cold} color="#ef4444" total={data.leads.total} />
+                        <ScoreRow label="Unscored" n={data.scoreHistogram.unscored} color="#6b7280" total={data.leads.total} />
+                      </div>
+                    </section>
+
+                    {/* Activity events detail */}
+                    <section
+                      className="p-3 rounded-lg border"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                    >
+                      <SectionLabel>Activity</SectionLabel>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <EventCell label="Bookings" value={data.events.bookings} />
+                        <EventCell label="Agent replies" value={data.events.agent_replies} />
+                        <EventCell label="Calls logged" value={data.events.calls_logged} />
+                      </div>
+                    </section>
+
+                    {/* Top active leads */}
+                    <section
+                      className="p-3 rounded-lg border"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                    >
+                      <SectionLabel>{range === 'today' ? 'Most active today' : 'Most active'}</SectionLabel>
+                      {data.topActive.length === 0 ? (
+                        <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          No customer messages yet in this window.
+                        </div>
+                      ) : (
+                        <ul className="space-y-1">
+                          {data.topActive.slice(0, 4).map((l) => (
+                            <li key={l.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpen(false)
+                                  router.push(`/dashboard/inbox?lead=${l.id}`)
+                                }}
+                                className="w-full text-left p-1.5 rounded-md hover:opacity-90 transition flex items-center gap-2"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[11px] font-semibold truncate">{l.name}</div>
+                                  <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                    {l.phone || '—'} · score {l.score == null ? '—' : l.score}
+                                  </div>
+                                </div>
+                                <span
+                                  className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                                  style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                                >
+                                  {l.messageCount} msg
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+function KpiCell({ label, value, accent }: { label: string; value: number; accent: string }) {
+  return (
+    <div
+      className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
+      style={{ background: `${accent}10`, borderColor: `${accent}40` }}
+    >
+      <span className="text-[22px] font-bold leading-none tabular-nums" style={{ color: accent }}>{value}</span>
+      <span className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="text-[10px] font-semibold uppercase tracking-wider mb-2"
+      style={{ color: 'var(--text-muted)' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function ScoreRow({ label, n, color, total }: { label: string; n: number; color: string; total: number }) {
+  const pct = total > 0 ? Math.round((n / total) * 100) : 0
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[11px] font-medium w-[80px] shrink-0" style={{ color }}>{label}</span>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{n}</span>
+    </div>
+  )
+}
+
+function EventCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div
+      className="px-2.5 py-1.5 rounded-md flex items-center justify-between"
+      style={{ background: 'rgba(255,255,255,0.03)' }}
+    >
+      <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      <span className="text-[13px] font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{value}</span>
+    </div>
+  )
+}
+
+/**
+ * Full-layout skeleton for the snapshot modal — mirrors the final shape
+ * (4-KPI strip + 2×2 section grid) with a rotating status line.
+ */
+function SnapshotSkeleton({ range }: { range: RangeKey }) {
+  const base = range === 'today' ? "today's leads" : range === '7d' ? 'leads from the last 7 days' : range === '14d' ? 'leads from the last 14 days' : 'leads from the last 28 days'
+  const messages = [
+    `Pulling ${base}…`,
+    'Counting bookings & replies…',
+    'Sorting by lead score…',
+    'Ranking most active conversations…',
+  ]
+  const [msgIdx, setMsgIdx] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % messages.length), 700)
+    return () => clearInterval(id)
+  }, [messages.length])
+
+  const SkelBox = ({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
+    <div className={`animate-pulse rounded ${className}`} style={{ background: 'rgba(255,255,255,0.06)', ...style }} />
+  )
+
+  return (
+    <>
+      <div className="grid grid-cols-4 gap-2 mb-1">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
+            style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border-primary)' }}
+          >
+            <SkelBox className="h-6 w-10 mb-2" />
+            <SkelBox className="h-2 w-16" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {[0, 1, 2, 3].map((sec) => (
+          <section
+            key={sec}
+            className="p-3 rounded-lg border"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+          >
+            <SkelBox className="h-2.5 w-20 mb-3" />
+            <div className="space-y-2">
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} className="flex items-center gap-2">
+                  <SkelBox className="h-2.5 flex-1" />
+                  <SkelBox className="h-2.5 w-6" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-2 pt-3 pb-1" aria-live="polite">
+        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent-primary)' }} aria-hidden="true" />
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{messages[msgIdx]}</span>
+      </div>
+    </>
+  )
+}
