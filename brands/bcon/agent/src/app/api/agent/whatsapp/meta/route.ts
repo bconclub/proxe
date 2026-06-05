@@ -557,13 +557,39 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       supabase,
     );
 
-    // 10. Update lead context
+    // 10. Update lead context + persist extracted intent fields to brand-specific context
+    const { data: leadCtxRow } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    const existingCtx = leadCtxRow?.unified_context || {};
+    const existingBrandCtx = existingCtx[brand] || existingCtx.bcon || existingCtx.windchasers || {};
+
+    const intentUpdate: Record<string, string> = {};
+    if (result.intent?.userType) intentUpdate.user_type = result.intent.userType;
+    if (result.intent?.courseInterest) intentUpdate.course_interest = result.intent.courseInterest;
+    if (result.intent?.timeline) {
+      intentUpdate.timeline = result.intent.timeline;
+      intentUpdate.plan_to_fly = result.intent.timeline;
+    }
+
+    const leadUpdate: Record<string, any> = {
+      last_touchpoint: 'whatsapp',
+      last_interaction_at: new Date().toISOString(),
+    };
+
+    if (Object.keys(intentUpdate).length > 0) {
+      leadUpdate.unified_context = {
+        ...existingCtx,
+        [brand]: { ...existingBrandCtx, ...intentUpdate },
+      };
+    }
+
     await supabase
       .from('all_leads')
-      .update({
-        last_touchpoint: 'whatsapp',
-        last_interaction_at: new Date().toISOString(),
-      })
+      .update(leadUpdate)
       .eq('id', leadId);
 
     // 11. Link lead_id + phone to whatsapp session

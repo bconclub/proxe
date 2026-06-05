@@ -96,6 +96,8 @@ export async function ensureOrUpdateLead(
     return null;
   }
 
+  const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+
   try {
     // Fetch conversation context from channel session if available
     let unifiedContext: any = {};
@@ -132,7 +134,7 @@ export async function ensureOrUpdateLead(
             booking_time: sessionData.booking_time || null,
             user_inputs: userInputs,
           },
-          ...(Object.keys(brandData).length > 0 ? { bcon: brandData } : {}),
+          ...(Object.keys(brandData).length > 0 ? { [brand]: brandData } : {}),
         };
       }
     }
@@ -146,7 +148,6 @@ export async function ensureOrUpdateLead(
     // 6. Only INSERT if nothing matches
     // 7. On unique constraint violation: catch and UPDATE instead
 
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
     let existingLead: any = null;
 
     // 2. Check by normalized_phone + brand first
@@ -183,9 +184,9 @@ export async function ensureOrUpdateLead(
         ...(existingCtx[channel] || {}),
         ...(unifiedContext[channel] || {}),
       },
-      bcon: {
-        ...(existingCtx.bcon || existingCtx.windchasers || {}),
-        ...(unifiedContext.bcon || {}),
+      [brand]: {
+        ...(existingCtx[brand] || existingCtx.bcon || existingCtx.windchasers || {}),
+        ...(unifiedContext[brand] || {}),
       },
     });
 
