@@ -577,16 +577,19 @@ export default function LeadsTable({
       <div className="overflow-x-auto overflow-y-auto flex-1 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            {/* Column widths sum to 100% (table-layout: fixed). Source +
-                Last Touch get extra room for their two-line content. */}
-            <col style={{ width: '18%' }} />  {/* Lead */}
-            <col style={{ width: '17%' }} />  {/* Contact */}
-            <col style={{ width: '14%' }} />  {/* Source (origin + entry point) */}
-            <col style={{ width: '12%' }} />  {/* Last Touch */}
+            {/* Column widths sum to exactly 100% (table-layout: fixed, so these
+                are authoritative regardless of cell content; email/phone truncate).
+                Contact is kept narrow (14%, matching Windchasers) — the freed
+                width from the removed aviation columns goes to the content-heavy
+                columns (Lead, Source, Stage), NOT Contact. */}
+            <col style={{ width: '20%' }} />  {/* Lead (name + company·city + date) */}
+            <col style={{ width: '14%' }} />  {/* Contact (phone + email, truncated) */}
+            <col style={{ width: '13%' }} />  {/* Source (marketing source + entry point) */}
+            <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
             <col style={{ width: '7%' }} />   {/* Score */}
-            <col style={{ width: '12%' }} />  {/* Stage */}
-            <col style={{ width: '9%' }} />   {/* Active */}
-            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
+            <col style={{ width: '13%' }} />  {/* Stage */}
+            <col style={{ width: '10%' }} />  {/* Active */}
+            <col style={{ width: '12%' }} />  {/* Booking (chip) */}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>

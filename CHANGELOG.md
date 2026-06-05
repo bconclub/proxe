@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 13:39 IST · BCON: LeadsTable column widths — Contact/email no longer too wide (definitive)
+
+- The Contact (phone/email) column was rendering too wide vs Windchasers. Root cause: when the aviation columns were removed, the freed width got spread into Lead/Contact (Contact was 17%).
+- Re-set the 8-column `colgroup` to sum to exactly 100% with Contact at **14%** (matching Windchasers), pushing the freed width into the content-heavy columns instead: Lead 20, Contact 14, Source 13, Last Touch 11, Score 7, Stage 13, Active 10, Booking 12.
+- `table-layout: fixed` makes these authoritative regardless of email length (email already truncates), so the column sizing is now stable and won't need re-fixing.
+
 ## 2026-06-05 13:33 IST · BCON: attribution layer — SOURCE now shows the marketing place (Meta Forms / Google / …), not just the channel
 
 - Ported Windchasers' attribution to BCON (brand-neutral, no aviation/PAT):
