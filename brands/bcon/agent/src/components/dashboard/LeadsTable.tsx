@@ -121,7 +121,6 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
-  const showAviationColumns = brandId === 'windchasers'
   const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
@@ -134,8 +133,6 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
-  const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -205,20 +202,6 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => lead.status === statusFilter)
     }
 
-    if (userTypeFilter !== 'all') {
-      filtered = filtered.filter((lead) => {
-        const brandData = lead.unified_context?.[brandId] || {}
-        return (brandData.user_type || brandData.business_type) === userTypeFilter
-      })
-    }
-
-    if (courseInterestFilter !== 'all') {
-      filtered = filtered.filter((lead) => {
-        const brandData = lead.unified_context?.[brandId] || {}
-        return brandData.course_interest === courseInterestFilter
-      })
-    }
-
     // Score filter (use calculated scores when available, fallback to DB score)
     if (scoreFilter !== 'all') {
       const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
@@ -255,7 +238,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
+  }, [leads, dateFilter, sourceFilter, statusFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -373,9 +356,7 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = showAviationColumns
-      ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
-      : ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
       const bookingDate = lead.booking_date ||
         lead.unified_context?.web?.booking_date ||
@@ -413,24 +394,8 @@ export default function LeadsTable({
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
       const brandData = lead.unified_context?.[brandId] || {}
-      const userType = brandData.user_type || brandData.business_type || ''
-      const courseInterest = brandData.course_interest || ''
       const timeline = brandData.plan_to_fly || brandData.timeline || ''
       const interest = brandData.pain_point || brandData.course_interest || ''
-      if (showAviationColumns) {
-        return [
-          lead.name || '',
-          lead.email || '',
-          lead.phone || '',
-          lead.first_touchpoint || lead.source || '',
-          userType,
-          courseInterest,
-          timeline,
-          score !== null && score !== undefined ? score.toString() : '',
-          stage || '',
-          keyEvent || '',
-        ]
-      }
       return [
         lead.name || '',
         lead.email || '',
@@ -571,25 +536,6 @@ export default function LeadsTable({
                 ))}
               </select>
 
-              {showAviationColumns && (
-                <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
-                  <option value="all">All types</option>
-                  <option value="student">Student</option>
-                  <option value="parent">Parent</option>
-                  <option value="professional">Professional</option>
-                </select>
-              )}
-
-              {showAviationColumns && (
-                <select value={courseInterestFilter} onChange={(e) => setCourseInterestFilter(e.target.value)} className={filterClass} style={filterStyle}>
-                  <option value="all">All courses</option>
-                  <option value="DGCA">DGCA</option>
-                  <option value="Flight">Flight</option>
-                  <option value="Heli">Heli</option>
-                  <option value="Cabin">Cabin</option>
-                  <option value="Drone">Drone</option>
-                </select>
-              )}
             </>
           )}
 
@@ -642,8 +588,6 @@ export default function LeadsTable({
             <col style={{ width: '10%' }} />  {/* Stage */}
             <col style={{ width: '7%' }} />   {/* Active */}
             <col style={{ width: '11%' }} />  {/* Booking (chip) */}
-            {showAviationColumns && <col style={{ width: '9%' }} />}
-            {showAviationColumns && <col style={{ width: '9%' }} />}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
@@ -656,10 +600,6 @@ export default function LeadsTable({
                 { label: 'Stage',      align: 'center' as const },
                 { label: 'Active',     align: 'left'   as const },
                 { label: 'Booking',    align: 'center' as const },
-                ...(showAviationColumns ? [
-                  { label: 'Type',   align: 'center' as const },
-                  { label: 'Course', align: 'center' as const },
-                ] : []),
               ].map(({ label, align }) => (
                 <th
                   key={label}
@@ -675,7 +615,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 10 : 8}
+                  colSpan={8}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -932,37 +872,6 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* Aviation columns — chip styling so the row reads as a
-                        scannable set of tags rather than mixed text + chips.
-                        Only renders when showAviationColumns is true (brand-gated). */}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs">
-                        {lead.unified_context?.[brandId]?.user_type ? (
-                          <span
-                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
-                            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
-                          >
-                            {lead.unified_context[brandId].user_type}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 text-xs">
-                        {lead.unified_context?.[brandId]?.course_interest ? (
-                          <span
-                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
-                            style={{ background: 'rgba(14,165,233,0.15)', color: '#7dd3fc', border: '1px solid rgba(14,165,233,0.3)' }}
-                          >
-                            {lead.unified_context[brandId].course_interest}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
                   </tr>
                 )
               })

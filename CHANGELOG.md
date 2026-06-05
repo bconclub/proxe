@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 12:48 IST · BCON: remove Windchasers aviation columns from LeadsTable entirely (not just gate them)
+
+- Per brand isolation, BCON shouldn't carry the aviation Type/Course logic at all — even gated. Removed the `showAviationColumns` flag and every gated block from BCON's `LeadsTable.tsx`: the Type + Course column headers and data cells, the User Type (Student/Parent/Professional) and Course (DGCA/Flight/Heli/Cabin/Drone) filter dropdowns, their `useState` + filter logic + effect deps, the two `colgroup` entries, the export's aviation header/row branch, and the `colSpan` (now fixed at 8).
+- BCON leads table now has one clean column set — Lead, Contact, Source, Last Touch, Score, Stage, Active, Booking — with no Windchasers aviation code path remaining.
+- No user-facing change for BCON (those columns were already hidden by the flag); this deletes the dead Windchasers code from the BCON fork.
+
 ## 2026-06-05 12:37 IST · BCON: leads table — drop Windchasers "Coaching PROXe" Instagram label (brand leak)
 
 - BCON's `LeadsTable.tsx` source badge mapped Instagram/IG leads to "Coaching PROXe" (a Windchasers coaching-campaign label) — wrong for the BCON business club.
