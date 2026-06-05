@@ -505,10 +505,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
-                        // Fixed-width leading box, icon centered — identical in
-                        // collapsed and expanded states so the icon stays put.
+                        // Fixed-width AND fixed-height leading box, icon centered.
+                        // The fixed 20px height matches the label's line-height so
+                        // the row is the SAME height whether collapsed (icon only)
+                        // or expanded (icon + label) — otherwise the taller label
+                        // line grows every row and the icons drift downward.
                         width: '40px',
                         minWidth: '40px',
+                        height: '20px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -519,7 +523,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate">{navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}

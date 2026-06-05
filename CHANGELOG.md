@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 13:15 IST · Windchasers: stop the vertical drift on sidebar expand
+
+- The remaining shift on open was vertical: collapsed, each nav row's height was set by the 16px icon; expanded, the label's ~20px line-height made every row ~4px taller, so the icons drifted downward as the rows grew. (Not the dividers — those render identically in both states.)
+- `DashboardLayout.tsx` — gave the icon leading box a fixed 20px height and pinned the label line-height to 20px, so a row is the same height whether it shows the icon only (collapsed) or icon + label (expanded). Rows no longer change height, so nothing shifts down on open. Header was already fixed-height, so the logo stays put too.
+
 ## 2026-06-04 13:05 IST · Windchasers: sidebar header simplified + narrower rail + pinned logo
 
 - `DashboardLayout.tsx`:
