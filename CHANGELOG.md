@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 20:05 IST · BCON: Inbox — fix invisible message bubbles (real contrast + width cap)
+
+- User-facing (Chats): the customer message bubble was effectively invisible — I had copied Windchasers' `var(--bg-secondary)` fill, but in BCON's dark theme that's #111111 on a #000000 chat pane (no contrast), so customer messages read as naked text sprawling full-width. Now fixed to look like the WC reference.
+  - `inbox/page.tsx`: customer bubble fill `bg-secondary` → **`bg-tertiary` (#1a1a1a)** so it actually reads as a card on black; AI (indigo) bubble bumped 0.10 → 0.18 fill / 0.45 border for clear presence. Regular bubble max-width `80%` → **`440px`** (matches WC; bubbles no longer span the whole pane). Template bubble unchanged (already green + visible).
+  - `TodaySnapshotButton.tsx`: active range pill used white text on `--accent-primary` (which is white in dark mode) → invisible label. Now uses `--bg-primary` (inverse) for the active label.
+- Verified live (dark mode) before shipping this time.
+
 ## 2026-06-05 19:40 IST · BCON: Overview parity (part 2) — Today's Snapshot button + endpoint
 
 - The home dashboard was missing Windchasers' "Today's Snapshot" quick-glance — a top-right floating button that opens a modal of recent activity. Ported it, brand-isolated (no aviation PAT / demo / parent-student concepts).

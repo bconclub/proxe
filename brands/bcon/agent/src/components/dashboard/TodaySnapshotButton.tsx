@@ -148,7 +148,9 @@ export default function TodaySnapshotButton() {
                       onClick={() => setRange(opt.key)}
                       className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
                       style={{
-                        color: active ? '#fff' : 'var(--text-secondary)',
+                        // accent-primary is white in dark mode, so white text would
+                        // vanish — use bg-primary (the inverse) for the active label.
+                        color: active ? 'var(--bg-primary)' : 'var(--text-secondary)',
                         background: active ? 'var(--accent-primary)' : 'transparent',
                       }}
                       disabled={loading && active}

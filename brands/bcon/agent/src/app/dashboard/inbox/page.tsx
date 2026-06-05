@@ -1757,23 +1757,24 @@ export default function InboxPage() {
                       <div
                         className={isTemplate
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
-                          : 'max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border'}
+                          : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
-                          // Three subtle bubble tints so customer / AI / template
-                          // all read as distinct at a glance (matches Windchasers):
-                          //   Customer → neutral · PROXe AI → indigo · Template → WA-green
+                          // Three distinct bubble tints (customer / AI / template).
+                          // Customer uses bg-tertiary (#1a1a1a) — bg-secondary (#111)
+                          // is nearly invisible on the #000 chat pane. AI = indigo,
+                          // template = WA-green. All readable in dark AND light.
                           background: isCustomer
-                            ? 'var(--bg-secondary)'
+                            ? 'var(--bg-tertiary)'
                             : isTemplate
-                              ? 'rgba(37, 211, 102, 0.10)'
-                              : 'rgba(99, 102, 241, 0.10)',
+                              ? 'rgba(37, 211, 102, 0.12)'
+                              : 'rgba(99, 102, 241, 0.18)',
                           backdropFilter: 'blur(8px)',
                           WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
                             ? 'var(--border-primary)'
                             : isTemplate
                               ? 'rgba(37, 211, 102, 0.45)'
-                              : 'rgba(99, 102, 241, 0.30)',
+                              : 'rgba(99, 102, 241, 0.45)',
                           borderWidth: '1px',
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
