@@ -47,7 +47,7 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
-  { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
+  { name: 'Chat', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
@@ -472,7 +472,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               const isActive = pathname === item.href
                 || matchesSubPath(item.href)
                 || (item.children && item.children.some(child => pathname === child.href || matchesSubPath(child.href)))
-              const isInbox = item.name === 'Conversations'
+              const isInbox = item.href === '/dashboard/inbox'
               const hasChildren = item.children && item.children.length > 0
 
               const renderNavItem = (navItem: NavItem, isChild = false) => {
