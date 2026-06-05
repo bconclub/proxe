@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-05 11:59 IST · BCON: dashboard sidebar parity with Windchasers (nav order, Chats rename, pinned logo, icon-drift fix)
+
+- Brought BCON's `DashboardLayout.tsx` sidebar up to the current Windchasers design, keeping BCON's brand (name "BCON", `/bcon-icon.png`, theme — no Windchasers content pulled in).
+- Nav reordered Overview → Leads → Chats → Pipeline; "Conversations" renamed to "Chats"; inbox detection switched to href-based so the rename doesn't break the unread badge.
+- Header: brand logo now sits in the same fixed 40px leading column as the nav icons (slimmer header) so it never shifts between collapsed/expanded.
+- Nav icons pinned in a fixed 40×20px box with 20px label line-height — stops the icon vertical drift on hover-expand. Hover rail narrowed to 184px.
+- User-facing: cleaner, non-drifting sidebar matching Windchasers; "Chats" label.
+- Scope: UI/structural only — no data or functional changes; HealthBar + auth heartbeat intentionally NOT included (BCON lacks those components/routes; separate slices).
+
 ## 2026-06-04 14:30 IST · Windchasers: Avg Lead Score — persist scores, stop recomputing every load, align with the per-lead value
 
 - Problem: the dashboard recomputed the whole null/zero lead base on every metrics cache-miss and never saved the result (redundant work forever), AND the stored value came from the SQL RPC while the per-lead score users see comes from the client `calculateLeadScore` — so the average never matched the lead cards. (The scorer is keyword/SQL-based, not an LLM call — so it's DB load, not token burn — but the waste was real.)

@@ -44,8 +44,8 @@ interface NavItem {
 const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
-  { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
@@ -264,7 +264,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
   const showExpanded = !isCollapsed || isHovered
-  const sidebarWidth = showExpanded ? '220px' : '56px'
+  const sidebarWidth = showExpanded ? '184px' : '56px'
   // Content margin uses only the pinned state so the main area doesn't shift on hover
   const contentMarginWidth = isCollapsed ? '56px' : '220px'
   const sidebarContentMargin = isMobile ? '0' : contentMarginWidth
@@ -322,78 +322,69 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
       >
-        {/* Logo and Toggle */}
+        {/* Logo and Toggle — the logo sits in the SAME 40px leading column as
+            the nav icons below, so it never shifts between collapsed/expanded.
+            Only the brand name reveals beside it. Slimmer, lighter header. */}
         <div
-          className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
-          style={{
-            padding: !showExpanded ? '10px' : '10px 12px',
-            justifyContent: !showExpanded ? 'center' : 'space-between',
-          }}
+          className="dashboard-layout-sidebar-header flex items-center flex-shrink-0"
+          style={{ padding: '6px 8px', minHeight: '44px' }}
         >
+          <div
+            className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
+            onClick={() => {
+              if (!showExpanded && !isMobile) {
+                setIsCollapsed(false)
+                localStorage.setItem('sidebar-collapsed', 'false')
+              }
+            }}
+            title={!showExpanded ? 'Click to expand sidebar' : undefined}
+          >
+            <img
+              src="/bcon-icon.png"
+              alt="BCON"
+              className="object-contain"
+              style={{ width: '24px', height: '24px' }}
+            />
+          </div>
           {showExpanded && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+              <h1
+                className="dashboard-layout-sidebar-logo flex-1 truncate"
+                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+              >
+                BCON
+              </h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
-                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
+                  className="dashboard-layout-sidebar-toggle-button p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   aria-label="Collapse sidebar"
                 >
-                  <MdChevronLeft size={20} />
+                  <MdChevronLeft size={18} />
                 </button>
               )}
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-primary)]"
-                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
+                  className="dashboard-layout-sidebar-close-button p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   aria-label="Close sidebar"
                 >
-                  <MdClose size={20} />
+                  <MdClose size={18} />
                 </button>
               )}
             </>
           )}
-          {!showExpanded && (
-            <div
-              className="dashboard-layout-sidebar-logo-collapsed flex items-center justify-center cursor-pointer"
-              style={{
-                width: '32px',
-                height: '32px',
-              }}
-              onClick={() => {
-                if (!isMobile) {
-                  setIsCollapsed(false)
-                  localStorage.setItem('sidebar-collapsed', 'false')
-                }
-              }}
-              title="Click to expand sidebar"
-            >
-              <img
-                src="/bcon-icon.png"
-                alt="BCON"
-                className="w-full h-full object-contain"
-                style={{ maxWidth: '32px', maxHeight: '32px' }}
-              />
-            </div>
-          )}
         </div>
 
         {/* Navigation */}
-        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: !showExpanded ? '8px 0' : '4px 8px' }}>
+        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: '8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
@@ -408,7 +399,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               const isActive = pathname === item.href
                 || matchesSubPath(item.href)
                 || (item.children && item.children.some(child => pathname === child.href || matchesSubPath(child.href)))
-              const isInbox = item.name === 'Conversations'
+              const isInbox = item.href === '/dashboard/inbox'
               const hasChildren = item.children && item.children.length > 0
 
               const renderNavItem = (navItem: NavItem, isChild = false) => {
@@ -424,16 +415,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   fontWeight: itemIsActive ? 600 : 500,
                   color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
-                  margin: !showExpanded ? '2px 6px' : '1px 4px',
+                  margin: '2px 0',
                   borderRadius: '8px',
-                  padding: !showExpanded ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
-                  justifyContent: !showExpanded ? 'center' : 'flex-start',
+                  padding: isChild && showExpanded ? '7px 10px 7px 28px' : '7px 10px 7px 0',
+                  justifyContent: 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
                   transition: 'background-color 180ms ease, color 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
                   position: 'relative',
                   overflow: 'hidden',
-                  width: !showExpanded ? '44px' : 'auto',
+                  width: !showExpanded ? '40px' : 'auto',
                   zIndex: !showExpanded && isItemHovered ? 40 : 1,
                   transform: !showExpanded && isItemHovered ? 'translateX(1px)' : 'translateX(0)',
                   boxShadow: !showExpanded && isItemHovered ? '0 6px 14px rgba(0,0,0,0.2)' : 'none',
@@ -444,9 +435,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
-                        marginRight: !showExpanded ? '0' : '10px',
+                        // Fixed-width AND fixed-height leading box, icon centered,
+                        // so rows are the same height collapsed or expanded and the
+                        // icons never drift downward on hover-expand.
+                        width: '40px',
+                        minWidth: '40px',
+                        height: '20px',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         color: 'inherit',
                       }}
                     >
@@ -454,7 +451,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate">{navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
