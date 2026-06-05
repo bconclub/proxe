@@ -2,7 +2,7 @@
 
 ## 2026-06-04 12:20 IST · Windchasers: sidebar nav — reorder + rename
 
-- `DashboardLayout.tsx` — Nav order is now Overview · Leads · Chat · Pipeline (Leads moved above Conversations). Renamed the "Conversations" item to "Chat"; route is unchanged (/dashboard/inbox). Re-keyed the unread-badge `isInbox` check on the href instead of the label so the rename can't break it. (ffea729b, d536d736)
+- `DashboardLayout.tsx` — Nav order is now Overview · Leads · Chats · Pipeline (Leads moved above Conversations). Renamed the "Conversations" item to "Chats"; route is unchanged (/dashboard/inbox). Re-keyed the unread-badge `isInbox` check on the href instead of the label so the rename can't break it. (ffea729b, d536d736)
 
 ## 2026-06-04 12:00 IST · Windchasers: WhatsApp booking no longer blocks on email
 
