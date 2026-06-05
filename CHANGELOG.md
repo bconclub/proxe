@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-04 14:05 IST · Windchasers: calendar-sync banner no longer alarms when Google isn't connected
+
+- The Events calendar auto-syncs on page load; with no Google creds the sync route returned a 503 and the UI showed a red "Google Calendar Sync Failed" banner every time — alarming for what is an optional, unconfigured integration (bookings are stored in our own DB regardless).
+- `api/calendar/sync/route.ts` — when creds are absent, returns 200 with a typed `{ configured: false, message }` instead of a 503 error.
+- `BookingsCalendar.tsx` — auto-sync on load is now silent (passes `isAuto`); the "not connected" case shows nothing on load and only a quiet neutral (gray, info icon) note if the user clicks Sync themselves — never the red banner. A genuine sync failure also stays silent on auto-load and only surfaces on a manual sync. Real errors (creds present but Google API fails) still show as before when the user clicks Sync.
+
 ## 2026-06-04 13:25 IST · Windchasers: Google Ads source badge → purple
 
 - The Google Ads badge in the Leads SOURCE column rendered an indigo close to Meta Forms' blue, so the two were hard to tell apart at a glance.
