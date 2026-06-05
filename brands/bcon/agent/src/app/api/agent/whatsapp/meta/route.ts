@@ -25,6 +25,7 @@ import {
   fetchCustomerContext,
   fetchSummary,
   normalizePhone,
+  type AttributionSignal,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -201,6 +202,9 @@ export async function POST(request: NextRequest) {
         whatsappMessageId,
         timestamp,
         brand,
+        // Click-to-WhatsApp ad referral (present only on the first message from
+        // an ad click). Carries the marketing source for attribution.
+        referral: msg.referral || null,
       });
     }
 
@@ -380,6 +384,12 @@ interface IncomingMessage {
   whatsappMessageId: string;
   timestamp: string;
   brand: string;
+  /**
+   * Click-to-WhatsApp ad referral (Meta sends this on the FIRST message after
+   * an ad click): { source_url, source_id, source_type, headline, body,
+   * ctwa_clid, ... }. Absent for organic conversations.
+   */
+  referral?: any;
 }
 
 async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
@@ -390,6 +400,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     whatsappMessageId,
     timestamp,
     brand,
+    referral,
   } = msg;
 
   const supabase = getServiceClient() || getClient();
@@ -402,6 +413,27 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
   try {
     // 1. Create/update lead
     const sessionId = `wa_meta_${normalizePhone(customerPhone)}`;
+
+    // Click-to-WhatsApp ad → real marketing source. Organic WhatsApp → no
+    // signal (resolves to Direct). Set once on the lead; never overwritten.
+    let attributionSignal: AttributionSignal | undefined;
+    if (referral && (referral.source_url || referral.source_id || referral.source_type)) {
+      const isAd = String(referral.source_type || '').toLowerCase() === 'ad';
+      attributionSignal = {
+        // Meta is the platform behind both ad and post CTWA entry points.
+        utmSource: 'meta',
+        formType: 'whatsapp_clickthrough',
+        utm: {
+          source: 'meta',
+          medium: isAd ? 'paid_social' : 'social',
+          campaign: referral.headline || referral.source_id || null,
+          content: referral.body || null,
+        },
+        pageUrl: referral.source_url || null,
+        referrer: referral.source_url || null,
+      };
+    }
+
     const leadId = await ensureOrUpdateLead(
       customerName,
       null,           // no email from WhatsApp
@@ -409,6 +441,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       'whatsapp',
       sessionId,
       supabase,
+      attributionSignal,
     );
 
     if (!leadId) {

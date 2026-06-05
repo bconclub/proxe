@@ -15,6 +15,21 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp, cleanSummary } from './utils';
 import { ensureSession, getChannelTable, type Channel } from './sessionManager';
+import { buildAttribution, type AttributionPayload } from './attribution';
+
+/**
+ * Optional marketing-source signal for a lead, resolved into unified_context.attribution.
+ * Web chat usually has none (→ Direct). WhatsApp CTWA ads carry one via the
+ * webhook `referral` object. Set ONCE on lead creation; never overwritten.
+ */
+export interface AttributionSignal {
+  utmSource?: string | null;
+  formType?: string | null;
+  resolvedChannel?: string | null;
+  utm?: AttributionPayload['utm'];
+  pageUrl?: string | null;
+  referrer?: string | null;
+}
 
 // ─── Phone Normalization ────────────────────────────────────────────────────
 
@@ -81,6 +96,7 @@ export async function ensureOrUpdateLead(
   channel: Channel,
   externalSessionId?: string,
   supabase?: SupabaseClient | null,
+  attributionSignal?: AttributionSignal | null,
 ): Promise<string | null> {
   // Prefer service role client for lead operations (bypasses RLS)
   const client = supabase || getServiceClient() || getClient();
@@ -97,6 +113,20 @@ export async function ensureOrUpdateLead(
   }
 
   const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+
+  // Resolve the marketing source / first-touch for this lead. With no signal
+  // (typical web chat / organic WhatsApp), `channel` is a platform so this
+  // correctly yields source 'direct' + a channel-level first touch (Web Chat /
+  // WhatsApp). CTWA ad leads pass a real signal via attributionSignal.
+  const attribution = buildAttribution({
+    utmSource: attributionSignal?.utmSource ?? null,
+    formType: attributionSignal?.formType ?? null,
+    channel,
+    resolvedChannel: attributionSignal?.resolvedChannel ?? null,
+    utm: attributionSignal?.utm,
+    pageUrl: attributionSignal?.pageUrl ?? null,
+  });
+  if (attributionSignal?.referrer) attribution.referrer = attributionSignal.referrer;
 
   try {
     // Fetch conversation context from channel session if available
@@ -193,6 +223,8 @@ export async function ensureOrUpdateLead(
     // Helper function to build update payload
     const buildUpdates = (existingCtx: any) => {
       const mergedContext = buildMergedContext(existingCtx);
+      // Set attribution ONCE — never overwrite an existing one (immutable origin).
+      if (!existingCtx?.attribution) mergedContext.attribution = attribution;
       const updates: any = {
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
@@ -232,7 +264,8 @@ export async function ensureOrUpdateLead(
       first_touchpoint: channel,
       last_touchpoint: channel,
       last_interaction_at: new Date().toISOString(),
-      unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
+      // Always stamp attribution on a brand-new lead (set once, immutable).
+      unified_context: { ...unifiedContext, attribution },
     };
 
     const { data: created, error: createError } = await client

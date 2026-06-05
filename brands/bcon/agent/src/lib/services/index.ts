@@ -41,6 +41,7 @@ export {
 
 // Lead management
 export {
+  type AttributionSignal,
   normalizePhone,
   ensureOrUpdateLead,
   updateLeadProfile,

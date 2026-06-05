@@ -159,6 +159,8 @@ export interface AttributionPayload {
     term?: string | null;
   };
   page_url?: string | null;
+  /** Referring URL (e.g. CTWA ad source_url) — surfaced as 'Referrer' in the modal. */
+  referrer?: string | null;
   captured_at: string;
 }
 

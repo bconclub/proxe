@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-05 16:30 IST · BCON: attribution on web + WhatsApp lead paths (not just inbound)
+
+- Previously only the inbound (Pabbly/Meta-form) path set `unified_context.attribution`; leads created via web chat or WhatsApp had none and showed blank/legacy-fallback in the Source column + modal Attribution tab. Now `ensureOrUpdateLead` (the single chokepoint for BOTH web and WhatsApp lead creation) stamps attribution on every lead — **set once, preserve-once** (never overwrites an existing origin).
+  - `leadManager.ts`: new optional `attributionSignal` param + `AttributionSignal` type. Builds attribution via the shared `buildAttribution`; with no signal (typical web chat / organic WhatsApp) `channel` is a platform so it correctly resolves to **Direct** + a channel-level first touch (Web Chat / WhatsApp) rather than faking a source. Stamped on INSERT always; on UPDATE only if missing.
+  - `whatsapp/meta/route.ts`: captures Meta's **click-to-WhatsApp (CTWA) ad `referral`** (was being dropped) from the first message and maps it to a real signal — source **Meta**, first touch **WA Click Through**, with campaign/medium/content + the ad `source_url` as page_url/referrer. So WhatsApp leads from ads now attribute to Meta instead of Direct.
+  - `attribution.ts`: added optional `referrer` to `AttributionPayload` (rendered as 'Referrer' in the modal). `AttributionSignal` re-exported from `services/index.ts`.
+- SCOPING NOTE (honest): web sessions don't currently capture utm/landing-page params at all (0 of 16 rows), so web leads stay Direct until the **chat widget** is taught to read utm params off the landing-page URL — flagged as a follow-up. CTWA attribution will confirm live on the first real ad-click lead (logic reuses the inbound-test-proven resolver).
+
 ## 2026-06-05 16:00 IST · BCON: DB fix — `meta_forms` now allowed on `last_touchpoint` (Meta lead inserts were failing)
 
 - **Campaign-blocking bug found via end-to-end inbound test.** The two touchpoint check-constraints on `all_leads` were out of sync: `first_touchpoint_check` included `'meta_forms'` but `last_touchpoint_check` did **not**. The inbound route maps `source:"facebook"` → touchpoint `meta_forms` and sets BOTH first- and last-touchpoint to it on a new lead, so every Meta lead-form submission was rejected with `all_leads_last_touchpoint_check` violation → the lead was lost. Would have silently 500'd every Meta lead once the campaign went live.
