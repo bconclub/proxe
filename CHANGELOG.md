@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-05 18:45 IST · BCON: Inbox aesthetic ported from Windchasers (channel icons, template card, Meta-form card)
+
+- The Inbox visuals were well behind Windchasers. Ported the full rendering treatment (BCON brand-isolated — no aviation/student concepts).
+  - **Channel icons** (`ChannelIcon`): were chunky solid-coloured square boxes with white icons. Now clean tinted line-glyphs on a transparent background (web → blue, WhatsApp → green, voice → purple), matching WC — uses the same precomputed CSS tint filters + inactive opacity.
+  - **Message bubbles**: three distinct tints (customer → neutral, PROXe AI → indigo, Template → WhatsApp-green) with backdrop blur, instead of one flat purple agent bubble.
+  - **Template card**: templates now render as a proper WhatsApp-style card — WA-green header strip ("Template · WA" + channel icon + time), bold template header text, body, and a footer with delivery-status / **TEST →** / **send-failed (hover for Meta's reason)** pills. Quick-reply buttons render stacked + divided, flush to the card (real WhatsApp look).
+  - **Meta-form card** (Facebook/Meta lead's first message): was a plain gray wrap-grid. Now a blue Meta-tinted card with a "Meta Form" pill and fields ordered one-per-row (Name, Email, Phone, City, Brand, Type, Urgency, then +N more). Dropped WC's aviation-only Parent/Student distinction.
+- Phase A (look-and-feel) of the Inbox parity pass — now actually faithful to the WC reference, not a partial tweak. Phase B (WhatsApp template send + anonymous web visitors) still to come.
+
 ## 2026-06-05 18:15 IST · BCON: Inbox look-and-feel — WhatsApp markdown + stacked template buttons
 
 - User-facing (Chats/Inbox): WhatsApp & template messages were rendering raw markdown — literal `*asterisks*`, `_underscores_`, `~tildes~` and no line breaks — so long WhatsApp messages read as a wall of text. Now they render the way the customer actually sees them on WhatsApp.

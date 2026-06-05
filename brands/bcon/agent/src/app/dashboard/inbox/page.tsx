@@ -29,49 +29,58 @@ import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 // Channel Icons using custom SVGs with colored backgrounds
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
-  const containerStyle: React.CSSProperties = {
-    width: size + 4,
-    height: size + 4,
-    borderRadius: 4,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: active ? 1 : 0.4,
+  const opacity = active ? 1 : 0.45;
+
+  // Tint white SVG line-art to the channel colour via precomputed CSS filters
+  // (matches Windchasers): clean tinted glyph on a transparent background — no
+  // solid colour box. Each filter maps a black source SVG to the listed hex.
+  const TINT: Record<string, string> = {
+    web:      'invert(46%) sepia(86%) saturate(2074%) hue-rotate(206deg) brightness(98%) contrast(94%)',   // #3B82F6
+    whatsapp: 'invert(67%) sepia(78%) saturate(396%) hue-rotate(89deg) brightness(96%) contrast(89%)',     // #25D366
+    social:   'invert(72%) sepia(64%) saturate(539%) hue-rotate(0deg) brightness(99%) contrast(94%)',       // #F59E0B
   };
 
   switch (channel) {
     case 'web':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#3B82F6' }}>
-          <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={{ filter: 'invert(1)' }} title="Website" />
-        </div>
+        <img
+          src="/browser-stroke-rounded.svg"
+          alt="Web" title="Website"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.web, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     case 'whatsapp':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#25D366' }}>
-          <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={{ filter: 'invert(1)' }} title="WhatsApp" />
-        </div>
+        <img
+          src="/whatsapp-business-stroke-rounded.svg"
+          alt="WhatsApp" title="WhatsApp"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.whatsapp, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     case 'voice':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#8B5CF6' }}>
-          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" title="Voice">
-            <path
-              d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
-              stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            />
-            <path
-              d="M18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6L18 2z"
-              fill="#fff" stroke="#fff" strokeWidth="0.5"
-            />
-          </svg>
-        </div>
+        <svg
+          width={size} height={size} viewBox="0 0 24 24" fill="none"
+          style={{ opacity, flexShrink: 0 }}
+          aria-label="Voice"
+        >
+          <title>Voice</title>
+          <path
+            d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
+            stroke="#8B5CF6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
       );
     case 'social':
       return (
-        <div style={{ ...containerStyle, backgroundColor: '#F59E0B' }}>
-          <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={{ filter: 'invert(1)' }} title="Social" />
-        </div>
+        <img
+          src="/video-ai-stroke-rounded.svg"
+          alt="Social" title="Social"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.social, display: 'inline-block', flexShrink: 0 }}
+        />
       );
     default:
       return null;
@@ -1677,57 +1686,52 @@ export default function InboxPage() {
                   ) : null;
 
                   if (formData) {
-                    // Render as compact form data card
-                    const priorityFields = formData.fields.filter(f => {
-                      const k = f.key.toLowerCase();
-                      return k.includes('brand') || k.includes('full name') || k.includes('email') ||
-                             k.includes('phone') || k.includes('city') || k.includes('how fast') ||
-                             k.includes('business type');
-                    });
-                    const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
-
-                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+                    // Meta-form card — clean, ordered, blue-tinted (so a Facebook/Meta
+                    // lead's first message reads as "came from Meta" the way agent
+                    // bubbles read green). Ported from Windchasers, trimmed to BCON's
+                    // business fields (no aviation student/parent concepts).
+                    const withLabels = formData.fields.map(f => ({ value: f.value, label: getFormFieldLabel(f.key) }));
+                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Brand', 'Type', 'Urgency'];
+                    const seen = new Set<typeof withLabels[number]>();
+                    const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)));
+                    const otherOrdered = withLabels.filter(f => !seen.has(f));
+                    const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide w-[68px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span className="text-[12px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                      </div>
+                    );
 
                     return (
                       <React.Fragment key={msg.id}>
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[90%] rounded-lg px-3 py-2 border"
-                          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                          className="max-w-[78%] rounded-xl px-3.5 py-2.5 border"
+                          style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
                               <ChannelIcon channel={msg.channel} size={10} active={true} />
                               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                                 {selectedConversation?.lead_name || 'Customer'}
                               </span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                                Form Submission
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
+                                Meta Form
                               </span>
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Compact fields grid */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1">
-                            {priorityFields.map((f, i) => (
-                              <div key={i} className="flex items-baseline gap-1">
-                                <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                              </div>
-                            ))}
+                          {/* Ordered fields — one per row */}
+                          <div className="space-y-1">
+                            {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
-                          {otherFields.length > 0 && (
-                            <details className="mt-1">
-                              <summary className="text-[9px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>+{otherFields.length} more fields</summary>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                                {otherFields.map((f, i) => (
-                                  <div key={i} className="flex items-baseline gap-1">
-                                    <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                                  </div>
-                                ))}
+                          {otherOrdered.length > 0 && (
+                            <details className="mt-1.5">
+                              <summary className="text-[10px] cursor-pointer" style={{ color: '#60a5fa' }}>+{otherOrdered.length} more fields</summary>
+                              <div className="space-y-1 mt-1.5">
+                                {otherOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                               </div>
                             </details>
                           )}
@@ -1740,6 +1744,9 @@ export default function InboxPage() {
                   // Regular message bubble
                   const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
                   const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
+                  // Template messages render as a compact WhatsApp-style card
+                  // (green header strip + body + footer), distinct from chat bubbles.
+                  const isTemplate = !isCustomer && !!msg.metadata?.template_name;
 
                   return (
                     <React.Fragment key={msg.id}>
@@ -1748,41 +1755,83 @@ export default function InboxPage() {
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border"
+                        className={isTemplate
+                          ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
+                          : 'max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
+                          // Three subtle bubble tints so customer / AI / template
+                          // all read as distinct at a glance (matches Windchasers):
+                          //   Customer → neutral · PROXe AI → indigo · Template → WA-green
                           background: isCustomer
-                            ? 'rgba(255,255,255,0.10)'
-                            : 'rgba(99,102,241,0.28)',
+                            ? 'var(--bg-secondary)'
+                            : isTemplate
+                              ? 'rgba(37, 211, 102, 0.10)'
+                              : 'rgba(99, 102, 241, 0.10)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
-                            ? 'rgba(255,255,255,0.18)'
-                            : 'rgba(99,102,241,0.45)',
+                            ? 'var(--border-primary)'
+                            : isTemplate
+                              ? 'rgba(37, 211, 102, 0.45)'
+                              : 'rgba(99, 102, 241, 0.30)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name
+                          ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
-                            : taskTag
+                            : !isTemplate && taskTag
                             ? { borderLeft: `3px solid ${taskTag.color}` }
                             : {}),
                         }}
                       >
-                        <div className="flex items-center justify-between gap-3 mb-1">
-                          <div className="flex items-center gap-1">
-                            <ChannelIcon channel={msg.channel} size={11} active={true} />
-                            <span
-                              className="text-[9px] font-bold uppercase tracking-wider"
-                              style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                        {isTemplate && (
+                          <>
+                            {/* WA-green template header strip — instantly reads as a Meta-approved template */}
+                            <div
+                              className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
+                              style={{ background: 'rgba(37, 211, 102, 0.18)', borderColor: 'rgba(37, 211, 102, 0.35)' }}
                             >
-                              {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
-                            </span>
-                            <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
-                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
+                              <div className="flex items-center gap-1.5">
+                                <ChannelIcon channel={msg.channel} size={10} active={true} />
+                                <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: '#22c55e' }}>
+                                  Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
+                                </span>
+                              </div>
+                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                                {formatTime(msg.created_at)}
+                              </span>
+                            </div>
+                            {msg.metadata?.template_header && (
+                              <div className="px-2.5 pt-2 pb-1 text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                                {msg.metadata.template_header}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {!isTemplate && (
+                          <div className="flex items-center justify-between gap-3 mb-1">
+                            <div className="flex items-center gap-1">
+                              <ChannelIcon channel={msg.channel} size={11} active={true} />
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider"
+                                style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                              >
+                                {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                              </span>
+                              <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
+                                {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
+                              </span>
+                            </div>
+                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                              {formatTime(msg.created_at)}
                             </span>
                           </div>
-                          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                            {formatTime(msg.created_at)}
-                          </span>
-                        </div>
-                        <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                          {(msg.channel === 'whatsapp' || msg.metadata?.template_name)
+                        )}
+                        <div
+                          className={isTemplate
+                            ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap'
+                            : 'text-[13px] leading-relaxed'}
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {(isTemplate || msg.channel === 'whatsapp')
                             ? renderWhatsAppMarkdown(msg.content)
                             : renderMarkdown(msg.content)}
                         </div>
@@ -1790,28 +1839,75 @@ export default function InboxPage() {
                           const ds = msg.metadata?.delivery_status
                           const statusStyle = getDeliveryStatusStyle(ds)
                           const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
+                          // Send-side failure (inbound auto-templates): show a red
+                          // FAILED pill with Meta's human-readable error on hover.
+                          const sendFailed = msg.metadata?.send_succeeded === false
+                          const sendError = typeof msg.metadata?.send_error === 'string'
+                            ? msg.metadata.send_error
+                            : (msg.metadata?.send_error ? JSON.stringify(msg.metadata.send_error) : null)
+                          let prettyError: string | null = null
+                          if (sendError) {
+                            try {
+                              const parsed = JSON.parse(sendError)
+                              const m = parsed?.error?.message
+                              const code = parsed?.error?.code
+                              prettyError = typeof m === 'string'
+                                ? (/^\(#\d+\)/.test(m) ? m : `(#${code || '?'}) ${m}`)
+                                : sendError
+                            } catch { prettyError = sendError }
+                          }
+                          const isTestSend = msg.metadata?.test_mode === true
+                          const testRecipient = typeof msg.metadata?.test_recipient === 'string' ? msg.metadata.test_recipient : null
                           return (
-                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                              <span
-                                className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
-                                style={{ background: statusStyle.bg, color: statusStyle.color }}
-                                data-tooltip={tooltip}
-                              >
-                                Template
-                              </span>
+                            <div
+                              className={isTemplate
+                                ? 'flex items-center gap-1.5 px-2.5 py-1 border-t flex-wrap'
+                                : 'flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap'}
+                              style={{ borderColor: 'var(--border-primary)' }}
+                            >
+                              {!isTemplate && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
+                                  style={{ background: statusStyle.bg, color: statusStyle.color }}
+                                  data-tooltip={tooltip}
+                                >
+                                  Template
+                                </span>
+                              )}
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {msg.metadata.template_name}
                               </span>
-                              <span className="flex items-center" title={ds || 'pending'}>
-                                <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
-                              </span>
+                              {isTestSend && (
+                                <span
+                                  className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                  style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
+                                  title={testRecipient ? `Test send — went to ${testRecipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                                >
+                                  {testRecipient ? `TEST → ${testRecipient}` : 'TEST'}
+                                </span>
+                              )}
+                              {sendFailed && prettyError && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-help"
+                                  style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
+                                  title={prettyError}
+                                  data-tooltip={prettyError}
+                                >
+                                  Send failed — hover for reason
+                                </span>
+                              )}
+                              {!sendFailed && (
+                                <span className="flex items-center" title={ds || 'pending'}>
+                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                                </span>
+                              )}
                             </div>
                           )
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
-                          msg.metadata?.template_name ? (
-                            // WhatsApp-style Quick Reply buttons — stacked, divided by hairlines (theme-aware).
-                            <div className="flex flex-col mt-1.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                          isTemplate ? (
+                            // WhatsApp-style Quick Reply buttons — stacked, flush, divided by hairlines (theme-aware).
+                            <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
                               {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
                                 <div
                                   key={btnIdx}
@@ -1819,6 +1915,7 @@ export default function InboxPage() {
                                   style={{
                                     color: 'var(--accent-primary)',
                                     borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                    background: 'var(--bg-primary)',
                                   }}
                                   title={`Quick Reply: ${btn}`}
                                 >
@@ -1853,7 +1950,7 @@ export default function InboxPage() {
                             )}
                           </div>
                         )}
-                        {!isCustomer && msg.channel === 'whatsapp' && (
+                        {!isTemplate && !isCustomer && msg.channel === 'whatsapp' && (
                           <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
                             {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
                               <div className="relative group flex items-center">
