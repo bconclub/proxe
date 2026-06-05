@@ -454,7 +454,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: !showExpanded ? '8px 0' : '4px 8px' }}>
+        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: '8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
@@ -490,16 +490,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   fontWeight: itemIsActive ? 600 : 500,
                   color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
-                  margin: !showExpanded ? '2px 6px' : '1px 4px',
+                  // Pin the icon: constant vertical margin + a left padding of 0
+                  // in both states (the icon sits in a fixed 40px leading box,
+                  // below). Only the label reveals on expand — the icon's X never
+                  // moves. Child items indent via left padding (expanded only).
+                  margin: '2px 0',
                   borderRadius: '8px',
-                  padding: !showExpanded ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
-                  justifyContent: !showExpanded ? 'center' : 'flex-start',
+                  padding: isChild && showExpanded ? '7px 10px 7px 28px' : '7px 10px 7px 0',
+                  justifyContent: 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
                   transition: 'background-color 180ms ease, color 180ms ease, box-shadow 200ms ease, transform 200ms ease, opacity 180ms ease',
                   position: 'relative',
                   overflow: 'hidden',
-                  width: !showExpanded ? '44px' : 'auto',
+                  width: !showExpanded ? '40px' : 'auto',
                   zIndex: !showExpanded && isItemHovered ? 40 : 1,
                   transform: !showExpanded && isItemHovered ? 'translateX(1px)' : 'translateX(0)',
                   boxShadow: !showExpanded && isItemHovered ? '0 6px 14px rgba(0,0,0,0.2)' : 'none',
@@ -510,9 +514,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
-                        marginRight: !showExpanded ? '0' : '10px',
+                        // Fixed-width leading box, icon centered — identical in
+                        // collapsed and expanded states so the icon stays put.
+                        width: '40px',
+                        minWidth: '40px',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         color: 'inherit',
                       }}
                     >

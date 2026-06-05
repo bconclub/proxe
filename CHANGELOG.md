@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 12:35 IST · Windchasers: sidebar icons no longer shift on hover-expand
+
+- The nav icons jumped ~4px when the rail expanded because three things swapped between collapsed/expanded states at once: nav padding (0→8px horizontal), item margin (6→4px), and the item flipped from `justify-center` + `10px` padding to `justify-start` + `7px 12px` (icon moved from centered to left-aligned).
+- `DashboardLayout.tsx` — Pinned the icon Supabase-style: the icon now lives in a fixed 40px leading box (centered, identical in both states), the item is `justify-start` always with `0` left padding, and nav padding + item margin + vertical padding are constant. The icon's X (28px) and Y never change — only the label reveals on expand. Children indent via expanded-only left padding.
+
 ## 2026-06-04 12:20 IST · Windchasers: sidebar nav — reorder + rename
 
 - `DashboardLayout.tsx` — Nav order is now Overview · Leads · Chats · Pipeline (Leads moved above Conversations). Renamed the "Conversations" item to "Chats"; route is unchanged (/dashboard/inbox). Re-keyed the unread-badge `isInbox` check on the href instead of the label so the rename can't break it. (ffea729b, d536d736)
