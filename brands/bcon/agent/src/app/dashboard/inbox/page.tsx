@@ -183,6 +183,35 @@ function renderMarkdown(text: string) {
   });
 }
 
+/**
+ * Render WhatsApp-style markdown — what Meta uses natively:
+ *   *text*  → bold
+ *   _text_  → italic
+ *   ~text~  → strikethrough
+ * Newlines preserved as <br/>. Used for WhatsApp/template messages so the inbox
+ * shows what the customer actually sees on WhatsApp (not raw asterisks).
+ */
+function renderWhatsAppMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  const cleanedText = cleanMessageContent(text);
+  // Split on whichever WA marker appears (single * bold, _ italic, ~ strike) and newlines.
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = cleanedText.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-semibold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
@@ -1753,7 +1782,9 @@ export default function InboxPage() {
                           </span>
                         </div>
                         <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                          {renderMarkdown(msg.content)}
+                          {(msg.channel === 'whatsapp' || msg.metadata?.template_name)
+                            ? renderWhatsAppMarkdown(msg.content)
+                            : renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
@@ -1778,17 +1809,36 @@ export default function InboxPage() {
                           )
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
-                              <span
-                                key={btnIdx}
-                                className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
-                                style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
-                              >
-                                {btn}
-                              </span>
-                            ))}
-                          </div>
+                          msg.metadata?.template_name ? (
+                            // WhatsApp-style Quick Reply buttons — stacked, divided by hairlines (theme-aware).
+                            <div className="flex flex-col mt-1.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <div
+                                  key={btnIdx}
+                                  className="text-[12px] font-medium text-center py-2 px-2"
+                                  style={{
+                                    color: 'var(--accent-primary)',
+                                    borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                  }}
+                                  title={`Quick Reply: ${btn}`}
+                                >
+                                  {btn}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <span
+                                  key={btnIdx}
+                                  className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                  style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
+                                >
+                                  {btn}
+                                </span>
+                              ))}
+                            </div>
+                          )
                         )}
                         {!msg.metadata?.template_name && taskTag && (
                           <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>

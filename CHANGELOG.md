@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 18:15 IST · BCON: Inbox look-and-feel — WhatsApp markdown + stacked template buttons
+
+- User-facing (Chats/Inbox): WhatsApp & template messages were rendering raw markdown — literal `*asterisks*`, `_underscores_`, `~tildes~` and no line breaks — so long WhatsApp messages read as a wall of text. Now they render the way the customer actually sees them on WhatsApp.
+  - `inbox/page.tsx`: new `renderWhatsAppMarkdown()` (ported from Windchasers) — `*bold*` → bold, `_italic_` → italic, `~strike~` → strikethrough, `\n` → line break. Message body picks the renderer by channel: WhatsApp/template → WA markdown, everything else → existing `**bold**` markdown.
+  - Template Quick-Reply buttons now render WhatsApp-style (stacked, divided by hairlines, theme-aware) instead of inline pills, matching how they appear on WhatsApp. Non-template buttons stay inline pills.
+- Phase A of the Inbox parity pass (look-and-feel). Phase B (WhatsApp templates to re-engage past the 24h window + anonymous web-visitor conversations) is next.
+
 ## 2026-06-05 17:30 IST · Windchasers: Avg Lead Score is a score, not a percentage
 
 - The "At a Glance" Avg Lead Score gauge rendered "50%". It's an average of lead scores (sum ÷ count, out of 100), not a percentage.
