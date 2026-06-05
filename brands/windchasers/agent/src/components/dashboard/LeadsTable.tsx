@@ -865,8 +865,8 @@ export default function LeadsTable({
                 const utmSourceConfig: Record<string, { label: string; color: string }> = {
                   google: { label: 'Google Organic', color: '#EA4335' },
                   google_organic: { label: 'Google Organic', color: '#EA4335' },
-                  google_ads: { label: 'Google Ads', color: '#EA4335' },
-                  googleads: { label: 'Google Ads', color: '#EA4335' },
+                  google_ads: { label: 'Google Ads', color: '#A855F7' },
+                  googleads: { label: 'Google Ads', color: '#A855F7' },
                   bing: { label: 'Bing', color: '#008373' },
                   bing_ads: { label: 'Bing Ads', color: '#008373' },
                   youtube: { label: 'YouTube', color: '#FF0000' },
@@ -920,6 +920,14 @@ export default function LeadsTable({
                   srcCfg = { label: 'Direct', color: '#6B7280' }
                 } else {
                   srcCfg = channelConfig[source] || channelConfig.unknown
+                }
+
+                // Google Ads → distinct PURPLE so it never reads as Meta's blue.
+                // Applied after resolution so it wins regardless of which branch
+                // set the color (map hit, generic attr-label fallback, etc.).
+                // Google Organic stays red, so paid vs organic Google is clear too.
+                if (/google\s*ads/i.test(srcCfg.label)) {
+                  srcCfg = { ...srcCfg, color: '#A855F7' }
                 }
 
                 // Derive sub-source from form_type first, then utm_medium,

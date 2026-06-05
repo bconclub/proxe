@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-04 13:25 IST · Windchasers: Google Ads source badge → purple
+
+- The Google Ads badge in the Leads SOURCE column rendered an indigo close to Meta Forms' blue, so the two were hard to tell apart at a glance.
+- `LeadsTable.tsx` — Google Ads now uses a distinct purple (#A855F7), applied via a label-based override so it wins no matter which branch resolved the badge color (mapped source, generic attribution-label fallback, etc.). Google Organic stays red, so paid-vs-organic Google also reads clearly. Meta Forms stays blue.
+
 ## 2026-06-04 13:15 IST · Windchasers: stop the vertical drift on sidebar expand
 
 - The remaining shift on open was vertical: collapsed, each nav row's height was set by the 16px icon; expanded, the label's ~20px line-height made every row ~4px taller, so the icons drifted downward as the rows grew. (Not the dividers — those render identically in both states.)
