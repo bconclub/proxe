@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 15:10 IST · Windchasers: REVERT the score-persistence change (regression — tanked Avg Lead Score)
+
+- The earlier score-persistence change recomputed EVERY lead via the `calculate_lead_score` RPC (all had a null `last_scored_at`) and persisted it, overwriting the previously-higher stored scores with this RPC's lower, decay-applied values. Result: Avg Lead Score ~40% → 14%, warm leads ~21 → 5.
+- `founder-metrics/route.ts` — reverted to the original read-side backfill: recompute only null/zero scores, in-memory, NEVER persisted. Stops further overwrites. (e8541850)
+- KNOWN ISSUE: the first bad load already persisted the lowered scores to the DB, so the dashboard keeps showing low numbers until the stored scores are restored. Restoration needs DB access (MCP currently erroring) to re-seed + verify — will NOT blind-fire another mass re-score.
+- The modal/[id]/score alignment from the same change is kept (single-lead on open, safe; self-heals a lead's score when its modal is viewed).
+
 ## 2026-06-05 13:39 IST · BCON: LeadsTable column widths — Contact/email no longer too wide (definitive)
 
 - The Contact (phone/email) column was rendering too wide vs Windchasers. Root cause: when the aviation columns were removed, the freed width got spread into Lead/Contact (Contact was 17%).
