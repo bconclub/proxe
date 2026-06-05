@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 20:30 IST · BCON: Inbox — one universal message renderer for every channel/tab
+
+- User-facing (Chats): message formatting (bold / italics / line breaks) was only applied to WhatsApp + template messages; web (and any other channel/tab) used a fallback renderer that only handled `**double**` asterisks — so a web message with the agent's `*single*` formatting would show raw asterisks. Now EVERY message on EVERY tab renders identically, the way WhatsApp messages do.
+  - `inbox/page.tsx`: `renderWhatsAppMarkdown` upgraded to a universal renderer — handles BOTH `**double**` (Markdown) and `*single*` (WhatsApp) bold, `_italic_`, `~strike~`, and newlines. The message body now uses it for ALL channels (dropped the per-channel `whatsapp ? … : renderMarkdown` branch). `renderMarkdown` left in place (no longer the body renderer).
+- Matches Windchasers, where the conversation thread renders the same regardless of channel.
+
 ## 2026-06-05 20:05 IST · BCON: Inbox — fix invisible message bubbles (real contrast + width cap)
 
 - User-facing (Chats): the customer message bubble was effectively invisible — I had copied Windchasers' `var(--bg-secondary)` fill, but in BCON's dark theme that's #111111 on a #000000 chat pane (no contrast), so customer messages read as naked text sprawling full-width. Now fixed to look like the WC reference.

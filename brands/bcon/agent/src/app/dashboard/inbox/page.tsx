@@ -203,11 +203,17 @@ function renderMarkdown(text: string) {
 function renderWhatsAppMarkdown(text: string): React.ReactNode {
   if (!text) return null;
   const cleanedText = cleanMessageContent(text);
-  // Split on whichever WA marker appears (single * bold, _ italic, ~ strike) and newlines.
-  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  // Universal message renderer used for EVERY channel (web, WhatsApp, voice, …)
+  // so messages render identically everywhere — matches Windchasers. Handles
+  // both **double** (Markdown) and *single* (WhatsApp) bold, _italic_,
+  // ~strike~, and newlines.
+  const re = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
   const segments = cleanedText.split(re).filter((s) => s !== undefined && s !== '');
   return segments.map((seg, i) => {
     if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length > 4) {
+      return <strong key={i} className="font-semibold">{seg.slice(2, -2)}</strong>;
+    }
     if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
       return <strong key={i} className="font-semibold">{seg.slice(1, -1)}</strong>;
     }
@@ -1832,9 +1838,9 @@ export default function InboxPage() {
                             : 'text-[13px] leading-relaxed'}
                           style={{ color: 'var(--text-primary)' }}
                         >
-                          {(isTemplate || msg.channel === 'whatsapp')
-                            ? renderWhatsAppMarkdown(msg.content)
-                            : renderMarkdown(msg.content)}
+                          {/* One renderer for EVERY channel so web / WhatsApp / voice
+                              all render identically (bold, italics, line breaks). */}
+                          {renderWhatsAppMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
