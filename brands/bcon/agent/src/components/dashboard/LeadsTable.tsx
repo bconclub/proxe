@@ -600,7 +600,7 @@ export default function LeadsTable({
                 { label: 'Last Touch', align: 'center' as const },
                 { label: 'Score',      align: 'center' as const },
                 { label: 'Stage',      align: 'center' as const },
-                { label: 'Active',     align: 'left'   as const },
+                { label: 'Active',     align: 'center' as const },
                 { label: 'Booking',    align: 'center' as const },
               ].map(({ label, align }) => (
                 <th
@@ -942,7 +942,7 @@ export default function LeadsTable({
                     </td>
 
                     {/* STAGE - badge */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
                         style={stageColor.style || {}}
@@ -952,12 +952,12 @@ export default function LeadsTable({
                     </td>
 
                     {/* ACTIVE */}
-                    <td className="px-3 py-2 text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                    <td className="px-3 py-2 text-xs text-center tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                       {timeAgo(lastActivity)}
                     </td>
 
                     {/* BOOKING - compact chip with calendar icon, "—" when none */}
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-3 py-2 text-xs text-center">
                       {bookingDate ? (
                         <Link
                           href="/dashboard/bookings"

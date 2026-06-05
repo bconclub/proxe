@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-05 16:55 IST · BCON: leads table — center-align all columns except Lead & Contact
+
+- User-facing: Stage, Active, and Booking cells were left-aligned while their headers were centered, looking ragged vs Windchasers. Now every column except Lead and Contact is center-aligned (header + cell), matching the Windchasers reference.
+- `LeadsTable.tsx`: Active header `left → center`; added `text-center` to the Stage, Active, and Booking `td`s (Source/Last Touch/Score were already centered). Lead and Contact stay left-aligned.
+
 ## 2026-06-05 16:30 IST · BCON: attribution on web + WhatsApp lead paths (not just inbound)
 
 - Previously only the inbound (Pabbly/Meta-form) path set `unified_context.attribution`; leads created via web chat or WhatsApp had none and showed blank/legacy-fallback in the Source column + modal Attribution tab. Now `ensureOrUpdateLead` (the single chokepoint for BOTH web and WhatsApp lead creation) stamps attribution on every lead — **set once, preserve-once** (never overwrites an existing origin).
