@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-05 13:02 IST · BCON: richer LeadsTable — city+date in Lead, two-layer Source (like Windchasers, no aviation)
+
+- Brought BCON's leads table up to the Windchasers richness the team expected, without any aviation/student content.
+- **Lead column**: now shows the lead-in **date** under the name/company·city line; broadened the `city` lookup so it also reads the top-level `unified_context.city` that `/api/agent/leads/inbound` actually writes (previously only checked channel profile blocks, so inbound city wasn't showing).
+- **Source column**: now two layers like Windchasers — marketing source badge (top) **+ entry-point sub-line** (Lead Form / WA Click Through / Web Form / Ads / etc.), derived from form_type → utm_medium → channel. Tells you *which source* AND *how/which page* the lead came in.
+- Last-Touch already showed channel + who-touched-last (@PROXe / user) — unchanged.
+- No flags, BCON-only code; no first-touch column (that lives in the lead detail model, per design).
+
 ## 2026-06-05 12:48 IST · BCON: remove Windchasers aviation columns from LeadsTable entirely (not just gate them)
 
 - Per brand isolation, BCON shouldn't carry the aviation Type/Course logic at all — even gated. Removed the `showAviationColumns` flag and every gated block from BCON's `LeadsTable.tsx`: the Type + Course column headers and data cells, the User Type (Student/Parent/Professional) and Course (DGCA/Flight/Heli/Cabin/Drone) filter dropdowns, their `useState` + filter logic + effect deps, the two `colgroup` entries, the export's aviation header/row branch, and the `colSpan` (now fixed at 8).

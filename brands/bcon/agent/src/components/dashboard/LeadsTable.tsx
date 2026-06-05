@@ -646,9 +646,17 @@ export default function LeadsTable({
                   uc?.whatsapp?.what_is_your_brand_name ||
                   uc?.whatsapp?.profile?.company ||
                   uc?.web?.profile?.company || ''
+                // City — check every known location: brand-namespaced (set by
+                // the inbound endpoint), channel profile blocks, raw form fields,
+                // landing-page, and the top-level uc.city that /api/agent/leads/inbound writes.
                 const city =
+                  uc?.[brandId]?.city ||
                   uc?.whatsapp?.profile?.city ||
-                  uc?.web?.profile?.city || ''
+                  uc?.web?.profile?.city ||
+                  uc?.raw_form_fields?.city ||
+                  uc?.landing_page?.city ||
+                  uc?.city ||
+                  ''
 
                 // If no name, use email as primary identifier
                 const displayName = resolvedName || lead.email || lead.phone || '-'
@@ -695,6 +703,67 @@ export default function LeadsTable({
                   || sourceConfig[source]
                   || sourceConfig.unknown
 
+                // SOURCE sub-line — the specific entry point ("which page/form"),
+                // shown under the source badge so SOURCE reads as two layers like
+                // Windchasers: marketing source (top) + how-they-came-in (sub).
+                const formType = String(
+                  uc?.raw_form_fields?.form_type ||
+                  uc?.raw_form_fields?.event_name ||
+                  uc?.web?.form_submission?.form_type ||
+                  uc?.landing_page?.form_name ||
+                  ''
+                ).toLowerCase().trim()
+                const utmMediumRaw = String(
+                  uc?.raw_form_fields?.utm_medium ||
+                  uc?.web?.utm?.medium ||
+                  uc?.landing_page?.utm_medium ||
+                  ''
+                ).trim().toLowerCase()
+                const subSourceLabels: Record<string, string> = {
+                  demo_booked: 'Demo Form',
+                  demo_form: 'Demo Form',
+                  demo: 'Demo',
+                  meta_lead_form: 'Meta Lead Form',
+                  facebook_lead: 'Meta Lead Form',
+                  whatsapp_clickthrough: 'WA Click Through',
+                  whatsapp_button: 'WA Popup',
+                  whatsapp: 'WhatsApp',
+                  web: 'Web Chat',
+                  web_chat: 'Web Chat',
+                  chat_widget: 'Web Chat',
+                  voice_call: 'Voice Call',
+                  voice: 'Voice Call',
+                  manual: 'Manual Entry',
+                  landing_page: 'Landing Page',
+                  contact: 'Contact Form',
+                  newsletter: 'Newsletter',
+                  page: 'Web Form',
+                  event: 'Event',
+                }
+                const utmMediumLabels: Record<string, string> = {
+                  cpc: 'Ads', ppc: 'Ads', paid: 'Ads', ad: 'Ads', ads: 'Ads',
+                  paid_social: 'Paid Social', social: 'Social', organic: 'Organic',
+                  email: 'Email', referral: 'Referral', affiliate: 'Affiliate',
+                }
+                let subSource = ''
+                if (formType) {
+                  subSource = subSourceLabels[formType] || formType.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (utmMediumRaw) {
+                  subSource = utmMediumLabels[utmMediumRaw] || utmMediumRaw.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (source === 'meta_forms') {
+                  subSource = 'Lead Form'
+                } else if (source === 'facebook') {
+                  subSource = 'Ads'
+                } else if (source === 'google') {
+                  subSource = 'Ads'
+                } else if (source === 'whatsapp') {
+                  subSource = 'Direct'
+                } else if (source === 'voice') {
+                  subSource = 'Call'
+                } else if (source === 'web' || source === 'form') {
+                  subSource = 'Web Form'
+                }
+
                 // Score pill colors
                 // Score pill classes - using CSS variables for consistency
                 const scorePillClass = score != null 
@@ -718,6 +787,12 @@ export default function LeadsTable({
                           {[brandName, city].filter(Boolean).join(' \u00b7 ')}
                         </div>
                       )}
+                      {/* Date the lead came in */}
+                      {((lead as any).created_at || lead.timestamp) && (
+                        <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {new Date((lead as any).created_at || lead.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
                     </td>
 
                     {/* CONTACT - 2 lines: Phone + Email */}
@@ -734,14 +809,21 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - small badge */}
+                    {/* SOURCE - marketing source (top) + entry point (sub) */}
                     <td className="px-3 py-2 text-center">
-                      <span
-                        className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                        style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
-                      >
-                        {srcCfg.label}
-                      </span>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                          style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                        >
+                          {srcCfg.label}
+                        </span>
+                        {subSource && (
+                          <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
+                            {subSource}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* LAST TOUCH - channel pill (primary) + @actor sub */}
