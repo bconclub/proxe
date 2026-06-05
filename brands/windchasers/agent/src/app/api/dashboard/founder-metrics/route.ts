@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +53,7 @@ export async function GET(request: NextRequest) {
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
       supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint, last_scored_at')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
         .order('lead_score', { ascending: false }),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       supabase
@@ -1003,19 +1002,9 @@ export async function GET(request: NextRequest) {
     // Score is dragged down by phantom zeros for leads that actually have
     // 10-40+ when the RPC runs. Caught it on 2026-05-20: dashboard showed
     // 26% but the real average (with RPC backfill on the zero leads) is ~39%.
-    // Recompute ONLY leads whose score is missing or STALE (last scored > TTL
-    // ago). Freshly-scored leads — even ones that legitimately score 0 — are
-    // skipped, so we stop recomputing the whole base on every cache-miss. What
-    // we compute is PERSISTED (write-through) + stamped with last_scored_at, so
-    // the next load reads the saved value instead of recomputing. A lead left
-    // untouched past the TTL gets re-scored, which lets it decay colder over
-    // time (the score factors days-inactive).
-    const SCORE_TTL_MS = 6 * 60 * 60 * 1000 // 6h
-    const nowMs = Date.now()
-    const leadsNeedingScores = safeLeads.filter((lead) => {
-      const ts = lead.last_scored_at ? new Date(lead.last_scored_at).getTime() : NaN
-      return isNaN(ts) || (nowMs - ts) > SCORE_TTL_MS
-    })
+    const leadsNeedingScores = safeLeads.filter(
+      (lead) => !lead.lead_score  // null, undefined, OR 0
+    )
 
     if (leadsNeedingScores.length > 0) {
       const scoreResults = await Promise.all(
@@ -1030,31 +1019,17 @@ export async function GET(request: NextRequest) {
         )
       )
 
-      // Apply calculated scores back to leads in memory
+      // Apply calculated scores back to leads in memory (NOT persisted — this is
+      // a read-side backfill only, so we never overwrite the stored score base).
       const scoreMap = new Map(scoreResults.map((r) => [r.leadId, r.score]))
-      const stampIso = new Date(nowMs).toISOString()
       leadsNeedingScores.forEach((lead) => {
         const calculated = scoreMap.get(lead.id)
-        lead.lead_score = (calculated !== undefined && !isNaN(calculated)) ? calculated : 0
-        lead.last_scored_at = stampIso
+        if (calculated !== undefined && !isNaN(calculated)) {
+          lead.lead_score = calculated
+        } else {
+          lead.lead_score = 0
+        }
       })
-
-      // Write-through persist via the service client so subsequent loads read
-      // the saved score instead of recomputing. Best-effort — a failed write
-      // must never break the metrics response (the lead just gets recomputed
-      // next time). Dashboard writes use the service role per project policy.
-      const svc = getServiceClient()
-      if (svc) {
-        await Promise.all(
-          leadsNeedingScores.map((lead) =>
-            svc
-              .from('all_leads')
-              .update({ lead_score: lead.lead_score, last_scored_at: stampIso })
-              .eq('id', lead.id)
-              .then(() => undefined, () => undefined)
-          )
-        )
-      }
     }
 
     // Now compute totals (all leads have scores)
