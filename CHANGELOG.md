@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05 20:55 IST · BCON: website contact-form leads now capture attribution (UTM source was lost)
+
+- BUG: website form leads showed SOURCE = "Web / Contact Form" even when they arrived WITH utm params. The `/api/website` endpoint captured `utm_source/medium/campaign` into `unified_context.web.utm` but never built `unified_context.attribution` — and the LeadsTable SOURCE column reads `attribution.source_label`, so the marketing source never surfaced (fell back to channel + form_type). Confirmed in DB: leads had `web.utm.source` populated (e.g. chatgpt.com) but `attribution` absent.
+- `api/website/route.ts`: now calls `buildAttribution` from the utm + form_type + page_url it already receives, and stamps `unified_context.attribution` — set on create, preserve-once on update (immutable origin). So website leads now show their real marketing source (Meta / Google / …) in the SOURCE column, matching inbound + chat-widget + WhatsApp-CTWA paths.
+- This was the one lead-ingress path not yet wired for attribution (inbound, chat widget, WhatsApp CTWA were already done). NOTE: existing pre-fix web leads still lack attribution (created before this); a one-time backfill from web.utm can fix them if wanted.
+
 ## 2026-06-05 20:30 IST · BCON: Inbox — one universal message renderer for every channel/tab
 
 - User-facing (Chats): message formatting (bold / italics / line breaks) was only applied to WhatsApp + template messages; web (and any other channel/tab) used a fallback renderer that only handled `**double**` asterisks — so a web message with the agent's `*single*` formatting would show raw asterisks. Now EVERY message on EVERY tab renders identically, the way WhatsApp messages do.

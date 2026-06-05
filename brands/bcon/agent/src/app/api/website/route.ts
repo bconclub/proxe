@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone } from '@/lib/services';
+import { getServiceClient, normalizePhone, buildAttribution } from '@/lib/services';
 
 // Auth check
 function isAuthorized(req: NextRequest): boolean {
@@ -87,6 +87,23 @@ export async function POST(req: NextRequest) {
       admin_notes: []
     };
 
+    // ── Attribution (source / first-touch) — resolved once per lead ─────────
+    // The website form already sends utm_source/medium/campaign + form_type +
+    // page_url. Promote them into unified_context.attribution so the dashboard
+    // SOURCE column shows the marketing source (Meta / Google / …), not just
+    // "Web". Without this the UTM only lived in web.utm and never surfaced.
+    const attribution = buildAttribution({
+      utmSource: utm_source || null,
+      formType: form_type || 'contact',
+      channel: 'web',
+      utm: {
+        source: utm_source || null,
+        medium: utm_medium || null,
+        campaign: utm_campaign || null,
+      },
+      pageUrl: page_url || null,
+    });
+
     // Check for existing lead (phone优先, then email)
     let existingLead = null;
     
@@ -117,6 +134,8 @@ export async function POST(req: NextRequest) {
       // Update existing lead
       const updatedContext = {
         ...existingLead.unified_context,
+        // Set attribution once — preserve the original origin if already present.
+        attribution: existingLead.unified_context?.attribution || attribution,
         web: {
           ...existingLead.unified_context?.web,
           ...unifiedContext.web,
@@ -161,7 +180,7 @@ export async function POST(req: NextRequest) {
           last_touchpoint: 'web',
           last_interaction_at: new Date().toISOString(),
           brand: normalizedBrand,
-          unified_context: unifiedContext,
+          unified_context: { ...unifiedContext, attribution },
           lead_stage: 'New',
         })
         .select('id')
