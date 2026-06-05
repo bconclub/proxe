@@ -147,6 +147,44 @@ const bconWelcomeSequence = [
   { text: "HI i am PROXe, BCON's AI Marketing Strategist\n\nHow can I help with your marketing today?", delay: 0 },
 ];
 
+// Capture the landing-page marketing attribution (utm params + page URL +
+// referrer) ONCE per visitor and persist it, so it survives in-site navigation
+// and is still available by the time the lead converts. Sent with each chat
+// request; the server resolves it into the lead's source (set once). Returns
+// null when there's no signal at all (organic/direct visit) so the payload
+// stays clean.
+const readLandingAttribution = (
+  brandKey: string,
+): { utm: Record<string, string | null>; page_url: string; referrer: string | null } | null => {
+  if (typeof window === 'undefined') return null;
+  const STORAGE_KEY = `proxe-attr-${brandKey}`;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const g = (k: string) => params.get(k) || null;
+    const utm = {
+      source: g('utm_source'),
+      medium: g('utm_medium'),
+      campaign: g('utm_campaign'),
+      content: g('utm_content'),
+      term: g('utm_term'),
+    };
+    const referrer = (document.referrer || '').trim() || null;
+    const hasSignal =
+      Object.values(utm).some(Boolean) ||
+      (referrer && !referrer.includes(window.location.host));
+    if (!hasSignal) return null; // organic/direct — let it resolve to Direct
+    const attr = { utm, page_url: window.location.href, referrer };
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(attr)); } catch { /* ignore */ }
+    return attr;
+  } catch {
+    return null;
+  }
+};
+
 // Helper function to clean metadata strings from conversation summary
 const cleanSummary = (summary: string | null | undefined): string => {
   if (!summary) return '';
@@ -772,6 +810,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       summary: cleanSummary(conversationSummary),
       recentHistory: historyRef.current,
     },
+    // Marketing attribution from the landing page (null on organic/direct).
+    ...(() => {
+      const attribution = readLandingAttribution(brandKey);
+      return attribution ? { attribution } : {};
+    })(),
   });
 
   const closeCalendarWidget = useCallback(() => {

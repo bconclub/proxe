@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-05 17:20 IST · BCON: web chat widget now captures utm attribution (closes the last attribution gap)
+
+- Web-chat leads previously had no marketing signal (web_sessions store no utm) so they always resolved to Direct. Now the chat widget captures the landing-page attribution and feeds it through to the lead.
+  - `ChatWidget.tsx`: new `readLandingAttribution(brandKey)` — reads utm_source/medium/campaign/content/term + page_url + document.referrer from the landing URL, persists to localStorage (`proxe-attr-<brand>`) so it survives in-site navigation and is still present when the visitor converts. Returns null on organic/direct visits (referrer on same host or no utm) → stays Direct. Included in the chat request payload as `metadata.attribution`.
+  - `web/chat/route.ts`: reads `metadata.attribution`, builds an `AttributionSignal` (only when there's a real signal), passes it to `updateLeadProfile`.
+  - `leadManager.ts`: `updateLeadProfile` forwards the optional `attributionSignal` to `ensureOrUpdateLead` (set-once / preserve-once, same path proven in the inbound E2E test).
+- With this, attribution now spans ALL ingress: inbound forms ✅, WhatsApp CTWA ✅, web chat ✅. Web ad leads (utm-tagged) attribute to their real source; organic web stays Direct.
+
 ## 2026-06-05 16:55 IST · BCON: leads table — center-align all columns except Lead & Contact
 
 - User-facing: Stage, Active, and Booking cells were left-aligned while their headers were centered, looking ragged vs Windchasers. Now every column except Lead and Contact is center-aligned (header + cell), matching the Windchasers reference.

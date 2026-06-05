@@ -350,6 +350,7 @@ export async function updateLeadProfile(
   },
   channel: Channel = 'web',
   supabase?: SupabaseClient | null,
+  attributionSignal?: AttributionSignal | null,
 ): Promise<string | null> {
   const client = supabase || getServiceClient() || getClient();
   if (!client) {
@@ -420,6 +421,7 @@ export async function updateLeadProfile(
     channel,
     externalSessionId,
     client,
+    attributionSignal,
   );
 
   // Link lead_id to session

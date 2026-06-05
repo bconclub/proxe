@@ -21,6 +21,7 @@ import {
   addUserInput,
   logMessage,
   upsertSummary,
+  type AttributionSignal,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +66,28 @@ export async function POST(request: NextRequest) {
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
+
+    // Landing-page attribution captured by the widget (utm params + page_url +
+    // referrer). Resolved into a marketing source on lead creation (set once).
+    const attr = metadata.attribution || {};
+    const attrUtm = attr.utm || {};
+    const hasAttrSignal = Boolean(
+      attrUtm.source || attrUtm.campaign || attr.page_url || attr.referrer,
+    );
+    const attributionSignal: AttributionSignal | undefined = hasAttrSignal
+      ? {
+          utmSource: attrUtm.source || null,
+          utm: {
+            source: attrUtm.source || null,
+            medium: attrUtm.medium || null,
+            campaign: attrUtm.campaign || null,
+            content: attrUtm.content || null,
+            term: attrUtm.term || null,
+          },
+          pageUrl: attr.page_url || null,
+          referrer: attr.referrer || null,
+        }
+      : undefined;
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userProfile = session.user || {};
 
@@ -215,6 +238,7 @@ async function postProcess(
         },
         'web',
         supabase,
+        attributionSignal,
       );
       isNewLead = true;
       
