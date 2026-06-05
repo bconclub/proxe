@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, getClient, normalizePhone, createCalendarEvent } from '@/lib/services'
+import { getServiceClient, getClient, normalizePhone, createCalendarEvent, buildAttribution } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -208,6 +208,26 @@ export async function POST(request: NextRequest) {
       inboundContext[leadBrand] = brandCtxData
     }
 
+    // ── Attribution (source / first-touch) — resolved once per lead ─────────
+    // Turns the raw utm + inbound source into a marketing SOURCE (Meta / Google
+    // / Instagram / ...) + first touch (Lead Form / Demo / WhatsApp / ...), so
+    // the dashboard SOURCE column shows the PLACE a lead came from, not just the
+    // channel. Stored at unified_context.attribution; never overwritten once set.
+    const cfUtmSource = String(cf2.utm_source || '').trim().toLowerCase()
+    const cfFormType = String(cf2.form_type || cf2.event_name || '').trim().toLowerCase()
+    const attribution = buildAttribution({
+      utmSource: cfUtmSource || null,
+      formType: cfFormType || null,
+      channel: leadSource,
+      utm: {
+        source: cfUtmSource || null,
+        medium: String(cf2.utm_medium || '').trim().toLowerCase() || null,
+        campaign: cf2.utm_campaign || campaign || null,
+        content: cf2.utm_content || null,
+      },
+      pageUrl: cf2.page_url || null,
+    })
+
     // Check for existing lead — scope to brand because the same phone can
     // exist across brands (e.g. someone is a lead for both bcon and
     // windchasers). Without the brand filter, .maybeSingle() returns null
@@ -250,6 +270,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Set attribution once — never overwrite an existing one (immutable origin).
+      const existingCtxForAttr = existing.unified_context || {}
+      if (!existingCtxForAttr.attribution) {
+        updates.unified_context = {
+          ...(updates.unified_context || existingCtxForAttr),
+          attribution,
+        }
+      }
+
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
       leadId = existing.id
     } else {
@@ -266,7 +295,7 @@ export async function POST(request: NextRequest) {
           last_touchpoint: leadSource,
           last_interaction_at: now,
           lead_stage: 'New',
-          ...(Object.keys(inboundContext).length > 0 ? { unified_context: { ...inboundContext, lead_sources: [leadSource] } } : { unified_context: { lead_sources: [leadSource] } }),
+          ...(Object.keys(inboundContext).length > 0 ? { unified_context: { ...inboundContext, attribution, lead_sources: [leadSource] } } : { unified_context: { attribution, lead_sources: [leadSource] } }),
         })
         .select('id')
         .single()

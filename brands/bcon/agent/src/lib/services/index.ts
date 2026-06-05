@@ -46,6 +46,14 @@ export {
   updateLeadProfile,
 } from './leadManager';
 
+// Attribution (source / first-touch resolution)
+export {
+  type AttributionPayload,
+  deriveSource,
+  deriveFirstTouch,
+  buildAttribution,
+} from './attribution';
+
 // Conversation logging
 export {
   type SessionSummary,

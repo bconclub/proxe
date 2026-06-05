@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-05 13:33 IST · BCON: attribution layer — SOURCE now shows the marketing place (Meta Forms / Google / …), not just the channel
+
+- Ported Windchasers' attribution to BCON (brand-neutral, no aviation/PAT):
+  - NEW `lib/services/attribution.ts` — `deriveSource` / `deriveFirstTouch` / `buildAttribution`; resolves the marketing SOURCE (Meta / Google / Instagram / Facebook / …) + first touch (Lead Form / Demo / WhatsApp / …) from utm + inbound source. Platforms (web/whatsapp/voice) are rejected as sources. Exported from `services/index.ts`.
+  - `/api/agent/leads/inbound` — now writes `unified_context.attribution` on lead creation (utm_source / campaign / form_type → source + first_touch). Set ONCE per lead; never overwritten on later touches (immutable origin).
+  - `LeadsTable.tsx` — SOURCE column now prefers the resolved attribution `source_label` (top) + `first_touch_label` (sub); falls back to utm/channel for legacy leads.
+- Effect: NEW campaign leads will read e.g. "Meta Forms / Lead Form" with the campaign. Existing leads with no utm still read "Direct" — honest, no marketing signal to invent.
+- Next: surface the attribution/source section inside the lead detail modal.
+
 ## 2026-06-05 13:20 IST · BCON: fix LeadsTable column widths (regression from aviation-column removal)
 
 - Removing the two aviation `<col>` entries earlier left the `colgroup` summing to ~83%, so `table-layout: fixed` stretched the remaining columns and the table looked misaligned.

@@ -698,9 +698,30 @@ export default function LeadsTable({
                   youtube:       { label: 'YouTube', color: '#FF0000' },
                   linkedin:      { label: 'LinkedIn', color: '#0A66C2' },
                 }
-                const srcCfg = (utmSourceRaw && utmSourceConfig[utmSourceRaw])
+                // Attribution (resolved marketing source) takes precedence — it
+                // turns the raw channel into the real PLACE (Meta Forms / Google
+                // Ads / Instagram / ...). Falls back to utm/channel for legacy
+                // leads that predate attribution.
+                const attribution = uc?.attribution || null
+                const attrSource = String(attribution?.source || '').toLowerCase().trim()
+                const attrSourceLabel = String(attribution?.source_label || '').trim()
+                let srcCfg = (utmSourceRaw && utmSourceConfig[utmSourceRaw])
                   || sourceConfig[source]
                   || sourceConfig.unknown
+                if (attrSourceLabel && attrSource && attrSource !== 'direct') {
+                  const SOURCE_COLORS: Record<string, string> = {
+                    meta: '#1877F2', meta_ads: '#1877F2', meta_forms: '#1877F2',
+                    meta_forms_clickthrough: '#1877F2',
+                    facebook: '#1877F2', facebook_ads: '#1877F2', fb: '#1877F2',
+                    instagram: '#E4405F', ig: '#E4405F',
+                    google: '#EA4335', google_ads: '#A855F7', googleads: '#A855F7',
+                    youtube: '#FF0000', yt: '#FF0000',
+                    linkedin: '#0A66C2', linkedin_ads: '#0A66C2',
+                    referral: '#10B981', organic: '#84CC16',
+                    email: '#0EA5E9', newsletter: '#0EA5E9',
+                  }
+                  srcCfg = { label: attrSourceLabel, color: SOURCE_COLORS[attrSource] || '#6366F1' }
+                }
 
                 // SOURCE sub-line — the specific entry point ("which page/form"),
                 // shown under the source badge so SOURCE reads as two layers like
@@ -745,7 +766,10 @@ export default function LeadsTable({
                   email: 'Email', referral: 'Referral', affiliate: 'Affiliate',
                 }
                 let subSource = ''
-                if (formType) {
+                const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
+                if (attrFirstTouchLabel) {
+                  subSource = attrFirstTouchLabel
+                } else if (formType) {
                   subSource = subSourceLabels[formType] || formType.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
                 } else if (utmMediumRaw) {
                   subSource = utmMediumLabels[utmMediumRaw] || utmMediumRaw.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
