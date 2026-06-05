@@ -444,10 +444,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     const result = await calculateLeadScoreUtil(leadData as ScoreLead)
     setCalculatedScore(result)
 
-    // Persist recalculated score to DB so list and modal always match
+    // Persist the SAME client-computed score we just displayed, so the list,
+    // modal, and dashboard Avg Lead Score all read one consistent value.
     if (result && typeof result.score === 'number') {
       try {
-        await fetch(`/api/dashboard/leads/${lead.id}/score`, { method: 'POST' })
+        await fetch(`/api/dashboard/leads/${lead.id}/score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: Math.round(result.score) }),
+        })
       } catch (err) {
         console.error('Failed to persist recalculated score:', err)
       }

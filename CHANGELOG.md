@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-04 14:30 IST · Windchasers: Avg Lead Score — persist scores, stop recomputing every load, align with the per-lead value
+
+- Problem: the dashboard recomputed the whole null/zero lead base on every metrics cache-miss and never saved the result (redundant work forever), AND the stored value came from the SQL RPC while the per-lead score users see comes from the client `calculateLeadScore` — so the average never matched the lead cards. (The scorer is keyword/SQL-based, not an LLM call — so it's DB load, not token burn — but the waste was real.)
+- `founder-metrics/route.ts` — now recomputes only leads whose `last_scored_at` is missing or older than a 6h TTL (freshly-scored leads, even legit 0s, are skipped), and PERSISTS what it computes via the service client (write-through) + stamps `last_scored_at`. Subsequent loads read the saved value. A lead left untouched past the TTL gets re-scored, so it decays colder over time (score factors days-inactive).
+- `dashboard/leads/[id]/score/route.ts` + `LeadDetailsModal.tsx` — the modal now sends the client-computed (user-visible) score in the POST body, and the route persists THAT value (plus `last_scored_at`) instead of only the divergent RPC value. So opening a lead refreshes + saves the exact score shown, and the dashboard average converges on what users actually see.
+- Net: scores are computed once and saved; the dashboard reads stored values; opening a lead refreshes it. No runner needed. (Note: 4 pre-existing TS errors in founder-metrics are unrelated and non-blocking.)
+
 ## 2026-06-04 14:05 IST · Windchasers: calendar-sync banner no longer alarms when Google isn't connected
 
 - The Events calendar auto-syncs on page load; with no Google creds the sync route returned a 503 and the UI showed a red "Google Calendar Sync Failed" banner every time — alarming for what is an optional, unconfigured integration (bookings are stored in our own DB regardless).
