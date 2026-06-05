@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-05 12:37 IST · BCON: leads table — drop Windchasers "Coaching PROXe" Instagram label (brand leak)
+
+- BCON's `LeadsTable.tsx` source badge mapped Instagram/IG leads to "Coaching PROXe" (a Windchasers coaching-campaign label) — wrong for the BCON business club.
+- Relabeled Instagram/IG → "Instagram" and removed the Windchasers-only `coachingproxe` utm_source mapping.
+- Checked the aviation Type/Course/PAT columns + course/type filters: already brand-gated out for BCON (`showAviationColumns = brandId === 'windchasers'`), confirmed live on proxe.bconclub.com — no change needed there.
+- User-facing: Instagram-sourced leads now read "Instagram" on the SOURCE column instead of "Coaching PROXe".
+
 ## 2026-06-05 11:59 IST · BCON: dashboard sidebar parity with Windchasers (nav order, Chats rename, pinned logo, icon-drift fix)
 
 - Brought BCON's `DashboardLayout.tsx` sidebar up to the current Windchasers design, keeping BCON's brand (name "BCON", `/bcon-icon.png`, theme — no Windchasers content pulled in).

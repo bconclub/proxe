@@ -743,9 +743,8 @@ export default function LeadsTable({
                   ''
                 ).trim().toLowerCase()
                 const utmSourceConfig: Record<string, { label: string; color: string }> = {
-                  instagram:     { label: 'Coaching PROXe', color: '#E4405F' },
-                  ig:            { label: 'Coaching PROXe', color: '#E4405F' },
-                  coachingproxe: { label: 'Coaching PROXe', color: '#E4405F' },
+                  instagram:     { label: 'Instagram', color: '#E4405F' },
+                  ig:            { label: 'Instagram', color: '#E4405F' },
                   google:        { label: 'Google', color: '#EA4335' },
                   facebook:      { label: 'Facebook', color: '#1877F2' },
                   meta:          { label: 'Meta', color: '#1877F2' },
