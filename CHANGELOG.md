@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-10 14:20 IST · BCON: welcome template now reads what the visitor actually submitted
+
+- BUG (user-reported with screenshot): website form fills triggered the WhatsApp welcome template with "General Inquiry for BCON" + the generic probe — ignoring the service the visitor picked and their business name. Root cause: the website packs both into the `message` field as `"<service-slug> - Brand: <visitor brand>"` (e.g. `"ai-customer-acquisition - Brand: BCON Club"`), but `/api/website` read a separate `service_interest` body field that never arrives, and hardcoded `brand_name: 'BCON'`.
+- `api/website/route.ts`:
+  - Parses the composite message → `service slug` + `visitor brand`; humanizes the slug ("ai-customer-acquisition" → "AI Customer Acquisition"). An explicit `service_interest` body field still wins if the website ever sends one.
+  - Template params now: `service_interest` = the actual service, `brand_name` = the visitor's business (falls back to 'BCON' only if no brand parsed). Probe map unchanged (generic fallback for unmapped services — per-service copy is a later tuning pass).
+  - Stores `service_interest` + `visitor_brand` in `web.form_submission`, and the visitor's brand at `unified_context.company` (same key the inbound route uses) so web leads show "Brand · City" in the leads table like WhatsApp leads do.
+
 ## 2026-06-05 21:30 IST · BCON: WhatsApp template send — re-engage leads past the 24h window (Inbox Phase B part 1)
 
 - User-facing (Chats): when a lead's 24-hour WhatsApp window expired, the composer was dead and there was NO way to reach them. Now there's a WhatsApp button in the reply bar that opens the approved-template picker (ported from Windchasers, brand-isolated).
