@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-05 21:30 IST · BCON: WhatsApp template send — re-engage leads past the 24h window (Inbox Phase B part 1)
+
+- User-facing (Chats): when a lead's 24-hour WhatsApp window expired, the composer was dead and there was NO way to reach them. Now there's a WhatsApp button in the reply bar that opens the approved-template picker (ported from Windchasers, brand-isolated).
+  - NEW `WhatsAppTemplatePicker.tsx` — lists Meta-APPROVED templates from `/api/whatsapp/templates` (10-min localStorage cache, key `bcon-wa-template-cache-v1`), parses `{{1}}`/`{{named}}` body variables into input fields, live preview, and a **Test-mode toggle that defaults ON** (sends to the owner test phone, not the lead) so operators can't accidentally fire at customers.
+  - `inbox/reply/route.ts` — new `action: 'send_template'`: sends via Meta Cloud API (positional OR named params, language defaults `en` — BCON templates like `bcon_welcome_web_v1` are approved as `en`, not `en_US`), no 24h check (templates legitimately bypass it), logs the rendered text to the conversation with `template_name`/`test_mode`/`test_recipient` metadata so the inbox renders the green template card + TEST pill.
+  - `inbox/page.tsx` — WhatsApp trigger button next to the AI button (WhatsApp channel only), picker render + thread refresh on send.
+- Closes UI Layer "WhatsApp template picker — MISSING" and Function Layer "WhatsApp templates mgmt — BEHIND" for BCON.
+
 ## 2026-06-05 20:55 IST · BCON: website contact-form leads now capture attribution (UTM source was lost)
 
 - BUG: website form leads showed SOURCE = "Web / Contact Form" even when they arrived WITH utm params. The `/api/website` endpoint captured `utm_source/medium/campaign` into `unified_context.web.utm` but never built `unified_context.attribution` — and the LeadsTable SOURCE column reads `attribution.source_label`, so the marketing source never surfaced (fell back to channel + form_type). Confirmed in DB: leads had `web.utm.source` populated (e.g. chatgpt.com) but `attribution` absent.
