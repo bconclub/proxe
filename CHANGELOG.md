@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-10 16:10 IST · Windchasers: agent stops promising a booking time that has already passed
+
+- A WhatsApp lead (prajwal) booked 5:00 PM today; at 6:28–6:30 PM, frustrated ("call now", "it's 6:30 now"), the agent kept robotically replying "your call is booked for today at 5:00 PM, the team will reach out at that time." Two causes: (1) `checkBooking` only looked at `unified_context.web.booking_*`, so WhatsApp bookings were invisible to it; (2) it never compared the booked time to the current IST time, so it had no idea the slot had passed.
+- `engine.ts` — `checkBooking` now scans all channels (web/whatsapp/voice/social), normalises the time, and compares the booked moment to NOW in IST wall-clock. It returns an explicit "ALREADY PASSED — it is now {time} IST, do NOT promise a call at {booked time}" when the slot is in the past, or "UPCOMING" otherwise. No longer gated on booking-intent, so a frustrated follow-up still gets the context.
+- The existing-booking RULES now branch: if PASSED → apologise warmly, never repeat the old time as if it's coming, offer the next slot or a team callback; if UPCOMING → brief reassurance. Plus: read the customer's tone, never send the same booking line twice.
+
 ## 2026-06-10 15:30 IST · Windchasers: booking times showing AM instead of PM
 
 - Bug: a 3:00 PM booking (e.g. SHAIK Juweria Kaif, Jun 12) rendered as "3:00 AM" in the Leads table. Root cause: booking_time is stored in TWO formats — 24h "HH:MM" (web flow) and 12h "H:MM AM/PM" (WhatsApp flow) — and the display parser split on ":" and read the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (the PM was silently dropped). 10 WhatsApp bookings were affected.

@@ -54,9 +54,11 @@ export async function process(
     ? `[EXISTING BOOKING INFO (internal — do not echo verbatim to the customer): ${existingBookingMessage}
 
 RULES for this turn:
-- The customer JUST booked. They know when. Do NOT restate the specific date or time back to them unless they explicitly ask "when is my session?" or similar.
-- Acknowledge the booking briefly ("Great, your demo is confirmed." or "All set."), then ask what they need help with.
-- If they give a different date/time in this message, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".]
+- Trust the "Current IST" time in your system prompt. NEVER tell the customer the team "will call you at {time}" if that time has ALREADY PASSED — repeating a past slot as if it's still coming is the #1 mistake to avoid here.
+- If the booking time has ALREADY PASSED (the info above says PASSED): take ownership warmly. Apologise that the team hasn't connected yet, do NOT repeat the old time as if it's still upcoming. Then give a concrete next step — offer the next available slot, OR tell them you'll have the team call them back shortly. If they want a call now, say you're getting the team to reach out and that you've flagged it as priority. Do not keep sending the same "booked for {time}" line.
+- If the booking is UPCOMING: acknowledge briefly and reassure ("All set — the team will reach out at {time}."). Don't over-repeat it.
+- If they give a different date/time, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".
+- Read the customer's tone. If they're frustrated or repeating themselves, respond to THAT directly — never send the same booking line twice in a row.]
 
 User's message: ${input.message}`
     : input.message;
@@ -477,31 +479,70 @@ function cleanResponse(raw: string, channel?: string): string {
   return cleaned;
 }
 
+/** "5:00 PM" or "17:00" → "17:00" (24h). */
+function bookingTo24(s: string): string {
+  const ampm = (s || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const p = ampm[3].toUpperCase();
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${ampm[2]}`;
+  }
+  const hm = (s || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  return hm ? `${hm[1].padStart(2, '0')}:${hm[2]}` : (s || '').trim();
+}
+/** "17:00" → "5:00 PM". */
+function bookingTo12(hhmm: string): string {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return hhmm;
+  const h = parseInt(m[1], 10);
+  return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
 async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promise<string | null> {
-  if (!isBookingIntent(input.message)) return null;
-  if (!input.userProfile.email && !input.userProfile.phone) return null;
+  // NOT gated on booking-intent: a customer with a booking who is frustrated
+  // ("call now", "it's 6:30") rarely uses booking keywords, yet the agent must
+  // still know their slot — and crucially whether it has already passed.
+  const phone = input.userProfile.phone;
+  if (!phone) return null;
 
   try {
-    // Check for existing booking in web_sessions or all_leads
-    const phone = input.userProfile.phone;
-    const email = input.userProfile.email;
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    const { data } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('customer_phone_normalized', normalizedPhone)
+      .maybeSingle();
 
-    if (phone) {
-      const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-      const { data } = await supabase
-        .from('all_leads')
-        .select('unified_context')
-        .eq('customer_phone_normalized', normalizedPhone)
-        .maybeSingle();
-
-      if (data?.unified_context?.web?.booking_date && data?.unified_context?.web?.booking_time) {
-        const date = new Date(data.unified_context.web.booking_date);
-        const formattedDate = date.toLocaleDateString('en-US', {
-          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
-        return `You already have a booking scheduled for ${formattedDate} at ${data.unified_context.web.booking_time}.`;
-      }
+    // Look across ALL channels (web-only missed every WhatsApp/voice booking).
+    const uc = data?.unified_context || {};
+    let bDate: string | null = null;
+    let bTime: string | null = null;
+    for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
+      const c = uc[ch] || {};
+      const d = c.booking_date || c?.booking?.date;
+      const t = c.booking_time || c?.booking?.time;
+      if (d && t) { bDate = String(d); bTime = String(t); break; }
     }
+    if (!bDate || !bTime) return null;
+
+    // Compare the booked moment against NOW, both as IST wall-clock strings.
+    const t24 = bookingTo24(bTime);
+    const nowDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const nowHM = new Date().toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    const isPast = `${bDate}T${t24}` < `${nowDate}T${nowHM}`;
+    const isToday = bDate === nowDate;
+    const whenLabel = isToday
+      ? 'today'
+      : new Date(bDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const display = bookingTo12(t24);
+    const nowDisplay = bookingTo12(nowHM);
+
+    if (isPast) {
+      return `The customer's booking was for ${whenLabel} at ${display}, but that time has ALREADY PASSED — it is now ${nowDisplay} IST. The scheduled call has not happened. Do NOT promise a call at ${display}; apologise and offer the next slot or a team callback.`;
+    }
+    return `The customer has an UPCOMING booking for ${whenLabel} at ${display} (it is now ${nowDisplay} IST).`;
   } catch (error) {
     console.error('[Engine] Error checking booking:', error);
   }
