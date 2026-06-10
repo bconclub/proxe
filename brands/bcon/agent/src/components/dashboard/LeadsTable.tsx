@@ -835,8 +835,8 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE - marketing source (top) + entry point (sub) */}
-                    <td className="px-3 py-2 text-center">
+                    {/* SOURCE - 3 lines: marketing source · entry point · landing page */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       <div className="flex flex-col items-center gap-0.5">
                         <span
                           className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
@@ -849,6 +849,38 @@ export default function LeadsTable({
                             {subSource}
                           </span>
                         )}
+                        {(() => {
+                          const pageUrl = String(
+                            (uc as any)?.attribution?.page_url ||
+                            (uc as any)?.raw_form_fields?.page_url ||
+                            (uc as any)?.web?.form_submission?.page_url ||
+                            ''
+                          ).trim()
+                          if (!pageUrl) return null
+                          // Show only the path — strip any query string (utm_*, etc.)
+                          // regardless of whether the URL is absolute or relative.
+                          let pathOnly = pageUrl.split('?')[0].split('#')[0]
+                          try {
+                            const u = new URL(pageUrl)
+                            pathOnly = u.pathname || pathOnly
+                          } catch {
+                            // already stripped above for relative URLs
+                          }
+                          if (pathOnly.length > 28) pathOnly = pathOnly.slice(0, 26) + '…'
+                          return (
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[9px] whitespace-nowrap hover:underline"
+                              style={{ color: '#6b7280' }}
+                              title={pageUrl}
+                            >
+                              {pathOnly}
+                            </a>
+                          )
+                        })()}
                       </div>
                     </td>
 

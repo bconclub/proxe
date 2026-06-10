@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-10 14:50 IST · BCON: LeadsTable SOURCE shows the landing page (3rd line, like Windchasers)
+
+- User-reported: the SOURCE column showed source + entry point but not the page the lead was captured on, which Windchasers shows as a third line. Ported WC's landing-page line 1:1: reads `attribution.page_url` → `raw_form_fields.page_url` → `web.form_submission.page_url`, strips query/hash (utm noise), renders the pathname as a small clickable link (full URL on hover, opens in new tab, ≤28 chars).
+- `LeadsTable.tsx` SOURCE cell only; leads with no captured page (e.g. organic WhatsApp/voice) show no third line — same as WC.
+
 ## 2026-06-10 14:20 IST · BCON: welcome template now reads what the visitor actually submitted
 
 - BUG (user-reported with screenshot): website form fills triggered the WhatsApp welcome template with "General Inquiry for BCON" + the generic probe — ignoring the service the visitor picked and their business name. Root cause: the website packs both into the `message` field as `"<service-slug> - Brand: <visitor brand>"` (e.g. `"ai-customer-acquisition - Brand: BCON Club"`), but `/api/website` read a separate `service_interest` body field that never arrives, and hardcoded `brand_name: 'BCON'`.
