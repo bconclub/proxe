@@ -89,6 +89,33 @@ function timeAgo(dateStr: string | null | undefined): string {
   return `${diffMonths}mo ago`
 }
 
+/**
+ * Format a stored booking time to a 12-hour display string. Bookings are stored
+ * in TWO formats — 24h "HH:MM" (web flow, e.g. "17:00") and 12h "H:MM AM/PM"
+ * (WhatsApp flow, e.g. "3:00 PM"). The old inline parser split on ":" and read
+ * the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (PM silently dropped).
+ * This handles both: keep an explicit AM/PM, otherwise convert from 24h.
+ */
+function formatBookingTime(raw: unknown): string {
+  if (raw == null) return ''
+  const s = String(raw).trim()
+  if (!s) return ''
+  // Already 12-hour with an explicit period — normalise and keep it.
+  const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+  if (ampm) {
+    const h = parseInt(ampm[1], 10)
+    const mins = ampm[2] || '00'
+    return `${h % 12 || 12}:${mins} ${ampm[3].toUpperCase()}M`
+  }
+  // 24-hour "HH:MM".
+  const tp = s.split(':')
+  if (tp.length < 2) return s
+  const h = parseInt(tp[0], 10)
+  const m = parseInt(tp[1], 10)
+  if (isNaN(h) || isNaN(m)) return s
+  return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 // Using Lead type from @/types to match LeadDetailsModal expectations
 type ExtendedLead = Lead & {
   first_touchpoint?: string | null
@@ -396,17 +423,7 @@ export default function LeadsTable({
         lead.unified_context?.social?.booking_time ||
         lead.unified_context?.social?.booking?.time;
       const keyEvent = bookingDate && bookingTime
-        ? `${formatDateTime(bookingDate).split(',')[0]}, ${(() => {
-          const timeParts = bookingTime.toString().split(':');
-          if (timeParts.length < 2) return bookingTime.toString();
-          const hours = parseInt(timeParts[0], 10);
-          const minutes = parseInt(timeParts[1], 10);
-          if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString();
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const hours12 = hours % 12 || 12;
-          const minutesStr = minutes.toString().padStart(2, '0');
-          return `${hours12}:${minutesStr} ${period}`;
-        })()}`
+        ? `${formatDateTime(bookingDate).split(',')[0]}, ${formatBookingTime(bookingTime)}`
         : bookingDate
           ? formatDateTime(bookingDate).split(',')[0]
           : bookingTime || '';
@@ -1245,13 +1262,7 @@ export default function LeadsTable({
                             >
                               <span aria-hidden="true">📅</span>
                               {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              {bookingTime ? (() => {
-                                const tp = bookingTime.toString().split(':');
-                                if (tp.length < 2) return `, ${bookingTime}`;
-                                const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
-                                if (isNaN(h) || isNaN(m)) return `, ${bookingTime}`;
-                                return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                              })() : ''}
+                              {bookingTime ? `, ${formatBookingTime(bookingTime)}` : ''}
                             </Link>
                             {sessionType && (
                               <span

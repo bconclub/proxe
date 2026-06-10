@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-10 15:30 IST · Windchasers: booking times showing AM instead of PM
+
+- Bug: a 3:00 PM booking (e.g. SHAIK Juweria Kaif, Jun 12) rendered as "3:00 AM" in the Leads table. Root cause: booking_time is stored in TWO formats — 24h "HH:MM" (web flow) and 12h "H:MM AM/PM" (WhatsApp flow) — and the display parser split on ":" and read the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (the PM was silently dropped). 10 WhatsApp bookings were affected.
+- `LeadsTable.tsx` + `LeadDetailsModal.tsx` — new robust `formatBookingTime` that keeps an explicit AM/PM and only converts when the value is bare 24h. Replaces the broken inline parsers in the table chip, the CSV export, and the modal.
+- `bookingManager.ts` — storeBooking now normalises booking.time to 24h (`toTime24`) before persisting, so new bookings are stored in one canonical format.
+- Data fix (direct DB write, no code): normalised the 10 existing 12h booking_time values to 24h. Verified 0 remain; SHAIK now stored as "15:00" → displays "3:00 PM".
+- FLAGGED (not fixed here): the Events/bookings page builds `new Date(date + "T" + time)` and uses `formatTime(bare-time)`, which is invalid for bare time strings — a separate pre-existing issue to address next.
+
 ## 2026-06-10 14:50 IST · BCON: LeadsTable SOURCE shows the landing page (3rd line, like Windchasers)
 
 - User-reported: the SOURCE column showed source + entry point but not the page the lead was captured on, which Windchasers shows as a third line. Ported WC's landing-page line 1:1: reads `attribution.page_url` → `raw_form_fields.page_url` → `web.form_submission.page_url`, strips query/hash (utm noise), renders the pathname as a small clickable link (full URL on hover, opens in new tab, ≤28 chars).

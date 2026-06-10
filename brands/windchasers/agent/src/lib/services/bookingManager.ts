@@ -315,7 +315,7 @@ export async function storeBooking(
   // Update session
   const bookingUpdate: Record<string, any> = {
     booking_date: booking.date,
-    booking_time: booking.time,
+    booking_time: toTime24(booking.time),
     google_event_id: booking.googleEventId ?? null,
     booking_status: booking.status ?? 'Call Booked',
     booking_created_at: getISTTimestamp(),
@@ -394,7 +394,7 @@ export async function storeBooking(
         conversation_summary: cleanSummary(sessionData?.conversation_summary || currentSession?.conversation_summary) || null,
         booking_status: booking.status ?? 'Call Booked',
         booking_date: booking.date,
-        booking_time: booking.time,
+        booking_time: toTime24(booking.time),
         // When the booking was MADE (IST). Lets the snapshot window "demos
         // booked today" precisely instead of falling back to lead creation.
         booking_created_at: getISTTimestamp(),
