@@ -44,10 +44,10 @@ export const LOCKED_ANSWERS = {
   },
   groundClassesFee: {
     display:
-      'DGCA Ground Classes — 4 subjects: ₹2.35 lakh + ₹20,000 registration (3–4 months). 6 subjects: ₹2.75 lakh + ₹20,000 registration (4–5 months). Offered offline & online.',
-    subjects4: 'Air Navigation, Air Regulations, Aviation Meteorology, RTR — ₹2.35 lakh + ₹20,000 registration, 3–4 months',
-    subjects6: 'Air Navigation, Air Regulations, Aviation Meteorology, Technical General, Technical Specific, Radio Telephony (RTR) — ₹2.75 lakh + ₹20,000 registration, 4–5 months',
-    rule: 'When the user asks about the DGCA GROUND CLASSES fee / theory course fee / "fees for DGCA" / ground class price / what the classes cost, give THIS course fee — NOT the ₹80 lakh figure. ₹80 lakh is the whole CPL journey (ground + flight hours + exams + certification); the ground classes course alone is ₹2.35 lakh (4 subjects) or ₹2.75 lakh (6 subjects), each PLUS ₹20,000 registration, available offline & online. Quote ₹80 lakh only when they ask about the full cost to become a pilot, not the ground course.',
+      'DGCA Ground Classes (offline or online). 4 Subjects: ₹2.35 lakh, 3 to 4 months. 6 Subjects: ₹2.75 lakh, 4 to 5 months. Registration is a SEPARATE one-time ₹20,000 (not added onto each price).',
+    subjects4: 'Air Navigation, Air Regulations, Aviation Meteorology, RTR. ₹2.35 lakh, 3 to 4 months.',
+    subjects6: 'The 4 above plus Technical General and Technical Specific. ₹2.75 lakh, 4 to 5 months.',
+    rule: 'When the user asks about the DGCA GROUND CLASSES fee / theory course fee / "fees for DGCA" / ground class price / what the classes cost, give THIS course fee — NOT the ₹80 lakh figure. Present it FORMATTED across multiple lines (per the prompt template), never as one run-on sentence. The two tracks are a choice: 4 subjects (₹2.35 lakh, 3-4 months) OR 6 subjects (₹2.75 lakh, 4-5 months). The ₹20,000 is a one-time registration fee on its own line — do NOT write "plus ₹20,000" on each price, and never say "3.5 months". ₹80 lakh is the whole CPL journey, quoted only when they ask the full cost to become a pilot.',
   },
   timeline: {
     display: '18 to 24 months',

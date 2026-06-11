@@ -80,7 +80,7 @@ const TRIGGERS: QuickReplyTrigger[] = [
     match: /\b(dgca|ground class(?:es)?|theory|subjects?)\b.*\b(cost|fees?|price|pricing|how much|charges?|structure)\b|\b(cost|fees?|price|pricing|how much|charges?|structure)\b.*\b(dgca|ground class(?:es)?|theory)\b/i,
     config: {
       triggerKey: 'ground_classes_cost',
-      body: 'DGCA Ground Classes fee:\n\n*4 subjects* — ₹2.35 lakh + ₹20,000 registration (3–4 months)\n*6 subjects* — ₹2.75 lakh + ₹20,000 registration (4–5 months)\n\nBoth offline & online. What would help?',
+      body: '*DGCA Ground Classes* (offline or online):\n\n*4 Subjects* - ₹2.35 lakh\nAir Navigation, Air Regulations, Aviation Meteorology, RTR\n3 to 4 months\n\n*6 Subjects* - ₹2.75 lakh\nThe 4 above plus Technical General and Technical Specific\n4 to 5 months\n\nRegistration: ₹20,000 (one time)\n\nWhat would help?',
       buttons: ['4 vs 6 subjects', 'Talk to counsellor', 'Full journey cost'],
     },
   },

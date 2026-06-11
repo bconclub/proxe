@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-10 18:10 IST · Windchasers: DGCA fee reply — properly formatted, registration as its own line
+
+- The agent collapsed the DGCA fee into a run-on sentence with errors: "plus ₹20,000" tacked onto each price (it's a separate one-time registration), dropped the subject names, and "3.5 months" (wrong — 4 subjects is 3-4 mo, 6 is 4-5 mo).
+- Now a structured multi-line reply: each track (4 Subjects ₹2.35 lakh / 6 Subjects ₹2.75 lakh) on its own block with the subject names and its own duration, and Registration ₹20,000 (one time) on a separate line.
+- `windchasers-prompt.ts` — cost section A rewritten with the exact formatted template + rules (registration on its own line, per-track durations, never "3.5 months", never a run-on sentence).
+- `quickReplyMap.ts` — the DGCA-fee quick reply uses the same formatted body.
+- `brand-facts.ts` — `groundClassesFee` fact corrected (registration is a separate one-time fee, correct durations) and instructs the formatted layout.
+
 ## 2026-06-10 17:45 IST · Windchasers: Agents tab — real icons + a visible Connect button
 
 - `InstagramAgentTab.tsx` — the "Connect to Instagram Business" button used `bg-[var(--button-bg)]`, which rendered with no fill on the dark theme, so it looked like plain text. Now a visible Instagram-gradient button with the Instagram glyph. The IG header badge uses the Instagram icon instead of the "IG" letters.
