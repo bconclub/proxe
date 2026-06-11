@@ -39,8 +39,15 @@ export const LOCKED_ANSWERS = {
   cost: {
     display: 'up to ₹80 lakh',
     displaySpoken: 'up to eighty lakh',
-    rule: 'NEVER quote a range. NEVER quote a lower bound. NEVER say "₹40 to 75 lakh" or any similar phrasing. If pressed for a lower number, defer: "It depends on the path. A counsellor will walk through specifics on the 1:1 call."',
+    rule: 'This ₹80 lakh figure is the FULL end-to-end pilot-training (CPL) journey ONLY. NEVER quote a range or a lower bound for the journey. BUT do NOT answer a DGCA-ground-classes fee question with ₹80 lakh — for the ground classes course use groundClassesFee below. If pressed for a lower journey number, defer: "It depends on the path. A counsellor will walk through specifics on the 1:1 call."',
     covers: 'ground school, flight hours, DGCA exams, and certification',
+  },
+  groundClassesFee: {
+    display:
+      'DGCA Ground Classes — 4 subjects: ₹2.35 lakh + ₹20,000 registration (3–4 months). 6 subjects: ₹2.75 lakh + ₹20,000 registration (4–5 months). Offered offline & online.',
+    subjects4: 'Air Navigation, Air Regulations, Aviation Meteorology, RTR — ₹2.35 lakh + ₹20,000 registration, 3–4 months',
+    subjects6: 'Air Navigation, Air Regulations, Aviation Meteorology, Technical General, Technical Specific, Radio Telephony (RTR) — ₹2.75 lakh + ₹20,000 registration, 4–5 months',
+    rule: 'When the user asks about the DGCA GROUND CLASSES fee / theory course fee / "fees for DGCA" / ground class price / what the classes cost, give THIS course fee — NOT the ₹80 lakh figure. ₹80 lakh is the whole CPL journey (ground + flight hours + exams + certification); the ground classes course alone is ₹2.35 lakh (4 subjects) or ₹2.75 lakh (6 subjects), each PLUS ₹20,000 registration, available offline & online. Quote ₹80 lakh only when they ask about the full cost to become a pilot, not the ground course.',
   },
   timeline: {
     display: '18 to 24 months',
@@ -241,7 +248,8 @@ export function getBrandFactsForPrompt(): string {
 =================================================================================
 LOCKED FACTS — These take precedence over knowledge base retrieval.
 =================================================================================
-COST: ${LOCKED_ANSWERS.cost.display}. Covers ${LOCKED_ANSWERS.cost.covers}. ${LOCKED_ANSWERS.cost.rule}
+COST (FULL CPL JOURNEY): ${LOCKED_ANSWERS.cost.display}. Covers ${LOCKED_ANSWERS.cost.covers}. ${LOCKED_ANSWERS.cost.rule}
+DGCA GROUND CLASSES FEE: ${LOCKED_ANSWERS.groundClassesFee.display}. 4-subject: ${LOCKED_ANSWERS.groundClassesFee.subjects4}. 6-subject: ${LOCKED_ANSWERS.groundClassesFee.subjects6}. ${LOCKED_ANSWERS.groundClassesFee.rule}
 TIMELINE: ${LOCKED_ANSWERS.timeline.display}. ${LOCKED_ANSWERS.timeline.rule}
 BATCH SCHEDULE: ${LOCKED_ANSWERS.batchSchedule.display}. ${LOCKED_ANSWERS.batchSchedule.rule}
 DGCA SEQUENCE: ${LOCKED_ANSWERS.dgcaSequence.display}. ${LOCKED_ANSWERS.dgcaSequence.rule}

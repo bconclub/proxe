@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-10 16:45 IST · Windchasers: agent gives DGCA ground-classes fee, not the ₹80 lakh total
+
+- Bug: asked "Fees structure for DGCA", the agent replied "investment goes up to ₹80 lakh" — that's the full CPL journey, not the ground-classes course fee. Everything cost-related routed to ₹80 lakh.
+- Now distinguishes the DGCA Ground Classes COURSE fee from the full-journey investment:
+  - 4 subjects — ₹2.35 lakh + ₹20,000 registration (3–4 months)
+  - 6 subjects — ₹2.75 lakh + ₹20,000 registration (4–5 months); offline & online
+- `brand-facts.ts` — new `groundClassesFee` locked fact (4/6 subject breakdown + registration), injected into the prompt; the `cost` rule now scopes ₹80 lakh to the full journey only.
+- `windchasers-prompt.ts` — cost section branches: DGCA-ground-classes fee question → course fee; "cost to become a pilot" → ₹80 lakh investment.
+- `quickReplyMap.ts` — a DGCA-fee quick-reply that fires BEFORE the generic ₹80 lakh one, so "fees structure for DGCA" returns the course fee with buttons (4 vs 6 subjects / counsellor / full journey cost). Bare "cost"/"fees" still default to the journey.
+
 ## 2026-06-10 16:30 IST · BCON: Notes — allow Demo Taken/Proposal Sent/Nurture stages + cancel tasks on terminal notes
 
 - DB migration `add_demo_proposal_nurture_lead_stages` (BCON prod): added `Demo Taken`, `Proposal Sent`, `Nurture` to `all_leads_lead_stage_check`. These were a LATENT BUG — the admin-note logic already wrote them (DEMO_TAKEN / PROPOSAL_SENT / WARM_LATER categories), but the constraint rejected them, so those stage moves silently failed. Now they stick.

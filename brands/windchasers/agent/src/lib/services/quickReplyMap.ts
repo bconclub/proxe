@@ -74,6 +74,16 @@ const TRIGGERS: QuickReplyTrigger[] = [
       buttons: ['Career', 'Duration', 'Cost'],
     },
   },
+  // ── DGCA ground-classes fee (MUST come before the generic cost trigger so a
+  //     "fees structure for DGCA" question gives the COURSE fee, not ₹80 lakh) ─
+  {
+    match: /\b(dgca|ground class(?:es)?|theory|subjects?)\b.*\b(cost|fees?|price|pricing|how much|charges?|structure)\b|\b(cost|fees?|price|pricing|how much|charges?|structure)\b.*\b(dgca|ground class(?:es)?|theory)\b/i,
+    config: {
+      triggerKey: 'ground_classes_cost',
+      body: 'DGCA Ground Classes fee:\n\n*4 subjects* — ₹2.35 lakh + ₹20,000 registration (3–4 months)\n*6 subjects* — ₹2.75 lakh + ₹20,000 registration (4–5 months)\n\nBoth offline & online. What would help?',
+      buttons: ['4 vs 6 subjects', 'Talk to counsellor', 'Full journey cost'],
+    },
+  },
   // ── Cost ────────────────────────────────────────────────────────────────
   {
     match: /\b(cost|fees?|price|pricing|how much|charges?)\b/i,
