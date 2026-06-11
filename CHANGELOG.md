@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-10 18:25 IST · Windchasers: DGCA subjects (4 vs 6) reply now formatted too
+
+- The "4 vs 6 subjects" answer was a flat two-line sentence. Now a formatted breakdown: each track lists its subjects on separate lines with its price and duration.
+- `quickReplyMap.ts` — new `dgca_subjects` trigger, ordered AFTER the fee trigger so "6 subjects fees" still returns the fee (with registration) while a bare "4 vs 6 subjects" returns the subject list. Routing verified.
+- `windchasers-prompt.ts` — subjects-list format template for the LLM path. (80aa5c7a)
+
 ## 2026-06-10 18:10 IST · Windchasers: DGCA fee reply — properly formatted, registration as its own line
 
 - The agent collapsed the DGCA fee into a run-on sentence with errors: "plus ₹20,000" tacked onto each price (it's a separate one-time registration), dropped the subject names, and "3.5 months" (wrong — 4 subjects is 3-4 mo, 6 is 4-5 mo).
