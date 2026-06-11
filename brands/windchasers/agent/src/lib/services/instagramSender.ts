@@ -11,8 +11,11 @@
  *   META_IG_BUSINESS_ACCOUNT_ID   — the IG account id (optional; falls back to "me")
  */
 
+// Instagram API with Instagram Login uses graph.instagram.com (the IGAA… token
+// returned by the Connect flow is rejected by graph.facebook.com). The send
+// endpoints (/me/messages, /{comment-id}/replies) live here.
 const GRAPH_API_VERSION = 'v21.0';
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const GRAPH_API_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
 
 function getCreds(): { token: string; igId: string } | null {
   const token = process.env.META_IG_ACCESS_TOKEN;
