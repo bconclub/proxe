@@ -1,14 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import WebAgentSettingsClient from '../settings/web-agent/WebAgentSettingsClient';
+import InstagramAgentTab from './InstagramAgentTab';
 import WhatsAppAgentTab from './WhatsAppAgentTab';
 import VoiceAgentTab from './VoiceAgentTab';
 
-const tabs = ['Web', 'WhatsApp', 'Voice'];
+const tabs = ['Web', 'WhatsApp', 'Instagram', 'Voice'];
 
 export default function AgentsPage() {
   const [active, setActive] = useState('Web');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const authCode = params.get('code');
+    const authState = params.get('state');
+
+    if (tab === 'Instagram' || authCode || authState === 'windchasers-instagram-agent') {
+      setActive('Instagram');
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full" style={{ minHeight: 'calc(100vh - 60px)' }}>
@@ -36,6 +48,7 @@ export default function AgentsPage() {
       <div className="flex-1 overflow-hidden" style={{ minHeight: 600 }}>
         {active === 'Web' && <WebAgentSettingsClient />}
         {active === 'WhatsApp' && <WhatsAppAgentTab />}
+        {active === 'Instagram' && <InstagramAgentTab />}
         {active === 'Voice' && <VoiceAgentTab />}
       </div>
     </div>
