@@ -75,13 +75,25 @@ const TRIGGERS: QuickReplyTrigger[] = [
     },
   },
   // ── DGCA ground-classes fee (MUST come before the generic cost trigger so a
-  //     "fees structure for DGCA" question gives the COURSE fee, not ₹80 lakh) ─
+  //     "fees structure for DGCA" question gives the COURSE fee, not ₹80 lakh.
+  //     Also before the subjects trigger so "6 subjects fees" → fee, not list) ─
   {
     match: /\b(dgca|ground class(?:es)?|theory|subjects?)\b.*\b(cost|fees?|price|pricing|how much|charges?|structure)\b|\b(cost|fees?|price|pricing|how much|charges?|structure)\b.*\b(dgca|ground class(?:es)?|theory)\b/i,
     config: {
       triggerKey: 'ground_classes_cost',
       body: '*DGCA Ground Classes* (offline or online):\n\n*4 Subjects* - ₹2.35 lakh\nAir Navigation, Air Regulations, Aviation Meteorology, RTR\n3 to 4 months\n\n*6 Subjects* - ₹2.75 lakh\nThe 4 above plus Technical General and Technical Specific\n4 to 5 months\n\nRegistration: ₹20,000 (one time)\n\nWhat would help?',
       buttons: ['4 vs 6 subjects', 'Talk to counsellor', 'Full journey cost'],
+    },
+  },
+  // ── DGCA subjects (4 vs 6) — formatted breakdown with price + duration. After
+  //     the fee trigger so a fee question still wins; this catches bare
+  //     "4 vs 6 subjects" / "which subjects" with no cost word. ─────────────────
+  {
+    match: /\b(subjects?|4 vs 6|six vs four|which subjects?|what subjects?)\b/i,
+    config: {
+      triggerKey: 'dgca_subjects',
+      body: '*4 Subjects* - ₹2.35 lakh (3 to 4 months):\n- Air Navigation\n- Air Regulations\n- Aviation Meteorology\n- Radio Telephony (RTR)\n\n*6 Subjects* - ₹2.75 lakh (4 to 5 months):\nAll 4 above, plus:\n- Technical General\n- Technical Specific\n\nWhat would help?',
+      buttons: ['Book a demo', 'Talk to counsellor', 'Eligibility'],
     },
   },
   // ── Cost ────────────────────────────────────────────────────────────────
