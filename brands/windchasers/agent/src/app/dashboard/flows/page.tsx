@@ -27,6 +27,17 @@ import {
   MdExpandLess,
   MdAdd,
   MdCircle,
+  MdSearch,
+  MdSettings,
+  MdFilterList,
+  MdCalendarToday,
+  MdRefresh,
+  MdClose,
+  MdMoreVert,
+  MdKeyboardArrowDown,
+  MdGroups,
+  MdInventory2,
+  MdAutoGraph,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -863,91 +874,157 @@ export default function FlowsPage() {
 
   if (view === 'stages') {
     const totalLeads = stageStats.reduce((sum, s) => sum + s.leadCount, 0)
-    const avgCoverage = stageStats.length > 0 
+    const avgCoverage = stageStats.length > 0
       ? Math.round(stageStats.reduce((sum, s) => sum + s.coverage, 0) / stageStats.length)
       : 0
+    const stagesActive = stageStats.filter(s => s.leadCount > 0).length
+    const templatesLive = templates.filter(t => t.status === 'approved').length
+    const stageMap = new Map(stageStats.map(stage => [stage.id, stage]))
+    const selectedStageId = expandedStage || 'low_touch'
+    const selectedStage = stageMap.get(selectedStageId) || stageStats[0] || {
+      id: 'low_touch',
+      name: 'Low Touch',
+      leadCount: 0,
+      coverage: 0,
+    }
+    const selectedConfig = STAGE_CONFIG[selectedStage.id] || STAGE_CONFIG.low_touch
+    const funnelGroups = [
+      { id: 'top', label: 'TOP', color: '#2563eb', stageIds: ['one_touch', 'low_touch', 'engaged'] },
+      { id: 'mid', label: 'MID', color: '#f59e0b', stageIds: ['high_intent', 'booking_made', 'no_show'] },
+      { id: 'bottom', label: 'BOTTOM', color: '#10b981', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
+    ]
 
     return (
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 40px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ padding: '0 0 32px', minHeight: '100%', color: 'var(--text-primary)' }}>
+        <section style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-              Journey Flows
+            <h1 style={{ margin: 0, fontSize: 30, lineHeight: 1.1, fontWeight: 800, letterSpacing: 0, color: '#0f172a' }}>
+              Flows
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-              9-stage follow-up sequence with template coverage
+            <p style={{ margin: '10px 0 0', color: '#64748b', fontSize: 14 }}>
+              Orchestrate every stage of your lead journey with templates, nudges and follow-ups.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={() => setView('overview')}
-              style={{
-                padding: '8px 16px',
-                background: 'var(--bg-secondary)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                color: 'var(--text-secondary)',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              Legacy View
-            </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <label
+                style={{
+                  width: 380,
+                  height: 42,
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  background: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '0 14px',
+                  color: '#94a3b8',
+                  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                }}
+              >
+                <MdSearch size={20} />
+                <input
+                  aria-label="Search leads, stages, templates"
+                  placeholder="Search leads, stages, templates..."
+                  style={{ border: 0, outline: 0, flex: 1, fontSize: 14, color: '#0f172a', background: 'transparent' }}
+                />
+                <span style={{ color: '#94a3b8', fontSize: 12 }}>Ctrl K</span>
+              </label>
+              <button type="button" style={flowButtonStyle('#2563eb', '#fff')}>
+                <MdAdd size={18} /> Create Flow
+              </button>
+              <button type="button" style={flowGhostButtonStyle}>
+                <MdSettings size={17} /> Flow Settings
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button type="button" style={flowGhostButtonStyle}>
+                <MdCalendarToday size={17} /> May 1 - May 31, 2024 <MdKeyboardArrowDown size={18} />
+              </button>
+              <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, width: 42, padding: 0, justifyContent: 'center' }} aria-label="Refresh flows">
+                <MdRefresh size={18} />
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Stats Row */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
-          <StatCard label="Total Leads" value={totalLeads} color="#3b82f6" />
-          <StatCard 
-            label="Avg Coverage" 
-            value={`${avgCoverage}%`} 
-            color={avgCoverage >= 80 ? '#22c55e' : avgCoverage >= 50 ? '#f59e0b' : '#ef4444'}
+        <section style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20 }}>
+          <button type="button" style={flowFilterButtonStyle}>All Funnels <MdKeyboardArrowDown size={18} /></button>
+          {funnelGroups.map(group => (
+            <button key={group.id} type="button" style={flowPillButtonStyle}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: group.color }} />
+              {group.label}
+            </button>
+          ))}
+          <button type="button" style={{ ...flowFilterButtonStyle, width: 42, padding: 0, justifyContent: 'center' }} aria-label="Filter flows">
+            <MdFilterList size={18} />
+          </button>
+        </section>
+
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', gap: 16, marginBottom: 22 }}>
+          <FlowKpiCard label="Total Leads" value={totalLeads} delta="12% vs Apr 1 - Apr 30" color="#2563eb" icon={<MdGroups size={26} />} />
+          <FlowKpiCard label="Avg Coverage" value={`${avgCoverage}%`} delta="4pp vs Apr 1 - Apr 30" color={avgCoverage >= 50 ? '#f59e0b' : '#ef4444'} icon={<CoverageRing value={avgCoverage} color={avgCoverage >= 50 ? '#f59e0b' : '#ef4444'} size={54} />} />
+          <FlowKpiCard label="Stages Active" value={`${stagesActive}/9`} delta="1 vs Apr 1 - Apr 30" color="#8b5cf6" icon={<MdAutoGraph size={26} />} />
+          <FlowKpiCard label="Templates Live" value={templatesLive} delta="2 vs Apr 1 - Apr 30" color="#0f9f9a" icon={<MdInventory2 size={25} />} />
+        </section>
+
+        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 18, alignItems: 'start' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', border: '1px solid #dbeafe', borderRadius: 12, overflow: 'hidden', background: '#fff', marginBottom: 16 }}>
+              {funnelGroups.map(group => (
+                <FunnelBand
+                  key={group.id}
+                  label={group.label}
+                  color={group.color}
+                  stageIds={group.stageIds}
+                  stageMap={stageMap}
+                />
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 10 }}>
+              {funnelGroups.map(group => (
+                <div key={group.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', overflow: 'hidden', boxShadow: '0 12px 30px rgba(15,23,42,0.04)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: `${group.color}08` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: group.color, fontSize: 13 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: group.color }} />
+                      {group.label}
+                    </div>
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      {group.stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)} leads
+                    </span>
+                  </div>
+
+                  <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 420 }}>
+                    {group.stageIds.map(stageId => {
+                      const stage = stageMap.get(stageId) || { id: stageId, name: stageId.replace(/_/g, ' '), leadCount: 0, coverage: 0 }
+                      return (
+                        <FlowStageCard
+                          key={stageId}
+                          stageId={stageId}
+                          stage={stage}
+                          config={STAGE_CONFIG[stageId]}
+                          selected={selectedStage.id === stageId}
+                          onSelect={() => setExpandedStage(stageId)}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <FlowDetailPanel
+            stage={selectedStage}
+            config={selectedConfig}
+            templates={templates}
+            getSlotStatus={getSlotStatus}
+            onClose={() => setExpandedStage(null)}
           />
-          <StatCard 
-            label="Stages Active" 
-            value={`${stageStats.filter(s => s.leadCount > 0).length}/9`} 
-            color="#8b5cf6"
-          />
-        </div>
-
-        {/* Funnel Sections */}
-        {/* TOP OF FUNNEL */}
-        <FunnelSection
-          title="TOP"
-          color="#3B82F6"
-          stageIds={['one_touch', 'low_touch', 'engaged']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-        />
-
-        {/* MID FUNNEL */}
-        <FunnelSection
-          title="MID"
-          color="#F59E0B"
-          stageIds={['high_intent', 'booking_made', 'no_show']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-        />
-
-        {/* BOTTOM FUNNEL */}
-        <FunnelSection
-          title="BOTTOM"
-          color="#22C55E"
-          stageIds={['demo_taken', 'proposal_sent', 'converted']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-        />
+        </section>
       </div>
     )
   }
@@ -1249,5 +1326,386 @@ function LegendItem({ color, label }: { color: string; label: string }) {
       <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
       {label}
     </span>
+  )
+}
+
+const flowButtonStyle = (background: string, color: string): React.CSSProperties => ({
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  border: '1px solid transparent',
+  borderRadius: 10,
+  padding: '0 18px',
+  background,
+  color,
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: 'pointer',
+  boxShadow: background === '#2563eb' ? '0 10px 22px rgba(37,99,235,0.22)' : 'none',
+})
+
+const flowGhostButtonStyle: React.CSSProperties = {
+  minHeight: 42,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  border: '1px solid #e2e8f0',
+  borderRadius: 10,
+  padding: '0 16px',
+  background: '#fff',
+  color: '#0f172a',
+  fontSize: 14,
+  fontWeight: 650,
+  cursor: 'pointer',
+  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+}
+
+const flowFilterButtonStyle: React.CSSProperties = {
+  ...flowGhostButtonStyle,
+  minHeight: 38,
+  padding: '0 14px',
+  fontSize: 13,
+  color: '#0f172a',
+}
+
+const flowPillButtonStyle: React.CSSProperties = {
+  minHeight: 38,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  border: '1px solid #e2e8f0',
+  borderRadius: 9,
+  padding: '0 14px',
+  background: '#fff',
+  color: '#0f172a',
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: 'pointer',
+}
+
+function FlowKpiCard({
+  label,
+  value,
+  delta,
+  color,
+  icon,
+}: {
+  label: string
+  value: string | number
+  delta: string
+  color: string
+  icon: React.ReactNode
+}) {
+  return (
+    <article style={{ minHeight: 112, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', padding: 18, boxShadow: '0 12px 30px rgba(15,23,42,0.04)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+        <div>
+          <p style={{ margin: 0, color: '#475569', fontSize: 14, fontWeight: 650 }}>{label}</p>
+          <div style={{ marginTop: 8, fontSize: 31, lineHeight: 1, fontWeight: 850, letterSpacing: 0, color }}>
+            {value}
+          </div>
+        </div>
+        <div style={{ width: 50, height: 50, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${color}18`, color }}>
+          {icon}
+        </div>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 12, color: delta.includes('4pp') ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <MdTrendingUp size={14} />
+        {delta}
+      </div>
+    </article>
+  )
+}
+
+function FunnelBand({
+  label,
+  color,
+  stageIds,
+  stageMap,
+}: {
+  label: string
+  color: string
+  stageIds: string[]
+  stageMap: Map<string, StageStats>
+}) {
+  const count = stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)
+  const values = stageIds.map(id => stageMap.get(id)?.leadCount || 0)
+
+  return (
+    <div style={{ minHeight: 104, padding: '16px 20px 10px', background: `linear-gradient(90deg, ${color}14 0%, #fff 100%)`, borderRight: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color, fontWeight: 850, fontSize: 13 }}>
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+        {label}
+      </div>
+      <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <strong style={{ fontSize: 29, lineHeight: 1, color: '#0f172a' }}>{count}</strong>
+        <span style={{ color: '#64748b', fontSize: 13 }}>lead{count === 1 ? '' : 's'}</span>
+      </div>
+      <MiniSparkline values={values} color={color} />
+    </div>
+  )
+}
+
+function MiniSparkline({ values, color }: { values: number[]; color: string }) {
+  const safe = values.length > 0 ? values : [0, 0, 0]
+  const max = Math.max(...safe, 1)
+  const width = 260
+  const height = 42
+  const points = safe.map((value, index) => {
+    const x = safe.length === 1 ? width / 2 : (index / (safe.length - 1)) * width
+    const y = height - 8 - (value / max) * 26
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true" style={{ display: 'block', marginTop: 4 }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="0" y1={height - 8} x2={width} y2={height - 8} stroke={`${color}33`} strokeWidth="1" />
+    </svg>
+  )
+}
+
+function FlowStageCard({
+  stageId,
+  stage,
+  config,
+  selected,
+  onSelect,
+}: {
+  stageId: string
+  stage: StageStats
+  config: (typeof STAGE_CONFIG)[string]
+  selected: boolean
+  onSelect: () => void
+}) {
+  const accent = config?.color || '#2563eb'
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        width: '100%',
+        textAlign: 'left',
+        border: selected ? `2px solid #2563eb` : '1px solid #e2e8f0',
+        borderRadius: 10,
+        background: selected ? '#eff6ff' : '#fff',
+        padding: 14,
+        cursor: 'pointer',
+        boxShadow: selected ? '0 10px 24px rgba(37,99,235,0.12)' : '0 6px 18px rgba(15,23,42,0.03)',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: config?.bg || `${accent}16`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {config?.icon || <MdTimeline size={22} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {stage.name}
+            </h3>
+            <MdMoreVert size={18} color="#64748b" />
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ borderRadius: 999, padding: '3px 8px', color: accent, background: `${accent}16`, fontSize: 12, fontWeight: 800 }}>
+              {stage.leadCount} lead{stage.leadCount === 1 ? '' : 's'}
+            </span>
+            <span style={{ color: '#64748b', fontSize: 12 }}>{config?.timing || 'No schedule'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: stage.coverage > 0 ? '#f97316' : '#ef4444', fontSize: 12, fontWeight: 800 }}>{stage.coverage}%</span>
+        <div style={{ flex: 1, height: 4, borderRadius: 999, background: '#e2e8f0', overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(100, Math.max(0, stage.coverage))}%`, height: '100%', background: stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444' }} />
+        </div>
+      </div>
+      <span style={{ display: 'none' }}>{stageId}</span>
+    </button>
+  )
+}
+
+function FlowDetailPanel({
+  stage,
+  config,
+  templates,
+  getSlotStatus,
+  onClose,
+}: {
+  stage: StageStats
+  config: (typeof STAGE_CONFIG)[string]
+  templates: TemplateInfo[]
+  getSlotStatus: (stageId: string, day: number, channel: string) => string
+  onClose: () => void
+}) {
+  const stageTemplates = templates.filter(template => template.stage === stage.id)
+  const approved = stageTemplates.filter(template => template.status === 'approved').length
+  const pending = stageTemplates.filter(template => template.status === 'pending').length
+  const rejected = stageTemplates.filter(template => template.status === 'rejected').length
+  const emptySlots = Math.max(0, (config?.days.length || 0) * (config?.channels.length || 0) - stageTemplates.length)
+  const totalSlots = Math.max(1, approved + pending + rejected + emptySlots)
+
+  return (
+    <aside style={{ position: 'sticky', top: 16, border: '1px solid #e2e8f0', borderRadius: 14, background: '#fff', boxShadow: '0 18px 40px rgba(15,23,42,0.08)', padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 20, color: '#0f172a', fontWeight: 850 }}>{stage.name}</h2>
+            <span style={{ color: '#2563eb', background: '#dbeafe', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 800 }}>
+              {stage.leadCount} leads
+            </span>
+          </div>
+          <p style={{ margin: '12px 0 0', color: '#475569', fontSize: 13 }}>{config?.timing || 'No schedule'}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close selected flow" style={{ border: 0, background: 'transparent', color: '#64748b', cursor: 'pointer', padding: 4 }}>
+          <MdClose size={20} />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 26, borderBottom: '1px solid #e2e8f0', marginTop: 24 }}>
+        {['Overview', 'Templates', 'Performance', 'Activity'].map((tab, index) => (
+          <button key={tab} type="button" style={{ border: 0, background: 'transparent', padding: '0 0 12px', color: index === 0 ? '#2563eb' : '#475569', borderBottom: index === 0 ? '3px solid #2563eb' : '3px solid transparent', fontSize: 13, fontWeight: 750, cursor: 'pointer' }}>
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 148px', gap: 12, marginTop: 14 }}>
+        <section style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 14, color: '#0f172a' }}>Channels</h3>
+          {(config?.channels.length ? config.channels : ['whatsapp']).map(channel => (
+            <div key={channel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: channel === 'whatsapp' ? '#22c55e' : '#ef476f', fontSize: 20 }}>{channel === 'whatsapp' ? 'W' : 'V'}</span>
+                <span style={{ color: '#475569', fontSize: 13, textTransform: 'capitalize' }}>{channel}</span>
+              </div>
+              <span style={{ borderRadius: 999, padding: '4px 9px', background: '#dcfce7', color: '#16a34a', fontSize: 12, fontWeight: 800 }}>Active</span>
+            </div>
+          ))}
+        </section>
+
+        <section style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 14, color: '#0f172a', textAlign: 'left' }}>Coverage</h3>
+          <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : '#f59e0b'} size={92} showLabel />
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', color: '#16a34a', fontSize: 12, marginTop: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />
+            Good
+          </div>
+        </section>
+      </div>
+
+      <section style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginTop: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: '#0f172a' }}>Lead Progress</h3>
+        <p style={{ margin: '8px 0 12px', color: '#475569', fontSize: 12 }}>{stage.leadCount} leads in this stage</p>
+        <SegmentedProgress approved={approved} pending={pending} rejected={rejected} empty={emptySlots} total={totalSlots} />
+      </section>
+
+      <section style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginTop: 12 }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 14, color: '#0f172a' }}>Template Schedule</h3>
+        <ScheduleMatrix stageId={stage.id} config={config} getSlotStatus={getSlotStatus} />
+        <button type="button" style={{ ...flowGhostButtonStyle, width: '100%', marginTop: 14, color: '#2563eb', minHeight: 36 }}>
+          View Full Templates
+        </button>
+      </section>
+    </aside>
+  )
+}
+
+function CoverageRing({ value, color, size = 54, showLabel = false }: { value: number; color: string; size?: number; showLabel?: boolean }) {
+  const stroke = Math.max(6, Math.round(size * 0.12))
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (Math.min(100, Math.max(0, value)) / 100) * circumference
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`${value}% coverage`}>
+      <circle cx={size / 2} cy={size / 2} r={radius} stroke="#e5e7eb" strokeWidth={stroke} fill="none" />
+      <circle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      {showLabel && (
+        <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 18, fontWeight: 850, fill: '#0f172a' }}>
+          {value}%
+        </text>
+      )}
+    </svg>
+  )
+}
+
+function SegmentedProgress({ approved, pending, rejected, empty, total }: { approved: number; pending: number; rejected: number; empty: number; total: number }) {
+  const segments = [
+    { label: 'Approved', value: approved, color: '#22c55e' },
+    { label: 'Pending', value: pending, color: '#f59e0b' },
+    { label: 'Rejected', value: rejected, color: '#ef4444' },
+    { label: 'Empty', value: empty, color: '#94a3b8' },
+  ]
+
+  return (
+    <>
+      <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: '#e2e8f0' }}>
+        {segments.map(segment => (
+          <div key={segment.label} style={{ width: `${Math.max(0, (segment.value / total) * 100)}%`, background: segment.color }} />
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
+        {segments.map(segment => (
+          <div key={segment.label} style={{ fontSize: 11, color: '#475569' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 750, color: '#334155' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: segment.color }} />
+              {segment.label}
+            </div>
+            <div style={{ marginTop: 3 }}>{segment.value} ({Math.round((segment.value / total) * 100)}%)</div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function ScheduleMatrix({
+  stageId,
+  config,
+  getSlotStatus,
+}: {
+  stageId: string
+  config: (typeof STAGE_CONFIG)[string]
+  getSlotStatus: (stageId: string, day: number, channel: string) => string
+}) {
+  const days = config?.days.length ? config.days.slice(0, 4) : [1]
+  const channels = config?.channels.length ? config.channels : ['whatsapp']
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `88px repeat(${days.length}, 1fr)`, gap: 8, alignItems: 'stretch' }}>
+      <div />
+      {days.map(day => (
+        <div key={day} style={{ textAlign: 'center', fontSize: 12, color: '#0f172a', fontWeight: 800 }}>Day {day}</div>
+      ))}
+      {channels.map(channel => (
+        <React.Fragment key={channel}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 12 }}>
+            <span style={{ color: channel === 'whatsapp' ? '#22c55e' : '#ef476f', fontWeight: 900 }}>{channel === 'whatsapp' ? 'W' : 'V'}</span>
+            {channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
+          </div>
+          {days.map(day => {
+            const status = getSlotStatus(stageId, day, channel)
+            const palette: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
+              approved: { bg: '#dcfce7', color: '#16a34a', icon: <MdCheckCircle size={16} />, label: 'Approved' },
+              pending: { bg: '#ffedd5', color: '#f97316', icon: <MdAccessTime size={16} />, label: 'Pending' },
+              rejected: { bg: '#fee2e2', color: '#ef4444', icon: <MdRemoveCircleOutline size={16} />, label: 'Rejected' },
+              empty: { bg: '#f1f5f9', color: '#64748b', icon: <MdCircle size={16} />, label: 'Empty' },
+            }
+            const item = palette[status] || palette.empty
+            return (
+              <div key={`${channel}-${day}`} style={{ minHeight: 62, borderRadius: 9, background: item.bg, color: item.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 11, fontWeight: 750 }}>
+                {item.icon}
+                {item.label}
+              </div>
+            )
+          })}
+        </React.Fragment>
+      ))}
+    </div>
   )
 }
