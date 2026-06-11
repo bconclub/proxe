@@ -584,7 +584,17 @@ export async function POST(
     }
 
     if (classification.category === 'NOT_INTERESTED') {
-      console.log(`[AdminNote] Step 3: NOT_INTERESTED — closing lead`)
+      console.log(`[AdminNote] Step 3: NOT_INTERESTED — cancelling tasks, closing lead`)
+      // Terminal stage — cancel ALL pending tasks (matches WC + NOT_POTENTIAL)
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: not interested via admin note` })
+        .eq('lead_id', leadId)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const niCancelCount = cancelledTasks?.length || 0
+      if (niCancelCount > 0) actionsTaken.push(`Cancelled ${niCancelCount} pending tasks`)
+
       newStage = 'Closed Lost'
       await supabase
         .from('all_leads')
@@ -592,11 +602,22 @@ export async function POST(
         .eq('id', leadId)
       actions.push('stage_updated:Closed Lost')
       actionsTaken.push(`Stage changed to Closed Lost`)
-      console.log(`[AdminNote] Step 3a: Stage → Closed Lost`)
+      console.log(`[AdminNote] Step 3a: Cancelled ${niCancelCount} tasks, Stage → Closed Lost`)
     }
 
     if (classification.category === 'CONVERTED') {
-      console.log(`[AdminNote] Step 3: CONVERTED — marking as won`)
+      console.log(`[AdminNote] Step 3: CONVERTED — cancelling tasks, marking as won`)
+      // Terminal stage — cancel ALL pending tasks (matches WC) so a converted
+      // lead doesn't keep getting follow-up nudges.
+      const { data: cancelledTasks } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: converted via admin note` })
+        .eq('lead_id', leadId)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+      const cvCancelCount = cancelledTasks?.length || 0
+      if (cvCancelCount > 0) actionsTaken.push(`Cancelled ${cvCancelCount} pending tasks`)
+
       newStage = 'Converted'
       await supabase
         .from('all_leads')
@@ -604,7 +625,7 @@ export async function POST(
         .eq('id', leadId)
       actions.push('stage_updated:Converted')
       actionsTaken.push(`Stage changed to Converted`)
-      console.log(`[AdminNote] Step 3a: Stage → Converted`)
+      console.log(`[AdminNote] Step 3a: Cancelled ${cvCancelCount} tasks, Stage → Converted`)
     }
 
     if (classification.category === 'DEMO_TAKEN') {

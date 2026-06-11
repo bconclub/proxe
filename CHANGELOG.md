@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-10 16:30 IST · BCON: Notes — allow Demo Taken/Proposal Sent/Nurture stages + cancel tasks on terminal notes
+
+- DB migration `add_demo_proposal_nurture_lead_stages` (BCON prod): added `Demo Taken`, `Proposal Sent`, `Nurture` to `all_leads_lead_stage_check`. These were a LATENT BUG — the admin-note logic already wrote them (DEMO_TAKEN / PROPOSAL_SENT / WARM_LATER categories), but the constraint rejected them, so those stage moves silently failed. Now they stick.
+- `admin-notes/route.ts`: NOT_INTERESTED and CONVERTED notes now cancel all pending tasks before closing the lead (matches WC + the existing NOT_POTENTIAL behavior) — a converted/dead lead no longer keeps getting follow-up nudges.
+- Note: BCON's note classification + actions already match WC functionally (14/14 categories); the remaining difference is architectural (BCON inline vs WC's shared noteOrchestrator.ts) — deferred to the packages/core extraction so it isn't done per-brand twice. Pipeline board folds the new stages into existing columns exactly like WC (mirror), so no leads are orphaned beyond WC's own behavior.
+
 ## 2026-06-10 16:10 IST · Windchasers: agent stops promising a booking time that has already passed
 
 - A WhatsApp lead (prajwal) booked 5:00 PM today; at 6:28–6:30 PM, frustrated ("call now", "it's 6:30 now"), the agent kept robotically replying "your call is booked for today at 5:00 PM, the team will reach out at that time." Two causes: (1) `checkBooking` only looked at `unified_context.web.booking_*`, so WhatsApp bookings were invisible to it; (2) it never compared the booked time to the current IST time, so it had no idea the slot had passed.
