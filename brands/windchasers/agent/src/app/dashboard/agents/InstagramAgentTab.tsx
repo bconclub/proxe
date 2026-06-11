@@ -42,13 +42,13 @@ export default function InstagramAgentTab() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-[var(--bg-primary)]">
-      <div className="grid min-h-full grid-cols-1 xl:grid-cols-[520px_1fr]">
-        <section className="border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] p-8">
+    <div className="h-full overflow-auto bg-[var(--bg-primary)] px-5 py-6 md:px-8">
+      <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-[minmax(360px,480px)_1fr]">
+        <section className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 md:p-8">
           <div className="mb-8">
-            <div className="mb-3 flex items-center gap-3">
+            <div className="mb-4 flex items-center gap-4">
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-black text-white shadow-lg"
+                className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl text-base font-black text-white shadow-lg"
                 style={{
                   background: 'linear-gradient(135deg, #833AB4 0%, #E1306C 45%, #FCAF45 100%)',
                 }}
@@ -56,9 +56,14 @@ export default function InstagramAgentTab() {
               >
                 IG
               </div>
-              <h2 className="text-2xl font-bold text-[var(--text-primary)]">
-                Instagram Agent
-              </h2>
+              <div>
+                <p className="mb-1 text-xs font-black uppercase tracking-widest text-[#E1306C]">
+                  Instagram Business
+                </p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+                  Instagram Agent
+                </h2>
+              </div>
             </div>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
               Connect the official WindChasers Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
@@ -75,7 +80,7 @@ export default function InstagramAgentTab() {
               onClick={handleConnectInstagram}
               className="w-full rounded-lg bg-[var(--button-bg)] px-4 py-3 text-sm font-bold text-[var(--text-button)] transition-opacity hover:opacity-90"
             >
-              Connect Instagram Business
+              Connect to Instagram Business
             </button>
 
             <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-4">
@@ -115,8 +120,8 @@ export default function InstagramAgentTab() {
           </div>
         </section>
 
-        <section className="p-8">
-          <div className="mx-auto max-w-3xl rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6">
+        <section className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 md:p-8">
+          <div className="mx-auto max-w-3xl">
             <h3 className="mb-4 text-lg font-bold text-[var(--text-primary)]">
               Instagram workflow
             </h3>
