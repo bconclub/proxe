@@ -47,16 +47,26 @@ export default function InstagramAgentTab() {
         <section className="border-r border-[var(--border-primary)] bg-[var(--bg-secondary)] p-8">
           <div className="mb-8">
             <div className="mb-3 flex items-center gap-3">
+              <div
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-black text-white shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #833AB4 0%, #E1306C 45%, #FCAF45 100%)',
+                }}
+                aria-hidden="true"
+              >
+                IG
+              </div>
               <h2 className="text-2xl font-bold text-[var(--text-primary)]">
                 Instagram Agent
               </h2>
-              <span className="rounded-full border border-[var(--accent-primary)] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[var(--accent-primary)]">
-                Setup
-              </span>
             </div>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
               Connect the official WindChasers Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
             </p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
+              <span className="h-2 w-2 rounded-full bg-[#E1306C]" />
+              Target account: @windchasersblr
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -67,6 +77,16 @@ export default function InstagramAgentTab() {
             >
               Connect Instagram Business
             </button>
+
+            <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                Instagram connection pending
+              </div>
+              <p className="text-xs leading-5 text-[var(--text-secondary)]">
+                Complete Instagram Business Login to authorize account identity, DMs, and comments for the WindChasers workspace.
+              </p>
+            </div>
 
             {authReturned && (
               <div className="rounded-lg border border-[var(--accent-primary)] bg-[var(--accent-subtle)] p-4 text-sm text-[var(--accent-primary)]">

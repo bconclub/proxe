@@ -6,7 +6,39 @@ import InstagramAgentTab from './InstagramAgentTab';
 import WhatsAppAgentTab from './WhatsAppAgentTab';
 import VoiceAgentTab from './VoiceAgentTab';
 
-const tabs = ['Web', 'WhatsApp', 'Instagram', 'Voice'];
+const tabs = [
+  {
+    id: 'Web',
+    label: 'Web',
+    icon: 'WWW',
+    activeClass: 'bg-[var(--button-bg)] text-[var(--text-button)]',
+    inactiveClass: 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]',
+  },
+  {
+    id: 'WhatsApp',
+    label: 'WhatsApp',
+    icon: 'WA',
+    activeClass: 'bg-[#22C55E] text-white',
+    inactiveClass: 'text-[#22C55E] hover:text-[#4ADE80]',
+  },
+  {
+    id: 'Instagram',
+    label: 'Instagram',
+    icon: 'IG',
+    activeClass: 'text-white',
+    inactiveClass: 'text-[#E4405F] hover:text-[#F97316]',
+    activeStyle: {
+      background: 'linear-gradient(135deg, #833AB4 0%, #E1306C 45%, #FCAF45 100%)',
+    },
+  },
+  {
+    id: 'Voice',
+    label: 'Voice',
+    icon: 'MIC',
+    activeClass: 'bg-[#3B82F6] text-white',
+    inactiveClass: 'text-[#60A5FA] hover:text-[#93C5FD]',
+  },
+] as const;
 
 export default function AgentsPage() {
   const [active, setActive] = useState('Web');
@@ -30,15 +62,23 @@ export default function AgentsPage() {
         <div className="flex gap-1">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActive(tab)}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                active === tab
-                  ? 'bg-[var(--button-bg)] text-[var(--text-button)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              key={tab.id}
+              onClick={() => setActive(tab.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                active === tab.id
+                  ? tab.activeClass
+                  : tab.inactiveClass
               }`}
+              style={active === tab.id && 'activeStyle' in tab ? tab.activeStyle : undefined}
             >
-              {tab}
+              <span
+                className={`text-[10px] font-black tracking-tight rounded px-1.5 py-0.5 ${
+                  active === tab.id ? 'bg-white/20' : 'bg-white/10'
+                }`}
+              >
+                {tab.icon}
+              </span>
+              {tab.label}
             </button>
           ))}
         </div>
