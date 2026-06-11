@@ -1478,7 +1478,7 @@ export default function InboxPage() {
             />
           </div>
           <div className="flex gap-1">
-            {['all', 'web', 'whatsapp'].map((ch) => (
+            {['all', 'web', 'whatsapp', 'social'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}

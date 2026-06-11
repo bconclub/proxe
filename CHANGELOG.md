@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-10 17:30 IST · Windchasers: Instagram DMs + comments wired into the agent (App Review MVP)
+
+- The Instagram webhook was a stub (verified + logged, never processed). Now it bridges Instagram into the same unified agent as WhatsApp/web, on the `social` channel. Identity is the IGSID (IG users have no phone), so leads resolve/create by `unified_context.social.igsid`.
+- `instagramSender.ts` (new) — Graph API send helpers: `sendInstagramDM`, `sendInstagramCommentReply` (public), `sendInstagramPrivateReply` (comment→DM lead capture), `fetchInstagramUsername`. Uses `META_IG_ACCESS_TOKEN` (+ optional `META_IG_BUSINESS_ACCOUNT_ID`).
+- `instagram/meta/route.ts` — POST now verifies the X-Hub-Signature (when `META_IG_APP_SECRET` set), dedups, and processes: inbound DM → lead → agent → reply; inbound comment → lead → agent-generated private reply (comment→DM) + a short public reply. GET verify unchanged.
+- `promptBuilder.ts` — `social` channel now uses plain-text formatting (no markdown/asterisks, which IG/WhatsApp render literally).
+- `inbox/page.tsx` — added a `social` channel filter tab (Instagram convos already render under "all").
+- Needs to go live/testable: `META_IG_ACCESS_TOKEN` + `META_IG_VERIFY_TOKEN` in env, the Meta webhook subscribed to messages/comments with our callback URL. Booking-via-IG and button parsing are deliberately out of this MVP.
+
 ## 2026-06-10 16:45 IST · Windchasers: agent gives DGCA ground-classes fee, not the ₹80 lakh total
 
 - Bug: asked "Fees structure for DGCA", the agent replied "investment goes up to ₹80 lakh" — that's the full CPL journey, not the ground-classes course fee. Everything cost-related routed to ₹80 lakh.

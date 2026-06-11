@@ -186,8 +186,8 @@ function buildUserPrompt(params: {
     : '';
 
   // Channel-specific formatting (WhatsApp rules are in system prompt + channel instructions)
-  const formattingInstructions = channel === 'whatsapp'
-    ? 'Plain text. Keep it tight: 1-2 sentences per paragraph. If the answer has multiple parts (e.g. a timeline AND the steps AND a call-to-action), split it into 2-3 short paragraphs separated by a blank line (\\n\\n) instead of one long block. Put any call-to-action ("Want me to set up a quick call?") on its own line as the last paragraph.'
+  const formattingInstructions = (channel === 'whatsapp' || channel === 'social')
+    ? 'Plain text, NO markdown and NO asterisks (Instagram and WhatsApp show them literally). Keep it tight: 1-2 sentences per paragraph. If the answer has multiple parts (e.g. a timeline AND the steps AND a call-to-action), split it into 2-3 short paragraphs separated by a blank line (\\n\\n) instead of one long block. Put any call-to-action ("Want me to set up a quick call?") on its own line as the last paragraph.'
     : 'Format with <br><br> between paragraphs. Max 2 sentences.';
 
   // Inject current date + a live "is today still bookable" rule so Claude never
