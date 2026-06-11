@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-10 17:45 IST · Windchasers: Agents tab — real icons + a visible Connect button
+
+- `InstagramAgentTab.tsx` — the "Connect to Instagram Business" button used `bg-[var(--button-bg)]`, which rendered with no fill on the dark theme, so it looked like plain text. Now a visible Instagram-gradient button with the Instagram glyph. The IG header badge uses the Instagram icon instead of the "IG" letters.
+- `agents/page.tsx` — channel tabs now use real icons (globe / WhatsApp / Instagram / mic via react-icons) instead of the `WWW`/`WA`/`IG`/`MIC` text badges.
+
 ## 2026-06-10 17:30 IST · Windchasers: Instagram DMs + comments wired into the agent (App Review MVP)
 
 - The Instagram webhook was a stub (verified + logged, never processed). Now it bridges Instagram into the same unified agent as WhatsApp/web, on the `social` channel. Identity is the IGSID (IG users have no phone), so leads resolve/create by `unified_context.social.igsid`.

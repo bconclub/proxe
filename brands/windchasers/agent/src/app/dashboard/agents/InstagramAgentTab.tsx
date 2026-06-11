@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { FaInstagram } from 'react-icons/fa';
 
 const INSTAGRAM_APP_ID = '1667051187795636';
 const INSTAGRAM_SCOPES = [
@@ -54,7 +55,7 @@ export default function InstagramAgentTab() {
                 }}
                 aria-hidden="true"
               >
-                IG
+                <FaInstagram size={28} />
               </div>
               <div>
                 <p className="mb-1 text-xs font-black uppercase tracking-widest text-[#E1306C]">
@@ -78,8 +79,10 @@ export default function InstagramAgentTab() {
             <button
               type="button"
               onClick={handleConnectInstagram}
-              className="w-full rounded-lg bg-[var(--button-bg)] px-4 py-3 text-sm font-bold text-[var(--text-button)] transition-opacity hover:opacity-90"
+              className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-bold text-white shadow-lg transition-opacity hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #833AB4 0%, #E1306C 45%, #FCAF45 100%)' }}
             >
+              <FaInstagram size={18} />
               Connect to Instagram Business
             </button>
 
