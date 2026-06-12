@@ -95,47 +95,55 @@ function AcceptInviteForm() {
 
     setLoading(true)
 
-    const supabase = createClient()
+    // ── Server-side redeem ───────────────────────────────────────────────
+    // We POST to /api/auth/redeem-invite which:
+    //   1. Validates the token (exists, not accepted, not expired)
+    //   2. Uses the service-role admin API to create the user with
+    //      email_confirm:true — so they can sign in immediately. Previously
+    //      we did supabase.auth.signUp() in the browser which left users
+    //      stranded on the login screen with "Please verify your email."
+    //   3. Sets the dashboard_users role + marks invitation accepted
+    //
+    // After it returns success, we sign in with the password they just set
+    // to establish the cookie session, then route to /dashboard.
+    try {
+      const res = await fetch('/api/auth/redeem-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password, fullName }),
+      })
+      const payload = await res.json().catch(() => ({}))
 
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email: invitation.email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    })
+      if (!res.ok) {
+        setError(payload?.error || 'Could not accept invitation')
+        setLoading(false)
+        return
+      }
 
-    if (signUpError) {
-      setError(signUpError.message)
+      // Establish a session — the redeem endpoint just created the user
+      // server-side; the browser still has no auth cookie. signInWithPassword
+      // sets it via the supabase-ssr cookie handlers in middleware.
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitation.email,
+        password,
+      })
+      if (signInError) {
+        // Highly unlikely (we just created/confirmed the user) but if it
+        // happens, the account is fine — send them to login with the email
+        // pre-filled.
+        console.error('[accept-invite] signIn after redeem failed:', signInError)
+        router.push('/auth/login')
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err: any) {
+      console.error('[accept-invite] Redeem failed:', err)
+      setError(err?.message || 'Could not accept invitation')
       setLoading(false)
-      return
     }
-
-    // Mark invitation as accepted
-    if (authData.user) {
-      const { error: updateError } = await (supabase as any)
-        .from('user_invitations')
-        .update({ accepted_at: new Date().toISOString() })
-        .eq('token', token)
-
-      if (updateError) {
-        console.error('Error updating invitation:', updateError)
-      }
-
-      const { error: roleError } = await (supabase as any)
-        .from('dashboard_users')
-        .update({ role: invitation.role })
-        .eq('id', authData.user.id)
-
-      if (roleError) {
-        console.error('Error updating role:', roleError)
-      }
-    }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   if (!token) {
