@@ -679,22 +679,64 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   // ── MEETING_REQUEST ──────────────────────────────────────────────────────
   if (classification.category === 'MEETING_REQUEST') {
     if (leadPhone) {
-      const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`;
-      const sendResult = await sendWhatsAppText(leadPhone, msg);
-      if (sendResult.success) {
-        actions.push('whatsapp_sent:meeting_request');
-        actionsTaken.push(`Sent WhatsApp: meeting time request`);
-        await supabase.from('conversations').insert({
-          lead_id: leadId,
-          channel: 'whatsapp',
-          sender: 'agent',
-          content: msg,
-          message_type: 'text',
-          metadata: { source: 'note_orchestrator', note: trimmedNote },
-        });
+      // Only send free-form text if the customer has previously initiated a
+      // WhatsApp conversation with us. WhatsApp Meta policy prohibits sending
+      // free-form messages outside a 24h customer-initiated window — and for
+      // leads who have never messaged us, we have no window at all.
+      const { data: customerMsg } = await supabase
+        .from('conversations')
+        .select('id, created_at')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'customer')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const hasInitiated = !!customerMsg;
+      const within24h = hasInitiated
+        && (Date.now() - new Date(customerMsg.created_at).getTime()) < 24 * 60 * 60 * 1000;
+
+      // Dedup: skip if this exact message type was already sent in the last 5 min
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: recentSend } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'agent')
+        .contains('metadata', { source: 'note_orchestrator', note_type: 'meeting_request' })
+        .gte('created_at', fiveMinAgo)
+        .limit(1)
+        .maybeSingle();
+
+      if (!hasInitiated) {
+        actions.push('whatsapp_skipped:customer_never_initiated');
+        actionsTaken.push(`WhatsApp skipped — customer hasn't messaged us yet (use a template for cold outreach)`);
+      } else if (!within24h) {
+        actions.push('whatsapp_skipped:outside_24h_window');
+        actionsTaken.push(`WhatsApp skipped — last customer message was >24h ago (use a template to re-open)`);
+      } else if (recentSend) {
+        actions.push('whatsapp_skipped:duplicate_within_5min');
+        actionsTaken.push(`WhatsApp skipped — same message already sent in the last 5 minutes`);
       } else {
-        actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`);
-        actionsTaken.push(`WhatsApp send failed`);
+        const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`;
+        const sendResult = await sendWhatsAppText(leadPhone, msg);
+        if (sendResult.success) {
+          actions.push('whatsapp_sent:meeting_request');
+          actionsTaken.push(`Sent WhatsApp: meeting time request`);
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: msg,
+            message_type: 'text',
+            metadata: { source: 'note_orchestrator', note: trimmedNote, note_type: 'meeting_request' },
+          });
+        } else {
+          actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`);
+          actionsTaken.push(`WhatsApp send failed`);
+        }
       }
     }
     await supabase.from('agent_tasks').insert({
@@ -716,21 +758,40 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   if (classification.category === 'SEND_MESSAGE') {
     const directMessage = classification.send_message?.trim();
     if (directMessage && leadPhone) {
-      const sendResult = await sendWhatsAppText(leadPhone, directMessage);
-      if (sendResult.success) {
-        actions.push('whatsapp_sent:direct_message');
-        actionsTaken.push(`Sent WhatsApp message to lead`);
-        await supabase.from('conversations').insert({
-          lead_id: leadId,
-          channel: 'whatsapp',
-          sender: 'agent',
-          content: directMessage,
-          message_type: 'text',
-          metadata: { source: 'note_orchestrator', direct_send: true },
-        });
+      // Same gate as MEETING_REQUEST — only send free-form within the 24h window
+      const { data: lastCustomerMsg } = await supabase
+        .from('conversations')
+        .select('created_at')
+        .eq('lead_id', leadId)
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'customer')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const sendOk = lastCustomerMsg
+        && (Date.now() - new Date(lastCustomerMsg.created_at).getTime()) < 24 * 60 * 60 * 1000;
+
+      if (!sendOk) {
+        actions.push('whatsapp_skipped:no_active_window');
+        actionsTaken.push(`WhatsApp skipped — customer hasn't messaged within 24h (use a template)`);
       } else {
-        actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`);
-        actionsTaken.push(`WhatsApp send failed`);
+        const sendResult = await sendWhatsAppText(leadPhone, directMessage);
+        if (sendResult.success) {
+          actions.push('whatsapp_sent:direct_message');
+          actionsTaken.push(`Sent WhatsApp message to lead`);
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: directMessage,
+            message_type: 'text',
+            metadata: { source: 'note_orchestrator', direct_send: true },
+          });
+        } else {
+          actions.push(`whatsapp_failed:${sendResult.error?.substring(0, 50)}`);
+          actionsTaken.push(`WhatsApp send failed`);
+        }
       }
     }
   }
