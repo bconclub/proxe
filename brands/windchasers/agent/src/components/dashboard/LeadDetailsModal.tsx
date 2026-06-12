@@ -1234,19 +1234,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowAdminNoteInput(false)
       setActiveTab('notes')
 
-      // Keep visible longer so the user can read what happened + the note text
-      await new Promise(resolve => setTimeout(resolve, 4500))
-      setNoteProgress(prev => ({ ...prev, visible: false }))
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setNoteProgress({ steps: [], visible: false })
-
+      // Overlay STAYS until the operator clicks Done — so they can read every
+      // step (and fix anything the AI did) instead of it auto-vanishing.
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
     } catch (err) {
       console.error('Error saving admin note:', err)
       setNoteProgress({ steps: [{ text: 'Analyzing note...', done: true }, { text: 'Error saving note', done: true }], visible: true })
-      setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
     } finally {
       setSavingAdminNote(false)
     }
@@ -1325,17 +1320,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setLogCallNotes('')
       setActiveTab('notes')
 
-      await new Promise((resolve) => setTimeout(resolve, 4500))
-      setNoteProgress((prev) => ({ ...prev, visible: false }))
-      await new Promise((resolve) => setTimeout(resolve, 300))
-      setNoteProgress({ steps: [], visible: false })
+      // Overlay STAYS until the operator clicks Done (see the Done button in the
+      // orchestrator overlay) — no auto-vanish, so they can read what happened.
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
     } catch (err) {
       console.error('Error logging call:', err)
       setNoteProgress({
         steps: [{ text: `Logging call: ${logCallOutcome}...`, done: true }, { text: 'Error logging call', done: true }],
         visible: true,
       })
-      setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
     } finally {
       setSavingLogCall(false)
     }
@@ -1665,6 +1660,28 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     </div>
                   ))}
                 </div>
+
+                {/* Done button — appears once the run completes so the operator
+                    can READ every step (and fix anything) instead of the overlay
+                    auto-vanishing. Simple single-step toasts (e.g. "copied") have
+                    no Done/Error terminal step, so they still auto-dismiss. */}
+                {(() => {
+                  const last = noteProgress.steps[noteProgress.steps.length - 1]
+                  const complete = !!last && (last.text === 'Done' || last.text.startsWith('Error'))
+                  if (!complete) return null
+                  return (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setNoteProgress({ steps: [], visible: false })}
+                        className="px-4 py-1.5 rounded-lg text-[12px] font-bold transition-opacity hover:opacity-90"
+                        style={{ background: 'rgb(99,102,241)', color: '#fff' }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  )
+                })()}
 
                 <style>{`
                   @keyframes orchFadeIn {

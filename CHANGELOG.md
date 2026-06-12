@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-10 18:40 IST · Windchasers: AI orchestrator overlay waits for a Done click (stops auto-vanishing)
+
+- The "PROXe AI" overlay that shows what happened after logging a call / saving a note (Classified as…, Sent WhatsApp, Created nudge task, Summary refresh, Done) auto-dismissed after a few seconds, so the operator couldn't read what the AI did or catch anything to fix.
+- `LeadDetailsModal.tsx` — removed the auto-hide timers in both the note-save and log-call flows; the overlay now stays until the operator clicks a new **Done** button (shown once the run reaches its Done/Error step). Simple single-step toasts (e.g. "Lead details copied") still auto-dismiss.
+
 ## 2026-06-10 18:25 IST · Windchasers: DGCA subjects (4 vs 6) reply now formatted too
 
 - The "4 vs 6 subjects" answer was a flat two-line sentence. Now a formatted breakdown: each track lists its subjects on separate lines with its price and duration.
