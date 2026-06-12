@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendFacebookLeadWelcome, buildAttribution } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendFacebookLeadWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +26,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // ── Field parsing ─────────────────────────────────────────────────────────
-    const name: string =
+    // `rawName` is used for the required-field gate (we never drop a lead because
+    // somebody typed junk into the name field — phone is the real identifier).
+    // `cleanName` is the real-person-validated name for storage and template use.
+    const rawName: string =
       body.name || body.full_name || body.customer_name || body.Name || '';
+    // Prefer full_name (FB profile name) over form field `name` (often a referral
+    // code or other junk people type into the first form field).
+    const cleanName: string =
+      [body.full_name, body.name, body.customer_name, body.Name]
+        .find((n): n is string => typeof n === 'string' && isLikelyRealPersonName(n)) ?? '';
+    const name: string = rawName;
     const phone: string =
       body.phone || body.phone_number || body.mobile || body.Phone || body.whatsapp || '';
     const email: string | null =
@@ -111,7 +120,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('all_leads')
         .update({
-          customer_name: name,
+          ...(cleanName ? { customer_name: cleanName } : {}),
           ...(email ? { email } : {}),
           phone,
           customer_phone_normalized: normalizedPhone,
@@ -138,7 +147,7 @@ export async function POST(request: NextRequest) {
       const { data: created, error: insertError } = await supabase
         .from('all_leads')
         .insert({
-          customer_name: name,
+          customer_name: cleanName || null,
           email,
           phone,
           customer_phone_normalized: normalizedPhone,
@@ -172,7 +181,7 @@ export async function POST(request: NextRequest) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
     } else {
       // ── 3. Fire windchasers_facebook_welcome template ────────────────────────
-      const sendResult = await sendFacebookLeadWelcome(phone, name);
+      const sendResult = await sendFacebookLeadWelcome(phone, cleanName);
       whatsappSent = sendResult.success;
 
       if (!sendResult.success) {

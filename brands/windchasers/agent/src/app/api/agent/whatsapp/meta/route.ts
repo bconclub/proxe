@@ -755,7 +755,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // the first inbound (the form prefill), which is detected reliably.
     if (!isCustomerButtonTap && userMessageCount <= 1 && isMetaFormClickThrough(messageText)) {
       const ff = parseFormPrefill(messageText);
-      const firstName = (ff.full_name || ff.name || customerName || 'there').split(' ')[0];
+      const cleanFormName = [ff.full_name, ff.name, ff.first_name].find(n => n && isLikelyRealPersonName(n)) || '';
+      const firstName = (cleanFormName || customerName || 'there').split(' ')[0];
       const isParent = Object.keys(ff).some((k) => k.includes('child'));
       const body = isParent
         ? `Hi ${firstName}! Great that you're exploring pilot training for your child. To point you the right way, what would you like to understand first?`

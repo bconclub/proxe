@@ -439,7 +439,8 @@ export async function sendFacebookLeadWelcome(
   to: string,
   name: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const firstName = (name || 'there').split(' ')[0];
+  const cleanName = /\d/.test(name || '') ? '' : name;
+  const firstName = (cleanName || 'there').split(' ')[0];
   return sendWhatsAppTemplate(to, 'windchasers_facebook_welcome', [
     {
       type: 'body',
