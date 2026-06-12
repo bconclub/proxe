@@ -10,7 +10,7 @@
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE_KEY
  * 
- * Scheduling: PM2 cron_restart: "0 */6 * * *"
+ * Scheduling: PM2 cron_restart every 6 hours (0 0,6,12,18 * * *)
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
