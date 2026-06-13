@@ -5,6 +5,8 @@ import {
   normalizePhone,
   buildAttribution,
   isLikelyRealPersonName,
+  sendFacebookLeadWelcome,
+  logMessage,
 } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
@@ -21,6 +23,10 @@ export const dynamic = 'force-dynamic'
  * it (fill blanks, append the note) rather than create a duplicate. This is
  * what makes "add a screenshot to update that lead" work — re-adding a known
  * number lands on the existing record.
+ *
+ * Optional `send_welcome`: fire the Meta-approved welcome template to the lead.
+ * Templates are allowed for cold outreach (no 24h window needed), so this is a
+ * safe, explicit, operator-triggered first touch.
  *
  * Auth: logged-in Supabase session. Write uses the service client (RLS bypass,
  * same as every other dashboard write).
@@ -45,7 +51,9 @@ export async function POST(request: NextRequest) {
     const city = clean(body.city)
     const courseInterest = clean(body.course_interest)
     const userType = clean(body.user_type).toLowerCase()
+    const education = clean(body.education)
     const note = clean(body.note)
+    const sendWelcome = body.send_welcome === true
 
     if (!phoneRaw) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
@@ -80,10 +88,11 @@ export async function POST(request: NextRequest) {
         }
       : null
 
-    // Brand-namespaced context powers the dashboard TYPE / COURSE / city columns.
+    // Brand-namespaced context powers the dashboard TYPE / COURSE / city / education.
     const brandCtx: Record<string, any> = {}
     if (city) brandCtx.city = city
     if (courseInterest) brandCtx.course_interest = courseInterest
+    if (education) brandCtx.education = education
     if (['student', 'parent', 'professional', 'early_stage'].includes(userType)) {
       brandCtx.user_type = userType
     }
@@ -144,7 +153,6 @@ export async function POST(request: NextRequest) {
           last_touchpoint: 'manual',
           last_interaction_at: now,
           lead_stage: 'New',
-          status: 'New Lead',
           unified_context: {
             ...(Object.keys(brandCtx).length > 0 ? { [brand]: brandCtx } : {}),
             manual: {
@@ -175,7 +183,10 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.error('[leads/create] insert failed:', insErr?.message)
-          return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
+          return NextResponse.json(
+            { error: `Failed to create lead${insErr?.message ? `: ${insErr.message}` : ''}` },
+            { status: 500 },
+          )
         }
       } else {
         leadId = created.id
@@ -195,7 +206,42 @@ export async function POST(request: NextRequest) {
       if (actErr) console.error('[leads/create] activity note failed:', actErr.message)
     }
 
-    return NextResponse.json({ success: true, lead_id: leadId, is_new: isNew })
+    // ── Optional welcome message ──────────────────────────────────────────────
+    // Fires the Meta-approved welcome template (allowed cold). Soft-fail: a send
+    // failure never blocks the lead from being saved — we just report it.
+    let welcomeSent = false
+    let welcomeError: string | null = null
+    if (sendWelcome) {
+      try {
+        const result = await sendFacebookLeadWelcome(phoneRaw, cleanName)
+        welcomeSent = result.success
+        if (!result.success) {
+          welcomeError = result.error || 'send failed'
+          console.error('[leads/create] welcome send failed:', welcomeError)
+        } else {
+          const firstName = (cleanName || 'there').split(' ')[0]
+          await logMessage(
+            leadId,
+            'whatsapp',
+            'agent',
+            `Hey ${firstName}! (windchasers_facebook_welcome template)`,
+            'template',
+            {
+              source: 'dashboard_add_lead',
+              template_name: 'windchasers_facebook_welcome',
+              sent_by: createdBy,
+              trigger: 'manual_welcome',
+            },
+            supabase,
+          )
+        }
+      } catch (err: any) {
+        welcomeError = err?.message || String(err)
+        console.error('[leads/create] welcome send exception:', welcomeError)
+      }
+    }
+
+    return NextResponse.json({ success: true, lead_id: leadId, is_new: isNew, welcome_sent: welcomeSent, welcome_error: welcomeError })
   } catch (error: any) {
     console.error('[leads/create] Error:', error?.message || error)
     return NextResponse.json({ error: 'Failed to add lead' }, { status: 500 })

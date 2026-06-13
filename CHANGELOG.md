@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-13 12:43 IST · Windchasers: fix Add Lead failure + education capture + 2-step modal + send welcome message
+
+- **Bug fix**: "Failed to create lead" — the create endpoint was inserting a `status` column that doesn't exist on `all_leads` (PGRST204). Removed it (matches the known-good inbound-lead insert). Verified against the live DB. Insert error message is now surfaced in the API response for easier diagnosis.
+- **Education capture**: the screenshot extractor now also reads education/qualification (e.g. "12th with PCM"); added an Education field to the form; stored in `unified_context[brand].education` so it shows on the lead like form-sourced leads.
+- **2-step modal**: Add Lead was too tall — split into "Details" (screenshot + phone/name/email) and "More" (city/course/type/education/note) with Back/Next. Phone still required.
+- **Send welcome message**: optional checkbox on step 2 — fires the Meta-approved welcome template to the lead on save (templates are allowed cold, so it works even before they message us). Soft-fails: the lead always saves; a send failure is reported, not fatal.
+- User-facing: adding a lead works again; founders can capture education, move through a shorter two-step form, and optionally send a welcome WhatsApp on the spot.
+
 ## 2026-06-13 12:29 IST · Windchasers: snapshot button → eye icon, notification bell stacked below it, home-page only
 
 - Today's Snapshot button now uses an eye icon (MdVisibility) instead of the calendar/today icon — both the floating button and the popup header.

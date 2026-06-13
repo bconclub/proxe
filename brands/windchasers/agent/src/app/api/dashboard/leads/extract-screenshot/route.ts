@@ -27,6 +27,7 @@ Return ONLY a single JSON object, no prose, no markdown fences. Schema:
   "email": string | null,           // email if visible, else null
   "city": string | null,            // city/location if mentioned, else null
   "interest": string | null,        // what they're asking about (e.g. "DGCA ground classes", "cabin crew course"), else null
+  "education": string | null,       // education/qualification if mentioned (e.g. "12th with PCM", "B.Sc", "Diploma"), else null
   "summary": string | null          // one or two short sentences summarising what the person wants
 }
 
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
         email: str(parsed.email),
         city: str(parsed.city),
         interest: str(parsed.interest),
+        education: str(parsed.education),
         summary: str(parsed.summary),
       },
     })
