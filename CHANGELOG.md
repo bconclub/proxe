@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-13 21:40 IST · BCON: document META_IG_* env + redeploy to activate Instagram env
+
+- Documents the `META_IG_*` env vars in `brands/bcon/agent/env.production.example` (access token required; app secret, business account id, verify token).
+- Push also serves to trigger a fresh Vercel deploy so the newly-set `META_IG_ACCESS_TOKEN` (and `META_IG_BUSINESS_ACCOUNT_ID=17841416558085381`, @bconclub) take effect — Vercel only injects env vars into deployments created after they're set. (`1e9e9cfb`)
+
 ## 2026-06-13 21:10 IST · BCON: move Instagram webhook to /api/agent/meta/instagram
 
 - **Restructure**: moved the Instagram webhook route from `agent/instagram/meta` → `agent/meta/instagram`, adopting a provider-first namespace (`agent/meta/<platform>`) so Meta channels group cleanly: `meta/whatsapp`, `meta/instagram`, `meta/facebook`. No logic change — file moved + doc comment updated.
