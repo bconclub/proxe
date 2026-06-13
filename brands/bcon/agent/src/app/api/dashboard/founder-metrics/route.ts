@@ -994,9 +994,12 @@ export async function GET(request: NextRequest) {
     let totalScore = 0
     let leadsWithScores = 0
 
-    // Batch-calculate scores for leads with null scores (parallel RPC calls)
+    // Batch-calculate scores for leads with no real score (parallel RPC calls).
+    // `!lead.lead_score` deliberately catches null, undefined AND literal 0 —
+    // phantom zeros (from crashed prior writes / pre-scoring leads) otherwise
+    // drag the average down materially. Matches Windchasers.
     const leadsNeedingScores = safeLeads.filter(
-      (lead) => lead.lead_score === null || lead.lead_score === undefined
+      (lead) => !lead.lead_score
     )
 
     if (leadsNeedingScores.length > 0) {
@@ -1031,7 +1034,7 @@ export async function GET(request: NextRequest) {
     }
     
     const avgScore = leadsWithScores > 0
-      ? Math.round(totalScore / leadsWithScores)
+      ? Math.floor(totalScore / leadsWithScores)
       : 0
     
     // Debug logging for score calculation

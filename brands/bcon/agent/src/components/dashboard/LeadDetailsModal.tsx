@@ -45,15 +45,24 @@ function formatDateTimeIST(dateString: string | null | undefined): string {
 
 function formatBookingTime(timeString: string | null | undefined): string {
   if (!timeString) return '';
-  const timeParts = timeString.toString().split(':');
-  if (timeParts.length < 2) return timeString.toString();
+  const s = timeString.toString().trim();
+  if (!s) return '';
+  // Bookings are stored in two formats: 24h "HH:MM" (web) and 12h "H:MM AM/PM"
+  // (WhatsApp). If a period is already present, keep it — otherwise the hour
+  // would be misread as 24h and a PM time would flip to AM.
+  const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i);
+  if (ampm) {
+    const h = parseInt(ampm[1], 10);
+    return `${h % 12 || 12}:${ampm[2] || '00'} ${ampm[3].toUpperCase()}M`;
+  }
+  const timeParts = s.split(':');
+  if (timeParts.length < 2) return s;
   const hours = parseInt(timeParts[0], 10);
   const minutes = parseInt(timeParts[1], 10);
-  if (isNaN(hours) || isNaN(minutes)) return timeString.toString();
+  if (isNaN(hours) || isNaN(minutes)) return s;
   const period = hours >= 12 ? 'PM' : 'AM';
   const hours12 = hours % 12 || 12;
-  const minutesStr = minutes.toString().padStart(2, '0');
-  return `${hours12}:${minutesStr} ${period}`;
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 function formatBookingDateShort(dateString: string | null | undefined): string {
