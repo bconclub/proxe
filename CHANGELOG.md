@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-13 12:20 IST · Windchasers: Add Lead (manual + screenshot) + site-wide status-change notifications + home full-screen
+
+- **Add Lead**: prominent "+ Add Lead" button at the far right of the Leads header opens a modal. Enter a lead by hand, OR drop/paste a WhatsApp screenshot — Claude vision reads name/phone/email/city + a summary and prefills the form for review. Dedupes by phone (per brand): re-adding a known number updates that lead instead of duplicating.
+  - New: `AddLeadModal.tsx`, `api/dashboard/leads/create`, `api/dashboard/leads/extract-screenshot`; `generateFromImage()` added to `claudeClient.ts`.
+- **Status-change notifications**: the dashboard's old "Recent Activity" card is gone; status changes now surface site-wide via a bell (top-right, unread count) that opens a right-side slide-out drawer listing recent changes, plus toasts that pop bottom-right with a sound. Distinct treatment for NEW LEADS (green tag + bright chime) vs UPDATES (stage/score/booking + soft tone). Mute toggle persists.
+  - New: `NotificationCenter.tsx`, `api/dashboard/notifications` (lead_stage_changes-backed), sounds in `public/sounds/`. Mounted in `DashboardLayout`.
+- **Home page**: removed the "Leads Needing Attention" and "Recent Activity" boxes; remaining sections (At a Glance, metric cards, Upcoming Events) now fill the viewport — Upcoming Events grows to fill leftover space and shows up to 8.
+- User-facing: founders can add leads from a WhatsApp screenshot in seconds, and get live notified (with sound) on every lead status change without watching the dashboard.
+
 ## 2026-06-10 18:40 IST · Windchasers: AI orchestrator overlay waits for a Done click (stops auto-vanishing)
 
 - The "PROXe AI" overlay that shows what happened after logging a call / saving a note (Classified as…, Sent WhatsApp, Created nudge task, Summary refresh, Done) auto-dismissed after a few seconds, so the operator couldn't read what the AI did or catch anything to fix.
