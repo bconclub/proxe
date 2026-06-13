@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-13 20:55 IST · BCON: Instagram webhook + sender (Meta App Review env-token path)
+
+- **New**: Instagram (Meta) integration on the BCON PROXe agent, mirroring the proven Windchasers route, adapted to BCON conventions (`getCurrentBrandId()`, BCON-neutral default copy).
+  - `/api/agent/instagram/meta` — webhook verify (GET hub.challenge) + POST handler for DMs and comments → unified agent engine → reply. IG users are resolved as leads by their IGSID in `unified_context.social.igsid`, channel `social`. Comment→DM private reply for lead capture, plus a public "sent you a DM" reply.
+  - `services/instagramSender.ts` — Graph API send helpers (DM, comment reply, comment→DM private reply, username lookup) via `graph.instagram.com`, token from `META_IG_ACCESS_TOKEN`.
+- **Config**: webhook verify-token default set to `proxe-instagram-verify-token` to match the value configured in the Meta dashboard (so verification passes without an env var). Override via `META_IG_VERIFY_TOKEN`.
+- Single-tenant env-token path for App Review validation on BCON's own Instagram. Multi-account OAuth connect is a later phase.
+- Scope: CORE capability, ported to the BCON brand. (`1d7101ab`)
+
 ## 2026-06-13 14:03 IST · Windchasers: fix WhatsApp booking silently lost (stale unified_context clobber)
 
 - **Bug**: the WA agent confirmed "Your booking is recorded…" but the booking vanished — `unified_context.whatsapp` came back empty, lead showed "No upcoming events". Root cause: `book_consultation`/`storeBooking` saves the booking into `unified_context.whatsapp.booking_date` mid-turn, but the engine's post-turn writers (`updateLeadTemperature`, `updateResponsePatterns`) and `businessCrawler.saveIntel` then wrote back a `unified_context` snapshot captured BEFORE the booking, wiping it. (all_leads/whatsapp_sessions have no scalar booking_date column, so unified_context is the only store.)

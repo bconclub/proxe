@@ -31,7 +31,7 @@ import { getCurrentBrandId } from '@/configs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const DEFAULT_VERIFY_TOKEN = 'bcon-ig-proxe-verify';
+const DEFAULT_VERIFY_TOKEN = 'proxe-instagram-verify-token';
 
 // In-memory dedup — Meta re-delivers webhooks.
 const processedIds = new Set<string>();
