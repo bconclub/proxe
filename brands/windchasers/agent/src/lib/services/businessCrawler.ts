@@ -142,11 +142,21 @@ async function saveIntel(
   intel: BusinessIntel,
   websiteUrl?: string | null
 ): Promise<void> {
+  // Re-read the latest context before writing. The crawl does slow network I/O
+  // between the initial read and here; spreading the stale snapshot would wipe
+  // anything saved in the meantime (e.g. a booking from book_consultation).
+  const { data: freshRow } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .maybeSingle();
+  const freshCtx = freshRow?.unified_context || existingCtx || {};
+
   const updates: Record<string, any> = {
-    ...existingCtx,
+    ...freshCtx,
     business_intel: intel,
   };
-  if (websiteUrl && !existingCtx.website_url) {
+  if (websiteUrl && !freshCtx.website_url) {
     updates.website_url = websiteUrl;
   }
 

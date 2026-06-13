@@ -1318,20 +1318,31 @@ async function updateLeadTemperature(
   existingContext: Record<string, any>,
 ): Promise<void> {
   try {
+    // Re-read the LATEST context right before writing. The engine captured
+    // `existingContext` at the start of the turn; if book_consultation saved a
+    // booking into unified_context.<channel> mid-turn, spreading the stale
+    // snapshot here would wipe it. Always merge onto the fresh DB copy.
+    const { data: freshRow } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    const freshCtx = freshRow?.unified_context || existingContext || {};
+
     // Get last response time for this lead
-    const lastResponseTimes = existingContext.response_patterns?.last_5_response_times || [];
+    const lastResponseTimes = freshCtx.response_patterns?.last_5_response_times || [];
     const lastResponseTimeSec = lastResponseTimes.length > 0 ? lastResponseTimes[lastResponseTimes.length - 1] : null;
 
     const { temperature, reason } = evaluateLeadTemperature(message, messageCount, lastResponseTimeSec);
 
     // Build temperature history (keep last 20 entries)
-    const history = [...(existingContext.temperature_history || [])];
+    const history = [...(freshCtx.temperature_history || [])];
     history.push({ temperature, timestamp: new Date().toISOString(), reason });
     const trimmedHistory = history.slice(-20);
 
     // Detect objections
     const objection = detectObjection(message);
-    let objections = existingContext.objections || [];
+    let objections = freshCtx.objections || [];
     if (objection) {
       objections = [...objections, { type: objection.type, message: message.substring(0, 100), timestamp: new Date().toISOString() }];
       objections = objections.slice(-10);
@@ -1341,7 +1352,7 @@ async function updateLeadTemperature(
       .from('all_leads')
       .update({
         unified_context: {
-          ...existingContext,
+          ...freshCtx,
           lead_temperature: temperature,
           temperature_history: trimmedHistory,
           objections,
@@ -1438,8 +1449,17 @@ async function updateResponsePatterns(
       ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
       : null;
 
+    // Re-read latest context before writing so we don't clobber a booking (or
+    // any other field) saved into unified_context after the engine's snapshot.
+    const { data: freshRow } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    const freshCtx = freshRow?.unified_context || existingContext || {};
+
     const responsePatterns: Record<string, any> = {
-      ...(existingContext.response_patterns || {}),
+      ...(freshCtx.response_patterns || {}),
       avg_response_time_seconds: avgResponseTime,
       active_hours: activeHours,
       preferred_day_parts: preferredDayParts,
@@ -1451,7 +1471,7 @@ async function updateResponsePatterns(
       .from('all_leads')
       .update({
         unified_context: {
-          ...existingContext,
+          ...freshCtx,
           response_patterns: responsePatterns,
         },
       })

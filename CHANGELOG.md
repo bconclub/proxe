@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-13 14:03 IST · Windchasers: fix WhatsApp booking silently lost (stale unified_context clobber)
+
+- **Bug**: the WA agent confirmed "Your booking is recorded…" but the booking vanished — `unified_context.whatsapp` came back empty, lead showed "No upcoming events". Root cause: `book_consultation`/`storeBooking` saves the booking into `unified_context.whatsapp.booking_date` mid-turn, but the engine's post-turn writers (`updateLeadTemperature`, `updateResponsePatterns`) and `businessCrawler.saveIntel` then wrote back a `unified_context` snapshot captured BEFORE the booking, wiping it. (all_leads/whatsapp_sessions have no scalar booking_date column, so unified_context is the only store.)
+- **Fix**: all three writers now re-read the latest `unified_context` from the DB immediately before their read-modify-write, instead of spreading a stale in-memory snapshot. Bookings (and any other mid-turn context write) survive.
+- **Data**: restored the one affected lead's (Allen Vedaraj) booking — Mon 15 Jun, 4:00 PM, online — into unified_context so it shows again.
+- User-facing: WhatsApp bookings now actually stick and appear in the lead's Upcoming + Events.
+
 ## 2026-06-13 12:43 IST · Windchasers: fix Add Lead failure + education capture + 2-step modal + send welcome message
 
 - **Bug fix**: "Failed to create lead" — the create endpoint was inserting a `status` column that doesn't exist on `all_leads` (PGRST204). Removed it (matches the known-good inbound-lead insert). Verified against the live DB. Insert error message is now surfaced in the API response for easier diagnosis.
