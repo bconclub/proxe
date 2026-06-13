@@ -204,10 +204,11 @@ export default function NotificationCenter() {
         onClick={openDrawer}
         className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg transition hover:opacity-90"
         style={{
-          top: '14px',
-          right: '72px',
-          width: '40px',
-          height: '40px',
+          // Stacked directly beneath the snapshot "eye" button (32px @ top:14/right:20).
+          top: '54px',
+          right: '20px',
+          width: '32px',
+          height: '32px',
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border-primary)',
           color: 'var(--text-primary)',
@@ -215,7 +216,7 @@ export default function NotificationCenter() {
         aria-label="Notifications"
         title="Notifications"
       >
-        {unread > 0 ? <MdNotificationsActive size={20} /> : <MdNotificationsNone size={20} />}
+        {unread > 0 ? <MdNotificationsActive size={18} /> : <MdNotificationsNone size={18} />}
         {unread > 0 && (
           <span
             className="absolute flex items-center justify-center text-[10px] font-bold text-white rounded-full"

@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
-import NotificationCenter from '@/components/dashboard/NotificationCenter'
 import { getBuildDate } from '@/lib/buildInfo'
 import {
   MdInbox,
@@ -871,9 +870,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Endpoint health — controlled by the sidebar three-dot menu's "Endpoint Health" item. */}
         <HealthBarButton open={healthOpen} onClose={() => setHealthOpen(false)} />
-
-        {/* Site-wide status-change notifications (bell + toasts + sound) */}
-        <NotificationCenter />
 
         {/* Mobile top bar — only visible on mobile */}
         <div

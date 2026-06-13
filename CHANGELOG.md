@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-13 12:29 IST · Windchasers: snapshot button → eye icon, notification bell stacked below it, home-page only
+
+- Today's Snapshot button now uses an eye icon (MdVisibility) instead of the calendar/today icon — both the floating button and the popup header.
+- Notification bell moved from beside the snapshot to directly **below** it (stacked, top-right), sized to match (32px).
+- Notifications are now **home-page only**: NotificationCenter moved out of DashboardLayout (no longer hovering over Leads/Inbox/other pages) into FounderDashboard. Toasts + sound still pop while on the home page.
+- User-facing: cleaner top-right — eye to peek today's snapshot, bell right under it for status changes; nothing floats over the other pages anymore.
+
 ## 2026-06-13 12:20 IST · Windchasers: Add Lead (manual + screenshot) + site-wide status-change notifications + home full-screen
 
 - **Add Lead**: prominent "+ Add Lead" button at the far right of the Leads header opens a modal. Enter a lead by hand, OR drop/paste a WhatsApp screenshot — Claude vision reads name/phone/email/city + a summary and prefills the form for review. Dedupes by phone (per brand): re-adding a known number updates that lead instead of duplicating.

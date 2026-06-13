@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
+import { MdVisibility, MdClose, MdRefresh } from 'react-icons/md'
 
 /**
  * TodaySnapshotButton — top-right floating button that opens a quick-glance
@@ -93,7 +93,7 @@ export default function TodaySnapshotButton() {
         aria-label="Open today's snapshot"
         title="Today's snapshot"
       >
-        <MdToday size={16} />
+        <MdVisibility size={16} />
       </button>
 
       {!open ? null : (
@@ -127,7 +127,7 @@ export default function TodaySnapshotButton() {
               className="flex items-center gap-2 px-3 py-2.5 border-b"
               style={{ borderColor: 'var(--border-primary)' }}
             >
-              <MdToday size={16} style={{ color: '#C9A961' }} />
+              <MdVisibility size={16} style={{ color: '#C9A961' }} />
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-semibold leading-tight truncate">
                   {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
