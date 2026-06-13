@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getServiceClient } from '@/lib/services'
+import { getServiceClient, sendInvitationEmail } from '@/lib/services'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -158,13 +158,33 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com'
     const inviteUrl = `${appUrl}/auth/accept-invite?token=${token}`
 
-    // Email delivery is wired at item ③ (Resend). For now the admin shares
-    // inviteUrl manually from the settings UI (copy-link). The invitation
-    // row is already persisted, so the link works regardless.
+    // Send the invite email via Resend. Soft-fail: if the send errors
+    // (missing env var, unverified domain, Resend down), the invitation
+    // row is already in the DB and inviteUrl is in the response — the
+    // admin can copy-paste it manually. Never block invitation creation
+    // on email delivery.
+    const emailResult = await sendInvitationEmail({
+      to: trimmedEmail,
+      inviteUrl,
+      invitedByEmail: (auth as any).user.email,
+      role,
+    })
+    if (!emailResult.sent) {
+      console.warn(
+        `[users] Email send failed for ${trimmedEmail}: ${emailResult.error}. ` +
+        `Admin can share inviteUrl manually.`,
+      )
+    } else {
+      console.log(`[users] Invite sent to ${trimmedEmail} (resend id=${emailResult.id})`)
+    }
+
     return NextResponse.json({
       invitation,
       inviteUrl,
-      message: 'Invitation created — share the invite link with the teammate',
+      email: emailResult,
+      message: emailResult.sent
+        ? 'Invitation created and email sent'
+        : 'Invitation created (email send failed — share inviteUrl manually)',
     })
   } catch (error) {
     console.error('[users] POST error:', error)

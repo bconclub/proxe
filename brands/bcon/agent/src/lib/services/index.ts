@@ -97,3 +97,10 @@ export {
   fetchCustomerContext,
   updateBrandProfile,
 } from './contextBuilder';
+
+// Transactional email (Resend)
+export {
+  type SendResult,
+  sendEmail,
+  sendInvitationEmail,
+} from './email';
