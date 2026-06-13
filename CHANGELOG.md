@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-13 21:10 IST · BCON: move Instagram webhook to /api/agent/meta/instagram
+
+- **Restructure**: moved the Instagram webhook route from `agent/instagram/meta` → `agent/meta/instagram`, adopting a provider-first namespace (`agent/meta/<platform>`) so Meta channels group cleanly: `meta/whatsapp`, `meta/instagram`, `meta/facebook`. No logic change — file moved + doc comment updated.
+- Meta webhook callback URL becomes `https://proxe.bconclub.com/api/agent/meta/instagram`.
+- Note: the live WhatsApp webhook stays at `agent/whatsapp/meta` for now — migrating it to `agent/meta/whatsapp` is a separate coordinated change (must update its Meta callback URL simultaneously).
+
 ## 2026-06-13 20:55 IST · BCON: Instagram webhook + sender (Meta App Review env-token path)
 
 - **New**: Instagram (Meta) integration on the BCON PROXe agent, mirroring the proven Windchasers route, adapted to BCON conventions (`getCurrentBrandId()`, BCON-neutral default copy).

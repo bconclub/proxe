@@ -1,7 +1,7 @@
 /**
  * Meta Instagram Webhook
- * GET  /api/agent/instagram/meta - Webhook verification (hub.challenge)
- * POST /api/agent/instagram/meta - Incoming Instagram DMs + comments
+ * GET  /api/agent/meta/instagram - Webhook verification (hub.challenge)
+ * POST /api/agent/meta/instagram - Incoming Instagram DMs + comments
  *
  * Bridges Meta's Instagram webhook into the PROXe unified agent engine, the
  * same way the WhatsApp meta route does — Instagram leads use channel 'social'
