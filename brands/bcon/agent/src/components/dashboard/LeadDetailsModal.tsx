@@ -256,9 +256,47 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
   )
 }
 
+// Shared classifier for call-log outcomes in the Notes tab — true when the
+// call did NOT connect (no answer / busy / voicemail / RNR / unreachable).
+function isNoAnswerOutcome(outcome: string): boolean {
+  return /no answer|busy|voicemail|rnr|not reachable|unreachable|switched off|missed|no response|declin|disconnect/.test(outcome.toLowerCase())
+}
+
+// Color for the small outcome badge next to "Call log".
+function getNoteOutcomeClass(outcome: string): string {
+  if (isNoAnswerOutcome(outcome)) return 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+  if (/connect|interest|answered|spoke|reachable|booked/.test(outcome.toLowerCase())) {
+    return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+  }
+  return 'bg-slate-500/10 text-slate-600 dark:text-slate-300'
+}
+
+// Tint for the whole call-log card so the outcome is scannable at a glance:
+// no-answer-type calls read amber, connected (and outcome-less) calls stay green.
+function getCallCardClass(outcome: string | null): string {
+  if (outcome && isNoAnswerOutcome(outcome)) {
+    return 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40'
+  }
+  return 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
+  // Manual refresh for the Notes tab — re-pulls the lead row (fresh admin_notes)
+  // and the activity timeline so a just-logged note/call shows without reopening.
+  const [isRefreshingNotes, setIsRefreshingNotes] = useState(false)
+  const refreshNotes = async () => {
+    if (isRefreshingNotes) return
+    setIsRefreshingNotes(true)
+    try {
+      await Promise.all([loadFreshLeadData(), loadActivities()])
+    } catch (err) {
+      console.error('Error refreshing notes:', err)
+    } finally {
+      setIsRefreshingNotes(false)
+    }
+  }
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -1090,6 +1128,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
       setAdminNoteText('')
       setShowAdminNoteInput(false)
+      setActiveTab('notes') // surface the note in the Notes tab once saved
 
       // Keep visible longer so the user can read what happened + the note text
       await new Promise(resolve => setTimeout(resolve, 4500))
@@ -1143,6 +1182,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowLogCallForm(false)
       setLogCallOutcome('Connected')
       setLogCallNotes('')
+      setActiveTab('notes') // surface the logged call in the Notes tab
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
@@ -1716,14 +1756,21 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
                       {activeChannels.map((channel, index) => (
                         <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
-                          <div
-                            className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
+                          <button
+                            type="button"
+                            className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                             style={{ backgroundColor: channel.color }}
-                            title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
-                            aria-label={`${channel.name} channel`}
+                            title={`Open ${channel.name} conversation - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                            aria-label={`Open ${channel.name} conversation`}
+                            onClick={() => {
+                              if (currentLead?.id) {
+                                router.push(`/dashboard/inbox?lead=${currentLead.id}&channel=${channel.key}`)
+                                onClose()
+                              }
+                            }}
                           >
                             <channel.icon size={14} />
-                          </div>
+                          </button>
                           {index < activeChannels.length - 1 && (
                             <MdChevronRight className="lead-journey-separator text-[var(--text-muted)] flex-shrink-0" size={16} aria-hidden="true" />
                           )}
@@ -2048,6 +2095,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               Activity
             </button>
             <button
+              onClick={() => setActiveTab('notes')}
+              className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-notes px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'notes'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              role="tab"
+              aria-selected={activeTab === 'notes'}
+              aria-controls="lead-tabpanel-notes"
+              id="lead-tab-notes"
+            >
+              Notes
+            </button>
+            <button
               onClick={() => setActiveTab('breakdown')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -2255,6 +2315,134 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             {/* Other Tabs - Full Width */}
             {activeTab !== 'activity' && (
               <div className="lead-tabpanel-container px-4 pt-4 pb-2">
+                {/* Notes Tab */}
+                {activeTab === 'notes' && (
+                  <section
+                    id="lead-tabpanel-notes"
+                    role="tabpanel"
+                    aria-labelledby="lead-tab-notes"
+                    className="lead-tabpanel-notes space-y-4"
+                  >
+                    <div className="lead-notes-toolbar flex items-center justify-end -mb-1">
+                      <button
+                        type="button"
+                        onClick={refreshNotes}
+                        disabled={isRefreshingNotes}
+                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 focus:outline-none"
+                        style={{ color: 'var(--accent-primary)' }}
+                        title="Refresh notes"
+                      >
+                        <MdRefresh size={12} className={isRefreshingNotes ? 'animate-spin' : ''} />
+                        Refresh
+                      </button>
+                    </div>
+                    {(() => {
+                      const adminNotes = ((currentLead.unified_context?.admin_notes || []) as Array<{
+                        id?: string
+                        text?: string
+                        created_by?: string
+                        created_at?: string
+                        source?: string
+                        outcome?: string
+                      }>).filter(note => note.text?.trim())
+
+                      const adminNoteKeys = new Set(adminNotes.map(note => `${note.text}|${note.created_at || ''}`))
+                      const timelineItems = [
+                        ...adminNotes.map(note => ({
+                          id: note.id || `admin-note-${note.created_at || note.text}`,
+                          label: note.source === 'log_call' ? 'Call log' : 'Note',
+                          actor: note.created_by || 'team',
+                          content: note.text || '',
+                          timestamp: note.created_at || new Date().toISOString(),
+                          tone: note.source === 'log_call' ? 'call' : 'note',
+                          outcome: note.outcome || null,
+                        })),
+                        ...activities
+                          .filter(activity => {
+                            if (activity.type !== 'team' && activity.type !== 'proxe') return false
+                            if (!activity.content) return false
+                            const key = `${activity.content}|${activity.timestamp || ''}`
+                            return !adminNoteKeys.has(key)
+                          })
+                          .map(activity => ({
+                            id: `activity-${activity.id}`,
+                            label: activity.type === 'proxe' || activity.icon === 'automation' ? 'Automation' : (activity.action || 'Update'),
+                            actor: activity.actor || (activity.type === 'proxe' ? 'PROXe' : 'team'),
+                            content: activity.content,
+                            timestamp: activity.timestamp,
+                            tone: activity.type === 'proxe' || activity.icon === 'automation' ? 'automation' : activity.icon === 'call' ? 'call' : 'update',
+                            outcome: null,
+                          })),
+                      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+                      const pendingTasks = leadTasks.filter(t =>
+                        ['pending', 'queued', 'in_queue', 'awaiting_approval'].includes(t.status) &&
+                        !t.completed_at
+                      )
+                      const cancelledTasks = leadTasks.filter(t => t.status === 'cancelled' || t.completed_at)
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-3 gap-3">
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Logged notes</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{adminNotes.length}</p>
+                            </article>
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Open actions</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{pendingTasks.length}</p>
+                            </article>
+                            <article className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-3">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Closed actions</p>
+                              <p className="mt-1 text-2xl font-black text-[var(--text-primary)]">{cancelledTasks.length}</p>
+                            </article>
+                          </div>
+
+                          {timelineItems.length === 0 ? (
+                            <div className="text-sm text-center py-10 text-[var(--text-muted)] border border-dashed border-[var(--border-primary)] rounded-lg">
+                              No notes or updates logged yet.
+                            </div>
+                          ) : (
+                            <ol className="space-y-3" aria-label="Lead notes and updates">
+                              {timelineItems.map(item => {
+                                const actor = typeof item.actor === 'string' && item.actor.includes('@')
+                                  ? item.actor.split('@')[0]
+                                  : item.actor
+                                const toneClass = item.tone === 'automation'
+                                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/40'
+                                  : item.tone === 'call'
+                                    ? getCallCardClass(item.outcome)
+                                    : 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                                return (
+                                  <li key={item.id} className={`rounded-lg border p-3 ${toneClass}`}>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-[var(--text-primary)]">{item.label}</span>
+                                          {item.outcome && (
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${getNoteOutcomeClass(item.outcome)}`}>
+                                              {item.outcome}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">{item.content}</p>
+                                      </div>
+                                      <time className="text-[10px] whitespace-nowrap text-[var(--text-muted)]" dateTime={item.timestamp}>
+                                        {formatDateTimeIST(item.timestamp)}
+                                      </time>
+                                    </div>
+                                    <p className="mt-2 text-[11px] text-[var(--text-muted)]">{actor || 'team'}</p>
+                                  </li>
+                                )
+                              })}
+                            </ol>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </section>
+                )}
+
                 {/* Summary Tab */}
                 {activeTab === 'summary' && (
                   <section
