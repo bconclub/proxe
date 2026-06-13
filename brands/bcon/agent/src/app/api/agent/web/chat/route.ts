@@ -12,6 +12,11 @@
 import { NextRequest } from 'next/server';
 import { processStream } from '@/lib/agent-core/engine';
 import { generateSummary } from '@/lib/agent-core/summarizer';
+import {
+  extractProfileFromConversation,
+  mergeProfile,
+  isLikelyRealPersonName,
+} from '@/lib/agent-core/conversationIntelligence';
 import { AgentInput } from '@/lib/agent-core/types';
 import {
   getServiceClient,
@@ -332,6 +337,75 @@ async function postProcess(
         }
       } catch (summaryError) {
         console.error('[agent/web/chat] Summary generation failed:', summaryError);
+      }
+    }
+
+    // 4b. AI profile extraction — business_type, service_interest, pain_point,
+    //     timeline, lead_volume, user_type from the conversation (catches
+    //     phrasing the keyword extractor misses). Every 2nd message. AWAITED:
+    //     Vercel kills unawaited work once the stream closes (see postProcess note).
+    if (leadId && messageCount >= 2 && messageCount % 2 === 0) {
+      try {
+        const history = [
+          ...agentInput.conversationHistory,
+          { role: 'user' as const, content: userMessage },
+          { role: 'assistant' as const, content: assistantResponse },
+        ];
+        const profile = await extractProfileFromConversation(history);
+        if (profile && Object.keys(profile).length > 0) {
+          const brandId = 'bcon';
+          const { data: ctxRow } = await supabase
+            .from('all_leads')
+            .select('unified_context, customer_name')
+            .eq('id', leadId)
+            .maybeSingle();
+          const ctx = ctxRow?.unified_context || {};
+          const existingBrandCtx = ctx[brandId] || ctx.bcon || {};
+          const mergedBrandCtx = mergeProfile(existingBrandCtx, profile);
+
+          // Promote profile.full_name → customer_name when the stored name is
+          // garbled / not a real person (e.g. junk Meta form name the customer
+          // later corrected in chat).
+          const storedName = ctxRow?.customer_name as string | null | undefined;
+          const promote = !!profile.full_name && !isLikelyRealPersonName(storedName || '');
+
+          const update: Record<string, any> = {
+            unified_context: { ...ctx, [brandId]: mergedBrandCtx },
+          };
+          if (promote) update.customer_name = profile.full_name;
+
+          await supabase.from('all_leads').update(update).eq('id', leadId);
+          if (promote) {
+            console.log(
+              `[agent/web/chat/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${profile.full_name}"`,
+            );
+          }
+          console.log(`[agent/web/chat/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
+        }
+      } catch (err) {
+        console.error('[agent/web/chat/ai-intent] failed:', err);
+      }
+    } else if (!leadId && externalSessionId && (messageCount % 2 === 0 || messageCount <= 2)) {
+      // Anonymous web session (no all_leads row yet). Capture just the NAME onto
+      // web_sessions so the inbox shows a real name instead of "Anonymous".
+      try {
+        const history = [
+          ...agentInput.conversationHistory,
+          { role: 'user' as const, content: userMessage },
+          { role: 'assistant' as const, content: assistantResponse },
+        ];
+        const profile = await extractProfileFromConversation(history);
+        const fullName = profile?.full_name;
+        if (fullName && isLikelyRealPersonName(fullName)) {
+          await supabase
+            .from('web_sessions')
+            .update({ customer_name: fullName })
+            .eq('external_session_id', externalSessionId)
+            .is('customer_name', null);
+          console.log(`[agent/web/chat] anon session ${externalSessionId} name captured: "${fullName}"`);
+        }
+      } catch (err) {
+        console.error('[agent/web/chat] anon name capture failed:', err);
       }
     }
 

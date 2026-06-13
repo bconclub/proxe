@@ -14,6 +14,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { process as processMessage } from '@/lib/agent-core/engine';
+import {
+  extractProfileFromConversation,
+  mergeProfile,
+  isLikelyRealPersonName,
+} from '@/lib/agent-core/conversationIntelligence';
 import { AgentInput } from '@/lib/agent-core/types';
 import {
   getServiceClient,
@@ -624,6 +629,47 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       .from('all_leads')
       .update(leadUpdate)
       .eq('id', leadId);
+
+    // 10b. AI profile extraction — richer B2B profile (business_type,
+    //      service_interest, pain_point, lead_volume, user_type) that the
+    //      keyword intent extractor misses, plus real-name promotion. Runs on
+    //      every 2nd user message. Awaited (webhook handler, no streaming).
+    if (userMessageCount >= 2 && userMessageCount % 2 === 0) {
+      try {
+        const profile = await extractProfileFromConversation(conversationHistory);
+        if (profile && Object.keys(profile).length > 0) {
+          const { data: ctxRow2 } = await supabase
+            .from('all_leads')
+            .select('unified_context, customer_name')
+            .eq('id', leadId)
+            .maybeSingle();
+          const ctx2 = ctxRow2?.unified_context || {};
+          const brandCtx2 = ctx2[brand] || ctx2.bcon || {};
+          const mergedBrandCtx = mergeProfile(brandCtx2, profile);
+
+          // Promote profile.full_name → customer_name when the stored name is
+          // garbled / not a real person (e.g. junk Meta form name the customer
+          // later corrected in chat).
+          const storedName = ctxRow2?.customer_name as string | null | undefined;
+          const promote = !!profile.full_name && !isLikelyRealPersonName(storedName || '');
+
+          const update2: Record<string, any> = {
+            unified_context: { ...ctx2, [brand]: mergedBrandCtx },
+          };
+          if (promote) update2.customer_name = profile.full_name;
+
+          await supabase.from('all_leads').update(update2).eq('id', leadId);
+          if (promote) {
+            console.log(
+              `[meta/webhook/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${profile.full_name}"`,
+            );
+          }
+          console.log(`[meta/webhook/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
+        }
+      } catch (err) {
+        console.error('[meta/webhook/ai-intent] failed:', err);
+      }
+    }
 
     // 11. Link lead_id + phone to whatsapp session
     const normalizedSessionPhone = normalizePhone(customerPhone);
