@@ -311,12 +311,23 @@ function getCallCardClass(outcome: string | null): string {
   return 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
 }
 
+// Strip emoji / decorative junk from a display name so the "Clean" affordance
+// can offer a tidy version (e.g. "♥╣firru╠♥" -> "firru").
+function cleanDisplayName(raw: string): string {
+  if (!raw) return ''
+  return raw.replace(/[^\p{L}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   // Manual refresh for the Notes tab — re-pulls the lead row (fresh admin_notes)
   // and the activity timeline so a just-logged note/call shows without reopening.
   const [isRefreshingNotes, setIsRefreshingNotes] = useState(false)
+  // Inline name editing
+  const [editingName, setEditingName] = useState(false)
+  const [editingNameValue, setEditingNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
   const refreshNotes = async () => {
     if (isRefreshingNotes) return
     setIsRefreshingNotes(true)
@@ -1568,14 +1579,98 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <div className="group flex items-center gap-1.5 flex-1 min-w-0">
-                    <h2
-                      id="lead-modal-title"
-                      className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
-                    >
-                      {currentLead.name || 'Unknown Lead'}
-                    </h2>
-                    {currentLead.name && (
-                      <CopyIconButton value={currentLead.name} label="name" />
+                    {editingName ? (() => {
+                      const commitName = async () => {
+                        const newName = editingNameValue.trim()
+                        if (!newName) { setEditingName(false); return }
+                        setSavingName(true)
+                        try {
+                          const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ customer_name: newName }),
+                          })
+                          if (!r.ok) {
+                            const d = await r.json().catch(() => ({}))
+                            console.error('Name save failed:', d.error || r.statusText)
+                          }
+                          setEditingName(false)
+                          loadFreshLeadData()
+                        } finally {
+                          setSavingName(false)
+                        }
+                      }
+                      return (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingNameValue}
+                            onChange={(e) => setEditingNameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { e.preventDefault(); void commitName() }
+                              else if (e.key === 'Escape') { setEditingName(false) }
+                            }}
+                            disabled={savingName}
+                            placeholder="Enter name…"
+                            className="text-xl font-bold flex-1 min-w-0 bg-transparent border-b border-[var(--accent-primary)] outline-none text-[var(--text-primary)]"
+                          />
+                          <button
+                            onClick={() => void commitName()}
+                            className="p-1 rounded text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition"
+                            title="Save (Enter)"
+                            disabled={savingName || !editingNameValue.trim()}
+                            aria-label="Save name"
+                          >
+                            <MdCheck size={16} />
+                          </button>
+                          <button
+                            onClick={() => setEditingName(false)}
+                            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                            title="Cancel (Esc)"
+                            disabled={savingName}
+                            aria-label="Cancel"
+                          >
+                            <MdClose size={16} />
+                          </button>
+                        </div>
+                      )
+                    })() : (
+                      <>
+                        <h2
+                          id="lead-modal-title"
+                          className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
+                        >
+                          {currentLead.name || 'Unknown Lead'}
+                        </h2>
+                        <button
+                          onClick={() => { setEditingNameValue(currentLead.name || ''); setEditingName(true) }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          title={currentLead.name ? 'Edit name' : 'Add a name'}
+                          aria-label="Edit name"
+                        >
+                          <MdEdit size={14} />
+                        </button>
+                        {currentLead.name && (() => {
+                          const cleaned = cleanDisplayName(currentLead.name)
+                          if (cleaned && cleaned !== currentLead.name) {
+                            return (
+                              <button
+                                onClick={() => { setEditingNameValue(cleaned); setEditingName(true) }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                title={`Clean up: "${currentLead.name}" → "${cleaned}"`}
+                                aria-label="Clean up name"
+                              >
+                                <MdAutoAwesome size={14} />
+                              </button>
+                            )
+                          }
+                          return null
+                        })()}
+                        {currentLead.name && (
+                          <CopyIconButton value={currentLead.name} label="name" />
+                        )}
+                      </>
                     )}
                   </div>
 
