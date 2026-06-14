@@ -1075,6 +1075,22 @@ export async function GET(request: NextRequest) {
     const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
     console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
 
+    // Time-filtered engaged counts for the 7D/14D/30D dashboard card (mirrors
+    // warm-leads). Same engaged predicate as engagedLeadsList above.
+    const isEngagedLead = (lead: any) => {
+      if (engagedStages.includes(lead.lead_stage || '')) return true
+      const { bookingDate } = getBookingData(lead)
+      return !!bookingDate
+    }
+    const engagedWithin = (days: number) => safeLeads.filter(lead => {
+      if (!isEngagedLead(lead)) return false
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= days * 24 * 60 * 60 * 1000
+    }).length
+    const engagedLeads7D = engagedWithin(7)
+    const engagedLeads14D = engagedWithin(14)
+    const engagedLeads30D = engagedWithin(30)
+
     // WARM LEADS: Leads with score 40-69 (warming up, need attention)
     // Time-filtered counts for 7D/14D/30D dashboard card
     const isWarmLead = (lead: any) => {
@@ -1375,6 +1391,9 @@ export async function GET(request: NextRequest) {
       },
       engagedLeads: {
         count: engagedLeadsCount,
+        count7D: engagedLeads7D,
+        count14D: engagedLeads14D,
+        count30D: engagedLeads30D,
         total: totalLeadsCount,
         engagementRate: engagementRate,
         leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),

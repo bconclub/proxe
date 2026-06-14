@@ -26,7 +26,7 @@ interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
   totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
-  engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
+  engagedLeads: { count: number; count7D?: number; count14D?: number; count30D?: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
@@ -75,7 +75,7 @@ export default function FounderDashboard() {
   const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   const [warmLeadsFilter, setWarmLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   const [leadsFilter, setLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [hotLeadsFilter, setHotLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
+  const [engagedLeadsFilter, setEngagedLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
   
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
@@ -453,7 +453,10 @@ export default function FounderDashboard() {
               <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
             </div>
             <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {metrics.engagedLeads?.count ?? 0}
+              {engagedLeadsFilter === 'All' && (metrics.engagedLeads?.count ?? 0)}
+              {engagedLeadsFilter === '7D' && (metrics.engagedLeads?.count7D ?? metrics.engagedLeads?.count ?? 0)}
+              {engagedLeadsFilter === '14D' && (metrics.engagedLeads?.count14D ?? metrics.engagedLeads?.count ?? 0)}
+              {engagedLeadsFilter === '30D' && (metrics.engagedLeads?.count30D ?? metrics.engagedLeads?.count ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#22C55E' }}>
               {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%
@@ -464,9 +467,19 @@ export default function FounderDashboard() {
               <Sparkline data={metrics.trends!.leads.data} color="#22C55E" height={48} showGradient={true} />
             </div>
           )}
-          <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline mt-2 sm:mt-0" style={{ color: '#22C55E' }}>
-            View <MdArrowForward size={12} />
-          </button>
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
+            <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#22C55E' }}>
+              View <MdArrowForward size={12} />
+            </button>
+            <div className="hidden sm:flex gap-1">
+              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+                <button key={period} onClick={() => setEngagedLeadsFilter(period)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${engagedLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
+                  style={engagedLeadsFilter === period ? { backgroundColor: '#22C55E' } : { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: 'var(--text-secondary)' }}
+                >{period}</button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Card 3: Warm Leads */}
