@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-13 22:10 IST · BCON: Instagram agent tab in dashboard (branch ig-dashboard-ui)
+
+- Adds `dashboard/agents/InstagramAgentTab.tsx` — Instagram Business connect panel (target @bconclub, PROXe-IG app 734209706078170, basic/messages/comments scopes, redirect to /dashboard/agents) + App-review screencast steps + workflow cards.
+- Wires it into `dashboard/agents/page.tsx`: new "Instagram" tab between WhatsApp and Voice.
+- Inbox already renders the Social channel, so incoming IG DMs/comments surface there with no change.
+- Built on branch `ig-dashboard-ui` (isolated from concurrent BCON work); merge to main for production after review.
+
 ## 2026-06-13 21:40 IST · BCON: document META_IG_* env + redeploy to activate Instagram env
 
 - Documents the `META_IG_*` env vars in `brands/bcon/agent/env.production.example` (access token required; app secret, business account id, verify token).

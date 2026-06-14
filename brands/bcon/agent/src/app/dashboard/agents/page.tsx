@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import WebAgentSettingsClient from '../settings/web-agent/WebAgentSettingsClient';
 import WhatsAppAgentTab from './WhatsAppAgentTab';
+import InstagramAgentTab from './InstagramAgentTab';
 import VoiceAgentTab from './VoiceAgentTab';
 
-const tabs = ['Web', 'WhatsApp', 'Voice'];
+const tabs = ['Web', 'WhatsApp', 'Instagram', 'Voice'];
 
 export default function AgentsPage() {
   const [active, setActive] = useState('Web');
@@ -36,6 +37,7 @@ export default function AgentsPage() {
       <div className="flex-1 overflow-hidden" style={{ minHeight: 600 }}>
         {active === 'Web' && <WebAgentSettingsClient />}
         {active === 'WhatsApp' && <WhatsAppAgentTab />}
+        {active === 'Instagram' && <InstagramAgentTab />}
         {active === 'Voice' && <VoiceAgentTab />}
       </div>
     </div>
