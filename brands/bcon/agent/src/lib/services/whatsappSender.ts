@@ -54,6 +54,10 @@ export async function sendWhatsAppText(
   const creds = getCredentials();
   if (!creds) return { success: false, error: 'Missing credentials' };
 
+  // Strip em/en dashes from ALL WhatsApp sends (not just LLM output) — the brand
+  // voice uses hyphens/commas, never long dashes.
+  message = message.replace(/\s*[—–]\s*/g, ' - ');
+
   try {
     const res = await fetch(`${GRAPH_API_BASE}/${creds.phoneNumberId}/messages`, {
       method: 'POST',

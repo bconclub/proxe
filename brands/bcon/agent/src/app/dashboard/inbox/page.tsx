@@ -231,7 +231,9 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
-  const fieldPattern = /\b(\w+(?:_\w+)+\??)\s*:\s*/g;
+  // Match snake_case keys AND common plain labels (first name, phone, email…) +
+  // Meta's trailing "?_" quirk, so Meta lead forms parse regardless of style.
+  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|\w+(?:[_ '][a-z0-9]+)+[?_]*)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -267,7 +269,7 @@ function getFormFieldLabel(key: string): string {
   if (k.includes('website')) return 'Website';
   if (k.includes('leads') || k.includes('handle')) return 'Volume';
   if (k.includes('ai system')) return 'AI Systems';
-  return key.length > 15 ? key.substring(0, 15) + '…' : key;
+  return key.length > 48 ? key.substring(0, 48) + '…' : key;
 }
 
 /** Format a time gap in ms to a human-readable short string */

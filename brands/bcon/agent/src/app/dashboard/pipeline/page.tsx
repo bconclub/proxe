@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { MdSearch, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
 // --- Types ---
 
@@ -152,6 +153,10 @@ export default function PipelinePage() {
   const perPage = 20
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  // Stored lead_score is 0/stale for many leads (AI scoring didn't run), which
+  // made the pipeline show 0 while the lead detail showed the real score.
+  // Compute the same client-side score here so they match.
+  const [calcScores, setCalcScores] = useState<Record<string, number>>({})
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -164,6 +169,33 @@ export default function PipelinePage() {
       setLoading(false)
     }
   }, [])
+
+  // Compute the displayed score the same way the leads table / lead detail do.
+  // Falls back to the stored lead_score on error.
+  useEffect(() => {
+    if (leads.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const scores: Record<string, number> = {}
+      await Promise.all(
+        leads.map(async (lead) => {
+          try {
+            const r = await calculateLeadScore(lead as any)
+            scores[lead.id] = r.score
+          } catch {
+            scores[lead.id] = lead.lead_score ?? 0
+          }
+        }),
+      )
+      if (!cancelled) setCalcScores(scores)
+    })()
+    return () => { cancelled = true }
+  }, [leads])
+
+  const scoreOf = useCallback(
+    (lead: Lead) => calcScores[lead.id] ?? lead.lead_score ?? 0,
+    [calcScores],
+  )
 
   const handleLeadClick = useCallback((lead: Lead) => {
     setSelectedLead({
@@ -178,11 +210,11 @@ export default function PipelinePage() {
       status: lead.lead_stage || null,
       booking_date: null,
       booking_time: null,
-      lead_score: lead.lead_score,
+      lead_score: scoreOf(lead),
       lead_stage: lead.lead_stage,
     })
     setIsLeadModalOpen(true)
-  }, [])
+  }, [scoreOf])
 
   const updateLeadStatus = useCallback(async (leadId: string, newStatus: string) => {
     try {
@@ -264,7 +296,7 @@ export default function PipelinePage() {
       return true
     })
     filtered.sort((a, b) => {
-      if (sortBy === 'score') return (b.lead_score || 0) - (a.lead_score || 0)
+      if (sortBy === 'score') return scoreOf(b) - scoreOf(a)
       if (sortBy === 'activity') return new Date(b.last_interaction_at || 0).getTime() - new Date(a.last_interaction_at || 0).getTime()
       return daysBetween(b.created_at || null, b.last_interaction_at) - daysBetween(a.created_at || null, a.last_interaction_at)
     })
@@ -422,7 +454,7 @@ export default function PipelinePage() {
                     {stageObj?.label}
                   </span>
                 </span>
-                <span><ScoreDot score={lead.lead_score} /></span>
+                <span><ScoreDot score={scoreOf(lead)} /></span>
                 <span><ChannelIcon lead={lead} /></span>
                 <span style={{ color: '#525252', fontSize: 12 }}>{relativeTime(lead.last_interaction_at)}</span>
                 <span style={{ color: '#525252', fontSize: 12 }}>{days > 0 ? `${days}d` : '<1d'}</span>
