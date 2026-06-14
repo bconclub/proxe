@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-14 13:09 IST · Windchasers: floating buttons use brand token (drop clashing hardcoded colors)
+
+- Eye / bell / Ask-PROXe buttons were three clashing hardcoded colors (gold/blue/purple). All now use the brand token var(--button-bg) with var(--text-button) icons and var(--border-primary) — cohesive + semantic, distinguished by icon only. Unread badge stays red (semantic alert).
+
 ## 2026-06-14 13:06 IST · Windchasers: Ask PROXe polish + WhatsApp cost-intent clarifier
 
 - **WA agent — cost intent**: a bare "how much does it cost?" no longer defaults to the ₹80 lakh full-journey answer. If the chat was about DGCA, it answers the DGCA fee; if unclear, it asks once with quick-reply buttons ([DGCA classes][Full pilot training]), leading with DGCA (our product).

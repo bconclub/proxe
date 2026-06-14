@@ -85,9 +85,9 @@ export default function TodaySnapshotButton() {
           right: '20px',
           width: '36px',
           height: '36px',
-          background: '#C9A961',
-          border: '1px solid rgba(255,255,255,0.6)',
-          color: '#ffffff',
+          backgroundColor: 'var(--button-bg)',
+          border: '1px solid var(--border-primary)',
+          color: 'var(--text-button)',
         }}
         aria-label="Open today's snapshot"
         title="Today's snapshot"

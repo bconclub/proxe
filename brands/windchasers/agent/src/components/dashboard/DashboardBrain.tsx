@@ -138,9 +138,9 @@ export default function DashboardBrain() {
           right: '20px',
           width: '36px',
           height: '36px',
-          backgroundColor: '#8B5CF6',
-          color: '#ffffff',
-          border: '1px solid rgba(255,255,255,0.6)',
+          backgroundColor: 'var(--button-bg)',
+          color: 'var(--text-button)',
+          border: '1px solid var(--border-primary)',
         }}
         aria-label="Ask PROXe"
         title="Ask PROXe"

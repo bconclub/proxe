@@ -210,9 +210,9 @@ export default function NotificationCenter() {
           right: '20px',
           width: '36px',
           height: '36px',
-          backgroundColor: '#3B82F6',
-          border: '1px solid rgba(255,255,255,0.6)',
-          color: '#ffffff',
+          backgroundColor: 'var(--button-bg)',
+          border: '1px solid var(--border-primary)',
+          color: 'var(--text-button)',
         }}
         aria-label="Notifications"
         title="Notifications"
