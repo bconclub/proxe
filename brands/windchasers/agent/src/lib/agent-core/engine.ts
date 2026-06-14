@@ -213,6 +213,21 @@ User's message: ${input.message}`
     }
   }
 
+  // ── DUPLICATE CONFIRMATION GUARD ───────────────────────────────────────
+  // A booking confirmation already exists for this lead (existingBookingMessage)
+  // and the model is repeating "booking is recorded" WITHOUT making a new
+  // booking this turn — e.g. the customer just said "okay". Re-announcing the
+  // booking a second time reads as broken ("recorded… recorded again"). Replace
+  // the repeat with a brief acknowledgement so it's only ever confirmed once.
+  if (input.channel === 'whatsapp' && noBookingThisTurn && existingBookingMessage) {
+    const repeatsBooking = /\b(is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? )\b/i
+      .test(rawResponse);
+    if (repeatsBooking) {
+      console.log('[Engine] Suppressing duplicate booking confirmation (already confirmed earlier, no new booking this turn).');
+      rawResponse = "You're all set — our team will reach out to confirm. Anything else I can help with?";
+    }
+  }
+
   // If user explicitly asked for a human, flag for follow-up regardless of AI response
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
@@ -1019,16 +1034,30 @@ function buildBookingTools(
 
       // NOTE: No separate WhatsApp confirmation - Claude's response IS the only message
 
+      // Canonical human date label (IST) so the confirmation matches the booked
+      // date exactly — the model must echo THIS, never restate a day from memory.
+      const dateLabel = (() => {
+        try {
+          const d = new Date(`${date}T12:00:00+05:30`);
+          return isNaN(d.getTime())
+            ? date
+            : d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
+        } catch {
+          return date;
+        }
+      })();
+
       return JSON.stringify({
         success: true,
         date,
+        date_label: dateLabel,
         time,
         name: bookingName,
         title: bookingTitle,
         session_type: sessionType,
         google_event_created: !!calendarResult,
         meet_link: calendarResult?.meetLink || null,
-        message: `Booking confirmed for ${bookingName} on ${date} at ${time}. STOP - do NOT call any more tools. Send ONE confirmation message to the user and end your turn.`,
+        message: `Booking confirmed for ${bookingName} on ${dateLabel} at ${time}. Send EXACTLY ONE confirmation to the user using this exact date ("${dateLabel}") and time — do NOT restate a different day. STOP: do not call any more tools, and do not repeat this confirmation in any later message.`,
       });
     },
 

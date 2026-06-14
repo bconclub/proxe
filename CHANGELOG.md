@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-14 12:49 IST · Windchasers: WhatsApp booking — wrong date + double "recorded" confirmation
+
+- **Double confirmation fix**: after a booking, a follow-up like "okay" made the agent re-send "Your booking is recorded…" a second time (the false-booking guard skips when a prior booking exists). Added a duplicate-confirmation guard — if no new booking happened this turn and one already exists, the repeat is replaced with a short ack. Confirmed once, never twice.
+- **Wrong date hardening**: agent offered Monday but booked Saturday (date recalled from memory, not the offered day). book_consultation now returns a canonical IST `date_label` and instructs the model to confirm with that exact label and to book the ISO date matching the day it offered. Prompt Step 4 gained explicit date discipline (book the day you offered; don't carry over a passed slot) + confirm-once.
+- User-facing: bookings confirm the right day, once.
+- Note: the date the model passes is ultimately model-chosen; these are guardrails (canonical label + prompt discipline), not a hard server lock on the weekday.
+
 ## 2026-06-14 12:34 IST · Windchasers: Dashboard Brain (Sonnet 4.6 Q&A) + Upcoming Events past-leak fix + better cards
 
 - **Dashboard Brain**: ask-anything panel over live dashboard data. Floating ✨ button on the home page (stacked under the eye + bell) opens a right slide-out chat. `/api/dashboard/brain` gathers compact aggregates (lead counts all-time/today/7d, score buckets, pipeline by stage, leads by source, today's new leads, today's status changes, upcoming bookings, conversations today) and answers with **claude-sonnet-4-6**. Read-only, answers strictly from the snapshot. Suggested prompts: "What happened today?", "How many leads today?", "What's my pipeline?".
