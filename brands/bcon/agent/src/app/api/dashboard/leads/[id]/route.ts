@@ -34,6 +34,117 @@ export async function GET(
   }
 }
 
+// PATCH handler — update editable lead fields from the dashboard.
+// Supported body fields: customer_name (rename), email, city
+// (unified_context.<brand>.city). Stamps unified_context.last_actor so LAST
+// TOUCH shows who edited. Auth-gated like every other dashboard route.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const userSupabase = await createClient()
+    const {
+      data: { user },
+    } = await userSupabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const service = getServiceClient()
+    if (!service) {
+      return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 })
+    }
+
+    const leadId = params.id
+    const body = await request.json()
+
+    const { data: lead, error: fetchErr } = await service
+      .from('all_leads')
+      .select('id, customer_name, email, unified_context, brand')
+      .eq('id', leadId)
+      .maybeSingle()
+    if (fetchErr || !lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const updates: Record<string, any> = {}
+    const auditChanges: string[] = []
+    const ctx = lead.unified_context || {}
+    const brand = lead.brand || 'bcon'
+    const brandCtx = ctx[brand] || ctx.bcon || {}
+    const newBrandCtx: Record<string, any> = { ...brandCtx }
+    let ctxChanged = false
+
+    if (body.customer_name !== undefined) {
+      const name = String(body.customer_name || '').trim()
+      updates.customer_name = name || null
+      if ((lead.customer_name || null) !== (updates.customer_name || null)) {
+        auditChanges.push(`Name: ${lead.customer_name || 'empty'} -> ${updates.customer_name || 'empty'}`)
+      }
+    }
+    if (body.email !== undefined) {
+      const email = String(body.email || '').trim().toLowerCase() || null
+      updates.email = email
+      if ((lead.email || null) !== email) {
+        auditChanges.push(`Email: ${lead.email || 'empty'} -> ${email || 'empty'}`)
+      }
+    }
+    if (body.city !== undefined) {
+      const previous = brandCtx.city || null
+      const city = String(body.city || '').trim() || null
+      newBrandCtx.city = city
+      ctxChanged = true
+      if (previous !== city) auditChanges.push(`City: ${previous || 'empty'} -> ${city || 'empty'}`)
+    }
+
+    if (Object.keys(updates).length === 0 && !ctxChanged) {
+      return NextResponse.json({ error: 'No supported fields to update' }, { status: 400 })
+    }
+
+    const editorName = (user.email || 'User').split('@')[0]
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+    updates.unified_context = {
+      ...ctx,
+      ...(ctxChanged ? { [brand]: newBrandCtx } : {}),
+      last_actor: {
+        type: 'user',
+        email: user.email,
+        name: editorName,
+        at: new Date().toISOString(),
+        source: 'lead_edit',
+      },
+    }
+    // NOTE: do NOT touch last_interaction_at — that tracks CUSTOMER activity,
+    // not dashboard edits.
+
+    const { error: upErr } = await service
+      .from('all_leads')
+      .update(updates)
+      .eq('id', leadId)
+    if (upErr) throw upErr
+
+    // Best-effort audit trail; never fail the edit if the table differs.
+    if (auditChanges.length > 0) {
+      try {
+        await service.from('activities').insert({
+          lead_id: leadId,
+          activity_type: 'note',
+          note: `Lead updated by ${editorName}: ${auditChanges.join('; ')}`,
+          created_by: user.email || user.id || 'system',
+        })
+      } catch { /* audit is non-critical */ }
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[leads/PATCH] error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update lead' },
+      { status: 500 },
+    )
+  }
+}
+
 // DELETE handler for /api/dashboard/leads/[id]
 export async function DELETE(
   request: NextRequest,

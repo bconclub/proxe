@@ -124,6 +124,28 @@ function getTaskActionLabel(task: any): string {
   return task.task_description || task.task_type?.replace(/_/g, ' ') || 'Scheduled action'
 }
 
+// WhatsApp-native markdown (single *bold*, _italic_, ~strike~). Used for
+// activities from the WhatsApp channel — otherwise free-form replies show
+// literal asterisks (e.g. "Date: *Fri, 22 May* Time: *1:00 PM*").
+function renderWhatsAppMarkdown(text: string) {
+  if (!text) return null;
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-bold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 function renderMarkdown(text: string) {
   if (!text) return null;
 
@@ -289,12 +311,30 @@ function getCallCardClass(outcome: string | null): string {
   return 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40'
 }
 
+// Strip emoji / decorative junk from a display name so the "Clean" affordance
+// can offer a tidy version (e.g. "♥╣firru╠♥" -> "firru").
+function cleanDisplayName(raw: string): string {
+  if (!raw) return ''
+  return raw.replace(/[^\p{L}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   // Manual refresh for the Notes tab — re-pulls the lead row (fresh admin_notes)
   // and the activity timeline so a just-logged note/call shows without reopening.
   const [isRefreshingNotes, setIsRefreshingNotes] = useState(false)
+  // Inline name editing
+  const [editingName, setEditingName] = useState(false)
+  const [editingNameValue, setEditingNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  // Lead merge
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [mergeQuery, setMergeQuery] = useState('')
+  const [mergeCandidates, setMergeCandidates] = useState<Array<{ id: string; customer_name: string | null; phone: string | null; email: string | null; lead_score: number | null }>>([])
+  const [mergeSearchLoading, setMergeSearchLoading] = useState(false)
+  const [mergeSelected, setMergeSelected] = useState<{ id: string; customer_name: string | null; phone: string | null; email: string | null; lead_score: number | null } | null>(null)
+  const [merging, setMerging] = useState(false)
   const refreshNotes = async () => {
     if (isRefreshingNotes) return
     setIsRefreshingNotes(true)
@@ -1139,12 +1179,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowAdminNoteInput(false)
       setActiveTab('notes') // surface the note in the Notes tab once saved
 
-      // Keep visible longer so the user can read what happened + the note text
-      await new Promise(resolve => setTimeout(resolve, 4500))
-      setNoteProgress(prev => ({ ...prev, visible: false }))
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setNoteProgress({ steps: [], visible: false })
-
+      // Overlay stays visible until the operator clicks Done (button in the
+      // overlay) so they can read the classification + actions taken — no
+      // auto-dismiss. Refresh the underlying data now.
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
@@ -1533,6 +1570,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     to   { opacity: 1; transform: translateY(0); }
                   }
                 `}</style>
+
+                {noteProgress.steps.some(s => s.text === 'Done' || s.text.startsWith('Error')) && (
+                  <button
+                    type="button"
+                    onClick={() => setNoteProgress({ steps: [], visible: false })}
+                    className="mt-3 w-full text-center text-[12px] font-semibold py-1.5 rounded-md transition-colors hover:opacity-90"
+                    style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
+                  >
+                    Done
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1546,14 +1594,98 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <div className="group flex items-center gap-1.5 flex-1 min-w-0">
-                    <h2
-                      id="lead-modal-title"
-                      className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
-                    >
-                      {currentLead.name || 'Unknown Lead'}
-                    </h2>
-                    {currentLead.name && (
-                      <CopyIconButton value={currentLead.name} label="name" />
+                    {editingName ? (() => {
+                      const commitName = async () => {
+                        const newName = editingNameValue.trim()
+                        if (!newName) { setEditingName(false); return }
+                        setSavingName(true)
+                        try {
+                          const r = await fetch(`/api/dashboard/leads/${currentLead.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ customer_name: newName }),
+                          })
+                          if (!r.ok) {
+                            const d = await r.json().catch(() => ({}))
+                            console.error('Name save failed:', d.error || r.statusText)
+                          }
+                          setEditingName(false)
+                          loadFreshLeadData()
+                        } finally {
+                          setSavingName(false)
+                        }
+                      }
+                      return (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingNameValue}
+                            onChange={(e) => setEditingNameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { e.preventDefault(); void commitName() }
+                              else if (e.key === 'Escape') { setEditingName(false) }
+                            }}
+                            disabled={savingName}
+                            placeholder="Enter name…"
+                            className="text-xl font-bold flex-1 min-w-0 bg-transparent border-b border-[var(--accent-primary)] outline-none text-[var(--text-primary)]"
+                          />
+                          <button
+                            onClick={() => void commitName()}
+                            className="p-1 rounded text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition"
+                            title="Save (Enter)"
+                            disabled={savingName || !editingNameValue.trim()}
+                            aria-label="Save name"
+                          >
+                            <MdCheck size={16} />
+                          </button>
+                          <button
+                            onClick={() => setEditingName(false)}
+                            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition"
+                            title="Cancel (Esc)"
+                            disabled={savingName}
+                            aria-label="Cancel"
+                          >
+                            <MdClose size={16} />
+                          </button>
+                        </div>
+                      )
+                    })() : (
+                      <>
+                        <h2
+                          id="lead-modal-title"
+                          className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
+                        >
+                          {currentLead.name || 'Unknown Lead'}
+                        </h2>
+                        <button
+                          onClick={() => { setEditingNameValue(currentLead.name || ''); setEditingName(true) }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          title={currentLead.name ? 'Edit name' : 'Add a name'}
+                          aria-label="Edit name"
+                        >
+                          <MdEdit size={14} />
+                        </button>
+                        {currentLead.name && (() => {
+                          const cleaned = cleanDisplayName(currentLead.name)
+                          if (cleaned && cleaned !== currentLead.name) {
+                            return (
+                              <button
+                                onClick={() => { setEditingNameValue(cleaned); setEditingName(true) }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                title={`Clean up: "${currentLead.name}" → "${cleaned}"`}
+                                aria-label="Clean up name"
+                              >
+                                <MdAutoAwesome size={14} />
+                              </button>
+                            )
+                          }
+                          return null
+                        })()}
+                        {currentLead.name && (
+                          <CopyIconButton value={currentLead.name} label="name" />
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -2029,6 +2161,51 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
                     </button>
+                    <button
+                      onClick={async () => {
+                        setShowActionDropdown(false)
+                        const bc = currentLead.unified_context?.bcon || {}
+                        const attr = currentLead.unified_context?.attribution || {}
+                        const city = bc.city
+                          || currentLead.unified_context?.whatsapp?.profile?.city
+                          || currentLead.unified_context?.web?.profile?.city
+                          || ''
+                        const titleCase = (s: string) => String(s).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        const lines = [
+                          `*Lead Details*`,
+                          `Name: ${currentLead.name || 'Unknown'}`,
+                          `Phone: ${currentLead.phone || '—'}`,
+                          currentLead.email ? `Email: ${currentLead.email}` : null,
+                          city ? `City: ${city}` : null,
+                          bc.business_type ? `Business: ${bc.business_type}` : null,
+                          bc.service_interest ? `Service interest: ${bc.service_interest}` : null,
+                          bc.pain_point ? `Pain point: ${bc.pain_point}` : null,
+                          bc.user_type ? `Role: ${titleCase(bc.user_type)}` : null,
+                          bc.timeline ? `Timeline: ${bc.timeline}` : null,
+                          bc.lead_volume ? `Lead volume: ${bc.lead_volume}` : null,
+                          `Lead Score: ${(currentLead as any).lead_score ?? '—'}/100`,
+                          `Stage: ${currentLead.lead_stage || 'New'}`,
+                          attr.source_label ? `Source: ${attr.source_label}${attr.first_touch_label ? ' · ' + attr.first_touch_label : ''}` : null,
+                          (currentLead as any).created_at ? `First seen: ${new Date((currentLead as any).created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : null,
+                        ].filter(Boolean).join('\n')
+                        try {
+                          await navigator.clipboard.writeText(lines)
+                          setNoteProgress({ steps: [{ text: 'Lead details copied to clipboard', done: true }], visible: true })
+                          setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
+                        } catch {
+                          window.prompt('Copy lead details:', lines)
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdContentCopy size={16} className="text-amber-500" /> Copy Lead Details
+                    </button>
+                    <button
+                      onClick={() => { setShowActionDropdown(false); setMergeQuery(''); setMergeCandidates([]); setMergeSelected(null); setShowMergeDialog(true) }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdShare size={16} className="text-purple-500 rotate-90" /> Merge with another lead
+                    </button>
                   </div>
                 </>
               )}
@@ -2277,13 +2454,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   marginRight: isCustomer ? '0' : 'auto'
                                 }}
                               >
-                                <p className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
-                                  {renderMarkdown(activity.content)}
+                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
+                                  {activity.channel === 'whatsapp'
+                                    ? renderWhatsAppMarkdown(activity.content)
+                                    : renderMarkdown(activity.content)}
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
-                                {renderMarkdown(activity.content)}
+                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                                {activity.channel === 'whatsapp'
+                                  ? renderWhatsAppMarkdown(activity.content)
+                                  : renderMarkdown(activity.content)}
                               </p>
                             ) : null}
 
@@ -3094,6 +3275,192 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           }}
         />
       )}
+
+      {/* Merge with another lead */}
+      {showMergeDialog && currentLead && (() => {
+        const currentScore = currentLead.lead_score ?? 0
+        let willKeep: typeof mergeSelected | null = null
+        let willDelete: typeof mergeSelected | null = null
+        if (mergeSelected) {
+          const otherScore = mergeSelected.lead_score ?? 0
+          const currentAsCand = {
+            id: String(currentLead.id),
+            customer_name: currentLead.name || null,
+            phone: currentLead.phone || null,
+            email: currentLead.email || null,
+            lead_score: currentScore,
+          }
+          if (currentScore >= otherScore) { willKeep = currentAsCand; willDelete = mergeSelected }
+          else { willKeep = mergeSelected; willDelete = currentAsCand }
+        }
+
+        async function runSearch(q: string) {
+          setMergeQuery(q)
+          if (!q || q.trim().length < 2) { setMergeCandidates([]); return }
+          setMergeSearchLoading(true)
+          try {
+            const r = await fetch(`/api/dashboard/leads?search=${encodeURIComponent(q.trim())}&limit=20`, { credentials: 'include' })
+            const data = await r.json().catch(() => ({}))
+            const list = (data?.leads || data?.data || data || []) as Array<any>
+            setMergeCandidates(
+              list
+                .filter((l) => String(l.id) !== String(currentLead.id))
+                .map((l) => ({ id: l.id, customer_name: l.customer_name || l.name || null, phone: l.phone || null, email: l.email || null, lead_score: l.lead_score ?? null }))
+                .slice(0, 10),
+            )
+          } catch (err) {
+            console.error('Merge search failed:', err)
+            setMergeCandidates([])
+          } finally {
+            setMergeSearchLoading(false)
+          }
+        }
+
+        async function doMerge() {
+          if (!mergeSelected) return
+          setMerging(true)
+          try {
+            const r = await fetch(`/api/dashboard/leads/${currentLead.id}/merge`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ other_lead_id: mergeSelected.id }),
+            })
+            const data = await r.json().catch(() => ({}))
+            if (!r.ok || !data?.success) {
+              console.error('Merge failed:', data)
+              alert(`Merge failed: ${data?.error || r.statusText}`)
+              return
+            }
+            setShowMergeDialog(false)
+            onClose()
+            window.location.reload()
+          } catch (err: any) {
+            console.error('Merge exception:', err)
+            alert(`Merge exception: ${err?.message || err}`)
+          } finally {
+            setMerging(false)
+          }
+        }
+
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-[100]"
+              style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}
+              onClick={() => !merging && setShowMergeDialog(false)}
+              aria-hidden="true"
+            />
+            <div
+              role="dialog"
+              aria-label="Merge leads"
+              className="fixed z-[101] rounded-xl border shadow-2xl flex flex-col"
+              style={{
+                top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                width: 'min(520px, 94vw)', maxHeight: '80vh',
+                background: 'var(--bg-secondary)',
+                borderColor: 'var(--border-primary)',
+                color: 'var(--text-primary)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <div>
+                  <div className="text-sm font-semibold">Merge with another lead</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Higher-score lead wins. Other lead will be permanently deleted.
+                  </div>
+                </div>
+                <button type="button" onClick={() => !merging && setShowMergeDialog(false)} className="p-1 rounded hover:opacity-80" disabled={merging} aria-label="Cancel">
+                  <MdClose size={16} />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-3 overflow-y-auto">
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider mb-1 block" style={{ color: 'var(--text-muted)' }}>
+                    Find the other lead (name, phone, or email)
+                  </label>
+                  <input
+                    type="text"
+                    value={mergeQuery}
+                    onChange={(e) => runSearch(e.target.value)}
+                    placeholder="Type at least 2 characters…"
+                    className="w-full text-sm px-3 py-2 rounded border outline-none focus:ring-1"
+                    style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                    autoFocus
+                    disabled={merging}
+                  />
+                </div>
+
+                {mergeSearchLoading && (
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Searching…</div>
+                )}
+                {!mergeSearchLoading && mergeQuery.trim().length >= 2 && mergeCandidates.length === 0 && (
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No matches.</div>
+                )}
+                {mergeCandidates.length > 0 && !mergeSelected && (
+                  <ul className="space-y-1">
+                    {mergeCandidates.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => setMergeSelected(c)}
+                          className="w-full text-left p-2 rounded-md border hover:opacity-90 transition flex items-center gap-2"
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[12px] font-semibold truncate">
+                              {c.customer_name || c.phone || c.email || c.id.slice(0, 8)}
+                            </div>
+                            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {c.phone || '—'}{c.email ? ` · ${c.email}` : ''} · score {c.lead_score ?? '—'}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {mergeSelected && willKeep && willDelete && (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      Confirm merge
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <article className="p-3 rounded-lg border" style={{ background: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.45)' }}>
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 mb-1">Keep</div>
+                        <div className="text-[12px] font-semibold truncate">{willKeep.customer_name || willKeep.phone || '—'}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          {willKeep.phone || '—'} · score {willKeep.lead_score ?? '—'}
+                        </div>
+                      </article>
+                      <article className="p-3 rounded-lg border" style={{ background: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.45)' }}>
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-red-400 mb-1">Delete</div>
+                        <div className="text-[12px] font-semibold truncate">{willDelete.customer_name || willDelete.phone || '—'}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          {willDelete.phone || '—'} · score {willDelete.lead_score ?? '—'}
+                        </div>
+                      </article>
+                    </div>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      All conversations, tasks, and activities from the deleted lead move to the kept one. The deleted lead row is removed permanently.
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button type="button" onClick={() => setMergeSelected(null)} className="px-3 py-1.5 text-[12px] rounded border hover:opacity-80" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }} disabled={merging}>
+                        Back
+                      </button>
+                      <button type="button" onClick={doMerge} className="px-3 py-1.5 text-[12px] rounded font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ background: '#dc2626' }} disabled={merging}>
+                        {merging ? 'Merging…' : 'Confirm merge'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </>
   )
 }

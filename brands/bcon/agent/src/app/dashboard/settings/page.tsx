@@ -22,7 +22,9 @@ export default function SettingsPage() {
   const [widgetStyleError, setWidgetStyleError] = useState<string | null>(null);
   const [loadingWidgetStyle, setLoadingWidgetStyle] = useState(true);
 
-  // Load saved theme on mount
+  // Load + (re)apply saved accent theme. Depends on `theme` (dark/light) so the
+  // accent CSS vars are re-applied after a dark/light switch — otherwise the
+  // ThemeProvider re-sets the base vars on toggle and the chosen accent is lost.
   useEffect(() => {
     const savedTheme = localStorage.getItem('bcon-accent-theme');
     if (savedTheme) {
@@ -32,7 +34,7 @@ export default function SettingsPage() {
       // Default to BCON theme
       applyTheme('bcon');
     }
-  }, []);
+  }, [theme]);
 
   // Load saved widget style on mount
   useEffect(() => {
