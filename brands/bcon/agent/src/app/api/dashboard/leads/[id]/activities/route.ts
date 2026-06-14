@@ -14,17 +14,12 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
-    
-    // Use a placeholder user ID for logging (since auth is disabled)
-    const user = { id: 'system' }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const leadId = params.id
 
@@ -188,6 +183,13 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const leadId = params.id
     const body = await request.json()
     const { activity_type, note, duration_minutes } = body
