@@ -330,3 +330,68 @@ export function getErrorMessage(error: any): string {
 
   return claudeErrorMessage || errorMessage;
 }
+
+// ─── Vision: extract structured data from an image ────────────────────────────
+
+export type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+/**
+ * Send an image + a system/user prompt to Claude and return the raw text reply.
+ * Vision-capable models only. Used by the "add lead from screenshot" flow.
+ */
+export async function generateFromImage(
+  systemPrompt: string,
+  userPrompt: string,
+  imageBase64: string,
+  mediaType: VisionMediaType = 'image/png',
+  maxTokens: number = 1024,
+): Promise<string> {
+  const anthropic = getClient();
+  const model = getModel();
+
+  const maxRetries = 3;
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+
+      const response = await (anthropic.messages.create as any)({
+        model,
+        max_tokens: maxTokens,
+        system: cacheable(systemPrompt),
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+              },
+              { type: 'text', text: userPrompt },
+            ],
+          },
+        ],
+      });
+
+      const content = response.content?.[0];
+      if (content && content.type === 'text') {
+        return content.text.trim();
+      }
+      return '';
+    } catch (error: any) {
+      lastError = error;
+      const isOverloaded =
+        error?.error?.type === 'overloaded_error' ||
+        error?.message?.includes('overloaded');
+      if (!isOverloaded || attempt >= maxRetries) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to generate from image after retries');
+}
