@@ -124,6 +124,28 @@ function getTaskActionLabel(task: any): string {
   return task.task_description || task.task_type?.replace(/_/g, ' ') || 'Scheduled action'
 }
 
+// WhatsApp-native markdown (single *bold*, _italic_, ~strike~). Used for
+// activities from the WhatsApp channel — otherwise free-form replies show
+// literal asterisks (e.g. "Date: *Fri, 22 May* Time: *1:00 PM*").
+function renderWhatsAppMarkdown(text: string) {
+  if (!text) return null;
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-bold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 function renderMarkdown(text: string) {
   if (!text) return null;
 
@@ -2277,13 +2299,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   marginRight: isCustomer ? '0' : 'auto'
                                 }}
                               >
-                                <p className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
-                                  {renderMarkdown(activity.content)}
+                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isCustomer ? 'text-emerald-900 dark:text-emerald-50' : 'text-blue-900 dark:text-blue-50'}`}>
+                                  {activity.channel === 'whatsapp'
+                                    ? renderWhatsAppMarkdown(activity.content)
+                                    : renderMarkdown(activity.content)}
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
-                                {renderMarkdown(activity.content)}
+                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                                {activity.channel === 'whatsapp'
+                                  ? renderWhatsAppMarkdown(activity.content)
+                                  : renderMarkdown(activity.content)}
                               </p>
                             ) : null}
 
