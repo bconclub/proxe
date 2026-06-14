@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-14 13:17 IST · Windchasers: WhatsApp reply length cap + Ask PROXe table-pipe stripping
+
+- **WA reply length/format**: messages were inconsistent — some clean bulleted, some 3-paragraph walls. Consolidated into one HARD rule: every reply under ~55 words, max shape = 1 lead line + ≤4 short bullets + 1 closing line/CTA. No essays; if there's more, give the key point + offer a call/buttons. Reconciled the conflicting per-section guidance.
+- **Ask PROXe renderer**: now strips ALL markdown-table pipes — the model sometimes drops the leading pipe ("New | 130 |"), which leaked before; any pipe line becomes " · "-joined, separator rows dropped. (Pairs with the rename to "Ask PROXe", already live — hard-refresh if you still see "Dashboard Brain".)
+
 ## 2026-06-14 13:09 IST · Windchasers: floating buttons use brand token (drop clashing hardcoded colors)
 
 - Eye / bell / Ask-PROXe buttons were three clashing hardcoded colors (gold/blue/purple). All now use the brand token var(--button-bg) with var(--text-button) icons and var(--border-primary) — cohesive + semantic, distinguished by icon only. Unread badge stays red (semantic alert).
