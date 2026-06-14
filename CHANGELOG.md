@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-14 12:58 IST · Windchasers: Brain click-through follow-ups
+
+- Brain now returns 2-3 contextual follow-up questions with each answer; the panel renders them as tappable chips. The founder drills down by clicking (e.g. "48 leads today" → "Breakdown by source" → "Lead quality today") instead of typing.
+- API appends a parsed "FOLLOWUPS:" line; UI shows the chips under the latest answer and clears them on the next question.
+- User-facing: click-click-click exploration of top-level stats.
+
 ## 2026-06-14 12:54 IST · Windchasers: Brain formatting + visible floating buttons + At-a-Glance thresholds + narrower Meta Form bubble
 
 - **Brain formatting**: answers rendered literal markdown (** , -). Added a minimal renderer — bold, bullets, paragraph spacing — in the assistant bubble.

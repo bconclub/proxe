@@ -64,6 +64,7 @@ export default function DashboardBrain() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [followups, setFollowups] = useState<string[]>([])
   const endRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function DashboardBrain() {
     const history = messages.slice(-6)
     setMessages((m) => [...m, { role: 'user', content: q }])
     setInput('')
+    setFollowups([])
     setLoading(true)
     try {
       const res = await fetch('/api/dashboard/brain', {
@@ -87,6 +89,7 @@ export default function DashboardBrain() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to answer')
       setMessages((m) => [...m, { role: 'assistant', content: data.answer || '(no answer)' }])
+      setFollowups(Array.isArray(data.followups) ? data.followups : [])
     } catch (err: any) {
       setError(err?.message || 'Failed to answer')
     } finally {
@@ -183,6 +186,23 @@ export default function DashboardBrain() {
                   <div className="px-3 py-2 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
                     Thinking…
                   </div>
+                </div>
+              )}
+              {/* Tap-through follow-ups after the latest answer */}
+              {!loading && followups.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {followups.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => ask(f)}
+                      className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                      style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent-subtle)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                    >
+                      {f}
+                    </button>
+                  ))}
                 </div>
               )}
               {error && <p className="text-xs text-red-500">{error}</p>}

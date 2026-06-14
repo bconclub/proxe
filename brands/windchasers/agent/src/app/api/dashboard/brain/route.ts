@@ -147,6 +147,8 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} sales dashboard (Windchasers: pilot-training lead gen).
 Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
 
+This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: "Breakdown by source | Lead quality today | Show hot leads". Put FOLLOWUPS only on that last line, nowhere else.
+
 DATA:
 ${JSON.stringify(data)}`
 
@@ -155,15 +157,24 @@ ${JSON.stringify(data)}`
       .join('\n')
     const userPrompt = transcript ? `${transcript}\nOperator: ${question}` : question
 
-    let answer: string
+    let raw: string
     try {
-      answer = await generateResponse(systemPrompt, userPrompt, 1024, BRAIN_MODEL)
+      raw = await generateResponse(systemPrompt, userPrompt, 1024, BRAIN_MODEL)
     } catch (err: any) {
       console.error('[brain] model call failed:', err?.message || err)
       return NextResponse.json({ error: 'The brain is unavailable right now. Try again in a moment.' }, { status: 502 })
     }
 
-    return NextResponse.json({ success: true, answer, data_summary: { today, all_time: safe.length, upcoming: upcomingTop.length } })
+    // Split the answer from the trailing "FOLLOWUPS: a | b | c" line.
+    let answer = raw
+    let followups: string[] = []
+    const fm = raw.match(/FOLLOWUPS:\s*(.+)\s*$/is)
+    if (fm) {
+      answer = raw.slice(0, fm.index).trim()
+      followups = fm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+    }
+
+    return NextResponse.json({ success: true, answer, followups, data_summary: { today, all_time: safe.length, upcoming: upcomingTop.length } })
   } catch (error: any) {
     console.error('[brain] Error:', error?.message || error)
     return NextResponse.json({ error: 'Failed to answer' }, { status: 500 })
