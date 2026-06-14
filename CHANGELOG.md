@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-14 18:55 IST · Windchasers: WA agent recognizes aviation acronyms (CHPL etc.)
+
+- A customer asked about "CHPL" (Commercial Helicopter Pilot License) and the agent asked them to define it ("is there a program called CHPL?") — reads as clueless. Added an aviation-acronym glossary to the prompt: CPL/PPL (airplane), CHPL/PHPL (helicopter), DGCA, RTR. Rule: never ask the customer to define a standard acronym; CHPL → treat as the helicopter commercial path and answer with helicopter-training detail.
+
 ## 2026-06-14 14:12 IST · Windchasers: fix Ask PROXe upcoming-booking times (UTC shown as IST)
 
 - Ask PROXe listed booking times in UTC but labelled them IST — Allen's 4:00 PM IST booking showed as "10:30 AM IST" (16:00 IST = 10:30 UTC). The brain passed dt.toISOString() (UTC) and the model read the UTC hour as IST.
