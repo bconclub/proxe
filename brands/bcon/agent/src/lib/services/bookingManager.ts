@@ -307,7 +307,7 @@ export async function storeBooking(
       },
     };
 
-    await client
+    const { error: leadUpdateError } = await client
       .from('all_leads')
       .update({
         unified_context: mergedCtx,
@@ -319,9 +319,17 @@ export async function storeBooking(
       })
       .eq('id', leadId);
 
+    if (leadUpdateError) {
+      // Fail loudly — otherwise the caller/agent confirms "booking recorded"
+      // while nothing was actually persisted.
+      throw new Error(`Failed to persist booking to all_leads: ${leadUpdateError.message || leadUpdateError}`);
+    }
+
     console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
-    console.error('[bookingManager] Could not find lead_id to save booking - data may be lost', { externalSessionId, channel });
+    // No lead resolved — never silently swallow; the booking would be lost and
+    // the agent would still claim success.
+    throw new Error('Could not resolve a lead to save the booking');
   }
 }
 
