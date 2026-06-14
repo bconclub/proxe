@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-14 14:12 IST · Windchasers: fix Ask PROXe upcoming-booking times (UTC shown as IST)
+
+- Ask PROXe listed booking times in UTC but labelled them IST — Allen's 4:00 PM IST booking showed as "10:30 AM IST" (16:00 IST = 10:30 UTC). The brain passed dt.toISOString() (UTC) and the model read the UTC hour as IST.
+- Fix: upcoming_bookings now passes a pre-formatted IST string ("Mon, 15 Jun, 4:00 pm IST"); prompt instructs the model to show DATA times exactly, never convert.
+
 ## 2026-06-14 14:07 IST · Windchasers: Ask PROXe renders clean HTML tables for breakdowns
 
 - Numeric breakdowns (counts by stage / source / score bucket, all-time splits) were hard to read as text+bullets. The panel renderer now groups consecutive markdown pipe-rows into a real styled <table> (header + bordered rows). Brain prompt updated to emit compact 2-3 column tables for any numeric breakdown, with minimal prose around them.

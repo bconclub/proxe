@@ -104,7 +104,14 @@ export async function POST(request: NextRequest) {
       const b = bookingFromCtx(l.unified_context)
       const dt = parseBookingIST(b.date, b.time)
       if (dt && dt.getTime() >= now) {
-        upcoming.push({ name: l.customer_name || 'Unknown', when: dt.toISOString(), _ms: dt.getTime() })
+        // Pass a human IST string — NOT a UTC ISO. The model was reading the UTC
+        // hour as IST (4:00 PM IST = 10:30 UTC → "10:30 AM IST"), so every
+        // upcoming time was wrong. Format in IST here so it can't be misread.
+        const when = dt.toLocaleString('en-IN', {
+          weekday: 'short', day: 'numeric', month: 'short',
+          hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
+        }) + ' IST'
+        upcoming.push({ name: l.customer_name || 'Unknown', when, _ms: dt.getTime() })
       }
     }
     upcoming.sort((a, b) => a._ms - b._ms)
@@ -146,6 +153,8 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} sales dashboard (Windchasers: pilot-training lead gen).
 Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
+
+Times in DATA (e.g. upcoming_bookings "when") are already formatted IST strings — show them EXACTLY as given. Never convert, recompute, or restate a time in a different value.
 
 FORMAT (built for a phone-sized panel, ~360px wide):
 - For ANY numeric breakdown (counts by stage / source / score bucket, all-time splits) use a COMPACT markdown table: a header row + 2-3 columns max (e.g. "| Stage | Count |"). It renders as a clean table — always prefer this over listing numbers in prose.
