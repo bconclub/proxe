@@ -450,32 +450,36 @@ export async function GET(request: NextRequest) {
         stage: lead.lead_stage || 'New',
       }))
 
-    // 6. Upcoming Bookings (next 10)
+    // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
+    // list matches the card countdown. The old filter parsed without a timezone
+    // and fell back to 23:59:59 for missing times, so same-day-past bookings (and
+    // 12h "4:00 PM" strings that parse to Invalid Date) leaked in and rendered as
+    // "Past" inside "Upcoming". One canonical IST parser fixes filter/sort/datetime.
+    const parseBookingIST = (date: string | null, time: string | null): Date | null => {
+      if (!date) return null
+      let hhmm = '12:00'
+      const t = String(time || '').trim()
+      const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+      if (ampm) {
+        let h = parseInt(ampm[1], 10) % 12
+        if (/p/i.test(ampm[3])) h += 12
+        hhmm = `${String(h).padStart(2, '0')}:${ampm[2] || '00'}`
+      } else if (/^\d{1,2}:\d{2}/.test(t)) {
+        hhmm = t.slice(0, 5)
+      }
+      const d = new Date(`${date}T${hhmm}:00+05:30`)
+      return isNaN(d.getTime()) ? null : d
+    }
+
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
-        return { lead, bookingDate, bookingTime }
+        return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }
       })
-      .filter(({ bookingDate, bookingTime }) => {
-        if (!bookingDate) return false
-        try {
-          const bookingDateTime = new Date(`${bookingDate}T${bookingTime || '23:59:59'}`)
-          return bookingDateTime >= now && !isNaN(bookingDateTime.getTime())
-        } catch {
-          return false
-        }
-      })
-      .sort((a, b) => {
-        try {
-          const dateA = new Date(`${a.bookingDate}T${a.bookingTime || '12:00:00'}`)
-          const dateB = new Date(`${b.bookingDate}T${b.bookingTime || '12:00:00'}`)
-          return dateA.getTime() - dateB.getTime()
-        } catch {
-          return 0
-        }
-      })
+      .filter(({ dt }) => dt !== null && dt >= now)
+      .sort((a, b) => a.dt!.getTime() - b.dt!.getTime())
       .slice(0, 10)
-      .map(({ lead, bookingDate, bookingTime }) => {
+      .map(({ lead, bookingDate, bookingTime, dt }) => {
         const uc = lead.unified_context || {}
         const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
         return {
@@ -484,7 +488,7 @@ export async function GET(request: NextRequest) {
           title,
           date: bookingDate,
           time: bookingTime,
-          datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}+05:30`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
+          datetime: dt!.toISOString(),
         }
       })
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-14 12:34 IST · Windchasers: Dashboard Brain (Sonnet 4.6 Q&A) + Upcoming Events past-leak fix + better cards
+
+- **Dashboard Brain**: ask-anything panel over live dashboard data. Floating ✨ button on the home page (stacked under the eye + bell) opens a right slide-out chat. `/api/dashboard/brain` gathers compact aggregates (lead counts all-time/today/7d, score buckets, pipeline by stage, leads by source, today's new leads, today's status changes, upcoming bookings, conversations today) and answers with **claude-sonnet-4-6**. Read-only, answers strictly from the snapshot. Suggested prompts: "What happened today?", "How many leads today?", "What's my pipeline?".
+- **Fix — past events in Upcoming**: the Upcoming Events filter parsed booking times without a timezone and fell back to 23:59:59 for missing times, so same-day-past bookings (and 12h "4:00 PM" strings that parse to Invalid Date) leaked in and rendered as "Past". Now a single IST parser drives filter/sort/datetime — strict future-only.
+- **Better Upcoming cards**: show date + time (IST, e.g. "Mon, 15 Jun · 4:00 PM") alongside a relative countdown pill.
+- Plumbing: `generateResponse` accepts an optional model override (used by the brain).
+- User-facing: founders can ask the dashboard questions in plain English; Upcoming Events no longer shows past sessions.
+
 ## 2026-06-13 22:10 IST · BCON: Instagram agent tab in dashboard (branch ig-dashboard-ui)
 
 - Adds `dashboard/agents/InstagramAgentTab.tsx` — Instagram Business connect panel (target @bconclub, PROXe-IG app 734209706078170, basic/messages/comments scopes, redirect to /dashboard/agents) + App-review screencast steps + workflow cards.

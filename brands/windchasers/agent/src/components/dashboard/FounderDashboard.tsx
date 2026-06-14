@@ -8,6 +8,7 @@ import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMe
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
+import DashboardBrain from './DashboardBrain'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -72,6 +73,19 @@ interface FounderMetrics {
     responseRate: Array<{ value: number }>
     bookingRate: Array<{ value: number }>
     avgResponseTime: Array<{ value: number }>
+  }
+}
+
+// "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
+function formatBookingWhen(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
+    const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+    return `${date} · ${time}`
+  } catch {
+    return ''
   }
 }
 
@@ -388,6 +402,9 @@ export default function FounderDashboard() {
       {/* Status-change notifications — home page only (bell below the eye + toasts + sound) */}
       <NotificationCenter />
 
+      {/* Dashboard Brain — ask-anything over live data (button below the bell) */}
+      <DashboardBrain />
+
       {/* AT A GLANCE - Radial Progress Charts with Trends */}
       {metrics.radialMetrics && (
         <div 
@@ -657,9 +674,17 @@ export default function FounderDashboard() {
                       {booking.title}
                     </p>
                   )}
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {formatCountdown(booking.datetime)}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {formatBookingWhen(booking.datetime)}
+                    </span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap"
+                      style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}
+                    >
+                      {formatCountdown(booking.datetime)}
+                    </span>
+                  </div>
                 </div>
                 <MdArrowForward
                   className="flex-shrink-0"

@@ -95,10 +95,11 @@ export async function* streamResponse(
 export async function generateResponse(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens: number = 768
+  maxTokens: number = 768,
+  modelOverride?: string
 ): Promise<string> {
   const anthropic = getClient();
-  const model = getModel();
+  const model = modelOverride || getModel();
 
   // Retry logic
   const maxRetries = 3;
