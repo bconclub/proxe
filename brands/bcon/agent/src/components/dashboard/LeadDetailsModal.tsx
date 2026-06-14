@@ -1172,12 +1172,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowAdminNoteInput(false)
       setActiveTab('notes') // surface the note in the Notes tab once saved
 
-      // Keep visible longer so the user can read what happened + the note text
-      await new Promise(resolve => setTimeout(resolve, 4500))
-      setNoteProgress(prev => ({ ...prev, visible: false }))
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setNoteProgress({ steps: [], visible: false })
-
+      // Overlay stays visible until the operator clicks Done (button in the
+      // overlay) so they can read the classification + actions taken — no
+      // auto-dismiss. Refresh the underlying data now.
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
@@ -1566,6 +1563,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     to   { opacity: 1; transform: translateY(0); }
                   }
                 `}</style>
+
+                {noteProgress.steps.some(s => s.text === 'Done' || s.text.startsWith('Error')) && (
+                  <button
+                    type="button"
+                    onClick={() => setNoteProgress({ steps: [], visible: false })}
+                    className="mt-3 w-full text-center text-[12px] font-semibold py-1.5 rounded-md transition-colors hover:opacity-90"
+                    style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
+                  >
+                    Done
+                  </button>
+                )}
               </div>
             </div>
           )}
