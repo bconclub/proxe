@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-14 18:59 IST · Windchasers: WA agent — job-seeker intent + don't force English
+
+- A clear job seeker ("Is this a job? How much does it pay?", in Bengali too) got pilot-training/salary talk ("pay scales are competitive") — misleading. Added a JOB-SEEKER rule: detect employment-framed questions; on first ambiguous one, clarify with buttons ([Pilot training][Looking for a job]); on a confirmed/second job question, be honest ("we're a training academy, not a hiring line") and hand to the team; never quote salaries / imply employment.
+- LANGUAGE rule: if the user writes in another language (Hindi/Bengali/etc.), understand and reply in that language — never tell them to rephrase in English (the agent had done exactly that).
+
 ## 2026-06-14 18:55 IST · Windchasers: WA agent recognizes aviation acronyms (CHPL etc.)
 
 - A customer asked about "CHPL" (Commercial Helicopter Pilot License) and the agent asked them to define it ("is there a program called CHPL?") — reads as clueless. Added an aviation-acronym glossary to the prompt: CPL/PPL (airplane), CHPL/PHPL (helicopter), DGCA, RTR. Rule: never ask the customer to define a standard acronym; CHPL → treat as the helicopter commercial path and answer with helicopter-training detail.
