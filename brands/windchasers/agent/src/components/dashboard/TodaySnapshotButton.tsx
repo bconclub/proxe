@@ -83,17 +83,16 @@ export default function TodaySnapshotButton() {
         style={{
           top: '14px',
           right: '20px',
-          width: '32px',
-          height: '32px',
-          background: 'rgba(201,169,97,0.18)',
-          border: '1px solid rgba(201,169,97,0.55)',
-          color: '#C9A961',
-          backdropFilter: 'blur(8px)',
+          width: '36px',
+          height: '36px',
+          background: '#C9A961',
+          border: '1px solid rgba(255,255,255,0.6)',
+          color: '#ffffff',
         }}
         aria-label="Open today's snapshot"
         title="Today's snapshot"
       >
-        <MdVisibility size={16} />
+        <MdVisibility size={18} />
       </button>
 
       {!open ? null : (

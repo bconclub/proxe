@@ -1774,7 +1774,7 @@ export default function InboxPage() {
                   if (formFields.length === 0) return null
                   return (
                     <div className="flex justify-start mb-2">
-                      <div className="max-w-[90%] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
+                      <div className="max-w-[440px] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -1838,7 +1838,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[78%] rounded-xl px-3.5 py-2.5 border"
+                          className="max-w-[440px] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}

@@ -9,10 +9,47 @@
  * answers with Sonnet 4.6.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import { MdClose, MdAutoAwesome, MdSend } from 'react-icons/md'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
+
+// Inline bold: split on **...** and wrap the captured parts in <strong>.
+function renderInline(text: string, keyPrefix: string) {
+  const parts = text.split(/\*\*(.+?)\*\*/g)
+  return parts.map((p, i) =>
+    i % 2 === 1
+      ? <strong key={`${keyPrefix}-b-${i}`}>{p}</strong>
+      : <Fragment key={`${keyPrefix}-t-${i}`}>{p}</Fragment>,
+  )
+}
+
+// Minimal markdown: bold, "- " bullets, blank-line spacing. The brain replies
+// in markdown; without this the bubble showed literal ** and - .
+function renderRich(content: string) {
+  const lines = content.replace(/\r/g, '').split('\n')
+  const out: React.ReactNode[] = []
+  let bullets: string[] = []
+  const flush = (key: string) => {
+    if (bullets.length === 0) return
+    out.push(
+      <ul key={`ul-${key}`} className="list-disc pl-4 space-y-0.5 my-1">
+        {bullets.map((b, i) => <li key={`li-${key}-${i}`}>{renderInline(b, `li-${key}-${i}`)}</li>)}
+      </ul>,
+    )
+    bullets = []
+  }
+  lines.forEach((raw, idx) => {
+    const line = raw.trimEnd()
+    const m = line.match(/^\s*[-*•]\s+(.*)$/)
+    if (m) { bullets.push(m[1]); return }
+    flush(String(idx))
+    if (line.trim() === '') { out.push(<div key={`sp-${idx}`} className="h-1.5" />); return }
+    out.push(<p key={`p-${idx}`} className="leading-snug">{renderInline(line, `p-${idx}`)}</p>)
+  })
+  flush('end')
+  return out
+}
 
 const SUGGESTIONS = [
   'What happened today?',
@@ -66,10 +103,11 @@ export default function DashboardBrain() {
         style={{
           top: '94px',
           right: '20px',
-          width: '32px',
-          height: '32px',
-          backgroundColor: 'var(--accent-primary)',
-          color: 'var(--text-button)',
+          width: '36px',
+          height: '36px',
+          backgroundColor: '#8B5CF6',
+          color: '#ffffff',
+          border: '1px solid rgba(255,255,255,0.6)',
         }}
         aria-label="Ask the dashboard brain"
         title="Ask the dashboard brain"
@@ -128,14 +166,14 @@ export default function DashboardBrain() {
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className="max-w-[85%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap"
+                    className="max-w-[85%] px-3 py-2 rounded-2xl text-sm"
                     style={
                       m.role === 'user'
-                        ? { backgroundColor: 'var(--button-bg)', color: 'var(--text-button)', borderBottomRightRadius: 4 }
+                        ? { backgroundColor: 'var(--button-bg)', color: 'var(--text-button)', borderBottomRightRadius: 4, whiteSpace: 'pre-wrap' }
                         : { backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderBottomLeftRadius: 4 }
                     }
                   >
-                    {m.content}
+                    {m.role === 'assistant' ? renderRich(m.content) : m.content}
                   </div>
                 </div>
               ))}

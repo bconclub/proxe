@@ -296,25 +296,31 @@ export default function FounderDashboard() {
     const RED = '#ef4444'
 
     switch (metricType) {
+      // Thresholds tuned to realistic B2B lead-gen / AI-agent benchmarks so a
+      // healthy dashboard reads green, not alarming red on first open.
       case 'avgScore':
-        if (value >= 60) return GREEN
+        // Lead score 0-100. Avg ~50 across a funnel is solid.
+        if (value >= 50) return GREEN
         if (value >= 30) return AMBER
         return RED
 
       case 'responseRate':
-        if (value >= 95) return GREEN
-        if (value >= 80) return AMBER
+        // % of inbound that got a reply. 80%+ is healthy for an always-on agent.
+        if (value >= 80) return GREEN
+        if (value >= 50) return AMBER
         return RED
 
       case 'bookingRate':
-        if (value >= 25) return GREEN
-        if (value >= 15) return AMBER
+        // Lead → booking conversion %. 8%+ is strong for cold WhatsApp leads
+        // (industry lead-to-meeting benchmarks sit ~5-12%).
+        if (value >= 8) return GREEN
+        if (value >= 3) return AMBER
         return RED
 
       case 'avgResponseTime':
-        // Lower is better
-        if (value <= 3000) return GREEN
-        if (value <= 8000) return AMBER
+        // Agent reply latency (ms). Lower is better; under ~5s feels instant.
+        if (value <= 5000) return GREEN
+        if (value <= 15000) return AMBER
         return RED
 
       default:

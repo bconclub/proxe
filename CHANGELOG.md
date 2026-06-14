@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-14 12:54 IST · Windchasers: Brain formatting + visible floating buttons + At-a-Glance thresholds + narrower Meta Form bubble
+
+- **Brain formatting**: answers rendered literal markdown (** , -). Added a minimal renderer — bold, bullets, paragraph spacing — in the assistant bubble.
+- **Floating buttons**: eye / bell / brain were hard to see + tell apart. Now distinct filled colors (gold eye, blue bell, purple brain), 36px, white icons, light border + tooltips.
+- **At a Glance thresholds**: colors were alarmist (94% response amber, 11% key-event red). Reset to realistic benchmarks — Avg Score green ≥50, Response Rate green ≥80%, Key Event Rate green ≥8%, Avg Response green ≤5s.
+- **Meta Form bubble**: inbox form card was over-wide (78–90%); narrowed to 440px to match normal message bubbles.
+- User-facing: dashboard reads accurately at a glance, the Brain is readable, controls are findable.
+
 ## 2026-06-14 12:49 IST · Windchasers: WhatsApp booking — wrong date + double "recorded" confirmation
 
 - **Double confirmation fix**: after a booking, a follow-up like "okay" made the agent re-send "Your booking is recorded…" a second time (the false-booking guard skips when a prior booking exists). Added a duplicate-confirmation guard — if no new booking happened this turn and one already exists, the repeat is replaced with a short ack. Confirmed once, never twice.
