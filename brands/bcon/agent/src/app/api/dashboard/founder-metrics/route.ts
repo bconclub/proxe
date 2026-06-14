@@ -1116,9 +1116,32 @@ export async function GET(request: NextRequest) {
     // A higher rate indicates better customer service responsiveness.
     // Note: This is NOT the same as "customer response rate" (how often customers reply).
     const customerMessages = messages?.filter(m => m.sender === 'customer').length || 0
-    const agentReplies = messages?.filter(m => m.sender === 'agent').length || 0
+    // (agent-message total no longer needed — response rate is conversation-aware below)
+    // Conversation-aware response rate: count customer messages that got an agent
+    // reply in the SAME conversation before the customer spoke again (bounded
+    // 0-100%). The old formula (agentReplies / customerMessages) exceeded 100%
+    // whenever the agent sent more bubbles than the customer (greetings, split
+    // replies) — that's a message ratio, not a response rate. `messages` is
+    // ordered created_at asc; anonymous web rows (lead_id null) group by session_id.
+    const convoKeyOf = (m: any) => m.lead_id || m.metadata?.session_id || 'unknown'
+    const messagesByConvo: Record<string, any[]> = {}
+    for (const m of (messages || [])) {
+      const k = convoKeyOf(m)
+      ;(messagesByConvo[k] = messagesByConvo[k] || []).push(m)
+    }
+    let repliedCustomerMessages = 0
+    for (const k of Object.keys(messagesByConvo)) {
+      const ordered = messagesByConvo[k]
+      for (let i = 0; i < ordered.length; i++) {
+        if (ordered[i].sender !== 'customer') continue
+        for (let j = i + 1; j < ordered.length; j++) {
+          if (ordered[j].sender === 'customer') break
+          if (ordered[j].sender === 'agent') { repliedCustomerMessages++; break }
+        }
+      }
+    }
     const responseRate = customerMessages > 0
-      ? Math.round((agentReplies / customerMessages) * 100)
+      ? Math.round((repliedCustomerMessages / customerMessages) * 100)
       : 0
     
     // ----------------------------------------------------------------------------

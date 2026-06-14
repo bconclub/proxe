@@ -2148,9 +2148,19 @@ export default function InboxPage() {
             const daysInPipeline = leadDetails.created_at
               ? Math.floor((Date.now() - new Date(leadDetails.created_at).getTime()) / 86400000)
               : null
-            const agentMsgs = messages.filter(m => m.sender === 'agent').length
             const customerMsgs = messages.filter(m => m.sender === 'customer').length
-            const responseRate = customerMsgs > 0 ? Math.round((agentMsgs / customerMsgs) * 100) : null
+            // Conversation-aware response rate (bounded 0-100%): count customer
+            // messages that got an agent reply before the customer spoke again.
+            // A raw agent/customer ratio exceeds 100% on split/greeting replies.
+            let repliedCustomerMsgs = 0
+            for (let i = 0; i < messages.length; i++) {
+              if (messages[i].sender !== 'customer') continue
+              for (let j = i + 1; j < messages.length; j++) {
+                if (messages[j].sender === 'customer') break
+                if (messages[j].sender === 'agent') { repliedCustomerMsgs++; break }
+              }
+            }
+            const responseRate = customerMsgs > 0 ? Math.round((repliedCustomerMsgs / customerMsgs) * 100) : null
 
             const profileRows: { label: string; value: string }[] = []
             if (userType) profileRows.push({ label: 'Type', value: String(userType) })
