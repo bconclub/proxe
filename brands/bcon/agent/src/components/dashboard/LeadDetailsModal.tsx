@@ -2146,6 +2146,45 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
                     </button>
+                    <button
+                      onClick={async () => {
+                        setShowActionDropdown(false)
+                        const bc = currentLead.unified_context?.bcon || {}
+                        const attr = currentLead.unified_context?.attribution || {}
+                        const city = bc.city
+                          || currentLead.unified_context?.whatsapp?.profile?.city
+                          || currentLead.unified_context?.web?.profile?.city
+                          || ''
+                        const titleCase = (s: string) => String(s).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        const lines = [
+                          `*Lead Details*`,
+                          `Name: ${currentLead.name || 'Unknown'}`,
+                          `Phone: ${currentLead.phone || '—'}`,
+                          currentLead.email ? `Email: ${currentLead.email}` : null,
+                          city ? `City: ${city}` : null,
+                          bc.business_type ? `Business: ${bc.business_type}` : null,
+                          bc.service_interest ? `Service interest: ${bc.service_interest}` : null,
+                          bc.pain_point ? `Pain point: ${bc.pain_point}` : null,
+                          bc.user_type ? `Role: ${titleCase(bc.user_type)}` : null,
+                          bc.timeline ? `Timeline: ${bc.timeline}` : null,
+                          bc.lead_volume ? `Lead volume: ${bc.lead_volume}` : null,
+                          `Lead Score: ${(currentLead as any).lead_score ?? '—'}/100`,
+                          `Stage: ${currentLead.lead_stage || 'New'}`,
+                          attr.source_label ? `Source: ${attr.source_label}${attr.first_touch_label ? ' · ' + attr.first_touch_label : ''}` : null,
+                          (currentLead as any).created_at ? `First seen: ${new Date((currentLead as any).created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : null,
+                        ].filter(Boolean).join('\n')
+                        try {
+                          await navigator.clipboard.writeText(lines)
+                          setNoteProgress({ steps: [{ text: 'Lead details copied to clipboard', done: true }], visible: true })
+                          setTimeout(() => setNoteProgress({ steps: [], visible: false }), 2000)
+                        } catch {
+                          window.prompt('Copy lead details:', lines)
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    >
+                      <MdContentCopy size={16} className="text-amber-500" /> Copy Lead Details
+                    </button>
                   </div>
                 </>
               )}
