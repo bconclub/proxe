@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
+import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId } from '@/configs'
@@ -22,6 +23,7 @@ import {
   MdTrendingDown,
   MdRemove,
   MdSearch,
+  MdAdd,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -137,6 +139,7 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 50)
 
   useEffect(() => {
@@ -559,6 +562,17 @@ export default function LeadsTable({
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-primary)' }}
           >
             Export
+          </button>
+
+          {/* Add Lead — opens the manual / screenshot-import modal */}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-1.5 pl-2 pr-3 py-1 text-xs font-semibold rounded-md shadow-sm transition-transform hover:scale-[1.04]"
+            style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
+            title="Add a new lead"
+          >
+            <MdAdd size={16} />
+            Add Lead
           </button>
 
           {showViewAll && (
@@ -1026,6 +1040,13 @@ export default function LeadsTable({
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onStatusUpdate={updateLeadStatus}
+      />
+
+      {/* Add Lead — manual entry + screenshot OCR. Realtime subscription
+          (useRealtimeLeads) refreshes the list when the new lead lands. */}
+      <AddLeadModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
       />
     </div>
   )
