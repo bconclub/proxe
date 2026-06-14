@@ -41,8 +41,8 @@ function renderRich(content: string) {
   }
   lines.forEach((raw, idx) => {
     let line = raw.trimEnd()
-    // Drop horizontal rules and markdown table separators (|---|---|).
-    if (/^\s*-{3,}\s*$/.test(line) || /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line)) return
+    // Drop horizontal rules.
+    if (/^\s*-{3,}\s*$/.test(line)) return
     // Heading "### Foo" → bold line (no raw #).
     const h = line.match(/^\s*#{1,6}\s+(.*)$/)
     if (h) {
@@ -50,9 +50,12 @@ function renderRich(content: string) {
       out.push(<p key={`h-${idx}`} className="font-semibold mt-1">{renderInline(h[1], `h-${idx}`)}</p>)
       return
     }
-    // Table row "| a | b |" → "a — b" (strip pipes).
-    if (/^\s*\|.*\|\s*$/.test(line)) {
-      line = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim()).filter(Boolean).join(' — ')
+    // Any pipe-containing line is treated as a markdown table row (the model
+    // sometimes drops the leading pipe, e.g. "New | 130 |"). Separator rows
+    // (only | - : space) are dropped; data rows become " · "-joined cells.
+    if (line.includes('|')) {
+      if (/^[\s|:-]+$/.test(line)) return
+      line = line.split('|').map((c) => c.trim()).filter(Boolean).join('  ·  ')
     }
     const m = line.match(/^\s*[-*•]\s+(.*)$/)
     if (m) { bullets.push(m[1]); return }
