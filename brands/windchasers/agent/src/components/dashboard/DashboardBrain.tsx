@@ -40,7 +40,20 @@ function renderRich(content: string) {
     bullets = []
   }
   lines.forEach((raw, idx) => {
-    const line = raw.trimEnd()
+    let line = raw.trimEnd()
+    // Drop horizontal rules and markdown table separators (|---|---|).
+    if (/^\s*-{3,}\s*$/.test(line) || /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line)) return
+    // Heading "### Foo" → bold line (no raw #).
+    const h = line.match(/^\s*#{1,6}\s+(.*)$/)
+    if (h) {
+      flush(String(idx))
+      out.push(<p key={`h-${idx}`} className="font-semibold mt-1">{renderInline(h[1], `h-${idx}`)}</p>)
+      return
+    }
+    // Table row "| a | b |" → "a — b" (strip pipes).
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      line = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim()).filter(Boolean).join(' — ')
+    }
     const m = line.match(/^\s*[-*•]\s+(.*)$/)
     if (m) { bullets.push(m[1]); return }
     flush(String(idx))
@@ -58,6 +71,13 @@ const SUGGESTIONS = [
   'Any upcoming bookings?',
 ]
 
+const LOADING_MSGS = [
+  'Pulling lead numbers…',
+  'Reading your pipeline…',
+  "Checking today's bookings…",
+  'Crunching the data…',
+]
+
 export default function DashboardBrain() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
@@ -65,7 +85,17 @@ export default function DashboardBrain() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [followups, setFollowups] = useState<string[]>([])
+  const [loadingMsg, setLoadingMsg] = useState(LOADING_MSGS[0])
   const endRef = useRef<HTMLDivElement | null>(null)
+
+  // Rotate the loading status so it reads as real work, not a stuck "Thinking…".
+  useEffect(() => {
+    if (!loading) return
+    let i = 0
+    setLoadingMsg(LOADING_MSGS[0])
+    const id = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; setLoadingMsg(LOADING_MSGS[i]) }, 1200)
+    return () => clearInterval(id)
+  }, [loading])
 
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -112,8 +142,8 @@ export default function DashboardBrain() {
           color: '#ffffff',
           border: '1px solid rgba(255,255,255,0.6)',
         }}
-        aria-label="Ask the dashboard brain"
-        title="Ask the dashboard brain"
+        aria-label="Ask PROXe"
+        title="Ask PROXe"
       >
         <MdAutoAwesome size={17} />
       </button>
@@ -135,7 +165,7 @@ export default function DashboardBrain() {
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
               <div className="flex items-center gap-2">
                 <MdAutoAwesome size={18} style={{ color: 'var(--accent-primary)' }} />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Dashboard Brain</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ask PROXe</h3>
               </div>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-md" style={{ color: 'var(--text-secondary)' }} aria-label="Close">
                 <MdClose size={18} />
@@ -183,8 +213,9 @@ export default function DashboardBrain() {
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="px-3 py-2 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                    Thinking…
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                    <MdAutoAwesome size={14} className="animate-pulse" style={{ color: 'var(--accent-primary)' }} />
+                    <span>{loadingMsg}</span>
                   </div>
                 </div>
               )}

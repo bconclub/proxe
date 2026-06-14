@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-14 13:06 IST · Windchasers: Ask PROXe polish + WhatsApp cost-intent clarifier
+
+- **WA agent — cost intent**: a bare "how much does it cost?" no longer defaults to the ₹80 lakh full-journey answer. If the chat was about DGCA, it answers the DGCA fee; if unclear, it asks once with quick-reply buttons ([DGCA classes][Full pilot training]), leading with DGCA (our product).
+- **Ask PROXe (renamed from "Dashboard Brain")**: button tooltip + panel title now "Ask PROXe".
+- **Brain output format**: instructed plain text (no markdown tables / ### headings / --- rules); renderer also strips/handles headings, horizontal rules, and table pipes so output stays clean on the phone-sized panel.
+- **Loading state**: replaced static "Thinking…" with rotating status ("Pulling lead numbers…", "Reading your pipeline…", …).
+
 ## 2026-06-14 12:58 IST · Windchasers: Brain click-through follow-ups
 
 - Brain now returns 2-3 contextual follow-up questions with each answer; the panel renders them as tappable chips. The founder drills down by clicking (e.g. "48 leads today" → "Breakdown by source" → "Lead quality today") instead of typing.
