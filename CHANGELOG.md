@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-14 14:07 IST · Windchasers: Ask PROXe renders clean HTML tables for breakdowns
+
+- Numeric breakdowns (counts by stage / source / score bucket, all-time splits) were hard to read as text+bullets. The panel renderer now groups consecutive markdown pipe-rows into a real styled <table> (header + bordered rows). Brain prompt updated to emit compact 2-3 column tables for any numeric breakdown, with minimal prose around them.
+- Lone/loose pipe lines and separator rows still handled gracefully (no raw pipes leak).
+
 ## 2026-06-14 13:17 IST · Windchasers: WhatsApp reply length cap + Ask PROXe table-pipe stripping
 
 - **WA reply length/format**: messages were inconsistent — some clean bulleted, some 3-paragraph walls. Consolidated into one HARD rule: every reply under ~55 words, max shape = 1 lead line + ≤4 short bullets + 1 closing line/CTA. No essays; if there's more, give the key point + offer a call/buttons. Reconciled the conflicting per-section guidance.

@@ -26,6 +26,10 @@ function renderInline(text: string, keyPrefix: string) {
 
 // Minimal markdown: bold, "- " bullets, blank-line spacing. The brain replies
 // in markdown; without this the bubble showed literal ** and - .
+const isPipeRow = (s: string) => s.includes('|')
+const isSepRow = (s: string) => /^[\s|:_-]+$/.test(s) && s.includes('|')
+const splitCells = (s: string) => s.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim())
+
 function renderRich(content: string) {
   const lines = content.replace(/\r/g, '').split('\n')
   const out: React.ReactNode[] = []
@@ -39,30 +43,74 @@ function renderRich(content: string) {
     )
     bullets = []
   }
-  lines.forEach((raw, idx) => {
-    let line = raw.trimEnd()
-    // Drop horizontal rules.
-    if (/^\s*-{3,}\s*$/.test(line)) return
-    // Heading "### Foo" → bold line (no raw #).
-    const h = line.match(/^\s*#{1,6}\s+(.*)$/)
-    if (h) {
-      flush(String(idx))
-      out.push(<p key={`h-${idx}`} className="font-semibold mt-1">{renderInline(h[1], `h-${idx}`)}</p>)
-      return
+
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i].trimEnd()
+
+    // ── Table block: 2+ consecutive pipe rows → real <table> ────────────────
+    if (isPipeRow(line) && i + 1 < lines.length && isPipeRow(lines[i + 1].trimEnd())) {
+      flush(String(i))
+      const block: string[] = []
+      let j = i
+      while (j < lines.length && isPipeRow(lines[j].trimEnd())) { block.push(lines[j].trimEnd()); j++ }
+      const rows = block.filter((r) => !isSepRow(r)).map(splitCells)
+      if (rows.length >= 1) {
+        const header = rows[0]
+        const body = rows.slice(1)
+        out.push(
+          <table key={`tb-${i}`} className="w-full text-xs my-1.5" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {header.map((c, ci) => (
+                  <th key={ci} className="text-left font-semibold py-1 pr-3"
+                    style={{ borderBottom: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    {renderInline(c, `th-${i}-${ci}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {body.length > 0 && (
+              <tbody>
+                {body.map((r, ri) => (
+                  <tr key={ri}>
+                    {r.map((c, ci) => (
+                      <td key={ci} className="py-1 pr-3 align-top" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                        {renderInline(c, `td-${i}-${ri}-${ci}`)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            )}
+          </table>,
+        )
+      }
+      i = j
+      continue
     }
-    // Any pipe-containing line is treated as a markdown table row (the model
-    // sometimes drops the leading pipe, e.g. "New | 130 |"). Separator rows
-    // (only | - : space) are dropped; data rows become " · "-joined cells.
-    if (line.includes('|')) {
-      if (/^[\s|:-]+$/.test(line)) return
-      line = line.split('|').map((c) => c.trim()).filter(Boolean).join('  ·  ')
-    }
-    const m = line.match(/^\s*[-*•]\s+(.*)$/)
-    if (m) { bullets.push(m[1]); return }
-    flush(String(idx))
-    if (line.trim() === '') { out.push(<div key={`sp-${idx}`} className="h-1.5" />); return }
-    out.push(<p key={`p-${idx}`} className="leading-snug">{renderInline(line, `p-${idx}`)}</p>)
-  })
+
+    // Lone pipe row (rare) → join cells so no raw pipes show.
+    let text = line
+    if (isPipeRow(text) && !isSepRow(text)) text = splitCells(text).filter(Boolean).join('  ·  ')
+    else if (isSepRow(text)) { i++; continue }
+
+    // Horizontal rule.
+    if (/^\s*-{3,}\s*$/.test(text)) { i++; continue }
+
+    // Heading "### Foo" → bold line.
+    const h = text.match(/^\s*#{1,6}\s+(.*)$/)
+    if (h) { flush(String(i)); out.push(<p key={`h-${i}`} className="font-semibold mt-1">{renderInline(h[1], `h-${i}`)}</p>); i++; continue }
+
+    // Bullet.
+    const m = text.match(/^\s*[-*•]\s+(.*)$/)
+    if (m) { bullets.push(m[1]); i++; continue }
+
+    flush(String(i))
+    if (text.trim() === '') { out.push(<div key={`sp-${i}`} className="h-1.5" />); i++; continue }
+    out.push(<p key={`p-${i}`} className="leading-snug">{renderInline(text, `p-${i}`)}</p>)
+    i++
+  }
   flush('end')
   return out
 }
