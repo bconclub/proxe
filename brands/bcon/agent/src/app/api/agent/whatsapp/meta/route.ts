@@ -18,6 +18,7 @@ import {
   extractProfileFromConversation,
   mergeProfile,
   isLikelyRealPersonName,
+  cleanDisplayName,
 } from '@/lib/agent-core/conversationIntelligence';
 import { AgentInput } from '@/lib/agent-core/types';
 import {
@@ -183,8 +184,16 @@ export async function POST(request: NextRequest) {
       const messageText = msg.text?.body;
       const whatsappMessageId = msg.id;
       const timestamp = msg.timestamp;
+      // Sanitize the WhatsApp display name before greeting/DB write — Meta
+      // profile names are often decorative/garbled ("♥╣firru╠♥") or a business
+      // name. Clean it and only keep it if it looks like a real person; else
+      // fall back to 'WhatsApp User' (which is not persisted as customer_name).
+      const rawProfileName = contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || '';
+      const cleanedProfileName = cleanDisplayName(rawProfileName);
       const customerName =
-        contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || 'WhatsApp User';
+        cleanedProfileName && isLikelyRealPersonName(cleanedProfileName)
+          ? cleanedProfileName
+          : 'WhatsApp User';
 
       if (!messageText) continue;
 
