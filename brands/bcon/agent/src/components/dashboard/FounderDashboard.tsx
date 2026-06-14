@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
+import NotificationCenter from './NotificationCenter'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -358,6 +359,9 @@ export default function FounderDashboard() {
 
       {/* Today's Snapshot — floating top-right quick-glance button */}
       <TodaySnapshotButton />
+
+      {/* Status-change notifications — bell + toasts (lead_stage_changes feed) */}
+      <NotificationCenter />
 
       {/* AT A GLANCE - Radial Progress Charts with Trends */}
       {metrics.radialMetrics && (
