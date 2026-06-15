@@ -14,12 +14,14 @@
  * first poll sets a baseline so a backlog doesn't blast you on load — only
  * events arriving AFTER the page is open pop + play a sound.
  *
- * Swap a sound: drop your own file at public/sounds/new-lead.wav or
- * public/sounds/update.wav (or change the SOUND_* paths below).
+ * Sounds + mute/enable prefs are owned by @/lib/sound-prefs (shared with the
+ * home-page "ready" cue and the Settings panel). Regenerate the WAVs via
+ * scripts/gen_notification_sounds.py.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { playSound as playEventSound } from '@/lib/sound-prefs'
 import {
   MdNotificationsNone,
   MdNotificationsActive,
@@ -34,8 +36,6 @@ import {
   MdPersonAdd,
 } from 'react-icons/md'
 
-const SOUND_NEW = '/sounds/new-lead.wav'
-const SOUND_UPDATE = '/sounds/update.wav'
 const POLL_MS = 30_000
 const SEEN_AT_KEY = 'wc-notif-seen-at'
 const MUTED_KEY = 'wc-notif-muted'
@@ -99,10 +99,9 @@ export default function NotificationCenter() {
   const baselineSetRef = useRef(false)
   const seenAtRef = useRef<string>('1970-01-01T00:00:00.000Z')
   const mutedRef = useRef(false)
-  const audioNewRef = useRef<HTMLAudioElement | null>(null)
-  const audioUpdateRef = useRef<HTMLAudioElement | null>(null)
 
-  // Load persisted prefs + prepare both sounds.
+  // Load persisted prefs (mute + last-seen). Sounds are owned by the shared
+  // sound-prefs helper, which also honours the per-event Configure toggles.
   useEffect(() => {
     try {
       const m = localStorage.getItem(MUTED_KEY) === '1'
@@ -110,20 +109,11 @@ export default function NotificationCenter() {
       const s = localStorage.getItem(SEEN_AT_KEY)
       if (s) seenAtRef.current = s
     } catch { /* ignore */ }
-    if (typeof Audio !== 'undefined') {
-      audioNewRef.current = new Audio(SOUND_NEW)
-      audioUpdateRef.current = new Audio(SOUND_UPDATE)
-    }
   }, [])
 
   const playSound = useCallback((kind: 'new' | 'update') => {
-    if (mutedRef.current) return
-    const a = kind === 'new' ? audioNewRef.current : audioUpdateRef.current
-    if (!a) return
-    try {
-      a.currentTime = 0
-      void a.play().catch(() => { /* autoplay blocked until first interaction */ })
-    } catch { /* ignore */ }
+    // Master-mute + per-event gating both live in playEventSound.
+    playEventSound(kind)
   }, [])
 
   const recomputeUnread = useCallback((evs: NotificationEvent[]) => {

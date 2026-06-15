@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
+import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
@@ -110,6 +111,9 @@ export default function FounderDashboard() {
   })
   const [showThresholdDropdown, setShowThresholdDropdown] = useState(false)
 
+  // Fire the soft "ready" chime once, when the home page's first load lands.
+  const readyChimedRef = useRef(false)
+
   const loadMetrics = useCallback(async () => {
     try {
       const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}`)
@@ -126,6 +130,10 @@ export default function FounderDashboard() {
       setMetrics(null)
     } finally {
       setLoading(false)
+      if (!readyChimedRef.current) {
+        readyChimedRef.current = true
+        playSound('ready') // once per mount; gated by the Configure toggle + mute
+      }
     }
   }, [hotLeadThreshold])
 

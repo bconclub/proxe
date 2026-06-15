@@ -3,6 +3,21 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useTheme } from '@/components/dashboard/ThemeProvider';
+import {
+  SOUND_LABELS,
+  type SoundEvent,
+  isMuted,
+  setMuted as persistMuted,
+  isEventEnabled,
+  setEventEnabled,
+  preview as previewSound,
+} from '@/lib/sound-prefs';
+
+const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
+  { ev: 'new', hint: 'Rising bell when a fresh lead is scored' },
+  { ev: 'update', hint: 'Soft tone on a stage or score change' },
+  { ev: 'ready', hint: 'Gentle shimmer when the home page finishes loading' },
+];
 
 const ACCENT_THEMES = [
   {
@@ -33,6 +48,33 @@ export default function SettingsPage() {
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
   const [widgetStyleError, setWidgetStyleError] = useState<string | null>(null);
   const [loadingWidgetStyle, setLoadingWidgetStyle] = useState(true);
+
+  // Notification sound prefs (mirror localStorage via the sound-prefs helper).
+  const [soundMuted, setSoundMuted] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState<Record<SoundEvent, boolean>>({
+    new: true, update: true, ready: true,
+  });
+
+  // Hydrate sound prefs on mount (localStorage is client-only).
+  useEffect(() => {
+    setSoundMuted(isMuted());
+    setSoundEnabled({
+      new: isEventEnabled('new'),
+      update: isEventEnabled('update'),
+      ready: isEventEnabled('ready'),
+    });
+  }, []);
+
+  function toggleMuted() {
+    setSoundMuted((m) => { const next = !m; persistMuted(next); return next; });
+  }
+  function toggleEvent(ev: SoundEvent) {
+    setSoundEnabled((prev) => {
+      const next = { ...prev, [ev]: !prev[ev] };
+      setEventEnabled(ev, next[ev]);
+      return next;
+    });
+  }
 
   // Load saved theme on mount, and re-apply whenever the dashboard mode
   // (dark/light/brand) changes — otherwise the accent's bg/text overrides
@@ -600,16 +642,86 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Other Settings Placeholder */}
+        {/* Notifications & Sounds */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Other Settings
+            Notifications &amp; Sounds
           </h2>
-          
+
           <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              More settings coming soon...
-            </p>
+            {/* Master mute */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div>
+                <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  All notification sounds
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  {soundMuted ? 'Muted — no sounds will play' : 'On — events below play their sound'}
+                </p>
+              </div>
+              <button
+                onClick={toggleMuted}
+                role="switch"
+                aria-checked={!soundMuted}
+                aria-label="Toggle all notification sounds"
+                className="relative w-12 h-7 rounded-full transition-colors flex-shrink-0"
+                style={{ background: soundMuted ? 'var(--bg-tertiary)' : 'var(--accent-primary)' }}
+              >
+                <span
+                  className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all"
+                  style={{ left: soundMuted ? '4px' : '24px' }}
+                />
+              </button>
+            </div>
+
+            {/* Per-event toggles + preview */}
+            <div className="flex flex-col gap-3">
+              {SOUND_EVENTS.map(({ ev, hint }) => {
+                const on = soundEnabled[ev] && !soundMuted;
+                return (
+                  <div
+                    key={ev}
+                    className="flex items-center justify-between p-3 rounded-lg"
+                    style={{ background: 'var(--bg-tertiary)', opacity: soundMuted ? 0.5 : 1 }}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {SOUND_LABELS[ev]}
+                      </p>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                        {hint}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      {/* Preview — always playable so you can audition while muted */}
+                      <button
+                        onClick={() => previewSound(ev)}
+                        className="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:border-[var(--accent-primary)]"
+                        style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+                        title={`Preview ${SOUND_LABELS[ev]} sound`}
+                      >
+                        ▶ Preview
+                      </button>
+                      {/* Per-event toggle */}
+                      <button
+                        onClick={() => toggleEvent(ev)}
+                        disabled={soundMuted}
+                        role="switch"
+                        aria-checked={soundEnabled[ev]}
+                        aria-label={`Toggle ${SOUND_LABELS[ev]} sound`}
+                        className="relative w-11 h-6 rounded-full transition-colors disabled:cursor-not-allowed"
+                        style={{ background: on ? 'var(--accent-primary)' : 'var(--bg-secondary)' }}
+                      >
+                        <span
+                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                          style={{ left: soundEnabled[ev] ? '22px' : '2px' }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
