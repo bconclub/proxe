@@ -70,36 +70,41 @@ export async function GET(
       })
     }
 
-    // 2. Team actions: logged activities (from activities table)
+    // 2. Team actions: logged activities (from activities table).
+    // created_by is a TEXT label (default 'system'), NOT a FK to
+    // dashboard_users — so we can't PostgREST-embed the creator. Select the
+    // scalar columns and resolve the actor name in a second query only for
+    // rows whose created_by is a real dashboard_users UUID.
     const { data: teamActivities, error: teamError } = await supabase
       .from('activities')
-      .select(`
-        id,
-        activity_type,
-        note,
-        duration_minutes,
-        next_followup_date,
-        created_at,
-        created_by,
-        dashboard_users:created_by (
-          id,
-          name,
-          email
-        )
-      `)
+      .select('id, activity_type, note, duration_minutes, next_followup_date, created_at, created_by')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
 
     if (!teamError && teamActivities) {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const creatorIds = Array.from(new Set(
+        teamActivities
+          .map((a: any) => a.created_by)
+          .filter((v: any) => typeof v === 'string' && UUID_RE.test(v))
+      ))
+      const nameById: Record<string, string> = {}
+      if (creatorIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('dashboard_users')
+          .select('id, name, email')
+          .in('id', creatorIds)
+        for (const u of (creators || []) as Array<{ id: string; name: string | null; email: string | null }>) {
+          nameById[u.id] = u.name || u.email || 'Team Member'
+        }
+      }
       for (const activity of teamActivities) {
-        // dashboard_users is an array from the relation query, get first element
-        const creator = Array.isArray(activity.dashboard_users) 
-          ? activity.dashboard_users[0] 
-          : activity.dashboard_users
+        const cb = activity.created_by
+        const actor = (cb && nameById[cb]) || (cb && cb !== 'system' ? cb : 'Team Member')
         activities.push({
           id: activity.id,
           type: 'team',
-          actor: creator?.name || creator?.email || 'Team Member',
+          actor,
           action: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
           content: activity.note,
           duration_minutes: activity.duration_minutes,
