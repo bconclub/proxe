@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-15 23:32 IST · Windchasers home: founder KPI row tweaks
+
+- Home KPI card 1 changed from "Active Conversations" to "New Leads", with an inline period toggle (7D / 14D / 30D / All) that swaps the count from real `totalLeads` data, plus sparkline; clicking the number opens the leads list.
+- "Booked Calls / Events" card footer now shows "X% of total leads" (booked ÷ total leads) instead of "vs last 7 days" — a founder-facing conversion read.
+- Response Rate, Follow-up Health and Avg Response Time cards unchanged.
+- User-facing: founders can see lead volume by period at a glance and what share of leads are converting to booked calls.
+- (3de7328a)
+
 ## 2026-06-15 22:26 IST · Windchasers: custom POP sounds + notification toast redesign + auto-version
 
 - `sound-prefs.ts`: new-lead + lead-update cues now play `/sounds/pop.wav`; page-load ("ready") cue now plays `/sounds/long-pop.wav` (both supplied by the team). Old `new-lead.mp3` / `update.mp3` / `page-load.mp3` left on disk, no longer referenced.
