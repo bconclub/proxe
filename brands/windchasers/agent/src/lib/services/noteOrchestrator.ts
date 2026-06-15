@@ -25,6 +25,7 @@ export interface NoteClassification {
   category: string;
   booking_date: string | null;
   booking_time: string | null;
+  session_type: 'online' | 'offline' | null;
   name: string | null;
   send_message: string | null;
   summary: string | null;
@@ -55,7 +56,9 @@ const CLASSIFY_SYSTEM_PROMPT = `You are a sales admin assistant. Given an admin 
 3) any name if mentioned
 4) if a direct message should be sent (note starts with "send:", "message:", "tell them")
 
-Respond in JSON only: {"category": "...", "booking_date": "...", "booking_time": "...", "name": "...", "send_message": "...", "summary": "..."}
+Respond in JSON only: {"category": "...", "booking_date": "...", "booking_time": "...", "session_type": "...", "name": "...", "send_message": "...", "summary": "..."}
+
+For session_type (only meaningful for BOOKING_MADE / DEMO_TAKEN): "offline" if they will come IN PERSON — "visit our HQ/office/campus", "come to the centre", "in-person", "facility visit". "online" if it's a video/Zoom/Google-Meet/online session. null if not stated. A visit to HQ is ALWAYS "offline".
 
 Category guide:
 - POST_CALL: "spoke to", "just called", "had a call", "after the call", OR any plan to CALL BACK / FOLLOW UP ("call back tomorrow", "callback", "call him/her tomorrow", "follow up tomorrow", "reach out later", "check back with them") — a call happened and/or a follow-up call is planned. A call-back/follow-up is POST_CALL, never a booking.
@@ -82,7 +85,8 @@ For booking_date: use relative terms as-is ("tomorrow", "next Monday", "March 28
 For name: extract the actual name mentioned, or null if none.
 For send_message: extract the exact message text to send (everything after "send:" /"message:" /"tell them"), or null.
 
-Example: note "spoke to him have a demo booked for tomorrow 4 pm" → {"category": "BOOKING_MADE", "booking_date": "tomorrow", "booking_time": "4 pm", "name": null, "send_message": null, "summary": "Demo booked for tomorrow 4pm after call"}
+Example: note "spoke to him have a demo booked for tomorrow 4 pm" → {"category": "BOOKING_MADE", "booking_date": "tomorrow", "booking_time": "4 pm", "session_type": "online", "name": null, "send_message": null, "summary": "Demo booked for tomorrow 4pm after call"}
+Example: note "wants to visit our hq on 19-06-2026 around 2:30 pm" → {"category": "BOOKING_MADE", "booking_date": "19-06-2026", "booking_time": "2:30 pm", "session_type": "offline", "name": null, "send_message": null, "summary": "Booked an in-person HQ visit on 19 Jun, 2:30pm"}
 Example: note "He is interested to take this up, call back tomorrow" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — call back tomorrow"}
 Example: note "interested, asked me to follow up next week" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — follow up next week"}
 Example: note "[No Answer] tried calling twice" → {"category": "RNR", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Called twice, no answer"}
@@ -96,6 +100,7 @@ const EMPTY_CLASSIFICATION: NoteClassification = {
   category: 'INFO_ONLY',
   booking_date: null,
   booking_time: null,
+  session_type: null,
   name: null,
   send_message: null,
   summary: null,
@@ -152,10 +157,12 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
       return EMPTY_CLASSIFICATION;
     }
     const parsed = JSON.parse(jsonMatch[0]);
+    const st = String(parsed.session_type || '').toLowerCase().trim();
     return {
       category: parsed.category || 'INFO_ONLY',
       booking_date: parsed.booking_date || null,
       booking_time: parsed.booking_time || null,
+      session_type: st === 'online' || st === 'offline' ? (st as 'online' | 'offline') : null,
       name: parsed.name || null,
       send_message: parsed.send_message || null,
       summary: parsed.summary || null,
@@ -338,6 +345,35 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     actions.push('stage_updated:Booking Made,score_80');
     actionsTaken.push(`Stage changed to Booking Made`);
     actionsTaken.push(`Score updated to 80`);
+
+    // Persist the booking into unified_context so it shows as a real booking in
+    // Upcoming + the lead pane (not just a stage flip), with the right format —
+    // an HQ / in-person visit is stored as session_type 'offline'.
+    try {
+      const { data: ctxRow } = await supabase
+        .from('all_leads').select('unified_context').eq('id', leadId).maybeSingle();
+      const ctx = ctxRow?.unified_context || {};
+      const istDate = bookingAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      const istTime = bookingAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+      const sessionType = classification.session_type || null;
+      ctx.voice = {
+        ...(ctx.voice || {}),
+        booking_date: istDate,
+        booking_time: istTime,
+        booking_status: 'Call Booked',
+        booking_created_at: now.toISOString(),
+        ...(sessionType ? { session_type: sessionType } : {}),
+      };
+      await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', leadId);
+      actions.push(`booking_stored:${sessionType || 'unspecified'}`);
+      actionsTaken.push(
+        sessionType === 'offline' ? 'Recorded as an in-person (offline) visit'
+        : sessionType === 'online' ? 'Recorded as an online session'
+        : 'Booking recorded',
+      );
+    } catch (e: any) {
+      console.error('[noteOrchestrator] booking store failed (non-fatal):', e?.message || e);
+    }
   }
 
   // ── POST_CALL ────────────────────────────────────────────────────────────

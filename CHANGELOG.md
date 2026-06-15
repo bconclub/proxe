@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-15 10:26 IST · Windchasers: note bookings record session type + persist (HQ visit = offline)
+
+- A logged note like "wants to visit our HQ on 19-06-2026 around 2:30 pm" was classified Booking Made but the booking was never stored on the lead (only stage + reminders), and the in-person/offline nature was dropped.
+- Classifier now extracts session_type (offline for HQ/office/campus/in-person visits, online for video sessions). The BOOKING_MADE action now persists the booking into unified_context.voice (booking_date/time + session_type + status) so it shows as a real booking in Upcoming + the lead pane — an HQ visit lands as OFFLINE.
+
 ## 2026-06-15 07:11 IST · Windchasers: note orchestrator Phase 1 — affordability, thin-input, already-done
 
 Reduces PROXe over-acting on shallow free-text notes:
