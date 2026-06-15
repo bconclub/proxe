@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-15 10:33 IST · Windchasers: dark theme default for everyone + current-theme indicator
+
+- Dark is now the default for all users. One-time migration flips any existing light/brand preference to dark (so everyone goes black now); afterwards each user's choice is respected. New users already default to dark. (Theme is per-device — stored in localStorage.)
+- Configure → Appearance now shows "Currently running: Dark/Light/Brand" so you can see which theme is active; the Dark/Light switch is right there to change it.
+
 ## 2026-06-15 10:26 IST · Windchasers: note bookings record session type + persist (HQ visit = offline)
 
 - A logged note like "wants to visit our HQ on 19-06-2026 around 2:30 pm" was classified Booking Made but the booking was never stored on the lead (only stage + reminders), and the in-person/offline nature was dropped.

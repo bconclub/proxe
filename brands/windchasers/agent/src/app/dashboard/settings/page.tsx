@@ -197,9 +197,16 @@ export default function SettingsPage() {
             Appearance
           </h2>
           <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
+            <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
               Dashboard Mode
             </h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              Currently running:{' '}
+              <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                {theme === 'bw-light' ? 'Light' : theme === 'brand' ? 'Brand' : 'Dark'}
+              </span>
+              {' '}· Dark is the default for everyone
+            </p>
             <div className="grid grid-cols-2 gap-4 max-w-sm">
               {[
                 { id: 'bw-dark', label: 'Dark', icon: '🌙' },
