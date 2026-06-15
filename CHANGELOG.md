@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-15 06:15 IST · Windchasers: call-back no longer misclassified as a booking
+
+- A logged note "He is interested, call back tomorrow" was classified BOOKING_MADE (created a booking reminder, moved the lead to Booking Made, score 80). A call-back is a FOLLOW-UP, not a booking. Tightened the note classifier: BOOKING_MADE only for an actual demo/session/meeting booked at a slot; any plan to call back / follow up is POST_CALL (creates a follow-up, not a booking). Added examples.
+
 ## 2026-06-15 06:04 IST · Windchasers: cancel/remove a booked session (dashboard + agent)
 
 - New cancelBooking service: deletes the Google Calendar event (new deleteCalendarEvent), clears the booking from the lead's unified_context + web_sessions (status → cancelled, date/time nulled so it drops from Upcoming/pipeline), and cancels pending booking_reminder_24h / _30m tasks so no reminder fires.
