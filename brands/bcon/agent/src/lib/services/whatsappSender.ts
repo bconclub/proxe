@@ -332,3 +332,65 @@ export async function sendMissedCallMessage(
   console.error('[whatsappSender] Both text and template failed for missed call to', to);
   return false;
 }
+
+/**
+ * Send a generic Meta interactive-buttons message: a body text plus up to 3
+ * quick-reply buttons. Works only within the 24-hour customer-initiated window
+ * (no template needed). Button titles are capped at 20 chars and body at 1024
+ * to satisfy Meta's validation. Returns success + optional messageId/error.
+ */
+export async function sendWhatsAppInteractiveButtons(
+  to: string,
+  bodyText: string,
+  buttons: string[],
+  options: { headerText?: string; footerText?: string } = {},
+): Promise<{ success: boolean; error?: string; messageId?: string; statusCode?: number }> {
+  const creds = getCredentials();
+  if (!creds) return { success: false, error: 'Missing credentials' };
+
+  // Hard caps to satisfy Meta's validation
+  const safeButtons = buttons.slice(0, 3).map((b, i) => ({
+    type: 'reply' as const,
+    reply: { id: `btn_${i}`, title: b.slice(0, 20) },
+  }));
+  if (safeButtons.length === 0) return { success: false, error: 'No buttons provided' };
+
+  const payload: any = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: normalizePhone(to),
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: bodyText.slice(0, 1024) },
+      action: { buttons: safeButtons },
+    },
+  };
+  if (options.headerText) {
+    payload.interactive.header = { type: 'text', text: options.headerText.slice(0, 60) };
+  }
+  if (options.footerText) {
+    payload.interactive.footer = { text: options.footerText.slice(0, 60) };
+  }
+
+  try {
+    const res = await fetch(`${GRAPH_API_BASE}/${creds.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${creds.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const statusCode = res.status;
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`[whatsappSender] Interactive send FAILED status=${statusCode} to=${normalizePhone(to)}:`, errBody);
+      return { success: false, error: errBody, statusCode };
+    }
+    const body = await res.json().catch(() => ({}));
+    const messageId = body?.messages?.[0]?.id;
+    console.log(`[whatsappSender] Interactive send OK status=${statusCode} to=${normalizePhone(to)} messageId=${messageId} buttons=[${safeButtons.map(b => b.reply.title).join(',')}]`);
+    return { success: true, messageId, statusCode };
+  } catch (err: any) {
+    console.error(`[whatsappSender] Interactive send EXCEPTION to=${normalizePhone(to)}:`, err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}

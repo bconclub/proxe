@@ -18,6 +18,8 @@ export {
   stripHTML,
   formatTimeForDisplay,
   formatDate,
+  cleanDisplayName,
+  isLikelyRealPersonName,
 } from './utils';
 
 // Supabase clients
@@ -69,10 +71,15 @@ export {
 // Booking management
 export {
   type BookingData,
+  type BookingSessionType,
   type ExistingBooking,
   type TimeSlot,
+  getAvailableBookingSlotStarts,
+  getBookableSlotStartsForDate,
   getGoogleCalendarAuth,
   checkExistingBooking,
+  isAllowedBookingTime,
+  normalizeBookingSessionType,
   storeBooking,
   getAvailableSlots,
   createCalendarEvent,
@@ -87,6 +94,7 @@ export {
   sendBookingConfirmation,
   sendBookingReminder,
   sendMissedCallMessage,
+  sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
 
 // Cross-channel context

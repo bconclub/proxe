@@ -32,6 +32,79 @@ const AVAILABLE_SLOTS = [
   '18:00', // 6:00 PM
 ];
 
+// ─── Slot-availability helpers (ported from Windchasers) ─────────────────────
+// BCON does not split bookings by session type (WC has online/offline windows);
+// BCON uses a single fixed AVAILABLE_SLOTS list. The `sessionType` param is kept
+// for API parity with WC + the cancel/booking UI, but is currently ignored.
+// FLAG FOR REVIEW: if BCON later needs distinct online/offline windows, replace
+// AVAILABLE_SLOTS with a BOOKING_WINDOWS map like WC.
+
+export type BookingSessionType = 'online' | 'offline';
+
+export function normalizeBookingSessionType(sessionType?: string | null): BookingSessionType {
+  return sessionType === 'offline' ? 'offline' : 'online';
+}
+
+function timeToMinutes(time24: string): number {
+  const [hour, minute] = time24.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function normalizeBookingTime(time: string): string | null {
+  if (!time) return null;
+  const trimmed = time.trim();
+
+  if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    const [hour, minute] = trimmed.split(':').map(Number);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    }
+    return null;
+  }
+
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const period = match[3].toUpperCase();
+
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function getAvailableBookingSlotStarts(sessionType?: string | null): string[] {
+  // BCON: single fixed slot list (sessionType ignored — see note above).
+  return [...AVAILABLE_SLOTS];
+}
+
+export function isAllowedBookingTime(time: string, sessionType?: string | null): boolean {
+  const normalizedTime = normalizeBookingTime(time);
+  return !!normalizedTime && getAvailableBookingSlotStarts(sessionType).includes(normalizedTime);
+}
+
+/**
+ * Slot starts that are still bookable for a SPECIFIC date.
+ * For any future date this is the full window. For TODAY (IST) we drop slots
+ * whose start time has already passed — otherwise a customer messaging at
+ * 8:30 PM would be offered (or booked into) a 3:00 PM slot that is long gone.
+ */
+export function getBookableSlotStartsForDate(dateStr: string, sessionType?: string | null): string[] {
+  const all = getAvailableBookingSlotStarts(sessionType);
+  const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+  if (dateStr !== todayIST) return all;
+  const hm = new Date().toLocaleTimeString('en-GB', {
+    hour12: false, hour: '2-digit', minute: '2-digit', timeZone: TIMEZONE,
+  });
+  const [h, m] = hm.split(':').map(Number);
+  const nowMinutes = h * 60 + m;
+  return all.filter(slot => timeToMinutes(slot) > nowMinutes);
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface BookingData {

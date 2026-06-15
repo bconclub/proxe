@@ -121,6 +121,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       })
   }, [])
 
+  // Activity heartbeat. POSTs to /api/auth/touch on mount + every 60s
+  // while the tab is visible, so the team-members table can show
+  // "Live now" / "Last active" per user. Skipped while the tab is
+  // hidden so a backgrounded tab doesn't masquerade as live.
+  useEffect(() => {
+    let cancelled = false
+    const ping = () => {
+      if (cancelled) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      fetch('/api/auth/touch', { method: 'POST' }).catch(() => {
+        // Soft-fail — heartbeat is best-effort.
+      })
+    }
+    ping() // fire once on mount
+    const id = setInterval(ping, 60_000)
+    // Also ping when the tab becomes visible again, so we don't wait
+    // up to 60s after a long backgrounded session.
+    const onVis = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
   // Global preferences hydration. Sounds + theme are stored server-side so one
   // user's setting applies to every user (global config). On load we paint the
   // locally-cached accent instantly (no bare flash), then fetch the global
