@@ -267,7 +267,7 @@ export async function fetchSummary(
  * Requires leadId - use leadManager.ensureOrUpdateLead() first
  */
 export async function logMessage(
-  leadId: string,
+  leadId: string | null,
   channel: Channel,
   sender: 'customer' | 'agent' | 'system',
   content: string,
@@ -275,8 +275,11 @@ export async function logMessage(
   metadata: any = {},
   supabase?: SupabaseClient | null,
 ): Promise<any | null> {
-  if (!leadId || !content) {
-    console.log('[conversationLogger] Missing leadId or content, skipping');
+  // leadId is optional — anonymous web-chat sessions log conversations before
+  // a lead row exists. conversations.lead_id is nullable; the session_id in
+  // metadata is the linking key for those rows (surfaced in the inbox).
+  if (!content) {
+    console.log('[conversationLogger] Missing content, skipping');
     return null;
   }
 
@@ -303,16 +306,20 @@ export async function logMessage(
   };
 
   try {
-    // Verify lead exists (foreign key constraint)
-    const { data: leadCheck } = await client
-      .from('all_leads')
-      .select('id')
-      .eq('id', leadId)
-      .maybeSingle();
+    // Verify lead exists (foreign key constraint). Anonymous web chats
+    // (leadId=null) skip this — conversations.lead_id is nullable and the FK
+    // only fires for non-null values.
+    if (leadId) {
+      const { data: leadCheck } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('id', leadId)
+        .maybeSingle();
 
-    if (!leadCheck) {
-      console.error('[conversationLogger] Lead does not exist', { leadId });
-      return null;
+      if (!leadCheck) {
+        console.error('[conversationLogger] Lead does not exist', { leadId });
+        return null;
+      }
     }
 
     const { data, error } = await client
