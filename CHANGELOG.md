@@ -1,6 +1,13 @@
 # Changelog
 
-## 2026-06-15 17:59 IST · Windchasers: fix page-load sound (autoplay-blocked) — retry on first gesture
+## 2026-06-15 22:26 IST · Windchasers: custom POP sounds + notification toast redesign
+
+- `sound-prefs.ts`: new-lead + lead-update cues now play `/sounds/pop.wav`; page-load ("ready") cue now plays `/sounds/long-pop.wav` (both supplied by the team). Old `new-lead.mp3` / `update.mp3` / `page-load.mp3` left on disk, no longer referenced.
+- `NotificationCenter.tsx`: corner toast stack capped to the latest TWO cards (was 3–4) so notifications surface one/two at a time, not a blast.
+- `NotificationCenter.tsx`: toast cards restyled — icon circle, bold title, coloured tag chip + humanised channel chip, time-ago, "View lead →" link, dismiss X. Width pinned to a clean 340px (reference panel was too wide).
+- `NotificationCenter.tsx`: new frosted-glass "View all notifications (N) →" button beneath the cards, opens the Recent Activity drawer.
+- User-facing: distinct pop sound on new leads/updates, longer pop on home-page load, tidier and narrower notification popups with a one-tap "view all".
+- (PENDING_SHA)
 
 - The page-load "ready" cue fired on dashboard mount before any user interaction, so the browser autoplay policy rejected `Audio.play()` and the `.catch()` swallowed it silently — sound never played on a cold load.
 - `sound-prefs.ts`: on a blocked play, arm a one-shot `pointerdown`/`keydown`/`touchstart` listener that retries the cue on the first user gesture. New-lead/update already worked (they fire after interaction); now page-load plays the instant you touch the page.

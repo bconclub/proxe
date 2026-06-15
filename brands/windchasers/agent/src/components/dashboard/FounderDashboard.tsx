@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -13,19 +13,11 @@ import DashboardBrain from './DashboardBrain'
 import type { Lead } from '@/types'
 import {
   Sparkline,
-  TrendSparkline,
-  MiniFunnel,
-  ChannelActivityBars,
-  DonutChart,
-  Heatmap,
-  StackedBar,
   ActivityArea,
   RadialProgress,
-  MiniBarChart,
 } from './MicroCharts'
 
 type TimeFilter = 'All' | '7D' | '14D' | '30D'
-const TIME_FILTERS: TimeFilter[] = ['All', '7D', '14D', '30D']
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
@@ -69,16 +61,8 @@ interface FounderMetrics {
     hotLeads: { data: Array<{ value: number }>; change: number }
     responseTime: { data: Array<{ value: number }>; change: number }
   }
-  trendSeries?: {
-    conversations: Record<TimeFilter, Array<{ value: number }>>
-    totalLeads: Record<TimeFilter, Array<{ value: number }>>
-    engagedLeads: Record<TimeFilter, Array<{ value: number }>>
-    warmLeads: Record<TimeFilter, Array<{ value: number }>>
-  }
   upcomingBookingsTrend?: Array<{ value: number }>
   hourlyActivity?: Array<{ time: string; value: number }>
-  channelDistribution?: Array<{ name: string; value: number }>
-  heatmapData?: Array<{ hour: number; value: number }>
   radialMetrics?: {
     avgScore: number
     responseRate: number
@@ -106,26 +90,31 @@ function formatBookingWhen(iso: string): string {
   }
 }
 
+// Human-readable duration from milliseconds (agent reply latency).
+function fmtMs(ms: number): string {
+  if (!ms || ms <= 0) return '—'
+  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`
+  const h = Math.floor(ms / 3_600_000)
+  const m = Math.round((ms % 3_600_000) / 60_000)
+  return `${h}h ${m}m`
+}
+
 export default function FounderDashboard() {
   const router = useRouter()
   const [metrics, setMetrics] = useState<FounderMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<TimeFilter>('All')
-  const [engagedLeadsFilter, setEngagedLeadsFilter] = useState<TimeFilter>('All')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<TimeFilter>('All')
-  const [leadsFilter, setLeadsFilter] = useState<TimeFilter>('All')
-  
+
   // Hot Leads threshold with localStorage persistence
-  const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
+  const [hotLeadThreshold] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hot-lead-threshold')
       return saved ? parseInt(saved, 10) : 70
     }
     return 70
   })
-  const [showThresholdDropdown, setShowThresholdDropdown] = useState(false)
 
   // Fire the soft "ready" chime once, when the home page's first load lands.
   const readyChimedRef = useRef(false)
@@ -154,27 +143,14 @@ export default function FounderDashboard() {
   }, [hotLeadThreshold])
 
   useEffect(() => {
-    // Initial load
     loadMetrics()
-    
-    // Only poll when component is visible
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadMetrics()
-      }
+      if (document.visibilityState === 'visible') loadMetrics()
     }
-    
-    // Poll every 60 seconds (1 minute) instead of 30 seconds
     const interval = setInterval(() => {
-      // Only poll if page is visible
-      if (document.visibilityState === 'visible') {
-        loadMetrics()
-      }
+      if (document.visibilityState === 'visible') loadMetrics()
     }, 60000)
-    
-    // Listen for visibility changes
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
     return () => {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -188,14 +164,12 @@ export default function FounderDashboard() {
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMins < 60) return `${diffMins}m ago`
     if (diffHours < 24) return `${diffHours}h ago`
     return `${diffDays}d ago`
   }
 
   const openLeadModal = async (leadId: string) => {
-    console.log('🔵 openLeadModal called with leadId:', leadId)
     try {
       const supabase = createClient()
       const { data: lead, error } = await supabase
@@ -205,76 +179,37 @@ export default function FounderDashboard() {
         .single()
 
       if (error) {
-        console.error('❌ Error fetching lead:', error)
+        console.error('Error fetching lead:', error)
         return
       }
+      if (!lead) return
 
-      if (lead) {
-        const typedLead = lead as {
-          id?: string
-          customer_name?: string | null
-          email?: string | null
-          phone?: string | null
-          created_at?: string | null
-          last_interaction_at?: string | null
-          lead_score?: number | null
-          lead_stage?: string | null
-          sub_stage?: string | null
-          status?: string | null
-          first_touchpoint?: string | null
-          last_touchpoint?: string | null
-          metadata?: any
-          unified_context?: {
-            web?: { booking?: any; booking_date?: any; booking_time?: any }
-            whatsapp?: { booking?: any; booking_date?: any; booking_time?: any }
-          }
-        }
-        console.log('✅ Lead fetched:', typedLead.customer_name || 'Unknown')
-        // Get booking data from unified_context
-        const unifiedContext = typedLead.unified_context || {}
-        const webBooking = unifiedContext?.web?.booking || {}
-        const whatsappBooking = unifiedContext?.whatsapp?.booking || {}
-        
-        const bookingDate = 
-          webBooking?.date || 
-          webBooking?.booking_date ||
-          whatsappBooking?.date ||
-          whatsappBooking?.booking_date ||
-          null
-        
-        const bookingTime = 
-          webBooking?.time || 
-          webBooking?.booking_time ||
-          whatsappBooking?.time ||
-          whatsappBooking?.booking_time ||
-          null
+      const typedLead = lead as any
+      const unifiedContext = typedLead.unified_context || {}
+      const webBooking = unifiedContext?.web?.booking || {}
+      const whatsappBooking = unifiedContext?.whatsapp?.booking || {}
+      const bookingDate = webBooking?.date || webBooking?.booking_date || whatsappBooking?.date || whatsappBooking?.booking_date || null
+      const bookingTime = webBooking?.time || webBooking?.booking_time || whatsappBooking?.time || whatsappBooking?.booking_time || null
 
-        // Convert to Lead type expected by LeadDetailsModal
-        const modalLead: Lead = {
-          id: typedLead.id || '',
-          name: typedLead.customer_name || 'Unknown',
-          email: typedLead.email || '',
-          phone: typedLead.phone || '',
-          source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
-          first_touchpoint: typedLead.first_touchpoint || null,
-          last_touchpoint: typedLead.last_touchpoint || null,
-          timestamp: typedLead.created_at || new Date().toISOString(),
-          status: typedLead.status || null,
-          booking_date: bookingDate,
-          booking_time: bookingTime,
-          unified_context: typedLead.unified_context || null,
-          metadata: typedLead.metadata || {},
-        }
-
-        console.log('✅ Setting selected lead and opening modal')
-        setSelectedLead(modalLead)
-        setShowLeadModal(true)
-        console.log('✅ Modal state updated - showLeadModal:', true, 'selectedLead:', modalLead.id)
-      } else {
-        console.warn('⚠️ Lead data is null or undefined')
+      const modalLead: Lead = {
+        id: typedLead.id || '',
+        name: typedLead.customer_name || 'Unknown',
+        email: typedLead.email || '',
+        phone: typedLead.phone || '',
+        source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
+        first_touchpoint: typedLead.first_touchpoint || null,
+        last_touchpoint: typedLead.last_touchpoint || null,
+        timestamp: typedLead.created_at || new Date().toISOString(),
+        status: typedLead.status || null,
+        booking_date: bookingDate,
+        booking_time: bookingTime,
+        unified_context: typedLead.unified_context || null,
+        metadata: typedLead.metadata || {},
       }
+      setSelectedLead(modalLead)
+      setShowLeadModal(true)
     } catch (err) {
-      console.error('❌ Error opening lead modal:', err)
+      console.error('Error opening lead modal:', err)
     }
   }
 
@@ -284,7 +219,6 @@ export default function FounderDashboard() {
     const diffMs = bookingDate.getTime() - now.getTime()
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMs < 0) return 'Past'
     if (diffDays > 0) {
       const hours = Math.floor((diffMs % 86400000) / 3600000)
@@ -295,96 +229,35 @@ export default function FounderDashboard() {
     return `In ${mins}m`
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join('') || 'L'
+  const getInitials = (name: string) =>
+    name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
+
+  // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
+  const intentFor = (score: number): { label: string; color: string; bg: string } => {
+    if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (score >= 50) return { label: 'Comparing', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    return { label: 'Needs follow-up', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
-  const getScoreTone = (score: number) => {
-    if (score >= hotLeadThreshold) {
-      return { label: 'High priority', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
-    }
-    if (score >= 50) {
-      return { label: 'Warm', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' }
-    }
-    return { label: 'Needs review', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' }
+  // Recommended next step derived from the lead's stage (Phase-1 heuristic;
+  // a later phase wires the real agent_tasks "next action").
+  const nextStepFor = (stage: string): string => {
+    const s = (stage || '').toLowerCase()
+    if (s.includes('booking')) return 'Confirm the slot'
+    if (s.includes('high')) return 'Push to book a call'
+    if (s.includes('qualified')) return 'Share pricing + offers'
+    if (s.includes('engaged')) return 'Share program details'
+    if (s.includes('converted')) return 'Onboard / next steps'
+    if (s.includes('lost') || s.includes('cold')) return 'Re-engage'
+    return 'First outreach'
   }
 
-  const getResponseHealthColor = (status: string) => {
-    switch (status) {
-      case 'good': return 'text-green-600 dark:text-green-400'
-      case 'warning': return 'text-yellow-600 dark:text-yellow-400'
-      case 'critical': return 'text-red-600 dark:text-red-400'
-      default: return 'text-gray-600 dark:text-gray-400'
-    }
-  }
-
-  const getResponseHealthBg = (status: string) => {
-    switch (status) {
-      case 'good': return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-      case 'warning': return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-      case 'critical': return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-      default: return 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'
-    }
-  }
-
-  // Traffic light colors for At a Glance metrics (B2B warm WhatsApp lead benchmarks)
-  const getMetricColor = (metricType: 'avgScore' | 'responseRate' | 'bookingRate' | 'avgResponseTime', value: number): string => {
-    const GREEN = '#22c55e'
-    const AMBER = '#f59e0b'
-    const RED = '#ef4444'
-
-    switch (metricType) {
-      // Thresholds tuned to realistic B2B lead-gen / AI-agent benchmarks so a
-      // healthy dashboard reads green, not alarming red on first open.
-      case 'avgScore':
-        // Lead score 0-100. Avg ~50 across a funnel is solid.
-        if (value >= 50) return GREEN
-        if (value >= 30) return AMBER
-        return RED
-
-      case 'responseRate':
-        // % of inbound that got a reply. 80%+ is healthy for an always-on agent.
-        if (value >= 80) return GREEN
-        if (value >= 50) return AMBER
-        return RED
-
-      case 'bookingRate':
-        // Lead → booking conversion %. 8%+ is strong for cold WhatsApp leads
-        // (industry lead-to-meeting benchmarks sit ~5-12%).
-        if (value >= 8) return GREEN
-        if (value >= 3) return AMBER
-        return RED
-
-      case 'avgResponseTime':
-        // Agent reply latency (ms). Lower is better; under ~5s feels instant.
-        if (value <= 5000) return GREEN
-        if (value <= 15000) return AMBER
-        return RED
-
-      default:
-        return GREEN
-    }
-  }
-
-  const periodLabel = (period: TimeFilter) => {
-    if (period === 'All') return 'all time'
-    if (period === '7D') return 'last 7 days'
-    if (period === '14D') return 'last 14 days'
-    return 'last 30 days'
-  }
-
-  const getTrendData = (
-    metric: keyof NonNullable<FounderMetrics['trendSeries']>,
-    period: TimeFilter,
-    fallback?: Array<{ value: number }>,
-  ) => {
-    const data = metrics?.trendSeries?.[metric]?.[period]
-    return data && data.length > 0 ? data : fallback || []
+  // Status from last-contact recency + score.
+  const statusFor = (lastContact: string, score: number): { label: string; color: string; bg: string } => {
+    const hrs = (Date.now() - new Date(lastContact).getTime()) / 3_600_000
+    if (score >= hotLeadThreshold && hrs > 24) return { label: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (hrs <= 24) return { label: 'Due today', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    return { label: 'Scheduled', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
   if (loading) {
@@ -392,24 +265,9 @@ export default function FounderDashboard() {
       <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div
-              className="absolute inset-0 rounded-full animate-ping opacity-30"
-              style={{
-                backgroundColor: 'var(--accent-primary)',
-                width: '100px',
-                height: '100px',
-                margin: '-10px',
-              }}
-            />
+            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
-              <Image
-                src="/logo.png"
-                alt="BCON"
-                width={80}
-                height={80}
-                className="drop-shadow-lg"
-                priority
-              />
+              <Image src="/logo.png" alt="Windchasers" width={80} height={80} className="drop-shadow-lg" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
@@ -423,435 +281,127 @@ export default function FounderDashboard() {
       <div className="p-6">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
           <p className="text-red-700 dark:text-red-300 font-semibold mb-2">Failed to load metrics</p>
-          <p className="text-sm text-red-600 dark:text-red-400">
-            Please check:
-          </p>
-          <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside mt-2 space-y-1">
-            <li>Server is running (check terminal logs)</li>
-            <li>Database connection is working</li>
-            <li>Check browser console for detailed errors</li>
-          </ul>
-          <button
-            onClick={loadMetrics}
-            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-          >
-            Retry
-          </button>
+          <button onClick={loadMetrics} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm">Retry</button>
         </div>
       </div>
     )
   }
 
+  // ── Derived values for the mockup layout ──────────────────────────────────
+  const rm = metrics.radialMetrics
+  const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
+  const total = metrics.totalLeads?.count || 0
+  const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
+  const convSeries = metrics.trends?.conversations?.data || []
+  const dailyAvg = convSeries.length ? Math.round(convSeries.reduce((a, b) => a + (b.value || 0), 0) / convSeries.length) : 0
+
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 min-h-[calc(100vh-3.5rem)]">
-
-      {/* Today's Snapshot — front-dashboard only (fixed top-right "eye" button) */}
+    <div className="flex flex-col gap-4 sm:gap-5 p-4 sm:p-6 min-h-[calc(100vh-3.5rem)]">
+      {/* Floating controls — home page only */}
       <TodaySnapshotButton />
-
-      {/* Status-change notifications — home page only (bell below the eye + toasts + sound) */}
       <NotificationCenter />
-
-      {/* Dashboard Brain — ask-anything over live data (button below the bell) */}
       <DashboardBrain />
 
-      {/* AT A GLANCE - Radial Progress Charts with Trends */}
-      {metrics.radialMetrics && (
-        <div 
-          className="rounded-lg p-4 sm:p-6 border"
-          style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
-          }}
-        >
-          <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} valueFormatter={(v) => `${Math.round(v)}`} showPercentage={false} />
-              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={96} />
-              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={96} />
-              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={96} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
-              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
-            </div>
+      {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+        <KpiCard
+          icon={<MdChatBubble size={15} />} iconColor="#3B82F6"
+          label="Active Conversations"
+          value={metrics.totalConversations.total}
+          delta={<KpiDelta change={metrics.trends?.conversations?.change} />}
+          sparkData={convSeries} sparkColor="#3B82F6"
+          onClick={() => router.push('/dashboard/inbox')}
+        />
+        <KpiCard
+          icon={<MdShowChart size={15} />} iconColor="#22c55e"
+          label="Response Rate"
+          value={`${Math.round(rm?.responseRate ?? 0)}%`}
+          sparkData={metrics.radialTrends?.responseRate} sparkColor="#22c55e"
+          sub="reply coverage"
+        />
+        {/* Follow-up Health — status + ring */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><MdFavorite size={15} /></span>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
           </div>
+          <div className="flex items-center justify-between mt-1">
+            <div>
+              <div className="text-2xl sm:text-3xl font-bold leading-none capitalize" style={{ color: metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444' }}>
+                {metrics.responseHealth.status === 'good' ? 'Good' : metrics.responseHealth.status === 'warning' ? 'Fair' : 'Needs work'}
+              </div>
+            </div>
+            <RadialProgress value={Math.round(rm?.responseRate ?? 0)} size={48} color={metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'} showPercentage={false} label="" />
+          </div>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(rm?.responseRate ?? 0)}% on track</span>
         </div>
-      )}
-
-      {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
-        {/* Card 1: Total Conversations */}
-        <div
-          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
-          style={{
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-          }}
-        >
-          <div>
-            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
-              <MdChatBubble className="text-blue-500 flex-shrink-0" size={14} />
-              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Conversations</h3>
-            </div>
-            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? 0)}
-              {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
-              {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
-              {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              {conversationTimeFilter === 'All' ? `${metrics.totalConversations.total} all time` : periodLabel(conversationTimeFilter)}
-            </p>
-          </div>
-          {getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
-              <Sparkline data={getTrendData('conversations', conversationTimeFilter, metrics.trends?.conversations?.data)} color="#3B82F6" height={48} />
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-2 sm:mt-0">
-            <button onClick={() => router.push('/dashboard/inbox')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#3B82F6' }}>
-              View <MdArrowForward size={12} />
-            </button>
-            <div className="hidden sm:flex gap-1">
-              {TIME_FILTERS.map((period) => (
-                <button key={period} onClick={() => setConversationTimeFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
-                  style={conversationTimeFilter === period ? { backgroundColor: '#3B82F6' } : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }}
-                >{period}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Engaged Leads */}
-        <div
-          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
-          style={{
-            backgroundColor: 'rgba(34, 197, 94, 0.05)',
-            borderColor: 'rgba(34, 197, 94, 0.2)',
-          }}
-        >
-          <div>
-            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
-              <MdLocalFireDepartment className="text-green-500 flex-shrink-0" size={14} />
-              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
-            </div>
-            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {engagedLeadsFilter === 'All' && (metrics.engagedLeads?.count ?? 0)}
-              {engagedLeadsFilter === '7D' && (metrics.engagedLeads?.count7D ?? 0)}
-              {engagedLeadsFilter === '14D' && (metrics.engagedLeads?.count14D ?? 0)}
-              {engagedLeadsFilter === '30D' && (metrics.engagedLeads?.count30D ?? 0)}
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#22C55E' }}>
-              {engagedLeadsFilter === 'All' ? `${metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%` : periodLabel(engagedLeadsFilter)}
-            </p>
-          </div>
-          {getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
-              <Sparkline data={getTrendData('engagedLeads', engagedLeadsFilter, metrics.trends?.leads?.data)} color="#22C55E" height={48} showGradient={true} />
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-2 sm:mt-0">
-            <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#22C55E' }}>
-              View <MdArrowForward size={12} />
-            </button>
-            <div className="hidden sm:flex gap-1">
-              {TIME_FILTERS.map((period) => (
-                <button key={period} onClick={() => setEngagedLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${engagedLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
-                  style={engagedLeadsFilter === period ? { backgroundColor: '#22C55E' } : { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: 'var(--text-secondary)' }}
-                >{period}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Warm Leads */}
-        <div
-          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
-          style={{
-            backgroundColor: 'rgba(249, 115, 22, 0.05)',
-            borderColor: 'rgba(249, 115, 22, 0.2)',
-          }}
-        >
-          <div>
-            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
-              <MdLocalFireDepartment className="text-orange-500 flex-shrink-0" size={14} />
-              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
-            </div>
-            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {warmLeadsFilter === 'All' && (metrics.warmLeads?.count ?? 0)}
-              {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
-              {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
-              {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#F97316' }}>
-              {warmLeadsFilter === 'All'
-                ? `${(metrics.totalLeads?.count ? ((metrics.warmLeads?.count ?? 0) / metrics.totalLeads.count) * 100 : 0).toFixed(1)}%`
-                : periodLabel(warmLeadsFilter)}
-            </p>
-          </div>
-          {getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
-              <Sparkline data={getTrendData('warmLeads', warmLeadsFilter, metrics.trends?.leads?.data)} color="#F97316" height={48} showGradient={true} />
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-2 sm:mt-0">
-            <button onClick={() => router.push('/dashboard/leads?filter=warm')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#F97316' }}>
-              View <MdArrowForward size={12} />
-            </button>
-            <div className="hidden sm:flex gap-1">
-              {TIME_FILTERS.map((period) => (
-                <button key={period} onClick={() => setWarmLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
-                  style={warmLeadsFilter === period ? { backgroundColor: '#F97316' } : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }}
-                >{period}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Total Leads */}
-        <div
-          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
-          style={{
-            backgroundColor: 'var(--accent-subtle)',
-            borderColor: 'var(--accent-primary)',
-          }}
-        >
-          <div>
-            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
-              <MdPeople className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} size={14} />
-              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
-            </div>
-            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {leadsFilter === 'All' && metrics.totalLeads.count}
-              {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
-              {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
-              {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--accent-primary)' }}>
-              {leadsFilter === 'All' ? `${metrics.totalLeads.count} all time` : periodLabel(leadsFilter)}
-            </p>
-          </div>
-          {getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data).length > 0 && (
-            <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
-              <Sparkline data={getTrendData('totalLeads', leadsFilter, metrics.trends?.leads?.data)} color="var(--accent-primary)" height={48} showGradient={true} />
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-2 sm:mt-0">
-            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-primary)' }}>
-              View <MdArrowForward size={12} />
-            </button>
-            <div className="hidden sm:flex gap-1">
-              {TIME_FILTERS.map((period) => (
-                <button key={period} onClick={() => setLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
-                  style={leadsFilter === period ? { backgroundColor: 'var(--button-bg)' } : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }}
-                >{period}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
+        <KpiCard
+          icon={<MdEvent size={15} />} iconColor="#a855f7"
+          label="Booked Calls / Events"
+          value={Math.max(flow.booked || 0, metrics.upcomingBookings.length)}
+          delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
+          sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
+          onClick={() => router.push('/dashboard/bookings')}
+        />
+        <KpiCard
+          icon={<MdSpeed size={15} />} iconColor="#3B82F6"
+          label="Avg Response Time"
+          value={fmtMs(metrics.responseHealth.avgMs)}
+          delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
+          sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
+        />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6">
-        {/* Priority Lead Queue - cross-dashboard view of leads that need attention */}
-        <section
-          className="xl:col-span-7 rounded-lg border overflow-hidden"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)',
-          }}
-        >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--accent-subtle)' }}>
-            <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                Across-the-board leads that need attention now
-              </p>
-            </div>
-            <button
-              onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View Leads <MdArrowForward size={14} />
-            </button>
+      {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        {/* Engine Overview funnel */}
+        <section className="xl:col-span-7 rounded-xl p-4 sm:p-6 border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
+          <p className="text-xs mt-0.5 mb-5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
+          <div className="flex items-start justify-between gap-1">
+            <EngineNode icon={<MdChatBubble size={22} />} color="#3B82F6" count={metrics.totalConversations.total} label="New Conversations" sub={metrics.trends?.conversations?.change ? `${metrics.trends.conversations.change > 0 ? '+' : ''}${Math.round(metrics.trends.conversations.change)}%` : undefined} />
+            <EngineNode icon={<MdPeople size={22} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={22} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
+            <EngineNode icon={<MdSchedule size={22} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
+            <EngineNode icon={<MdCalendarToday size={22} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
           </div>
-
-          {metrics.leadsNeedingAttention.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                    <th className="px-4 py-2 font-medium">Lead</th>
-                    <th className="px-3 py-2 font-medium">Intent</th>
-                    <th className="px-3 py-2 font-medium hidden md:table-cell">Owner</th>
-                    <th className="px-3 py-2 font-medium hidden lg:table-cell">Last Contact</th>
-                    <th className="px-3 py-2 font-medium">Stage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metrics.leadsNeedingAttention.map((lead) => {
-                    const tone = getScoreTone(lead.score)
-                    return (
-                      <tr
-                        key={lead.id}
-                        onClick={() => openLeadModal(lead.id)}
-                        className="group cursor-pointer border-t transition-colors"
-                        style={{ borderColor: 'var(--accent-subtle)' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3 min-w-[180px]">
-                            <span
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                              style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}
-                            >
-                              {getInitials(lead.name)}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
-                              <p className="text-xs truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} lead</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span
-                            className="inline-flex items-center rounded px-2 py-1 text-[11px] font-semibold whitespace-nowrap"
-                            style={{ backgroundColor: tone.bg, color: tone.color }}
-                          >
-                            {tone.label} · {lead.score}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 hidden md:table-cell">
-                          <span className="text-xs" style={{ color: lead.owner?.name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                            {lead.owner?.name || 'Unowned'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 hidden lg:table-cell">
-                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                            {formatTimeAgo(lead.lastContact)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span
-                            className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap"
-                            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-                          >
-                            {lead.stage}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
-              No priority leads right now.
-            </div>
-          )}
+          <div className="mt-5 pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
+            {metrics.responseHealth.status === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+          </div>
         </section>
 
-        {/* Upcoming Events - owner-aware list tied back to lead detail */}
-        <section
-          className="xl:col-span-5 rounded-lg p-4 sm:p-5 border flex flex-col"
-          style={{
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-          }}
-        >
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
-                <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {metrics.upcomingBookings.length}
-                </span>
-              </div>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                Shows the lead owner so the right person can follow through
-              </p>
-            </div>
-            <button
-              onClick={() => router.push('/dashboard/bookings')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap"
-              style={{ color: '#3B82F6' }}
-            >
-              View All <MdArrowForward size={14} />
+        {/* Upcoming Events — owner-aware (reused) */}
+        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
+            <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              View all <MdArrowForward size={13} />
             </button>
           </div>
-
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-2.5">
             {metrics.upcomingBookings.length > 0 ? (
-              metrics.upcomingBookings.slice(0, 6).map((booking) => (
+              metrics.upcomingBookings.slice(0, 5).map((booking) => (
                 <button
-                  key={booking.id}
-                  type="button"
-                  onClick={() => openLeadModal(booking.id)}
-                  className="w-full flex items-center gap-3 p-3 text-left rounded-lg transition-all border"
-                  style={{
-                    borderColor: 'rgba(59, 130, 246, 0.2)',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    borderWidth: '1px',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                    e.currentTarget.style.borderColor = '#3B82F6'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-                  }}
+                  key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
+                  className="w-full flex items-center gap-3 p-2.5 text-left rounded-lg transition-all border"
+                  style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
                 >
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}
-                  >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                        {booking.name}
-                      </p>
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap"
-                        style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}
-                      >
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                         {formatCountdown(booking.datetime)}
                       </span>
                     </div>
-                    {booking.title && (
-                      <p className="text-xs truncate" style={{ color: 'var(--text-primary)', opacity: 0.75 }}>
-                        {booking.title}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                        {formatBookingWhen(booking.datetime)}
-                      </span>
-                      <span className="text-xs" style={{ color: booking.owner?.name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                        Owner: {booking.owner?.name || 'Unowned'}
-                      </span>
-                    </div>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {booking.title ? `${booking.title} · ` : ''}{formatBookingWhen(booking.datetime)}
+                    </p>
                   </div>
                 </button>
               ))
@@ -862,27 +412,184 @@ export default function FounderDashboard() {
         </section>
       </div>
 
+      {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        {/* Priority Lead Queue */}
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Leads that need your attention now</p>
+            </div>
+            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              View Leads <MdArrowForward size={13} />
+            </button>
+          </div>
+          {metrics.leadsNeedingAttention.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    <th className="px-4 py-2 font-medium">Lead</th>
+                    <th className="px-3 py-2 font-medium">Intent</th>
+                    <th className="px-3 py-2 font-medium hidden md:table-cell">Recommended Next Step</th>
+                    <th className="px-3 py-2 font-medium hidden lg:table-cell">Due</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metrics.leadsNeedingAttention.slice(0, 6).map((lead) => {
+                    const intent = intentFor(lead.score)
+                    const status = statusFor(lead.lastContact, lead.score)
+                    return (
+                      <tr key={lead.id} onClick={() => openLeadModal(lead.id)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-[150px]">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{getInitials(lead.name)}</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
+                              <p className="text-[11px] truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} · score {lead.score}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-semibold whitespace-nowrap" style={{ backgroundColor: intent.bg, color: intent.color }}>{intent.label}</span>
+                        </td>
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nextStepFor(lead.stage)}</span>
+                        </td>
+                        <td className="px-3 py-3 hidden lg:table-cell">
+                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{formatTimeAgo(lead.lastContact)}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No priority leads right now.</div>
+          )}
+        </section>
+
+        {/* Conversations Trend */}
+        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>7D</span>
+          </div>
+          <div className="flex-1 min-h-[120px]">
+            {convSeries.length > 1 ? (
+              <ActivityArea data={convSeries.map((d, i) => ({ time: String(i), value: d.value }))} color="#afd510" />
+            ) : (
+              <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+            <div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{metrics.totalConversations.total}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
+            </div>
+            <div>
+              <KpiDelta change={metrics.trends?.conversations?.change} />
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs last 7 days</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dailyAvg}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
       {/* Lead Details Modal */}
       {showLeadModal && selectedLead && (
         <LeadDetailsModal
           lead={selectedLead}
           isOpen={showLeadModal}
-          onClose={() => {
-            console.log('🔴 Closing modal')
-            setShowLeadModal(false)
-            setSelectedLead(null)
-          }}
-          onStatusUpdate={async () => {
-            await loadMetrics()
-          }}
+          onClose={() => { setShowLeadModal(false); setSelectedLead(null) }}
+          onStatusUpdate={async () => { await loadMetrics() }}
         />
       )}
-      {/* Debug: Show modal state */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black/80 text-white text-xs p-2 rounded z-50">
-          Modal: {showLeadModal ? 'OPEN' : 'CLOSED'} | Lead: {selectedLead?.id || 'NONE'}
-        </div>
-      )}
     </div>
+  )
+}
+
+// ── Home-page building blocks (mockup layout) ──────────────────────────────
+
+function KpiDelta({ change, goodWhenUp = true, suffix = '%' }: { change?: number; goodWhenUp?: boolean; suffix?: string }) {
+  if (change == null || !isFinite(change) || change === 0) return null
+  const up = change > 0
+  const good = up === goodWhenUp
+  const color = good ? '#22c55e' : '#ef4444'
+  const Icon = up ? MdTrendingUp : MdTrendingDown
+  return (
+    <span className="inline-flex items-center gap-0.5 text-xs font-semibold" style={{ color }}>
+      <Icon size={13} />{Math.abs(Math.round(change))}{suffix}
+    </span>
+  )
+}
+
+function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkColor, onClick }: {
+  icon: React.ReactNode
+  iconColor: string
+  label: string
+  value: React.ReactNode
+  sub?: string
+  delta?: React.ReactNode
+  sparkData?: Array<{ value: number }>
+  sparkColor?: string
+  onClick?: () => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
+        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </div>
+      <div className="flex items-end gap-2 mt-2">
+        <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
+        {delta}
+      </div>
+      {sparkData && sparkData.length > 1 ? (
+        <div className="w-full mt-2" style={{ height: 30 }}>
+          <Sparkline data={sparkData} color={sparkColor || iconColor} height={30} showGradient />
+        </div>
+      ) : (
+        <div style={{ height: 30 }} />
+      )}
+      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{sub || 'vs last 7 days'}</span>
+    </div>
+  )
+}
+
+function EngineNode({ icon, color, count, label, sub, last }: {
+  icon: React.ReactNode
+  color: string
+  count: number
+  label: string
+  sub?: string
+  last?: boolean
+}) {
+  return (
+    <>
+      <div className="flex flex-col items-center text-center flex-1 min-w-[60px]">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full mb-2" style={{ backgroundColor: `${color}1f`, color }}>{icon}</span>
+        <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{count}</span>
+        <span className="text-[11px] mt-0.5 leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        {sub && <span className="text-[10px] mt-0.5" style={{ color }}>{sub}</span>}
+      </div>
+      {!last && <MdArrowForward className="shrink-0 mx-0.5 mt-4 hidden sm:block" size={15} style={{ color: 'var(--text-muted)' }} />}
+    </>
   )
 }

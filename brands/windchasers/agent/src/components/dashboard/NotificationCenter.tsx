@@ -64,6 +64,19 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
+// Humanise the channel for the neutral chip (skip generic/system values).
+function channelLabel(ch?: string): string | null {
+  const c = (ch || '').trim().toLowerCase()
+  if (!c || c === 'system' || c === 'internal' || c === 'unknown') return null
+  const map: Record<string, string> = {
+    web: 'Web Form', webform: 'Web Form', web_form: 'Web Form',
+    whatsapp: 'WhatsApp', wa: 'WhatsApp', email: 'Email',
+    call: 'Call', phone: 'Call', score: 'Score Update', score_update: 'Score Update',
+  }
+  if (map[c]) return map[c]
+  return c.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
+}
+
 // New leads read green with a NEW LEAD tag; updates keep stage/score colours.
 function eventVisual(ev: { type: string; content: string; metadata?: any }): Visual {
   if (ev.type === 'new_lead_scored') {
@@ -150,7 +163,10 @@ export default function NotificationCenter() {
       const fresh = incoming.filter((e) => !knownIdsRef.current.has(e.id))
       if (fresh.length > 0) {
         fresh.forEach((e) => knownIdsRef.current.add(e.id))
-        setToasts((prev) => [...fresh.slice(0, 3), ...prev].slice(0, 4))
+        // Only ever surface the latest TWO as toasts — newest on top. Anything
+        // beyond that lives behind the "View all notifications" button. Keeps
+        // the corner stack from blasting 3-4 cards at once.
+        setToasts((prev) => [...fresh.slice(0, 2), ...prev].slice(0, 2))
         // New leads take sound priority over plain updates.
         playSound(fresh.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
       }
@@ -313,48 +329,76 @@ export default function NotificationCenter() {
         </div>
       )}
 
-      {/* Toast stack — bottom-right. New leads get a green accent + tag. */}
-      <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', maxWidth: 'calc(100vw - 40px)' }}>
-        {toasts.map((t) => {
-          const v = eventVisual(t)
-          return (
-            <div
-              key={t.id}
-              onClick={goToLead}
-              className="flex items-start gap-3 px-4 py-3 rounded-xl shadow-2xl cursor-pointer"
-              style={{
-                width: '320px',
-                maxWidth: 'calc(100vw - 40px)',
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-primary)',
-                borderLeft: `3px solid ${v.color}`,
-                animation: 'wc-notif-in 220ms cubic-bezier(0.2,0,0,1)',
-              }}
-            >
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
-                <v.Icon size={16} />
-              </span>
-              <span className="flex-1 min-w-0">
-                {v.kind === 'new' && (
-                  <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded mb-1" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
-                    {v.label}
-                  </span>
-                )}
-                <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
-                <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>{timeAgo(t.timestamp)}</span>
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
-                className="p-0.5 rounded flex-shrink-0"
-                style={{ color: 'var(--text-secondary)' }}
-                aria-label="Dismiss"
+      {/* Toast stack — bottom-right. At most the latest TWO cards, then a
+          frosted "View all notifications" button that opens the full drawer.
+          Narrow + clean (reference panel was too wide). */}
+      {toasts.length > 0 && (
+        <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', width: '340px', maxWidth: 'calc(100vw - 32px)' }}>
+          {toasts.slice(0, 2).map((t) => {
+            const v = eventVisual(t)
+            const chan = channelLabel(t.channel)
+            return (
+              <div
+                key={t.id}
+                onClick={goToLead}
+                className="flex items-start gap-3 px-3.5 py-3 rounded-xl shadow-2xl cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  borderLeft: `3px solid ${v.color}`,
+                  animation: 'wc-notif-in 220ms cubic-bezier(0.2,0,0,1)',
+                }}
               >
-                <MdClose size={16} />
-              </button>
-            </div>
-          )
-        })}
-      </div>
+                <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
+                  <v.Icon size={16} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  {/* top row: time + dismiss */}
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="block text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
+                      className="p-0.5 -mt-0.5 -mr-0.5 rounded flex-shrink-0"
+                      style={{ color: 'var(--text-secondary)' }}
+                      aria-label="Dismiss"
+                    >
+                      <MdClose size={15} />
+                    </button>
+                  </span>
+                  {/* chips */}
+                  <span className="flex items-center gap-1.5 mt-1.5">
+                    <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
+                      {v.label}
+                    </span>
+                    {chan && (
+                      <span className="inline-block text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                        {chan}
+                      </span>
+                    )}
+                    <span className="ml-auto text-[11px]" style={{ color: 'var(--text-secondary)' }}>{timeAgo(t.timestamp)}</span>
+                  </span>
+                  {/* action */}
+                  <span className="block text-[11px] font-medium mt-1.5 hover:underline" style={{ color: v.color }}>View lead →</span>
+                </span>
+              </div>
+            )
+          })}
+          <button
+            onClick={openDrawer}
+            className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-medium transition hover:opacity-90"
+            style={{
+              background: 'color-mix(in srgb, var(--bg-secondary) 65%, transparent)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--text-primary)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            }}
+          >
+            View all notifications{unread > 0 ? ` (${unread})` : ''} →
+          </button>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes wc-notif-in {
