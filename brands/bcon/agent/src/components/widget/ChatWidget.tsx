@@ -794,6 +794,44 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setRecentHistory(historyRef.current);
   };
 
+  // Fire-and-forget web-visitor event telemetry (mirrors Windchasers).
+  const persistWebEvents = useCallback(async (
+    eventMessages: Array<{
+      sender: 'customer' | 'agent' | 'system';
+      content: string;
+      messageType?: string;
+      metadata?: Record<string, any>;
+    }>,
+  ) => {
+    if (!externalSessionId || eventMessages.length === 0) return;
+
+    try {
+      await fetch('/api/agent/web/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+          messages: eventMessages,
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist web event:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
 
   const buildRequestPayload = () => ({
     session: {
@@ -1195,8 +1233,25 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (message.text) {
       // Strip HTML tags before adding to history for summarization
       const plainText = message.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      // Capture the latest user turn (set just before this assistant reply) for telemetry.
+      const lastUserTurn = [...historyRef.current].reverse().find((entry) => entry.role === 'user');
       appendHistory({ role: 'assistant', content: plainText });
       // Don't store assistant messages - we focus on user inputs and summaries
+
+      // Fire-and-forget: log the customer message + assistant reply as web events.
+      if (plainText) {
+        const events: Array<{
+          sender: 'customer' | 'agent' | 'system';
+          content: string;
+          messageType?: string;
+          metadata?: Record<string, any>;
+        }> = [];
+        if (lastUserTurn?.content) {
+          events.push({ sender: 'customer', content: lastUserTurn.content, messageType: 'text' });
+        }
+        events.push({ sender: 'agent', content: plainText, messageType: 'text' });
+        void persistWebEvents(events);
+      }
     }
 
     if (!hasReceivedFirstResponse) {
@@ -2230,11 +2285,36 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         const bookingMessage = `Your call is scheduled for ${formattedDate} at ${formattedTime}.`;
         addAIMessage(bookingMessage);
 
+        // Fire-and-forget: log the booking as web events (mirrors Windchasers).
+        await persistWebEvents([
+          {
+            sender: 'system',
+            content: `Booking confirmed for ${formattedDate} at ${formattedTime}.`,
+            messageType: 'booking',
+            metadata: {
+              intent: 'booking_complete',
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+            },
+          },
+          {
+            sender: 'agent',
+            content: bookingMessage,
+            messageType: 'booking_confirmation',
+            metadata: {
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+            },
+          },
+        ]);
+
         // Note: Booking info will be naturally included in the summary when the AI processes the booking message
         // No need to manually append metadata strings - let the summarize API handle it naturally
       }
     }
-  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary]);
+  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary, persistWebEvents]);
 
   // Check for existing booking before showing calendar
   const checkAndShowBooking = useCallback(async () => {
