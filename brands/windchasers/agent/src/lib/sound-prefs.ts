@@ -13,7 +13,7 @@
 export type SoundEvent = 'new' | 'update' | 'ready'
 
 export const SOUND_FILES: Record<SoundEvent, string> = {
-  new: '/sounds/new-lead.wav',
+  new: '/sounds/new-lead.mp3', // custom file supplied by the team
   update: '/sounds/update.wav',
   ready: '/sounds/page-load.mp3', // custom file supplied by the team
 }

@@ -11,12 +11,11 @@ Proper notification-sound synthesis (as Slack/iOS use), not bare sine beeps:
   - gentle tanh soft-clip + normalize
 
 Chosen mapping (audition the full set with gen_sound_candidates.py):
-  new-lead.wav     <- "A" marimba knock  (G4->C5, warm, friendly)
   update.wav       <- "D" soft pop       (tap + warm note, subtler sibling)
-  notification.wav <- alias of new-lead   (keeps the orphan path resolving)
 
-The page-ready cue is NOT synthesized here — it uses public/sounds/page-load.mp3
-(a custom file supplied by the team; see SOUND_FILES.ready in sound-prefs.ts).
+Only the "update" cue is synthesized here. New-lead and page-ready both use
+custom team-supplied mp3s (public/sounds/new-lead.mp3, public/sounds/page-load.mp3;
+see SOUND_FILES in sound-prefs.ts).
 
 Re-run after tweaking; pure stdlib, deterministic, no external deps.
 """
@@ -108,13 +107,7 @@ def write(path, buf):
 MARIMBA = [(1.0, 1.0, 5.5), (3.93, 0.42, 10), (9.2, 0.14, 18), (2.0, 0.10, 8)]
 GLASS   = [(1.0, 1.0, 3.2), (2.76, 0.45, 5), (5.40, 0.22, 7), (8.93, 0.08, 9)]
 
-C5, C6, G4, A5 = 523.25, 1046.5, 392.0, 880.0
-
-def build_new_lead():   # "A" marimba knock — warm two-note G4->C5
-    g = int(RATE * 0.11)
-    raw = mix([(0, voice(G4, 0.6, MARIMBA, amp=0.6, glide=0.06, noise_amp=0.18, seed=3)),
-               (g, voice(C5, 0.7, MARIMBA, amp=0.6, glide=0.05, noise_amp=0.14, seed=7))])
-    return finalize(raw, wet=0.25)
+C6 = 1046.5
 
 def build_update():     # "D" soft pop — tap + warm note, quieter sibling
     pop = voice(180, 0.18, [(1.0, 1.0, 22), (2.0, 0.3, 30)], amp=0.7, glide=0.5,
@@ -124,11 +117,8 @@ def build_update():     # "D" soft pop — tap + warm note, quieter sibling
 
 def main():
     out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "sounds"))
-    new_lead = build_new_lead()
-    write(os.path.join(out, "new-lead.wav"), new_lead)
-    write(os.path.join(out, "notification.wav"), list(new_lead))
     write(os.path.join(out, "update.wav"), build_update())
-    # ready/page-load is a custom mp3, not generated here.
+    # new-lead and ready/page-load are custom mp3s, not generated here.
 
 if __name__ == "__main__":
     main()
