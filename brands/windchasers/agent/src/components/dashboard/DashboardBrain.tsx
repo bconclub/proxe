@@ -10,7 +10,8 @@
  */
 
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
-import { MdClose, MdAutoAwesome, MdSend } from 'react-icons/md'
+import { MdClose, MdSend } from 'react-icons/md'
+import ProxeMark from '@/components/ProxeMark'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 
@@ -196,7 +197,7 @@ export default function DashboardBrain() {
         aria-label="Ask PROXe"
         title="Ask PROXe"
       >
-        <MdAutoAwesome size={17} />
+        <ProxeMark size={18} />
       </button>
 
       {open && (
@@ -215,7 +216,7 @@ export default function DashboardBrain() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
               <div className="flex items-center gap-2">
-                <MdAutoAwesome size={18} style={{ color: 'var(--accent-primary)' }} />
+                <ProxeMark size={18} color="var(--accent-primary)" />
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ask PROXe</h3>
               </div>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-md" style={{ color: 'var(--text-secondary)' }} aria-label="Close">
@@ -227,7 +228,7 @@ export default function DashboardBrain() {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {messages.length === 0 && (
                 <div className="text-center py-6">
-                  <MdAutoAwesome size={28} style={{ color: 'var(--accent-primary)', margin: '0 auto' }} />
+                  <ProxeMark size={30} color="var(--accent-primary)" className="mx-auto" />
                   <p className="text-sm mt-2" style={{ color: 'var(--text-primary)' }}>Ask anything about your dashboard.</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Leads, pipeline, today’s activity, bookings.</p>
                   <div className="flex flex-col gap-2 mt-4">
@@ -265,7 +266,7 @@ export default function DashboardBrain() {
               {loading && (
                 <div className="flex justify-start">
                   <div className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                    <MdAutoAwesome size={14} className="animate-pulse" style={{ color: 'var(--accent-primary)' }} />
+                    <ProxeMark size={14} color="var(--accent-primary)" className="animate-pulse" />
                     <span>{loadingMsg}</span>
                   </div>
                 </div>

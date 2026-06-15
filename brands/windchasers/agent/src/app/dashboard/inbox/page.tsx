@@ -2642,12 +2642,16 @@ export default function InboxPage() {
                 <select
                   value={leadDetails?.unified_context?.owner?.id || ''}
                   onChange={(e) => setLeadOwner(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  // colorScheme makes the native dropdown render dark in dark mode —
+                  // without it the options were white-on-white (only the highlighted
+                  // row showed), so the list looked empty. Options also get explicit
+                  // bg/color for browsers that honour it.
+                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-secondary)', colorScheme: 'light dark' }}
                 >
-                  <option value="">Unassigned</option>
+                  <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Unassigned</option>
                   {teamMembers.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{m.name}</option>
                   ))}
                 </select>
               </div>
