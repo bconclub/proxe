@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-15 11:12 IST · Windchasers: Humans is now a top-level nav item (full team management)
+
+- Promoted Humans from a tab inside Agents to its own sidebar item, directly below Agents (/dashboard/humans).
+- It opens the full team-management screen — invite, role, deactivate, and last-active/last-login per person (the existing UserManagement, reused). "Manage team" now lives under Humans.
+- Removed the read-only Humans tab from the Agents page (and HumansTab.tsx).
+
 ## 2026-06-15 10:50 IST · Windchasers: "Humans" tab under Agents (the managing team)
 
 - Added a Humans tab on the Agents page — the real people managing leads alongside the AI agents. Lists active team members (name + email) from /api/dashboard/team-members, with a "Manage team" link to Configure → Users. Read-only roster; add/remove/roles stay in Configure.

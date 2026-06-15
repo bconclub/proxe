@@ -55,6 +55,7 @@ const navigation: NavItem[] = [
   { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
   // SYSTEM
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
+  { name: 'Humans', href: '/dashboard/humans', icon: MdPeople },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
