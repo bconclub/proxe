@@ -20,6 +20,7 @@ interface SnapshotData {
     agent_replies: number
   }
   scoreHistogram: { hot: number; warm: number; cold: number; unscored: number }
+  callsByUser?: Array<{ name: string; count: number }>
   topActive: Array<{ id: string; name: string; phone: string | null; score: number | null; messageCount: number }>
 }
 
@@ -285,6 +286,19 @@ export default function TodaySnapshotButton() {
                         <EventCell label="Agent replies" value={data.events.agent_replies} />
                         <EventCell label="Calls logged" value={data.events.calls_logged} />
                       </div>
+
+                      {/* Who logged calls + how many each */}
+                      {data.callsByUser && data.callsByUser.length > 0 && (
+                        <div className="mt-2.5 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Calls by</p>
+                          {data.callsByUser.map((u) => (
+                            <div key={u.name} className="flex items-center justify-between">
+                              <span className="text-[11px] truncate" style={{ color: 'var(--text-primary)' }}>{u.name}</span>
+                              <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{u.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </section>
 
                     {/* Top active leads */}

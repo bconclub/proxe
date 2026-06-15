@@ -401,6 +401,7 @@ Sentence 1: Who they are and which course/program they're interested in (e.g. CP
 Sentence 2: What they asked about or what was discussed.
 Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
 If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
+IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
 
 CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
 If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
@@ -416,7 +417,7 @@ Keep it under 50 words. Be specific to what was actually said. No fluff.
 Lead: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
 ${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-
+${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
 ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}`
 
           // Add timeout to prevent hanging
@@ -775,6 +776,7 @@ Sentence 1: Who they are and which course/program they're interested in (e.g. CP
 Sentence 2: What they asked about or what was discussed.
 Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
 If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
+IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
 
 CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
 If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
@@ -790,7 +792,7 @@ Keep it under 50 words. Be specific to what was actually said. No fluff.
 Lead: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
 ${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-
+${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
 CONVERSATION (${conversationMessages.length} messages):
 ${conversationContext || 'No messages yet'}`
 

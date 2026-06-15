@@ -272,7 +272,9 @@ const CHANNEL_CONFIG = {
   voice: {
     name: 'Voice',
     icon: MdPhone,
-    color: 'var(--accent-primary)',
+    // Fixed sky-blue, NOT var(--accent-primary): the accent is white in dark
+    // mode, so the white phone icon was invisible on a white circle.
+    color: '#0EA5E9',
     emoji: '📞'
   },
   social: {

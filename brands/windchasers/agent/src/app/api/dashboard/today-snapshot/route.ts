@@ -196,10 +196,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // Agent replies + calls — still conversation-based
+    // Agent replies (conversation-based) + manually logged calls (activities).
+    // Calls are logged via the Log Call action → activities row with
+    // activity_type='call' and created_by=<user id>. The old metric counted
+    // conversations.channel='voice' (Vapi voice calls only), so manual call
+    // logs never showed up — that's why "Calls logged" stayed at 0.
     const [
       { data: agentMsgsToday },
-      { data: voiceCallsToday },
+      { data: callActsToday },
     ] = await Promise.all([
       supabase
         .from('conversations')
@@ -209,11 +213,11 @@ export async function GET(request: Request) {
         .eq('sender', 'agent')
         .eq('channel', 'whatsapp'),
       supabase
-        .from('conversations')
-        .select('id, channel, created_at')
+        .from('activities')
+        .select('created_by, created_at')
+        .eq('activity_type', 'call')
         .gte('created_at', startIso)
-        .lte('created_at', endIso)
-        .eq('channel', 'voice'),
+        .lte('created_at', endIso),
     ]);
 
     let agentReplies = 0;
@@ -221,10 +225,34 @@ export async function GET(request: Request) {
       if (m?.metadata?.ai_generated) agentReplies++;
     }
 
+    // Who logged calls + how many each (founder wants the per-user breakdown).
+    const callCountByUser = new Map<string, number>();
+    for (const a of (callActsToday || [])) {
+      const key = (a as any).created_by || 'unknown';
+      callCountByUser.set(key, (callCountByUser.get(key) || 0) + 1);
+    }
+    const callUserIds = Array.from(callCountByUser.keys()).filter((k) => k !== 'unknown');
+    const callUserNameById = new Map<string, string>();
+    if (callUserIds.length > 0) {
+      const { data: callUsers } = await supabase
+        .from('dashboard_users')
+        .select('id, full_name, email')
+        .in('id', callUserIds);
+      for (const u of (callUsers || [])) {
+        callUserNameById.set(u.id, u.full_name || (u.email || '').split('@')[0] || 'User');
+      }
+    }
+    const callsByUser = Array.from(callCountByUser.entries())
+      .map(([id, count]) => ({
+        name: id === 'unknown' ? 'Unknown' : (callUserNameById.get(id) || 'User'),
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
     const events = {
       pat_submitted: patSubmitted,
       demo_booked: demoBooked,
-      calls_logged: (voiceCallsToday || []).length,
+      calls_logged: (callActsToday || []).length,
       agent_replies: agentReplies,
     };
 
@@ -269,6 +297,7 @@ export async function GET(request: Request) {
       window: { startIso, endIso, label: RANGE_LABELS[range] || 'Today (IST)', range },
       leads: { total: leads.length, bySource, byType },
       events,
+      callsByUser,
       scoreHistogram,
       topActive,
     });
