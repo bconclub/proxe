@@ -203,11 +203,42 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
     const m = lower.match(/in\s*(\d+)\s*days?/);
     if (m) targetIST.setUTCDate(targetIST.getUTCDate() + parseInt(m[1]));
   } else {
-    const parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) {
-      targetIST = new Date(parsed.getTime() + istOffsetMs);
+    // Robust parse of free-text dates the classifier emits — "25 june",
+    // "25th june", "june 25", "19-06-2026" (DD-MM-YYYY, Indian), "2026-06-25",
+    // "25/06". Native new Date("25th june") is Invalid → it was silently
+    // falling back to tomorrow (so "25 june" booked as Jun 16). Parse it here.
+    const cleaned = lower.replace(/(\d{1,2})(st|nd|rd|th)/g, '$1').trim();
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    let day = 0, mon = -1, year = 0, explicitYear = false;
+
+    const monIdx = months.findIndex((m) => cleaned.includes(m) || new RegExp(`\\b${m.slice(0, 3)}\\b`).test(cleaned));
+    if (monIdx >= 0) {
+      mon = monIdx;
+      const dayM = cleaned.match(/\b(\d{1,2})\b/);
+      if (dayM) day = parseInt(dayM[1], 10);
+      const yrM = cleaned.match(/\b(20\d{2})\b/);
+      if (yrM) { year = parseInt(yrM[1], 10); explicitYear = true; }
     } else {
-      targetIST.setUTCDate(targetIST.getUTCDate() + 1);
+      let m;
+      if ((m = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](20\d{2})$/))) { day = +m[1]; mon = +m[2] - 1; year = +m[3]; explicitYear = true; }
+      else if ((m = cleaned.match(/^(20\d{2})[-/](\d{1,2})[-/](\d{1,2})$/))) { year = +m[1]; mon = +m[2] - 1; day = +m[3]; explicitYear = true; }
+      else if ((m = cleaned.match(/^(\d{1,2})[-/](\d{1,2})$/))) { day = +m[1]; mon = +m[2] - 1; }
+    }
+
+    if (mon >= 0 && mon <= 11 && day >= 1 && day <= 31) {
+      if (!explicitYear) year = targetIST.getUTCFullYear();
+      targetIST.setUTCFullYear(year, mon, day);
+      // No year given and the date already passed this year → roll to next year.
+      if (!explicitYear && targetIST.getTime() < nowIST.getTime()) {
+        targetIST.setUTCFullYear(year + 1, mon, day);
+      }
+    } else {
+      const parsed = new Date(dateStr);
+      if (!isNaN(parsed.getTime())) {
+        targetIST = new Date(parsed.getTime() + istOffsetMs);
+      } else {
+        targetIST.setUTCDate(targetIST.getUTCDate() + 1);
+      }
     }
   }
 

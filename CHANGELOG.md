@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-15 10:44 IST · Windchasers: fix booking date parse ("25th june" was landing on tomorrow)
+
+- "Demo booked 25th june 3pm" was recorded as the Key Event on Jun 16 (today+1). resolveBookingDate couldn't parse "25th june" (native new Date() returns Invalid) and silently fell back to tomorrow — same bug for "19-06-2026".
+- Rewrote the parser to handle "25 june" / "25th june" / "june 25", DD-MM-YYYY (Indian), YYYY-MM-DD, and DD-MM, with day/ordinal stripping and next-year roll when no year is given and the date already passed. Now "25th june" books Jun 25.
+
 ## 2026-06-15 10:33 IST · Windchasers: dark theme default for everyone + current-theme indicator
 
 - Dark is now the default for all users. One-time migration flips any existing light/brand preference to dark (so everyone goes black now); afterwards each user's choice is respected. New users already default to dark. (Theme is per-device — stored in localStorage.)
