@@ -12,30 +12,13 @@ import {
   setEventEnabled,
   preview as previewSound,
 } from '@/lib/sound-prefs';
+import { ACCENT_THEMES } from '@/lib/accent-theme';
+import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
   { ev: 'new', hint: 'Warm marimba knock when a fresh lead is scored' },
   { ev: 'update', hint: 'Soft pop on a stage or score change' },
   { ev: 'ready', hint: 'Calm glass ding when the home page finishes loading' },
-];
-
-const ACCENT_THEMES = [
-  {
-    id: 'aviation-gold',
-    name: 'Aviation Gold',
-    color: '#C9A961',
-    bgSecondary: '#1A0F0A',
-    bgTertiary: 'rgba(201, 169, 97, 0.12)',
-    bgHover: 'rgba(201, 169, 97, 0.16)',
-    borderPrimary: 'rgba(201, 169, 97, 0.32)',
-    textPrimary: '#E8D5B7',
-    textSecondary: 'rgba(232, 213, 183, 0.75)',
-    buttonBg: '#C9A961',
-    textButton: '#1A0F0A',
-  },
-  { id: 'gold', name: 'Electric Lime', color: '#afd510' },
-  { id: 'orange', name: 'Sunset Orange', color: '#fc7301' },
-  { id: 'grey', name: 'Neutral Grey', color: '#6B7280' },
 ];
 
 export default function SettingsPage() {
@@ -60,12 +43,19 @@ export default function SettingsPage() {
   }, []);
 
   function toggleMuted() {
-    setSoundMuted((m) => { const next = !m; persistMuted(next); return next; });
+    setSoundMuted((m) => {
+      const next = !m;
+      persistMuted(next);
+      // Global: applies to every user on their next load.
+      saveGlobalPrefs({ sounds: { muted: next, ...soundEnabled } });
+      return next;
+    });
   }
   function toggleEvent(ev: SoundEvent) {
     setSoundEnabled((prev) => {
       const next = { ...prev, [ev]: !prev[ev] };
       setEventEnabled(ev, next[ev]);
+      saveGlobalPrefs({ sounds: { muted: soundMuted, ...next } });
       return next;
     });
   }
@@ -131,6 +121,8 @@ export default function SettingsPage() {
     setSelectedTheme(themeId);
     applyTheme(themeId);
     localStorage.setItem('windchasers-accent-theme', themeId);
+    // Global: every user picks up this accent on their next load.
+    saveGlobalPrefs({ theme: { accent: themeId } });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -168,7 +160,11 @@ export default function SettingsPage() {
               return (
                 <button
                   key={mode.id}
-                  onClick={() => setTheme(mode.id as 'bw-dark' | 'bw-light')}
+                  onClick={() => {
+                    setTheme(mode.id as 'bw-dark' | 'bw-light');
+                    // Global: dashboard mode for everyone on next load.
+                    saveGlobalPrefs({ theme: { mode: mode.id as 'bw-dark' | 'bw-light' } });
+                  }}
                   className="p-4 rounded-xl border-2 transition-all flex items-center gap-3 text-left"
                   style={{
                     background: 'var(--bg-secondary)',
@@ -229,45 +225,8 @@ export default function SettingsPage() {
           )}
         </section>
 
-        {/* ── Widget Appearance ──────────────────────────────────────── */}
-        {/* Only one widget exists, so there's no style chooser any more — this
-            section shows how the live website chat widget looks with the current
-            theme. The launcher + prompt mirror the real widget. */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-            Widget Appearance
-          </h2>
-          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-            Your website chat widget automatically uses the theme above. Here's how it looks to visitors.
-          </p>
-
-          <div className="p-6 rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
-            {/* Faux website canvas with the launcher docked bottom-right */}
-            <div
-              className="relative rounded-lg overflow-hidden"
-              style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', height: 200 }}
-            >
-              <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2">
-                {/* Prompt pill */}
-                <div
-                  className="px-3 py-2 rounded-2xl text-xs font-medium shadow-md"
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-                >
-                  How can I help you?
-                </div>
-                {/* Launcher bubble */}
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                  style={{ background: 'var(--button-bg)' }}
-                >
-                  <svg className="w-7 h-7" style={{ color: 'var(--text-button)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Widget Appearance preview removed — the Agents › Web tab already
+            previews the live widget, so duplicating it here was redundant. */}
 
         {/* ── Preview ────────────────────────────────────────────────── */}
         {/* Theme samples — how the chosen accent renders across common UI. */}
