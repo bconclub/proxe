@@ -5,8 +5,9 @@ import WebAgentSettingsClient from '../settings/web-agent/WebAgentSettingsClient
 import InstagramAgentTab from './InstagramAgentTab';
 import WhatsAppAgentTab from './WhatsAppAgentTab';
 import VoiceAgentTab from './VoiceAgentTab';
+import HumansTab from './HumansTab';
 import { FaWhatsapp, FaInstagram } from 'react-icons/fa';
-import { MdLanguage, MdMic } from 'react-icons/md';
+import { MdLanguage, MdMic, MdPeople } from 'react-icons/md';
 import type { IconType } from 'react-icons';
 
 const tabs: Array<{
@@ -47,6 +48,13 @@ const tabs: Array<{
     icon: MdMic,
     activeClass: 'bg-[#3B82F6] text-white',
     inactiveClass: 'text-[#60A5FA] hover:text-[#93C5FD]',
+  },
+  {
+    id: 'Humans',
+    label: 'Humans',
+    icon: MdPeople,
+    activeClass: 'bg-[var(--button-bg)] text-[var(--text-button)]',
+    inactiveClass: 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]',
   },
 ];
 
@@ -94,6 +102,7 @@ export default function AgentsPage() {
         {active === 'WhatsApp' && <WhatsAppAgentTab />}
         {active === 'Instagram' && <InstagramAgentTab />}
         {active === 'Voice' && <VoiceAgentTab />}
+        {active === 'Humans' && <HumansTab />}
       </div>
     </div>
   );

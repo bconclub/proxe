@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-15 10:50 IST · Windchasers: "Humans" tab under Agents (the managing team)
+
+- Added a Humans tab on the Agents page — the real people managing leads alongside the AI agents. Lists active team members (name + email) from /api/dashboard/team-members, with a "Manage team" link to Configure → Users. Read-only roster; add/remove/roles stay in Configure.
+
 ## 2026-06-15 10:44 IST · Windchasers: fix booking date parse ("25th june" was landing on tomorrow)
 
 - "Demo booked 25th june 3pm" was recorded as the Key Event on Jun 16 (today+1). resolveBookingDate couldn't parse "25th june" (native new Date() returns Invalid) and silently fell back to tomorrow — same bug for "19-06-2026".
