@@ -306,13 +306,21 @@ export default function FounderDashboard() {
       <DashboardBrain />
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <NewLeadsCard metrics={metrics} onOpen={() => router.push('/dashboard/leads')} />
         <KpiCard
-          icon={<MdShowChart size={15} />} iconColor="#22c55e"
+          icon={<MdPeople size={15} />} iconColor="#22c55e"
+          label="Engaged Leads"
+          value={metrics.engagedLeads?.count ?? 0}
+          sparkData={metrics.trends?.leads?.data} sparkColor="#22c55e"
+          sub={total > 0 ? `of ${total} total leads` : 'engaged'}
+          onClick={() => router.push('/dashboard/leads?filter=engaged')}
+        />
+        <KpiCard
+          icon={<MdShowChart size={15} />} iconColor="#06b6d4"
           label="Response Rate"
           value={`${Math.round(rm?.responseRate ?? 0)}%`}
-          sparkData={metrics.radialTrends?.responseRate} sparkColor="#22c55e"
+          sparkData={metrics.radialTrends?.responseRate} sparkColor="#06b6d4"
           sub="reply coverage"
         />
         {/* Follow-up Health — status + ring */}
@@ -352,12 +360,12 @@ export default function FounderDashboard() {
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-7 rounded-xl p-4 sm:p-6 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdChatBubble size={28} />} color="#3B82F6" count={metrics.totalConversations.total} label="New Conversations" sub={metrics.trends?.conversations?.change ? `${metrics.trends.conversations.change > 0 ? '+' : ''}${Math.round(metrics.trends.conversations.change)}%` : undefined} />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub={metrics.trends?.leads?.change ? `${metrics.trends.leads.change > 0 ? '+' : ''}${Math.round(metrics.trends.leads.change)}%` : 'top of funnel'} />
             <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
             <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
@@ -369,8 +377,8 @@ export default function FounderDashboard() {
           </div>
         </section>
 
-        {/* Upcoming Events — owner-aware (reused) */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
+        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -609,7 +617,9 @@ function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: ()
       </div>
       <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={onOpen}>
         <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
-        <KpiDelta change={metrics.trends?.leads?.change} />
+        {/* Only the 7-day change is real; hide the delta on other periods rather
+            than repeat the 7-day number (that's the bug founder flagged). */}
+        {period === '7D' && <KpiDelta change={metrics.trends?.leads?.change} />}
       </div>
       {spark && spark.length > 1 ? (
         <div className="w-full mt-2" style={{ height: 30 }}>
