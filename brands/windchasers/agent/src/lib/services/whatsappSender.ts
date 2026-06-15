@@ -273,9 +273,9 @@ export async function sendWhatsAppInteractiveButtons(
  * 2026-05-19. Update if Meta changes the HEADER component on any template.
  */
 export const TEMPLATE_HEADERS: Record<string, string> = {
-  windchasers_pat_result_v1:    'PAT Result',
-  windchasers_demo_online:      'Demo Session Booked',
-  windchasers_demo_offline_v1:  'Campus Visit Booked',
+  windchasers_pat_result_v2:    'PAT Result',
+  windchasers_demo_online_v2:      'Demo Session Booked',
+  windchasers_demo_offline_v2:  'Campus Visit Booked',
 };
 
 /**
@@ -283,9 +283,9 @@ export const TEMPLATE_HEADERS: Record<string, string> = {
  * template (verified against Graph API).
  */
 export const TEMPLATE_BUTTONS: Record<string, string[]> = {
-  windchasers_pat_result_v1:    ['Book a Demo Class', 'Plan My Pilot Career'],
-  windchasers_demo_online:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
-  windchasers_demo_offline_v1:  ['Get Directions', 'Join Pilot Community'],
+  windchasers_pat_result_v2:    ['Book a Demo Class', 'Plan My Pilot Career'],
+  windchasers_demo_online_v2:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
+  windchasers_demo_offline_v2:  ['Get Directions', 'Join Pilot Community'],
 };
 
 /**
@@ -496,11 +496,11 @@ export async function sendWelcomeTemplate(
  *
  * Two templates depending on format:
  *
- * OFFLINE — windchasers_demo_offline_v1
+ * OFFLINE — windchasers_demo_offline_v2
  *   {{1}} = first name · {{2}} = date · {{3}} = time
  *   No buttons (no Meet link, no Add to Calendar — user comes to the facility).
  *
- * ONLINE — windchasers_demo_online (note: no _v1 suffix; Meta-approved name)
+ * ONLINE — windchasers_demo_online_v2 (note: no _v1 suffix; Meta-approved name)
  *   {{1}} = first name · {{2}} = date · {{3}} = time
  *   Button 0 (URL, dynamic): base64 Google Calendar eventId.
  *   URL pattern registered in Meta: https://calendar.google.com/calendar/event?eid={{1}}
@@ -533,8 +533,8 @@ export async function sendDemoConfirmation(
     },
   ];
   const templateName = format === 'offline'
-    ? 'windchasers_demo_offline_v1'
-    : 'windchasers_demo_online';
+    ? 'windchasers_demo_offline_v2'
+    : 'windchasers_demo_online_v2';
   return sendWhatsAppTemplate(to, templateName, components);
 }
 
@@ -559,7 +559,7 @@ export async function sendDemoBookedConfirmation(
 /**
  * Send a PAT (Pilot Aptitude Test) result message after the lead completes the test.
  *
- * Template: windchasers_pat_result_v1
+ * Template: windchasers_pat_result_v2
  *   {{1}} = first name
  *   {{2}} = score displayed as /100 (e.g. "58") — converted from raw /150
  *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Early Stage")
@@ -610,7 +610,7 @@ export async function sendPATResult(
       ],
     },
   ];
-  return sendWhatsAppTemplate(to, 'windchasers_pat_result_v1', components);
+  return sendWhatsAppTemplate(to, 'windchasers_pat_result_v2', components);
 }
 
 /**

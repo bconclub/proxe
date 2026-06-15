@@ -571,7 +571,7 @@ export async function POST(request: NextRequest) {
           // Failures get a "[Template send FAILED]" prefix so they're scannable.
           const content = result.success
             ? renderedBody
-            : `[Template send FAILED: windchasers_pat_result_v1]\n\n${renderedBody}`
+            : `[Template send FAILED: windchasers_pat_result_v2]\n\n${renderedBody}`
 
           const { error: logErr } = await supabase.from('conversations').insert({
             lead_id: leadId,
@@ -580,10 +580,10 @@ export async function POST(request: NextRequest) {
             content,
             message_type: 'template',
             metadata: {
-              template_name: 'windchasers_pat_result_v1',
+              template_name: 'windchasers_pat_result_v2',
               template_language: 'en',
-              template_header: TEMPLATE_HEADERS['windchasers_pat_result_v1'] || null,
-              template_buttons: TEMPLATE_BUTTONS['windchasers_pat_result_v1'] || [],
+              template_header: TEMPLATE_HEADERS['windchasers_pat_result_v2'] || null,
+              template_buttons: TEMPLATE_BUTTONS['windchasers_pat_result_v2'] || [],
               auto_sent: true,
               trigger: 'pat_completed',
               sent_by: 'system (inbound webhook)',
@@ -619,10 +619,10 @@ export async function POST(request: NextRequest) {
             lead_id: leadId,
             channel: 'whatsapp',
             sender: 'agent',
-            content: `[Template send EXCEPTION: windchasers_pat_result_v1]\n\n${renderedBody}`,
+            content: `[Template send EXCEPTION: windchasers_pat_result_v2]\n\n${renderedBody}`,
             message_type: 'template',
             metadata: {
-              template_name: 'windchasers_pat_result_v1',
+              template_name: 'windchasers_pat_result_v2',
               auto_sent: true,
               trigger: 'pat_completed',
               send_succeeded: false,
@@ -756,8 +756,8 @@ export async function POST(request: NextRequest) {
         const demoFormat: DemoFormat = rawDemoType === 'online' ? 'online' : 'offline'
         const eventIdForButton = calendarResult?.eventId || null
         const templateName = demoFormat === 'online'
-          ? 'windchasers_demo_online'
-          : 'windchasers_demo_offline_v1'
+          ? 'windchasers_demo_online_v2'
+          : 'windchasers_demo_offline_v2'
 
         // AWAIT (not fire-and-forget) — see PAT block above for rationale.
         const firstName = (leadName || 'there').split(' ')[0]
