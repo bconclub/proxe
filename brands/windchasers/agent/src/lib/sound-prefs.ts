@@ -15,7 +15,7 @@ export type SoundEvent = 'new' | 'update' | 'ready'
 export const SOUND_FILES: Record<SoundEvent, string> = {
   new: '/sounds/new-lead.wav',
   update: '/sounds/update.wav',
-  ready: '/sounds/ready.wav',
+  ready: '/sounds/page-load.mp3', // custom file supplied by the team
 }
 
 export const SOUND_LABELS: Record<SoundEvent, string> = {

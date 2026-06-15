@@ -13,8 +13,10 @@ Proper notification-sound synthesis (as Slack/iOS use), not bare sine beeps:
 Chosen mapping (audition the full set with gen_sound_candidates.py):
   new-lead.wav     <- "A" marimba knock  (G4->C5, warm, friendly)
   update.wav       <- "D" soft pop       (tap + warm note, subtler sibling)
-  ready.wav        <- "B" glass ding      (single calm bell, home-load cue)
   notification.wav <- alias of new-lead   (keeps the orphan path resolving)
+
+The page-ready cue is NOT synthesized here — it uses public/sounds/page-load.mp3
+(a custom file supplied by the team; see SOUND_FILES.ready in sound-prefs.ts).
 
 Re-run after tweaking; pure stdlib, deterministic, no external deps.
 """
@@ -120,17 +122,13 @@ def build_update():     # "D" soft pop — tap + warm note, quieter sibling
     raw = mix([(0, pop), (int(RATE * 0.05), voice(C6, 0.5, GLASS, amp=0.4, seed=13))])
     return finalize(raw, cutoff=8000, wet=0.18, peak=0.7)
 
-def build_ready():      # "B" glass ding — single calm bell with shimmer
-    raw = voice(A5, 1.1, GLASS, amp=0.6, glide=0.02, noise_amp=0.06, seed=11)
-    return finalize(raw, cutoff=9500, wet=0.30, peak=0.6)
-
 def main():
     out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "sounds"))
     new_lead = build_new_lead()
     write(os.path.join(out, "new-lead.wav"), new_lead)
     write(os.path.join(out, "notification.wav"), list(new_lead))
     write(os.path.join(out, "update.wav"), build_update())
-    write(os.path.join(out, "ready.wav"), build_ready())
+    # ready/page-load is a custom mp3, not generated here.
 
 if __name__ == "__main__":
     main()
