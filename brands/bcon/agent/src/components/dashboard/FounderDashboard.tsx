@@ -395,7 +395,7 @@ export default function FounderDashboard() {
       )}
 
       {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
         {/* Card 1: Total Conversations */}
         <div
           className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
@@ -567,6 +567,45 @@ export default function FounderDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Card 5: Booked — booked calls/events + share of total leads (WC parity) */}
+        {(() => {
+          const bookedVal = Math.max(metrics.leadFlow?.booked ?? 0, metrics.upcomingBookings?.length ?? 0)
+          const total = metrics.totalLeads?.count ?? 0
+          const bookedPct = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
+          return (
+            <div
+              className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
+              style={{
+                backgroundColor: 'rgba(168, 85, 247, 0.05)',
+                borderColor: 'rgba(168, 85, 247, 0.2)',
+              }}
+            >
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+                  <MdEvent className="flex-shrink-0" style={{ color: '#A855F7' }} size={14} />
+                  <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Booked</h3>
+                </div>
+                <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {bookedVal}
+                </p>
+                <p className="text-xs mt-1" style={{ color: '#A855F7' }}>
+                  {bookedPct}
+                </p>
+              </div>
+              {(metrics.trends?.bookings?.data?.length ?? 0) > 0 && (
+                <div className="hidden sm:block w-full my-3" style={{ height: '48px' }}>
+                  <Sparkline data={metrics.trends!.bookings.data} color="#A855F7" height={48} showGradient={true} />
+                </div>
+              )}
+              <div className="flex items-center justify-between mt-2 sm:mt-0">
+                <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#A855F7' }}>
+                  View <MdArrowForward size={12} />
+                </button>
+              </div>
+            </div>
+          )
+        })()}
 
       </div>
 
