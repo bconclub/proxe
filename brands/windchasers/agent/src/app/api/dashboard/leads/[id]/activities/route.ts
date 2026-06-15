@@ -72,24 +72,20 @@ export async function GET(
       })
     }
 
-    // 2. Team actions: logged activities (from activities table)
+    // 2. Team actions: logged activities (from activities table).
+    // Select only the columns we know exist on every brand's activities table.
+    // Older WC schemas lack duration_minutes / next_followup_date, and the
+    // previous select-then-throw made the WHOLE activity feed 500 — which made
+    // the modal fall back to conversations only, hiding logged calls/notes.
+    // Degrade gracefully instead: a team-query failure just omits team rows.
     const { data: teamActivities, error: teamError } = await supabase
       .from('activities')
-      .select(`
-        id,
-        activity_type,
-        note,
-        duration_minutes,
-        next_followup_date,
-        created_at,
-        created_by
-      `)
+      .select('id, activity_type, note, created_at, created_by')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
 
     if (teamError) {
-      console.error('Error fetching team activities:', teamError)
-      throw teamError
+      console.error('Error fetching team activities (continuing without them):', teamError.message)
     }
 
     if (teamActivities) {
@@ -113,8 +109,6 @@ export async function GET(
             ? 'Call logged'
             : activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1).replace(/_/g, ' '),
           content: activity.note,
-          duration_minutes: activity.duration_minutes,
-          next_followup_date: activity.next_followup_date,
           timestamp: activity.created_at,
           icon: activity.activity_type,
           color: '#F59E0B', // Amber — distinct from PROXe (purple) + Customer (green)

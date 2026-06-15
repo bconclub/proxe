@@ -129,11 +129,21 @@ export default function NotificationCenter() {
       const incoming: NotificationEvent[] = Array.isArray(data.events) ? data.events : []
 
       if (!baselineSetRef.current) {
-        // First poll — baseline only, no toasts/sound for the backlog.
+        // First poll after a (re)load. Don't blast the whole backlog, but DO
+        // surface what you missed while away: toast the latest UNSEEN events
+        // (newer than the persisted last-seen), capped at 2. Everything older
+        // stays in the bell drawer with the unread badge. Founder: "whatever
+        // notification I miss should come in — latest two, older in the list."
         incoming.forEach((e) => knownIdsRef.current.add(e.id))
         baselineSetRef.current = true
         setEvents(incoming)
         recomputeUnread(incoming)
+        const seenAt = new Date(seenAtRef.current).getTime()
+        const missed = incoming.filter((e) => new Date(e.timestamp).getTime() > seenAt)
+        if (missed.length > 0) {
+          setToasts(missed.slice(0, 2))
+          playSound(missed.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
+        }
         return
       }
 
@@ -331,7 +341,7 @@ export default function NotificationCenter() {
                   </span>
                 )}
                 <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
-                <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>just now</span>
+                <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>{timeAgo(t.timestamp)}</span>
               </span>
               <button
                 onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
