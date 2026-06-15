@@ -390,6 +390,7 @@ export default function InboxPage() {
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
   const [calculatedLeadScore, setCalculatedLeadScore] = useState<number | null>(null)
   // Map of lead_id → calculated score for the conversation list. The DB
   // lead_score is often null/0; this lets the list reflect real engagement.
@@ -496,6 +497,32 @@ export default function InboxPage() {
     fetchLeadDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
+
+  // Team members for the lead-owner dropdown (fetched once).
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/dashboard/team-members')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && Array.isArray(d.members)) setTeamMembers(d.members) })
+      .catch(() => { /* non-fatal */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Assign / clear the owner of the currently open lead.
+  const setLeadOwner = async (ownerId: string) => {
+    if (!selectedLeadId) return
+    const member = teamMembers.find((m) => m.id === ownerId) || null
+    const owner = member ? { id: member.id, name: member.name, email: member.email } : null
+    // Optimistic update
+    setLeadDetails((prev: any) => prev ? { ...prev, unified_context: { ...(prev.unified_context || {}), owner: owner ? { ...owner } : null } } : prev)
+    try {
+      await fetch(`/api/dashboard/leads/${selectedLeadId}/owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner }),
+      })
+    } catch { /* non-fatal; optimistic value stays */ }
+  }
 
   // Recalculate lead score client-side whenever lead details change
   // (DB lead_score is often stale/0 — calculator looks at messages + context)
@@ -2608,6 +2635,22 @@ export default function InboxPage() {
                   </div>
                 </div>
               )}
+
+              {/* ── OWNER ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Owner</p>
+                <select
+                  value={leadDetails?.unified_context?.owner?.id || ''}
+                  onChange={(e) => setLeadOwner(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* ── UPCOMING / BOOKING ── */}
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-15 06:29 IST · Windchasers: lead ownership (dropdown + auto-assign, pane + table column)
+
+- Owner stored in unified_context.owner { id, name, email, assigned_at, assigned_by }.
+- Inbox lead pane: "Owner" dropdown (team members + Unassigned) to assign/reassign.
+- Leads table: "Owner" column (far right) showing the assigned owner.
+- Auto-assign: the first founder to reply to an unowned lead (text or template send) claims it — never overwrites an existing owner.
+- New endpoints: /api/dashboard/team-members (any logged-in user; active dashboard_users for the dropdown), /api/dashboard/leads/[id]/owner (set/clear owner).
+
+Booking-trigger reference (what flips a lead to "Booking Made"):
+- WhatsApp agent book_consultation — only on explicit consent (yes / tapped slot).
+- Inbound demo form (demo_booked) — creates calendar event + demo confirmation.
+- Logged note classified BOOKING_MADE — ONLY an actual demo/session booked at a slot.
+- NOT a booking: "call back tomorrow" → POST_CALL follow-up; "maybe later/follow up later" → WARM_LATER (90-day check-in).
+
 ## 2026-06-15 06:15 IST · Windchasers: call-back no longer misclassified as a booking
 
 - A logged note "He is interested, call back tomorrow" was classified BOOKING_MADE (created a booking reminder, moved the lead to Booking Made, score 80). A call-back is a FOLLOW-UP, not a booking. Tightened the note classifier: BOOKING_MADE only for an actual demo/session/meeting booked at a slot; any plan to call back / follow up is POST_CALL (creates a follow-up, not a booking). Added examples.

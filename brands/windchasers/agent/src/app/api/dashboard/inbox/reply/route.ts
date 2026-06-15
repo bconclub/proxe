@@ -142,6 +142,36 @@ async function sendWhatsAppTemplate(params: {
   }
 }
 
+/**
+ * Auto-assign lead ownership to the acting user if the lead has no owner yet.
+ * Sending a reply = "I'm handling this lead", so the first founder to reply
+ * claims it. Never overwrites an existing owner. Non-fatal.
+ */
+async function claimOwnershipIfUnowned(supabase: any, leadId: string): Promise<void> {
+  try {
+    const authClient = await createClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) return;
+    const { data: row } = await supabase
+      .from('all_leads').select('unified_context').eq('id', leadId).maybeSingle();
+    const ctx = row?.unified_context || {};
+    if (ctx.owner && ctx.owner.id) return; // already owned — don't steal
+    const { data: du } = await supabase
+      .from('dashboard_users').select('full_name, email').eq('id', user.id).maybeSingle();
+    const owner = {
+      id: user.id,
+      name: du?.full_name || (user.email || 'User').split('@')[0],
+      email: du?.email || user.email || null,
+      assigned_at: new Date().toISOString(),
+      assigned_by: user.email || user.id,
+      auto: true,
+    };
+    await supabase.from('all_leads').update({ unified_context: { ...ctx, owner } }).eq('id', leadId);
+  } catch (e: any) {
+    console.warn('[inbox/reply] auto-claim ownership failed (non-fatal):', e?.message || e);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -322,6 +352,9 @@ export async function POST(request: NextRequest) {
         supabase,
       );
 
+      // First founder to reply claims the lead (if unowned).
+      await claimOwnershipIfUnowned(supabase, leadId);
+
       return NextResponse.json({
         success: true,
         message: 'Message sent successfully',
@@ -423,6 +456,8 @@ export async function POST(request: NextRequest) {
         },
         supabase,
       );
+
+      if (!isTest) await claimOwnershipIfUnowned(supabase, leadId);
 
       return NextResponse.json({
         success: true,
