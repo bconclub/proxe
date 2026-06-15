@@ -101,7 +101,7 @@ const TRIGGERS: QuickReplyTrigger[] = [
     match: /\b(cost|fees?|price|pricing|how much|charges?)\b/i,
     config: {
       triggerKey: 'cost',
-      body: 'Pilot training *investment* goes up to *₹80 lakh*. What would help?',
+      body: 'Pilot training *investment* is *around ₹60–70 lakh* on average, end to end. What would help?',
       buttons: ['Full breakdown', 'Talk to counsellor', 'Financing'],
     },
   },

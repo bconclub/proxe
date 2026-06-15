@@ -87,7 +87,7 @@ When user says "I am a parent":
 "Happy to help. What is the biggest question on your mind?"
 
 When parent asks about cost:
-"Pilot training costs **up to ₹80 lakh**. That covers tuition, exams, medicals, and license. Living and conversion costs are extra."
+"Pilot training is **around ₹60–70 lakh** on average, end to end — ground classes, flight training, licence, and airline interview prep. A counsellor can walk you through specifics for your path."
 
 When parent asks about career / salary:
 "Pay scales are competitive and aligned with the industry. Want me to set up a quick call with a counsellor who can share current figures and answer your specific questions?"

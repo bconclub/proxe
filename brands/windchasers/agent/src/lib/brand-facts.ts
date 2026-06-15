@@ -37,10 +37,22 @@ export const BRAND_IDENTITY = {
 // ============================================================================
 export const LOCKED_ANSWERS = {
   cost: {
-    display: 'up to ₹80 lakh',
-    displaySpoken: 'up to eighty lakh',
-    rule: 'This ₹80 lakh figure is the FULL end-to-end pilot-training (CPL) journey ONLY. NEVER quote a range or a lower bound for the journey. BUT do NOT answer a DGCA-ground-classes fee question with ₹80 lakh — for the ground classes course use groundClassesFee below. If pressed for a lower journey number, defer: "It depends on the path. A counsellor will walk through specifics on the 1:1 call."',
-    covers: 'ground school, flight hours, DGCA exams, and certification',
+    display: 'around ₹60–70 lakh on average',
+    displaySpoken: 'around sixty to seventy lakh on average',
+    rule: 'This is the FULL end-to-end pilot-training (CPL) journey, driven mainly by the flying-school fees. Quote ONE simple figure — "around ₹60–70 lakh on average" — do NOT rattle off ranges, lower bounds, or the old ₹80 lakh number (keep it simple so it does not confuse people). Do NOT answer a DGCA-ground-classes fee question with this number — for the ground classes course use groundClassesFee below. If pressed for an exact figure, defer: "It depends on the flying school you choose — a counsellor will walk through specifics on the 1:1 call."',
+    covers: 'end-to-end: ground classes + DGCA prep, loan/documentation/medicals help, flight training at a partner flying school (India or abroad), licence conversion, and airline interview prep — until you land your first pilot job',
+  },
+  journey: {
+    display: 'End-to-end support from registration to your first pilot job.',
+    phases: [
+      'Ground classes at our Bengaluru academy — 4 subjects if you plan to fly abroad, 6 if you plan to fly in India. We teach 5 days a week and run a mock test every 6th day; doubt-clearing sessions, revisions and re-attending any class are included. Before the DGCA papers we run an in-house exam modelled on the real ones — you sit the papers once you score 80%+, so you clear in one go (it matters for airline interviews later).',
+      'Alongside ground classes we help with your education loan, document filing, Class-1 medicals and DGCA computer number.',
+      'Flight training — we enroll you in a partner flying school in India or abroad (tie-ups across 11 countries including India, multiple schools). Schools visit the academy for seminars so you can pick the right fit; we assist with the process, documentation and visa. Investment averages around ₹60–70 lakh.',
+      'While you are at the school we stay in touch and ensure the school follows the process properly.',
+      'On return we help with conversion flying — converting your foreign licence to an Indian one.',
+      'Airline interview training — we prep you for the interviews (mentors inside airlines keep us posted on openings and what they look for). Our support runs until you get the job.',
+    ],
+    rule: 'Use when the user asks how it works, what is included, what you offer end-to-end, or about the process/steps. Share only the relevant phase(s) concisely — do NOT dump all six unless they want the full picture. Keep it conversational and to the point.',
   },
   groundClassesFee: {
     display:
@@ -177,7 +189,7 @@ export const PROGRAMS = {
 export const HARD_RULES = [
   'Never quote pilot salaries. If asked: "Pay scales are competitive and aligned with the industry. The counsellor will share details on the 1:1 call."',
   'Never declare anyone "eligible" or "not eligible". The qualifier is the Pilot Assessment on the website or a counsellor review.',
-  'Never quote cost as a range. Always "up to ₹80 lakh". If pressed for a lower number, defer to the counsellor.',
+  'Quote the journey cost as ONE simple figure: "around ₹60–70 lakh on average". Do not list ranges or multiple numbers (no ₹80 lakh, no 55 lakh–1 crore). If pressed for an exact figure, defer to the counsellor.',
   'Never quote a timeline shorter than 18 to 24 months. Same in India or abroad.',
   'Never claim WindChasers is a DGCA-approved Flying Training Organisation. WindChasers is DGCA-aligned for ground classes. Flight training is at DGCA-approved partner FTOs.',
   'Never name individual instructors. Never say "ex-Air Force pilots". Use "DGCA-aligned training with commercial pilot instructors".',
