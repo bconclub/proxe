@@ -89,6 +89,22 @@ export async function POST(request: NextRequest) {
       await ensureSession(externalSessionId, 'web', supabase);
     }
 
+    // Server-authoritative history — mirror the WhatsApp pipeline. Web previously
+    // trusted a browser-side ref capped at 6 turns (memory.recentHistory), which
+    // gave the booking flow amnesia: it re-asked for name/email/date already
+    // given and drifted on the agreed slot. Every web message is already logged
+    // to `conversations` in postProcess, so rebuild the real window from the DB
+    // each turn instead. Web visitors are usually anonymous (no lead_id), so we
+    // key on metadata->>session_id (always stamped) rather than lead_id like
+    // WhatsApp does. Falls back to the client-sent history only when the DB read
+    // is empty (e.g. the very first turn, before anything is persisted).
+    const dbHistory = isHealthCheck
+      ? []
+      : await fetchWebHistory(externalSessionId, supabase);
+    const conversationHistory = dbHistory.length > 0
+      ? dbHistory
+      : (memory.recentHistory || []);
+
     // Build AgentInput
     const agentInput: AgentInput = {
       channel: 'web',
@@ -100,7 +116,7 @@ export async function POST(request: NextRequest) {
         email: userProfile.email,
         phone: userProfile.phone,
       },
-      conversationHistory: memory.recentHistory || [],
+      conversationHistory,
       summary: memory.summary || '',
       usedButtons,
     };
@@ -178,6 +194,49 @@ export async function POST(request: NextRequest) {
       JSON.stringify({ error: error.message || 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } },
     );
+  }
+}
+
+// ─── Server-Authoritative History (parity with WhatsApp) ────────────────────
+
+/**
+ * Rebuild the conversation window from the `conversations` table, keyed on the
+ * web session id stored in metadata. This is the web counterpart to the
+ * WhatsApp webhook's fetchRecentHistory — except web is keyed on
+ * metadata->>session_id (anonymous visitors have no lead_id) and ordered
+ * DESCENDING + reversed so we get the genuinely most-recent turns (WhatsApp's
+ * ascending+limit grabs the oldest N, a latent bug for long chats).
+ *
+ * Rows are logged in postProcess AFTER the stream closes, so at request time
+ * this returns all PRIOR turns; the current user message is passed separately
+ * as AgentInput.message.
+ */
+async function fetchWebHistory(
+  sessionId: string,
+  supabase: any,
+  limit: number = 24,
+): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('sender, content')
+      .eq('channel', 'web')
+      .filter('metadata->>session_id', 'eq', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error || !data) return [];
+
+    return data
+      .reverse()
+      .map((row: any) => ({
+        role: row.sender === 'customer' ? ('user' as const) : ('assistant' as const),
+        content: row.content,
+      }))
+      .filter((m: { content: string }) => !!m.content);
+  } catch (err) {
+    console.error('[agent/web/chat] fetchWebHistory failed:', err);
+    return [];
   }
 }
 

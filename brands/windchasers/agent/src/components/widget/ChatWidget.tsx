@@ -2882,7 +2882,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       ) {
         if (typeof window !== 'undefined') {
           try {
-            const assessmentUrl = new URL('https://pilot.windchasers.in/assessment');
+            const assessmentUrl = new URL('https://windchasers.in/assessment');
             assessmentUrl.searchParams.set('source', 'chat');
             if (externalSessionId) {
               assessmentUrl.searchParams.set('conversation_id', externalSessionId);
