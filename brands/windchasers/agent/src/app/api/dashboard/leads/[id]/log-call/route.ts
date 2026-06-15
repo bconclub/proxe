@@ -30,7 +30,11 @@ export async function POST(
       data: { user },
     } = await authClient.auth.getUser()
     const createdBy = user?.email || 'system'
-    const activityCreatedBy = user?.id || createdBy
+    // activities.created_by is a UUID column — only ever a real user id, else
+    // null. Passing 'system'/email here throws 22P02 and 500s the whole log
+    // ("Error logging call"). The human-readable creator is kept in the
+    // unified_context.admin_notes entry below (created_by: email).
+    const activityCreatedBy = user?.id || null
     const supabase = getServiceClient() || authClient
 
     const leadId = params.id

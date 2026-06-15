@@ -200,8 +200,9 @@ export async function POST(request: NextRequest) {
       const { error: actErr } = await supabase.from('activities').insert({
         lead_id: leadId,
         activity_type: 'note',
+        // created_by is a UUID column — user id or null, never email/'system'.
+        created_by: user.id || null,
         note: noteObj.text,
-        created_by: createdBy,
       })
       if (actErr) console.error('[leads/create] activity note failed:', actErr.message)
     }

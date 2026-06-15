@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-15 06:41 IST · Windchasers: fix "Error logging call" (activities.created_by UUID crash)
+
+- Logging a call (and adding/creating notes) 500'd intermittently with "Error logging call". Root cause: activities.created_by is a UUID column, but the routes passed 'system'/email when the session user was null → Postgres 22P02 "invalid input syntax for type uuid" → the whole log failed.
+- Fix: activities.created_by now gets the user id (uuid) or null, never email/'system' — in log-call, admin-notes, and the Add-Lead create route. The readable author is still kept on the unified_context.admin_notes entry (created_by: email).
+
 ## 2026-06-15 06:29 IST · Windchasers: lead ownership (dropdown + auto-assign, pane + table column)
 
 - Owner stored in unified_context.owner { id, name, email, assigned_at, assigned_by }.

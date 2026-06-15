@@ -91,12 +91,14 @@ export async function POST(
       .eq('id', leadId)
     if (updateError) throw updateError
 
-    // 4. Insert into activities table
+    // 4. Insert into activities table. created_by is a UUID column — pass the
+    // user id or null, never the email/'system' (that throws 22P02 and 500s).
+    // The readable author lives on the unified_context.admin_notes entry above.
     const { error: activityError } = await supabase.from('activities').insert({
       lead_id: leadId,
       activity_type: 'note',
       note: trimmedNote,
-      created_by: createdBy,
+      created_by: user?.id || null,
     })
     if (activityError) throw activityError
 
