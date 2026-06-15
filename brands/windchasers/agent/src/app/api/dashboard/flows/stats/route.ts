@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,10 +68,12 @@ export async function GET(request: NextRequest) {
       leadCounts[stageId] = (leadCounts[stageId] || 0) + 1
     })
 
-    // 2. Query follow_up_templates table
+    // 2. Query follow_up_templates table — scoped to THIS brand only.
+    // (Shared table: without this filter Windchasers was counting BCON rows.)
     const { data: templates, error: templatesError } = await supabase
       .from('follow_up_templates')
       .select('*')
+      .eq('brand', BRAND_ID)
 
     if (templatesError) {
       console.error('[flows/stats] Failed to fetch templates:', templatesError)
@@ -107,12 +110,15 @@ export async function GET(request: NextRequest) {
 
     // Build templates array with stage/day/channel/status
     const templatesList = (templates || []).map((t: any) => ({
+      id: t.id,
       stage: t.stage,
       day: t.day,
       channel: t.channel,
       status: t.meta_status,
       variant: t.variant,
       templateName: t.meta_template_name,
+      content: t.content,
+      isActive: t.is_active,
     }))
 
     return NextResponse.json({

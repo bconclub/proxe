@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
-import { MdClose, MdSend } from 'react-icons/md'
+import { MdClose, MdSend, MdArrowForward } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -202,22 +202,44 @@ export default function DashboardBrain() {
 
       {open && (
         <div className="fixed inset-0 z-[70]" aria-modal="true" role="dialog">
-          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={() => setOpen(false)} />
+          {/* Glass-blur the whole dashboard behind so focus lands on the panel */}
           <div
-            className="absolute top-0 right-0 h-full flex flex-col shadow-2xl"
+            className="absolute inset-0"
             style={{
-              width: '420px',
+              backgroundColor: 'rgba(8,10,14,0.55)',
+              backdropFilter: 'blur(14px) saturate(115%)',
+              WebkitBackdropFilter: 'blur(14px) saturate(115%)',
+              animation: 'wc-fade-in 220ms ease',
+            }}
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="absolute top-0 right-0 h-full flex flex-col overflow-hidden"
+            style={{
+              width: '440px',
               maxWidth: '94vw',
-              backgroundColor: 'var(--bg-secondary)',
-              borderLeft: '1px solid var(--border-primary)',
-              animation: 'wc-brain-in 220ms cubic-bezier(0.2,0,0,1)',
+              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 80%, transparent) 0%, color-mix(in srgb, var(--bg-primary) 90%, transparent) 100%)',
+              backdropFilter: 'blur(26px) saturate(150%)',
+              WebkitBackdropFilter: 'blur(26px) saturate(150%)',
+              borderLeft: '1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent)',
+              boxShadow: '-28px 0 70px rgba(0,0,0,0.5)',
+              animation: 'wc-brain-in 280ms cubic-bezier(0.2,0,0,1)',
             }}
           >
+            {/* Top accent glow line + soft radial glow behind the header */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)', opacity: 0.75 }} />
+            <div style={{ position: 'absolute', top: -80, right: -40, width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-primary) 26%, transparent), transparent 70%)', filter: 'blur(18px)', pointerEvents: 'none' }} />
+
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 relative" style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' }}>
               <div className="flex items-center gap-2">
-                <ProxeMark size={18} color="var(--accent-primary)" />
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Ask PROXe</h3>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)' }}>
+                  <ProxeMark size={16} color="var(--accent-primary)" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>Ask PROXe</h3>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Live dashboard intelligence</span>
+                </div>
               </div>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-md" style={{ color: 'var(--text-secondary)' }} aria-label="Close">
                 <MdClose size={18} />
@@ -228,20 +250,35 @@ export default function DashboardBrain() {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {messages.length === 0 && (
                 <div className="text-center py-6">
-                  <ProxeMark size={30} color="var(--accent-primary)" className="mx-auto" />
-                  <p className="text-sm mt-2" style={{ color: 'var(--text-primary)' }}>Ask anything about your dashboard.</p>
+                  {/* Glowing brand mark */}
+                  <div className="relative mx-auto flex items-center justify-center" style={{ width: 64, height: 64 }}>
+                    <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-primary) 40%, transparent), transparent 65%)' }} />
+                    <ProxeMark size={34} color="var(--accent-primary)" className="relative" />
+                  </div>
+                  <p className="text-sm mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>Ask anything about your dashboard.</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Leads, pipeline, today’s activity, bookings.</p>
-                  <div className="flex flex-col gap-2 mt-4">
+                  <div className="flex flex-col gap-2 mt-5">
                     {SUGGESTIONS.map((s) => (
                       <button
                         key={s}
                         onClick={() => ask(s)}
-                        className="text-left text-xs px-3 py-2 rounded-lg border transition-colors"
-                        style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                        className="group flex items-center justify-between text-left text-xs px-3.5 py-2.5 rounded-xl border transition-all"
+                        style={{
+                          borderColor: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+                          background: 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)',
+                          color: 'var(--text-primary)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-primary) 14%, transparent)'
+                          e.currentTarget.style.borderColor = 'var(--accent-primary)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)'
+                          e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent-primary) 18%, transparent)'
+                        }}
                       >
-                        {s}
+                        <span>{s}</span>
+                        <MdArrowForward size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--accent-primary)' }} />
                       </button>
                     ))}
                   </div>
@@ -293,15 +330,15 @@ export default function DashboardBrain() {
             </div>
 
             {/* Input */}
-            <div className="px-3 py-3 border-t flex items-center gap-2 flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="px-3 py-3 border-t flex items-center gap-2 flex-shrink-0" style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' }}>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
                 placeholder="Ask about your dashboard…"
                 disabled={loading}
-                className="flex-1 px-3 py-2 rounded-lg border text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
-                style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                className="flex-1 px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
+                style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)', background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)', color: 'var(--text-primary)' }}
               />
               <button
                 onClick={() => ask(input)}
@@ -319,8 +356,12 @@ export default function DashboardBrain() {
 
       <style jsx global>{`
         @keyframes wc-brain-in {
-          from { transform: translateX(100%); }
-          to   { transform: translateX(0); }
+          from { transform: translateX(100%); opacity: 0.6; }
+          to   { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes wc-fade-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
     </>
