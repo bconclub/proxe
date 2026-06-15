@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-15 05:41 IST · Windchasers: WA booking consent gate (stop force-booking)
+
+- Customer said "don't book online" and only stated a constraint ("available after 6pm") — no confirmation — yet the agent booked Friday 6PM offline anyway. Added a CONSENT TO BOOK gate (overrides the flow): book only on an explicit yes / tapped time; a constraint or preference is NOT consent (offer + ask, don't lock); any refusal ("don't book", "not now", reluctance) = stop, never re-push or re-offer what they refused. Step 4 now requires explicit confirmation before book_consultation.
+
 ## 2026-06-14 18:59 IST · Windchasers: WA agent — job-seeker intent + don't force English
 
 - A clear job seeker ("Is this a job? How much does it pay?", in Bengali too) got pilot-training/salary talk ("pay scales are competitive") — misleading. Added a JOB-SEEKER rule: detect employment-framed questions; on first ambiguous one, clarify with buttons ([Pilot training][Looking for a job]); on a confirmed/second job question, be honest ("we're a training academy, not a hiring line") and hand to the team; never quote salaries / imply employment.
