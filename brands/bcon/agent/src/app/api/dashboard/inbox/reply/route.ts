@@ -26,8 +26,26 @@ import {
   logMessage,
 } from '@/lib/services';
 import { createClient } from '@/lib/supabase/server';
+import { assignOwnerOnTouch } from '@/lib/services/leadOwnership';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Reassign lead ownership to the acting user. Sending a reply or template =
+ * "I'm handling this lead now", so the sender becomes the owner — even if
+ * someone else owned it before (owner follows whoever is actively working it).
+ * Resolves the logged-in user from the cookie session; no-ops for system
+ * paths. Non-fatal.
+ */
+async function reassignOwnerToActor(supabase: any, leadId: string): Promise<void> {
+  try {
+    const authClient = await createClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    await assignOwnerOnTouch(supabase, leadId, user);
+  } catch (e: any) {
+    console.warn('[inbox/reply] reassignOwnerToActor failed (non-fatal):', e?.message || e);
+  }
+}
 
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -324,6 +342,9 @@ export async function POST(request: NextRequest) {
         supabase,
       );
 
+      // Sending a reply = "I'm handling this lead now" → become the owner.
+      await reassignOwnerToActor(supabase, leadId);
+
       return NextResponse.json({
         success: true,
         message: 'Message sent successfully',
@@ -420,6 +441,12 @@ export async function POST(request: NextRequest) {
         },
         supabase,
       );
+
+      // A real (non-test) template send = "I'm working this lead now" → become
+      // the owner. Test sends to an override number don't reflect lead work.
+      if (!isTest) {
+        await reassignOwnerToActor(supabase, leadId);
+      }
 
       return NextResponse.json({
         success: true,

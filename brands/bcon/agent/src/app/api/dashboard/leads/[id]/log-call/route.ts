@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,6 +99,9 @@ export async function POST(
         note: notes ? `[${outcome}] ${notes.trim()}` : `[${outcome}]`,
         created_by: createdBy,
       })
+
+    // Logging a call = "I'm working this lead now" → become the owner.
+    await assignOwnerOnTouch(supabase, leadId, user)
 
     // 3. Update last_interaction_at and last_touchpoint
     await supabase
