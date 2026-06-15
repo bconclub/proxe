@@ -96,6 +96,8 @@ export {
   type DemoFormat,
   sendPATResult,
   sendFacebookLeadWelcome,
+  sendWelcomeTemplate,
+  pickWelcomeTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
 

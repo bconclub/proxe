@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendFacebookLeadWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
@@ -180,8 +180,17 @@ export async function POST(request: NextRequest) {
     if (inCooldown) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
     } else {
-      // ── 3. Fire windchasers_facebook_welcome template ────────────────────────
-      const sendResult = await sendFacebookLeadWelcome(phone, cleanName);
+      // ── 3. Fire the welcome template — pilot vs generic by the ad/form/campaign
+      // the lead came from (a pilot ad/form/campaign → pilot welcome).
+      const welcomeTpl = pickWelcomeTemplate(
+        facebookMeta.form_name,
+        facebookMeta.campaign_name,
+        facebookMeta.ad_name,
+        facebookMeta.utm_campaign,
+        facebookMeta.utm_content,
+        facebookMeta.utm_source,
+      );
+      const sendResult = await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
       whatsappSent = sendResult.success;
 
       if (!sendResult.success) {
@@ -194,9 +203,9 @@ export async function POST(request: NextRequest) {
           leadId,
           'whatsapp',
           'agent',
-          `Hey ${name.split(' ')[0]}! (windchasers_facebook_welcome template)`,
+          `Hey ${name.split(' ')[0]}! (${welcomeTpl} template)`,
           'template',
-          { source: 'facebook_lead', template_name: 'windchasers_facebook_welcome', ...facebookMeta },
+          { source: 'facebook_lead', template_name: welcomeTpl, ...facebookMeta },
           supabase,
         );
       }

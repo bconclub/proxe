@@ -5,7 +5,8 @@ import {
   normalizePhone,
   buildAttribution,
   isLikelyRealPersonName,
-  sendFacebookLeadWelcome,
+  sendWelcomeTemplate,
+  pickWelcomeTemplate,
   logMessage,
 } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -214,7 +215,9 @@ export async function POST(request: NextRequest) {
     let welcomeError: string | null = null
     if (sendWelcome) {
       try {
-        const result = await sendFacebookLeadWelcome(phoneRaw, cleanName)
+        // Pilot vs generic by the course interest / note picked on the form.
+        const welcomeTpl = pickWelcomeTemplate(courseInterest, note, userType)
+        const result = await sendWelcomeTemplate(phoneRaw, cleanName, welcomeTpl)
         welcomeSent = result.success
         if (!result.success) {
           welcomeError = result.error || 'send failed'
@@ -225,11 +228,11 @@ export async function POST(request: NextRequest) {
             leadId,
             'whatsapp',
             'agent',
-            `Hey ${firstName}! (windchasers_facebook_welcome template)`,
+            `Hey ${firstName}! (${welcomeTpl} template)`,
             'template',
             {
               source: 'dashboard_add_lead',
-              template_name: 'windchasers_facebook_welcome',
+              template_name: welcomeTpl,
               sent_by: createdBy,
               trigger: 'manual_welcome',
             },

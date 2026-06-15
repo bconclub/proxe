@@ -449,6 +449,40 @@ export async function sendFacebookLeadWelcome(
   ]);
 }
 
+/**
+ * Pick the welcome template by where the lead came from. Anything pilot-related
+ * — a pilot landing page, a pilot ad/form/campaign, or a pilot course interest
+ * (CPL / PPL / CHPL / DGCA / flying) — gets the pilot welcome; everything else
+ * (home/main pages, generic forms, cabin crew, etc.) gets the generic welcome.
+ *
+ * Pass any page/source/interest strings you have; nulls are ignored.
+ */
+export function pickWelcomeTemplate(...signals: Array<string | null | undefined>): string {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  const isPilot = /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
+  return isPilot ? 'windchasers_pilot_welcome_v2' : 'windchasers_generic_welcome_v1'
+}
+
+/**
+ * Send a welcome template (generic or pilot) with the customer's first name.
+ * Both Meta-approved welcome templates use a single NAMED body param
+ * `customer_name` (the form preview reads "Hi {{customer_name}}, welcome to …").
+ */
+export async function sendWelcomeTemplate(
+  to: string,
+  name: string,
+  templateName: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, templateName, [
+    {
+      type: 'body',
+      parameters: [{ type: 'text', parameter_name: 'customer_name', text: firstName }],
+    },
+  ])
+}
+
 // NOTE: sendFirstOutreach() was removed because the 'windchasers_followup'
 // template was never approved in Meta — every call was failing silently.
 // To re-enable a first-outreach flow:
