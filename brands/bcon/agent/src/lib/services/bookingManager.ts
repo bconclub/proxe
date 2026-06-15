@@ -617,3 +617,134 @@ export async function createCalendarEvent(booking: {
     return null;
   }
 }
+
+// ─── Cancel Booking ───────────────────────────────────────────────────────────
+
+/**
+ * Delete a Google Calendar event by id. Returns true on success (or if the
+ * event is already gone — 404/410). Best-effort; never throws.
+ */
+export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+  if (!eventId) return false;
+  try {
+    const { google } = await import('googleapis');
+    const auth = await getGoogleCalendarAuth();
+    const calendar = google.calendar({ version: 'v3', auth });
+    await calendar.events.delete({ calendarId: CALENDAR_ID, eventId });
+    console.log('[bookingManager] Deleted calendar event', eventId);
+    return true;
+  } catch (error: any) {
+    const code = error?.code || error?.response?.status;
+    if (code === 404 || code === 410) {
+      console.warn('[bookingManager] Calendar event already gone', eventId);
+      return true;
+    }
+    console.error('[bookingManager] Failed to delete calendar event', eventId, error?.message || error);
+    return false;
+  }
+}
+
+/**
+ * Cancel a lead's booking completely (BCON storage model):
+ *   1. Delete the Google Calendar event (if we have its id).
+ *   2. Clear the booking from unified_context.<channel> (status → cancelled,
+ *      date/time/meet-link/title nulled) so it drops out of Upcoming / pipeline.
+ *   3. Null the top-level all_leads.booking_date / booking_time mirror.
+ *   4. Clear booking columns on web_sessions (the only session table with them).
+ *   5. Cancel pending booking_reminder_24h / _30m agent_tasks so no reminder fires.
+ *
+ * Used by the dashboard "Cancel booking" action. Best-effort per step; returns
+ * what happened. DESTRUCTIVE on the calendar — never deletes without an explicit
+ * event id, and reports a clear error when no booking exists.
+ */
+export async function cancelBooking(
+  leadId: string,
+  supabase: SupabaseClient,
+): Promise<{ ok: boolean; calendarDeleted: boolean; remindersCancelled: number; error?: string }> {
+  const { data: lead, error } = await supabase
+    .from('all_leads')
+    .select('unified_context, metadata')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (error || !lead) {
+    return { ok: false, calendarDeleted: false, remindersCancelled: 0, error: 'Lead not found' };
+  }
+
+  const uc: Record<string, any> = lead.unified_context || {};
+  const meta: Record<string, any> = lead.metadata || {};
+
+  // Resolve the calendar event id from any place BCON stores it.
+  // storeBooking writes it to all_leads.metadata.googleEventId and to the
+  // session-table google_event_id column.
+  const sessionGoogleEventId = await (async () => {
+    const { data: ws } = await supabase
+      .from('web_sessions')
+      .select('google_event_id')
+      .eq('lead_id', leadId)
+      .not('google_event_id', 'is', null)
+      .maybeSingle();
+    return ws?.google_event_id || null;
+  })();
+
+  const eventId =
+    meta.googleEventId || meta.google_event_id ||
+    uc.web?.googleEventId || uc.web?.google_event_id ||
+    uc.whatsapp?.googleEventId || uc.whatsapp?.google_event_id ||
+    sessionGoogleEventId || null;
+
+  // Defensive: do not proceed if there is no booking at all to cancel.
+  const hasBooking =
+    !!eventId ||
+    ['web', 'whatsapp', 'voice', 'social'].some((ch) => {
+      const blk = uc[ch];
+      return blk && (blk.booking_date || blk.booking_status);
+    });
+  if (!hasBooking) {
+    return { ok: false, calendarDeleted: false, remindersCancelled: 0, error: 'No booking found to cancel' };
+  }
+
+  let calendarDeleted = false;
+  if (eventId) calendarDeleted = await deleteCalendarEvent(eventId);
+
+  // Clear the booking from every channel block (BCON uses flat booking_* keys).
+  const newUc: Record<string, any> = { ...uc };
+  for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
+    const blk = newUc[ch];
+    if (blk && (blk.booking_date || blk.booking_status)) {
+      newUc[ch] = {
+        ...blk,
+        booking_status: 'cancelled',
+        booking_date: null,
+        booking_time: null,
+        booking_meet_link: null,
+        booking_title: null,
+        booking_cancelled_at: getISTTimestamp(),
+      };
+    }
+  }
+
+  await supabase
+    .from('all_leads')
+    .update({ unified_context: newUc, booking_date: null, booking_time: null })
+    .eq('id', leadId)
+    .then(({ error: e }) => { if (e) console.warn('[cancelBooking] all_leads clear failed:', e.message); });
+
+  // web_sessions is the only session table with booking columns — clear it too
+  // so any session-booking fallback doesn't resurrect it.
+  await supabase
+    .from('web_sessions')
+    .update({ booking_date: null, booking_time: null, booking_status: 'cancelled', google_event_id: null })
+    .eq('lead_id', leadId)
+    .then(({ error: e }) => { if (e) console.warn('[cancelBooking] web_sessions clear failed:', e.message); });
+
+  // Cancel pending reminder tasks (BCON uses the same agent_tasks mechanism + types).
+  const { count } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'cancelled', completed_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('lead_id', leadId)
+    .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
+    .in('status', ['pending', 'queued']);
+
+  console.log(`[cancelBooking] lead=${leadId} calendarDeleted=${calendarDeleted} remindersCancelled=${count ?? 0}`);
+  return { ok: true, calendarDeleted, remindersCancelled: count ?? 0 };
+}
