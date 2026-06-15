@@ -4,6 +4,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { recordTokenUsage, usageFrom, type TokenCategory } from '@/lib/token-usage';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -96,7 +97,8 @@ export async function generateResponse(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 768,
-  modelOverride?: string
+  modelOverride?: string,
+  category: TokenCategory = 'chat'
 ): Promise<string> {
   const anthropic = getClient();
   const model = modelOverride || getModel();
@@ -118,6 +120,9 @@ export async function generateResponse(
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
+
+      const { input, output } = usageFrom(response);
+      void recordTokenUsage(category, model, input, output);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {
@@ -164,7 +169,8 @@ export async function generateResponseWithTools(
   systemPrompt: string,
   userPrompt: string,
   toolOptions: ToolUseOptions,
-  maxTokens: number = 1024
+  maxTokens: number = 1024,
+  category: TokenCategory = 'chat'
 ): Promise<string> {
   const anthropic = getClient();
   const model = getModel();
@@ -205,6 +211,9 @@ export async function generateResponseWithTools(
     }
 
     if (!response) throw lastError || new Error('Failed after retries');
+
+    const { input: tuIn, output: tuOut } = usageFrom(response);
+    void recordTokenUsage(category, model, tuIn, tuOut);
 
     // Extract text from this response (may accompany tool_use blocks)
     const textBlocks = response.content.filter((b: any) => b.type === 'text');
@@ -330,6 +339,9 @@ export async function generateFromImage(
           },
         ],
       });
+
+      const { input, output } = usageFrom(response);
+      void recordTokenUsage('vision', model, input, output);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {

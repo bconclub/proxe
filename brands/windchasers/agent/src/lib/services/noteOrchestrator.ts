@@ -15,6 +15,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordTokenUsage, usageFrom } from '@/lib/token-usage';
 import { sendWhatsAppText } from './whatsappSender';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -150,6 +151,7 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
     }
 
     const data = await response.json();
+    void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output);
     const responseText = data.content?.[0]?.text || '{}';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {

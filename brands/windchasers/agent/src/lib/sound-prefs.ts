@@ -24,11 +24,12 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
   ready: 'Page ready',
 }
 
-// Per-event playback gain (0..1). Page-ready mp3 is loud — turn it down.
+// Per-event playback gain (0..1). Page-ready mp3 is loud — turn it down hard
+// (founder: "the homepage reload sound is too loud"). Halved from 0.35 → 0.18.
 const SOUND_VOLUME: Record<SoundEvent, number> = {
   new: 1.0,
   update: 1.0,
-  ready: 0.35,
+  ready: 0.18,
 }
 
 // Master mute key kept as-is for back-compat with the existing bell toggle.

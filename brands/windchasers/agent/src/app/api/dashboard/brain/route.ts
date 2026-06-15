@@ -173,7 +173,7 @@ ${JSON.stringify(data)}`
 
     let raw: string
     try {
-      raw = await generateResponse(systemPrompt, userPrompt, 1024, BRAIN_MODEL)
+      raw = await generateResponse(systemPrompt, userPrompt, 1024, BRAIN_MODEL, 'brain')
     } catch (err: any) {
       console.error('[brain] model call failed:', err?.message || err)
       return NextResponse.json({ error: 'The brain is unavailable right now. Try again in a moment.' }, { status: 502 })

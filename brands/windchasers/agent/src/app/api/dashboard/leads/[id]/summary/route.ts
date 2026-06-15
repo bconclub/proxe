@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -458,6 +459,7 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
 
           if (response.ok) {
             const data = await response.json()
+            void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
             const unifiedSummary = data.content?.[0]?.text || ''
             if (unifiedSummary) {
               // Build attribution
@@ -834,6 +836,7 @@ ${conversationContext || 'No messages yet'}`
 
         if (response.ok) {
           const data = await response.json()
+          void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const aiSummary = data.content?.[0]?.text || ''
           if (aiSummary) {
             // Save the new summary to the database
