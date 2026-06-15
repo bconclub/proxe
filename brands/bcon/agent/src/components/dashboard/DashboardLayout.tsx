@@ -7,6 +7,9 @@ import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
+import { useTheme } from './ThemeProvider'
+import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
+import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
 import {
   MdInbox,
   MdDashboard,
@@ -65,6 +68,7 @@ const DIVIDER_AFTER_INDICES = [3, 6]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null)
@@ -116,6 +120,37 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         setBuildDate(getBuildDate())
       })
   }, [])
+
+  // Global preferences hydration. Sounds + theme are stored server-side so one
+  // user's setting applies to every user (global config). On load we paint the
+  // locally-cached accent instantly (no bare flash), then fetch the global
+  // config and reconcile: sounds → localStorage, dashboard mode →
+  // ThemeProvider, accent → CSS vars. When nothing is saved globally yet, this
+  // is a no-op and per-user/local wins.
+  useEffect(() => {
+    let cancelled = false
+    try {
+      const cachedAccent = localStorage.getItem('bcon-accent-theme')
+      if (cachedAccent) {
+        const mode = (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
+        applyAccentColor(cachedAccent, mode)
+      }
+    } catch { /* ignore */ }
+    ;(async () => {
+      const prefs = await fetchGlobalPrefs()
+      if (cancelled) return
+      applySoundsToLocal(prefs.sounds)
+      const mode = prefs.theme?.mode
+      if (mode) setTheme(mode)
+      const accent = prefs.theme?.accent
+      if (accent) {
+        try { localStorage.setItem('bcon-accent-theme', accent) } catch { /* ignore */ }
+        const effMode = mode || (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
+        applyAccentColor(accent, effMode)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [setTheme])
 
   // AUTHENTICATION DISABLED - Client-side auth check commented out
   // useEffect(() => {

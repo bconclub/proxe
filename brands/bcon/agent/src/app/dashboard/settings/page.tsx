@@ -3,12 +3,22 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useTheme } from '@/components/dashboard/ThemeProvider';
+import {
+  SOUND_LABELS,
+  type SoundEvent,
+  isMuted,
+  setMuted as persistMuted,
+  isEventEnabled,
+  setEventEnabled,
+  preview as previewSound,
+} from '@/lib/sound-prefs';
+import { ACCENT_THEMES } from '@/lib/accent-theme';
+import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
 
-const ACCENT_THEMES = [
-  { id: 'bcon', name: 'BCON Purple', color: '#8B5CF6', darkColor: '#8B5CF6' },
-  { id: 'gold', name: 'Electric Lime', color: '#afd510', darkColor: '#afd510' },
-  { id: 'orange', name: 'Sunset Orange', color: '#fc7301', darkColor: '#fc7301' },
-  { id: 'grey', name: 'Neutral Grey', color: '#6B7280', darkColor: '#9CA3AF' },
+const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
+  { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
+  { ev: 'update', hint: 'Pop on a stage or score change' },
+  { ev: 'ready', hint: 'Cue when the home page finishes loading' },
 ];
 
 type WidgetStyle = 'searchbar' | 'bubble';
@@ -21,6 +31,40 @@ export default function SettingsPage() {
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
   const [widgetStyleError, setWidgetStyleError] = useState<string | null>(null);
   const [loadingWidgetStyle, setLoadingWidgetStyle] = useState(true);
+
+  // Notification sound prefs (mirror localStorage via the sound-prefs helper).
+  const [soundMuted, setSoundMuted] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState<Record<SoundEvent, boolean>>({
+    new: true, update: true, ready: true,
+  });
+
+  // Hydrate sound prefs on mount (localStorage is client-only).
+  useEffect(() => {
+    setSoundMuted(isMuted());
+    setSoundEnabled({
+      new: isEventEnabled('new'),
+      update: isEventEnabled('update'),
+      ready: isEventEnabled('ready'),
+    });
+  }, []);
+
+  function toggleMuted() {
+    setSoundMuted((m) => {
+      const next = !m;
+      persistMuted(next);
+      // Global: applies to every user on their next load.
+      saveGlobalPrefs({ sounds: { muted: next, ...soundEnabled } });
+      return next;
+    });
+  }
+  function toggleEvent(ev: SoundEvent) {
+    setSoundEnabled((prev) => {
+      const next = { ...prev, [ev]: !prev[ev] };
+      setEventEnabled(ev, next[ev]);
+      saveGlobalPrefs({ sounds: { muted: soundMuted, ...next } });
+      return next;
+    });
+  }
 
   // Load + (re)apply saved accent theme. Depends on `theme` (dark/light) so the
   // accent CSS vars are re-applied after a dark/light switch — otherwise the
@@ -71,6 +115,8 @@ export default function SettingsPage() {
     setSelectedTheme(themeId);
     applyTheme(themeId);
     localStorage.setItem('bcon-accent-theme', themeId);
+    // Global: every user picks up this accent on their next load.
+    saveGlobalPrefs({ theme: { accent: themeId } });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -163,7 +209,11 @@ export default function SettingsPage() {
               ].map((mode) => (
                 <button
                   key={mode.id}
-                  onClick={() => setTheme(mode.id as 'bw-dark' | 'bw-light')}
+                  onClick={() => {
+                    setTheme(mode.id as 'bw-dark' | 'bw-light');
+                    // Global: dashboard mode for everyone on next load.
+                    saveGlobalPrefs({ theme: { mode: mode.id as 'bw-dark' | 'bw-light' } });
+                  }}
                   className="p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2"
                   style={{
                     background: 'var(--bg-tertiary)',
@@ -545,6 +595,89 @@ export default function SettingsPage() {
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                 This is how accent colors appear in cards and highlights.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Notifications & Sounds Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Notifications &amp; Sounds
+          </h2>
+
+          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+            {/* Master mute */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div>
+                <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  All notification sounds
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  {soundMuted ? 'Muted — no sounds will play' : 'On — events below play their sound'}
+                </p>
+              </div>
+              <button
+                onClick={toggleMuted}
+                role="switch"
+                aria-checked={!soundMuted}
+                aria-label="Toggle all notification sounds"
+                className="relative w-12 h-7 rounded-full transition-colors flex-shrink-0"
+                style={{ background: soundMuted ? 'var(--bg-tertiary)' : 'var(--accent-primary)' }}
+              >
+                <span
+                  className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all"
+                  style={{ left: soundMuted ? '4px' : '24px' }}
+                />
+              </button>
+            </div>
+
+            {/* Per-event toggles + preview */}
+            <div className="flex flex-col gap-3">
+              {SOUND_EVENTS.map(({ ev, hint }) => {
+                const on = soundEnabled[ev] && !soundMuted;
+                return (
+                  <div
+                    key={ev}
+                    className="flex items-center justify-between p-3 rounded-lg"
+                    style={{ background: 'var(--bg-tertiary)', opacity: soundMuted ? 0.5 : 1 }}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {SOUND_LABELS[ev]}
+                      </p>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                        {hint}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      {/* Preview — always playable so you can audition while muted */}
+                      <button
+                        onClick={() => previewSound(ev)}
+                        className="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:border-[var(--accent-primary)]"
+                        style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+                        title={`Preview ${SOUND_LABELS[ev]} sound`}
+                      >
+                        ▶ Preview
+                      </button>
+                      {/* Per-event toggle */}
+                      <button
+                        onClick={() => toggleEvent(ev)}
+                        disabled={soundMuted}
+                        role="switch"
+                        aria-checked={soundEnabled[ev]}
+                        aria-label={`Toggle ${SOUND_LABELS[ev]} sound`}
+                        className="relative w-11 h-6 rounded-full transition-colors disabled:cursor-not-allowed"
+                        style={{ background: on ? 'var(--accent-primary)' : 'var(--bg-secondary)' }}
+                      >
+                        <span
+                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                          style={{ left: soundEnabled[ev] ? '22px' : '2px' }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
