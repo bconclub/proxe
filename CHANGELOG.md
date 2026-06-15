@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-15 17:50 IST · Windchasers: custom mp3 notification sounds + per-event volume
+
+- New-lead and update cues now play a custom `mario.mp3` (`new-lead.mp3`, `update.mp3`); retired the synthesized `update.wav`.
+- Page-ready cue now uses custom `agrege.mp3` (`page-load.mp3`), played at 0.35 volume — the raw file was too loud.
+- Added per-event playback gain `SOUND_VOLUME` in `sound-prefs.ts` (new/update 1.0, ready 0.35).
+- `gen_notification_sounds.py` updated: all three live cues are custom mp3s now; synthesis helpers kept as fallback only.
+- User-facing: new-lead + lead-update play the Mario cue; page-load plays a quieter chime.
+
 ## 2026-06-15 11:12 IST · Windchasers: Humans is now a top-level nav item (full team management)
 
 - Promoted Humans from a tab inside Agents to its own sidebar item, directly below Agents (/dashboard/humans).

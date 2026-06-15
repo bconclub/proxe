@@ -14,7 +14,7 @@ export type SoundEvent = 'new' | 'update' | 'ready'
 
 export const SOUND_FILES: Record<SoundEvent, string> = {
   new: '/sounds/new-lead.mp3', // custom file supplied by the team
-  update: '/sounds/update.wav',
+  update: '/sounds/update.mp3', // custom file (same mario cue as new-lead)
   ready: '/sounds/page-load.mp3', // custom file supplied by the team
 }
 
@@ -22,6 +22,13 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
   new: 'New lead',
   update: 'Lead update',
   ready: 'Page ready',
+}
+
+// Per-event playback gain (0..1). Page-ready mp3 is loud — turn it down.
+const SOUND_VOLUME: Record<SoundEvent, number> = {
+  new: 1.0,
+  update: 1.0,
+  ready: 0.35,
 }
 
 // Master mute key kept as-is for back-compat with the existing bell toggle.
@@ -73,6 +80,7 @@ export function preview(ev: SoundEvent) {
   if (!a) { a = new Audio(SOUND_FILES[ev]); cache[ev] = a }
   try {
     a.currentTime = 0
+    a.volume = SOUND_VOLUME[ev]
     void a.play().catch(() => { /* autoplay blocked until first interaction */ })
   } catch { /* ignore */ }
 }

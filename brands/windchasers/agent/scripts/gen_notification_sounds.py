@@ -10,12 +10,10 @@ Proper notification-sound synthesis (as Slack/iOS use), not bare sine beeps:
   - a small Schroeder reverb tail for air
   - gentle tanh soft-clip + normalize
 
-Chosen mapping (audition the full set with gen_sound_candidates.py):
-  update.wav       <- "D" soft pop       (tap + warm note, subtler sibling)
-
-Only the "update" cue is synthesized here. New-lead and page-ready both use
-custom team-supplied mp3s (public/sounds/new-lead.mp3, public/sounds/page-load.mp3;
-see SOUND_FILES in sound-prefs.ts).
+NOTE: all three live cues now use custom team-supplied mp3s, so main() emits
+nothing by default — new-lead.mp3, update.mp3, page-load.mp3 (see SOUND_FILES
+in sound-prefs.ts). The synthesis helpers below are kept for re-deriving a
+fallback WAV if a custom file is ever dropped; call build_update() etc. manually.
 
 Re-run after tweaking; pure stdlib, deterministic, no external deps.
 """
@@ -116,9 +114,11 @@ def build_update():     # "D" soft pop — tap + warm note, quieter sibling
     return finalize(raw, cutoff=8000, wet=0.18, peak=0.7)
 
 def main():
-    out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "sounds"))
-    write(os.path.join(out, "update.wav"), build_update())
-    # new-lead and ready/page-load are custom mp3s, not generated here.
+    # All live cues use custom mp3s right now; nothing to generate.
+    # To regenerate a synthesized fallback, e.g.:
+    #   out = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "sounds"))
+    #   write(os.path.join(out, "update.wav"), build_update())
+    print("Nothing to generate — new-lead / update / page-ready all use custom mp3s.")
 
 if __name__ == "__main__":
     main()
