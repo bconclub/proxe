@@ -355,17 +355,18 @@ export default function FounderDashboard() {
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-7 rounded-xl p-4 sm:p-6 border" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-7 rounded-xl p-4 sm:p-6 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
-          <p className="text-xs mt-0.5 mb-5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
-          <div className="flex items-start justify-between gap-1">
-            <EngineNode icon={<MdChatBubble size={22} />} color="#3B82F6" count={metrics.totalConversations.total} label="New Conversations" sub={metrics.trends?.conversations?.change ? `${metrics.trends.conversations.change > 0 ? '+' : ''}${Math.round(metrics.trends.conversations.change)}%` : undefined} />
-            <EngineNode icon={<MdPeople size={22} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={22} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
-            <EngineNode icon={<MdSchedule size={22} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={22} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
+          {/* Funnel fills the card's height so there's no dead space at the bottom */}
+          <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+            <EngineNode icon={<MdChatBubble size={28} />} color="#3B82F6" count={metrics.totalConversations.total} label="New Conversations" sub={metrics.trends?.conversations?.change ? `${metrics.trends.conversations.change > 0 ? '+' : ''}${Math.round(metrics.trends.conversations.change)}%` : undefined} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
+            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
+            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
           </div>
-          <div className="mt-5 pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
+          <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
             {metrics.responseHealth.status === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
           </div>
@@ -399,8 +400,14 @@ export default function FounderDashboard() {
                         {formatCountdown(booking.datetime)}
                       </span>
                     </div>
+                    {booking.title && (
+                      <p className="text-[11px] truncate" style={{ color: 'var(--text-primary)', opacity: 0.8 }}>{booking.title}</p>
+                    )}
                     <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                      {booking.title ? `${booking.title} · ` : ''}{formatBookingWhen(booking.datetime)}
+                      {formatBookingWhen(booking.datetime)}
+                    </p>
+                    <p className="text-[10px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                      Owner: {booking.owner?.name || 'Unassigned'}
                     </p>
                   </div>
                 </button>
@@ -583,13 +590,13 @@ function EngineNode({ icon, color, count, label, sub, last }: {
 }) {
   return (
     <>
-      <div className="flex flex-col items-center text-center flex-1 min-w-[60px]">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full mb-2" style={{ backgroundColor: `${color}1f`, color }}>{icon}</span>
-        <span className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{count}</span>
-        <span className="text-[11px] mt-0.5 leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-        {sub && <span className="text-[10px] mt-0.5" style={{ color }}>{sub}</span>}
+      <div className="flex flex-col items-center text-center flex-1 min-w-[64px]">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full mb-3" style={{ backgroundColor: `${color}1f`, color }}>{icon}</span>
+        <span className="text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{count}</span>
+        <span className="text-xs mt-1.5 leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        {sub && <span className="text-[11px] mt-0.5 font-medium" style={{ color }}>{sub}</span>}
       </div>
-      {!last && <MdArrowForward className="shrink-0 mx-0.5 mt-4 hidden sm:block" size={15} style={{ color: 'var(--text-muted)' }} />}
+      {!last && <MdArrowForward className="shrink-0 mx-0.5 hidden sm:block" size={18} style={{ color: 'var(--text-muted)' }} />}
     </>
   )
 }
