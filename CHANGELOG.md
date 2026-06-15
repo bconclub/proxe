@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-15 17:59 IST · Windchasers: fix page-load sound (autoplay-blocked) — retry on first gesture
+
+- The page-load "ready" cue fired on dashboard mount before any user interaction, so the browser autoplay policy rejected `Audio.play()` and the `.catch()` swallowed it silently — sound never played on a cold load.
+- `sound-prefs.ts`: on a blocked play, arm a one-shot `pointerdown`/`keydown`/`touchstart` listener that retries the cue on the first user gesture. New-lead/update already worked (they fire after interaction); now page-load plays the instant you touch the page.
+- User-facing: the dashboard page-load sound now works on a fresh load.
+
 ## 2026-06-15 17:50 IST · Windchasers: custom mp3 notification sounds + per-event volume
 
 - New-lead and update cues now play a custom `mario.mp3` (`new-lead.mp3`, `update.mp3`); retired the synthesized `update.wav`.

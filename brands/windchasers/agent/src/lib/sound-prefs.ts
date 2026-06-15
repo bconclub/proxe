@@ -66,6 +66,27 @@ export function setEventEnabled(ev: SoundEvent, v: boolean) {
 // Lazily-built, reused <audio> elements so we don't re-fetch on every play.
 const cache: Partial<Record<SoundEvent, HTMLAudioElement>> = {}
 
+// When a cue (e.g. the page-load "ready" sound) fires before the user has
+// interacted with the page, the browser's autoplay policy rejects play().
+// Arm a one-shot listener that retries the cue on the first gesture.
+let armedFor: SoundEvent | null = null
+function armGestureRetry(ev: SoundEvent) {
+  if (typeof document === 'undefined') return
+  if (armedFor) { armedFor = ev; return } // listener already pending — just update target
+  armedFor = ev
+  const retry = () => {
+    document.removeEventListener('pointerdown', retry)
+    document.removeEventListener('keydown', retry)
+    document.removeEventListener('touchstart', retry)
+    const pending = armedFor
+    armedFor = null
+    if (pending) preview(pending)
+  }
+  document.addEventListener('pointerdown', retry, { once: true })
+  document.addEventListener('keydown', retry, { once: true })
+  document.addEventListener('touchstart', retry, { once: true })
+}
+
 /** Play an event sound, respecting master mute + the per-event toggle. */
 export function playSound(ev: SoundEvent) {
   if (typeof window === 'undefined' || typeof Audio === 'undefined') return
@@ -81,6 +102,9 @@ export function preview(ev: SoundEvent) {
   try {
     a.currentTime = 0
     a.volume = SOUND_VOLUME[ev]
-    void a.play().catch(() => { /* autoplay blocked until first interaction */ })
+    void a.play().catch(() => {
+      // Autoplay blocked (no user gesture yet) — retry on first interaction.
+      armGestureRetry(ev)
+    })
   } catch { /* ignore */ }
 }
