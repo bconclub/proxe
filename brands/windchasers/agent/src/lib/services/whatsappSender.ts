@@ -457,10 +457,23 @@ export async function sendFacebookLeadWelcome(
  *
  * Pass any page/source/interest strings you have; nulls are ignored.
  */
-export function pickWelcomeTemplate(...signals: Array<string | null | undefined>): string {
+export function isPilotSource(...signals: Array<string | null | undefined>): boolean {
   const hay = signals.filter(Boolean).join(' ').toLowerCase()
-  const isPilot = /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
-  return isPilot ? 'windchasers_pilot_welcome_v2' : 'windchasers_generic_welcome_v1'
+  return /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
+}
+
+export function pickWelcomeTemplate(...signals: Array<string | null | undefined>): string {
+  return isPilotSource(...signals) ? 'windchasers_pilot_welcome_v2' : 'windchasers_generic_welcome_v1'
+}
+
+/**
+ * Pick the RNR (no-reply / missed-call) re-engagement template.
+ * Two steps per segment — step 1 = first re-attempt, step 2 = "tried again".
+ * Routed pilot vs generic by the lead's source. Names are Meta-approved with a
+ * _v1 suffix: rnr_pilot_1_v1 / rnr_pilot_2_v1 / rnr_generic_1_v1 / rnr_generic_2_v1.
+ */
+export function pickRnrTemplate(isPilot: boolean, step: 1 | 2): string {
+  return `rnr_${isPilot ? 'pilot' : 'generic'}_${step}_v1`
 }
 
 /**

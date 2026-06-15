@@ -98,6 +98,8 @@ export {
   sendFacebookLeadWelcome,
   sendWelcomeTemplate,
   pickWelcomeTemplate,
+  isPilotSource,
+  pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
 
