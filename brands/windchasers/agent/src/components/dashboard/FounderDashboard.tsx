@@ -294,6 +294,9 @@ export default function FounderDashboard() {
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
   const convSeries = metrics.trends?.conversations?.data || []
   const dailyAvg = convSeries.length ? Math.round(convSeries.reduce((a, b) => a + (b.value || 0), 0) / convSeries.length) : 0
+  // Booked calls + what share of total leads that represents (founder conversion view).
+  const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
+  const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 p-4 sm:p-6 min-h-[calc(100vh-3.5rem)]">
@@ -304,14 +307,7 @@ export default function FounderDashboard() {
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
-        <KpiCard
-          icon={<MdChatBubble size={15} />} iconColor="#3B82F6"
-          label="Active Conversations"
-          value={metrics.totalConversations.total}
-          delta={<KpiDelta change={metrics.trends?.conversations?.change} />}
-          sparkData={convSeries} sparkColor="#3B82F6"
-          onClick={() => router.push('/dashboard/inbox')}
-        />
+        <NewLeadsCard metrics={metrics} onOpen={() => router.push('/dashboard/leads')} />
         <KpiCard
           icon={<MdShowChart size={15} />} iconColor="#22c55e"
           label="Response Rate"
@@ -338,9 +334,10 @@ export default function FounderDashboard() {
         <KpiCard
           icon={<MdEvent size={15} />} iconColor="#a855f7"
           label="Booked Calls / Events"
-          value={Math.max(flow.booked || 0, metrics.upcomingBookings.length)}
+          value={bookedVal}
           delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
           sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
+          sub={bookedPctOfLeads}
           onClick={() => router.push('/dashboard/bookings')}
         />
         <KpiCard
@@ -576,6 +573,54 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
         <div style={{ height: 30 }} />
       )}
       <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{sub || 'vs last 7 days'}</span>
+    </div>
+  )
+}
+
+// New Leads KPI with an inline period toggle (7D / 14D / 30D / All). Clicking the
+// number opens the leads list; the pills swap the count without leaving the page.
+function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: () => void }) {
+  const [period, setPeriod] = useState<'7D' | '14D' | '30D' | 'All'>('7D')
+  const tl = metrics.totalLeads
+  const value = period === '7D' ? tl.count7D : period === '14D' ? tl.count14D : period === '30D' ? tl.count30D : tl.count
+  const periods: Array<'7D' | '14D' | '30D' | 'All'> = ['7D', '14D', '30D', 'All']
+  const spark = metrics.trends?.leads?.data
+
+  return (
+    <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdPeople size={15} /></span>
+          <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>New Leads</span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          {periods.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPeriod(p) }}
+              className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+              style={{ color: period === p ? '#3B82F6' : 'var(--text-muted)', backgroundColor: period === p ? 'rgba(59,130,246,0.14)' : 'transparent' }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={onOpen}>
+        <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
+        <KpiDelta change={metrics.trends?.leads?.change} />
+      </div>
+      {spark && spark.length > 1 ? (
+        <div className="w-full mt-2" style={{ height: 30 }}>
+          <Sparkline data={spark} color="#3B82F6" height={30} showGradient />
+        </div>
+      ) : (
+        <div style={{ height: 30 }} />
+      )}
+      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+        {period === 'All' ? 'all time' : `last ${period.replace('D', ' days')}`}
+      </span>
     </div>
   )
 }
