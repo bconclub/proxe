@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 
 /**
- * Prebuild script — auto-bump patch version + set build time
+ * Prebuild script — stamp build time + surface the COMMITTED version.
  * Runs before every build via "prebuild" in package.json.
  *
  * Sets two NEXT_PUBLIC_ env vars in .env.local:
  *   NEXT_PUBLIC_BUILD_TIME  — ISO timestamp of this build
- *   NEXT_PUBLIC_APP_VERSION — auto-incremented patch version from package.json
+ *   NEXT_PUBLIC_APP_VERSION — version from package.json (as committed)
  *
  * Also writes a .build-info JSON file for the build-info API route.
+ *
+ * NOTE: the version is NOT bumped here. Bumping happens at commit time via
+ * scripts/bump-version.js (driven by the pre-commit hook), so the committed
+ * number is the source of truth and actually persists/climbs per push. Bumping
+ * here as well meant the build server always added +1 on top of an unchanged
+ * committed version, so the deploy was stuck showing the same number forever.
  */
 
 const fs = require('fs')
@@ -18,14 +24,11 @@ const pkgPath = path.join(process.cwd(), 'package.json')
 const envLocal = path.join(process.cwd(), '.env.local')
 const buildInfoPath = path.join(process.cwd(), '.build-info')
 
-// ── 1. Auto-bump patch version in package.json ──────────────────────────────
+// ── 1. Read the committed version (no bump — see note above) ────────────────
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-const [major, minor, patch] = (pkg.version || '0.0.1').split('.').map(Number)
-const newVersion = `${major}.${minor}.${patch + 1}`
-pkg.version = newVersion
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
-console.log(`📦 Version bumped: ${major}.${minor}.${patch} → ${newVersion}`)
+const newVersion = pkg.version || '0.0.1'
+console.log(`📦 Building version: ${newVersion}`)
 
 // ── 2. Build timestamp ──────────────────────────────────────────────────────
 

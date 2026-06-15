@@ -1,13 +1,14 @@
 # Changelog
 
-## 2026-06-15 22:26 IST · Windchasers: custom POP sounds + notification toast redesign
+## 2026-06-15 22:26 IST · Windchasers: custom POP sounds + notification toast redesign + auto-version
 
 - `sound-prefs.ts`: new-lead + lead-update cues now play `/sounds/pop.wav`; page-load ("ready") cue now plays `/sounds/long-pop.wav` (both supplied by the team). Old `new-lead.mp3` / `update.mp3` / `page-load.mp3` left on disk, no longer referenced.
 - `NotificationCenter.tsx`: corner toast stack capped to the latest TWO cards (was 3–4) so notifications surface one/two at a time, not a blast.
 - `NotificationCenter.tsx`: toast cards restyled — icon circle, bold title, coloured tag chip + humanised channel chip, time-ago, "View lead →" link, dismiss X. Width pinned to a clean 340px (reference panel was too wide).
 - `NotificationCenter.tsx`: new frosted-glass "View all notifications (N) →" button beneath the cards, opens the Recent Activity drawer.
-- User-facing: distinct pop sound on new leads/updates, longer pop on home-page load, tidier and narrower notification popups with a one-tap "view all".
-- (PENDING_SHA)
+- Deploy version now auto-increments and PERSISTS. Root cause: `set-build-time.js` bumped the patch at build time but never committed it, so every deploy reset to the same `0.0.23`. Fix: version is bumped at commit time via new `scripts/bump-version.js` (carry at 100: `0.0.99 → 0.1.0`, `0.99.99 → 1.0.0`), wired through a `.git/hooks/pre-commit` hook that fires on any commit touching `brands/windchasers/agent/`. `set-build-time.js` now just stamps the build time and surfaces the committed version (no more double-bump).
+- User-facing: distinct pop sound on new leads/updates, longer pop on home-page load, tidier/narrower notification popups with a one-tap "view all", and a deploy version that visibly climbs every release.
+- (feature code `556e15ee`, version automation `8a4e0231`)
 
 - The page-load "ready" cue fired on dashboard mount before any user interaction, so the browser autoplay policy rejected `Audio.play()` and the `.catch()` swallowed it silently — sound never played on a cold load.
 - `sound-prefs.ts`: on a blocked play, arm a one-shot `pointerdown`/`keydown`/`touchstart` listener that retries the cue on the first user gesture. New-lead/update already worked (they fire after interaction); now page-load plays the instant you touch the page.
