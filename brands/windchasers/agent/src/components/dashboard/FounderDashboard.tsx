@@ -34,8 +34,24 @@ interface FounderMetrics {
   engagedLeads: { count: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
-  leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
-  upcomingBookings: Array<{ id: string; name: string; title?: string | null; date: string; time: string; datetime: string }>
+  leadsNeedingAttention: Array<{
+    id: string
+    name: string
+    score: number
+    lastContact: string
+    stage: string
+    owner?: { name?: string | null; email?: string | null } | null
+    channel?: string | null
+  }>
+  upcomingBookings: Array<{
+    id: string
+    name: string
+    title?: string | null
+    date: string
+    time: string
+    datetime: string
+    owner?: { name?: string | null; email?: string | null } | null
+  }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
   channelPerformance: {
@@ -277,6 +293,25 @@ export default function FounderDashboard() {
     if (diffHours > 0) return `In ${diffHours}h`
     const mins = Math.floor(diffMs / 60000)
     return `In ${mins}m`
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'L'
+  }
+
+  const getScoreTone = (score: number) => {
+    if (score >= hotLeadThreshold) {
+      return { label: 'High priority', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
+    }
+    if (score >= 50) {
+      return { label: 'Warm', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' }
+    }
+    return { label: 'Needs review', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' }
   }
 
   const getResponseHealthColor = (status: string) => {
@@ -628,90 +663,203 @@ export default function FounderDashboard() {
 
       </div>
 
-      {/* Upcoming Events - Full width; grows to fill the viewport (full-screen feel) */}
-      <div
-        className="rounded-lg p-3 sm:p-6 border transition-all hover:shadow-lg flex-1 flex flex-col"
-        style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.05)',
-          borderColor: 'rgba(59, 130, 246, 0.2)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Upcoming Events</h3>
-            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {metrics.upcomingBookings.length}
-            </span>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6">
+        {/* Priority Lead Queue - cross-dashboard view of leads that need attention */}
+        <section
+          className="xl:col-span-7 rounded-lg border overflow-hidden"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: 'var(--accent-subtle)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--accent-subtle)' }}>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                Across-the-board leads that need attention now
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/leads')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              View Leads <MdArrowForward size={14} />
+            </button>
           </div>
-          <button
-            onClick={() => router.push('/dashboard/bookings')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline"
-            style={{ color: '#3B82F6' }}
-          >
-            View All <MdArrowForward size={14} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-        {metrics.upcomingBookings.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {metrics.upcomingBookings.slice(0, 8).map((booking) => (
-              <div
-                key={booking.id}
-                onClick={() => openLeadModal(booking.id)}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border"
-                style={{
-                  borderColor: 'rgba(59, 130, 246, 0.2)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  borderRadius: '8px',
-                  borderWidth: '1px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                  e.currentTarget.style.borderColor = '#3B82F6'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-                }}
-              >
-                <MdEvent
-                  className="flex-shrink-0"
-                  size={18}
-                  style={{ color: '#3B82F6' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {booking.name}
-                  </p>
-                  {booking.title && (
-                    <p className="text-xs truncate" style={{ color: 'var(--text-primary)', opacity: 0.7 }}>
-                      {booking.title}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {formatBookingWhen(booking.datetime)}
-                    </span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap"
-                      style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}
-                    >
-                      {formatCountdown(booking.datetime)}
-                    </span>
-                  </div>
-                </div>
-                <MdArrowForward
-                  className="flex-shrink-0"
-                  size={16}
-                  style={{ color: '#3B82F6' }}
-                />
+
+          {metrics.leadsNeedingAttention.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    <th className="px-4 py-2 font-medium">Lead</th>
+                    <th className="px-3 py-2 font-medium">Intent</th>
+                    <th className="px-3 py-2 font-medium hidden md:table-cell">Owner</th>
+                    <th className="px-3 py-2 font-medium hidden lg:table-cell">Last Contact</th>
+                    <th className="px-3 py-2 font-medium">Stage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metrics.leadsNeedingAttention.map((lead) => {
+                    const tone = getScoreTone(lead.score)
+                    return (
+                      <tr
+                        key={lead.id}
+                        onClick={() => openLeadModal(lead.id)}
+                        className="group cursor-pointer border-t transition-colors"
+                        style={{ borderColor: 'var(--accent-subtle)' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-[180px]">
+                            <span
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                              style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}
+                            >
+                              {getInitials(lead.name)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
+                              <p className="text-xs truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} lead</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span
+                            className="inline-flex items-center rounded px-2 py-1 text-[11px] font-semibold whitespace-nowrap"
+                            style={{ backgroundColor: tone.bg, color: tone.color }}
+                          >
+                            {tone.label} · {lead.score}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs" style={{ color: lead.owner?.name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {lead.owner?.name || 'Unowned'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 hidden lg:table-cell">
+                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                            {formatTimeAgo(lead.lastContact)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span
+                            className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap"
+                            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                          >
+                            {lead.stage}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              No priority leads right now.
+            </div>
+          )}
+        </section>
+
+        {/* Upcoming Events - owner-aware list tied back to lead detail */}
+        <section
+          className="xl:col-span-5 rounded-lg p-4 sm:p-5 border flex flex-col"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+            borderColor: 'rgba(59, 130, 246, 0.2)',
+          }}
+        >
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
+                <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {metrics.upcomingBookings.length}
+                </span>
               </div>
-            ))}
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                Shows the lead owner so the right person can follow through
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/bookings')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap"
+              style={{ color: '#3B82F6' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
           </div>
-        ) : (
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
-        )}
-        </div>
+
+          <div className="flex-1 space-y-3">
+            {metrics.upcomingBookings.length > 0 ? (
+              metrics.upcomingBookings.slice(0, 6).map((booking) => (
+                <button
+                  key={booking.id}
+                  type="button"
+                  onClick={() => openLeadModal(booking.id)}
+                  className="w-full flex items-center gap-3 p-3 text-left rounded-lg transition-all border"
+                  style={{
+                    borderColor: 'rgba(59, 130, 246, 0.2)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    borderWidth: '1px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
+                    e.currentTarget.style.borderColor = '#3B82F6'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
+                  }}
+                >
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3B82F6' }}
+                  >
+                    {getInitials(booking.name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {booking.name}
+                      </p>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap"
+                        style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}
+                      >
+                        {formatCountdown(booking.datetime)}
+                      </span>
+                    </div>
+                    {booking.title && (
+                      <p className="text-xs truncate" style={{ color: 'var(--text-primary)', opacity: 0.75 }}>
+                        {booking.title}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        {formatBookingWhen(booking.datetime)}
+                      </span>
+                      <span className="text-xs" style={{ color: booking.owner?.name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        Owner: {booking.owner?.name || 'Unowned'}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Lead Details Modal */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,15 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     // Check cache
     const cacheNow = Date.now()
@@ -35,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Cache miss - proceed with database queries
-    const supabase = await createClient()
+    const supabase = getServiceClient() || authClient
 
     // ============================================================================
     // PERFORMANCE: All queries run in parallel via Promise.all
@@ -53,7 +63,7 @@ export async function GET(request: NextRequest) {
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
       supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
         .order('lead_score', { ascending: false }),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       supabase
@@ -441,13 +451,20 @@ export async function GET(request: NextRequest) {
         return score > 0 && daysSinceInteraction < 14
       })
       .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
-      .slice(0, 5)
+      .slice(0, 8)
       .map(lead => ({
         id: lead.id,
         name: lead.customer_name || 'Unknown',
         score: lead.lead_score || 0,
         lastContact: lead.last_interaction_at || lead.created_at,
         stage: lead.lead_stage || 'New',
+        owner: lead.unified_context?.owner
+          ? {
+              name: lead.unified_context.owner.name || null,
+              email: lead.unified_context.owner.email || null,
+            }
+          : null,
+        channel: lead.last_touchpoint || lead.first_touchpoint || 'unknown',
       }))
 
     // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
@@ -489,6 +506,12 @@ export async function GET(request: NextRequest) {
           date: bookingDate,
           time: bookingTime,
           datetime: dt!.toISOString(),
+          owner: lead.unified_context?.owner
+            ? {
+                name: lead.unified_context.owner.name || null,
+                email: lead.unified_context.owner.email || null,
+              }
+            : null,
         }
       })
 
@@ -1012,20 +1035,24 @@ export async function GET(request: NextRequest) {
 
     if (leadsNeedingScores.length > 0) {
       const scoreResults = await Promise.all(
-        leadsNeedingScores.map((lead) =>
-          supabase
-            .rpc('calculate_lead_score', { lead_uuid: lead.id })
-            .then(({ data, error }) => ({
+        leadsNeedingScores.map(async (lead) => {
+          try {
+            const { data, error } = await supabase
+              .rpc('calculate_lead_score', { lead_uuid: lead.id })
+
+            return {
               leadId: lead.id,
               score: !error && data != null ? (typeof data === 'number' ? data : parseFloat(data)) : 0,
-            }))
-            .catch(() => ({ leadId: lead.id, score: 0 }))
-        )
+            }
+          } catch {
+            return { leadId: lead.id, score: 0 }
+          }
+        })
       )
 
       // Apply calculated scores back to leads in memory (NOT persisted — this is
       // a read-side backfill only, so we never overwrite the stored score base).
-      const scoreMap = new Map(scoreResults.map((r) => [r.leadId, r.score]))
+      const scoreMap = new Map<string, number>(scoreResults.map((r) => [r.leadId, r.score]))
       leadsNeedingScores.forEach((lead) => {
         const calculated = scoreMap.get(lead.id)
         if (calculated !== undefined && !isNaN(calculated)) {
