@@ -16,6 +16,7 @@ import {
   getAvailableSlots,
   isAllowedBookingTime,
   createCalendarEvent,
+  cancelBooking,
   storeBooking,
   checkExistingBooking,
   normalizeBookingSessionType,
@@ -716,6 +717,17 @@ function buildBookingTools(
       },
     },
     {
+      name: 'cancel_booking',
+      description: "Cancel / remove this lead's EXISTING booked session. Call when the customer asks to cancel, says they can't make it, wants to undo a booking, or clearly declines a session that was already booked. Deletes the calendar event and stops the reminder messages. Do NOT use this to book — only to cancel.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', description: 'Short reason for cancelling, if the user gave one' },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'update_lead_profile',
       description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, or website URL. Can be called multiple times as new details emerge. Only include fields explicitly shared - never guess.',
       input_schema: {
@@ -1059,6 +1071,32 @@ function buildBookingTools(
         meet_link: calendarResult?.meetLink || null,
         message: `Booking confirmed for ${bookingName} on ${dateLabel} at ${time}. Send EXACTLY ONE confirmation to the user using this exact date ("${dateLabel}") and time — do NOT restate a different day. STOP: do not call any more tools, and do not repeat this confirmation in any later message.`,
       });
+    },
+
+    cancel_booking: async () => {
+      const phone = input.userProfile.phone || '';
+      const norm = phone.replace(/\D/g, '').slice(-10);
+      if (!norm) {
+        return JSON.stringify({ success: false, error: 'No phone on file to identify the booking.' });
+      }
+      const { data: lead } = await supabase
+        .from('all_leads')
+        .select('id')
+        .eq('customer_phone_normalized', norm)
+        .maybeSingle();
+      if (!lead) {
+        return JSON.stringify({ success: false, error: 'No matching lead found to cancel.' });
+      }
+      try {
+        const res = await cancelBooking(lead.id, supabase);
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error || 'Cancel failed' });
+        return JSON.stringify({
+          success: true,
+          message: 'Booking cancelled — calendar event removed and reminders stopped. Tell the user their session is cancelled and offer to rebook whenever they like. Do NOT claim a new booking.',
+        });
+      } catch (e: any) {
+        return JSON.stringify({ success: false, error: e?.message || 'Cancel failed' });
+      }
     },
 
     update_lead_profile: async (toolInput: Record<string, any>) => {

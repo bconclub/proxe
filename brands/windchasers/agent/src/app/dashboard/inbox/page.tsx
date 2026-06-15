@@ -2633,6 +2633,23 @@ export default function InboxPage() {
                         <MdOpenInNew size={11} /> Join Meeting
                       </a>
                     )}
+                    <button
+                      onClick={async () => {
+                        if (!leadDetails?.id) return
+                        if (!window.confirm('Cancel this booking? This removes the Google Calendar event and stops the reminder messages.')) return
+                        try {
+                          const r = await fetch(`/api/dashboard/leads/${leadDetails.id}/cancel-booking`, { method: 'POST' })
+                          if (r.ok) window.location.reload()
+                          else window.alert('Could not cancel the booking. Try again.')
+                        } catch {
+                          window.alert('Could not cancel the booking. Try again.')
+                        }
+                      }}
+                      className="mt-2 text-[11px] hover:underline"
+                      style={{ color: '#ef4444' }}
+                    >
+                      Cancel booking
+                    </button>
                   </div>
                 ) : bd ? (
                   <div className="rounded-xl p-3 border" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', opacity: 0.6 }}>

@@ -73,6 +73,8 @@ export {
   storeBooking,
   getAvailableSlots,
   createCalendarEvent,
+  deleteCalendarEvent,
+  cancelBooking,
 } from './bookingManager';
 
 // WhatsApp messaging

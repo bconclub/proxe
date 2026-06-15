@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-15 06:04 IST · Windchasers: cancel/remove a booked session (dashboard + agent)
+
+- New cancelBooking service: deletes the Google Calendar event (new deleteCalendarEvent), clears the booking from the lead's unified_context + web_sessions (status → cancelled, date/time nulled so it drops from Upcoming/pipeline), and cancels pending booking_reminder_24h / _30m tasks so no reminder fires.
+- Dashboard: "Cancel booking" button in the inbox lead pane (with confirm) → POST /api/dashboard/leads/[id]/cancel-booking.
+- Agent: new cancel_booking tool + prompt rule — if a customer asks to cancel / can't make it / backs out of a booked session, the agent cancels it (calendar + reminders) and confirms, never leaving a session they backed out of.
+
 ## 2026-06-15 05:41 IST · Windchasers: WA booking consent gate (stop force-booking)
 
 - Customer said "don't book online" and only stated a constraint ("available after 6pm") — no confirmation — yet the agent booked Friday 6PM offline anyway. Added a CONSENT TO BOOK gate (overrides the flow): book only on an explicit yes / tapped time; a constraint or preference is NOT consent (offer + ask, don't lock); any refusal ("don't book", "not now", reluctance) = stop, never re-push or re-offer what they refused. Step 4 now requires explicit confirmation before book_consultation.

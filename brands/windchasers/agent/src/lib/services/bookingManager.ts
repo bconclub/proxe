@@ -828,3 +828,101 @@ export async function createCalendarEvent(booking: {
     return null;
   }
 }
+
+/**
+ * Delete a Google Calendar event by id. Returns true on success (or if the
+ * event is already gone — 404/410). Best-effort; never throws.
+ */
+export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+  if (!eventId) return false;
+  try {
+    const { google } = await import('googleapis');
+    const auth = await getGoogleCalendarAuth();
+    const calendar = google.calendar({ version: 'v3', auth });
+    await calendar.events.delete({ calendarId: CALENDAR_ID, eventId });
+    console.log('[bookingManager] Deleted calendar event', eventId);
+    return true;
+  } catch (error: any) {
+    const code = error?.code || error?.response?.status;
+    if (code === 404 || code === 410) {
+      console.warn('[bookingManager] Calendar event already gone', eventId);
+      return true;
+    }
+    console.error('[bookingManager] Failed to delete calendar event', eventId, error?.message || error);
+    return false;
+  }
+}
+
+/**
+ * Cancel a lead's booking completely:
+ *   1. Delete the Google Calendar event (if we have its id).
+ *   2. Clear the booking from unified_context.<channel> (status → cancelled,
+ *      date/time nulled) so it drops out of Upcoming / pipeline.
+ *   3. Clear booking columns on web_sessions (the only session table with them).
+ *   4. Cancel pending booking_reminder_24h / _30m tasks so no reminder fires.
+ *
+ * Used by the dashboard "Cancel booking" action and the agent's cancel_booking
+ * tool. Best-effort per step; returns what happened.
+ */
+export async function cancelBooking(
+  leadId: string,
+  supabase: SupabaseClient,
+): Promise<{ ok: boolean; calendarDeleted: boolean; remindersCancelled: number; error?: string }> {
+  const { data: lead, error } = await supabase
+    .from('all_leads')
+    .select('unified_context, metadata')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (error || !lead) {
+    return { ok: false, calendarDeleted: false, remindersCancelled: 0, error: 'Lead not found' };
+  }
+
+  const uc: Record<string, any> = lead.unified_context || {};
+  const meta: Record<string, any> = lead.metadata || {};
+
+  // Resolve the calendar event id from any place it might live.
+  const eventId =
+    meta.googleEventId || meta.google_event_id ||
+    uc.web?.booking?.eventId || uc.web?.google_event_id ||
+    uc.whatsapp?.booking?.eventId || uc.whatsapp?.google_event_id ||
+    uc.voice?.booking?.eventId || uc.social?.booking?.eventId || null;
+
+  let calendarDeleted = false;
+  if (eventId) calendarDeleted = await deleteCalendarEvent(eventId);
+
+  // Clear the booking from every channel block.
+  const newUc: Record<string, any> = { ...uc };
+  for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
+    const blk = newUc[ch];
+    if (blk && (blk.booking_date || blk.booking)) {
+      newUc[ch] = {
+        ...blk,
+        booking_status: 'cancelled',
+        booking_date: null,
+        booking_time: null,
+        booking_cancelled_at: getISTTimestamp(),
+        ...(blk.booking ? { booking: { ...blk.booking, status: 'cancelled', date: null, time: null } } : {}),
+      };
+    }
+  }
+  await supabase.from('all_leads').update({ unified_context: newUc }).eq('id', leadId);
+
+  // web_sessions is the only session table with booking columns — clear it too
+  // so founder-metrics' session-booking fallback doesn't resurrect it.
+  await supabase
+    .from('web_sessions')
+    .update({ booking_date: null, booking_time: null, booking_status: 'cancelled' })
+    .eq('lead_id', leadId)
+    .then(({ error: e }) => { if (e) console.warn('[cancelBooking] web_sessions clear failed:', e.message); });
+
+  // Cancel pending reminder tasks.
+  const { count } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'cancelled', completed_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('lead_id', leadId)
+    .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
+    .in('status', ['pending', 'queued', 'awaiting_approval']);
+
+  console.log(`[cancelBooking] lead=${leadId} calendarDeleted=${calendarDeleted} remindersCancelled=${count ?? 0}`);
+  return { ok: true, calendarDeleted, remindersCancelled: count ?? 0 };
+}
