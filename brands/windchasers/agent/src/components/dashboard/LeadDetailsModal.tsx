@@ -441,6 +441,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   } | null>(null)
   const [merging, setMerging] = useState(false)
 
+  // Next Actions — hidden until redesigned. Founder: "Next Actions is completely
+  // messed up. Rather than showing random things, just stop showing anything,
+  // figure out what needs to be done, then set up Next Actions." Flip to true
+  // once the auto-task logic is reworked.
+  const SHOW_NEXT_ACTIONS = false
+
   // Next Actions state
   const [leadTasks, setLeadTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
@@ -3092,7 +3098,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )
                     })()}
 
-                    {/* Next Actions */}
+                    {/* Next Actions — hidden until redesigned (see SHOW_NEXT_ACTIONS) */}
+                    {SHOW_NEXT_ACTIONS && (
                     <section className="lead-next-actions mt-4">
                       <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-[var(--text-primary)]">
                         <MdSchedule size={14} className="text-orange-500" />
@@ -3154,6 +3161,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         )
                       })()}
                     </section>
+                    )}
 
                     {/* Compact Intelligence Insights - Only render when data exists */}
                     {(() => {
@@ -3216,6 +3224,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                     {/* Next step one-liner */}
                     {(() => {
+                      if (!SHOW_NEXT_ACTIONS) return null
                       const firstPending = leadTasks.find(t => ['pending', 'queued', 'in_queue', 'awaiting_approval'].includes(t.status) && !t.completed_at)
                       if (!firstPending) return null
                       const actionLabel = getTaskActionLabel(firstPending)

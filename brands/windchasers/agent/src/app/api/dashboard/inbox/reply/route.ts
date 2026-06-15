@@ -24,6 +24,7 @@ import {
   logMessage,
 } from '@/lib/services';
 import { createClient } from '@/lib/supabase/server';
+import { assignOwnerOnTouch } from '@/lib/services/leadOwnership';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,33 +144,16 @@ async function sendWhatsAppTemplate(params: {
 }
 
 /**
- * Auto-assign lead ownership to the acting user if the lead has no owner yet.
- * Sending a reply = "I'm handling this lead", so the first founder to reply
- * claims it. Never overwrites an existing owner. Non-fatal.
+ * Reassign lead ownership to the acting user. Sending a reply or template =
+ * "I'm handling this lead now", so the sender becomes the owner — even if
+ * someone else owned it before (owner follows whoever is actively working it).
+ * Resolves the logged-in user from the cookie session; no-ops for system
+ * paths. Non-fatal.
  */
-async function claimOwnershipIfUnowned(supabase: any, leadId: string): Promise<void> {
-  try {
-    const authClient = await createClient();
-    const { data: { user } } = await authClient.auth.getUser();
-    if (!user) return;
-    const { data: row } = await supabase
-      .from('all_leads').select('unified_context').eq('id', leadId).maybeSingle();
-    const ctx = row?.unified_context || {};
-    if (ctx.owner && ctx.owner.id) return; // already owned — don't steal
-    const { data: du } = await supabase
-      .from('dashboard_users').select('full_name, email').eq('id', user.id).maybeSingle();
-    const owner = {
-      id: user.id,
-      name: du?.full_name || (user.email || 'User').split('@')[0],
-      email: du?.email || user.email || null,
-      assigned_at: new Date().toISOString(),
-      assigned_by: user.email || user.id,
-      auto: true,
-    };
-    await supabase.from('all_leads').update({ unified_context: { ...ctx, owner } }).eq('id', leadId);
-  } catch (e: any) {
-    console.warn('[inbox/reply] auto-claim ownership failed (non-fatal):', e?.message || e);
-  }
+async function reassignOwnerToActor(supabase: any, leadId: string): Promise<void> {
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  await assignOwnerOnTouch(supabase, leadId, user);
 }
 
 export async function POST(request: NextRequest) {
@@ -352,8 +336,8 @@ export async function POST(request: NextRequest) {
         supabase,
       );
 
-      // First founder to reply claims the lead (if unowned).
-      await claimOwnershipIfUnowned(supabase, leadId);
+      // Replying = "I'm working this lead now" → become the owner.
+      await reassignOwnerToActor(supabase, leadId);
 
       return NextResponse.json({
         success: true,
@@ -457,7 +441,7 @@ export async function POST(request: NextRequest) {
         supabase,
       );
 
-      if (!isTest) await claimOwnershipIfUnowned(supabase, leadId);
+      if (!isTest) await reassignOwnerToActor(supabase, leadId);
 
       return NextResponse.json({
         success: true,

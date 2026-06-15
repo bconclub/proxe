@@ -29,6 +29,9 @@ export default function UserManagementPage() {
   const [invites, setInvites] = useState<PendingInvite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Only admins see activity (last active), status, role controls, and invites.
+  // Viewers get a redacted, name-only roster from the API (isAdmin === false).
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // Invite form state
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -50,6 +53,7 @@ export default function UserManagementPage() {
       const data = await res.json()
       setUsers(data.users || [])
       setInvites(data.pendingInvites || [])
+      setIsAdmin(data.isAdmin === true)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -182,11 +186,14 @@ export default function UserManagementPage() {
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">User Management</h1>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{isAdmin ? 'User Management' : 'Team'}</h1>
             <p className="text-sm text-[var(--text-secondary)] mt-1">
-              Invite teammates and manage roles. All actions a user takes are logged on the leads they touch.
+              {isAdmin
+                ? 'Invite teammates and manage roles. All actions a user takes are logged on the leads they touch.'
+                : 'The people on your team. Only admins can manage roles or see activity.'}
             </p>
           </div>
+          {isAdmin && (
           <div className="flex items-center gap-2">
             <button
               onClick={load}
@@ -204,6 +211,7 @@ export default function UserManagementPage() {
               Invite User
             </button>
           </div>
+          )}
         </div>
 
         {error && (
@@ -279,16 +287,20 @@ export default function UserManagementPage() {
                 <tr>
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Name / Email</th>
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Role</th>
-                  <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
-                  <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
-                  <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
+                  {isAdmin && (
+                    <>
+                      <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
+                      <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
+                      <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">Loading…</td></tr>
+                  <tr><td colSpan={isAdmin ? 5 : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">Loading…</td></tr>
                 ) : users.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No users yet</td></tr>
+                  <tr><td colSpan={isAdmin ? 5 : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No users yet</td></tr>
                 ) : (
                   users.map((u) => (
                     <tr key={u.id} className="border-t border-[var(--border-primary)]">
@@ -297,16 +309,26 @@ export default function UserManagementPage() {
                         <div className="text-xs text-[var(--text-secondary)]">{u.email}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          className="text-xs border border-[var(--border-primary)] rounded px-2 py-1 outline-none"
-                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', colorScheme: 'light dark' }}
-                        >
-                          <option value="admin" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>admin</option>
-                          <option value="viewer" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>viewer</option>
-                        </select>
+                        {isAdmin ? (
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            className="text-xs border border-[var(--border-primary)] rounded px-2 py-1 outline-none"
+                            style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', colorScheme: 'light dark' }}
+                          >
+                            <option value="admin" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>admin</option>
+                            <option value="viewer" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>viewer</option>
+                          </select>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                            style={u.role === 'admin'
+                              ? { background: 'rgba(168,85,247,0.15)', color: '#a855f7' }
+                              : { background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}>
+                            {u.role}
+                          </span>
+                        )}
                       </td>
+                      {isAdmin && (<>
                       <td className="px-4 py-3 text-xs">
                         {(() => {
                           const { label, live } = formatLastActive(u.last_login)
@@ -348,6 +370,7 @@ export default function UserManagementPage() {
                           {u.is_active === false ? 'Reactivate' : 'Deactivate'}
                         </button>
                       </td>
+                      </>)}
                     </tr>
                   ))
                 )}

@@ -47,29 +47,79 @@ async function requireAdmin(userSupabase: any) {
   return { user, role: dashboardUser.role, status: 200 as const, service }
 }
 
+/**
+ * Like requireAdmin, but does NOT forbid non-admins — it just reports the
+ * caller's role so the route can redact sensitive fields for viewers.
+ * Used by GET: everyone may see *who* is on the team, but only admins see
+ * activity (last active), status, and pending invitations.
+ */
+async function requireUser(userSupabase: any) {
+  const {
+    data: { user },
+  } = await userSupabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', status: 401 as const }
+
+  const service = getServiceClient()
+  if (!service) {
+    return { error: 'Service client unavailable', status: 500 as const }
+  }
+
+  const { data: dashboardUser } = await service
+    .from('dashboard_users')
+    .select('role, is_active')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!dashboardUser) {
+    return { error: 'Your account is not provisioned in dashboard_users. Ask another admin to add you.', status: 403 as const }
+  }
+  if (dashboardUser.is_active === false) {
+    return { error: 'Your account is deactivated', status: 403 as const }
+  }
+  return { user, role: dashboardUser.role, isAdmin: dashboardUser.role === 'admin', status: 200 as const, service }
+}
+
 // ── GET — list users + pending invitations ────────────────────────────────────
 export async function GET() {
   try {
     const supabase = await createClient()
-    const auth = await requireAdmin(supabase)
+    const auth = await requireUser(supabase)
     if (auth.status !== 200) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
     const service = (auth as any).service
+    const isAdmin = (auth as any).isAdmin === true
 
-    const [usersRes, invitesRes] = await Promise.all([
-      service
-        .from('dashboard_users')
-        .select('id, email, full_name, role, is_active, created_at, last_login')
-        .order('created_at', { ascending: false }),
-      service
-        .from('user_invitations')
-        .select('id, email, token, role, invited_by, expires_at, accepted_at, created_at')
-        .is('accepted_at', null)
-        .order('created_at', { ascending: false }),
-    ])
+    // Non-admins may see WHO is on the team (name, email, role) but NOT
+    // activity — no last_login, status, created_at, or pending invitations.
+    // Founder: "Only the admin should be able to see all the users / active
+    // time. The users can see other users, but not active time or anything."
+    const userColumns = isAdmin
+      ? 'id, email, full_name, role, is_active, created_at, last_login'
+      : 'id, email, full_name, role'
+
+    const usersRes = await service
+      .from('dashboard_users')
+      .select(userColumns)
+      .order(isAdmin ? 'created_at' : 'full_name', { ascending: isAdmin ? false : true })
 
     if (usersRes.error) throw usersRes.error
+
+    if (!isAdmin) {
+      // Viewers: redacted list, no invitations.
+      return NextResponse.json({
+        users: usersRes.data || [],
+        pendingInvites: [],
+        isAdmin: false,
+      })
+    }
+
+    const invitesRes = await service
+      .from('user_invitations')
+      .select('id, email, token, role, invited_by, expires_at, accepted_at, created_at')
+      .is('accepted_at', null)
+      .order('created_at', { ascending: false })
+
     if (invitesRes.error) throw invitesRes.error
 
     const now = new Date()
@@ -80,6 +130,7 @@ export async function GET() {
     return NextResponse.json({
       users: usersRes.data || [],
       pendingInvites,
+      isAdmin: true,
     })
   } catch (error) {
     console.error('[users] GET error:', error)

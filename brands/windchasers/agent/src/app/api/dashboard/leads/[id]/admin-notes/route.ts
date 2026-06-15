@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { classifyAndAct, getServiceClient } from '@/lib/services'
+import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,10 @@ export async function POST(
       created_by: user?.id || null,
     })
     if (activityError) throw activityError
+
+    // Adding a note = "I'm working this lead now" → become the owner.
+    // Done BEFORE the orchestrator so its fresh context re-read keeps the owner.
+    await assignOwnerOnTouch(supabase, leadId, user)
 
     // 5. Run the shared orchestrator (classify + act)
     const result = await classifyAndAct({
