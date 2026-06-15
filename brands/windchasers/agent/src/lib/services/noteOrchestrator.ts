@@ -50,7 +50,7 @@ export interface OrchestratorResult {
 // ─── Classifier prompt ──────────────────────────────────────────────────────
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a sales admin assistant. Given an admin note about a lead, extract:
-1) category (one of: POST_CALL, BOOKING_MADE, NOT_POTENTIAL, HOT_LEAD, WARM_LATER, RNR, NOT_INTERESTED, CONVERTED, DEMO_TAKEN, PROPOSAL_SENT, MEETING_REQUEST, SEND_MESSAGE, NAME_UPDATE, INFO_ONLY)
+1) category (one of: POST_CALL, BOOKING_MADE, NOT_POTENTIAL, AFFORDABILITY, HOT_LEAD, WARM_LATER, RNR, NOT_INTERESTED, CONVERTED, DEMO_TAKEN, PROPOSAL_SENT, MEETING_REQUEST, SEND_MESSAGE, NAME_UPDATE, INFO_ONLY)
 2) any booking details if mentioned (date, time)
 3) any name if mentioned
 4) if a direct message should be sent (note starts with "send:", "message:", "tell them")
@@ -60,7 +60,8 @@ Respond in JSON only: {"category": "...", "booking_date": "...", "booking_time":
 Category guide:
 - POST_CALL: "spoke to", "just called", "had a call", "after the call", OR any plan to CALL BACK / FOLLOW UP ("call back tomorrow", "callback", "call him/her tomorrow", "follow up tomorrow", "reach out later", "check back with them") — a call happened and/or a follow-up call is planned. A call-back/follow-up is POST_CALL, never a booking.
 - BOOKING_MADE: ONLY when an actual demo/session/meeting was BOOKED/CONFIRMED for the lead to ATTEND, at a specific slot — e.g. "demo booked", "session scheduled for Fri 4pm", "booked his demo for Monday 3pm", "meeting set". A real appointment, not a plan to phone them. NEVER classify a plan to CALL the lead ("call back tomorrow", "follow up", "callback") as BOOKING_MADE — that is POST_CALL. If there's no actual booked demo/session, it is NOT a booking.
-- NOT_POTENTIAL: "not potential", "not a fit", "waste of time", "no budget", "too small" — lead is not worth pursuing
+- NOT_POTENTIAL: "not potential", "not a fit", "wrong audience", "spam", "fake enquiry", "not eligible" — genuinely not worth pursuing. Do NOT use this just because they mention cost/affordability — that is AFFORDABILITY.
+- AFFORDABILITY: "can't afford", "too expensive", "fees too high", "budget issue", "needs a loan", "need EMI/financing", "cost is a problem" — they WANT the course but are worried about money. This is a FINANCING conversation, NOT a dead lead — keep them alive and route to loan/nurture help.
 - HOT_LEAD: "hot lead", "very interested", "wants to start", "ready to go", "priority", "close this week" — high intent
 - WARM_LATER: "maybe later", "check back later", "not now but maybe", "low potential", "follow up later" — warm but not now
 - RNR: "no show", "didn't show", "no answer", "didn't pick up", "rnr", "rang no response", "not responding", "not replying", "no response", "voicemail", "busy" — couldn't reach them
@@ -73,6 +74,8 @@ Category guide:
 - NAME_UPDATE: "it's [name]", "name is [name]", "his/her name is [name]" — name correction
 - INFO_ONLY: general notes, observations, no action needed
 
+DO NOT OVER-REACT TO THIN INPUT: if the note is very short or vague with no clear signal, use INFO_ONLY. Only assign a destructive category (NOT_POTENTIAL, NOT_INTERESTED) when the note CLEARLY states disinterest/unfitness. A two-word note must NEVER trigger Closed Lost on its own.
+
 When a call outcome is prefixed in square brackets (e.g. "[No Answer]", "[Voicemail]", "[Busy]"), treat it as a strong signal — if outcome is No Answer/Voicemail/Busy with no contrary info in the text, classify as RNR.
 
 For booking_date: use relative terms as-is ("tomorrow", "next Monday", "March 28"). For booking_time: extract the time ("4 pm", "10:30 am"). If not mentioned, use null.
@@ -83,7 +86,9 @@ Example: note "spoke to him have a demo booked for tomorrow 4 pm" → {"category
 Example: note "He is interested to take this up, call back tomorrow" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — call back tomorrow"}
 Example: note "interested, asked me to follow up next week" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — follow up next week"}
 Example: note "[No Answer] tried calling twice" → {"category": "RNR", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Called twice, no answer"}
-Example: note "send: Hey, just checking in!" → {"category": "SEND_MESSAGE", "booking_date": null, "booking_time": null, "name": null, "send_message": "Hey, just checking in!", "summary": "Direct message to send to lead"}`;
+Example: note "send: Hey, just checking in!" → {"category": "SEND_MESSAGE", "booking_date": null, "booking_time": null, "name": null, "send_message": "Hey, just checking in!", "summary": "Direct message to send to lead"}
+Example: note "can't afford" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Cost concern — route to financing/loan help, keep nurturing"}
+Example: note "interested but needs a bank loan for the fees" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants the course, needs loan support"}`;
 
 // ─── Classifier ─────────────────────────────────────────────────────────────
 
@@ -260,6 +265,15 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   console.log(`[noteOrchestrator] Step 2: Classification:`, JSON.stringify(classification));
   actions.push(`ai_category:${classification.category}`);
 
+  // #4 — don't duplicate what the human already did. If the note says the team
+  // already messaged / shared the contact, suppress PROXe's own auto-sends and
+  // follow-up sequences (we still log + update stage/touchpoint).
+  const alreadyActioned = /\b(chaser|already\s+(sent|messaged|texted|followed\s*up|reached\s*out)|message\s+(already\s+)?sent|sent\s+(over|on|via)\s+whatsapp|contact\s+shared|shared\s+(with|to)\s+(the\s+)?team|handed\s+(over\s+)?to\s+(the\s+)?team|informed\s+the\s+team)\b/i.test(trimmedNote);
+  if (alreadyActioned) {
+    actions.push('already_actioned_detected');
+    actionsTaken.push('Note says the team already reached out — skipping PROXe auto-send/sequence');
+  }
+
   // ── BOOKING_MADE ─────────────────────────────────────────────────────────
   if (classification.category === 'BOOKING_MADE') {
     const { data: cancelledTasks } = await supabase
@@ -383,6 +397,32 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     actionsTaken.push(`Scheduled 90-day re-engagement check-in`);
   }
 
+  // ── AFFORDABILITY ────────────────────────────────────────────────────────
+  // #8 — cost concern is a FINANCING conversation, NOT a dead lead. Keep the
+  // lead alive, never zero the score, and queue loan/nurture help for the team.
+  if (classification.category === 'AFFORDABILITY') {
+    newStage = 'Nurture';
+    await supabase
+      .from('all_leads')
+      .update({ lead_stage: newStage, stage_override: true })
+      .eq('id', leadId);
+    actionsTaken.push(`Stage changed to Nurture (financing — not lost)`);
+
+    await supabase.from('agent_tasks').insert({
+      task_type: 'loan_assistance',
+      task_description: `Financing/loan help for ${leadName}: ${trimmedNote || 'cost concern'}`,
+      lead_id: leadId,
+      lead_phone: leadPhone,
+      lead_name: leadName,
+      status: 'pending',
+      scheduled_at: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      metadata: { source: 'note_orchestrator', trigger: 'affordability' },
+      created_at: now.toISOString(),
+    });
+    actions.push('affordability:nurture,loan_assistance_task');
+    actionsTaken.push(`Queued loan/financing follow-up for the team (1 day)`);
+  }
+
   // ── HOT_LEAD ─────────────────────────────────────────────────────────────
   if (classification.category === 'HOT_LEAD') {
     const { data: freshCtx } = await supabase
@@ -495,47 +535,54 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
       .in('status', ['pending', 'queued']);
 
-    await supabase.from('agent_tasks').insert({
-      task_type: 'missed_call_followup',
-      task_description: `Missed call follow-up: ${trimmedNote || outcome || 'no answer'}`,
-      lead_id: leadId,
-      lead_phone: leadPhone,
-      lead_name: leadName,
-      status: 'pending',
-      scheduled_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
-      metadata: { source: 'note_orchestrator', sequence: 'no_show', step: 0, timing_reason: 'RNR — follow-up in 30 min', outcome: outcome || null },
-      created_at: now.toISOString(),
-    });
-    actions.push('missed_call_followup_created');
-    actionsTaken.push(`Created missed-call follow-up (30 min)`);
-
-    const rnrSequence = [
-      { type: 'follow_up_day1', offsetMs: 1 * 24 * 60 * 60 * 1000, step: 1 },
-      { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000, step: 2 },
-      { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000, step: 3 },
-      { type: 're_engage', offsetMs: 7 * 24 * 60 * 60 * 1000, step: 4 },
-    ];
-    for (const s of rnrSequence) {
+    // #4 — if the team already sent the chaser/WhatsApp, don't stack PROXe's
+    // own missed-call follow-up + 4-step sequence on top. Just log the call.
+    if (alreadyActioned) {
+      actions.push('rnr_sequence_skipped:already_actioned');
+      actionsTaken.push(`Skipped auto follow-up — chaser already sent by the team`);
+    } else {
       await supabase.from('agent_tasks').insert({
-        task_type: s.type,
-        task_description: `Sequence step ${s.step}/4: ${s.type} for ${leadName} (RNR)`,
+        task_type: 'missed_call_followup',
+        task_description: `Missed call follow-up: ${trimmedNote || outcome || 'no answer'}`,
         lead_id: leadId,
         lead_phone: leadPhone,
         lead_name: leadName,
         status: 'pending',
-        scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
-        metadata: { source: 'note_orchestrator', sequence: 'rnr', step: s.step, total_steps: 4 },
+        scheduled_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        metadata: { source: 'note_orchestrator', sequence: 'no_show', step: 0, timing_reason: 'RNR — follow-up in 30 min', outcome: outcome || null },
         created_at: now.toISOString(),
       });
+      actions.push('missed_call_followup_created');
+      actionsTaken.push(`Created missed-call follow-up (30 min)`);
+
+      const rnrSequence = [
+        { type: 'follow_up_day1', offsetMs: 1 * 24 * 60 * 60 * 1000, step: 1 },
+        { type: 'follow_up_day3', offsetMs: 3 * 24 * 60 * 60 * 1000, step: 2 },
+        { type: 'follow_up_day5', offsetMs: 5 * 24 * 60 * 60 * 1000, step: 3 },
+        { type: 're_engage', offsetMs: 7 * 24 * 60 * 60 * 1000, step: 4 },
+      ];
+      for (const s of rnrSequence) {
+        await supabase.from('agent_tasks').insert({
+          task_type: s.type,
+          task_description: `Sequence step ${s.step}/4: ${s.type} for ${leadName} (RNR)`,
+          lead_id: leadId,
+          lead_phone: leadPhone,
+          lead_name: leadName,
+          status: 'pending',
+          scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(),
+          metadata: { source: 'note_orchestrator', sequence: 'rnr', step: s.step, total_steps: 4 },
+          created_at: now.toISOString(),
+        });
+      }
+      newStage = 'In Sequence';
+      await supabase
+        .from('all_leads')
+        .update({ lead_stage: newStage })
+        .eq('id', leadId);
+      actions.push('sequence_created:rnr:4_steps');
+      actionsTaken.push(`Created 4-step follow-up sequence (day 1, 3, 5, 7)`);
+      actionsTaken.push(`Stage changed to In Sequence`);
     }
-    newStage = 'In Sequence';
-    await supabase
-      .from('all_leads')
-      .update({ lead_stage: newStage })
-      .eq('id', leadId);
-    actions.push('sequence_created:rnr:4_steps');
-    actionsTaken.push(`Created 4-step follow-up sequence (day 1, 3, 5, 7)`);
-    actionsTaken.push(`Stage changed to In Sequence`);
   }
 
   // ── NOT_INTERESTED ───────────────────────────────────────────────────────
@@ -721,6 +768,9 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       } else if (recentSend) {
         actions.push('whatsapp_skipped:duplicate_within_5min');
         actionsTaken.push(`WhatsApp skipped — same message already sent in the last 5 minutes`);
+      } else if (alreadyActioned) {
+        actions.push('whatsapp_skipped:already_actioned');
+        actionsTaken.push(`WhatsApp skipped — the team already reached out per the note`);
       } else {
         const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`;
         const sendResult = await sendWhatsAppText(leadPhone, msg);
@@ -741,19 +791,21 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
         }
       }
     }
-    await supabase.from('agent_tasks').insert({
-      task_type: 'nudge_waiting',
-      task_description: `Nudge: asked for meeting time, no response yet (${leadName})`,
-      lead_id: leadId,
-      lead_phone: leadPhone,
-      lead_name: leadName,
-      status: 'pending',
-      scheduled_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
-      metadata: { source: 'note_orchestrator', trigger: 'meeting_request' },
-      created_at: now.toISOString(),
-    });
-    actions.push('nudge_waiting_created:2h');
-    actionsTaken.push(`Created nudge task if no reply (2 hours)`);
+    if (!alreadyActioned) {
+      await supabase.from('agent_tasks').insert({
+        task_type: 'nudge_waiting',
+        task_description: `Nudge: asked for meeting time, no response yet (${leadName})`,
+        lead_id: leadId,
+        lead_phone: leadPhone,
+        lead_name: leadName,
+        status: 'pending',
+        scheduled_at: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+        metadata: { source: 'note_orchestrator', trigger: 'meeting_request' },
+        created_at: now.toISOString(),
+      });
+      actions.push('nudge_waiting_created:2h');
+      actionsTaken.push(`Created nudge task if no reply (2 hours)`);
+    }
   }
 
   // ── SEND_MESSAGE ─────────────────────────────────────────────────────────

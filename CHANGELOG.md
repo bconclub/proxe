@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-15 07:11 IST · Windchasers: note orchestrator Phase 1 — affordability, thin-input, already-done
+
+Reduces PROXe over-acting on shallow free-text notes:
+- #8 Affordability is no longer death. New AFFORDABILITY category: "can't afford / too expensive / needs a loan" → stage Nurture (kept alive, score NOT zeroed) + a loan_assistance follow-up task for the team. Removed cost/budget from NOT_POTENTIAL.
+- #1 Thin-input guard: very short/vague notes → INFO_ONLY; destructive categories (NOT_POTENTIAL/NOT_INTERESTED) only on a clear statement; a two-word note can't trigger Closed Lost.
+- #4 Don't duplicate the human: when a note says the team already reached out ("chaser sent", "message already sent over WhatsApp", "contact shared with team"), PROXe skips its own WhatsApp send + nudge (MEETING_REQUEST) and its missed-call follow-up + 4-step sequence (RNR) — it still logs the call/note.
+- Call-back classifier examples extended.
+
+Phase 2 (structured note + propose/confirm step) and Phase 3 (timing/language routing, retire MEETING_REQUEST catch-all) still to come.
+
 ## 2026-06-15 06:41 IST · Windchasers: fix "Error logging call" (activities.created_by UUID crash)
 
 - Logging a call (and adding/creating notes) 500'd intermittently with "Error logging call". Root cause: activities.created_by is a UUID column, but the routes passed 'system'/email when the session user was null → Postgres 22P02 "invalid input syntax for type uuid" → the whole log failed.
