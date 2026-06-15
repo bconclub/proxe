@@ -27,6 +27,8 @@ import {
   MdExpandLess,
   MdAdd,
   MdCircle,
+  MdSettings,
+  MdClose,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -68,12 +70,15 @@ interface StageStats {
 }
 
 interface TemplateInfo {
+  id?: string
   stage: string
   day: number
   channel: string
   status: string
   variant: string
   templateName: string
+  content?: string
+  isActive?: boolean
 }
 
 // ── 9 Stage Config ────────────────────────────────────────────────
@@ -208,6 +213,11 @@ interface FunnelSectionProps {
   expandedStage: string | null
   setExpandedStage: (stage: string | null) => void
   getSlotStatus: (stageId: string, day: number, channel: string) => string
+  templates: TemplateInfo[]
+  onAddTemplate: (stageId: string) => void
+  onEditTemplate: (tpl: TemplateInfo) => void
+  onDeleteTemplate: (id: string) => void
+  onSetStatus: (id: string, status: string) => void
 }
 
 function FunnelSection({
@@ -219,6 +229,11 @@ function FunnelSection({
   expandedStage,
   setExpandedStage,
   getSlotStatus,
+  templates,
+  onAddTemplate,
+  onEditTemplate,
+  onDeleteTemplate,
+  onSetStatus,
 }: FunnelSectionProps) {
   const stages = stageIds
     .map((id) => ({ id, stage: stageStats.find((s) => s.id === id) }))
@@ -496,6 +511,61 @@ function FunnelSection({
                     <LegendItem color="#ef4444" label="Rejected" />
                     <LegendItem color="#6b7280" label="Empty" />
                   </div>
+
+                  {/* Templates manager */}
+                  {(() => {
+                    const stageTemplates = templates.filter((t) => t.stage === stageId)
+                    return (
+                      <div style={{ marginTop: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                            {stageTemplates.length} template{stageTemplates.length === 1 ? '' : 's'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onAddTemplate(stageId)}
+                            style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 32, fontSize: 13, padding: '0 12px' }}
+                          >
+                            <MdAdd size={16} /> Add
+                          </button>
+                        </div>
+                        {stageTemplates.length === 0 ? (
+                          <div style={{ border: '1px dashed var(--border-primary)', borderRadius: 10, padding: '20px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+                            No templates for this stage yet. Click <strong style={{ color: 'var(--text-primary)' }}>Add</strong> to create one.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {stageTemplates.map((t, i) => {
+                              const st = STATUS_STYLE[t.status] || STATUS_STYLE.empty
+                              return (
+                                <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-tertiary)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>Day {t.day}</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.channel === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}</span>
+                                      {t.variant && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Variant {t.variant}</span>}
+                                    </div>
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>{st.label}</span>
+                                  </div>
+                                  {(t.templateName || t.content) && (
+                                    <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                      {t.templateName ? <strong style={{ color: 'var(--text-primary)' }}>{t.templateName}: </strong> : null}{t.content}
+                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                                    <button type="button" onClick={() => onEditTemplate(t)} style={miniBtn('var(--accent-primary)')}>Edit</button>
+                                    {t.id && t.status !== 'approved' && <button type="button" onClick={() => onSetStatus(t.id!, 'approved')} style={miniBtn('#22c55e')}>Approve</button>}
+                                    {t.id && t.status !== 'rejected' && <button type="button" onClick={() => onSetStatus(t.id!, 'rejected')} style={miniBtn('#ef4444')}>Reject</button>}
+                                    {t.id && <button type="button" onClick={() => { if (confirm('Delete this template?')) onDeleteTemplate(t.id!) }} style={miniBtn('var(--text-secondary)')}>Delete</button>}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>
@@ -557,6 +627,13 @@ export default function FlowsPage() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [expandedStage, setExpandedStage] = useState<string | null>(null)
+  // Create Flow / edit template modal + Flow Settings modal
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorTemplate, setEditorTemplate] = useState<TemplateInfo | null>(null)
+  const [editorStage, setEditorStage] = useState<string>('low_touch')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [flowError, setFlowError] = useState<string | null>(null)
 
   // Map 9 stages to legacy 8 flows for backward compatibility
   const mapStagesToFlows = useCallback((stages: StageStats[]): FlowSummary[] => {
@@ -843,10 +920,79 @@ export default function FlowsPage() {
   // ── Get template status for a slot ──────────────────────────────
 
   const getSlotStatus = (stageId: string, day: number, channel: string): string => {
-    const template = templates.find(t => 
+    const template = templates.find(t =>
       t.stage === stageId && t.day === day && t.channel === channel
     )
     return template?.status || 'empty'
+  }
+
+  // ── Template CRUD (Create Flow / Flow Settings modals) ──────────────
+
+  const reloadFlows = useCallback(async () => {
+    await Promise.all([fetchStageStats(), fetchFlows()])
+  }, [fetchStageStats, fetchFlows])
+
+  const openCreateTemplate = (stageId?: string) => {
+    setFlowError(null)
+    setEditorTemplate(null)
+    setEditorStage(stageId || expandedStage || 'low_touch')
+    setEditorOpen(true)
+  }
+
+  const openEditTemplate = (tpl: TemplateInfo) => {
+    setFlowError(null)
+    setEditorTemplate(tpl)
+    setEditorStage(tpl.stage)
+    setEditorOpen(true)
+  }
+
+  const saveTemplate = async (payload: {
+    id?: string
+    stage: string
+    day: number
+    channel: string
+    variant: string
+    templateName: string
+    content: string
+  }) => {
+    setSavingTemplate(true)
+    setFlowError(null)
+    try {
+      const isEdit = !!payload.id
+      const res = await fetch('/api/dashboard/flows/templates', {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        setFlowError(data.error || 'Failed to save template')
+        return false
+      }
+      setEditorOpen(false)
+      setEditorTemplate(null)
+      await reloadFlows()
+      return true
+    } catch {
+      setFlowError('Network error while saving')
+      return false
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  const setTemplateStatus = async (id: string, meta_status: string) => {
+    await fetch('/api/dashboard/flows/templates', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, meta_status }),
+    })
+    await reloadFlows()
+  }
+
+  const deleteTemplate = async (id: string) => {
+    await fetch(`/api/dashboard/flows/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    await reloadFlows()
   }
 
   // ── Loading state ───────────────────────────────────────────────
@@ -879,7 +1025,13 @@ export default function FlowsPage() {
               9-stage follow-up sequence with template coverage
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button type="button" onClick={() => openCreateTemplate()} style={flowButtonStyle('var(--button-bg)', 'var(--text-button)')}>
+              <MdAdd size={18} /> Create Flow
+            </button>
+            <button type="button" onClick={() => setSettingsOpen(true)} style={flowGhostButtonStyle}>
+              <MdSettings size={17} /> Flow Settings
+            </button>
             <button
               onClick={() => setView('overview')}
               style={{
@@ -923,6 +1075,11 @@ export default function FlowsPage() {
           expandedStage={expandedStage}
           setExpandedStage={setExpandedStage}
           getSlotStatus={getSlotStatus}
+          templates={templates}
+          onAddTemplate={openCreateTemplate}
+          onEditTemplate={openEditTemplate}
+          onDeleteTemplate={deleteTemplate}
+          onSetStatus={setTemplateStatus}
         />
 
         {/* MID FUNNEL */}
@@ -935,6 +1092,11 @@ export default function FlowsPage() {
           expandedStage={expandedStage}
           setExpandedStage={setExpandedStage}
           getSlotStatus={getSlotStatus}
+          templates={templates}
+          onAddTemplate={openCreateTemplate}
+          onEditTemplate={openEditTemplate}
+          onDeleteTemplate={deleteTemplate}
+          onSetStatus={setTemplateStatus}
         />
 
         {/* BOTTOM FUNNEL */}
@@ -947,7 +1109,32 @@ export default function FlowsPage() {
           expandedStage={expandedStage}
           setExpandedStage={setExpandedStage}
           getSlotStatus={getSlotStatus}
+          templates={templates}
+          onAddTemplate={openCreateTemplate}
+          onEditTemplate={openEditTemplate}
+          onDeleteTemplate={deleteTemplate}
+          onSetStatus={setTemplateStatus}
         />
+
+        {editorOpen && (
+          <TemplateEditorModal
+            template={editorTemplate}
+            stageId={editorStage}
+            saving={savingTemplate}
+            error={flowError}
+            onCancel={() => { setEditorOpen(false); setEditorTemplate(null); setFlowError(null) }}
+            onSave={saveTemplate}
+          />
+        )}
+
+        {settingsOpen && (
+          <FlowSettingsModal
+            stageStats={stageStats}
+            templates={templates}
+            onClose={() => setSettingsOpen(false)}
+            onAddTemplate={(sid) => { setSettingsOpen(false); openCreateTemplate(sid) }}
+          />
+        )}
       </div>
     )
   }
@@ -1249,5 +1436,244 @@ function LegendItem({ color, label }: { color: string; label: string }) {
       <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
       {label}
     </span>
+  )
+}
+
+// ── Template-management styles + modals (ported from WC, BCON-themed) ──
+
+const flowButtonStyle = (background: string, color: string): React.CSSProperties => ({
+  minHeight: 40,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  border: '1px solid transparent',
+  borderRadius: 10,
+  padding: '0 16px',
+  background,
+  color,
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: 'pointer',
+})
+
+const flowGhostButtonStyle: React.CSSProperties = {
+  minHeight: 40,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  border: '1px solid var(--border-primary)',
+  borderRadius: 10,
+  padding: '0 16px',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-primary)',
+  fontSize: 14,
+  fontWeight: 650,
+  cursor: 'pointer',
+}
+
+const miniBtn = (color: string): React.CSSProperties => ({
+  border: '1px solid var(--border-primary)',
+  background: 'transparent',
+  color,
+  borderRadius: 8,
+  padding: '5px 10px',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+})
+
+function humanizeStage(id: string): string {
+  return id.replace(/_/g, ' ').replace(/\b\w/g, m => m.toUpperCase())
+}
+
+const modalInputStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: 40,
+  border: '1px solid var(--border-primary)',
+  borderRadius: 9,
+  background: 'var(--bg-tertiary)',
+  color: 'var(--text-primary)',
+  padding: '0 12px',
+  fontSize: 14,
+  outline: 'none',
+}
+
+const modalLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--text-secondary)',
+  marginBottom: 6,
+}
+
+function ModalShell({ title, onClose, children, width = 480 }: { title: string; onClose: () => void; children: React.ReactNode; width?: number }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px', animation: 'bcon-fade-in 140ms ease' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width, maxWidth: '94vw', maxHeight: '86vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.4)', padding: 20 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: 'var(--text-primary)' }}>{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ border: 0, background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', padding: 4 }}>
+            <MdClose size={20} />
+          </button>
+        </div>
+        {children}
+      </div>
+      <style jsx global>{`
+        @keyframes bcon-fade-in { from { opacity: 0 } to { opacity: 1 } }
+      `}</style>
+    </div>
+  )
+}
+
+function TemplateEditorModal({
+  template,
+  stageId,
+  saving,
+  error,
+  onCancel,
+  onSave,
+}: {
+  template: TemplateInfo | null
+  stageId: string
+  saving: boolean
+  error: string | null
+  onCancel: () => void
+  onSave: (payload: { id?: string; stage: string; day: number; channel: string; variant: string; templateName: string; content: string }) => void
+}) {
+  const [stage, setStage] = useState(template?.stage || stageId)
+  const [day, setDay] = useState(String(template?.day ?? 1))
+  const [channel, setChannel] = useState(template?.channel || 'whatsapp')
+  const [variant, setVariant] = useState(template?.variant || 'A')
+  const [templateName, setTemplateName] = useState(template?.templateName || '')
+  const [content, setContent] = useState(template?.content || '')
+
+  const isEdit = !!template?.id
+  const canSave = content.trim().length > 0 && Number.isFinite(Number(day)) && !saving
+
+  return (
+    <ModalShell title={isEdit ? 'Edit Template' : 'Create Flow Template'} onClose={onCancel}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label style={modalLabelStyle}>Stage</label>
+          <select value={stage} onChange={e => setStage(e.target.value)} style={modalInputStyle}>
+            {STAGE_ORDER.filter(s => s !== 'converted').map(s => (
+              <option key={s} value={s}>{humanizeStage(s)}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div>
+            <label style={modalLabelStyle}>Day</label>
+            <input type="number" min={0} value={day} onChange={e => setDay(e.target.value)} style={modalInputStyle} />
+          </div>
+          <div>
+            <label style={modalLabelStyle}>Channel</label>
+            <select value={channel} onChange={e => setChannel(e.target.value)} style={modalInputStyle}>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="voice">Voice</option>
+            </select>
+          </div>
+          <div>
+            <label style={modalLabelStyle}>Variant</label>
+            <select value={variant} onChange={e => setVariant(e.target.value)} style={modalInputStyle}>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style={modalLabelStyle}>Template name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. onetouch_d1_intro" style={modalInputStyle} />
+        </div>
+
+        <div>
+          <label style={modalLabelStyle}>Message content</label>
+          <textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Hi {{1}}, ..."
+            rows={4}
+            style={{ ...modalInputStyle, minHeight: 96, padding: '10px 12px', resize: 'vertical', lineHeight: 1.5 }}
+          />
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>Use {'{{1}}'} for the lead&apos;s name. New templates start as <strong style={{ color: 'var(--text-secondary)' }}>Pending</strong>.</p>
+        </div>
+
+        {error && <div style={{ fontSize: 13, color: '#ef4444', background: 'rgba(239,68,68,0.12)', borderRadius: 8, padding: '8px 12px' }}>{error}</div>}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+          <button type="button" onClick={onCancel} style={{ ...flowGhostButtonStyle, minHeight: 40 }}>Cancel</button>
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={() => onSave({ id: template?.id, stage, day: Number(day), channel, variant, templateName: templateName.trim(), content: content.trim() })}
+            style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 40, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
+          >
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create template'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  )
+}
+
+function FlowSettingsModal({
+  stageStats,
+  templates,
+  onClose,
+  onAddTemplate,
+}: {
+  stageStats: StageStats[]
+  templates: TemplateInfo[]
+  onClose: () => void
+  onAddTemplate: (stageId: string) => void
+}) {
+  const nameMap = new Map(stageStats.map(s => [s.id, s.name]))
+  return (
+    <ModalShell title="Flow Settings" onClose={onClose} width={560}>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+        Each stage runs follow-ups on the channels and cadence below. Add or manage templates per stage.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {STAGE_ORDER.filter(s => s !== 'converted').map(sid => {
+          const cfg = STAGE_CONFIG[sid]
+          const count = templates.filter(t => t.stage === sid).length
+          return (
+            <div key={sid} style={{ border: '1px solid var(--border-primary)', borderRadius: 12, padding: 14, background: 'var(--bg-tertiary)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 8, background: cfg?.bg, color: cfg?.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{cfg?.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{nameMap.get(sid) || humanizeStage(sid)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{cfg?.timing || 'No schedule'}</div>
+                  </div>
+                </div>
+                <button type="button" onClick={() => onAddTemplate(sid)} style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 32, fontSize: 12, padding: '0 10px', flexShrink: 0 }}>
+                  <MdAdd size={15} /> Add
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                {(cfg?.channels.length ? cfg.channels : ['whatsapp']).map(ch => (
+                  <span key={ch} style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    {ch === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}
+                  </span>
+                ))}
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{count} template{count === 1 ? '' : 's'}</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </ModalShell>
   )
 }

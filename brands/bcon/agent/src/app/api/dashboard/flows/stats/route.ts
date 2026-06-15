@@ -9,6 +9,9 @@ import { getServiceClient, getClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
+// BCON has no BRAND_ID export — resolve brand from env the same way configs do.
+const BRAND_ID = process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon'
+
 // 9 Stage definitions
 const STAGES = [
   { id: 'one_touch', name: 'One Touch', timing: 'Day 1, 3, 7, 30' },
@@ -67,10 +70,12 @@ export async function GET(request: NextRequest) {
       leadCounts[stageId] = (leadCounts[stageId] || 0) + 1
     })
 
-    // 2. Query follow_up_templates table
+    // 2. Query follow_up_templates table — scoped to THIS brand only.
+    // (Shared multi-brand table: without this filter BCON would count other brands' rows.)
     const { data: templates, error: templatesError } = await supabase
       .from('follow_up_templates')
       .select('*')
+      .eq('brand', BRAND_ID)
 
     if (templatesError) {
       console.error('[flows/stats] Failed to fetch templates:', templatesError)
@@ -107,12 +112,15 @@ export async function GET(request: NextRequest) {
 
     // Build templates array with stage/day/channel/status
     const templatesList = (templates || []).map((t: any) => ({
+      id: t.id,
       stage: t.stage,
       day: t.day,
       channel: t.channel,
       status: t.meta_status,
       variant: t.variant,
       templateName: t.meta_template_name,
+      content: t.content,
+      isActive: t.is_active,
     }))
 
     return NextResponse.json({
