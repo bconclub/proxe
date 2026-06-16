@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
+import { cleanDisplayName } from '@/lib/services/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -285,7 +286,7 @@ export async function GET(request: Request) {
         const r: any = byId.get(id) || {};
         return {
           id,
-          name: r.customer_name || 'Unnamed',
+          name: cleanDisplayName(r.customer_name || '') || (r.customer_name || '').trim() || 'Unnamed',
           phone: r.phone || null,
           score: typeof r.lead_score === 'number' ? r.lead_score : null,
           messageCount: msgCountByLead.get(id) || 0,

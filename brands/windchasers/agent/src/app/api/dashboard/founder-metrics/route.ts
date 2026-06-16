@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { cleanDisplayName } from '@/lib/services/utils'
+
+// Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
+// decorative junk so the dashboard reads as a professional system. Falls back to
+// the raw trimmed value (then 'Unknown') if cleaning empties it.
+const dn = (raw?: string | null): string => {
+  const cleaned = cleanDisplayName(raw || '')
+  return cleaned || (raw || '').trim() || 'Unknown'
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -476,7 +485,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 8)
       .map(lead => ({
         id: lead.id,
-        name: lead.customer_name || 'Unknown',
+        name: dn(lead.customer_name),
         score: lead.lead_score || 0,
         lastContact: lead.last_interaction_at || lead.created_at,
         stage: lead.lead_stage || 'New',
@@ -523,7 +532,7 @@ export async function GET(request: NextRequest) {
         const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
         return {
           id: lead.id,
-          name: lead.customer_name || 'Unknown',
+          name: dn(lead.customer_name),
           title,
           date: bookingDate,
           time: bookingTime,
@@ -1533,6 +1542,31 @@ export async function GET(request: NextRequest) {
       },
     }
 
+    // LEADS RECOVERED: distinct leads that went cold / lost / dormant and were
+    // brought BACK to an active stage — the core PROXe value (a follow-up, or a
+    // lead that drifted off and got re-engaged). Uses the full stage-transition
+    // history (not the recent-50 slice the activity feed uses).
+    let leadsRecoveredCount = 0
+    try {
+      const { data: allStageChanges } = await supabase
+        .from('lead_stage_changes')
+        .select('lead_id, old_stage, new_stage')
+        .order('created_at', { ascending: false })
+        .limit(5000)
+      const COLD = ['cold', 'lost', 'dormant', 'stale', 'nurture', 're-engage', 'reengage', 'in sequence', 'follow-up', 'followup', 'inactive', 'closed']
+      const ACTIVE = ['engaged', 'qualified', 'warm', 'high intent', 'booking', 'booked', 'demo', 'converted', 'interested', 'active', 'call done']
+      const lc = (s: string) => (s || '').toLowerCase()
+      const isCold = (s: string) => COLD.some(c => lc(s).includes(c))
+      const isActive = (s: string) => ACTIVE.some(a => lc(s).includes(a))
+      const recovered = new Set<string>()
+      ;(allStageChanges || []).forEach((c: any) => {
+        if (c.lead_id && isCold(c.old_stage) && isActive(c.new_stage)) recovered.add(c.lead_id)
+      })
+      leadsRecoveredCount = recovered.size
+    } catch {
+      // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1584,6 +1618,7 @@ export async function GET(request: NextRequest) {
         bookings: todayBookings.length,
         newLeads: todayNewLeads.length,
       },
+      leadsRecovered: { count: leadsRecoveredCount },
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',

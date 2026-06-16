@@ -25,6 +25,7 @@ interface FounderMetrics {
   totalLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; change7D?: number; change14D?: number; change30D?: number; fromConversations: number; conversionRate: number }
   engagedLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
+  leadsRecovered?: { count: number }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{
     id: string
@@ -341,9 +342,6 @@ export default function FounderDashboard() {
   // series follows the top-bar range so the trend reacts to 7D / 14D / 30D.
   const rangeDays = range === 'Today' ? 1 : range === '14D' ? 14 : range === '30D' ? 30 : 7
   const rangeLabel = range === 'Today' ? 'today' : `last ${rangeDays} days`
-  // Pick a per-range value from the API's count1D / count7D / 14D / 30D fields.
-  const pickCount = (o?: { count1D?: number; count7D: number; count14D: number; count30D: number }) =>
-    !o ? 0 : range === 'Today' ? (o.count1D ?? 0) : range === '14D' ? o.count14D : range === '30D' ? o.count30D : o.count7D
   // Trend chart: a single-day "Today" line is meaningless, so show the 7-day
   // context line for Today; the headline numbers below still reflect today.
   const seriesKey: '7D' | '14D' | '30D' = range === 'Today' ? '7D' : range
@@ -446,14 +444,23 @@ export default function FounderDashboard() {
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
-        <NewLeadsCard metrics={metrics} range={range} rangeLabel={rangeLabel} value={pickCount(metrics.totalLeads)} onOpen={() => router.push('/dashboard/leads')} />
+        {/* Card 1 — Active Conversations: chats with activity in the last 24h. */}
         <KpiCard
-          icon={<MdPeople size={15} />} iconColor="#22c55e"
-          label="Engaged Leads"
-          value={pickCount(metrics.engagedLeads)}
-          sparkData={metrics.trends?.leads?.data} sparkColor="#22c55e"
-          sub={total > 0 ? `${rangeLabel} · of ${total} total leads` : 'engaged'}
-          onClick={() => router.push('/dashboard/leads?filter=engaged')}
+          icon={<MdChatBubble size={15} />} iconColor="#3B82F6"
+          label="Active Conversations"
+          value={metrics.totalConversations.count1D ?? 0}
+          sparkData={metrics.trendSeries?.conversations?.['7D']} sparkColor="#3B82F6"
+          sub="in the last 24 hours"
+          onClick={() => router.push('/dashboard/inbox')}
+        />
+        {/* Card 2 — Leads Recovered: went cold/lost and were brought back. */}
+        <KpiCard
+          icon={<MdRefresh size={15} />} iconColor="#22c55e"
+          label="Leads Recovered"
+          value={metrics.leadsRecovered?.count ?? 0}
+          sparkColor="#22c55e"
+          sub="followed up & brought back"
+          onClick={() => router.push('/dashboard/leads')}
         />
         {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
@@ -520,35 +527,40 @@ export default function FounderDashboard() {
               View all <MdArrowForward size={13} />
             </button>
           </div>
-          <div className="flex-1 space-y-2.5 overflow-y-auto min-h-0">
+          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0">
             {metrics.upcomingBookings.length > 0 ? (
-              metrics.upcomingBookings.slice(0, 5).map((booking) => (
+              metrics.upcomingBookings.map((booking) => (
                 <button
                   key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
-                  className="w-full flex items-center gap-3 p-2.5 text-left rounded-lg transition-all border"
+                  className="w-full flex items-start gap-2 p-2 text-left rounded-lg transition-all border"
                   style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
+                    {/* Line 1 — name + countdown chip */}
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                      <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                         {formatCountdown(booking.datetime)}
                       </span>
                     </div>
+                    {/* Line 2 — event heading */}
                     {booking.title && (
-                      <p className="text-[11px] truncate" style={{ color: 'var(--text-primary)', opacity: 0.8 }}>{booking.title}</p>
+                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
                     )}
-                    <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                      {formatBookingWhen(booking.datetime)}
-                    </p>
-                    <p className="text-[10px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                      Owner: {booking.owner?.name || 'Unassigned'}
-                    </p>
+                    {/* Line 3 — when + owner chips */}
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                        {formatBookingWhen(booking.datetime)}
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                        {booking.owner?.name ? booking.owner.name : 'Unassigned'}
+                      </span>
+                    </div>
                   </div>
                 </button>
               ))
@@ -719,42 +731,6 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
         <div style={{ height: 30 }} />
       )}
       <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{sub || 'vs last 7 days'}</span>
-    </div>
-  )
-}
-
-// New Leads KPI — driven by the global top-bar range (Today / 7D / 14D / 30D).
-// Clicking the number opens the leads list.
-function NewLeadsCard({ metrics, range, rangeLabel, value, onOpen }: {
-  metrics: FounderMetrics
-  range: 'Today' | '7D' | '14D' | '30D'
-  rangeLabel: string
-  value: number
-  onOpen: () => void
-}) {
-  const tl = metrics.totalLeads
-  // Per-window change vs the prior equal window (Today has no comparison yet).
-  const change = range === '7D' ? tl.change7D : range === '14D' ? tl.change14D : range === '30D' ? tl.change30D : undefined
-  const spark = metrics.trends?.leads?.data
-
-  return (
-    <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdPeople size={15} /></span>
-        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>New Leads</span>
-      </div>
-      <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={onOpen}>
-        <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
-        {change != null && <KpiDelta change={change} />}
-      </div>
-      {spark && spark.length > 1 ? (
-        <div className="w-full mt-2" style={{ height: 30 }}>
-          <Sparkline data={spark} color="#3B82F6" height={30} showGradient />
-        </div>
-      ) : (
-        <div style={{ height: 30 }} />
-      )}
-      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{rangeLabel}</span>
     </div>
   )
 }

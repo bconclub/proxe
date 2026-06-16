@@ -25,7 +25,6 @@ import {
   MdDarkMode,
   MdChatBubbleOutline,
   MdMonitorHeart,
-  MdMoreHoriz,
   MdTimeline,
   MdChecklist,
   MdViewKanban,
@@ -84,10 +83,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
-  // Logged-in user's email — shown in the three-dot menu so testers can
-  // see which account they're signed in as (especially useful while we're
-  // inviting multiple people).
-  const [userEmail, setUserEmail] = useState<string | null>(null)
   const moreOptionsRef = React.useRef<HTMLDivElement>(null)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
@@ -123,24 +118,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         // Fallback to existing method if API fails
         setBuildDate(getBuildDate())
       })
-  }, [])
-
-  // Pull the logged-in user's email once so we can show it in the
-  // sign-out dropdown. Cheap one-shot read — the SSR layout already
-  // confirmed there IS a user before rendering us, so this almost
-  // always resolves to a real value. Soft-fail to null otherwise.
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!cancelled) setUserEmail(user?.email || null)
-      } catch {
-        if (!cancelled) setUserEmail(null)
-      }
-    })()
-    return () => { cancelled = true }
   }, [])
 
   // Activity heartbeat. POSTs to /api/auth/touch on mount + every 60s
@@ -756,7 +733,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   color: 'var(--text-secondary)',
                   backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                 }}
-                title="More Options"
+                title="System"
                 aria-expanded={moreOptionsOpen}
                 aria-haspopup="menu"
                 onMouseEnter={(e) => {
@@ -770,7 +747,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   }
                 }}
               >
-                <MdMoreHoriz size={16} />
+                <MdMonitorHeart size={16} />
               </button>
 
               {moreOptionsOpen && (
@@ -782,39 +759,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '200px',
                   }}
                 >
-                  {/* Signed-in account — non-interactive header so the
-                     tester always knows which user the dashboard is acting
-                     as. Especially useful while we're inviting teammates
-                     and they're flipping between accounts. */}
-                  {userEmail && (
-                    <>
-                      <div
-                        className="px-4 py-2"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        <div
-                          className="text-[9px] font-semibold uppercase tracking-wider mb-0.5"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          Signed in as
-                        </div>
-                        <div
-                          className="text-[12px] font-medium truncate"
-                          style={{ color: 'var(--text-primary)' }}
-                          title={userEmail}
-                        >
-                          {userEmail}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          height: '1px',
-                          backgroundColor: 'var(--border-primary)',
-                          margin: '4px 0',
-                        }}
-                      />
-                    </>
-                  )}
                   {/* "Endpoint Health" used to live here as a popover modal,
                      but System Status (/dashboard/status) already renders
                      HealthStrip + EndpointHealthDetail on a single page —
