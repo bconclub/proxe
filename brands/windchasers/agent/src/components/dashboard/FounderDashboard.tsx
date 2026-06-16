@@ -27,6 +27,7 @@ interface FounderMetrics {
   engagedLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   leadsRecovered?: { count: number }
+  funnel?: Record<'Today' | '7D' | '14D' | 'All', { total: number; engaged: number; warm: number; followUpDue: number; booked: number }>
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{
     id: string
@@ -351,9 +352,15 @@ export default function FounderDashboard() {
   // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
   // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
   // range in the metrics yet).
-  const engTotal = engineRange === 'Today' ? (metrics.totalLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
-  const engEngaged = engineRange === 'Today' ? (metrics.engagedLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
-  const engWarm = engineRange === 'Today' ? (metrics.warmLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  // Cohort funnel for the selected window — all five nodes scale together (leads
+  // acquired in the window → how far each got). Falls back to the old per-metric
+  // counts if the backend hasn't shipped `funnel` yet.
+  const fn = metrics.funnel?.[engineRange]
+  const engTotal = fn ? fn.total : engineRange === 'Today' ? (metrics.totalLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
+  const engEngaged = fn ? fn.engaged : engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
+  const engWarm = fn ? fn.warm : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
+  const engBooked = fn ? fn.booked : (flow.booked || 0)
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
   const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
   // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
@@ -565,8 +572,8 @@ export default function FounderDashboard() {
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engTotal} label="Total Leads" sub={engTopSub} />
             <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engEngaged} label="Engaged" sub={engPct(engEngaged)} />
             <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engWarm} label="Warm" sub={engPct(engWarm)} />
-            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
+            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engDue} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
+            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engBooked} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
