@@ -27,8 +27,19 @@ import {
   MdExpandLess,
   MdAdd,
   MdCircle,
+  MdSearch,
   MdSettings,
+  MdFilterList,
+  MdCalendarToday,
+  MdRefresh,
   MdClose,
+  MdMoreVert,
+  MdKeyboardArrowDown,
+  MdGroups,
+  MdInventory2,
+  MdAutoGraph,
+  MdChecklist,
+  MdRadioButtonUnchecked,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -157,8 +168,8 @@ const STAGE_CONFIG: Record<string, {
   },
   converted: {
     icon: <MdCheckCircle size={22} />,
-    color: '#10b981',
-    bg: 'rgba(16,185,129,0.10)',
+    color: '#22c55e',
+    bg: 'rgba(34,197,94,0.10)',
     timing: 'Terminal',
     days: [],
     channels: [],
@@ -213,11 +224,6 @@ interface FunnelSectionProps {
   expandedStage: string | null
   setExpandedStage: (stage: string | null) => void
   getSlotStatus: (stageId: string, day: number, channel: string) => string
-  templates: TemplateInfo[]
-  onAddTemplate: (stageId: string) => void
-  onEditTemplate: (tpl: TemplateInfo) => void
-  onDeleteTemplate: (id: string) => void
-  onSetStatus: (id: string, status: string) => void
 }
 
 function FunnelSection({
@@ -229,11 +235,6 @@ function FunnelSection({
   expandedStage,
   setExpandedStage,
   getSlotStatus,
-  templates,
-  onAddTemplate,
-  onEditTemplate,
-  onDeleteTemplate,
-  onSetStatus,
 }: FunnelSectionProps) {
   const stages = stageIds
     .map((id) => ({ id, stage: stageStats.find((s) => s.id === id) }))
@@ -511,61 +512,6 @@ function FunnelSection({
                     <LegendItem color="#ef4444" label="Rejected" />
                     <LegendItem color="#6b7280" label="Empty" />
                   </div>
-
-                  {/* Templates manager */}
-                  {(() => {
-                    const stageTemplates = templates.filter((t) => t.stage === stageId)
-                    return (
-                      <div style={{ marginTop: 16 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                            {stageTemplates.length} template{stageTemplates.length === 1 ? '' : 's'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onAddTemplate(stageId)}
-                            style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 32, fontSize: 13, padding: '0 12px' }}
-                          >
-                            <MdAdd size={16} /> Add
-                          </button>
-                        </div>
-                        {stageTemplates.length === 0 ? (
-                          <div style={{ border: '1px dashed var(--border-primary)', borderRadius: 10, padding: '20px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
-                            No templates for this stage yet. Click <strong style={{ color: 'var(--text-primary)' }}>Add</strong> to create one.
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {stageTemplates.map((t, i) => {
-                              const st = STATUS_STYLE[t.status] || STATUS_STYLE.empty
-                              return (
-                                <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-tertiary)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>Day {t.day}</span>
-                                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.channel === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}</span>
-                                      {t.variant && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Variant {t.variant}</span>}
-                                    </div>
-                                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>{st.label}</span>
-                                  </div>
-                                  {(t.templateName || t.content) && (
-                                    <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                                      {t.templateName ? <strong style={{ color: 'var(--text-primary)' }}>{t.templateName}: </strong> : null}{t.content}
-                                    </p>
-                                  )}
-                                  <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                                    <button type="button" onClick={() => onEditTemplate(t)} style={miniBtn('var(--accent-primary)')}>Edit</button>
-                                    {t.id && t.status !== 'approved' && <button type="button" onClick={() => onSetStatus(t.id!, 'approved')} style={miniBtn('#22c55e')}>Approve</button>}
-                                    {t.id && t.status !== 'rejected' && <button type="button" onClick={() => onSetStatus(t.id!, 'rejected')} style={miniBtn('#ef4444')}>Reject</button>}
-                                    {t.id && <button type="button" onClick={() => { if (confirm('Delete this template?')) onDeleteTemplate(t.id!) }} style={miniBtn('var(--text-secondary)')}>Delete</button>}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })()}
                 </div>
               )}
             </div>
@@ -627,6 +573,7 @@ export default function FlowsPage() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [expandedStage, setExpandedStage] = useState<string | null>(null)
+  const [activeFunnel, setActiveFunnel] = useState<'top' | 'mid' | 'bottom'>('top')
   // Create Flow / edit template modal + Flow Settings modal
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorTemplate, setEditorTemplate] = useState<TemplateInfo | null>(null)
@@ -1009,112 +956,153 @@ export default function FlowsPage() {
 
   if (view === 'stages') {
     const totalLeads = stageStats.reduce((sum, s) => sum + s.leadCount, 0)
-    const avgCoverage = stageStats.length > 0 
+    const avgCoverage = stageStats.length > 0
       ? Math.round(stageStats.reduce((sum, s) => sum + s.coverage, 0) / stageStats.length)
       : 0
+    const stagesActive = stageStats.filter(s => s.leadCount > 0).length
+    const templatesLive = templates.filter(t => t.status === 'approved').length
+    const stageMap = new Map(stageStats.map(stage => [stage.id, stage]))
+    const funnelGroups = [
+      { id: 'top', label: 'TOP', color: '#3B82F6', stageIds: ['one_touch', 'low_touch', 'engaged'] },
+      { id: 'mid', label: 'MID', color: '#f59e0b', stageIds: ['high_intent', 'booking_made', 'no_show'] },
+      { id: 'bottom', label: 'BOTTOM', color: '#22c55e', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
+    ]
+    const activeGroup = funnelGroups.find(g => g.id === activeFunnel) || funnelGroups[0]
+    const funnelStageIds = activeGroup.stageIds
+    const selectedStageId = (expandedStage && funnelStageIds.includes(expandedStage)) ? expandedStage : funnelStageIds[0]
+    const selectedStage = stageMap.get(selectedStageId) || stageStats[0] || {
+      id: 'low_touch',
+      name: 'Low Touch',
+      leadCount: 0,
+      coverage: 0,
+    }
+    const selectedConfig = STAGE_CONFIG[selectedStage.id] || STAGE_CONFIG.low_touch
 
     return (
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 40px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ height: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, color: 'var(--text-primary)' }}>
+        {/* Compact header */}
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexShrink: 0 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-              Journey Flows
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-              9-stage follow-up sequence with template coverage
+            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700, color: 'var(--text-primary)' }}>Flows</h1>
+            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+              Pick a funnel to see its stages, templates and coverage.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <button type="button" onClick={() => openCreateTemplate()} style={flowButtonStyle('var(--button-bg)', 'var(--text-button)')}>
-              <MdAdd size={18} /> Create Flow
-            </button>
-            <button type="button" onClick={() => setSettingsOpen(true)} style={flowGhostButtonStyle}>
-              <MdSettings size={17} /> Flow Settings
-            </button>
-            <button
-              onClick={() => setView('overview')}
-              style={{
-                padding: '8px 16px',
-                background: 'var(--bg-secondary)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8,
-                color: 'var(--text-secondary)',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              Legacy View
-            </button>
+          <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
+            <MdRefresh size={18} /> Refresh
+          </button>
+        </header>
+
+        {/* Go-Live readiness — kept at top so you always see what's going on */}
+        <GoLiveChecklist
+          totalLeads={totalLeads}
+          stagesActive={stagesActive}
+          templatesCount={templates.length}
+          templatesLive={templatesLive}
+          avgCoverage={avgCoverage}
+          coveredStages={stageStats.filter(s => s.id !== 'converted' && s.coverage > 0).length}
+        />
+
+        {/* Funnel selector — quick "where am I" */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, flexShrink: 0 }}>
+          {funnelGroups.map(group => {
+            const count = group.stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)
+            const covs = group.stageIds.map(id => stageMap.get(id)?.coverage || 0)
+            const avgCov = covs.length ? Math.round(covs.reduce((a, b) => a + b, 0) / covs.length) : 0
+            const active = activeFunnel === group.id
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => { setActiveFunnel(group.id as 'top' | 'mid' | 'bottom'); setExpandedStage(group.stageIds[0]) }}
+                style={{
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: active ? `2px solid ${group.color}` : '1px solid var(--border-primary)',
+                  background: active ? `${group.color}12` : 'var(--bg-secondary)',
+                  borderRadius: 14,
+                  padding: '13px 16px',
+                  boxShadow: active ? `0 10px 24px ${group.color}22` : '0 6px 18px rgba(0,0,0,0.22)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: group.color, fontSize: 13, letterSpacing: '0.4px' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: group.color }} />
+                    {group.label} FUNNEL
+                  </span>
+                  {active && <MdCheckCircle size={18} color={group.color} />}
+                </div>
+                <div style={{ marginTop: 9, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <strong style={{ fontSize: 28, lineHeight: 1, color: 'var(--text-primary)' }}>{count}</strong>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>lead{count === 1 ? '' : 's'}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: group.color }}>{avgCov}% covered</span>
+                </div>
+                <div style={{ marginTop: 8, height: 5, borderRadius: 999, background: 'var(--border-primary)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, avgCov)}%`, height: '100%', background: group.color }} />
+                </div>
+              </button>
+            )
+          })}
+        </section>
+
+        {/* Drill-in — active funnel's stages (left) + selected stage detail (right) */}
+        <section style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12 }}>
+          <div style={{ border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 700, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
+              {activeGroup.label} FUNNEL · STAGES
+            </div>
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {funnelStageIds.map(stageId => {
+                const stage = stageMap.get(stageId) || { id: stageId, name: stageId.replace(/_/g, ' '), leadCount: 0, coverage: 0 }
+                const cfg = STAGE_CONFIG[stageId]
+                const sel = selectedStage.id === stageId
+                const accent = cfg?.color || activeGroup.color
+                return (
+                  <button
+                    key={stageId}
+                    type="button"
+                    onClick={() => setExpandedStage(stageId)}
+                    style={{
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      width: '100%',
+                      border: sel ? `2px solid ${accent}` : '1px solid var(--border-primary)',
+                      background: sel ? `${accent}12` : 'var(--bg-primary)',
+                      borderRadius: 10,
+                      padding: 11,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ width: 36, height: 36, borderRadius: 9, background: cfg?.bg || `${accent}16`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {cfg?.icon || <MdTimeline size={18} />}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stage.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{stage.leadCount} leads · {stage.coverage}% covered</div>
+                      </div>
+                      <MdKeyboardArrowDown size={18} style={{ transform: 'rotate(-90deg)', color: 'var(--text-muted)', flexShrink: 0 }} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Stats Row */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 32, flexWrap: 'wrap' }}>
-          <StatCard label="Total Leads" value={totalLeads} color="#3b82f6" />
-          <StatCard 
-            label="Avg Coverage" 
-            value={`${avgCoverage}%`} 
-            color={avgCoverage >= 80 ? '#22c55e' : avgCoverage >= 50 ? '#f59e0b' : '#ef4444'}
-          />
-          <StatCard 
-            label="Stages Active" 
-            value={`${stageStats.filter(s => s.leadCount > 0).length}/9`} 
-            color="#8b5cf6"
-          />
-        </div>
-
-        {/* Funnel Sections */}
-        {/* TOP OF FUNNEL */}
-        <FunnelSection
-          title="TOP"
-          color="#3B82F6"
-          stageIds={['one_touch', 'low_touch', 'engaged']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-          templates={templates}
-          onAddTemplate={openCreateTemplate}
-          onEditTemplate={openEditTemplate}
-          onDeleteTemplate={deleteTemplate}
-          onSetStatus={setTemplateStatus}
-        />
-
-        {/* MID FUNNEL */}
-        <FunnelSection
-          title="MID"
-          color="#F59E0B"
-          stageIds={['high_intent', 'booking_made', 'no_show']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-          templates={templates}
-          onAddTemplate={openCreateTemplate}
-          onEditTemplate={openEditTemplate}
-          onDeleteTemplate={deleteTemplate}
-          onSetStatus={setTemplateStatus}
-        />
-
-        {/* BOTTOM FUNNEL */}
-        <FunnelSection
-          title="BOTTOM"
-          color="#22C55E"
-          stageIds={['demo_taken', 'proposal_sent', 'converted']}
-          stageStats={stageStats}
-          stageConfig={STAGE_CONFIG}
-          expandedStage={expandedStage}
-          setExpandedStage={setExpandedStage}
-          getSlotStatus={getSlotStatus}
-          templates={templates}
-          onAddTemplate={openCreateTemplate}
-          onEditTemplate={openEditTemplate}
-          onDeleteTemplate={deleteTemplate}
-          onSetStatus={setTemplateStatus}
-        />
+          <div style={{ minWidth: 0, overflow: 'auto' }}>
+            <FlowDetailPanel
+              stage={selectedStage}
+              config={selectedConfig}
+              templates={templates}
+              getSlotStatus={getSlotStatus}
+              onClose={() => setExpandedStage(funnelStageIds[0])}
+              onAddTemplate={openCreateTemplate}
+              onEditTemplate={openEditTemplate}
+              onDeleteTemplate={deleteTemplate}
+              onSetStatus={setTemplateStatus}
+            />
+          </div>
+        </section>
 
         {editorOpen && (
           <TemplateEditorModal
@@ -1439,26 +1427,25 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-// ── Template-management styles + modals (ported from WC, BCON-themed) ──
-
 const flowButtonStyle = (background: string, color: string): React.CSSProperties => ({
-  minHeight: 40,
+  minHeight: 42,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 8,
   border: '1px solid transparent',
   borderRadius: 10,
-  padding: '0 16px',
+  padding: '0 18px',
   background,
   color,
   fontSize: 14,
   fontWeight: 700,
   cursor: 'pointer',
+  boxShadow: 'none',
 })
 
 const flowGhostButtonStyle: React.CSSProperties = {
-  minHeight: 40,
+  minHeight: 42,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1469,8 +1456,511 @@ const flowGhostButtonStyle: React.CSSProperties = {
   background: 'var(--bg-secondary)',
   color: 'var(--text-primary)',
   fontSize: 14,
-  fontWeight: 650,
+  fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.22)',
+}
+
+const flowFilterButtonStyle: React.CSSProperties = {
+  ...flowGhostButtonStyle,
+  minHeight: 38,
+  padding: '0 14px',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+}
+
+const flowPillButtonStyle: React.CSSProperties = {
+  minHeight: 38,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  border: '1px solid var(--border-primary)',
+  borderRadius: 9,
+  padding: '0 14px',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-primary)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+function FlowKpiCard({
+  label,
+  value,
+  delta,
+  color,
+  icon,
+}: {
+  label: string
+  value: string | number
+  delta: string
+  color: string
+  icon: React.ReactNode
+}) {
+  return (
+    <article style={{ minHeight: 112, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', padding: 18, boxShadow: '0 12px 30px rgba(0,0,0,0.22)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+        <div>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14, fontWeight: 600 }}>{label}</p>
+          <div style={{ marginTop: 8, fontSize: 31, lineHeight: 1, fontWeight: 700, letterSpacing: 0, color }}>
+            {value}
+          </div>
+        </div>
+        <div style={{ width: 50, height: 50, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${color}18`, color }}>
+          {icon}
+        </div>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 12, color: delta.includes('4pp') ? '#ef4444' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <MdTrendingUp size={14} />
+        {delta}
+      </div>
+    </article>
+  )
+}
+
+// ── Go-Live Checklist ─────────────────────────────────────────────
+// Data-driven readiness panel: auto-checks flip Done/Not-yet from live
+// stats; channel + worker items are "Verify" (not detectable here).
+
+type ChecklistStatus = 'done' | 'todo' | 'manual'
+
+function GoLiveChecklist({
+  totalLeads,
+  stagesActive,
+  templatesCount,
+  templatesLive,
+  avgCoverage,
+  coveredStages,
+}: {
+  totalLeads: number
+  stagesActive: number
+  templatesCount: number
+  templatesLive: number
+  avgCoverage: number
+  coveredStages: number
+}) {
+  const items: { label: string; short: string; detail: string; status: ChecklistStatus }[] = [
+    {
+      label: 'Lead data syncing',
+      short: 'Leads',
+      detail: `${totalLeads} leads pulled from all_leads and mapped to journey stages.`,
+      status: totalLeads > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Stages populated',
+      short: 'Stages',
+      detail: `${stagesActive}/9 stages currently hold leads.`,
+      status: stagesActive > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Follow-up templates created',
+      short: 'Templates',
+      detail: templatesCount > 0
+        ? `${templatesCount} template${templatesCount !== 1 ? 's' : ''} saved for this brand.`
+        : 'No follow_up_templates rows exist for this brand yet.',
+      status: templatesCount > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Templates approved & live',
+      short: 'Approved',
+      detail: templatesLive > 0
+        ? `${templatesLive} template${templatesLive !== 1 ? 's' : ''} approved on Meta and live.`
+        : 'No templates approved yet — coverage stays at 0% until at least one is approved.',
+      status: templatesLive > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Stage coverage',
+      short: 'Coverage',
+      detail: coveredStages > 0
+        ? `${coveredStages} stage${coveredStages !== 1 ? 's' : ''} have a live template (avg ${avgCoverage}%).`
+        : 'Every stage shows 0% coverage — approve templates to raise it.',
+      status: coveredStages > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'WhatsApp channel connected',
+      short: 'WhatsApp',
+      detail: 'Meta-approved sender + templates wired to the WhatsApp number. Verify on Meta.',
+      status: 'manual',
+    },
+    {
+      label: 'Voice channel connected',
+      short: 'Voice',
+      detail: 'Vapi assistant reachable for voice nudges. Verify in Vapi.',
+      status: 'manual',
+    },
+    {
+      label: 'Follow-up scheduler running',
+      short: 'Scheduler',
+      detail: 'Background worker that schedules + sends the per-day nudges. Verify the worker is up.',
+      status: 'manual',
+    },
+  ]
+
+  const statusMeta: Record<ChecklistStatus, { color: string; bg: string }> = {
+    done: { color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+    todo: { color: '#ef4444', bg: 'rgba(239,68,68,0.10)' },
+    manual: { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+  }
+
+  const autoItems = items.filter(i => i.status !== 'manual')
+  const doneCount = autoItems.filter(i => i.status === 'done').length
+  const allReady = doneCount === autoItems.length
+
+  return (
+    <section
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+        padding: '10px 14px',
+        border: '1px solid var(--border-primary)',
+        borderRadius: 12,
+        background: 'var(--bg-secondary)',
+        boxShadow: '0 6px 18px rgba(0,0,0,0.22)',
+      }}
+    >
+      <span
+        title="What's needed to make the flow page active and running"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+          fontSize: 13, fontWeight: 700, color: allReady ? '#22c55e' : 'var(--text-primary)',
+          paddingRight: 12, marginRight: 2, borderRight: '1px solid var(--border-primary)',
+        }}
+      >
+        <MdChecklist size={18} /> Go-Live {doneCount}/{autoItems.length}
+      </span>
+
+      {items.map(item => {
+        const meta = statusMeta[item.status]
+        return (
+          <span
+            key={item.label}
+            title={`${item.label} — ${item.detail}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',
+              background: meta.bg, padding: '5px 10px', borderRadius: 999,
+            }}
+          >
+            {item.status === 'done'
+              ? <MdCheckCircle size={14} color={meta.color} />
+              : <MdRadioButtonUnchecked size={14} color={meta.color} />}
+            {item.short}
+          </span>
+        )
+      })}
+    </section>
+  )
+}
+
+function FunnelBand({
+  label,
+  color,
+  stageIds,
+  stageMap,
+}: {
+  label: string
+  color: string
+  stageIds: string[]
+  stageMap: Map<string, StageStats>
+}) {
+  const count = stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)
+  const values = stageIds.map(id => stageMap.get(id)?.leadCount || 0)
+
+  return (
+    <div style={{ minHeight: 104, padding: '16px 20px 10px', background: `linear-gradient(90deg, ${color}14 0%, var(--bg-secondary) 100%)`, borderRight: '1px solid var(--border-primary)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color, fontWeight: 700, fontSize: 13 }}>
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+        {label}
+      </div>
+      <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <strong style={{ fontSize: 29, lineHeight: 1, color: 'var(--text-primary)' }}>{count}</strong>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>lead{count === 1 ? '' : 's'}</span>
+      </div>
+      <MiniSparkline values={values} color={color} />
+    </div>
+  )
+}
+
+function MiniSparkline({ values, color }: { values: number[]; color: string }) {
+  const safe = values.length > 0 ? values : [0, 0, 0]
+  const max = Math.max(...safe, 1)
+  const width = 260
+  const height = 42
+  const points = safe.map((value, index) => {
+    const x = safe.length === 1 ? width / 2 : (index / (safe.length - 1)) * width
+    const y = height - 8 - (value / max) * 26
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true" style={{ display: 'block', marginTop: 4 }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="0" y1={height - 8} x2={width} y2={height - 8} stroke={`${color}33`} strokeWidth="1" />
+    </svg>
+  )
+}
+
+function FlowStageCard({
+  stageId,
+  stage,
+  config,
+  selected,
+  onSelect,
+}: {
+  stageId: string
+  stage: StageStats
+  config: (typeof STAGE_CONFIG)[string]
+  selected: boolean
+  onSelect: () => void
+}) {
+  const accent = config?.color || 'var(--accent-primary)'
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        width: '100%',
+        textAlign: 'left',
+        border: selected ? `2px solid var(--accent-primary)` : '1px solid var(--border-primary)',
+        borderRadius: 10,
+        background: selected ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
+        padding: 14,
+        cursor: 'pointer',
+        boxShadow: selected ? '0 10px 24px var(--accent-subtle)' : '0 6px 18px rgba(0,0,0,0.22)',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: config?.bg || `${accent}16`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {config?.icon || <MdTimeline size={22} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {stage.name}
+            </h3>
+            <MdMoreVert size={18} color="var(--text-secondary)" />
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ borderRadius: 999, padding: '3px 8px', color: accent, background: `${accent}16`, fontSize: 12, fontWeight: 700 }}>
+              {stage.leadCount} lead{stage.leadCount === 1 ? '' : 's'}
+            </span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{config?.timing || 'No schedule'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: stage.coverage > 0 ? '#f97316' : '#ef4444', fontSize: 12, fontWeight: 700 }}>{stage.coverage}%</span>
+        <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'var(--border-primary)', overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(100, Math.max(0, stage.coverage))}%`, height: '100%', background: stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444' }} />
+        </div>
+      </div>
+      <span style={{ display: 'none' }}>{stageId}</span>
+    </button>
+  )
+}
+
+function FlowDetailPanel({
+  stage,
+  config,
+  templates,
+  getSlotStatus,
+  onClose,
+  onAddTemplate,
+  onEditTemplate,
+  onDeleteTemplate,
+  onSetStatus,
+}: {
+  stage: StageStats
+  config: (typeof STAGE_CONFIG)[string]
+  templates: TemplateInfo[]
+  getSlotStatus: (stageId: string, day: number, channel: string) => string
+  onClose: () => void
+  onAddTemplate: (stageId: string) => void
+  onEditTemplate: (tpl: TemplateInfo) => void
+  onDeleteTemplate: (id: string) => void
+  onSetStatus: (id: string, status: string) => void
+}) {
+  const [tab, setTab] = useState<'Overview' | 'Templates' | 'Performance' | 'Activity'>('Overview')
+  const stageTemplates = templates.filter(template => template.stage === stage.id)
+  const approved = stageTemplates.filter(template => template.status === 'approved').length
+  const pending = stageTemplates.filter(template => template.status === 'pending').length
+  const rejected = stageTemplates.filter(template => template.status === 'rejected').length
+  const emptySlots = Math.max(0, (config?.days.length || 0) * (config?.channels.length || 0) - stageTemplates.length)
+  const totalSlots = Math.max(1, approved + pending + rejected + emptySlots)
+
+  return (
+    <aside style={{ position: 'sticky', top: 16, border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', boxShadow: '0 18px 40px rgba(0,0,0,0.18)', padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 20, color: 'var(--text-primary)', fontWeight: 700 }}>{stage.name}</h2>
+            <span style={{ color: 'var(--accent-primary)', background: 'var(--accent-subtle)', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 }}>
+              {stage.leadCount} leads
+            </span>
+          </div>
+          <p style={{ margin: '12px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>{config?.timing || 'No schedule'}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close selected flow" style={{ border: 0, background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', padding: 4 }}>
+          <MdClose size={20} />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-primary)', marginTop: 24 }}>
+        {(['Overview', 'Templates', 'Performance', 'Activity'] as const).map((t) => {
+          const active = tab === t
+          return (
+            <button key={t} type="button" onClick={() => setTab(t)} style={{ border: 0, background: 'transparent', padding: '0 0 12px', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: active ? '3px solid var(--accent-primary)' : '3px solid transparent', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {t}{t === 'Templates' && stageTemplates.length > 0 ? ` (${stageTemplates.length})` : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'Overview' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 148px', gap: 12, marginTop: 14 }}>
+            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14 }}>
+              <h3 style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-primary)' }}>Channels</h3>
+              {(config?.channels.length ? config.channels : ['whatsapp']).map(channel => (
+                <div key={channel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: channel === 'whatsapp' ? '#22c55e' : '#ef476f', fontSize: 20 }}>{channel === 'whatsapp' ? 'W' : 'V'}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 13, textTransform: 'capitalize' }}>{channel}</span>
+                  </div>
+                  <span style={{ borderRadius: 999, padding: '4px 9px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: 12, fontWeight: 700 }}>Active</span>
+                </div>
+              ))}
+            </section>
+
+            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text-primary)', textAlign: 'left' }}>Coverage</h3>
+              <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : '#f59e0b'} size={92} showLabel />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', color: stage.coverage >= 50 ? '#22c55e' : '#ef4444', fontSize: 12, marginTop: 8 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: stage.coverage >= 50 ? '#22c55e' : '#ef4444' }} />
+                {stage.coverage >= 80 ? 'Good' : stage.coverage >= 50 ? 'Fair' : 'Low'}
+              </div>
+            </section>
+          </div>
+
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 14, color: 'var(--text-primary)' }}>Lead Progress</h3>
+            <p style={{ margin: '8px 0 12px', color: 'var(--text-secondary)', fontSize: 12 }}>{stage.leadCount} leads in this stage</p>
+            <SegmentedProgress approved={approved} pending={pending} rejected={rejected} empty={emptySlots} total={totalSlots} />
+          </section>
+
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12 }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-primary)' }}>Template Schedule</h3>
+            <ScheduleMatrix stageId={stage.id} config={config} getSlotStatus={getSlotStatus} />
+            <button type="button" onClick={() => setTab('Templates')} style={{ ...flowGhostButtonStyle, width: '100%', marginTop: 14, color: 'var(--accent-primary)', minHeight: 36 }}>
+              View Full Templates
+            </button>
+          </section>
+        </>
+      )}
+
+      {tab === 'Templates' && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+              {stageTemplates.length} template{stageTemplates.length === 1 ? '' : 's'}
+            </span>
+            <button type="button" onClick={() => onAddTemplate(stage.id)} style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 34, fontSize: 13, padding: '0 12px' }}>
+              <MdAdd size={16} /> Add
+            </button>
+          </div>
+          {stageTemplates.length === 0 ? (
+            <div style={{ border: '1px dashed var(--border-primary)', borderRadius: 10, padding: '28px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+              No templates for this stage yet.<br />Click <strong style={{ color: 'var(--text-primary)' }}>Add</strong> to create one.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {stageTemplates.map((t, i) => {
+                const st = STATUS_STYLE[t.status] || STATUS_STYLE.empty
+                return (
+                  <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Day {t.day}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.channel === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}</span>
+                        {t.variant && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Variant {t.variant}</span>}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>{st.label}</span>
+                    </div>
+                    {(t.templateName || t.content) && (
+                      <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {t.templateName ? <strong style={{ color: 'var(--text-primary)' }}>{t.templateName}: </strong> : null}{t.content}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                      <button type="button" onClick={() => onEditTemplate(t)} style={miniBtn('var(--accent-primary)')}>Edit</button>
+                      {t.id && t.status !== 'approved' && <button type="button" onClick={() => onSetStatus(t.id!, 'approved')} style={miniBtn('#22c55e')}>Approve</button>}
+                      {t.id && t.status !== 'rejected' && <button type="button" onClick={() => onSetStatus(t.id!, 'rejected')} style={miniBtn('#ef4444')}>Reject</button>}
+                      {t.id && <button type="button" onClick={() => { if (confirm('Delete this template?')) onDeleteTemplate(t.id!) }} style={miniBtn('var(--text-secondary)')}>Delete</button>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'Performance' && (
+        <div style={{ marginTop: 16 }}>
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+            <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444'} size={84} showLabel />
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Template coverage</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{stage.coverage}%</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{approved} approved of {totalSlots} slots</div>
+            </div>
+          </section>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
+            {[
+              { label: 'Approved', value: approved, color: '#22c55e' },
+              { label: 'Pending', value: pending, color: '#f59e0b' },
+              { label: 'Rejected', value: rejected, color: '#ef4444' },
+              { label: 'Leads in stage', value: stage.leadCount, color: 'var(--accent-primary)' },
+            ].map(s => (
+              <div key={s.label} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'Activity' && (
+        <div style={{ marginTop: 16 }}>
+          {stageTemplates.length === 0 ? (
+            <div style={{ border: '1px dashed var(--border-primary)', borderRadius: 10, padding: '28px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+              No template activity for this stage yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {[...stageTemplates].sort((a, b) => a.day - b.day).map((t, i) => {
+                const st = STATUS_STYLE[t.status] || STATUS_STYLE.empty
+                return (
+                  <div key={t.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', borderBottom: '1px solid var(--border-primary)' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>Day {t.day}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>{st.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </aside>
+  )
 }
 
 const miniBtn = (color: string): React.CSSProperties => ({
@@ -1484,6 +1974,103 @@ const miniBtn = (color: string): React.CSSProperties => ({
   cursor: 'pointer',
 })
 
+function CoverageRing({ value, color, size = 54, showLabel = false }: { value: number; color: string; size?: number; showLabel?: boolean }) {
+  const stroke = Math.max(6, Math.round(size * 0.12))
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (Math.min(100, Math.max(0, value)) / 100) * circumference
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`${value}% coverage`}>
+      <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(148,163,184,0.25)" strokeWidth={stroke} fill="none" />
+      <circle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      {showLabel && (
+        <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 18, fontWeight: 700, fill: 'var(--text-primary)' }}>
+          {value}%
+        </text>
+      )}
+    </svg>
+  )
+}
+
+function SegmentedProgress({ approved, pending, rejected, empty, total }: { approved: number; pending: number; rejected: number; empty: number; total: number }) {
+  const segments = [
+    { label: 'Approved', value: approved, color: '#22c55e' },
+    { label: 'Pending', value: pending, color: '#f59e0b' },
+    { label: 'Rejected', value: rejected, color: '#ef4444' },
+    { label: 'Empty', value: empty, color: 'var(--text-muted)' },
+  ]
+
+  return (
+    <>
+      <div style={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', background: 'var(--border-primary)' }}>
+        {segments.map(segment => (
+          <div key={segment.label} style={{ width: `${Math.max(0, (segment.value / total) * 100)}%`, background: segment.color }} />
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
+        {segments.map(segment => (
+          <div key={segment.label} style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: segment.color }} />
+              {segment.label}
+            </div>
+            <div style={{ marginTop: 3 }}>{segment.value} ({Math.round((segment.value / total) * 100)}%)</div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function ScheduleMatrix({
+  stageId,
+  config,
+  getSlotStatus,
+}: {
+  stageId: string
+  config: (typeof STAGE_CONFIG)[string]
+  getSlotStatus: (stageId: string, day: number, channel: string) => string
+}) {
+  const days = config?.days.length ? config.days.slice(0, 4) : [1]
+  const channels = config?.channels.length ? config.channels : ['whatsapp']
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `88px repeat(${days.length}, 1fr)`, gap: 8, alignItems: 'stretch' }}>
+      <div />
+      {days.map(day => (
+        <div key={day} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-primary)', fontWeight: 700 }}>Day {day}</div>
+      ))}
+      {channels.map(channel => (
+        <React.Fragment key={channel}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
+            <span style={{ color: channel === 'whatsapp' ? '#22c55e' : '#ef476f', fontWeight: 900 }}>{channel === 'whatsapp' ? 'W' : 'V'}</span>
+            {channel === 'whatsapp' ? 'WhatsApp' : 'Voice'}
+          </div>
+          {days.map(day => {
+            const status = getSlotStatus(stageId, day, channel)
+            const palette: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
+              approved: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', icon: <MdCheckCircle size={16} />, label: 'Approved' },
+              pending: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', icon: <MdAccessTime size={16} />, label: 'Pending' },
+              rejected: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', icon: <MdRemoveCircleOutline size={16} />, label: 'Rejected' },
+              empty: { bg: 'var(--bg-hover)', color: 'var(--text-secondary)', icon: <MdCircle size={16} />, label: 'Empty' },
+            }
+            const item = palette[status] || palette.empty
+            return (
+              <div key={`${channel}-${day}`} style={{ minHeight: 62, borderRadius: 9, background: item.bg, color: item.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
+                {item.icon}
+                {item.label}
+              </div>
+            )
+          })}
+        </React.Fragment>
+      ))}
+    </div>
+  )
+}
+
+// ── Modals ────────────────────────────────────────────────────────
+
 function humanizeStage(id: string): string {
   return id.replace(/_/g, ' ').replace(/\b\w/g, m => m.toUpperCase())
 }
@@ -1493,7 +2080,7 @@ const modalInputStyle: React.CSSProperties = {
   minHeight: 40,
   border: '1px solid var(--border-primary)',
   borderRadius: 9,
-  background: 'var(--bg-tertiary)',
+  background: 'var(--bg-primary)',
   color: 'var(--text-primary)',
   padding: '0 12px',
   fontSize: 14,
@@ -1512,14 +2099,14 @@ function ModalShell({ title, onClose, children, width = 480 }: { title: string; 
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px', animation: 'bcon-fade-in 140ms ease' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px', animation: 'wc-fade-in 140ms ease' }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{ width, maxWidth: '94vw', maxHeight: '86vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.4)', padding: 20 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: 'var(--text-primary)' }}>{title}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" style={{ border: 0, background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', padding: 4 }}>
             <MdClose size={20} />
           </button>
@@ -1527,7 +2114,7 @@ function ModalShell({ title, onClose, children, width = 480 }: { title: string; 
         {children}
       </div>
       <style jsx global>{`
-        @keyframes bcon-fade-in { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes wc-fade-in { from { opacity: 0 } to { opacity: 1 } }
       `}</style>
     </div>
   )
@@ -1594,7 +2181,7 @@ function TemplateEditorModal({
 
         <div>
           <label style={modalLabelStyle}>Template name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-          <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. onetouch_d1_intro" style={modalInputStyle} />
+          <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. wc_onetouch_d1_intro" style={modalInputStyle} />
         </div>
 
         <div>
@@ -1617,7 +2204,7 @@ function TemplateEditorModal({
             type="button"
             disabled={!canSave}
             onClick={() => onSave({ id: template?.id, stage, day: Number(day), channel, variant, templateName: templateName.trim(), content: content.trim() })}
-            style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 40, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
+            style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 40, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
           >
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create template'}
           </button>
@@ -1649,22 +2236,22 @@ function FlowSettingsModal({
           const cfg = STAGE_CONFIG[sid]
           const count = templates.filter(t => t.stage === sid).length
           return (
-            <div key={sid} style={{ border: '1px solid var(--border-primary)', borderRadius: 12, padding: 14, background: 'var(--bg-tertiary)' }}>
+            <div key={sid} style={{ border: '1px solid var(--border-primary)', borderRadius: 12, padding: 14, background: 'var(--bg-primary)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <span style={{ width: 32, height: 32, borderRadius: 8, background: cfg?.bg, color: cfg?.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{cfg?.icon}</span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{nameMap.get(sid) || humanizeStage(sid)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{nameMap.get(sid) || humanizeStage(sid)}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{cfg?.timing || 'No schedule'}</div>
                   </div>
                 </div>
-                <button type="button" onClick={() => onAddTemplate(sid)} style={{ ...flowButtonStyle('var(--button-bg)', 'var(--text-button)'), minHeight: 32, fontSize: 12, padding: '0 10px', flexShrink: 0 }}>
+                <button type="button" onClick={() => onAddTemplate(sid)} style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 32, fontSize: 12, padding: '0 10px', flexShrink: 0 }}>
                   <MdAdd size={15} /> Add
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 {(cfg?.channels.length ? cfg.channels : ['whatsapp']).map(ch => (
-                  <span key={ch} style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                  <span key={ch} style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                     {ch === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}
                   </span>
                 ))}
