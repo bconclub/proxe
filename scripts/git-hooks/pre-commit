@@ -23,6 +23,14 @@ AGENTS="brands/bcon/agent brands/windchasers/agent brands/proxe/agent master/age
 staged=$(git diff --cached --name-only)
 [ -z "$staged" ] && exit 0
 
+# Company-wide version: bump the root package.json on EVERY commit (any change,
+# any brand) — unless the commit ONLY touches root version files.
+companyonly=$(printf '%s\n' "$staged" | grep -v -E "^(package\.json|\.build-info)$" || true)
+if [ -n "$companyonly" ] && [ -f scripts/bump-company-version.js ]; then
+  node scripts/bump-company-version.js
+  git add package.json .build-info 2>/dev/null || true
+fi
+
 for agent in $AGENTS; do
   # Files staged under this agent.
   touched=$(printf '%s\n' "$staged" | grep "^$agent/" || true)

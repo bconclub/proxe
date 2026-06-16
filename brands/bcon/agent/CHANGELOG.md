@@ -1,0 +1,27 @@
+# BCON — Changelog
+
+> Brand-specific changelog for **BCON** (`proxe.bconclub.com`). Records what changed in this brand and when. Company-wide history across all brands lives in the repo-root [`/CHANGELOG.md`](../../../CHANGELOG.md). Core changes that belong to every brand should flow BCON → `master` → all branches (see the root changelog's propagation note).
+>
+> Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
+
+## 2026-06-17 · Cross-brand versioning + changelog
+
+- BCON now auto-versions on commit like the other brands (was frozen at 0.0.20 — its build-time `increment-build.js` never committed back). `prebuild` dropped `increment-build.js`; committed `package.json` version (bumped by the shared pre-commit hook) is the single source of truth. First real bump: **0.0.20 → 0.0.21**.
+- This per-brand changelog added.
+
+## 2026-06-17 · Home synced to Windchasers latest
+
+- **Engine Overview toggle** now 24h / 7D / 14D / All (added Today).
+- **Engine funnel is a real per-window cohort:** `founder-metrics` returns a `funnel` map — of leads acquired in the window, how many reached each stage — so all five nodes (incl. Follow-up Due + Booked) scale with the window. FounderDashboard reads it with a fallback to the old per-metric counts.
+- **Lighter KPI card tint** (7%→4% fill, 22%→14% border); **High Intent Leads** card now green (not red); **Upcoming Events** name gets breathing room (baseline row, date · owner grouped).
+- Ports WC `ed1cbc7a` + `8735fa16` + `0cf5c08d` (brand theme/accent untouched).
+
+## 2026-06-16 · Windchasers parity catch-up (pixel + functional), live
+
+- **Home / FounderDashboard** redesigned to WC parity: top-bar greeting, KPI cards with status-coloured accents (Follow-up Health follows status), Engine Overview funnel, chip-style Upcoming Events, Priority Lead Queue, Conversations Trend chart.
+- **Flows** funnel-first redesign (per-stage template manager: add/edit/approve/reject/delete).
+- **Inbox**: anonymous web-visitor sessions surface before contact capture; real-WhatsApp-style template bubbles; Notes tab human-only.
+- **Lead modal**: notes tab, name-edit, copy-details, WhatsApp markdown, lead merge, owner picker.
+- **Engine**: noteOrchestrator (Haiku classifier; WA sends gated to the 24h window), quick-reply map (B2B), conversation intelligence (B2B schema), attribution (inbound + web + WhatsApp CTWA), lead ownership, dashboard prefs (sounds + theme), health strip + status page, NotificationCenter, today-snapshot, token-usage meter.
+- **DB fixes**: created `activities` + `follow_up_templates` + `changelog` tables; `conversations.lead_id` made nullable.
+- Auth re-enabled on dashboard routes; multiple data-integrity fixes (response-rate, avg-score, cancelled/completed task filters).

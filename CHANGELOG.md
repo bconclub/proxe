@@ -1,6 +1,17 @@
-# Changelog
+# Changelog — company-wide
 
-> Multi-brand changelog. Entries are tagged by repo/brand — **bcon**, **windchasers**, **proxe**, or **master** (the canonical template). Versions auto-bump per commit per brand via `scripts/git-hooks/pre-commit` (install with `sh scripts/install-git-hooks.sh`).
+> Company-wide log across all brands. Entries are tagged by repo/brand — **bcon**, **windchasers**, **proxe**, or **master** (the canonical template).
+>
+> **Per-brand changelogs** (what changed inside one brand, even for single-brand work):
+> - [`brands/bcon/agent/CHANGELOG.md`](brands/bcon/agent/CHANGELOG.md)
+> - [`brands/windchasers/agent/CHANGELOG.md`](brands/windchasers/agent/CHANGELOG.md)
+> - [`master/agent/CHANGELOG.md`](master/agent/CHANGELOG.md)
+>
+> **Versioning** (two levels, both auto-bumped per commit by `scripts/git-hooks/pre-commit`; install with `sh scripts/install-git-hooks.sh`):
+> - **Company-wide** — root `package.json` (`proxe-platform`) bumps on *every* commit, any brand.
+> - **Per-brand** — each `<brand>/agent` bumps its own version when a commit touches it.
+>
+> **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
 ## 2026-06-17 · Infra: cross-brand versioning + changelog
 
