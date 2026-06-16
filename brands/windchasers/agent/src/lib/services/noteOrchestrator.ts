@@ -65,11 +65,11 @@ Category guide:
 - POST_CALL: "spoke to", "just called", "had a call", "after the call", OR any plan to CALL BACK / FOLLOW UP ("call back tomorrow", "callback", "call him/her tomorrow", "follow up tomorrow", "reach out later", "check back with them") — a call happened and/or a follow-up call is planned. A call-back/follow-up is POST_CALL, never a booking.
 - BOOKING_MADE: ONLY when an actual demo/session/meeting was BOOKED/CONFIRMED for the lead to ATTEND, at a specific slot — e.g. "demo booked", "session scheduled for Fri 4pm", "booked his demo for Monday 3pm", "meeting set". A real appointment, not a plan to phone them. NEVER classify a plan to CALL the lead ("call back tomorrow", "follow up", "callback") as BOOKING_MADE — that is POST_CALL. If there's no actual booked demo/session, it is NOT a booking.
 - NOT_POTENTIAL: "not potential", "not a fit", "wrong audience", "spam", "fake enquiry", "not eligible" — genuinely not worth pursuing. Do NOT use this just because they mention cost/affordability — that is AFFORDABILITY.
-- AFFORDABILITY: "can't afford", "too expensive", "fees too high", "budget issue", "needs a loan", "need EMI/financing", "cost is a problem" — they WANT the course but are worried about money. This is a FINANCING conversation, NOT a dead lead — keep them alive and route to loan/nurture help.
+- AFFORDABILITY: they want the course AND are open to a WAY TO PAY — "needs a loan", "need EMI/financing", "asked about a payment plan", "can you help with the fees", "worried about cost but exploring options". There must be a PATH to proceed (loan/EMI/financing). Keep them alive → loan/nurture help. ⚠️ Do NOT use AFFORDABILITY when the lead simply CANNOT or WON'T be able to afford it / is dropping out over cost — that is a LOST lead (see NOT_INTERESTED).
 - HOT_LEAD: "hot lead", "very interested", "wants to start", "ready to go", "priority", "close this week" — high intent
 - WARM_LATER: "maybe later", "check back later", "not now but maybe", "low potential", "follow up later" — warm but not now
 - RNR: "no show", "didn't show", "no answer", "didn't pick up", "rnr", "rang no response", "not responding", "not replying", "no response", "voicemail", "busy" — couldn't reach them
-- NOT_INTERESTED: "not interested", "dead lead" — explicit disinterest
+- NOT_INTERESTED: explicit disinterest OR a cost-driven drop-out — "not interested", "dead lead", "won't be able to afford it", "can't afford it" (as a final no), "too expensive so not doing it", "cost too high, can't go ahead", "interested but won't be able to afford it". If the applicant is NOT going to do the course — whether plainly uninterested OR because they definitively can't/won't afford it with no financing path — it is a LOST lead → NOT_INTERESTED, NOT AFFORDABILITY.
 - CONVERTED: "converted", "signed", "closed won", "deal done" — deal closed
 - DEMO_TAKEN: "demo done", "demo taken", "showed the demo", "demo complete", "they saw the demo" — a demo was given
 - PROPOSAL_SENT: "proposal sent", "sent proposal", "shared proposal", "sent the deck", "sent pricing" — proposal or pricing was sent
@@ -92,8 +92,10 @@ Example: note "He is interested to take this up, call back tomorrow" → {"categ
 Example: note "interested, asked me to follow up next week" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — follow up next week"}
 Example: note "[No Answer] tried calling twice" → {"category": "RNR", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Called twice, no answer"}
 Example: note "send: Hey, just checking in!" → {"category": "SEND_MESSAGE", "booking_date": null, "booking_time": null, "name": null, "send_message": "Hey, just checking in!", "summary": "Direct message to send to lead"}
-Example: note "can't afford" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Cost concern — route to financing/loan help, keep nurturing"}
-Example: note "interested but needs a bank loan for the fees" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants the course, needs loan support"}`;
+Example: note "Not interested, won't be able to afford it" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Dropping out — can't afford it"}
+Example: note "Interested but won't be able to afford it, CPL cost is too high" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants it but can't afford CPL — lost over cost"}
+Example: note "interested but needs a bank loan for the fees" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants the course, needs loan support"}
+Example: note "fees are high, do you have EMI options?" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Exploring financing — route to loan help"}`;
 
 // ─── Classifier ─────────────────────────────────────────────────────────────
 
