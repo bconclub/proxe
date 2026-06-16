@@ -130,7 +130,7 @@ const LOADING_MSGS = [
   'Crunching the data…',
 ]
 
-export default function DashboardBrain() {
+export default function DashboardBrain({ inline = false }: { inline?: boolean }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -184,10 +184,9 @@ export default function DashboardBrain() {
       {/* Brain button — stacked under the eye (14) + bell (54). */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg transition hover:opacity-90"
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
         style={{
-          top: '94px',
-          right: '20px',
+          ...(inline ? {} : { top: '94px', right: '20px' }),
           width: '36px',
           height: '36px',
           backgroundColor: 'var(--button-bg)',

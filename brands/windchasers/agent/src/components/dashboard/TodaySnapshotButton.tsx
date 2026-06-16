@@ -41,7 +41,7 @@ const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: '28d',   label: '28d' },
 ]
 
-export default function TodaySnapshotButton() {
+export default function TodaySnapshotButton({ inline = false }: { inline?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<SnapshotData | null>(null)
@@ -80,10 +80,9 @@ export default function TodaySnapshotButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg hover:opacity-90 transition"
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full hover:opacity-90 transition`}
         style={{
-          top: '14px',
-          right: '20px',
+          ...(inline ? {} : { top: '14px', right: '20px' }),
           width: '36px',
           height: '36px',
           backgroundColor: 'var(--button-bg)',

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -107,6 +107,49 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
+
+  // Global date-range for the top bar — drives the Conversations Trend (founder:
+  // "in the last 7 days or last 14 days we can quickly click there"). KPI cards
+  // keep their own behaviour for now per the founder's "keep the cards as is".
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
+  // Top-bar user profile menu.
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  // Pull the signed-in user once for the greeting + profile menu.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (cancelled) return
+        const meta = (user?.user_metadata || {}) as Record<string, unknown>
+        const name = (meta.full_name as string) || (meta.name as string) || ''
+        setUser({ name, email: user?.email || '' })
+      } catch { /* soft-fail — greeting falls back to "Founder" */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Close the profile menu on outside click.
+  useEffect(() => {
+    if (!profileOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [profileOpen])
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch { /* redirect anyway */ }
+    window.location.href = '/auth/login'
+  }
 
   // Hot Leads threshold with localStorage persistence
   const [hotLeadThreshold] = useState<number>(() => {
@@ -294,21 +337,104 @@ export default function FounderDashboard() {
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
   // Use the real per-day conversation series (distinct leads messaged/day) — the
-  // old trends.conversations.data was session-based and came back ~flat.
-  const convSeries = (metrics.trendSeries?.conversations?.['7D']?.length
-    ? metrics.trendSeries.conversations['7D']
+  // old trends.conversations.data was session-based and came back ~flat. The
+  // series follows the top-bar range so the trend reacts to 7D / 14D / 30D.
+  const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
+  const convSeries = (metrics.trendSeries?.conversations?.[range]?.length
+    ? metrics.trendSeries.conversations[range]
     : metrics.trends?.conversations?.data) || []
-  const dailyAvg = convSeries.length ? Math.round(convSeries.reduce((a, b) => a + (b.value || 0), 0) / convSeries.length) : 0
+  const convTotal = convSeries.length
+    ? convSeries.reduce((a, b) => a + (b.value || 0), 0)
+    : metrics.totalConversations.total
+  const dailyAvg = convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0
+  const convChange = range === '14D'
+    ? metrics.totalConversations.trend14D
+    : range === '30D'
+      ? metrics.totalConversations.trend30D
+      : metrics.totalConversations.trend7D
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
+  const firstName = displayName.split(' ')[0] || 'Founder'
+  const profileInitials = getInitials(displayName)
   // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
-      {/* Floating controls — home page only */}
-      <TodaySnapshotButton />
-      <NotificationCenter />
-      <DashboardBrain />
+      {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
+      <header className="flex items-center justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
+            Welcome back, {firstName} <span aria-hidden>👋</span>
+          </h1>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Here&apos;s what&apos;s happening across your pipeline</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Global date-range quick toggle */}
+          <div className="hidden sm:flex items-center rounded-lg border p-0.5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+            {(['7D', '14D', '30D'] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRange(r)}
+                className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
+                style={range === r
+                  ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
+                  : { backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+              >
+                {r === '7D' ? '7 Days' : r === '14D' ? '14 Days' : '30 Days'}
+              </button>
+            ))}
+          </div>
+          {/* Controls cluster (eye / bell / Ask PROXe) — now hosted in the bar */}
+          <TodaySnapshotButton inline />
+          <NotificationCenter inline />
+          <DashboardBrain inline />
+          {/* Profile menu */}
+          <div className="relative" ref={profileRef}>
+            <button
+              onClick={() => setProfileOpen((o) => !o)}
+              className="flex items-center gap-1 rounded-full pl-1 pr-1.5 py-1 border transition-colors hover:opacity-90"
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              title={user?.email || 'Account'}
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                {profileInitials}
+              </span>
+              <MdArrowDropDown size={18} style={{ color: 'var(--text-secondary)' }} />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
+                <div className="px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Signed in as</div>
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }} title={user?.email}>{displayName}</div>
+                  {user?.email && <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{user.email}</div>}
+                </div>
+                <div style={{ height: 1, backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
+                <button
+                  onClick={() => { setProfileOpen(false); router.push('/dashboard/settings') }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                >
+                  <MdSettings size={17} /> Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                >
+                  <MdLogout size={17} /> Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
@@ -491,8 +617,11 @@ export default function FounderDashboard() {
         {/* Conversations Trend */}
         <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>7D</span>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Last {rangeDays} days</span>
           </div>
           <div className="flex-1 min-h-[120px]">
             {convSeries.length > 1 ? (
@@ -503,12 +632,12 @@ export default function FounderDashboard() {
           </div>
           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{metrics.totalConversations.total}</div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
             </div>
             <div>
-              <KpiDelta change={metrics.trends?.conversations?.change} />
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs last 7 days</div>
+              <KpiDelta change={convChange} />
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {rangeDays}d</div>
             </div>
             <div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dailyAvg}</div>

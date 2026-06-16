@@ -100,7 +100,7 @@ function eventVisual(ev: { type: string; content: string; metadata?: any }): Vis
   return { Icon: MdArrowUpward, color: '#8B5CF6', kind: 'update', label: 'UPDATE' }
 }
 
-export default function NotificationCenter() {
+export default function NotificationCenter({ inline = false }: { inline?: boolean }) {
   const router = useRouter()
   const [events, setEvents] = useState<NotificationEvent[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -229,12 +229,11 @@ export default function NotificationCenter() {
       {/* Bell — fixed top-right, sits left of the home page's snapshot button. */}
       <button
         onClick={openDrawer}
-        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg transition hover:opacity-90"
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
         style={{
-          // Stacked beneath the snapshot "eye" button. Filled blue so it reads
-          // clearly on a light dashboard (the outline version was near-invisible).
-          top: '54px',
-          right: '20px',
+          // Floating: stacked beneath the snapshot "eye" button. Inline: sits in
+          // the dashboard top bar (no fixed positioning).
+          ...(inline ? {} : { top: '54px', right: '20px' }),
           width: '36px',
           height: '36px',
           backgroundColor: 'var(--button-bg)',
