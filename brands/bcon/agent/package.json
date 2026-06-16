@@ -1,10 +1,10 @@
 {
   "name": "proxe-agent-master",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "private": true,
   "scripts": {
     "dev": "next dev -p 4002",
-    "prebuild": "node scripts/increment-build.js && node scripts/set-build-time.js",
+    "prebuild": "node scripts/set-build-time.js",
     "build": "next build",
     "start": "next start -p ${PORT:-4002}",
     "lint": "next lint",

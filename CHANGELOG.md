@@ -1,5 +1,26 @@
 # Changelog
 
+> Multi-brand changelog. Entries are tagged by repo/brand — **bcon**, **windchasers**, **proxe**, or **master** (the canonical template). Versions auto-bump per commit per brand via `scripts/git-hooks/pre-commit` (install with `sh scripts/install-git-hooks.sh`).
+
+## 2026-06-17 · Infra: cross-brand versioning + changelog
+
+- **Versioning is now cross-brand, not Windchasers-only.** The pre-commit hook used to bump only `brands/windchasers/agent`; bcon was stuck (build-time `increment-build.js` only ran ephemerally on Vercel, committed version frozen at 0.0.20), and master/proxe had no bumper. The hook now loops every agent (`bcon`, `windchasers`, `proxe`, `master`) and bumps each one this commit touches — so the deploy version climbs for changes in **any** repo, and the bump rides along when changes flow brand → master → branches.
+- Canonical hook committed at `scripts/git-hooks/pre-commit` (+ installer `scripts/install-git-hooks.sh`) so it survives clones/worktrees (hooks aren't version-controlled inside `.git`). `bump-version.js` (generic, patch+carry-at-100) added to **bcon** + **master** (was windchasers-only).
+- bcon `prebuild` dropped `increment-build.js` → committed version (from the commit hook) is the single source of truth, matching windchasers/master.
+- This changelog is now the multi-brand log (entries tagged by brand).
+
+## 2026-06-17 · master: finished as the canonical multi-brand base
+
+- **master brought to full Windchasers core parity** (was 165 files, stale + non-building): 162 clean core files synced verbatim from WC + the brand-touched lib/app layer ported. Preserved master's multi-brand bits — `configs/*` resolver + `services/supabase.ts` `brandPrefix()` (not WC's hard `WINDCHASERS` lock). `next build` green, 48/48 pages.
+- **Brand layer made brand-resolved** so master is a true multi-brand base: `promptBuilder` now switches windchasers|bcon by env (default windchasers) instead of hardcoding WC; `leadManager` uses the resolved `BRAND_ID` context key. Adding a brand = drop in `<brand>-prompt` + one switch case + config + brand-facts, no other core surgery.
+
+## 2026-06-17 · bcon home: sync to Windchasers latest (Engine cohort funnel + lighter cards + High Intent green)
+
+- **Engine Overview toggle** now matches the others — **24h / 7D / 14D / All** (added Today).
+- **Engine funnel is a real per-window cohort:** `founder-metrics` returns a `funnel` map (of leads acquired in the window, how many reached each stage) so all five nodes — including **Follow-up Due** and **Booked** — scale with the window instead of staying constant. FounderDashboard reads it with a fallback to the old per-metric counts.
+- **Lighter KPI card tint** (7%→4% fill, 22%→14% border) across all cards; **High Intent Leads** card is now green (not red); **Upcoming Events** name gets breathing room (baseline row, date · owner grouped).
+- Ports WC's `ed1cbc7a` + `8735fa16` + `0cf5c08d` onto bcon (brand theme/accent untouched). master already carried these from its WC sync.
+
 ## 2026-06-17 00:10 IST · Windchasers home: time greeting, card tints, labelled controls, colour-coded events
 
 - **Greeting** now shifts by IST time of day — Good morning / afternoon / evening / night (was always "Welcome back").

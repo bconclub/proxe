@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Cross-brand auto version bump.
+#
+# Bumps the committed app version of EVERY agent touched by this commit —
+# bcon, windchasers, proxe, and the master template each carry their own
+# version that climbs by one patch per commit that touches them. So the deploy
+# version tracks real changes in ANY repo/brand, not just Windchasers, and the
+# bump rides along when changes flow brand -> master -> branches.
+#
+# Source of truth = committed files (package.json + .build-info +
+# src/lib/generated-version.ts), written in lockstep by each agent's
+# scripts/bump-version.js.
+#
+# This is the canonical copy. Install it into .git/hooks (shared across all
+# worktrees) with:  sh scripts/install-git-hooks.sh
+#
+set -e
+
+# Agent roots that carry an auto-bumped version.
+AGENTS="brands/bcon/agent brands/windchasers/agent brands/proxe/agent master/agent"
+
+staged=$(git diff --cached --name-only)
+[ -z "$staged" ] && exit 0
+
+for agent in $AGENTS; do
+  # Files staged under this agent.
+  touched=$(printf '%s\n' "$staged" | grep "^$agent/" || true)
+  [ -z "$touched" ] && continue
+
+  # Skip if the ONLY staged files under this agent are its own version files
+  # (prevents a re-bump on an amend / version-only commit).
+  nonversion=$(printf '%s\n' "$touched" | grep -v -E "^$agent/(package\.json|\.build-info|src/lib/generated-version\.ts)$" || true)
+  [ -z "$nonversion" ] && continue
+
+  # Only bump brands that ship a bumper.
+  [ -f "$agent/scripts/bump-version.js" ] || continue
+
+  node "$agent/scripts/bump-version.js"
+  git add "$agent/package.json" "$agent/.build-info" "$agent/src/lib/generated-version.ts" 2>/dev/null || true
+done
+
+exit 0
