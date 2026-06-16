@@ -115,7 +115,7 @@ export default function FounderDashboard() {
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
   const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
   // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
-  const [engineRange, setEngineRange] = useState<'All' | '7D' | '14D'>('All')
+  const [engineRange, setEngineRange] = useState<'Today' | '7D' | '14D' | 'All'>('All')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -351,11 +351,11 @@ export default function FounderDashboard() {
   // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
   // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
   // range in the metrics yet).
-  const engTotal = engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
-  const engEngaged = engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
-  const engWarm = engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  const engTotal = engineRange === 'Today' ? (metrics.totalLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
+  const engEngaged = engineRange === 'Today' ? (metrics.engagedLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
+  const engWarm = engineRange === 'Today' ? (metrics.warmLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
-  const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
+  const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
   // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
   const tc = metrics.totalConversations
@@ -549,13 +549,13 @@ export default function FounderDashboard() {
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
             <div className="flex items-center gap-0.5 shrink-0">
-              {(['All', '7D', '14D'] as const).map((p) => (
+              {(['Today', '7D', '14D', 'All'] as const).map((p) => (
                 <button
                   key={p} type="button" onClick={() => setEngineRange(p)}
                   className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
                   style={{ color: engineRange === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: engineRange === p ? 'var(--accent-subtle)' : 'transparent' }}
                 >
-                  {p}
+                  {p === 'Today' ? '24h' : p}
                 </button>
               ))}
             </div>
