@@ -1907,15 +1907,17 @@ export default function InboxPage() {
                               className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
                               style={{ background: 'rgba(37, 211, 102, 0.18)', borderColor: 'rgba(37, 211, 102, 0.35)' }}
                             >
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <ChannelIcon channel={msg.channel} size={10} active={true} />
-                                <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: '#22c55e' }}>
+                                <span className="text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ color: '#22c55e' }}>
                                   Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
                                 </span>
+                                {msg.metadata?.template_name && (
+                                  <span className="text-[8px] truncate" style={{ color: 'var(--text-muted)' }} title={msg.metadata.template_name}>
+                                    · {msg.metadata.template_name}
+                                  </span>
+                                )}
                               </div>
-                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                                {formatTime(msg.created_at)}
-                              </span>
                             </div>
                             {msg.metadata?.template_header && (
                               <div className="px-2.5 pt-2 pb-1 text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -1979,7 +1981,7 @@ export default function InboxPage() {
                           return (
                             <div
                               className={isTemplate
-                                ? 'flex items-center gap-1.5 px-2.5 py-1 border-t flex-wrap'
+                                ? 'flex items-center justify-end gap-1.5 px-2.5 pb-1.5 -mt-1 flex-wrap'
                                 : 'flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap'}
                               style={{ borderColor: 'var(--border-primary)' }}
                             >
@@ -1992,9 +1994,16 @@ export default function InboxPage() {
                                   Template
                                 </span>
                               )}
-                              <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                                {msg.metadata.template_name}
-                              </span>
+                              {!isTemplate && (
+                                <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                  {msg.metadata.template_name}
+                                </span>
+                              )}
+                              {isTemplate && (
+                                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                  {formatTime(msg.created_at)}
+                                </span>
+                              )}
                               {isTestSend && (
                                 <span
                                   className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
@@ -2029,7 +2038,7 @@ export default function InboxPage() {
                               {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
                                 <div
                                   key={btnIdx}
-                                  className="text-[12px] font-medium text-center py-2 px-2"
+                                  className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
                                   style={{
                                     color: 'var(--accent-primary)',
                                     borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
@@ -2037,6 +2046,10 @@ export default function InboxPage() {
                                   }}
                                   title={`Quick Reply: ${btn}`}
                                 >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+                                    <polyline points="9 17 4 12 9 7" />
+                                    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                  </svg>
                                   {btn}
                                 </div>
                               ))}
