@@ -38,6 +38,8 @@ import {
   MdGroups,
   MdInventory2,
   MdAutoGraph,
+  MdChecklist,
+  MdRadioButtonUnchecked,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -571,6 +573,7 @@ export default function FlowsPage() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [expandedStage, setExpandedStage] = useState<string | null>(null)
+  const [activeFunnel, setActiveFunnel] = useState<'top' | 'mid' | 'bottom'>('top')
   // Create Flow / edit template modal + Flow Settings modal
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorTemplate, setEditorTemplate] = useState<TemplateInfo | null>(null)
@@ -959,7 +962,14 @@ export default function FlowsPage() {
     const stagesActive = stageStats.filter(s => s.leadCount > 0).length
     const templatesLive = templates.filter(t => t.status === 'approved').length
     const stageMap = new Map(stageStats.map(stage => [stage.id, stage]))
-    const selectedStageId = expandedStage || 'low_touch'
+    const funnelGroups = [
+      { id: 'top', label: 'TOP', color: '#2563eb', stageIds: ['one_touch', 'low_touch', 'engaged'] },
+      { id: 'mid', label: 'MID', color: '#f59e0b', stageIds: ['high_intent', 'booking_made', 'no_show'] },
+      { id: 'bottom', label: 'BOTTOM', color: '#10b981', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
+    ]
+    const activeGroup = funnelGroups.find(g => g.id === activeFunnel) || funnelGroups[0]
+    const funnelStageIds = activeGroup.stageIds
+    const selectedStageId = (expandedStage && funnelStageIds.includes(expandedStage)) ? expandedStage : funnelStageIds[0]
     const selectedStage = stageMap.get(selectedStageId) || stageStats[0] || {
       id: 'low_touch',
       name: 'Low Touch',
@@ -967,146 +977,131 @@ export default function FlowsPage() {
       coverage: 0,
     }
     const selectedConfig = STAGE_CONFIG[selectedStage.id] || STAGE_CONFIG.low_touch
-    const funnelGroups = [
-      { id: 'top', label: 'TOP', color: '#2563eb', stageIds: ['one_touch', 'low_touch', 'engaged'] },
-      { id: 'mid', label: 'MID', color: '#f59e0b', stageIds: ['high_intent', 'booking_made', 'no_show'] },
-      { id: 'bottom', label: 'BOTTOM', color: '#10b981', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
-    ]
 
     return (
-      <div style={{ padding: '0 0 32px', minHeight: '100%', color: 'var(--text-primary)' }}>
-        <section style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ height: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, color: 'var(--text-primary)' }}>
+        {/* Compact header */}
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexShrink: 0 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 30, lineHeight: 1.1, fontWeight: 800, letterSpacing: 0, color: 'var(--text-primary)' }}>
-              Flows
-            </h1>
-            <p style={{ margin: '10px 0 0', color: 'var(--text-secondary)', fontSize: 14 }}>
-              Orchestrate every stage of your lead journey with templates, nudges and follow-ups.
+            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 850, color: 'var(--text-primary)' }}>Flows</h1>
+            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+              Pick a funnel to see its stages, templates and coverage.
             </p>
           </div>
+          <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
+            <MdRefresh size={18} /> Refresh
+          </button>
+        </header>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <label
+        {/* Go-Live readiness — kept at top so you always see what's going on */}
+        <GoLiveChecklist
+          totalLeads={totalLeads}
+          stagesActive={stagesActive}
+          templatesCount={templates.length}
+          templatesLive={templatesLive}
+          avgCoverage={avgCoverage}
+          coveredStages={stageStats.filter(s => s.id !== 'converted' && s.coverage > 0).length}
+        />
+
+        {/* Funnel selector — quick "where am I" */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, flexShrink: 0 }}>
+          {funnelGroups.map(group => {
+            const count = group.stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)
+            const covs = group.stageIds.map(id => stageMap.get(id)?.coverage || 0)
+            const avgCov = covs.length ? Math.round(covs.reduce((a, b) => a + b, 0) / covs.length) : 0
+            const active = activeFunnel === group.id
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => { setActiveFunnel(group.id as 'top' | 'mid' | 'bottom'); setExpandedStage(group.stageIds[0]) }}
                 style={{
-                  width: 380,
-                  height: 42,
-                  border: '1px solid var(--border-primary)',
-                  borderRadius: 10,
-                  background: 'var(--bg-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '0 14px',
-                  color: 'var(--text-muted)',
-                  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: active ? `2px solid ${group.color}` : '1px solid var(--border-primary)',
+                  background: active ? `${group.color}12` : 'var(--bg-secondary)',
+                  borderRadius: 14,
+                  padding: '13px 16px',
+                  boxShadow: active ? `0 10px 24px ${group.color}22` : '0 6px 18px rgba(15,23,42,0.03)',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <MdSearch size={20} />
-                <input
-                  aria-label="Search leads, stages, templates"
-                  placeholder="Search leads, stages, templates..."
-                  style={{ border: 0, outline: 0, flex: 1, fontSize: 14, color: 'var(--text-primary)', background: 'transparent' }}
-                />
-                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Ctrl K</span>
-              </label>
-              <button type="button" onClick={() => openCreateTemplate()} style={flowButtonStyle('#2563eb', '#fff')}>
-                <MdAdd size={18} /> Create Flow
-              </button>
-              <button type="button" onClick={() => setSettingsOpen(true)} style={flowGhostButtonStyle}>
-                <MdSettings size={17} /> Flow Settings
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <button type="button" style={flowGhostButtonStyle}>
-                <MdCalendarToday size={17} /> May 1 - May 31, 2024 <MdKeyboardArrowDown size={18} />
-              </button>
-              <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, width: 42, padding: 0, justifyContent: 'center' }} aria-label="Refresh flows">
-                <MdRefresh size={18} />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20 }}>
-          <button type="button" style={flowFilterButtonStyle}>All Funnels <MdKeyboardArrowDown size={18} /></button>
-          {funnelGroups.map(group => (
-            <button key={group.id} type="button" style={flowPillButtonStyle}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: group.color }} />
-              {group.label}
-            </button>
-          ))}
-          <button type="button" style={{ ...flowFilterButtonStyle, width: 42, padding: 0, justifyContent: 'center' }} aria-label="Filter flows">
-            <MdFilterList size={18} />
-          </button>
-        </section>
-
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))', gap: 16, marginBottom: 22 }}>
-          <FlowKpiCard label="Total Leads" value={totalLeads} delta="12% vs Apr 1 - Apr 30" color="#2563eb" icon={<MdGroups size={26} />} />
-          <FlowKpiCard label="Avg Coverage" value={`${avgCoverage}%`} delta="4pp vs Apr 1 - Apr 30" color={avgCoverage >= 50 ? '#f59e0b' : '#ef4444'} icon={<CoverageRing value={avgCoverage} color={avgCoverage >= 50 ? '#f59e0b' : '#ef4444'} size={54} />} />
-          <FlowKpiCard label="Stages Active" value={`${stagesActive}/9`} delta="1 vs Apr 1 - Apr 30" color="#8b5cf6" icon={<MdAutoGraph size={26} />} />
-          <FlowKpiCard label="Templates Live" value={templatesLive} delta="2 vs Apr 1 - Apr 30" color="#0f9f9a" icon={<MdInventory2 size={25} />} />
-        </section>
-
-        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 18, alignItems: 'start' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', border: '1px solid var(--border-primary)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-secondary)', marginBottom: 16 }}>
-              {funnelGroups.map(group => (
-                <FunnelBand
-                  key={group.id}
-                  label={group.label}
-                  color={group.color}
-                  stageIds={group.stageIds}
-                  stageMap={stageMap}
-                />
-              ))}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 10 }}>
-              {funnelGroups.map(group => (
-                <div key={group.id} style={{ border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', overflow: 'hidden', boxShadow: '0 12px 30px rgba(15,23,42,0.04)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', background: `${group.color}08` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: group.color, fontSize: 13 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: group.color }} />
-                      {group.label}
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {group.stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)} leads
-                    </span>
-                  </div>
-
-                  <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 420 }}>
-                    {group.stageIds.map(stageId => {
-                      const stage = stageMap.get(stageId) || { id: stageId, name: stageId.replace(/_/g, ' '), leadCount: 0, coverage: 0 }
-                      return (
-                        <FlowStageCard
-                          key={stageId}
-                          stageId={stageId}
-                          stage={stage}
-                          config={STAGE_CONFIG[stageId]}
-                          selected={selectedStage.id === stageId}
-                          onSelect={() => setExpandedStage(stageId)}
-                        />
-                      )
-                    })}
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 850, color: group.color, fontSize: 13, letterSpacing: '0.4px' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: group.color }} />
+                    {group.label} FUNNEL
+                  </span>
+                  {active && <MdCheckCircle size={18} color={group.color} />}
                 </div>
-              ))}
+                <div style={{ marginTop: 9, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <strong style={{ fontSize: 28, lineHeight: 1, color: 'var(--text-primary)' }}>{count}</strong>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>lead{count === 1 ? '' : 's'}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: group.color }}>{avgCov}% covered</span>
+                </div>
+                <div style={{ marginTop: 8, height: 5, borderRadius: 999, background: 'var(--border-primary)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, avgCov)}%`, height: '100%', background: group.color }} />
+                </div>
+              </button>
+            )
+          })}
+        </section>
+
+        {/* Drill-in — active funnel's stages (left) + selected stage detail (right) */}
+        <section style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12 }}>
+          <div style={{ border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 850, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
+              {activeGroup.label} FUNNEL · STAGES
+            </div>
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {funnelStageIds.map(stageId => {
+                const stage = stageMap.get(stageId) || { id: stageId, name: stageId.replace(/_/g, ' '), leadCount: 0, coverage: 0 }
+                const cfg = STAGE_CONFIG[stageId]
+                const sel = selectedStage.id === stageId
+                const accent = cfg?.color || activeGroup.color
+                return (
+                  <button
+                    key={stageId}
+                    type="button"
+                    onClick={() => setExpandedStage(stageId)}
+                    style={{
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      width: '100%',
+                      border: sel ? `2px solid ${accent}` : '1px solid var(--border-primary)',
+                      background: sel ? `${accent}12` : 'var(--bg-primary)',
+                      borderRadius: 10,
+                      padding: 11,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ width: 36, height: 36, borderRadius: 9, background: cfg?.bg || `${accent}16`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {cfg?.icon || <MdTimeline size={18} />}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 750, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stage.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{stage.leadCount} leads · {stage.coverage}% covered</div>
+                      </div>
+                      <MdKeyboardArrowDown size={18} style={{ transform: 'rotate(-90deg)', color: 'var(--text-muted)', flexShrink: 0 }} />
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          <FlowDetailPanel
-            stage={selectedStage}
-            config={selectedConfig}
-            templates={templates}
-            getSlotStatus={getSlotStatus}
-            onClose={() => setExpandedStage(null)}
-            onAddTemplate={openCreateTemplate}
-            onEditTemplate={openEditTemplate}
-            onDeleteTemplate={deleteTemplate}
-            onSetStatus={setTemplateStatus}
-          />
+          <div style={{ minWidth: 0, overflow: 'auto' }}>
+            <FlowDetailPanel
+              stage={selectedStage}
+              config={selectedConfig}
+              templates={templates}
+              getSlotStatus={getSlotStatus}
+              onClose={() => setExpandedStage(funnelStageIds[0])}
+              onAddTemplate={openCreateTemplate}
+              onEditTemplate={openEditTemplate}
+              onDeleteTemplate={deleteTemplate}
+              onSetStatus={setTemplateStatus}
+            />
+          </div>
         </section>
 
         {editorOpen && (
@@ -1520,6 +1515,143 @@ function FlowKpiCard({
         {delta}
       </div>
     </article>
+  )
+}
+
+// ── Go-Live Checklist ─────────────────────────────────────────────
+// Data-driven readiness panel: auto-checks flip Done/Not-yet from live
+// stats; channel + worker items are "Verify" (not detectable here).
+
+type ChecklistStatus = 'done' | 'todo' | 'manual'
+
+function GoLiveChecklist({
+  totalLeads,
+  stagesActive,
+  templatesCount,
+  templatesLive,
+  avgCoverage,
+  coveredStages,
+}: {
+  totalLeads: number
+  stagesActive: number
+  templatesCount: number
+  templatesLive: number
+  avgCoverage: number
+  coveredStages: number
+}) {
+  const items: { label: string; short: string; detail: string; status: ChecklistStatus }[] = [
+    {
+      label: 'Lead data syncing',
+      short: 'Leads',
+      detail: `${totalLeads} leads pulled from all_leads and mapped to journey stages.`,
+      status: totalLeads > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Stages populated',
+      short: 'Stages',
+      detail: `${stagesActive}/9 stages currently hold leads.`,
+      status: stagesActive > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Follow-up templates created',
+      short: 'Templates',
+      detail: templatesCount > 0
+        ? `${templatesCount} template${templatesCount !== 1 ? 's' : ''} saved for this brand.`
+        : 'No follow_up_templates rows exist for this brand yet.',
+      status: templatesCount > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Templates approved & live',
+      short: 'Approved',
+      detail: templatesLive > 0
+        ? `${templatesLive} template${templatesLive !== 1 ? 's' : ''} approved on Meta and live.`
+        : 'No templates approved yet — coverage stays at 0% until at least one is approved.',
+      status: templatesLive > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'Stage coverage',
+      short: 'Coverage',
+      detail: coveredStages > 0
+        ? `${coveredStages} stage${coveredStages !== 1 ? 's' : ''} have a live template (avg ${avgCoverage}%).`
+        : 'Every stage shows 0% coverage — approve templates to raise it.',
+      status: coveredStages > 0 ? 'done' : 'todo',
+    },
+    {
+      label: 'WhatsApp channel connected',
+      short: 'WhatsApp',
+      detail: 'Meta-approved sender + templates wired to the WhatsApp number. Verify on Meta.',
+      status: 'manual',
+    },
+    {
+      label: 'Voice channel connected',
+      short: 'Voice',
+      detail: 'Vapi assistant reachable for voice nudges. Verify in Vapi.',
+      status: 'manual',
+    },
+    {
+      label: 'Follow-up scheduler running',
+      short: 'Scheduler',
+      detail: 'Background worker that schedules + sends the per-day nudges. Verify the worker is up.',
+      status: 'manual',
+    },
+  ]
+
+  const statusMeta: Record<ChecklistStatus, { color: string; bg: string }> = {
+    done: { color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+    todo: { color: '#ef4444', bg: 'rgba(239,68,68,0.10)' },
+    manual: { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+  }
+
+  const autoItems = items.filter(i => i.status !== 'manual')
+  const doneCount = autoItems.filter(i => i.status === 'done').length
+  const allReady = doneCount === autoItems.length
+
+  return (
+    <section
+      style={{
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+        padding: '10px 14px',
+        border: '1px solid var(--border-primary)',
+        borderRadius: 12,
+        background: 'var(--bg-secondary)',
+        boxShadow: '0 6px 18px rgba(15,23,42,0.03)',
+      }}
+    >
+      <span
+        title="What's needed to make the flow page active and running"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+          fontSize: 13, fontWeight: 850, color: allReady ? '#22c55e' : 'var(--text-primary)',
+          paddingRight: 12, marginRight: 2, borderRight: '1px solid var(--border-primary)',
+        }}
+      >
+        <MdChecklist size={18} /> Go-Live {doneCount}/{autoItems.length}
+      </span>
+
+      {items.map(item => {
+        const meta = statusMeta[item.status]
+        return (
+          <span
+            key={item.label}
+            title={`${item.label} — ${item.detail}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',
+              background: meta.bg, padding: '5px 10px', borderRadius: 999,
+            }}
+          >
+            {item.status === 'done'
+              ? <MdCheckCircle size={14} color={meta.color} />
+              : <MdRadioButtonUnchecked size={14} color={meta.color} />}
+            {item.short}
+          </span>
+        )
+      })}
+    </section>
   )
 }
 
