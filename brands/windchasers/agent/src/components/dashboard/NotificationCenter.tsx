@@ -343,7 +343,7 @@ export default function NotificationCenter() {
       {/* Toast stack — bottom-right. At most the latest TWO cards, then a
           frosted "View all notifications" button that opens the full drawer.
           Narrow + clean (reference panel was too wide). */}
-      {toasts.length > 0 && (
+      {toasts.length > 0 && !open && (
         <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', width: '340px', maxWidth: 'calc(100vw - 32px)' }}>
           {toasts.slice(0, 3).map((t) => {
             const v = eventVisual(t)

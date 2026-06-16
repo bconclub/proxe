@@ -452,7 +452,7 @@ export default function FounderDashboard() {
                     const intent = intentFor(lead.score)
                     const status = statusFor(lead.lastContact, lead.score)
                     return (
-                      <tr key={lead.id} onClick={() => router.push(`/dashboard/inbox?lead=${lead.id}`)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
+                      <tr key={lead.id} onClick={() => openLeadModal(lead.id)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                       >
