@@ -14,6 +14,7 @@ import type { Lead } from '@/types'
 import {
   Sparkline,
   ActivityArea,
+  ConversationsTrendChart,
   RadialProgress,
 } from './MicroCharts'
 
@@ -642,7 +643,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Conversations Trend */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
@@ -660,14 +661,14 @@ export default function FounderDashboard() {
               ))}
             </div>
           </div>
-          <div className="flex-1 min-h-[120px]">
+          <div className="flex-1 min-h-[180px]">
             {convSeries.length > 1 ? (
-              <ActivityArea data={convSeries.map((d, i) => ({ time: String(i), value: d.value }))} color="#afd510" />
+              <ConversationsTrendChart data={convSeries} days={rangeDays} color="#afd510" />
             ) : (
               <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+          <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
             <div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
