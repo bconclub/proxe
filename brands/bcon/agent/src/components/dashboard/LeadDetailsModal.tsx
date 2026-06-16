@@ -433,6 +433,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [, setTick] = useState(0)
 
+  // Lead owner (assignment) state
+  const [owner, setOwner] = useState<{ id: string; name: string; email: string | null } | null>(null)
+  const [showOwnerDropdown, setShowOwnerDropdown] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+  const [savingOwner, setSavingOwner] = useState(false)
+
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
     if (!lead) return
@@ -701,6 +708,56 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshLeadData, isOpen])
+
+  // Sync owner from the effective lead's unified_context
+  useEffect(() => {
+    const o = (freshLeadData || lead)?.unified_context?.owner
+    setOwner(o && o.id ? { id: String(o.id), name: String(o.name || o.email || 'User'), email: o.email || null } : null)
+  }, [freshLeadData, lead])
+
+  // Lazy-load the team-member list the first time the owner picker opens
+  const loadTeamMembers = async () => {
+    if (teamMembers.length > 0 || loadingTeamMembers) return
+    setLoadingTeamMembers(true)
+    try {
+      const res = await fetch('/api/dashboard/team-members')
+      const data = await res.json()
+      setTeamMembers(Array.isArray(data?.members) ? data.members : [])
+    } catch {
+      setTeamMembers([])
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
+  // Assign or clear the owner (optimistic), persisting via the owner route
+  const assignOwner = async (member: { id: string; name: string; email: string | null } | null) => {
+    if (!lead) return
+    const prev = owner
+    setOwner(member) // optimistic
+    setShowOwnerDropdown(false)
+    setSavingOwner(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${lead.id}/owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner: member ? { id: member.id, name: member.name, email: member.email } : null }),
+      })
+      if (!res.ok) throw new Error('failed')
+      const data = await res.json()
+      const o = data?.owner
+      setOwner(o && o.id ? { id: String(o.id), name: String(o.name || o.email || 'User'), email: o.email || null } : null)
+      // Keep freshLeadData in sync so the value survives re-renders
+      setFreshLeadData((fd) => {
+        const base = fd || lead
+        return { ...base, unified_context: { ...(base.unified_context || {}), owner: data?.owner ?? null } } as Lead
+      })
+    } catch {
+      setOwner(prev) // revert on failure
+    } finally {
+      setSavingOwner(false)
+    }
+  }
 
 
   // Load 30-day interaction data when interaction tab is active
@@ -1746,6 +1803,75 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     <MdEdit size={12} className="text-[var(--text-muted)]" />
                   </button>
+                </div>
+
+                {/* Owner (assignment) */}
+                <div className="lead-owner-container flex items-center gap-1.5 relative mt-1.5">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    Owner
+                  </span>
+                  {owner ? (
+                    <span
+                      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[140px]"
+                      style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                      title={owner.name}
+                    >
+                      {owner.name}
+                    </span>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Unassigned</span>
+                  )}
+                  <button
+                    onClick={() => {
+                      const next = !showOwnerDropdown
+                      setShowOwnerDropdown(next)
+                      if (next) loadTeamMembers()
+                    }}
+                    disabled={savingOwner}
+                    className="p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
+                    title="Assign owner"
+                    aria-label="Assign lead owner"
+                    aria-expanded={showOwnerDropdown}
+                    aria-haspopup="true"
+                  >
+                    <MdEdit size={12} className="text-[var(--text-muted)]" />
+                  </button>
+
+                  {showOwnerDropdown && (
+                    <div
+                      className="absolute left-0 top-full mt-1 z-50 min-w-[180px] max-h-[240px] overflow-y-auto rounded-md shadow-lg py-1"
+                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
+                    >
+                      {loadingTeamMembers ? (
+                        <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => assignOwner(null)}
+                            className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            Unassigned
+                          </button>
+                          {teamMembers.length === 0 ? (
+                            <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>No team members</div>
+                          ) : (
+                            teamMembers.map((m) => (
+                              <button
+                                key={m.id}
+                                onClick={() => assignOwner(m)}
+                                className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors truncate"
+                                style={{ color: owner?.id === m.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                                title={m.email || m.name}
+                              >
+                                {m.name}
+                              </button>
+                            ))
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Service Interest & Pain Point pills - only for engaged leads (score 50+) */}

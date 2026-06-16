@@ -604,6 +604,7 @@ export default function LeadsTable({
             <col style={{ width: '13%' }} />  {/* Stage */}
             <col style={{ width: '10%' }} />  {/* Active */}
             <col style={{ width: '12%' }} />  {/* Booking (chip) */}
+            <col style={{ width: '9%' }} />   {/* Owner */}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
@@ -616,6 +617,7 @@ export default function LeadsTable({
                 { label: 'Stage',      align: 'center' as const },
                 { label: 'Active',     align: 'center' as const },
                 { label: 'Booking',    align: 'center' as const },
+                { label: 'Owner',      align: 'left'   as const },
               ].map(({ label, align }) => (
                 <th
                   key={label}
@@ -631,7 +633,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -1021,6 +1023,21 @@ export default function LeadsTable({
                             return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
                           })() : ''}
                         </Link>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </td>
+
+                    {/* OWNER */}
+                    <td className="px-3 py-2 text-xs">
+                      {lead.unified_context?.owner?.name ? (
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-full"
+                          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                          title={lead.unified_context.owner.name}
+                        >
+                          {lead.unified_context.owner.name}
+                        </span>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>—</span>
                       )}
