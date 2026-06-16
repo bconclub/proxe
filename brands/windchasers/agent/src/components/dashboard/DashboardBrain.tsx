@@ -130,7 +130,7 @@ const LOADING_MSGS = [
   'Crunching the data…',
 ]
 
-export default function DashboardBrain({ inline = false }: { inline?: boolean }) {
+export default function DashboardBrain({ inline = false, label }: { inline?: boolean; label?: string }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -184,18 +184,19 @@ export default function DashboardBrain({ inline = false }: { inline?: boolean })
       {/* Brain button — stacked under the eye (14) + bell (54). */}
       <button
         onClick={() => setOpen(true)}
-        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center gap-1.5 rounded-full transition hover:opacity-90`}
         style={{
           ...(inline
             ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
             : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
-          width: '36px',
           height: '36px',
+          ...(inline && label ? { padding: '0 12px' } : { width: '36px' }),
         }}
         aria-label="Ask PROXe"
         title="Ask PROXe"
       >
         <ProxeMark size={18} />
+        {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
       </button>
 
       {open && (

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-17 00:10 IST · Windchasers home: time greeting, card tints, labelled controls, colour-coded events
+
+- **Greeting** now shifts by IST time of day — Good morning / afternoon / evening / night (was always "Welcome back").
+- **KPI cards** get a subtle accent tint (~7% of their colour over black) + matching border. **Follow-up Health** now follows its status across the whole card — green (good) / amber (fair) / red (needs work) — icon, tint, ring and label all match (was a green heart even when "Fair").
+- **Top controls** — Snapshot and Ask PROXe are now labelled pill buttons (discoverable), with the notification bell as an icon to their right.
+- **Upcoming Events** trimmed to two lines max: line 1 = name · date · owner, line 2 = the event title (only when present); removed the third line. The countdown chip is now recency-coloured (<=24h blue, <=3d amber, beyond muted) — the only coloured element.
+
 ## 2026-06-16 23:35 IST · Windchasers: token metering — fix the actual write bug (updated_by UUID)
 
 - **Root cause found:** `dashboard_settings.updated_by` is a UUID column, but `recordTokenUsage`/`resetTokenUsage` passed `updated_by: 'system'` → every upsert 400'd (`22P02 invalid input syntax for type uuid`) and the empty catch swallowed it, so the `token_usage` row was NEVER written (even after the await fix). Removed `updated_by` from both upserts (defaults to null). Confirmed via a direct REST upsert test (201 when omitted). The catch now logs failures so this can't hide again.
