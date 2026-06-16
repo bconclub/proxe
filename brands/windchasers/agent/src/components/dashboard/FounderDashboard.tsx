@@ -22,7 +22,7 @@ type TimeFilter = 'All' | '7D' | '14D' | '30D'
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
-  totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
+  totalLeads: { count: number; count7D: number; count14D: number; count30D: number; change7D?: number; change14D?: number; change30D?: number; fromConversations: number; conversionRate: number }
   engagedLeads: { count: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
@@ -591,6 +591,8 @@ function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: ()
   const [period, setPeriod] = useState<'7D' | '14D' | '30D' | 'All'>('7D')
   const tl = metrics.totalLeads
   const value = period === '7D' ? tl.count7D : period === '14D' ? tl.count14D : period === '30D' ? tl.count30D : tl.count
+  // Per-period change (vs the prior equal-length window). 'All' has no comparison.
+  const change = period === '7D' ? tl.change7D : period === '14D' ? tl.change14D : period === '30D' ? tl.change30D : undefined
   const periods: Array<'7D' | '14D' | '30D' | 'All'> = ['7D', '14D', '30D', 'All']
   const spark = metrics.trends?.leads?.data
 
@@ -617,9 +619,8 @@ function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: ()
       </div>
       <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={onOpen}>
         <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
-        {/* Only the 7-day change is real; hide the delta on other periods rather
-            than repeat the 7-day number (that's the bug founder flagged). */}
-        {period === '7D' && <KpiDelta change={metrics.trends?.leads?.change} />}
+        {/* Real per-period change (this window vs the prior equal window). */}
+        {change != null && <KpiDelta change={change} />}
       </div>
       {spark && spark.length > 1 ? (
         <div className="w-full mt-2" style={{ height: 30 }}>

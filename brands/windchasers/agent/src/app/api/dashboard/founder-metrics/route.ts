@@ -313,6 +313,20 @@ export async function GET(request: NextRequest) {
       const created = new Date(lead.created_at)
       return (now.getTime() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000
     }).length
+
+    // Per-period deltas: this period vs the PRIOR equal-length period, so each
+    // toggle (7D/14D/30D) shows its own real change (not one reused 7-day number).
+    const DAY_MS = 24 * 60 * 60 * 1000
+    const leadsInWindow = (fromDays: number, toDays: number) =>
+      safeLeads.filter(lead => {
+        const age = now.getTime() - new Date(lead.created_at).getTime()
+        return age > fromDays * DAY_MS && age <= toDays * DAY_MS
+      }).length
+    const pctChange = (cur: number, prev: number) =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : (cur > 0 ? 100 : 0)
+    const newLeadsChange7D = pctChange(totalLeads7D, leadsInWindow(7, 14))
+    const newLeadsChange14D = pctChange(totalLeads14D, leadsInWindow(14, 28))
+    const newLeadsChange30D = pctChange(totalLeads30D, leadsInWindow(30, 60))
     
     // PRIMARY: Count unique lead_ids from conversations table (all platforms)
     // This is the most accurate count since it tracks every real conversation
@@ -1526,6 +1540,9 @@ export async function GET(request: NextRequest) {
         count7D: totalLeads7D,
         count14D: totalLeads14D,
         count30D: totalLeads30D,
+        change7D: newLeadsChange7D,
+        change14D: newLeadsChange14D,
+        change30D: newLeadsChange30D,
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
       },
