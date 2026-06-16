@@ -168,8 +168,8 @@ const STAGE_CONFIG: Record<string, {
   },
   converted: {
     icon: <MdCheckCircle size={22} />,
-    color: '#10b981',
-    bg: 'rgba(16,185,129,0.10)',
+    color: '#22c55e',
+    bg: 'rgba(34,197,94,0.10)',
     timing: 'Terminal',
     days: [],
     channels: [],
@@ -963,9 +963,9 @@ export default function FlowsPage() {
     const templatesLive = templates.filter(t => t.status === 'approved').length
     const stageMap = new Map(stageStats.map(stage => [stage.id, stage]))
     const funnelGroups = [
-      { id: 'top', label: 'TOP', color: '#2563eb', stageIds: ['one_touch', 'low_touch', 'engaged'] },
+      { id: 'top', label: 'TOP', color: '#3B82F6', stageIds: ['one_touch', 'low_touch', 'engaged'] },
       { id: 'mid', label: 'MID', color: '#f59e0b', stageIds: ['high_intent', 'booking_made', 'no_show'] },
-      { id: 'bottom', label: 'BOTTOM', color: '#10b981', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
+      { id: 'bottom', label: 'BOTTOM', color: '#22c55e', stageIds: ['demo_taken', 'proposal_sent', 'converted'] },
     ]
     const activeGroup = funnelGroups.find(g => g.id === activeFunnel) || funnelGroups[0]
     const funnelStageIds = activeGroup.stageIds
@@ -983,7 +983,7 @@ export default function FlowsPage() {
         {/* Compact header */}
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexShrink: 0 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 850, color: 'var(--text-primary)' }}>Flows</h1>
+            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700, color: 'var(--text-primary)' }}>Flows</h1>
             <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
               Pick a funnel to see its stages, templates and coverage.
             </p>
@@ -1022,12 +1022,12 @@ export default function FlowsPage() {
                   background: active ? `${group.color}12` : 'var(--bg-secondary)',
                   borderRadius: 14,
                   padding: '13px 16px',
-                  boxShadow: active ? `0 10px 24px ${group.color}22` : '0 6px 18px rgba(15,23,42,0.03)',
+                  boxShadow: active ? `0 10px 24px ${group.color}22` : '0 6px 18px rgba(0,0,0,0.22)',
                   transition: 'all 0.15s ease',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 850, color: group.color, fontSize: 13, letterSpacing: '0.4px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: group.color, fontSize: 13, letterSpacing: '0.4px' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: group.color }} />
                     {group.label} FUNNEL
                   </span>
@@ -1036,7 +1036,7 @@ export default function FlowsPage() {
                 <div style={{ marginTop: 9, display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <strong style={{ fontSize: 28, lineHeight: 1, color: 'var(--text-primary)' }}>{count}</strong>
                   <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>lead{count === 1 ? '' : 's'}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: group.color }}>{avgCov}% covered</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: group.color }}>{avgCov}% covered</span>
                 </div>
                 <div style={{ marginTop: 8, height: 5, borderRadius: 999, background: 'var(--border-primary)', overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, avgCov)}%`, height: '100%', background: group.color }} />
@@ -1049,7 +1049,7 @@ export default function FlowsPage() {
         {/* Drill-in — active funnel's stages (left) + selected stage detail (right) */}
         <section style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12 }}>
           <div style={{ border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 850, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 700, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
               {activeGroup.label} FUNNEL · STAGES
             </div>
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1078,7 +1078,7 @@ export default function FlowsPage() {
                         {cfg?.icon || <MdTimeline size={18} />}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 750, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stage.name}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stage.name}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{stage.leadCount} leads · {stage.coverage}% covered</div>
                       </div>
                       <MdKeyboardArrowDown size={18} style={{ transform: 'rotate(-90deg)', color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -1441,7 +1441,7 @@ const flowButtonStyle = (background: string, color: string): React.CSSProperties
   fontSize: 14,
   fontWeight: 700,
   cursor: 'pointer',
-  boxShadow: background === '#2563eb' ? '0 10px 22px rgba(37,99,235,0.22)' : 'none',
+  boxShadow: 'none',
 })
 
 const flowGhostButtonStyle: React.CSSProperties = {
@@ -1456,9 +1456,9 @@ const flowGhostButtonStyle: React.CSSProperties = {
   background: 'var(--bg-secondary)',
   color: 'var(--text-primary)',
   fontSize: 14,
-  fontWeight: 650,
+  fontWeight: 600,
   cursor: 'pointer',
-  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.22)',
 }
 
 const flowFilterButtonStyle: React.CSSProperties = {
@@ -1480,7 +1480,7 @@ const flowPillButtonStyle: React.CSSProperties = {
   background: 'var(--bg-secondary)',
   color: 'var(--text-primary)',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 700,
   cursor: 'pointer',
 }
 
@@ -1498,11 +1498,11 @@ function FlowKpiCard({
   icon: React.ReactNode
 }) {
   return (
-    <article style={{ minHeight: 112, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', padding: 18, boxShadow: '0 12px 30px rgba(15,23,42,0.04)' }}>
+    <article style={{ minHeight: 112, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', padding: 18, boxShadow: '0 12px 30px rgba(0,0,0,0.22)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14, fontWeight: 650 }}>{label}</p>
-          <div style={{ marginTop: 8, fontSize: 31, lineHeight: 1, fontWeight: 850, letterSpacing: 0, color }}>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14, fontWeight: 600 }}>{label}</p>
+          <div style={{ marginTop: 8, fontSize: 31, lineHeight: 1, fontWeight: 700, letterSpacing: 0, color }}>
             {value}
           </div>
         </div>
@@ -1618,14 +1618,14 @@ function GoLiveChecklist({
         border: '1px solid var(--border-primary)',
         borderRadius: 12,
         background: 'var(--bg-secondary)',
-        boxShadow: '0 6px 18px rgba(15,23,42,0.03)',
+        boxShadow: '0 6px 18px rgba(0,0,0,0.22)',
       }}
     >
       <span
         title="What's needed to make the flow page active and running"
         style={{
           display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
-          fontSize: 13, fontWeight: 850, color: allReady ? '#22c55e' : 'var(--text-primary)',
+          fontSize: 13, fontWeight: 700, color: allReady ? '#22c55e' : 'var(--text-primary)',
           paddingRight: 12, marginRight: 2, borderRight: '1px solid var(--border-primary)',
         }}
       >
@@ -1671,7 +1671,7 @@ function FunnelBand({
 
   return (
     <div style={{ minHeight: 104, padding: '16px 20px 10px', background: `linear-gradient(90deg, ${color}14 0%, var(--bg-secondary) 100%)`, borderRight: '1px solid var(--border-primary)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color, fontWeight: 850, fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color, fontWeight: 700, fontSize: 13 }}>
         <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
         {label}
       </div>
@@ -1716,7 +1716,7 @@ function FlowStageCard({
   selected: boolean
   onSelect: () => void
 }) {
-  const accent = config?.color || '#2563eb'
+  const accent = config?.color || 'var(--accent-primary)'
 
   return (
     <button
@@ -1725,12 +1725,12 @@ function FlowStageCard({
       style={{
         width: '100%',
         textAlign: 'left',
-        border: selected ? `2px solid #2563eb` : '1px solid var(--border-primary)',
+        border: selected ? `2px solid var(--accent-primary)` : '1px solid var(--border-primary)',
         borderRadius: 10,
-        background: selected ? 'rgba(37,99,235,0.12)' : 'var(--bg-secondary)',
+        background: selected ? 'var(--accent-subtle)' : 'var(--bg-secondary)',
         padding: 14,
         cursor: 'pointer',
-        boxShadow: selected ? '0 10px 24px rgba(37,99,235,0.12)' : '0 6px 18px rgba(15,23,42,0.03)',
+        boxShadow: selected ? '0 10px 24px var(--accent-subtle)' : '0 6px 18px rgba(0,0,0,0.22)',
       }}
     >
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -1739,13 +1739,13 @@ function FlowStageCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text-primary)', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <h3 style={{ margin: 0, fontSize: 16, color: 'var(--text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {stage.name}
             </h3>
             <MdMoreVert size={18} color="var(--text-secondary)" />
           </div>
           <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ borderRadius: 999, padding: '3px 8px', color: accent, background: `${accent}16`, fontSize: 12, fontWeight: 800 }}>
+            <span style={{ borderRadius: 999, padding: '3px 8px', color: accent, background: `${accent}16`, fontSize: 12, fontWeight: 700 }}>
               {stage.leadCount} lead{stage.leadCount === 1 ? '' : 's'}
             </span>
             <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{config?.timing || 'No schedule'}</span>
@@ -1754,7 +1754,7 @@ function FlowStageCard({
       </div>
 
       <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ color: stage.coverage > 0 ? '#f97316' : '#ef4444', fontSize: 12, fontWeight: 800 }}>{stage.coverage}%</span>
+        <span style={{ color: stage.coverage > 0 ? '#f97316' : '#ef4444', fontSize: 12, fontWeight: 700 }}>{stage.coverage}%</span>
         <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'var(--border-primary)', overflow: 'hidden' }}>
           <div style={{ width: `${Math.min(100, Math.max(0, stage.coverage))}%`, height: '100%', background: stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444' }} />
         </div>
@@ -1798,8 +1798,8 @@ function FlowDetailPanel({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 20, color: 'var(--text-primary)', fontWeight: 850 }}>{stage.name}</h2>
-            <span style={{ color: '#2563eb', background: 'rgba(37,99,235,0.16)', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 800 }}>
+            <h2 style={{ margin: 0, fontSize: 20, color: 'var(--text-primary)', fontWeight: 700 }}>{stage.name}</h2>
+            <span style={{ color: 'var(--accent-primary)', background: 'var(--accent-subtle)', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 }}>
               {stage.leadCount} leads
             </span>
           </div>
@@ -1814,7 +1814,7 @@ function FlowDetailPanel({
         {(['Overview', 'Templates', 'Performance', 'Activity'] as const).map((t) => {
           const active = tab === t
           return (
-            <button key={t} type="button" onClick={() => setTab(t)} style={{ border: 0, background: 'transparent', padding: '0 0 12px', color: active ? '#2563eb' : 'var(--text-secondary)', borderBottom: active ? '3px solid #2563eb' : '3px solid transparent', fontSize: 13, fontWeight: 750, cursor: 'pointer' }}>
+            <button key={t} type="button" onClick={() => setTab(t)} style={{ border: 0, background: 'transparent', padding: '0 0 12px', color: active ? 'var(--accent-primary)' : 'var(--text-secondary)', borderBottom: active ? '3px solid var(--accent-primary)' : '3px solid transparent', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
               {t}{t === 'Templates' && stageTemplates.length > 0 ? ` (${stageTemplates.length})` : ''}
             </button>
           )
@@ -1832,7 +1832,7 @@ function FlowDetailPanel({
                     <span style={{ color: channel === 'whatsapp' ? '#22c55e' : '#ef476f', fontSize: 20 }}>{channel === 'whatsapp' ? 'W' : 'V'}</span>
                     <span style={{ color: 'var(--text-secondary)', fontSize: 13, textTransform: 'capitalize' }}>{channel}</span>
                   </div>
-                  <span style={{ borderRadius: 999, padding: '4px 9px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: 12, fontWeight: 800 }}>Active</span>
+                  <span style={{ borderRadius: 999, padding: '4px 9px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: 12, fontWeight: 700 }}>Active</span>
                 </div>
               ))}
             </section>
@@ -1856,7 +1856,7 @@ function FlowDetailPanel({
           <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12 }}>
             <h3 style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-primary)' }}>Template Schedule</h3>
             <ScheduleMatrix stageId={stage.id} config={config} getSlotStatus={getSlotStatus} />
-            <button type="button" onClick={() => setTab('Templates')} style={{ ...flowGhostButtonStyle, width: '100%', marginTop: 14, color: '#2563eb', minHeight: 36 }}>
+            <button type="button" onClick={() => setTab('Templates')} style={{ ...flowGhostButtonStyle, width: '100%', marginTop: 14, color: 'var(--accent-primary)', minHeight: 36 }}>
               View Full Templates
             </button>
           </section>
@@ -1869,7 +1869,7 @@ function FlowDetailPanel({
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
               {stageTemplates.length} template{stageTemplates.length === 1 ? '' : 's'}
             </span>
-            <button type="button" onClick={() => onAddTemplate(stage.id)} style={{ ...flowButtonStyle('#2563eb', '#fff'), minHeight: 34, fontSize: 13, padding: '0 12px' }}>
+            <button type="button" onClick={() => onAddTemplate(stage.id)} style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 34, fontSize: 13, padding: '0 12px' }}>
               <MdAdd size={16} /> Add
             </button>
           </div>
@@ -1885,7 +1885,7 @@ function FlowDetailPanel({
                   <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>Day {t.day}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Day {t.day}</span>
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.channel === 'whatsapp' ? '💬 WhatsApp' : '📞 Voice'}</span>
                         {t.variant && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· Variant {t.variant}</span>}
                       </div>
@@ -1897,7 +1897,7 @@ function FlowDetailPanel({
                       </p>
                     )}
                     <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => onEditTemplate(t)} style={miniBtn('#2563eb')}>Edit</button>
+                      <button type="button" onClick={() => onEditTemplate(t)} style={miniBtn('var(--accent-primary)')}>Edit</button>
                       {t.id && t.status !== 'approved' && <button type="button" onClick={() => onSetStatus(t.id!, 'approved')} style={miniBtn('#22c55e')}>Approve</button>}
                       {t.id && t.status !== 'rejected' && <button type="button" onClick={() => onSetStatus(t.id!, 'rejected')} style={miniBtn('#ef4444')}>Reject</button>}
                       {t.id && <button type="button" onClick={() => { if (confirm('Delete this template?')) onDeleteTemplate(t.id!) }} style={miniBtn('var(--text-secondary)')}>Delete</button>}
@@ -1916,7 +1916,7 @@ function FlowDetailPanel({
             <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444'} size={84} showLabel />
             <div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Template coverage</div>
-              <div style={{ fontSize: 24, fontWeight: 850, color: 'var(--text-primary)' }}>{stage.coverage}%</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{stage.coverage}%</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{approved} approved of {totalSlots} slots</div>
             </div>
           </section>
@@ -1925,11 +1925,11 @@ function FlowDetailPanel({
               { label: 'Approved', value: approved, color: '#22c55e' },
               { label: 'Pending', value: pending, color: '#f59e0b' },
               { label: 'Rejected', value: rejected, color: '#ef4444' },
-              { label: 'Leads in stage', value: stage.leadCount, color: '#2563eb' },
+              { label: 'Leads in stage', value: stage.leadCount, color: 'var(--accent-primary)' },
             ].map(s => (
               <div key={s.label} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 850, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
               </div>
             ))}
           </div>
@@ -1985,7 +1985,7 @@ function CoverageRing({ value, color, size = 54, showLabel = false }: { value: n
       <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(148,163,184,0.25)" strokeWidth={stroke} fill="none" />
       <circle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       {showLabel && (
-        <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 18, fontWeight: 850, fill: 'var(--text-primary)' }}>
+        <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 18, fontWeight: 700, fill: 'var(--text-primary)' }}>
           {value}%
         </text>
       )}
@@ -2011,7 +2011,7 @@ function SegmentedProgress({ approved, pending, rejected, empty, total }: { appr
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
         {segments.map(segment => (
           <div key={segment.label} style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 750, color: 'var(--text-primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: segment.color }} />
               {segment.label}
             </div>
@@ -2039,7 +2039,7 @@ function ScheduleMatrix({
     <div style={{ display: 'grid', gridTemplateColumns: `88px repeat(${days.length}, 1fr)`, gap: 8, alignItems: 'stretch' }}>
       <div />
       {days.map(day => (
-        <div key={day} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-primary)', fontWeight: 800 }}>Day {day}</div>
+        <div key={day} style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-primary)', fontWeight: 700 }}>Day {day}</div>
       ))}
       {channels.map(channel => (
         <React.Fragment key={channel}>
@@ -2057,7 +2057,7 @@ function ScheduleMatrix({
             }
             const item = palette[status] || palette.empty
             return (
-              <div key={`${channel}-${day}`} style={{ minHeight: 62, borderRadius: 9, background: item.bg, color: item.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 11, fontWeight: 750 }}>
+              <div key={`${channel}-${day}`} style={{ minHeight: 62, borderRadius: 9, background: item.bg, color: item.color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
                 {item.icon}
                 {item.label}
               </div>
@@ -2106,7 +2106,7 @@ function ModalShell({ title, onClose, children, width = 480 }: { title: string; 
         style={{ width, maxWidth: '94vw', maxHeight: '86vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, boxShadow: '0 24px 60px rgba(0,0,0,0.4)', padding: 20 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 850, color: 'var(--text-primary)' }}>{title}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" style={{ border: 0, background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', padding: 4 }}>
             <MdClose size={20} />
           </button>
@@ -2204,7 +2204,7 @@ function TemplateEditorModal({
             type="button"
             disabled={!canSave}
             onClick={() => onSave({ id: template?.id, stage, day: Number(day), channel, variant, templateName: templateName.trim(), content: content.trim() })}
-            style={{ ...flowButtonStyle('#2563eb', '#fff'), minHeight: 40, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
+            style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 40, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
           >
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create template'}
           </button>
@@ -2241,11 +2241,11 @@ function FlowSettingsModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <span style={{ width: 32, height: 32, borderRadius: 8, background: cfg?.bg, color: cfg?.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{cfg?.icon}</span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{nameMap.get(sid) || humanizeStage(sid)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{nameMap.get(sid) || humanizeStage(sid)}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{cfg?.timing || 'No schedule'}</div>
                   </div>
                 </div>
-                <button type="button" onClick={() => onAddTemplate(sid)} style={{ ...flowButtonStyle('#2563eb', '#fff'), minHeight: 32, fontSize: 12, padding: '0 10px', flexShrink: 0 }}>
+                <button type="button" onClick={() => onAddTemplate(sid)} style={{ ...flowButtonStyle('var(--accent-subtle)', 'var(--accent-primary)'), minHeight: 32, fontSize: 12, padding: '0 10px', flexShrink: 0 }}>
                   <MdAdd size={15} /> Add
                 </button>
               </div>
