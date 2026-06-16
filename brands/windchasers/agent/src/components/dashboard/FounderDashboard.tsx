@@ -75,6 +75,7 @@ interface FounderMetrics {
     bookingRate: Array<{ value: number }>
     avgResponseTime: Array<{ value: number }>
   }
+  trendSeries?: { conversations: Record<TimeFilter, Array<{ value: number }>> }
 }
 
 // "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
@@ -292,7 +293,11 @@ export default function FounderDashboard() {
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
-  const convSeries = metrics.trends?.conversations?.data || []
+  // Use the real per-day conversation series (distinct leads messaged/day) — the
+  // old trends.conversations.data was session-based and came back ~flat.
+  const convSeries = (metrics.trendSeries?.conversations?.['7D']?.length
+    ? metrics.trendSeries.conversations['7D']
+    : metrics.trends?.conversations?.data) || []
   const dailyAvg = convSeries.length ? Math.round(convSeries.reduce((a, b) => a + (b.value || 0), 0) / convSeries.length) : 0
   // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
@@ -306,7 +311,7 @@ export default function FounderDashboard() {
       <DashboardBrain />
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
         <NewLeadsCard metrics={metrics} onOpen={() => router.push('/dashboard/leads')} />
         <KpiCard
           icon={<MdPeople size={15} />} iconColor="#22c55e"
@@ -316,15 +321,8 @@ export default function FounderDashboard() {
           sub={total > 0 ? `of ${total} total leads` : 'engaged'}
           onClick={() => router.push('/dashboard/leads?filter=engaged')}
         />
-        <KpiCard
-          icon={<MdShowChart size={15} />} iconColor="#06b6d4"
-          label="Response Rate"
-          value={`${Math.round(rm?.responseRate ?? 0)}%`}
-          sparkData={metrics.radialTrends?.responseRate} sparkColor="#06b6d4"
-          sub="reply coverage"
-        />
-        {/* Follow-up Health — status + ring */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}>
+        {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><MdFavorite size={15} /></span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
@@ -337,7 +335,7 @@ export default function FounderDashboard() {
             </div>
             <RadialProgress value={Math.round(rm?.responseRate ?? 0)} size={48} color={metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'} showPercentage={false} label="" />
           </div>
-          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(rm?.responseRate ?? 0)}% on track</span>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(rm?.responseRate ?? 0)}% reply rate · on track</span>
         </div>
         <KpiCard
           icon={<MdEvent size={15} />} iconColor="#a855f7"
@@ -454,7 +452,7 @@ export default function FounderDashboard() {
                     const intent = intentFor(lead.score)
                     const status = statusFor(lead.lastContact, lead.score)
                     return (
-                      <tr key={lead.id} onClick={() => openLeadModal(lead.id)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
+                      <tr key={lead.id} onClick={() => router.push(`/dashboard/inbox?lead=${lead.id}`)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                       >
@@ -563,7 +561,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}
+      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
@@ -597,7 +595,7 @@ function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: ()
   const spark = metrics.trends?.leads?.data
 
   return (
-    <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132 }}>
+    <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdPeople size={15} /></span>
