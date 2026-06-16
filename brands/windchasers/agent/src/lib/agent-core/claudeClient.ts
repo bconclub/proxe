@@ -100,7 +100,7 @@ export async function* streamResponse(
     }
   } finally {
     // Fires even if the consumer stops early — best-effort metering.
-    void recordTokenUsage('chat', model, tuInput, tuOutput);
+    await recordTokenUsage('chat', model, tuInput, tuOutput);
   }
 }
 
@@ -137,7 +137,7 @@ export async function generateResponse(
       });
 
       const { input, output } = usageFrom(response);
-      void recordTokenUsage(category, model, input, output);
+      await recordTokenUsage(category, model, input, output);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {
@@ -228,7 +228,7 @@ export async function generateResponseWithTools(
     if (!response) throw lastError || new Error('Failed after retries');
 
     const { input: tuIn, output: tuOut } = usageFrom(response);
-    void recordTokenUsage(category, model, tuIn, tuOut);
+    await recordTokenUsage(category, model, tuIn, tuOut);
 
     // Extract text from this response (may accompany tool_use blocks)
     const textBlocks = response.content.filter((b: any) => b.type === 'text');
@@ -356,7 +356,7 @@ export async function generateFromImage(
       });
 
       const { input, output } = usageFrom(response);
-      void recordTokenUsage('vision', model, input, output);
+      await recordTokenUsage('vision', model, input, output);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {

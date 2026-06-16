@@ -459,7 +459,7 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
 
           if (response.ok) {
             const data = await response.json()
-            void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
+            await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
             const unifiedSummary = data.content?.[0]?.text || ''
             if (unifiedSummary) {
               // Build attribution
@@ -836,7 +836,7 @@ ${conversationContext || 'No messages yet'}`
 
         if (response.ok) {
           const data = await response.json()
-          void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
+          await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const aiSummary = data.content?.[0]?.text || ''
           if (aiSummary) {
             // Save the new summary to the database

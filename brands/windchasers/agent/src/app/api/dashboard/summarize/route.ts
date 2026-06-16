@@ -76,7 +76,7 @@ Keep it brief and actionable:`
     }
 
     const data = await response.json();
-    void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output);
+    await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output);
     console.log('Claude response received');
     
     const summary = data.content?.[0]?.text || 'Unable to generate summary';

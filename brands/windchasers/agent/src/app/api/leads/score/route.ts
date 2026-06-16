@@ -182,7 +182,7 @@ Respond with ONLY a JSON object in this exact format:
 
         if (response.ok) {
           const data = await response.json()
-          void recordTokenUsage('scoring', data.model || '', usageFrom(data).input, usageFrom(data).output)
+          await recordTokenUsage('scoring', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const text = data.content?.[0]?.text || ''
           
           // Parse JSON from response

@@ -153,7 +153,7 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
     }
 
     const data = await response.json();
-    void recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output);
+    await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output);
     const responseText = data.content?.[0]?.text || '{}';
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {

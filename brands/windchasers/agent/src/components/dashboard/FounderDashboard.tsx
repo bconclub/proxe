@@ -366,6 +366,19 @@ export default function FounderDashboard() {
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
+      {/* Subtle bento entrance — cards fade + rise in, lightly staggered. Plays
+          once on mount (DOM persists across the 60s metric refresh, so it doesn't
+          replay). Respects reduced-motion. */}
+      <style>{`
+        @keyframes wcBentoIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: no-preference) {
+          .wc-bento > * { animation: wcBentoIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+          .wc-bento > *:nth-child(2) { animation-delay: 0.05s; }
+          .wc-bento > *:nth-child(3) { animation-delay: 0.10s; }
+          .wc-bento > *:nth-child(4) { animation-delay: 0.15s; }
+          .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
+        }
+      `}</style>
       {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
       <header className="flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
@@ -426,7 +439,7 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
+      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
@@ -506,9 +519,9 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
             <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>All-time</span>
@@ -529,14 +542,14 @@ export default function FounderDashboard() {
         </section>
 
         {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
               View all <MdArrowForward size={13} />
             </button>
           </div>
-          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0">
+          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
             {metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.map((booking) => (
                 <button
@@ -591,7 +604,7 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
         <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
@@ -657,7 +670,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Conversations Trend */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
