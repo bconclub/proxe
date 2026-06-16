@@ -1511,6 +1511,32 @@ export async function GET(request: NextRequest) {
       // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
     }
 
+    // Cohort funnel for the Engine Overview toggle: of leads ACQUIRED in the
+    // window, how many reached each stage — so EVERY node (incl. Follow-up Due +
+    // Booked) scales with the window instead of staying constant.
+    const engagedIdSet = new Set(engagedLeadsList.map((l: any) => l.id))
+    const staleIdSet = new Set(staleLeads.map((l: any) => l.id))
+    const hasBooking = (l: any) => !!getBookingData(l).bookingDate
+    const FUNNEL_DAY = 24 * 60 * 60 * 1000
+    const funnelFor = (days: number | null) => {
+      const cohort = days == null
+        ? safeLeads
+        : safeLeads.filter((l: any) => (now.getTime() - new Date(l.created_at).getTime()) <= days * FUNNEL_DAY)
+      return {
+        total: cohort.length,
+        engaged: cohort.filter((l: any) => engagedIdSet.has(l.id)).length,
+        warm: cohort.filter(isWarmLead).length,
+        followUpDue: cohort.filter((l: any) => staleIdSet.has(l.id)).length,
+        booked: cohort.filter(hasBooking).length,
+      }
+    }
+    const funnel = {
+      Today: funnelFor(1),
+      '7D': funnelFor(7),
+      '14D': funnelFor(14),
+      All: funnelFor(null),
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1558,6 +1584,7 @@ export async function GET(request: NextRequest) {
         newLeads: todayNewLeads.length,
       },
       leadsRecovered: { count: leadsRecoveredCount },
+      funnel,
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
