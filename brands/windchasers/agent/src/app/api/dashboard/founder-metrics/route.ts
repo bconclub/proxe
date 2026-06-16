@@ -153,6 +153,10 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       console.warn('Conversations pagination failed:', e?.message)
     }
+    // We fetched newest-first (for the row cap); restore ascending order — the
+    // response-rate + response-time calcs below scan each conversation forward in
+    // time for the agent's reply, so they REQUIRE chronological order.
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     const now = new Date()
     const todayStart = new Date(now)

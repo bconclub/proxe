@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-16 19:55 IST · Windchasers home: fix reply-rate, sparkline, blacker theme, compact events
+
+- **Bug fix — Follow-up Health reply rate dropped to 68%:** the reply-rate + response-time calcs scan each conversation forward in time for the agent's reply, which requires ascending order. The conversations pagination fetched newest-first, breaking detection. Now re-sorted ascending after fetch — reply rate computes correctly again.
+- **Active Conversations sparkline** now follows the card's 24h/7d/14d toggle (was hardcoded to the 7-day series).
+- **Booked Calls / Events** footer now reads "vs last 7 days" (pairs with the change %) instead of "% of total leads".
+- **Homepage made blacker:** home card/section surfaces switched from `--bg-secondary` (#111 grayish) to `--bg-primary` (#000); inner chips (#111) now actually show against the black cards instead of blending in.
+- **Upcoming Events compacted:** when an event has no title, the name + date + owner sit on a single line (was three) — fits more events.
+
 ## 2026-06-16 19:20 IST · Windchasers home: card 2 → High Intent Leads
 
 - Replaced the "Leads Recovered" card (low/redundant signal) with **High Intent Leads** = `hotLeads.count` (leads PROXe scored ≥ the hot threshold). Active Conversations and an engaged-today count were effectively the same set, so this surfaces a distinct, valuable number instead.

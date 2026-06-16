@@ -383,7 +383,7 @@ export default function FounderDashboard() {
             <button
               onClick={() => setProfileOpen((o) => !o)}
               className="flex items-center gap-1 rounded-full pl-1 pr-1.5 py-1 border transition-colors hover:opacity-90"
-              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
               aria-haspopup="menu"
               aria-expanded={profileOpen}
               title={user?.email || 'Account'}
@@ -394,7 +394,7 @@ export default function FounderDashboard() {
               <MdArrowDropDown size={18} style={{ color: 'var(--text-secondary)' }} />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
+              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
                 <div className="px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Signed in as</div>
                   <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }} title={user?.email}>{displayName}</div>
@@ -428,7 +428,7 @@ export default function FounderDashboard() {
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
@@ -449,13 +449,17 @@ export default function FounderDashboard() {
           <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
             <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{acValue}</span>
           </div>
-          {metrics.trendSeries?.conversations?.['7D'] && metrics.trendSeries.conversations['7D'].length > 1 ? (
-            <div className="w-full mt-2" style={{ height: 30 }}>
-              <Sparkline data={metrics.trendSeries.conversations['7D']} color="#3B82F6" height={30} showGradient />
-            </div>
-          ) : (
-            <div style={{ height: 30 }} />
-          )}
+          {(() => {
+            // Sparkline tracks the selected window (Today shows the 7-day context).
+            const acSeries = metrics.trendSeries?.conversations?.[acRange === 'Today' ? '7D' : acRange]
+            return acSeries && acSeries.length > 1 ? (
+              <div className="w-full mt-2" style={{ height: 30 }}>
+                <Sparkline data={acSeries} color="#3B82F6" height={30} showGradient />
+              </div>
+            ) : (
+              <div style={{ height: 30 }} />
+            )
+          })()}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
         {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
@@ -468,7 +472,7 @@ export default function FounderDashboard() {
           onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
         {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><MdFavorite size={15} /></span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
@@ -489,7 +493,7 @@ export default function FounderDashboard() {
           value={bookedVal}
           delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
           sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
-          sub={bookedPctOfLeads}
+          sub="vs last 7 days"
           onClick={() => router.push('/dashboard/bookings')}
         />
         <KpiCard
@@ -504,7 +508,7 @@ export default function FounderDashboard() {
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
             <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>All-time</span>
@@ -525,7 +529,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -546,26 +550,36 @@ export default function FounderDashboard() {
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name + countdown chip */}
+                    {/* Line 1 — name + countdown. When there's no event title, the
+                        date + owner ride on this same line to keep it one row. */}
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                        {!booking.title && (
+                          <>
+                            <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap shrink-0" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                          </>
+                        )}
+                      </div>
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                         {formatCountdown(booking.datetime)}
                       </span>
                     </div>
-                    {/* Line 2 — event heading */}
+                    {/* Titled events expand: heading, then date + owner chips. */}
                     {booking.title && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                      <>
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                            {formatBookingWhen(booking.datetime)}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                            {booking.owner?.name ? booking.owner.name : 'Unassigned'}
+                          </span>
+                        </div>
+                      </>
                     )}
-                    {/* Line 3 — when + owner chips */}
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                        {formatBookingWhen(booking.datetime)}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                        {booking.owner?.name ? booking.owner.name : 'Unassigned'}
-                      </span>
-                    </div>
                   </div>
                 </button>
               ))
@@ -579,7 +593,7 @@ export default function FounderDashboard() {
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
@@ -643,7 +657,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Conversations Trend */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
@@ -728,7 +742,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+      style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
