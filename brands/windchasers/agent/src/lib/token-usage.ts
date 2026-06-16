@@ -74,7 +74,10 @@ export async function recordTokenUsage(
   try {
     if (!inputTokens && !outputTokens) return
     const svc = getServiceClient()
-    if (!svc) return
+    if (!svc) {
+      console.error('[token-usage] recordTokenUsage skipped: getServiceClient() returned null (missing service key in this runtime?)')
+      return
+    }
 
     const { data } = await svc
       .from('dashboard_settings')

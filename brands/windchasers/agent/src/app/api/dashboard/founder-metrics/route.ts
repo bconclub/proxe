@@ -66,7 +66,6 @@ export async function GET(request: NextRequest) {
       { data: whatsappSessions },
       { data: voiceSessions },
       { data: socialSessions },
-      { data: conversationsData, error: conversationsError },
       { data: stageChanges },
     ] = await Promise.all([
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
@@ -90,12 +89,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('social_sessions')
         .select('lead_id'),
-      // 6. conversations - messages for response time + activity (ONE query)
-      supabase
-        .from('conversations')
-        .select('lead_id, sender, created_at, metadata, channel')
-        .order('created_at', { ascending: true }),
-      // 7. lead_stage_changes - recent stage transitions
+      // 6. lead_stage_changes - recent stage transitions
       supabase
         .from('lead_stage_changes')
         .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
@@ -136,13 +130,28 @@ export async function GET(request: NextRequest) {
     // Ensure leads is an array
     const safeLeads = leads || []
 
-    // Use conversations data from Promise.all (already fetched above)
+    // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
+    // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
+    // last 24h / 7d) was never fetched and Active Conversations read 0. Paginate
+    // the most-recent ~45 days, newest-first, so every window count is accurate.
     let messages: any[] = []
-    if (conversationsError) {
-      console.warn('Error fetching conversations:', conversationsError)
-      messages = []
-    } else {
-      messages = conversationsData || []
+    try {
+      const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      const PAGE = 1000
+      for (let page = 0; page < 20; page++) {
+        const { data: chunk, error: convErr } = await supabase
+          .from('conversations')
+          .select('lead_id, sender, created_at, metadata, channel')
+          .gte('created_at', convCutoff)
+          .order('created_at', { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1)
+        if (convErr) { console.warn('Error fetching conversations page', page, convErr.message); break }
+        if (!chunk || chunk.length === 0) break
+        messages.push(...chunk)
+        if (chunk.length < PAGE) break
+      }
+    } catch (e: any) {
+      console.warn('Conversations pagination failed:', e?.message)
     }
 
     const now = new Date()
@@ -1542,26 +1551,32 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // LEADS RECOVERED: distinct leads that went cold / lost / dormant and were
-    // brought BACK to an active stage — the core PROXe value (a follow-up, or a
-    // lead that drifted off and got re-engaged). Uses the full stage-transition
-    // history (not the recent-50 slice the activity feed uses).
+    // LEADS RECOVERED: leads that went quiet and came BACK — the core PROXe value.
+    // There's no explicit "cold" stage in the data, so we detect re-engagement
+    // from the conversation timeline: a CUSTOMER (inbound) message that lands
+    // after >= 7 days of silence for that lead, with the comeback inside the last
+    // 30 days. Counts distinct leads.
     let leadsRecoveredCount = 0
     try {
-      const { data: allStageChanges } = await supabase
-        .from('lead_stage_changes')
-        .select('lead_id, old_stage, new_stage')
-        .order('created_at', { ascending: false })
-        .limit(5000)
-      const COLD = ['cold', 'lost', 'dormant', 'stale', 'nurture', 're-engage', 'reengage', 'in sequence', 'follow-up', 'followup', 'inactive', 'closed']
-      const ACTIVE = ['engaged', 'qualified', 'warm', 'high intent', 'booking', 'booked', 'demo', 'converted', 'interested', 'active', 'call done']
-      const lc = (s: string) => (s || '').toLowerCase()
-      const isCold = (s: string) => COLD.some(c => lc(s).includes(c))
-      const isActive = (s: string) => ACTIVE.some(a => lc(s).includes(a))
+      const GAP_MS = 7 * 24 * 60 * 60 * 1000
+      const recentMs = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const byLead: Record<string, Array<{ t: number; cust: boolean }>> = {}
+      for (const m of messages) {
+        if (!m.lead_id) continue
+        const t = new Date(m.created_at).getTime()
+        if (isNaN(t)) continue
+        ;(byLead[m.lead_id] ||= []).push({ t, cust: m.sender === 'customer' })
+      }
       const recovered = new Set<string>()
-      ;(allStageChanges || []).forEach((c: any) => {
-        if (c.lead_id && isCold(c.old_stage) && isActive(c.new_stage)) recovered.add(c.lead_id)
-      })
+      for (const [leadId, arr] of Object.entries(byLead)) {
+        arr.sort((a, b) => a.t - b.t)
+        for (let i = 1; i < arr.length; i++) {
+          if (arr[i].cust && arr[i].t - arr[i - 1].t >= GAP_MS && arr[i].t >= recentMs) {
+            recovered.add(leadId)
+            break
+          }
+        }
+      }
       leadsRecoveredCount = recovered.size
     } catch {
       // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard

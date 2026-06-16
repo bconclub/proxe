@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-16 18:40 IST · Windchasers home: fix Active Conversations (conversations fetch cap), redefine Leads Recovered, per-card toggles
+
+- **Bug fix — Active Conversations always 0:** the founder-metrics conversations query fetched ascending with no date filter, so PostgREST's 1000-row cap returned the 1000 *oldest* rows and no recent activity. Now paginates the most-recent ~45 days newest-first, so 24h / 7d / 14d / 30d counts are accurate (live data: 153 conversations in last 24h, 1854 in last 7d).
+- **Leads Recovered redefined:** there is no "cold/lost" stage in the data, so the old cold→active stage heuristic matched nothing. Now detected from the conversation timeline — a customer (inbound) message after ≥7 days of silence for that lead, comeback within the last 30 days; counts distinct leads.
+- **Per-card date toggles (founder request "put it inside the cards"):** removed the global top-bar Today/7D/14D/30D segmented toggle. Active Conversations card now has its own 24h / 7d / 14d toggle; Conversations Trend has its own 7d / 14d / 30d toggle.
+- **Token metering:** `streamResponse` (streaming chat) is now metered too (was the one un-metered path); `recordTokenUsage` logs when it skips on a null service client, to surface why the /tokens aggregate was empty.
+- User-facing: the two PROXe-value cards (Active Conversations, Leads Recovered) now show real numbers and each card carries its own time-window toggle.
+
 ## 2026-06-15 23:32 IST · Windchasers home: founder KPI row tweaks
 
 - Home KPI card 1 changed from "Active Conversations" to "New Leads", with an inline period toggle (7D / 14D / 30D / All) that swaps the count from real `totalLeads` data, plus sparkline; clicking the number opens the leads list.

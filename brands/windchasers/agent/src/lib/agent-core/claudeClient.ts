@@ -77,15 +77,30 @@ export async function* streamResponse(
     throw lastError || new Error('Failed to create stream after retries');
   }
 
-  for await (const chunk of stream) {
-    if (chunk.type === 'content_block_delta' &&
-        'delta' in chunk &&
-        chunk.delta?.type === 'text_delta') {
-      const text = chunk.delta.text || '';
-      if (text && typeof text === 'string') {
-        yield text;
+  // Capture token usage from the stream events so streaming chat is metered too
+  // (it was previously the one un-metered path). input_tokens arrive on
+  // message_start, output_tokens accumulate on message_delta.
+  let tuInput = 0;
+  let tuOutput = 0;
+  try {
+    for await (const chunk of stream) {
+      if (chunk.type === 'message_start') {
+        const u = chunk.message?.usage || {};
+        tuInput = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+      } else if (chunk.type === 'message_delta' && chunk.usage?.output_tokens != null) {
+        tuOutput = chunk.usage.output_tokens;
+      } else if (chunk.type === 'content_block_delta' &&
+          'delta' in chunk &&
+          chunk.delta?.type === 'text_delta') {
+        const text = chunk.delta.text || '';
+        if (text && typeof text === 'string') {
+          yield text;
+        }
       }
     }
+  } finally {
+    // Fires even if the consumer stops early — best-effort metering.
+    void recordTokenUsage('chat', model, tuInput, tuOutput);
   }
 }
 

@@ -109,10 +109,10 @@ export default function FounderDashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
 
-  // Global date-range for the top bar — drives the volume KPI cards (New Leads,
-  // Engaged) + Conversations Trend (founder: "the whole thing should change based
-  // on that"). Default 30 days ("let it start from 30 days").
-  const [range, setRange] = useState<'Today' | '7D' | '14D' | '30D'>('30D')
+  // Per-card date ranges (founder: "put the toggle inside the cards, as we used
+  // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
+  const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -337,24 +337,21 @@ export default function FounderDashboard() {
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
-  // Use the real per-day conversation series (distinct leads messaged/day) — the
-  // old trends.conversations.data was session-based and came back ~flat. The
-  // series follows the top-bar range so the trend reacts to 7D / 14D / 30D.
-  const rangeDays = range === 'Today' ? 1 : range === '14D' ? 14 : range === '30D' ? 30 : 7
-  const rangeLabel = range === 'Today' ? 'today' : `last ${rangeDays} days`
-  // Trend chart: a single-day "Today" line is meaningless, so show the 7-day
-  // context line for Today; the headline numbers below still reflect today.
-  const seriesKey: '7D' | '14D' | '30D' = range === 'Today' ? '7D' : range
-  const convSeries = (metrics.trendSeries?.conversations?.[seriesKey]?.length
-    ? metrics.trendSeries.conversations[seriesKey]
+  // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
+  // with conversation activity in the window.
+  const tc = metrics.totalConversations
+  const acValue = acRange === '7D' ? tc.count7D : acRange === '14D' ? tc.count14D : (tc.count1D ?? 0)
+  const acLabel = acRange === 'Today' ? 'in the last 24 hours' : acRange === '7D' ? 'in the last 7 days' : 'in the last 14 days'
+  // Conversations Trend — its own toggle (7d / 14d / 30d). Real per-day series
+  // (distinct leads messaged/day); old trends.conversations.data came back ~flat.
+  const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
+  const rangeLabel = `last ${rangeDays} days`
+  const convSeries = (metrics.trendSeries?.conversations?.[range]?.length
+    ? metrics.trendSeries.conversations[range]
     : metrics.trends?.conversations?.data) || []
-  const convTotal = range === 'Today'
-    ? (metrics.totalConversations.count1D ?? 0)
-    : (convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total)
-  const dailyAvg = range === 'Today'
-    ? convTotal
-    : (convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0)
-  const convChange = range === 'Today' ? undefined : range === '14D'
+  const convTotal = convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total
+  const dailyAvg = convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0
+  const convChange = range === '14D'
     ? metrics.totalConversations.trend14D
     : range === '30D'
       ? metrics.totalConversations.trend30D
@@ -376,21 +373,6 @@ export default function FounderDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Global date-range quick toggle */}
-          <div className="hidden sm:flex items-center rounded-lg border p-0.5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-            {(['Today', '7D', '14D', '30D'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
-                style={range === r
-                  ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
-                  : { backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
-              >
-                {r === 'Today' ? 'Today' : r === '7D' ? '7 Days' : r === '14D' ? '14 Days' : '30 Days'}
-              </button>
-            ))}
-          </div>
           {/* Controls cluster (eye / bell / Ask PROXe) — now hosted in the bar */}
           <TodaySnapshotButton inline />
           <NotificationCenter inline />
@@ -444,15 +426,37 @@ export default function FounderDashboard() {
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
-        {/* Card 1 — Active Conversations: chats with activity in the last 24h. */}
-        <KpiCard
-          icon={<MdChatBubble size={15} />} iconColor="#3B82F6"
-          label="Active Conversations"
-          value={metrics.totalConversations.count1D ?? 0}
-          sparkData={metrics.trendSeries?.conversations?.['7D']} sparkColor="#3B82F6"
-          sub="in the last 24 hours"
-          onClick={() => router.push('/dashboard/inbox')}
-        />
+        {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>Active Conversations</span>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['Today', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={(e) => { e.stopPropagation(); setAcRange(p) }}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: acRange === p ? '#3B82F6' : 'var(--text-muted)', backgroundColor: acRange === p ? 'rgba(59,130,246,0.14)' : 'transparent' }}
+                >
+                  {p === 'Today' ? '24h' : p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
+            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{acValue}</span>
+          </div>
+          {metrics.trendSeries?.conversations?.['7D'] && metrics.trendSeries.conversations['7D'].length > 1 ? (
+            <div className="w-full mt-2" style={{ height: 30 }}>
+              <Sparkline data={metrics.trendSeries.conversations['7D']} color="#3B82F6" height={30} showGradient />
+            </div>
+          ) : (
+            <div style={{ height: 30 }} />
+          )}
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
+        </div>
         {/* Card 2 — Leads Recovered: went cold/lost and were brought back. */}
         <KpiCard
           icon={<MdRefresh size={15} />} iconColor="#22c55e"
@@ -644,7 +648,17 @@ export default function FounderDashboard() {
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
               <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{rangeLabel}</span>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['7D', '14D', '30D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex-1 min-h-[120px]">
             {convSeries.length > 1 ? (
