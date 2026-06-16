@@ -102,6 +102,11 @@ export const LOCKED_ANSWERS = {
     display: 'HDFC Credila, Avanse, Auxilo',
     coverage: 'up to ₹40 lakh',
   },
+  ageCareerPath: {
+    display: 'No DGCA age limit on the CPL. Airlines prefer pilots ~18-30 for cockpit jobs.',
+    over30: 'Flying Instructor (CPL, pays on par with an airline pilot), Helicopter pilot (CHPL), or PPL (always available).',
+    rule: 'DGCA sets NO age limit on the CPL — anyone can earn it. But airlines prefer ~18-30 for flying jobs. For a lead OVER 30 whose goal is an airline cockpit, be HONEST (do not promise an airline job) AND encouraging — point them to the strong, equally well-paying paths: Flying Instructor, Helicopter (CHPL), or PPL. NEVER tell a 30+ lead "yes, airline pilot, no problem". Under 30 / unknown age: standard airline-pilot CPL path, no need to raise age.',
+  },
   community: {
     whatsappLink: 'https://chat.whatsapp.com/B7nQhU9J5IFEWMmC6qLd8V',
     description: 'WindChasers aviation aspirants community',
