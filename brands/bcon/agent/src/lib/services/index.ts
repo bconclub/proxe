@@ -114,3 +114,14 @@ export {
   sendEmail,
   sendInvitationEmail,
 } from './email';
+
+// Note classification + action orchestrator (shared by admin-notes + log-call)
+export {
+  type CallOutcome,
+  type NoteClassification,
+  type ClassifyAndActInput,
+  type OrchestratorResult,
+  classifyNote,
+  resolveBookingDate,
+  classifyAndAct,
+} from './noteOrchestrator';

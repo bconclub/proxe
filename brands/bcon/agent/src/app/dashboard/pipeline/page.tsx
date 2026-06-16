@@ -32,11 +32,11 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { id: 'new',           dbValues: ['New', ''],          label: 'New',           bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
-  { id: 'engaged',       dbValues: ['Engaged'],          label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
+  { id: 'new',           dbValues: ['New', '', 'In Sequence'], label: 'New',     bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
+  { id: 'engaged',       dbValues: ['Engaged', 'Nurture'], label: 'Engaged',     bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
   { id: 'qualified',     dbValues: ['Qualified'],        label: 'Qualified',     bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
   { id: 'key_events',    dbValues: ['Booking Made'],     label: 'Key Events',    bg: '#534AB7', text: '#EEEDFE', sub: '#b0ace0' },
-  { id: 'call_done',     dbValues: ['High Intent'],      label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
+  { id: 'call_done',     dbValues: ['High Intent', 'Demo Taken'], label: 'Call Done', bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
   { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
   { id: 'won',           dbValues: ['Converted'],        label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
   { id: 'lost',          dbValues: ['Cold', 'Closed Lost'], label: 'Lost',       bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
