@@ -187,9 +187,9 @@ export async function ensureOrUpdateLead(
         ...(existingCtx[channel] || {}),
         ...(unifiedContext[channel] || {}),
       },
-      bcon: {
-        ...(existingCtx.bcon || existingCtx.windchasers || {}),
-        ...(unifiedContext.bcon || {}),
+      [BRAND_ID]: {
+        ...(existingCtx[BRAND_ID] || existingCtx.bcon || existingCtx.windchasers || {}),
+        ...(unifiedContext[BRAND_ID] || unifiedContext.bcon || {}),
       },
     });
 

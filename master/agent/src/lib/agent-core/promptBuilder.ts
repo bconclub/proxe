@@ -6,6 +6,8 @@
 import { Channel, HistoryEntry } from './types';
 import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
 import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
+import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
+import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
 import { isLikelyRealPersonName } from '../services/utils';
 
 interface PromptOptions {
@@ -20,18 +22,28 @@ interface PromptOptions {
   bookingAlreadyScheduled?: boolean;
   messageCount?: number;
   crossChannelContext?: string;
-  /** Kept for backward compat with call sites; ignored — this fork is windchasers. */
+  /** Explicit brand override; falls back to NEXT_PUBLIC_BRAND_ID/BRAND env, then 'windchasers'. */
   brand?: string;
   formData?: Record<string, any> | null;
 }
 
 /**
- * Get system prompt for this brand (windchasers — this is the windchasers fork).
+ * Get the brand-specific system prompt. Master is the multi-brand canonical
+ * base: resolve the brand and pick its prompt. Adding a brand = drop in its
+ * prompt module + one case here (no other core edits).
  */
-function getBrandSystemPrompt(context: string, messageCount?: number, channel?: Channel): string {
-  return channel === 'web'
-    ? getWindchasersWebSystemPrompt(context, messageCount)
-    : getWindchasersSystemPrompt(context, messageCount);
+function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
+  switch (brand.toLowerCase()) {
+    case 'bcon':
+      return channel === 'web'
+        ? getBconWebSystemPrompt(context, messageCount)
+        : getBconSystemPrompt(context, messageCount);
+    case 'windchasers':
+    default:
+      return channel === 'web'
+        ? getWindchasersWebSystemPrompt(context, messageCount)
+        : getWindchasersSystemPrompt(context, messageCount);
+  }
 }
 
 /**
@@ -50,11 +62,15 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     bookingAlreadyScheduled,
     messageCount,
     crossChannelContext,
+    brand,
     formData,
   } = options;
 
-  // Build the core system prompt (windchasers-only fork)
-  let systemPrompt = buildSystemPrompt(userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
+  // Resolve brand: explicit param > env var > default (windchasers)
+  const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
+
+  // Build the core system prompt (brand-specific)
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -84,6 +100,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
  * Build the system prompt with windchasers personality and knowledge context
  */
 function buildSystemPrompt(
+  brand: string,
   userName?: string | null,
   knowledgeBase?: string,
   messageCount?: number,
@@ -148,7 +165,7 @@ function buildSystemPrompt(
     }
   }
 
-  return getBrandSystemPrompt(knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
