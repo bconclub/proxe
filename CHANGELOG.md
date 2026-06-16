@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-16 23:35 IST · Windchasers: token metering — fix the actual write bug (updated_by UUID)
+
+- **Root cause found:** `dashboard_settings.updated_by` is a UUID column, but `recordTokenUsage`/`resetTokenUsage` passed `updated_by: 'system'` → every upsert 400'd (`22P02 invalid input syntax for type uuid`) and the empty catch swallowed it, so the `token_usage` row was NEVER written (even after the await fix). Removed `updated_by` from both upserts (defaults to null). Confirmed via a direct REST upsert test (201 when omitted). The catch now logs failures so this can't hide again.
+- User-facing: /tokens counters now populate as the agent runs (chat/scoring/notes/summaries).
+
 ## 2026-06-16 20:25 IST · Windchasers: token metering now persists + bento polish
 
 - **Token usage finally records:** `recordTokenUsage` was fire-and-forget (`void`) inside the Claude client, so on Vercel the lambda froze after the response and the DB write never completed — the `dashboard_settings.token_usage` row was never written once. Now awaited at every call site (chat / tools / vision / streaming / scoring / notes / summaries), so the write lands before the function returns. Counters fill going forward. (Historical backfill still needs an Anthropic Admin key.)

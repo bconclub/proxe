@@ -109,12 +109,15 @@ export async function recordTokenUsage(
           key: SETTINGS_KEY,
           value: cur,
           description: 'TEST: Claude token usage by category',
-          updated_by: 'system',
+          // NB: dashboard_settings.updated_by is a UUID column — passing the
+          // string 'system' 400s (22P02) and silently drops the write. Omit it.
         },
         { onConflict: 'key' },
       )
-  } catch {
-    /* metering is best-effort — never throw into a live reply path */
+  } catch (e) {
+    // Best-effort — never throw into a live reply path — but DO log, so a silent
+    // write failure (like the updated_by UUID bug) is visible next time.
+    console.error('[token-usage] write failed:', (e as any)?.message || e)
   }
 }
 
@@ -147,7 +150,8 @@ export async function resetTokenUsage(): Promise<void> {
           key: SETTINGS_KEY,
           value: { byCategory: {}, since: nowIso, updatedAt: nowIso } as TokenUsageDoc,
           description: 'TEST: Claude token usage by category',
-          updated_by: 'system',
+          // NB: dashboard_settings.updated_by is a UUID column — passing the
+          // string 'system' 400s (22P02) and silently drops the write. Omit it.
         },
         { onConflict: 'key' },
       )
