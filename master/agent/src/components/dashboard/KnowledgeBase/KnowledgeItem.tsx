@@ -58,7 +58,7 @@ export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
     setDeleting(false)
   }
 
-  const source = item.source_url || item.file_name || '—'
+  const source = item.source_url || item.file_name || '-'
 
   return (
     <tr

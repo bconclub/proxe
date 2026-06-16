@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Fetch all active leads (not converted or closed_lost)
     const { data: leads, error: leadsError } = await supabase
       .from('all_leads')
-      .select('id, lead_stage, stage_override')
+      .select('id, lead_stage, is_manual_override')
       .not('lead_stage', 'in', '(converted,closed_lost)')
       .or('lead_stage.is.null,lead_stage.neq.converted,lead_stage.neq.closed_lost')
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         batch.map(async (lead) => {
           try {
             // Skip if manual override is active
-            if (lead.stage_override) {
+            if (lead.is_manual_override) {
               processed++
               return
             }

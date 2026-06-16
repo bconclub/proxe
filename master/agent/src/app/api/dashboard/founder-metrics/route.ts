@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
+import { cleanDisplayName } from '@/lib/services/utils'
+
+// Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
+// decorative junk so the dashboard reads as a professional system. Falls back to
+// the raw trimmed value (then 'Unknown') if cleaning empties it.
+const dn = (raw?: string | null): string => {
+  const cleaned = cleanDisplayName(raw || '')
+  return cleaned || (raw || '').trim() || 'Unknown'
+}
 
 export const dynamic = 'force-dynamic'
 
-// In-memory cache for metrics (30 seconds TTL)
+// In-memory cache for metrics (5 minutes TTL)
 interface CachedMetrics {
   data: any
   timestamp: number
@@ -11,12 +21,21 @@ interface CachedMetrics {
 }
 
 let metricsCache: CachedMetrics | null = null
-const CACHE_TTL = 30000 // 30 seconds in milliseconds
+const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     // Check cache
     const cacheNow = Date.now()
@@ -29,47 +48,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(metricsCache.data, {
         headers: {
           'X-Cache': 'HIT',
-          'Cache-Control': 'private, max-age=30',
+          'Cache-Control': 'private, max-age=300',
         },
       })
     }
 
     // Cache miss - proceed with database queries
-    const supabase = await createClient()
-    
-    // Get all leads with full data (booking_date/booking_time don't exist in all_leads)
-    const { data: leads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
-      .order('lead_score', { ascending: false })
-    
-    // Get booking data from all session tables
-    const { data: whatsappSessions } = await supabase
-      .from('whatsapp_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    const { data: webSessions } = await supabase
-      .from('web_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    // Get session data for conversation counting (with message_count and created_at)
-    const { data: webSessionsForConversations } = await supabase
-      .from('web_sessions')
-      .select('id, created_at, message_count')
-      .gte('message_count', 1)
-    
-    const { data: whatsappSessionsForConversations } = await supabase
-      .from('whatsapp_sessions')
-      .select('id, created_at, message_count')
-      .gte('message_count', 1)
-    
-    const { data: voiceSessions } = await supabase
-      .from('voice_sessions')
-      .select('lead_id, booking_date, booking_time')
-    
-    const { data: socialSessions } = await supabase
-      .from('social_sessions')
-      .select('lead_id, booking_date, booking_time')
+    const supabase = getServiceClient() || authClient
+
+    // ============================================================================
+    // PERFORMANCE: All queries run in parallel via Promise.all
+    // Each table is queried ONCE with only the columns needed
+    // ============================================================================
+    const [
+      { data: leads, error: leadsError },
+      { data: webSessions },
+      { data: whatsappSessions },
+      { data: voiceSessions },
+      { data: socialSessions },
+      { data: stageChanges },
+    ] = await Promise.all([
+      // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
+        .order('lead_score', { ascending: false }),
+      // 2. web_sessions - ONE query for bookings + conversation counting + booking events
+      supabase
+        .from('web_sessions')
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
+      // 3. whatsapp_sessions - conversation counting only (no booking columns on this table)
+      supabase
+        .from('whatsapp_sessions')
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name'),
+      // 4. voice_sessions - lead linkage only (no booking columns on this table)
+      supabase
+        .from('voice_sessions')
+        .select('lead_id'),
+      // 5. social_sessions - lead linkage only (no booking columns on this table)
+      supabase
+        .from('social_sessions')
+        .select('lead_id'),
+      // 6. lead_stage_changes - recent stage transitions
+      supabase
+        .from('lead_stage_changes')
+        .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ])
     
     // Create a map of lead_id -> booking data from all channels
     const sessionBookings: Record<string, { date: string | null; time: string | null }> = {}
@@ -100,35 +126,37 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
-    
+
     // Ensure leads is an array
     const safeLeads = leads || []
 
-    // Get messages for response time calculation
-    // Try conversations first, fallback to messages
+    // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
+    // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
+    // last 24h / 7d) was never fetched and Active Conversations read 0. Paginate
+    // the most-recent ~45 days, newest-first, so every window count is accurate.
     let messages: any[] = []
-    const { data: conversationsData, error: conversationsError } = await supabase
-      .from('conversations')
-      .select('lead_id, sender, created_at, metadata, channel')
-      .order('created_at', { ascending: true })
-    
-    if (conversationsError) {
-      console.warn('Error fetching conversations, trying messages table:', conversationsError)
-      // Fallback to messages table if conversations doesn't exist
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('messages')
-        .select('lead_id, sender, created_at, metadata, channel')
-        .order('created_at', { ascending: true })
-      
-      if (messagesError) {
-        console.warn('Error fetching messages:', messagesError)
-        messages = []
-      } else {
-        messages = messagesData || []
+    try {
+      const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      const PAGE = 1000
+      for (let page = 0; page < 20; page++) {
+        const { data: chunk, error: convErr } = await supabase
+          .from('conversations')
+          .select('lead_id, sender, created_at, metadata, channel')
+          .gte('created_at', convCutoff)
+          .order('created_at', { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1)
+        if (convErr) { console.warn('Error fetching conversations page', page, convErr.message); break }
+        if (!chunk || chunk.length === 0) break
+        messages.push(...chunk)
+        if (chunk.length < PAGE) break
       }
-    } else {
-      messages = conversationsData || []
+    } catch (e: any) {
+      console.warn('Conversations pagination failed:', e?.message)
     }
+    // We fetched newest-first (for the row cap); restore ascending order — the
+    // response-rate + response-time calcs below scan each conversation forward in
+    // time for the agent's reply, so they REQUIRE chronological order.
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     const now = new Date()
     const todayStart = new Date(now)
@@ -147,13 +175,14 @@ export async function GET(request: NextRequest) {
       const socialBooking = unifiedContext?.social?.booking || {}
       const sessionBooking = sessionBookings[lead.id]
       
-      // Check unified_context for booking_date directly (not nested in booking object)
-      const bookingDate = 
+      // Check direct columns first, then unified_context, then session data
+      const bookingDate =
+        lead.booking_date ||
         unifiedContext?.web?.booking_date ||
         unifiedContext?.whatsapp?.booking_date ||
         unifiedContext?.voice?.booking_date ||
         unifiedContext?.social?.booking_date ||
-        webBooking?.date || 
+        webBooking?.date ||
         webBooking?.booking_date ||
         whatsappBooking?.date ||
         whatsappBooking?.booking_date ||
@@ -163,13 +192,14 @@ export async function GET(request: NextRequest) {
         socialBooking?.booking_date ||
         sessionBooking?.date ||
         null
-      
-      const bookingTime = 
+
+      const bookingTime =
+        lead.booking_time ||
         unifiedContext?.web?.booking_time ||
         unifiedContext?.whatsapp?.booking_time ||
         unifiedContext?.voice?.booking_time ||
         unifiedContext?.social?.booking_time ||
-        webBooking?.time || 
+        webBooking?.time ||
         webBooking?.booking_time ||
         whatsappBooking?.time ||
         whatsappBooking?.booking_time ||
@@ -211,8 +241,29 @@ export async function GET(request: NextRequest) {
     // - Any user-initiated message
     // - One per session
     
-    const safeWebSessions = webSessionsForConversations || []
-    const safeWhatsappSessions = whatsappSessionsForConversations || []
+    // Filter sessions that represent real conversations:
+    // - message_count >= 1 (properly tracked sessions), OR
+    // - last_message_at is set (activity happened but message_count wasn't incremented), OR
+    // - conversation_summary exists (AI generated a summary for this session)
+    const hasActivity = (session: any) => {
+      return (
+        (session.message_count && session.message_count >= 1) ||
+        !!session.last_message_at ||
+        !!session.conversation_summary
+      )
+    }
+    // Only count sessions tied to a lead that still exists. This drops
+    // anonymous test chats (lead_id null) and orphans pointing at a
+    // deleted lead, so the Conversations tile mirrors the leads list.
+    const leadIdSet = new Set(safeLeads.map((lead: any) => lead.id))
+    const isLinkedToActiveLead = (session: any) =>
+      !!session?.lead_id && leadIdSet.has(session.lead_id)
+    const safeWebSessions = (webSessions || []).filter(
+      (session: any) => hasActivity(session) && isLinkedToActiveLead(session)
+    )
+    const safeWhatsappSessions = (whatsappSessions || []).filter(
+      (session: any) => hasActivity(session) && isLinkedToActiveLead(session)
+    )
     
     // Helper function to count unique sessions within a date range
     const countSessionsInRange = (sessions: any[], startDate: Date, endDate?: Date) => {
@@ -239,14 +290,30 @@ export async function GET(request: NextRequest) {
     const whatsappConversations30D = countSessionsInRange(safeWhatsappSessions, thirtyDaysAgo)
     const uniqueConversations30D = webConversations30D + whatsappConversations30D
     
-    // Previous 7 days (for trend calculation)
+    // Previous periods (for trend calculations)
     const webConversationsPrevious7D = countSessionsInRange(safeWebSessions, previous7DaysStart, sevenDaysAgo)
     const whatsappConversationsPrevious7D = countSessionsInRange(safeWhatsappSessions, previous7DaysStart, sevenDaysAgo)
     const previous7DUniqueConversations = webConversationsPrevious7D + whatsappConversationsPrevious7D
-    
-    // Calculate trend (percentage change from previous 7 days)
-    const trend7D = previous7DUniqueConversations > 0 
+
+    const previous14DaysStart = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
+    const webConversationsPrevious14D = countSessionsInRange(safeWebSessions, previous14DaysStart, fourteenDaysAgo)
+    const whatsappConversationsPrevious14D = countSessionsInRange(safeWhatsappSessions, previous14DaysStart, fourteenDaysAgo)
+    const previous14DUniqueConversations = webConversationsPrevious14D + whatsappConversationsPrevious14D
+
+    const previous30DaysStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+    const webConversationsPrevious30D = countSessionsInRange(safeWebSessions, previous30DaysStart, thirtyDaysAgo)
+    const whatsappConversationsPrevious30D = countSessionsInRange(safeWhatsappSessions, previous30DaysStart, thirtyDaysAgo)
+    const previous30DUniqueConversations = webConversationsPrevious30D + whatsappConversationsPrevious30D
+
+    // Calculate trends (percentage change from previous equivalent period)
+    const trend7D = previous7DUniqueConversations > 0
       ? Math.round(((uniqueConversations7D - previous7DUniqueConversations) / previous7DUniqueConversations) * 100)
+      : 0
+    const trend14D = previous14DUniqueConversations > 0
+      ? Math.round(((uniqueConversations14D - previous14DUniqueConversations) / previous14DUniqueConversations) * 100)
+      : 0
+    const trend30D = previous30DUniqueConversations > 0
+      ? Math.round(((uniqueConversations30D - previous30DUniqueConversations) / previous30DUniqueConversations) * 100)
       : 0
     
     // Total unique conversations (all time) = all sessions with message_count >= 1
@@ -254,28 +321,79 @@ export async function GET(request: NextRequest) {
     const totalWhatsappConversations = safeWhatsappSessions.length
     const totalUniqueConversations = totalWebConversations + totalWhatsappConversations
     
-    // Total leads count
+    // Total leads count (all time + time-filtered)
     const totalLeadsCount = safeLeads.length
+    const totalLeads7D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 7 * 24 * 60 * 60 * 1000
+    }).length
+    const totalLeads14D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 14 * 24 * 60 * 60 * 1000
+    }).length
+    const totalLeads30D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000
+    }).length
+    const totalLeads1D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 24 * 60 * 60 * 1000
+    }).length
+
+    // Per-period deltas: this period vs the PRIOR equal-length period, so each
+    // toggle (7D/14D/30D) shows its own real change (not one reused 7-day number).
+    const DAY_MS = 24 * 60 * 60 * 1000
+    const leadsInWindow = (fromDays: number, toDays: number) =>
+      safeLeads.filter(lead => {
+        const age = now.getTime() - new Date(lead.created_at).getTime()
+        return age > fromDays * DAY_MS && age <= toDays * DAY_MS
+      }).length
+    const pctChange = (cur: number, prev: number) =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : (cur > 0 ? 100 : 0)
+    const newLeadsChange7D = pctChange(totalLeads7D, leadsInWindow(7, 14))
+    const newLeadsChange14D = pctChange(totalLeads14D, leadsInWindow(14, 28))
+    const newLeadsChange30D = pctChange(totalLeads30D, leadsInWindow(30, 60))
     
-    // Use the unique session-based conversation counts
-    const conversations7D = uniqueConversations7D
-    const conversations14D = uniqueConversations14D
-    const conversations30D = uniqueConversations30D
-    const totalConversationsCount = totalUniqueConversations
+    // PRIMARY: Count unique lead_ids from conversations table (all platforms)
+    // This is the most accurate count since it tracks every real conversation
+    const uniqueLeadIds = new Set<string>()
+    const uniqueLeadIds1D = new Set<string>()
+    const uniqueLeadIds7D = new Set<string>()
+    const uniqueLeadIds14D = new Set<string>()
+    const uniqueLeadIds30D = new Set<string>()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    if (messages && messages.length > 0) {
+      messages.forEach((msg: any) => {
+        if (!msg.lead_id || msg.sender === 'system') return
+        uniqueLeadIds.add(msg.lead_id)
+
+        const msgDate = new Date(msg.created_at)
+        if (msgDate >= thirtyDaysAgo) uniqueLeadIds30D.add(msg.lead_id)
+        if (msgDate >= fourteenDaysAgo) uniqueLeadIds14D.add(msg.lead_id)
+        if (msgDate >= sevenDaysAgo) uniqueLeadIds7D.add(msg.lead_id)
+        if (msgDate >= oneDayAgo) uniqueLeadIds1D.add(msg.lead_id)
+      })
+    }
+
+    // Use conversations table counts (primary), fall back to session counts if empty
+    const conversations1D = uniqueLeadIds1D.size
+    let conversations7D = uniqueLeadIds7D.size || uniqueConversations7D
+    let conversations14D = uniqueLeadIds14D.size || uniqueConversations14D
+    let conversations30D = uniqueLeadIds30D.size || uniqueConversations30D
+    let totalConversationsCount = uniqueLeadIds.size || totalUniqueConversations
     
     // Debug logging for conversation counts
-    console.log('📊 Total Conversations Calculation (Session-based):')
-    console.log(`  - Web sessions with engagement (message_count >= 1): ${totalWebConversations}`)
-    console.log(`  - WhatsApp sessions with engagement (message_count >= 1): ${totalWhatsappConversations}`)
-    console.log(`  - Total unique conversations: ${totalUniqueConversations}`)
-    console.log(`  - 7D: ${conversations7D} (Web: ${webConversations7D}, WhatsApp: ${whatsappConversations7D})`)
-    console.log(`  - 14D: ${conversations14D} (Web: ${webConversations14D}, WhatsApp: ${whatsappConversations14D})`)
-    console.log(`  - 30D: ${conversations30D} (Web: ${webConversations30D}, WhatsApp: ${whatsappConversations30D})`)
+    console.log('📊 Total Conversations (primary: conversations table, fallback: sessions):')
+    console.log(`  - Unique lead_ids from conversations table: ${uniqueLeadIds.size}`)
+    console.log(`  - Session-based (web+whatsapp): ${totalUniqueConversations}`)
+    console.log(`  - Final total: ${totalConversationsCount}`)
+    console.log(`  - 7D: ${conversations7D}, 14D: ${conversations14D}, 30D: ${conversations30D}`)
     console.log(`  - Previous 7D: ${previous7DUniqueConversations} (for trend: ${trend7D}%)`)
 
-    // 1. Hot Leads (score >= threshold, default 70)
-    // hotLeadThreshold already defined at the top of the function
-    const hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
+    // 1. Hot Leads - calculated AFTER score computation below (see "DEFERRED: Hot Leads")
+    // Placeholder: hotLeads will be set after scores are calculated
+    let hotLeads: typeof safeLeads = []
 
     // 2. Today's Activity
     const todayMessages = messages?.filter(msg => {
@@ -293,27 +411,24 @@ export async function GET(request: NextRequest) {
       return createdDate >= todayStart && createdDate <= todayEnd
     })
 
-    // 3. Response Health (avg response time in seconds)
-    // Calculate from conversations table using input_to_output_gap_ms
-    // Filter: channel IN ('web', 'whatsapp') AND sender = 'agent'
-    // SQL equivalent: SELECT AVG((metadata->>'input_to_output_gap_ms')::numeric / 1000) as avg_response_seconds
-    //                 FROM conversations
-    //                 WHERE channel IN ('web', 'whatsapp') AND sender = 'agent'
-    //                 AND metadata->>'input_to_output_gap_ms' IS NOT NULL
-    let avgResponseTimeSeconds = 0
-    
+    // 3. Response Health (avg response time in milliseconds)
+    // Strategy 1: Use input_to_output_gap_ms from metadata (most accurate)
+    // Strategy 2: Calculate from consecutive customer→agent message timestamps (fallback)
+    let avgResponseTimeMs = 0
+
     try {
-      const { data: conversationsForResponse, error: convError } = await supabase
-        .from('conversations')
-        .select('metadata')
-        .in('channel', ['web', 'whatsapp'])
-        .eq('sender', 'agent')
-        .not('metadata->input_to_output_gap_ms', 'is', null)
-      
-      if (!convError && conversationsForResponse && conversationsForResponse.length > 0) {
+      // Strategy 1: Use pre-calculated input_to_output_gap_ms from conversations (already fetched)
+      // Only use the last 10 agent messages (most recent) to reflect current system performance
+      const conversationsForResponse = messages.filter((msg: any) =>
+        (msg.channel === 'web' || msg.channel === 'whatsapp') &&
+        msg.sender === 'agent' &&
+        msg.metadata?.input_to_output_gap_ms != null
+      ).slice(-10)
+
+      if (conversationsForResponse.length > 0) {
         let totalGapMs = 0
         let validCount = 0
-        
+
         conversationsForResponse.forEach((conv: any) => {
           const gapMs = conv.metadata?.input_to_output_gap_ms
           if (gapMs !== null && gapMs !== undefined) {
@@ -324,13 +439,45 @@ export async function GET(request: NextRequest) {
             }
           }
         })
-        
+
         if (validCount > 0) {
-          avgResponseTimeSeconds = (totalGapMs / validCount) / 1000 // Convert ms to seconds
+          avgResponseTimeMs = totalGapMs / validCount // Keep in ms
         }
-      } else if (convError) {
-        console.warn('Error fetching conversations for response time:', convError)
       }
+
+      // Strategy 2 (fallback): Calculate from consecutive customer→agent timestamps
+      // Use only last 10 messages overall to reflect current performance
+      if (avgResponseTimeMs === 0 && messages && messages.length > 0) {
+        let totalGapMs2 = 0
+        let pairCount = 0
+
+        // Take the last 20 messages (enough to find ~10 customer→agent pairs)
+        const recentMessages = messages.slice(-20)
+
+        for (let i = 0; i < recentMessages.length - 1; i++) {
+          const current = recentMessages[i]
+          const next = recentMessages[i + 1]
+
+          // Find customer→agent pairs
+          if (current.sender === 'customer' && next.sender === 'agent') {
+            const customerTime = new Date(current.created_at).getTime()
+            const agentTime = new Date(next.created_at).getTime()
+            const gapMs = agentTime - customerTime
+
+            // Only count reasonable response times (between 100ms and 300000ms / 5 minutes)
+            if (gapMs > 100 && gapMs < 300000) {
+              totalGapMs2 += gapMs
+              pairCount++
+              if (pairCount >= 10) break
+            }
+          }
+        }
+
+        if (pairCount > 0) {
+          avgResponseTimeMs = totalGapMs2 / pairCount
+        }
+      }
+
     } catch (error) {
       console.warn('Error calculating avg response time:', error)
     }
@@ -348,47 +495,69 @@ export async function GET(request: NextRequest) {
         return score > 0 && daysSinceInteraction < 14
       })
       .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
-      .slice(0, 5)
+      .slice(0, 8)
       .map(lead => ({
         id: lead.id,
-        name: lead.customer_name || 'Unknown',
+        name: dn(lead.customer_name),
         score: lead.lead_score || 0,
         lastContact: lead.last_interaction_at || lead.created_at,
         stage: lead.lead_stage || 'New',
+        owner: lead.unified_context?.owner
+          ? {
+              name: lead.unified_context.owner.name || null,
+              email: lead.unified_context.owner.email || null,
+            }
+          : null,
+        channel: lead.last_touchpoint || lead.first_touchpoint || 'unknown',
       }))
 
-    // 6. Upcoming Bookings (next 3)
+    // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
+    // list matches the card countdown. The old filter parsed without a timezone
+    // and fell back to 23:59:59 for missing times, so same-day-past bookings (and
+    // 12h "4:00 PM" strings that parse to Invalid Date) leaked in and rendered as
+    // "Past" inside "Upcoming". One canonical IST parser fixes filter/sort/datetime.
+    const parseBookingIST = (date: string | null, time: string | null): Date | null => {
+      if (!date) return null
+      let hhmm = '12:00'
+      const t = String(time || '').trim()
+      const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+      if (ampm) {
+        let h = parseInt(ampm[1], 10) % 12
+        if (/p/i.test(ampm[3])) h += 12
+        hhmm = `${String(h).padStart(2, '0')}:${ampm[2] || '00'}`
+      } else if (/^\d{1,2}:\d{2}/.test(t)) {
+        hhmm = t.slice(0, 5)
+      }
+      const d = new Date(`${date}T${hhmm}:00+05:30`)
+      return isNaN(d.getTime()) ? null : d
+    }
+
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
-        return { lead, bookingDate, bookingTime }
+        return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }
       })
-      .filter(({ bookingDate }) => {
-        if (!bookingDate) return false
-        try {
-          const bookingDateTime = new Date(`${bookingDate}T12:00:00`)
-          return bookingDateTime >= now && !isNaN(bookingDateTime.getTime())
-        } catch {
-          return false
+      .filter(({ dt }) => dt !== null && dt >= now)
+      .sort((a, b) => a.dt!.getTime() - b.dt!.getTime())
+      .slice(0, 10)
+      .map(({ lead, bookingDate, bookingTime, dt }) => {
+        const uc = lead.unified_context || {}
+        const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
+        return {
+          id: lead.id,
+          name: dn(lead.customer_name),
+          title,
+          date: bookingDate,
+          time: bookingTime,
+          datetime: dt!.toISOString(),
+          owner: lead.unified_context?.owner
+            ? {
+                name: lead.unified_context.owner.name || null,
+                email: lead.unified_context.owner.email || null,
+              }
+            : null,
         }
       })
-      .sort((a, b) => {
-        try {
-          const dateA = new Date(`${a.bookingDate}T${a.bookingTime || '12:00:00'}`)
-          const dateB = new Date(`${b.bookingDate}T${b.bookingTime || '12:00:00'}`)
-          return dateA.getTime() - dateB.getTime()
-        } catch {
-          return 0
-        }
-      })
-      .slice(0, 3)
-      .map(({ lead, bookingDate, bookingTime }) => ({
-        id: lead.id,
-        name: lead.customer_name || 'Unknown',
-        date: bookingDate,
-        time: bookingTime,
-        datetime: new Date(`${bookingDate}T${bookingTime || '12:00:00'}`).toISOString(),
-      }))
 
     // 7. Stale Leads (>48h no response)
     const staleLeads = safeLeads.filter(lead => {
@@ -436,12 +605,9 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // 10. Score Distribution
-    const scoreDistribution = {
-      hot: safeLeads.filter(l => (l.lead_score || 0) >= hotLeadThreshold).length,
-      warm: safeLeads.filter(l => (l.lead_score || 0) >= 40 && (l.lead_score || 0) < 70).length,
-      cold: safeLeads.filter(l => (l.lead_score || 0) < 40).length,
-    }
+    // 10. Score Distribution - computed AFTER score calculation (see below)
+    // Placeholder: will be set after scores are populated via RPC
+    let scoreDistribution = { hot: 0, warm: 0, cold: 0 }
 
     // 11. Recent Activity - Key Business Events Only
     const keyEvents: Array<{
@@ -455,13 +621,7 @@ export async function GET(request: NextRequest) {
       metadata?: any
     }> = []
 
-    // Get stage changes from lead_stage_changes
-    const { data: stageChanges } = await supabase
-      .from('lead_stage_changes')
-      .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
-      .order('created_at', { ascending: false })
-      .limit(50)
-
+    // Stage changes already fetched in Promise.all above
     stageChanges?.forEach((change: any) => {
       const lead = safeLeads.find(l => l.id === change.lead_id)
       if (lead && change.old_stage !== change.new_stage) {
@@ -473,20 +633,18 @@ export async function GET(request: NextRequest) {
           timestamp: change.created_at,
           content: change.old_stage
             ? `${lead.customer_name || 'Unknown'} entered ${change.new_stage} stage (from ${change.old_stage})`
-            : `${lead.customer_name || 'Unknown'} scored ${change.new_score || 0} — entered ${change.new_stage} stage`,
+            : `${lead.customer_name || 'Unknown'} scored ${change.new_score || 0} - entered ${change.new_stage} stage`,
           channel: lead.first_touchpoint || lead.last_touchpoint || 'web',
           metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.new_score },
         })
       }
     })
 
-    // Get booking events from web_sessions and whatsapp_sessions
-    const { data: webBookingSessions } = await supabase
-      .from('web_sessions')
-      .select('lead_id, booking_date, booking_time, booking_status, booking_created_at, customer_name')
-      .not('booking_date', 'is', null)
-      .order('booking_created_at', { ascending: false })
-      .limit(20)
+    // Get booking events from web_sessions (already fetched in Promise.all, filter here)
+    const webBookingSessions = (webSessions || [])
+      .filter((s: any) => s.booking_date != null)
+      .sort((a: any, b: any) => new Date(b.booking_created_at || 0).getTime() - new Date(a.booking_created_at || 0).getTime())
+      .slice(0, 20)
 
     webBookingSessions?.forEach((session: any) => {
       const lead = safeLeads.find(l => l.id === session.lead_id)
@@ -501,18 +659,17 @@ export async function GET(request: NextRequest) {
         timestamp: session.booking_created_at || session.updated_at,
         content: eventType === 'booking_cancelled' 
           ? `${leadName} cancelled their booking`
-          : `${leadName} booked a call${session.booking_date ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
+          : `${leadName} booked a call${session.booking_date && !isNaN(new Date(session.booking_date).getTime()) ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
         channel: 'web',
         metadata: { bookingDate: session.booking_date, bookingTime: session.booking_time, status: session.booking_status },
       })
     })
 
-    const { data: whatsappBookingSessions } = await supabase
-      .from('whatsapp_sessions')
-      .select('lead_id, booking_date, booking_time, booking_status, booking_created_at, customer_name')
-      .not('booking_date', 'is', null)
-      .order('booking_created_at', { ascending: false })
-      .limit(20)
+    // Get booking events from whatsapp_sessions (already fetched in Promise.all, filter here)
+    const whatsappBookingSessions = (whatsappSessions || [])
+      .filter((s: any) => s.booking_date != null)
+      .sort((a: any, b: any) => new Date(b.booking_created_at || 0).getTime() - new Date(a.booking_created_at || 0).getTime())
+      .slice(0, 20)
 
     whatsappBookingSessions?.forEach((session: any) => {
       const lead = safeLeads.find(l => l.id === session.lead_id)
@@ -527,7 +684,7 @@ export async function GET(request: NextRequest) {
         timestamp: session.booking_created_at || session.updated_at,
         content: eventType === 'booking_cancelled'
           ? `${leadName} cancelled their booking`
-          : `${leadName} booked a call${session.booking_date ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
+          : `${leadName} booked a call${session.booking_date && !isNaN(new Date(session.booking_date).getTime()) ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
         channel: 'whatsapp',
         metadata: { bookingDate: session.booking_date, bookingTime: session.booking_time, status: session.booking_status },
       })
@@ -823,11 +980,11 @@ export async function GET(request: NextRequest) {
       let dayResponseCount = 0
       dayMessages.forEach((msg: any) => {
         if (msg.metadata?.input_to_output_gap_ms) {
-          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number' 
-            ? msg.metadata.input_to_output_gap_ms 
+          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number'
+            ? msg.metadata.input_to_output_gap_ms
             : parseFloat(msg.metadata.input_to_output_gap_ms)
           if (!isNaN(gapMs) && gapMs > 0) {
-            dayTotalResponse += gapMs / 1000 // Convert ms to seconds
+            dayTotalResponse += gapMs // Keep in ms
             dayResponseCount++
           }
         }
@@ -907,37 +1064,57 @@ export async function GET(request: NextRequest) {
     // This ensures scores are always available, especially when there's only one lead
     let totalScore = 0
     let leadsWithScores = 0
-    
-    for (const lead of safeLeads) {
-      let score = lead.lead_score
-      
-      // If score is null/undefined, try to calculate it using database function
-      if (score === null || score === undefined) {
-        try {
-          const { data: calculatedScore, error: scoreError } = await supabase.rpc('calculate_lead_score', {
-            lead_uuid: lead.id
-          })
-          
-          if (!scoreError && calculatedScore !== null && calculatedScore !== undefined) {
-            score = typeof calculatedScore === 'number' ? calculatedScore : parseFloat(calculatedScore)
-            // Update the lead's score in memory for later use
-            lead.lead_score = score
-          } else {
-            // If calculation fails, default to 0
-            score = 0
+
+    // Batch-calculate scores for leads with null OR zero scores.
+    // Previously we only refreshed nulls — but ~half of leads have
+    // lead_score stored as literal 0 (calculation crashed mid-flight on an
+    // earlier write, or the lead was created before scoring was wired).
+    // Those need to be re-evaluated too, otherwise the dashboard's Avg Lead
+    // Score is dragged down by phantom zeros for leads that actually have
+    // 10-40+ when the RPC runs. Caught it on 2026-05-20: dashboard showed
+    // 26% but the real average (with RPC backfill on the zero leads) is ~39%.
+    const leadsNeedingScores = safeLeads.filter(
+      (lead) => !lead.lead_score  // null, undefined, OR 0
+    )
+
+    if (leadsNeedingScores.length > 0) {
+      const scoreResults = await Promise.all(
+        leadsNeedingScores.map(async (lead) => {
+          try {
+            const { data, error } = await supabase
+              .rpc('calculate_lead_score', { lead_uuid: lead.id })
+
+            return {
+              leadId: lead.id,
+              score: !error && data != null ? (typeof data === 'number' ? data : parseFloat(data)) : 0,
+            }
+          } catch {
+            return { leadId: lead.id, score: 0 }
           }
-        } catch (error) {
-          console.warn(`Failed to calculate score for lead ${lead.id}:`, error)
-          score = 0
+        })
+      )
+
+      // Apply calculated scores back to leads in memory (NOT persisted — this is
+      // a read-side backfill only, so we never overwrite the stored score base).
+      const scoreMap = new Map<string, number>(scoreResults.map((r) => [r.leadId, r.score]))
+      leadsNeedingScores.forEach((lead) => {
+        const calculated = scoreMap.get(lead.id)
+        if (calculated !== undefined && !isNaN(calculated)) {
+          lead.lead_score = calculated
+        } else {
+          lead.lead_score = 0
         }
-      }
-      
-      totalScore += score || 0
+      })
+    }
+
+    // Now compute totals (all leads have scores)
+    for (const lead of safeLeads) {
+      totalScore += lead.lead_score || 0
       leadsWithScores++
     }
     
     const avgScore = leadsWithScores > 0
-      ? Math.round(totalScore / leadsWithScores)
+      ? Math.floor(totalScore / leadsWithScores)
       : 0
     
     // Debug logging for score calculation
@@ -951,7 +1128,66 @@ export async function GET(request: NextRequest) {
       name: l.customer_name,
       score: l.lead_score ?? 'null'
     })))
-    
+
+    // DEFERRED: Hot Leads + Score Distribution - now that scores are calculated via RPC
+    hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
+    scoreDistribution = {
+      hot: safeLeads.filter(l => (l.lead_score || 0) >= hotLeadThreshold).length,
+      warm: safeLeads.filter(l => (l.lead_score || 0) >= 40 && (l.lead_score || 0) < 70).length,
+      cold: safeLeads.filter(l => (l.lead_score || 0) < 40).length,
+    }
+    console.log(`📊 Hot Leads (after score calc): ${hotLeads.length} leads with score >= ${hotLeadThreshold}`)
+    console.log(`📊 Score Distribution: hot=${scoreDistribution.hot} warm=${scoreDistribution.warm} cold=${scoreDistribution.cold}`)
+
+    // ENGAGED LEADS: People who actually showed real interest
+    // Criteria: stage-based (Engaged or above) OR has a confirmed booking
+    // Score alone is NOT sufficient -- many new leads get moderate scores from basic info
+    const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+    const engagedLeadsList = safeLeads.filter(lead => {
+      // Has an engaged+ stage (set by scoring engine or manual override)
+      if (engagedStages.includes(lead.lead_stage || '')) return true
+      // Has a booking (definitely engaged)
+      const { bookingDate } = getBookingData(lead)
+      if (bookingDate) return true
+      return false
+    })
+    const isActiveWithinDays = (lead: any, days: number) => {
+      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
+      return (now.getTime() - lastActive.getTime()) <= days * 24 * 60 * 60 * 1000
+    }
+    const engagedLeadsCount = engagedLeadsList.length
+    const engagedLeads1D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 1))
+    const engagedLeads7D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 7))
+    const engagedLeads14D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 14))
+    const engagedLeads30D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 30))
+    const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
+    console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
+
+    // WARM LEADS: Leads with score 40-69 (warming up, need attention)
+    // Time-filtered counts for 7D/14D/30D dashboard card
+    const isWarmLead = (lead: any) => {
+      const score = lead.lead_score || 0
+      return score >= 40 && score < 70
+    }
+    const warmLeadsList = safeLeads.filter(isWarmLead)
+    const warmLeads1D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 1)
+    })
+    const warmLeads7D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 7)
+    })
+    const warmLeads14D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 14)
+    })
+    const warmLeads30D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 30)
+    })
+    console.log(`📊 Warm Leads: 7D=${warmLeads7D.length} 14D=${warmLeads14D.length} 30D=${warmLeads30D.length} total=${warmLeadsList.length}`)
+
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
     // ----------------------------------------------------------------------------
@@ -970,8 +1206,33 @@ export async function GET(request: NextRequest) {
     // Note: This is NOT the same as "customer response rate" (how often customers reply).
     const customerMessages = messages?.filter(m => m.sender === 'customer').length || 0
     const agentReplies = messages?.filter(m => m.sender === 'agent').length || 0
+    // Response rate = share of customer messages that received an agent reply
+    // in the same conversation before the customer spoke again (bounded 0–100%).
+    // The old formula (agentReplies / customerMessages) exceeded 100% whenever the
+    // agent sent more bubbles than the customer (greetings, follow-ups, split
+    // replies) — that's a message ratio, not a real response rate.
+    // `messages` is already ordered by created_at asc (see query above), so each
+    // conversation group stays chronological. Anonymous web rows (lead_id = null)
+    // are grouped by their session_id from metadata.
+    const convoKeyOf = (m: any) => m.lead_id || m.metadata?.session_id || 'unknown'
+    const messagesByConvo: Record<string, any[]> = {}
+    for (const m of (messages || [])) {
+      const k = convoKeyOf(m)
+      ;(messagesByConvo[k] = messagesByConvo[k] || []).push(m)
+    }
+    let repliedCustomerMessages = 0
+    for (const k of Object.keys(messagesByConvo)) {
+      const ordered = messagesByConvo[k]
+      for (let i = 0; i < ordered.length; i++) {
+        if (ordered[i].sender !== 'customer') continue
+        for (let j = i + 1; j < ordered.length; j++) {
+          if (ordered[j].sender === 'customer') break
+          if (ordered[j].sender === 'agent') { repliedCustomerMessages++; break }
+        }
+      }
+    }
     const responseRate = customerMessages > 0
-      ? Math.round((agentReplies / customerMessages) * 100)
+      ? Math.round((repliedCustomerMessages / customerMessages) * 100)
       : 0
     
     // ----------------------------------------------------------------------------
@@ -1134,8 +1395,10 @@ export async function GET(request: NextRequest) {
       }) || []
       const customerMessages = dailyMessages.filter((m: any) => m.sender === 'customer')
       const agentReplies = dailyMessages.filter((m: any) => m.sender === 'agent')
+      // Daily trend point for the Response Rate sparkline. Bounded to 100% so the
+      // trend line matches the headline metric (which can no longer exceed 100%).
       const dailyResponseRate = customerMessages.length > 0
-        ? (agentReplies.length / customerMessages.length) * 100
+        ? Math.min(100, (agentReplies.length / customerMessages.length) * 100)
         : 0
 
       // Daily booking rate
@@ -1165,7 +1428,7 @@ export async function GET(request: NextRequest) {
             ? msg.metadata.input_to_output_gap_ms
             : parseFloat(msg.metadata.input_to_output_gap_ms)
           if (!isNaN(gapMs) && gapMs > 0) {
-            dailyTotalResponseTime += gapMs / 1000 // Convert ms to seconds
+            dailyTotalResponseTime += gapMs // Keep in ms
             dailyResponseCount++
           }
         }
@@ -1177,7 +1440,150 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgScore.push({ date: dateStr, value: Math.round(dailyAvgScore) })
       dailyTrends.responseRate.push({ date: dateStr, value: Math.round(dailyResponseRate) })
       dailyTrends.bookingRate.push({ date: dateStr, value: Math.round(dailyBookingRate) })
-      dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime * 10) / 10 }) // Round to 1 decimal
+      dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime) }) // Round to whole ms
+    }
+
+    const periodWindows = {
+      All: null,
+      '7D': 7,
+      '14D': 14,
+      '30D': 30,
+    } as const
+
+    const allTrendDates = [
+      ...safeLeads.map((lead: any) => lead.created_at),
+      ...messages.map((msg: any) => msg.created_at),
+      ...safeWebSessions.map((session: any) => session.last_message_at || session.created_at),
+      ...safeWhatsappSessions.map((session: any) => session.last_message_at || session.created_at),
+    ].filter(Boolean)
+
+    const earliestTrendDate = allTrendDates.length > 0
+      ? new Date(Math.min(...allTrendDates.map((date: string) => new Date(date).getTime())))
+      : now
+
+    const getDayStart = (date: Date) => {
+      const day = new Date(date)
+      day.setHours(0, 0, 0, 0)
+      return day
+    }
+
+    const trendStartForPeriod = (period: keyof typeof periodWindows) => {
+      if (period === 'All') return getDayStart(earliestTrendDate)
+      const start = new Date(now)
+      start.setDate(start.getDate() - ((periodWindows[period] || 1) - 1))
+      return getDayStart(start)
+    }
+
+    const buildDailyTrend = (
+      period: keyof typeof periodWindows,
+      countForDay: (dayStart: Date, dayEnd: Date) => number,
+    ) => {
+      const values: Array<{ value: number }> = []
+      const cursor = trendStartForPeriod(period)
+      const end = getDayStart(now)
+
+      while (cursor <= end) {
+        const dayStart = new Date(cursor)
+        const dayEnd = new Date(cursor)
+        dayEnd.setDate(dayEnd.getDate() + 1)
+        values.push({ value: countForDay(dayStart, dayEnd) })
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      return values
+    }
+
+    const hasConversationMessages = messages.some((msg: any) => msg.lead_id && msg.sender !== 'system')
+    const countConversationsForDay = (dayStart: Date, dayEnd: Date) => {
+      if (hasConversationMessages) {
+        const leadIds = new Set<string>()
+        messages.forEach((msg: any) => {
+          if (!msg.lead_id || msg.sender === 'system') return
+          const msgDate = new Date(msg.created_at)
+          if (msgDate >= dayStart && msgDate < dayEnd) {
+            leadIds.add(msg.lead_id)
+          }
+        })
+        return leadIds.size
+      }
+
+      const countSessions = (sessions: any[]) => sessions.filter((session: any) => {
+        const activityAt = session.last_message_at || session.created_at
+        if (!activityAt) return false
+        const sessionDate = new Date(activityAt)
+        return sessionDate >= dayStart && sessionDate < dayEnd
+      }).length
+
+      return countSessions(safeWebSessions) + countSessions(safeWhatsappSessions)
+    }
+
+    const countLeadsForDay = (leadsForTrend: any[], dateField: 'created_at' | 'lastActive') => (
+      dayStart: Date,
+      dayEnd: Date,
+    ) => leadsForTrend.filter((lead: any) => {
+      const rawDate = dateField === 'created_at'
+        ? lead.created_at
+        : (lead.last_interaction_at || lead.created_at)
+      const leadDate = new Date(rawDate)
+      return leadDate >= dayStart && leadDate < dayEnd
+    }).length
+
+    const trendSeries = {
+      conversations: {
+        All: buildDailyTrend('All', countConversationsForDay),
+        '7D': buildDailyTrend('7D', countConversationsForDay),
+        '14D': buildDailyTrend('14D', countConversationsForDay),
+        '30D': buildDailyTrend('30D', countConversationsForDay),
+      },
+      totalLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(safeLeads, 'created_at')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(safeLeads, 'created_at')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(safeLeads, 'created_at')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(safeLeads, 'created_at')),
+      },
+      engagedLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+      },
+      warmLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(warmLeadsList, 'lastActive')),
+      },
+    }
+
+    // LEADS RECOVERED: leads that went quiet and came BACK — the core PROXe value.
+    // There's no explicit "cold" stage in the data, so we detect re-engagement
+    // from the conversation timeline: a CUSTOMER (inbound) message that lands
+    // after >= 7 days of silence for that lead, with the comeback inside the last
+    // 30 days. Counts distinct leads.
+    let leadsRecoveredCount = 0
+    try {
+      const GAP_MS = 7 * 24 * 60 * 60 * 1000
+      const recentMs = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const byLead: Record<string, Array<{ t: number; cust: boolean }>> = {}
+      for (const m of messages) {
+        if (!m.lead_id) continue
+        const t = new Date(m.created_at).getTime()
+        if (isNaN(t)) continue
+        ;(byLead[m.lead_id] ||= []).push({ t, cust: m.sender === 'customer' })
+      }
+      const recovered = new Set<string>()
+      for (const [leadId, arr] of Object.entries(byLead)) {
+        arr.sort((a, b) => a.t - b.t)
+        for (let i = 1; i < arr.length; i++) {
+          if (arr[i].cust && arr[i].t - arr[i - 1].t >= GAP_MS && arr[i].t >= recentMs) {
+            recovered.add(leadId)
+            break
+          }
+        }
+      }
+      leadsRecoveredCount = recovered.size
+    } catch {
+      // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
     }
 
     // Prepare response data
@@ -1187,24 +1593,54 @@ export async function GET(request: NextRequest) {
         leads: hotLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       totalConversations: {
+        total: totalConversationsCount,
+        count1D: conversations1D,
         count7D: conversations7D,
         count14D: conversations14D,
         count30D: conversations30D,
         trend7D: trend7D,
+        trend14D: trend14D,
+        trend30D: trend30D,
       },
       totalLeads: {
         count: totalLeadsCount,
+        count1D: totalLeads1D,
+        count7D: totalLeads7D,
+        count14D: totalLeads14D,
+        count30D: totalLeads30D,
+        change7D: newLeadsChange7D,
+        change14D: newLeadsChange14D,
+        change30D: newLeadsChange30D,
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
+      },
+      engagedLeads: {
+        count: engagedLeadsCount,
+        count1D: engagedLeads1D.length,
+        count7D: engagedLeads7D.length,
+        count14D: engagedLeads14D.length,
+        count30D: engagedLeads30D.length,
+        total: totalLeadsCount,
+        engagementRate: engagementRate,
+        leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
+      },
+      warmLeads: {
+        count: warmLeadsList.length,
+        count1D: warmLeads1D.length,
+        count7D: warmLeads7D.length,
+        count14D: warmLeads14D.length,
+        count30D: warmLeads30D.length,
+        leads: warmLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       todayActivity: {
         messages: todayMessages.length,
         bookings: todayBookings.length,
         newLeads: todayNewLeads.length,
       },
+      leadsRecovered: { count: leadsRecoveredCount },
       responseHealth: {
-        avgSeconds: avgResponseTimeSeconds,
-        status: avgResponseTimeSeconds < 5 ? 'good' : avgResponseTimeSeconds < 10 ? 'warning' : 'critical',
+        avgMs: avgResponseTimeMs,
+        status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
       },
       leadsNeedingAttention,
       upcomingBookings,
@@ -1228,6 +1664,7 @@ export async function GET(request: NextRequest) {
         hotLeads: { data: hotLeadsTrend, change: 0 }, // Daily hot leads count
         responseTime: { data: responseTimeTrend, change: responseTimeChange },
       },
+      trendSeries,
       // Upcoming bookings per day (next 7 days) for sparkline
       upcomingBookingsTrend: (() => {
         const upcomingTrend = []
@@ -1258,7 +1695,7 @@ export async function GET(request: NextRequest) {
         avgScore,
         responseRate,
         bookingRate,
-        avgResponseTime: Math.round(avgResponseTimeSeconds * 10) / 10, // Round to 1 decimal (seconds)
+        avgResponseTime: Math.round(avgResponseTimeMs), // Round to whole ms
       },
       radialTrends: {
         avgScore: dailyTrends.avgScore.map(d => ({ value: d.value })),
@@ -1278,7 +1715,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(responseData, {
       headers: {
         'X-Cache': 'MISS',
-        'Cache-Control': 'private, max-age=30',
+        'Cache-Control': 'private, max-age=300',
       },
     })
   } catch (error) {

@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
+import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId } from '@/configs'
@@ -21,10 +22,8 @@ import {
   MdTrendingUp,
   MdTrendingDown,
   MdRemove,
+  MdSearch,
   MdAdd,
-  MdClose,
-  MdViewList,
-  MdViewColumn,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -41,39 +40,39 @@ const STATUS_OPTIONS = [
 
 const getStatusColor = (status: string | null) => {
   const statusColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New Lead': { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200' },
-    'Follow Up': { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-200' },
-    'RNR (No Response)': { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200' },
-    'Interested': { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200' },
-    'Wrong Enquiry': { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200' },
+    'New Lead': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
+    'Follow Up': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
+    'RNR (No Response)': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
+    'Interested': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
+    'Wrong Enquiry': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
     'Call Booked': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
-    'Closed': { bg: 'bg-slate-100 dark:bg-slate-900', text: 'text-slate-800 dark:text-slate-200' },
+    'Closed': { bg: '', text: '', style: { backgroundColor: 'rgba(100,116,139,0.15)', color: '#94a3b8' } },
   }
   return statusColors[status || 'New Lead'] || statusColors['New Lead']
 }
 
 const getStageColor = (stage: string | null) => {
   const stageColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New': { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300' },
-    'Engaged': { bg: 'bg-cyan-100 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-300' },
-    'Qualified': { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300' },
-    'High Intent': { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-300' },
-    'Booking Made': { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300' },
-    'Converted': { bg: 'bg-emerald-100 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300' },
-    'Closed Lost': { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300' },
-    'Not Qualified': { bg: 'bg-rose-100 dark:bg-rose-900/40', text: 'text-rose-700 dark:text-rose-300' },
-    'In Sequence': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
-    'Cold': { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-300' },
-    'R&R': { bg: 'bg-amber-100 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300' },
+    'New': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
+    'Engaged': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
+    'Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7' } },
+    'High Intent': { bg: '', text: '', style: { backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316' } },
+    'Booking Made': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
+    'Converted': { bg: '', text: '', style: { backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981' } },
+    'Closed Lost': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
+    'Not Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(244,63,94,0.15)', color: '#f43f5e' } },
+    'In Sequence': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' } },
+    'Cold': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#6b7280' } },
+    'R&R': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
   }
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
 const getScoreColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined) return 'var(--text-secondary)'
-  if (score >= 90) return '#22C55E'
-  if (score >= 70) return '#F97316'
-  return 'var(--text-secondary)'
+  if (score >= 70) return '#22C55E'
+  if (score >= 40) return '#F59E0B'
+  return '#EF4444'
 }
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -90,6 +89,33 @@ function timeAgo(dateStr: string | null | undefined): string {
   if (diffDays < 30) return `${diffDays}d ago`
   const diffMonths = Math.floor(diffDays / 30)
   return `${diffMonths}mo ago`
+}
+
+/**
+ * Format a stored booking time to a 12-hour display string. Bookings are stored
+ * in TWO formats — 24h "HH:MM" (web flow, e.g. "17:00") and 12h "H:MM AM/PM"
+ * (WhatsApp flow, e.g. "3:00 PM"). The old inline parser split on ":" and read
+ * the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (PM silently dropped).
+ * This handles both: keep an explicit AM/PM, otherwise convert from 24h.
+ */
+function formatBookingTime(raw: unknown): string {
+  if (raw == null) return ''
+  const s = String(raw).trim()
+  if (!s) return ''
+  // Already 12-hour with an explicit period — normalise and keep it.
+  const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+  if (ampm) {
+    const h = parseInt(ampm[1], 10)
+    const mins = ampm[2] || '00'
+    return `${h % 12 || 12}:${mins} ${ampm[3].toUpperCase()}M`
+  }
+  // 24-hour "HH:MM".
+  const tp = s.split(':')
+  if (tp.length < 2) return s
+  const h = parseInt(tp[0], 10)
+  const m = parseInt(tp[1], 10)
+  if (isNaN(h) || isNaN(m)) return s
+  return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
 // Using Lead type from @/types to match LeadDetailsModal expectations
@@ -113,161 +139,6 @@ interface LeadsTableProps {
   hideFilters?: boolean
   showLimitSelector?: boolean
   showViewAll?: boolean
-}
-
-// Pipeline kanban view
-function PipelineView({
-  leads,
-  calculatedScores,
-  onLeadClick,
-}: {
-  leads: ExtendedLead[]
-  calculatedScores: Record<string, number>
-  onLeadClick: (lead: ExtendedLead) => void
-}) {
-  const getScore = (lead: ExtendedLead) => {
-    const calc = calculatedScores[lead.id]
-    return calc !== undefined ? calc : (lead.lead_score ?? 0)
-  }
-
-  const columns = [
-    { key: 'cold', label: 'Cold', min: 0, max: 40, color: '#3B82F6' },
-    { key: 'warm', label: 'Warm', min: 41, max: 70, color: '#F97316' },
-    { key: 'hot', label: 'Hot', min: 71, max: 100, color: '#EF4444' },
-  ] as const
-
-  const buckets = {
-    cold: leads.filter(l => getScore(l) <= 40).sort((a, b) => getScore(b) - getScore(a)),
-    warm: leads.filter(l => { const s = getScore(l); return s >= 41 && s <= 70 }).sort((a, b) => getScore(b) - getScore(a)),
-    hot: leads.filter(l => getScore(l) >= 71).sort((a, b) => getScore(b) - getScore(a)),
-  }
-
-  const getCompany = (lead: ExtendedLead) =>
-    lead.unified_context?.whatsapp?.profile?.company ||
-    lead.unified_context?.web?.profile?.company ||
-    lead.brand || null
-
-  const getChannels = (lead: ExtendedLead): string[] => {
-    const channels: string[] = []
-    const ctx = lead.unified_context || {}
-    if (ctx.web) channels.push('web')
-    if (ctx.whatsapp) channels.push('whatsapp')
-    if (ctx.voice) channels.push('voice')
-    if (ctx.social) channels.push('social')
-    if (channels.length === 0) {
-      const src = (lead.first_touchpoint || lead.source || '').toLowerCase()
-      if (['web', 'whatsapp', 'voice', 'social'].includes(src)) channels.push(src)
-    }
-    return channels
-  }
-
-  const getLatestNote = (lead: ExtendedLead): string | null => {
-    const ctx = lead.unified_context || {}
-    return ctx.latest_admin_note || ctx.admin_notes?.[0]?.note || null
-  }
-
-  const channelIcons: Record<string, { icon: typeof MdLanguage; color: string }> = {
-    web: { icon: MdLanguage, color: '#3B82F6' },
-    whatsapp: { icon: MdChat, color: '#22C55E' },
-    voice: { icon: MdCall, color: '#8B5CF6' },
-    social: { icon: MdPerson, color: '#EC4899' },
-  }
-
-  return (
-    <div className="flex gap-3 p-4 overflow-x-auto" style={{ minHeight: '60vh' }}>
-      {columns.map(col => {
-        const items = buckets[col.key]
-        return (
-          <div key={col.key} className="flex-1 min-w-[260px] flex flex-col rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-            {/* Column header */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-t-lg" style={{ backgroundColor: `${col.color}15` }}>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: col.color }}>
-                  {col.label}
-                </span>
-              </div>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${col.color}20`, color: col.color }}>
-                {items.length}
-              </span>
-            </div>
-
-            {/* Cards */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2" style={{ maxHeight: 'calc(80vh - 120px)' }}>
-              {items.length === 0 ? (
-                <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>No leads</p>
-              ) : items.map(lead => {
-                const score = getScore(lead)
-                const company = getCompany(lead)
-                const channels = getChannels(lead)
-                const note = getLatestNote(lead)
-                const lastActivity = lead.last_interaction_at || lead.timestamp
-
-                return (
-                  <div
-                    key={lead.id}
-                    className="rounded-md border p-2.5 cursor-pointer transition-all hover:shadow-sm"
-                    style={{
-                      borderColor: 'var(--border-primary)',
-                      backgroundColor: 'var(--bg-primary)',
-                    }}
-                    onClick={() => onLeadClick(lead)}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = col.color }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
-                  >
-                    {/* Name + Score */}
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                        {lead.name || 'Unknown'}
-                      </span>
-                      <span
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 tabular-nums"
-                        style={{ backgroundColor: `${col.color}15`, color: col.color }}
-                      >
-                        {score}
-                      </span>
-                    </div>
-
-                    {/* Company */}
-                    {company && (
-                      <p className="text-[11px] truncate mb-1" style={{ color: 'var(--text-secondary)' }}>
-                        {company}
-                      </p>
-                    )}
-
-                    {/* Channel icons + last activity */}
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1">
-                        {channels.map(ch => {
-                          const cfg = channelIcons[ch]
-                          if (!cfg) return null
-                          const Icon = cfg.icon
-                          return <Icon key={ch} size={12} style={{ color: cfg.color }} title={ch} />
-                        })}
-                      </div>
-                      <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                        {timeAgo(lastActivity)}
-                      </span>
-                    </div>
-
-                    {/* Latest note */}
-                    {note && (
-                      <p
-                        className="text-[10px] leading-tight mt-1 pt-1 border-t line-clamp-2"
-                        style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}
-                      >
-                        {note}
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 export default function LeadsTable({
@@ -294,19 +165,12 @@ export default function LeadsTable({
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [limit, setLimit] = useState<number>(initialLimit || 50)
-
-  const [viewMode, setViewMode] = useState<'list' | 'pipeline'>('list')
-
-  // Add Lead modal state
-  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false)
-  const [addLeadForm, setAddLeadForm] = useState({ name: '', phone: '', email: '', source: 'manual', context_note: '', auto_sequence: true })
-  const [addLeadSubmitting, setAddLeadSubmitting] = useState(false)
-  const [addLeadError, setAddLeadError] = useState<string | null>(null)
-  const [addLeadDuplicateId, setAddLeadDuplicateId] = useState<string | null>(null)
-  const [addLeadSuccess, setAddLeadSuccess] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [limit, setLimit] = useState<number>(initialLimit || 100)
 
   useEffect(() => {
     if (initialLimit) {
@@ -330,7 +194,7 @@ export default function LeadsTable({
       })
     } else if (presetFilter === 'warm') {
       filtered = filtered.filter((lead) => {
-        const score = lead.lead_score ?? 0
+        const score = calculatedScores[lead.id] !== undefined ? calculatedScores[lead.id] : (lead.lead_score ?? 0)
         return score >= 40 && score < 70
       })
     }
@@ -385,12 +249,43 @@ export default function LeadsTable({
       })
     }
 
+    // Score filter (use calculated scores when available, fallback to DB score)
+    if (scoreFilter !== 'all') {
+      const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
+      filtered = filtered.filter((lead) => {
+        const score = calculatedScores[lead.id] !== undefined ? calculatedScores[lead.id] : (lead.lead_score ?? 0)
+        return score >= minScore
+      })
+    }
+
+    // Search filter (client-side, across name, brand, email, phone)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter((lead) => {
+        const uc = lead.unified_context || {}
+        const name = (
+          uc?.whatsapp?.profile?.full_name ||
+          uc?.web?.profile?.full_name ||
+          lead.name || ''
+        ).toLowerCase()
+        const brand = (
+          uc?.web?.what_is_your_brand_name ||
+          uc?.whatsapp?.what_is_your_brand_name ||
+          uc?.whatsapp?.profile?.company ||
+          uc?.web?.profile?.company || ''
+        ).toLowerCase()
+        const email = (lead.email || '').toLowerCase()
+        const phone = (lead.phone || '').toLowerCase()
+        return name.includes(q) || brand.includes(q) || email.includes(q) || phone.includes(q)
+      })
+    }
+
     if (limit) {
       filtered = filtered.slice(0, limit)
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit, presetFilter])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -398,7 +293,7 @@ export default function LeadsTable({
     const fetchTrends = async () => {
       try {
         const supabase = createClient()
-        const leadIds = filteredLeads.slice(0, 50).map(l => l.id)
+        const leadIds = filteredLeads.slice(0, 250).map(l => l.id)
 
         const { data: changes } = await supabase
           .from('lead_stage_changes')
@@ -427,15 +322,14 @@ export default function LeadsTable({
   }, [filteredLeads])
 
   useEffect(() => {
-    if (filteredLeads.length === 0) return
+    if (leads.length === 0) return
 
     setCalculatingScores(true)
     const calculateScores = async () => {
       const scores: Record<string, number> = {}
-      const leadsToCalculate = filteredLeads.slice(0, 50)
 
       await Promise.all(
-        leadsToCalculate.map(async (lead) => {
+        leads.map(async (lead) => {
           try {
             const result = await calculateLeadScore(lead as Lead)
             scores[lead.id] = result.score
@@ -451,7 +345,7 @@ export default function LeadsTable({
     }
 
     calculateScores()
-  }, [filteredLeads])
+  }, [leads])
 
   const handleRowClick = (lead: ExtendedLead) => {
     const modalLead: Lead = {
@@ -532,17 +426,7 @@ export default function LeadsTable({
         lead.unified_context?.social?.booking_time ||
         lead.unified_context?.social?.booking?.time;
       const keyEvent = bookingDate && bookingTime
-        ? `${formatDateTime(bookingDate).split(',')[0]}, ${(() => {
-          const timeParts = bookingTime.toString().split(':');
-          if (timeParts.length < 2) return bookingTime.toString();
-          const hours = parseInt(timeParts[0], 10);
-          const minutes = parseInt(timeParts[1], 10);
-          if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString();
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const hours12 = hours % 12 || 12;
-          const minutesStr = minutes.toString().padStart(2, '0');
-          return `${hours12}:${minutesStr} ${period}`;
-        })()}`
+        ? `${formatDateTime(bookingDate).split(',')[0]}, ${formatBookingTime(bookingTime)}`
         : bookingDate
           ? formatDateTime(bookingDate).split(',')[0]
           : bookingTime || '';
@@ -593,40 +477,7 @@ export default function LeadsTable({
     a.click()
   }
 
-  const handleAddLeadSubmit = async () => {
-    setAddLeadError(null)
-    setAddLeadDuplicateId(null)
-    setAddLeadSubmitting(true)
-    try {
-      const res = await fetch('/api/dashboard/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addLeadForm),
-      })
-      const data = await res.json()
-      if (res.status === 409) {
-        setAddLeadError('Lead with this phone already exists')
-        setAddLeadDuplicateId(data.existing_lead_id)
-        return
-      }
-      if (!res.ok) {
-        setAddLeadError(data.error || 'Failed to create lead')
-        return
-      }
-      setAddLeadSuccess(true)
-      setTimeout(() => {
-        setIsAddLeadOpen(false)
-        setAddLeadForm({ name: '', phone: '', email: '', source: 'manual', context_note: '', auto_sequence: true })
-        setAddLeadSuccess(false)
-      }, 1500)
-    } catch {
-      setAddLeadError('Network error — please try again')
-    } finally {
-      setAddLeadSubmitting(false)
-    }
-  }
-
-  // Filter select style — compact Vercel-like
+  // Filter select style - compact Vercel-like
   const filterClass = "px-2.5 py-1 text-xs border rounded-md appearance-none cursor-pointer"
   const filterStyle: CSSProperties = {
     borderColor: 'var(--border-primary)',
@@ -651,10 +502,11 @@ export default function LeadsTable({
   }
 
   return (
-    <div className="leads-table">
-      {/* Header row: Title left, filters + actions right */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-        <div className="flex items-center gap-2">
+    <div className="leads-table flex flex-col flex-1 overflow-hidden">
+      {/* Header row: LEFT = title + count + score filters, RIGHT = search + dropdowns + actions */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+        {/* LEFT: Title + count + score filters */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
           </h2>
@@ -664,15 +516,55 @@ export default function LeadsTable({
           {presetFilter !== 'all' && (
             <Link
               href="/dashboard/leads"
-              className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-gray-100 dark:hover:bg-[#333]"
+              className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-[var(--bg-hover)]"
               style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
             >
               Clear filter
             </Link>
           )}
+
+          {/* Score quick filters */}
+          <div className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            {[
+              { value: 'all', label: 'All' },
+              { value: '50', label: '50+' },
+              { value: '70', label: '70+' },
+              { value: 'hot', label: 'Hot' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setScoreFilter(opt.value)}
+                className="px-2 py-0.5 text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: scoreFilter === opt.value ? 'var(--button-bg)' : 'var(--bg-primary)',
+                  color: scoreFilter === opt.value ? 'var(--text-button)' : 'var(--text-secondary)',
+                  borderRight: '1px solid var(--border-primary)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* RIGHT: Search + filters + actions */}
+        <div className="flex items-center gap-2">
+          {/* Search bar */}
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md border focus-within:ring-2 focus-within:ring-[var(--accent-primary)] transition-shadow"
+            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
+          >
+            <MdSearch size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none focus:outline-none text-xs w-[120px]"
+              style={{ color: 'var(--text-primary)' }}
+            />
+          </div>
+
           {!hideFilters && (
             <>
               <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className={filterClass} style={filterStyle}>
@@ -726,43 +618,11 @@ export default function LeadsTable({
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={0}>All</option>
             </select>
           )}
-
-          {/* View toggle */}
-          <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: 'var(--border-primary)' }}>
-            <button
-              onClick={() => setViewMode('list')}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--bg-primary)',
-                color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
-              }}
-            >
-              <MdViewList size={14} />
-              List
-            </button>
-            <button
-              onClick={() => setViewMode('pipeline')}
-              className="flex items-center gap-1 px-2 py-1 text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: viewMode === 'pipeline' ? 'var(--accent-primary)' : 'var(--bg-primary)',
-                color: viewMode === 'pipeline' ? '#fff' : 'var(--text-secondary)',
-              }}
-            >
-              <MdViewColumn size={14} />
-              Pipeline
-            </button>
-          </div>
-
-          <button
-            onClick={() => { setIsAddLeadOpen(true); setAddLeadError(null); setAddLeadDuplicateId(null); setAddLeadSuccess(false) }}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md text-white transition-colors"
-            style={{ backgroundColor: 'var(--accent-primary)' }}
-          >
-            <MdAdd size={14} />
-            Add Lead
-          </button>
 
           <button
             onClick={exportToCSV}
@@ -781,62 +641,73 @@ export default function LeadsTable({
           {showViewAll && (
             <Link
               href="/dashboard/leads"
-              className="px-2.5 py-1 text-xs font-medium rounded-md text-white"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="px-2.5 py-1 text-xs font-medium rounded-md text-[var(--text-button)]"
+              style={{ backgroundColor: 'var(--button-bg)' }}
             >
               View All
             </Link>
           )}
+
+          {/* Add Lead — prominent + button, sits at the far right of the header */}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-1.5 pl-2 pr-3 py-1.5 text-xs font-semibold rounded-md text-[var(--text-button)] shadow-sm transition-transform hover:scale-[1.04]"
+            style={{ backgroundColor: 'var(--button-bg)' }}
+            title="Add a new lead"
+          >
+            <MdAdd size={18} />
+            Add Lead
+          </button>
         </div>
       </div>
 
-      {/* Pipeline View */}
-      {viewMode === 'pipeline' && (
-        <PipelineView
-          leads={filteredLeads}
-          calculatedScores={calculatedScores}
-          onLeadClick={handleRowClick}
-        />
-      )}
-
-      {/* Table */}
-      {viewMode === 'list' && <div className="overflow-x-auto overflow-y-visible pb-6">
+      {/* Table — min-h-0 lets this flex child shrink so it scrolls INTERNALLY
+          (instead of the page scrolling), which is what makes the sticky <thead>
+          actually stay put. Without min-h-0 the child grows to content height,
+          the page scrolls, and the "sticky" header rides away with it. */}
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '11%' }} />  {/* Name */}
-            <col style={{ width: '11%' }} />  {/* Brand */}
-            <col style={{ width: '15%' }} />  {/* Email */}
-            <col style={{ width: '10%' }} />  {/* Phone */}
-            <col style={{ width: '6%' }} />   {/* Source */}
+            {/* Tightened column widths: Lead/Contact were oversized,
+                Booking was a wide text column (now a compact chip),
+                Type/Course are narrow chip columns. */}
+            <col style={{ width: '14%' }} />  {/* Lead */}
+            <col style={{ width: '14%' }} />  {/* Contact */}
+            <col style={{ width: '8%' }} />   {/* Source (origin, immutable) */}
+            <col style={{ width: '7%' }} />   {/* Last Touch */}
+            <col style={{ width: '6%' }} />   {/* Score */}
+            <col style={{ width: '10%' }} />  {/* Stage */}
+            <col style={{ width: '7%' }} />   {/* Active */}
+            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
-            <col style={{ width: '5%' }} />   {/* Score */}
-            <col style={{ width: '8%' }} />   {/* Stage */}
-            <col style={{ width: '8%' }} />   {/* Status */}
-            <col style={{ width: '6%' }} />   {/* Activity */}
-            <col style={{ width: '9%' }} />   {/* Booking */}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            <col style={{ width: '9%' }} />   {/* Owner */}
           </colgroup>
-          <thead>
+          <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
-                'Name',
-                'Brand',
-                'Email',
-                'Phone',
-                'Source',
-                ...(showAviationColumns ? ['Type', 'Course'] : []),
-                'Score',
-                'Stage',
-                'Status',
-                'Activity',
-                'Booking',
-              ].map((h) => (
+                { label: 'Lead',       align: 'left'   as const },
+                { label: 'Contact',    align: 'left'   as const },
+                { label: 'Source',     align: 'center' as const },
+                { label: 'Last Touch', align: 'center' as const },
+                { label: 'Score',      align: 'center' as const },
+                { label: 'Stage',      align: 'center' as const },
+                { label: 'Active',     align: 'left'   as const },
+                { label: 'Booking',    align: 'center' as const },
+                ...(showAviationColumns ? [
+                  { label: 'Type',   align: 'center' as const },
+                  { label: 'Course', align: 'center' as const },
+                  { label: 'PAT',    align: 'center' as const },
+                ] : []),
+                { label: 'Owner',  align: 'left' as const },
+              ].map(({ label, align }) => (
                 <th
-                  key={h}
-                  className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider"
+                  key={label}
+                  className={`px-3 py-2.5 text-${align} text-[10px] font-semibold uppercase tracking-wider`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {h}
+                  {label}
                 </th>
               ))}
             </tr>
@@ -845,7 +716,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 13 : 11}
+                  colSpan={showAviationColumns ? 12 : 9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -859,168 +730,661 @@ export default function LeadsTable({
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 const displayStage = stage || 'New'
                 const stageColor = getStageColor(displayStage)
-                const statusColor = getStatusColor(lead.status)
-                const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
+                // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
+                // first — never the last_touchpoint, since that gets overwritten
+                // by any later interaction (e.g. a logged call flips to 'voice').
+                const source = (lead.first_touchpoint || lead.source || lead.last_touchpoint || 'unknown').toLowerCase()
+                const lastTouch = (lead.last_touchpoint || '').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
-                const bookingDate = lead.booking_date ||
-                  lead.unified_context?.web?.booking_date ||
-                  lead.unified_context?.web?.booking?.date ||
-                  lead.unified_context?.whatsapp?.booking_date ||
-                  lead.unified_context?.whatsapp?.booking?.date ||
-                  lead.unified_context?.voice?.booking_date ||
-                  lead.unified_context?.voice?.booking?.date ||
-                  lead.unified_context?.social?.booking_date ||
-                  lead.unified_context?.social?.booking?.date
-                const bookingTime = lead.booking_time ||
-                  lead.unified_context?.web?.booking_time ||
-                  lead.unified_context?.web?.booking?.time ||
-                  lead.unified_context?.whatsapp?.booking_time ||
-                  lead.unified_context?.whatsapp?.booking?.time ||
-                  lead.unified_context?.voice?.booking_time ||
-                  lead.unified_context?.voice?.booking?.time ||
-                  lead.unified_context?.social?.booking_time ||
-                  lead.unified_context?.social?.booking?.time
+                const uc = lead.unified_context || {}
+                const resolvedName =
+                  uc?.whatsapp?.profile?.full_name ||
+                  uc?.web?.profile?.full_name ||
+                  lead.name || ''
+                const brandName =
+                  uc?.web?.what_is_your_brand_name ||
+                  uc?.whatsapp?.what_is_your_brand_name ||
+                  uc?.whatsapp?.profile?.company ||
+                  uc?.web?.profile?.company || ''
+                // City — check every known location:
+                //   brand-namespaced (set by inbound endpoint + AI extractor)
+                //   channel profile blocks (legacy)
+                //   raw_form_fields (from website form submissions)
+                //   landing_page.city (from /api/integrations/landing-pages)
+                const city =
+                  uc?.[brandId]?.city ||
+                  uc?.windchasers?.city ||
+                  uc?.bcon?.city ||
+                  uc?.whatsapp?.profile?.city ||
+                  uc?.web?.profile?.city ||
+                  uc?.raw_form_fields?.city ||
+                  uc?.landing_page?.city ||
+                  uc?.city ||                       // top-level (set by /api/agent/leads/inbound)
+                  ''
 
-                const sourceConfig: Record<string, { label: string; color: string }> = {
+                // If no name, use email as primary identifier
+                const displayName = resolvedName || lead.email || lead.phone || '-'
+                const isEmailAsName = !resolvedName && !!lead.email
+
+                const bookingDate = lead.booking_date ||
+                  uc?.web?.booking_date || uc?.web?.booking?.date ||
+                  uc?.whatsapp?.booking_date || uc?.whatsapp?.booking?.date ||
+                  uc?.voice?.booking_date || uc?.voice?.booking?.date ||
+                  uc?.social?.booking_date || uc?.social?.booking?.date
+                const bookingTime = lead.booking_time ||
+                  uc?.web?.booking_time || uc?.web?.booking?.time ||
+                  uc?.whatsapp?.booking_time || uc?.whatsapp?.booking?.time ||
+                  uc?.voice?.booking_time || uc?.voice?.booking?.time ||
+                  uc?.social?.booking_time || uc?.social?.booking?.time
+
+                // SOURCE column = where the lead actually came from.
+                //
+                // TOP badge: prefer utm_source (Google / Meta / Instagram /
+                //   YouTube / etc. — the ad platform that drove the visit)
+                //   so a "Google ad → Web → PAT" lead reads as Google, not
+                //   Web. Falls back to the channel medium (Web/WhatsApp/etc.)
+                //   when no UTM is present (direct traffic, organic, etc.).
+                //
+                // SUB line: the specific entry point — usually form_type
+                //   (PAT, Demo Booked, …). If form_type is missing we fall
+                //   back to utm_medium (cpc, social, organic) so the line
+                //   still tells you HOW they got here.
+
+                // ── ATTRIBUTION (canonical) ────────────────────────────────
+                // SOURCE column = the MARKETING SOURCE that drove the lead to us.
+                // WhatsApp and Web are PLATFORMS (the surface they used to reach
+                // out), not marketing sources, so they are explicitly rejected
+                // from this column. A WA-Popup lead with channel='whatsapp' but
+                // utm_source='ig' should show as Instagram, not WhatsApp.
+                //
+                // Priority chain (matches the server-side deriveSource logic):
+                //   1. utm_source (explicit marketing tracking — gold signal)
+                //   2. raw_form_fields.channel IF it's a marketing channel
+                //      (ig / fb / facebook_ads / google_ads / etc.)
+                //   3. attribution.source IF it's a marketing channel
+                //   4. 'direct'
+                //
+                // Channels considered MARKETING (acceptable as source). Platform
+                // values like 'whatsapp', 'web', 'voice' are NOT here.
+                const MARKETING_CHANNELS = new Set([
+                  'ig', 'instagram',
+                  'fb', 'facebook', 'facebook_ads', 'fb_ads',
+                  'meta', 'meta_ads', 'meta_forms_clickthrough',
+                  'google', 'google_ads', 'googleads',
+                  'bing', 'bing_ads',
+                  'youtube', 'yt',
+                  'linkedin', 'linkedin_ads',
+                  'tiktok', 'tiktok_ads',
+                  'twitter', 'x',
+                  'snapchat', 'pinterest',
+                  'email', 'newsletter',
+                  'referral', 'organic',
+                ])
+
+                const attribution = uc?.attribution || null
+                const rffChannel = String(uc?.raw_form_fields?.channel || '').toLowerCase().trim()
+                const rffUtmSource = String(uc?.raw_form_fields?.utm_source || '').toLowerCase().trim()
+                const attrSourceStored = String(attribution?.source || '').toLowerCase().trim()
+                const attrSourceLabelStored = String(attribution?.source_label || '').trim()
+                const attrFirstTouchKey = String(attribution?.first_touch || '').toLowerCase().trim()
+                const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
+
+                // attrSource = the EFFECTIVE source we'll surface on the SOURCE column.
+                //   1) utm_source (gold), 2) marketing-channel value, 3) 'direct'
+                const attrSource = (rffUtmSource && rffUtmSource !== 'direct')
+                  ? rffUtmSource
+                  : (rffChannel && MARKETING_CHANNELS.has(rffChannel))
+                    ? rffChannel
+                    : (attrSourceStored && MARKETING_CHANNELS.has(attrSourceStored))
+                      ? attrSourceStored
+                      : 'direct'
+                // attrSourceLabel: only honour a STORED label when its STORED
+                // source is also a marketing channel. Legacy rows from the
+                // May-19→May-20 window have attribution.source='whatsapp' +
+                // source_label='WhatsApp' baked in by the old deriveSource;
+                // surfacing that label here would re-leak "WhatsApp" into the
+                // SOURCE column even after we already filtered the platform
+                // out of attrSource above.
+                const attrSourceLabel =
+                  attrSource === 'direct' &&
+                  attrSourceStored &&
+                  MARKETING_CHANNELS.has(attrSourceStored)
+                    ? attrSourceLabelStored
+                    : ''
+
+                // Platform values that arrive as first_touchpoint but should
+                // NEVER render as a source — they describe the surface the
+                // lead used to message us, not the marketing source. When the
+                // resolver falls all the way through to channelConfig[source]
+                // and the source is one of these, show 'Direct' instead so
+                // the SOURCE column stays accurate.
+                const NON_MARKETING_PLATFORMS = new Set([
+                  'whatsapp', 'web', 'form', 'voice', 'social',
+                ])
+
+                // utmSourceRaw drives the SOURCE pill — same priority chain.
+                const utmSourceRaw = attrSource !== 'direct' ? attrSource : String(
+                  uc?.web?.utm?.source ||
+                  uc?.landing_page?.utm_source ||
+                  ''
+                ).trim().toLowerCase()
+                const utmMediumRaw = String(
+                  uc?.raw_form_fields?.utm_medium ||
+                  uc?.web?.utm?.medium ||
+                  uc?.landing_page?.utm_medium ||
+                  ''
+                ).trim().toLowerCase()
+
+                // Channel-medium fallback (when no utm_source).
+                const channelConfig: Record<string, { label: string; color: string }> = {
                   web: { label: 'Web', color: '#3B82F6' },
-                  whatsapp: { label: 'WA', color: '#22C55E' },
+                  form: { label: 'Web', color: '#3B82F6' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
                   voice: { label: 'Voice', color: '#8B5CF6' },
                   social: { label: 'Social', color: '#EC4899' },
-                  unknown: { label: 'Other', color: '#6B7280' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  meta_forms: { label: 'Meta', color: '#1877F2' },
+                  google: { label: 'Google', color: '#EA4335' },
+                  ads: { label: 'Ads', color: '#F97316' },
+                  pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  manual: { label: 'Manual', color: '#6B7280' },
+                  unknown: { label: '-', color: '#6B7280' },
                 }
-                const srcCfg = sourceConfig[source] || sourceConfig.unknown
+
+                // Friendly label + color per known utm_source / channel.
+                const utmSourceConfig: Record<string, { label: string; color: string }> = {
+                  google: { label: 'Google Organic', color: '#EA4335' },
+                  google_organic: { label: 'Google Organic', color: '#EA4335' },
+                  google_ads: { label: 'Google Ads', color: '#A855F7' },
+                  googleads: { label: 'Google Ads', color: '#A855F7' },
+                  bing: { label: 'Bing', color: '#008373' },
+                  bing_ads: { label: 'Bing Ads', color: '#008373' },
+                  youtube: { label: 'YouTube', color: '#FF0000' },
+                  yt: { label: 'YouTube', color: '#FF0000' },
+                  meta: { label: 'Meta', color: '#1877F2' },
+                  meta_ads: { label: 'Meta Ads', color: '#1877F2' },
+                  meta_forms_clickthrough: { label: 'Meta Forms', color: '#1877F2' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  facebook_ads: { label: 'Facebook Ads', color: '#1877F2' },
+                  fb: { label: 'Facebook', color: '#1877F2' },
+                  fb_ads: { label: 'Facebook Ads', color: '#1877F2' },
+                  instagram: { label: 'Instagram', color: '#E4405F' },
+                  ig: { label: 'Instagram', color: '#E4405F' },
+                  linkedin: { label: 'LinkedIn', color: '#0A66C2' },
+                  linkedin_ads: { label: 'LinkedIn Ads', color: '#0A66C2' },
+                  twitter: { label: 'X', color: '#000000' },
+                  x: { label: 'X', color: '#000000' },
+                  tiktok: { label: 'TikTok', color: '#000000' },
+                  tiktok_ads: { label: 'TikTok Ads', color: '#000000' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                  email: { label: 'Email', color: '#0EA5E9' },
+                  newsletter: { label: 'Newsletter', color: '#0EA5E9' },
+                  direct: { label: 'Direct', color: '#6B7280' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                }
+
+                // Resolve the top badge:
+                //   1. attribution.source_label (canonical, new leads)
+                //   2. utm_source from raw_form_fields (legacy)
+                //   3. Channel fallback
+                let srcCfg: { label: string; color: string }
+                if (utmSourceRaw && utmSourceConfig[utmSourceRaw]) {
+                  srcCfg = utmSourceConfig[utmSourceRaw]
+                  // Override label with the prettier server-side label if present
+                  if (attrSourceLabel) srcCfg = { ...srcCfg, label: attrSourceLabel }
+                } else if (attrSourceLabel) {
+                  // Attribution present with an unmapped source — use the label as-is
+                  srcCfg = { label: attrSourceLabel, color: '#6366F1' }
+                } else if (utmSourceRaw) {
+                  srcCfg = {
+                    label: utmSourceRaw
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase()),
+                    color: '#6366F1',
+                  }
+                } else if (source && NON_MARKETING_PLATFORMS.has(source)) {
+                  // Final fallback fired with a platform source (whatsapp/
+                  // web/voice/etc.) — don't render it as a marketing pill.
+                  // These leads simply have no marketing attribution.
+                  srcCfg = { label: 'Direct', color: '#6B7280' }
+                } else {
+                  srcCfg = channelConfig[source] || channelConfig.unknown
+                }
+
+                // Google Ads → distinct PURPLE so it never reads as Meta's blue.
+                // Applied after resolution so it wins regardless of which branch
+                // set the color (map hit, generic attr-label fallback, etc.).
+                // Google Organic stays red, so paid vs organic Google is clear too.
+                if (/google\s*ads/i.test(srcCfg.label)) {
+                  srcCfg = { ...srcCfg, color: '#A855F7' }
+                }
+
+                // Derive sub-source from form_type first, then utm_medium,
+                // then per-channel default.
+                const formTypeRaw =
+                  uc?.raw_form_fields?.form_type ||
+                  uc?.web?.form_submission?.form_type ||
+                  uc?.landing_page?.form_name ||
+                  uc?.raw_form_fields?.event_name ||
+                  ''
+                const formType = String(formTypeRaw).toLowerCase().trim()
+                const subSourceLabels: Record<string, string> = {
+                  pilot_aptitude_test: 'PAT',
+                  pat_assessment: 'PAT',
+                  pat: 'PAT',
+                  pilot_assessment: 'PAT',
+                  demo_booked: 'Demo Form',
+                  demo_form: 'Demo Form',
+                  demo: 'Demo',
+                  whatsapp_button: 'WA Popup',
+                  whatsapp_prelaunch: 'WA Popup',
+                  whatsapp: 'WhatsApp',
+                  web: 'Web Chat',
+                  web_chat: 'Web Chat',
+                  chat_widget: 'Web Chat',
+                  meta_lead_form: 'Meta Lead Form',
+                  facebook_lead: 'Meta Lead Form',
+                  whatsapp_clickthrough: 'WA Click Through',
+                  voice_call: 'Voice Call',
+                  voice: 'Voice Call',
+                  manual: 'Manual Entry',
+                  landing_page: 'Landing Page',
+                  visit_booked: 'Visit Booked',
+                  visit: 'Visit',
+                  eligibility: 'Eligibility',
+                  guide_download: 'Guide Download',
+                  guide: 'Guide',
+                  contact: 'Contact Form',
+                  newsletter: 'Newsletter',
+                  page: 'Web Form',
+                  event: 'Event',
+                }
+                const utmMediumLabels: Record<string, string> = {
+                  cpc: 'Ads',
+                  ppc: 'Ads',
+                  paid: 'Ads',
+                  ad: 'Ads',
+                  ads: 'Ads',
+                  paid_social: 'Paid Social',
+                  social: 'Social',
+                  organic: 'Organic',
+                  email: 'Email',
+                  referral: 'Referral',
+                  affiliate: 'Affiliate',
+                }
+                let subSource = ''
+                // Priority order:
+                //   1. attribution.first_touch (key) → fresh label from subSourceLabels
+                //      so renames take effect without re-backfill
+                //   2. attribution.first_touch_label (stored, may be stale)
+                //   3. raw_form_fields.form_type fallback
+                if (attrFirstTouchKey && subSourceLabels[attrFirstTouchKey]) {
+                  subSource = subSourceLabels[attrFirstTouchKey]
+                } else if (attrFirstTouchLabel) {
+                  subSource = attrFirstTouchLabel
+                } else if (formType) {
+                  subSource =
+                    subSourceLabels[formType] ||
+                    formType
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (utmMediumRaw) {
+                  subSource =
+                    utmMediumLabels[utmMediumRaw] ||
+                    utmMediumRaw
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
+                } else if (source === 'meta_forms') {
+                  subSource = 'Lead Form'
+                } else if (source === 'facebook') {
+                  subSource = 'Ads'
+                } else if (source === 'google') {
+                  subSource = 'Ads'
+                } else if (source === 'whatsapp') {
+                  subSource = 'Direct'
+                } else if (source === 'voice') {
+                  subSource = 'Call'
+                } else if (source === 'web' || source === 'form') {
+                  subSource = 'Web Form'
+                }
+
+                // Score pill colors
+                // Score pill classes - using CSS variables for consistency
+                const scorePillClass = score != null 
+                  ? (score >= 70 ? 'bg-[rgba(34,197,94,0.15)] text-[#22c55e]' : score >= 40 ? 'bg-[rgba(245,158,11,0.15)] text-[#f59e0b]' : 'bg-[rgba(239,68,68,0.15)] text-[#ef4444]')
+                  : ''
 
                 return (
                   <tr
                     key={lead.id}
-                    className="cursor-pointer transition-colors"
-                    style={{ borderBottom: '1px solid var(--border-primary)' }}
+                    className="cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
+                    style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
                     onClick={() => handleRowClick(lead)}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    {/* Name */}
-                    <td className="px-3 py-2 truncate">
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {lead.name || '-'}
-                      </span>
+                    {/* LEAD - 2 lines: Name + Brand · City */}
+                    <td className="px-3 py-2">
+                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                        {displayName}
+                      </div>
+                      {(brandName || city) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+                          {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                        </div>
+                      )}
+                      {/* Date the lead came in */}
+                      {((lead as any).created_at || lead.timestamp) && (
+                        <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {new Date((lead as any).created_at || lead.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
                     </td>
 
-                    {/* Brand */}
-                    <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={
-                      lead.unified_context?.whatsapp?.profile?.company ||
-                      lead.unified_context?.web?.profile?.company || ''
-                    }>
-                      {lead.unified_context?.whatsapp?.profile?.company ||
-                       lead.unified_context?.web?.profile?.company || '-'}
+                    {/* CONTACT - 2 lines: Phone + Email */}
+                    <td className="px-3 py-2">
+                      {lead.phone && (
+                        <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
+                          {lead.phone}
+                        </a>
+                      )}
+                      {lead.email && !isEmailAsName && (
+                        <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
+                          {lead.email}
+                        </a>
+                      )}
                     </td>
 
-                    {/* Email */}
-                    <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={lead.email || '-'}>
-                      {lead.email || '-'}
-                    </td>
-
-                    {/* Phone */}
-                    <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {lead.phone || '-'}
-                    </td>
-
-                    {/* Source */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase"
-                        style={{
-                          backgroundColor: `${srcCfg.color}15`,
-                          color: srcCfg.color,
-                        }}
-                      >
-                        {srcCfg.label}
-                      </span>
-                    </td>
-
-                    {/* Aviation: User Type */}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    {/* SOURCE - 3 lines: channel · first touch · landing page */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                          style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                        >
+                          {srcCfg.label}
+                        </span>
+                        {subSource && (
+                          <span
+                            className="text-[10px] whitespace-nowrap"
+                            style={{ color: '#9ca3af' }}
+                            title={subSource}
+                          >
+                            {subSource}
+                          </span>
+                        )}
                         {(() => {
-                          const brandData = lead.unified_context?.[brandId] || {}
-                          return brandData.user_type || '-'
+                          const pageUrl = String(
+                            uc?.attribution?.page_url ||
+                            uc?.raw_form_fields?.page_url ||
+                            uc?.web?.form_submission?.page_url ||
+                            ''
+                          ).trim()
+                          if (!pageUrl) return null
+                          // Show only the path — strip any query string (utm_*, etc.)
+                          // regardless of whether the URL is absolute or relative.
+                          let pathOnly = pageUrl.split('?')[0].split('#')[0]
+                          try {
+                            const u = new URL(pageUrl)
+                            pathOnly = u.pathname || pathOnly
+                          } catch {
+                            // already stripped above for relative URLs
+                          }
+                          if (pathOnly.length > 28) pathOnly = pathOnly.slice(0, 26) + '…'
+                          return (
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[9px] whitespace-nowrap hover:underline"
+                              style={{ color: '#6b7280' }}
+                              title={pageUrl}
+                            >
+                              {pathOnly}
+                            </a>
+                          )
                         })()}
-                      </td>
-                    )}
-
-                    {/* Aviation: Course */}
-                    {showAviationColumns && (
-                      <td className="px-3 py-2 whitespace-nowrap text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {(() => {
-                          const brandData = lead.unified_context?.[brandId] || {}
-                          return brandData.course_interest || '-'
-                        })()}
-                      </td>
-                    )}
-
-                    {/* Score */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className="text-sm font-semibold tabular-nums"
-                        style={{ color: getScoreColor(score) }}
-                      >
-                        {score !== null && score !== undefined ? score : '-'}
-                      </span>
+                      </div>
                     </td>
 
-                    {/* Stage */}
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    {/* LAST TOUCH - actor (top) + channel (bottom) */}
+                    <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                      {(() => {
+                        const actor = uc?.last_actor || null
+                        const lastTouchConfig: Record<string, { label: string; color: string }> = {
+                          web: { label: 'Web', color: '#3B82F6' },
+                          form: { label: 'Form', color: '#3B82F6' },
+                          whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                          voice: { label: 'Voice', color: '#8B5CF6' },
+                          social: { label: 'Social', color: '#EC4899' },
+                          facebook: { label: 'Facebook', color: '#1877F2' },
+                          facebook_lead: { label: 'Facebook', color: '#1877F2' },
+                          meta_forms: { label: 'Meta', color: '#1877F2' },
+                          google: { label: 'Google', color: '#EA4335' },
+                          ads: { label: 'Ads', color: '#F97316' },
+                          pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                          referral: { label: 'Referral', color: '#10B981' },
+                          organic: { label: 'Organic', color: '#84CC16' },
+                          manual: { label: 'Manual', color: '#6B7280' },
+                          landing_page: { label: 'Landing', color: '#3B82F6' },
+                          email: { label: 'Email', color: '#0EA5E9' },
+                        }
+                        const channelCfg = lastTouch
+                          ? (lastTouchConfig[lastTouch] || {
+                              label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+                              color: '#6B7280',
+                            })
+                          : null
+
+                        // Resolve actor badge config
+                        let actorBadge: { label: string; color: string; bg: string; tooltip: string } | null = null
+                        if (actor?.type === 'user' && (actor.name || actor.email)) {
+                          const name = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                          actorBadge = {
+                            label: name,
+                            color: '#F59E0B',
+                            bg: 'rgba(245,158,11,0.15)',
+                            tooltip: `Last touched by ${actor.email || name}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
+                        } else if (actor?.type === 'proxe') {
+                          actorBadge = {
+                            label: 'PROXe',
+                            color: '#8B5CF6',
+                            bg: 'rgba(139,92,246,0.15)',
+                            tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                          }
+                        }
+
+                        if (!actorBadge && !channelCfg) {
+                          return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        }
+
+                        // Channel is the primary signal (which surface the
+                        // last touch landed on); the actor — if any — is a
+                        // sub-line "@username" beneath it.
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            {channelCfg && (
+                              <span
+                                className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{ backgroundColor: `${channelCfg.color}22`, color: channelCfg.color }}
+                                title={`Channel: ${channelCfg.label}`}
+                              >
+                                {channelCfg.label}
+                              </span>
+                            )}
+                            {actorBadge && (
+                              <span
+                                className="text-[10px] whitespace-nowrap"
+                                style={{ color: '#9ca3af' }}
+                                title={actorBadge.tooltip}
+                              >
+                                @{actorBadge.label.toLowerCase().replace(/\s+/g, '')}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </td>
+
+                    {/* SCORE - colored pill */}
+                    <td className="px-3 py-2 text-center">
+                      {score != null ? (
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${scorePillClass}`}
+                        >
+                          {score}
+                        </span>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}></span>
+                      )}
+                    </td>
+
+                    {/* STAGE - badge */}
+                    <td className="px-3 py-2 text-center">
                       <span
-                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${stageColor.bg} ${stageColor.text}`}
-                        style={stageColor.style}
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                        style={stageColor.style || {}}
                       >
                         {displayStage}
                       </span>
                     </td>
 
-                    {/* Status */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {lead.status ? (
-                        <span
-                          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusColor.bg} ${statusColor.text}`}
-                          style={statusColor.style}
-                        >
-                          {lead.status}
-                        </span>
-                      ) : (
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>-</span>
-                      )}
-                    </td>
-
-                    {/* Last Activity */}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                    {/* ACTIVE */}
+                    <td className="px-3 py-2 text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* Booking — compact chip with calendar icon */}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs">
-                      {bookingDate || bookingTime ? (
-                        <Link
-                          href="/dashboard/bookings"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
-                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+                    {/* BOOKING - compact chip with calendar icon + online/offline subtext */}
+                    <td className="px-3 py-2 text-xs text-center">
+                      {bookingDate ? (() => {
+                        // Resolve session type: explicit field wins, else infer from meet link presence.
+                        const brandCtx = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
+                        const explicit = String(brandCtx.session_type || brandCtx.demo_type || uc?.raw_form_fields?.demo_type || '').toLowerCase()
+                        const meetLink = uc?.web?.booking?.meetLink || uc?.web?.booking?.meet_link || null
+                        let sessionType: 'online' | 'offline' | null = null
+                        if (explicit === 'online' || explicit === 'offline') sessionType = explicit as 'online' | 'offline'
+                        else if (meetLink) sessionType = 'online'
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Link
+                              href="/dashboard/bookings"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
+                              style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+                            >
+                              <span aria-hidden="true">📅</span>
+                              {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {bookingTime ? `, ${formatBookingTime(bookingTime)}` : ''}
+                            </Link>
+                            {sessionType && (
+                              <span
+                                className="text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                                style={{ color: sessionType === 'online' ? '#3B82F6' : '#F59E0B' }}
+                              >
+                                {sessionType === 'online' ? 'Online' : 'Offline'}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })() : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </td>
+
+                    {/* Aviation columns — chip styling so the row reads as a
+                        scannable set of tags rather than mixed text + chips */}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs text-center">
+                        {lead.unified_context?.[brandId]?.user_type ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].user_type}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    )}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs text-center">
+                        {lead.unified_context?.[brandId]?.course_interest ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(14,165,233,0.15)', color: '#7dd3fc', border: '1px solid rgba(14,165,233,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].course_interest}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    )}
+                    {showAviationColumns && (() => {
+                      const uc = lead.unified_context || {}
+                      const wc = uc[brandId] || uc.windchasers || {}
+                      const rawScore = wc.pat_score ?? uc.raw_form_fields?.total_score ?? null
+                      const patRaw = rawScore != null ? Number(rawScore) : null
+                      // Display as /100 — see docs/pat-scoring.md
+                      const patScore100 = patRaw != null && !isNaN(patRaw)
+                        ? (wc.pat_score_100 ?? Math.round((patRaw * 100) / 150))
+                        : null
+                      // Tier — derive from raw if not stored (e.g. legacy raw_form_fields)
+                      const storedTier = String(
+                        wc.pat_tier || uc.raw_form_fields?.tier || ''
+                      ).toLowerCase().trim()
+                      const derivedTier = patRaw == null || isNaN(patRaw) ? ''
+                        : patRaw >= 140 ? 'premium'
+                        : patRaw >= 120 ? 'strong'
+                        : patRaw >= 90  ? 'moderate'
+                        : 'not-ready'
+                      const tier = storedTier || derivedTier
+                      const tierColors: Record<string, string> = {
+                        premium:     '#EAB308', // gold
+                        strong:      '#22C55E', // green
+                        moderate:    '#F59E0B', // yellow / amber
+                        'not-ready': '#EF4444', // red
+                      }
+                      const tierLabels: Record<string, string> = {
+                        premium: 'Premium',
+                        strong: 'Strong',
+                        moderate: 'Moderate',
+                        'not-ready': 'Early Stage',
+                      }
+                      const patColor = tierColors[tier] || 'var(--text-muted)'
+                      return (
+                        <td className="px-3 py-2 text-xs text-center">
+                          {patScore100 !== null ? (
+                            <span
+                              className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums"
+                              style={{ color: patColor, background: `${patColor}18` }}
+                              title={tier ? `Tier: ${tierLabels[tier] || tier} (raw ${patRaw}/150)` : undefined}
+                            >
+                              {patScore100}
+                              <span className="text-[9px] opacity-70">/100</span>
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      )
+                    })()}
+
+                    {/* OWNER */}
+                    <td className="px-3 py-2 text-xs">
+                      {lead.unified_context?.owner?.name ? (
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-full"
+                          style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                          title={lead.unified_context.owner.name}
                         >
-                          <span aria-hidden="true">📅</span>
-                          {bookingDate ? formatDateTime(bookingDate).split(',')[0] : ''}
-                          {bookingDate && bookingTime ? ', ' : ''}
-                          {bookingTime ? (() => {
-                            const timeParts = bookingTime.toString().split(':')
-                            if (timeParts.length < 2) return bookingTime.toString()
-                            const hours = parseInt(timeParts[0], 10)
-                            const minutes = parseInt(timeParts[1], 10)
-                            if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString()
-                            const period = hours >= 12 ? 'PM' : 'AM'
-                            const hours12 = hours % 12 || 12
-                            return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
-                          })() : ''}
-                        </Link>
+                          {lead.unified_context.owner.name}
+                        </span>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>—</span>
                       )}
@@ -1031,7 +1395,7 @@ export default function LeadsTable({
             )}
           </tbody>
         </table>
-      </div>}
+      </div>
 
       {/* Lead Details Modal */}
       <LeadDetailsModal
@@ -1041,156 +1405,11 @@ export default function LeadsTable({
         onStatusUpdate={updateLeadStatus}
       />
 
-      {/* Add Lead Modal */}
-      {isAddLeadOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40"
-            onClick={() => setIsAddLeadOpen(false)}
-          />
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={() => setIsAddLeadOpen(false)}
-          >
-            <div
-              className="relative rounded-lg shadow-xl w-full max-w-md"
-              style={{ backgroundColor: 'var(--bg-primary)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Add New Lead</h3>
-                <button onClick={() => setIsAddLeadOpen(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
-                  <MdClose size={16} style={{ color: 'var(--text-secondary)' }} />
-                </button>
-              </div>
-
-              {/* Form */}
-              <div className="px-5 py-4 flex flex-col gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Name *</label>
-                  <input
-                    type="text"
-                    value={addLeadForm.name}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, name: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
-                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
-                    placeholder="Lead name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Phone *</label>
-                  <input
-                    type="tel"
-                    value={addLeadForm.phone}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
-                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
-                    placeholder="+91 98765 43210"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Email</label>
-                  <input
-                    type="email"
-                    value={addLeadForm.email}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
-                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
-                    placeholder="email@example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Source</label>
-                  <select
-                    value={addLeadForm.source}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, source: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-md border outline-none cursor-pointer"
-                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                  >
-                    <option value="manual">Manual Entry</option>
-                    <option value="referral">Referral</option>
-                    <option value="walk-in">Walk-in</option>
-                    <option value="phone-call">Phone Call</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Context Note</label>
-                  <textarea
-                    value={addLeadForm.context_note}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, context_note: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1 resize-none"
-                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
-                    rows={3}
-                    placeholder="Add any context about this lead - what they need, how you met them, etc."
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={addLeadForm.auto_sequence}
-                    onChange={(e) => setAddLeadForm({ ...addLeadForm, auto_sequence: e.target.checked })}
-                    className="rounded"
-                    style={{ accentColor: 'var(--accent-primary)' }}
-                  />
-                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Start outreach sequence automatically</span>
-                </label>
-
-                {/* Error / Duplicate */}
-                {addLeadError && (
-                  <div className="text-xs px-3 py-2 rounded-md" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-                    {addLeadError}
-                    {addLeadDuplicateId && (
-                      <button
-                        onClick={() => {
-                          setIsAddLeadOpen(false)
-                          const lead = leads.find(l => l.id === addLeadDuplicateId)
-                          if (lead) { setSelectedLead(lead as any); setIsModalOpen(true) }
-                        }}
-                        className="ml-2 underline font-medium"
-                      >
-                        View existing lead
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Success */}
-                {addLeadSuccess && (
-                  <div className="text-xs px-3 py-2 rounded-md" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
-                    Lead created successfully!
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-2 px-5 py-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                <button
-                  onClick={() => setIsAddLeadOpen(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
-                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddLeadSubmit}
-                  disabled={addLeadSubmitting || !addLeadForm.name.trim() || !addLeadForm.phone.trim()}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                >
-                  {addLeadSubmitting ? 'Creating...' : 'Create Lead'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Add Lead Modal — realtime subscription refreshes the list on insert */}
+      <AddLeadModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   )
 }

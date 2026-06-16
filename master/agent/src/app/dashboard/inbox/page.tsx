@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   MdInbox,
   MdSend,
@@ -17,42 +17,84 @@ import {
   MdBusiness,
   MdNotes,
   MdLanguage,
-  MdSpeed,
-  MdGroup,
-  MdCalendarMonth,
-  MdPersonAdd,
-  MdReply,
-  MdSmartToy,
-  MdTimeline,
-  MdHistory,
+  MdPerson,
+  MdFlightTakeoff,
+  MdMessage,
+  MdSchedule,
 } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
-import { ConversationsSkeleton } from '@/components/dashboard/Skeleton'
+import WhatsAppTemplatePicker from '@/components/dashboard/WhatsAppTemplatePicker'
+import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 
-// Channel Icons using custom SVGs
+// Channel icons — plain SVG, no container. Tinted with the channel brand
+// colour via CSS filter (for img tags) or stroke (for inline SVG). The old
+// version wrapped each icon in a coloured square which looked busy in the
+// conversation list; this version is just the icon at the channel colour.
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
-  const style = {
-    opacity: active ? 1 : 0.3,
-    filter: 'invert(1) brightness(2)', // Inverts black to white for dark mode
+  const opacity = active ? 1 : 0.45;
+
+  // We tint white SVG line-art assets to the brand colour using a precomputed
+  // CSS filter. (`filter:invert(1)` on its own only makes them white — not the
+  // channel colour we want.) Each filter below was generated to map a black
+  // source SVG to the listed hex; ok-ish approximation, fine at 16px.
+  const TINT: Record<string, string> = {
+    web:      'invert(46%) sepia(86%) saturate(2074%) hue-rotate(206deg) brightness(98%) contrast(94%)',   // #3B82F6
+    whatsapp: 'invert(67%) sepia(78%) saturate(396%) hue-rotate(89deg) brightness(96%) contrast(89%)',     // #25D366
+    social:   'invert(72%) sepia(64%) saturate(539%) hue-rotate(0deg) brightness(99%) contrast(94%)',       // #F59E0B
   };
 
   switch (channel) {
     case 'web':
-      return <img src="/browser-stroke-rounded.svg" alt="Web" width={size} height={size} style={style} title="Website" />;
+      return (
+        <img
+          src="/browser-stroke-rounded.svg"
+          alt="Web" title="Website"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.web, display: 'inline-block', flexShrink: 0 }}
+        />
+      );
     case 'whatsapp':
-      return <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={size} height={size} style={style} title="WhatsApp" />;
+      return (
+        <img
+          src="/whatsapp-business-stroke-rounded.svg"
+          alt="WhatsApp" title="WhatsApp"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.whatsapp, display: 'inline-block', flexShrink: 0 }}
+        />
+      );
     case 'voice':
-      return <img src="/ai-voice-stroke-rounded.svg" alt="Voice" width={size} height={size} style={style} title="Voice" />;
+      return (
+        <svg
+          width={size} height={size} viewBox="0 0 24 24" fill="none"
+          style={{ opacity, flexShrink: 0 }}
+          aria-label="Voice"
+        >
+          <title>Voice</title>
+          <path
+            d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.24 1.01l-2.2 2.2z"
+            stroke="#8B5CF6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
+      );
     case 'social':
-      return <img src="/video-ai-stroke-rounded.svg" alt="Social" width={size} height={size} style={style} title="Social" />;
+      return (
+        <img
+          src="/video-ai-stroke-rounded.svg"
+          alt="Social" title="Social"
+          width={size} height={size}
+          style={{ opacity, filter: TINT.social, display: 'inline-block', flexShrink: 0 }}
+        />
+      );
     default:
       return null;
   }
 };
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice'];
+const ALL_CHANNELS = ['web', 'whatsapp'];
 
+// Score Ring - circular progress indicator with score inside
 // Score color/label scheme — kept in sync with LeadDetailsModal.getHealthColor
 // so a "Warm" lead reads the same color everywhere in the dashboard.
 //   90+   Hot   green
@@ -65,7 +107,6 @@ const scoreVisual = (score: number | null) => {
   return { color: '#3B82F6', label: 'Cold' };
 };
 
-// Score Ring — circular progress indicator with score inside
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
   const s = score ?? 0;
   const { color } = scoreVisual(score);
@@ -83,7 +124,7 @@ const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }
         style={{ transition: 'stroke-dasharray 0.3s ease' }}
       />
       <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
-        fill="white" fontSize="10" fontWeight="bold">{s}</text>
+        fill="var(--text-primary)" fontSize="10" fontWeight="bold">{s}</text>
     </svg>
   );
 };
@@ -106,6 +147,13 @@ interface Conversation {
   booking_date: string | null
   booking_time: string | null
   next_touchpoint: string | null
+  form_data: Record<string, any> | null
+  first_touchpoint: string | null
+  // Carried so the conversation list can re-calculate the lead score
+  // client-side (the DB lead_score is often stale or 0).
+  unified_context?: Record<string, any> | null
+  last_interaction_at?: string | null
+  timestamp?: string | null
 }
 
 interface Message {
@@ -117,73 +165,9 @@ interface Message {
   message_type: string
   metadata: any
   created_at: string
-  delivery_status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null
-  status_updated_at?: string | null
-  status_error?: string | null
+  delivered_at?: string | null
+  read_at?: string | null
 }
-
-// Delivery status badge component
-const DeliveryStatusIcon = ({ status, error }: { status?: string | null; error?: string | null }) => {
-  if (!status) return null;
-  
-  const icons = {
-    pending: (
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <circle cx="6" cy="6" r="5" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="2 2" />
-      </svg>
-    ),
-    sent: (
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M2 6L5 9L10 3" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    delivered: (
-      <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-        <path d="M2 6L5 9L10 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 9L8 11L12 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    read: (
-      <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-        <path d="M2 6L5 9L10 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 9L8 11L12 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M8 9L10 11L14 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
-      </svg>
-    ),
-    failed: (
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <circle cx="6" cy="6" r="5" stroke="#ef4444" strokeWidth="1.5" />
-        <path d="M4 4L8 8M8 4L4 8" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  };
-  
-  const tooltips: Record<string, string> = {
-    pending: 'Pending: Message queued for sending',
-    sent: 'Sent: Message accepted by Meta',
-    delivered: 'Delivered: Message reached device',
-    read: 'Read: Message opened by recipient',
-    failed: `Failed: ${error || 'Delivery failed'}`,
-  };
-  
-  return (
-    <span title={tooltips[status] || status} style={{ display: 'inline-flex', alignItems: 'center' }}>
-      {icons[status as keyof typeof icons] || null}
-    </span>
-  );
-};
-
-// Get delivery status style for message bubble
-const getDeliveryStatusStyle = (status?: string | null) => {
-  const styles: Record<string, { color: string; bg: string }> = {
-    pending: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-    sent: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-    delivered: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
-    read: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
-    failed: { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
-  };
-  return styles[status || ''] || { color: 'var(--text-muted)', bg: 'transparent' };
-};
 
 
 function cleanMessageContent(text: string): string {
@@ -213,10 +197,47 @@ function renderMarkdown(text: string) {
   });
 }
 
+/**
+ * Render WhatsApp-style markdown — what Meta's templates use natively:
+ *   *text*  → bold
+ *   _text_  → italic
+ *   ~text~  → strikethrough
+ * Newlines preserved as <br/>. Used for template messages so the inbox shows
+ * what the customer actually sees on WhatsApp (not raw asterisks).
+ */
+function renderWhatsAppMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  // Split on whichever WA marker appears (single * for bold, _ for italic, ~ for strikethrough)
+  // and newlines. Captured groups stay in the result; uncaptured separators don't.
+  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  return segments.map((seg, i) => {
+    if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
+      return <strong key={i} className="font-semibold">{seg.slice(1, -1)}</strong>;
+    }
+    if (seg.startsWith('_') && seg.endsWith('_') && seg.length > 2) {
+      return <em key={i} className="italic">{seg.slice(1, -1)}</em>;
+    }
+    if (seg.startsWith('~') && seg.endsWith('~') && seg.length > 2) {
+      return <s key={i}>{seg.slice(1, -1)}</s>;
+    }
+    return <span key={i}>{seg}</span>;
+  });
+}
+
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
-  const fieldPattern = /\b(\w+(?:_\w+)+\??)\s*:\s*/g;
+  // Meta lead forms arrive flattened as "<label>: <value> <label>: <value> …".
+  // Labels are either snake_case question keys (what_is_your_…?, which may contain
+  // an apostrophe such as child's) OR simple labels Meta appends (first name, phone,
+  // email, city). The old pattern only matched snake_case keys, so the simple labels
+  // mashed into the previous value and an apostrophe split one key into two.
+  // Trailing [?_]* handles Meta's "what_is_your_age?_:" shape (question mark AND
+  // a stray underscore before the colon) — otherwise that field mashed into the
+  // previous value.
+  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+[?_]*)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -229,7 +250,7 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
     const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
     const value = content.substring(valueStart, valueEnd).trim();
     const cleanKey = rawKey
-      .replace(/\?$/, '')
+      .replace(/[?_]+$/, '')
       .replace(/_/g, ' ')
       .split(' ')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
@@ -252,30 +273,107 @@ function getFormFieldLabel(key: string): string {
   if (k.includes('website')) return 'Website';
   if (k.includes('leads') || k.includes('handle')) return 'Volume';
   if (k.includes('ai system')) return 'AI Systems';
-  return key.length > 15 ? key.substring(0, 15) + '…' : key;
+  // Windchasers Meta lead-form questions
+  if (k.includes('concern')) return 'Concern';
+  if (k.includes('timeline') || k.includes('planning') || k.includes('start the flight') ||
+      k.includes('when are you') || k.includes('looking to start')) return 'Timeline';
+  if (k.includes('age')) return 'Age';
+  if (k.includes('education')) return 'Education';
+  if (k.includes('child')) return 'Child';
+  if (k.includes('name')) return 'Name';
+  // Fallback: show the full label (don't hard-truncate to 15 chars — that's what
+  // produced unreadable "WHAT IS YOUR PR…" labels). Cap generously instead.
+  return key.length > 48 ? key.substring(0, 48) + '…' : key;
 }
 
-const TEMPLATE_BUTTONS: Record<string, string[]> = {
-  'bcon_proxe_first_outreach': ['Yes, tell me more', 'Just exploring'],
-  'bcon_proxe_reengagement_engaged': ['Yes, let\'s continue', 'Not right now'],
-  'bcon_proxe_reengagement_noengage': ['Yes, tell me more', 'Not interested'],
-  'bcon_proxe_followup_engaged': ['Yes, let\'s schedule', 'Maybe later'],
-  'bcon_proxe_followup_noengage': ['Yes, tell me more', 'Not right now'],
-  'bcon_proxe_booking_reminder_24h': ['I\'ll be there', 'Need to reschedule'],
-  'bcon_proxe_booking_reminder_30m': ['On my way', 'Running late'],
-  'bcon_proxe_post_call_followup': ['I have a question', 'All good, thanks'],
-  'bcon_proxe_rnr': ['Yes, let\'s reschedule', 'I\'ll call back'],
-};
+/** Format a time gap in ms to a human-readable short string */
+function formatGap(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  if (hrs < 24) return remainMins > 0 ? `${hrs}h ${remainMins}m` : `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
 
-function getTemplateButtons(templateName: string): string[] {
-  return TEMPLATE_BUTTONS[templateName] || [];
+/** Color for gap: green < 5min, yellow 5-30min, red > 30min */
+function gapColor(ms: number): string {
+  const mins = ms / 60000;
+  if (mins < 5) return '#22c55e';
+  if (mins <= 30) return '#f59e0b';
+  return '#ef4444';
+}
+
+
+function getDeliveryStatusStyle(status: string | undefined): { bg: string; color: string } {
+  if (!status) return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  switch (status) {
+    case 'read': return { bg: 'rgba(59,130,246,0.12)', color: '#3B82F6' }
+    case 'delivered': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+    case 'failed': return { bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+    default: return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  }
+}
+
+function getTaskTypeTag(taskType: string | undefined): { label: string; bg: string; color: string } | null {
+  if (!taskType) return null
+  const t = taskType.toLowerCase()
+  if (t.includes('nudge')) return { label: 'Nudge', bg: 'rgba(249,115,22,0.15)', color: '#F97316' }
+  if (t.includes('push_to_book')) return { label: 'Push to Book', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('follow_up') || t.includes('followup')) return { label: 'Follow-up', bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { label: 'Re-engage', bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+  if (t.includes('first_outreach')) return { label: 'First Outreach', bg: 'rgba(99,102,241,0.15)', color: '#818CF8' }
+  if (t.includes('reminder')) return { label: 'Reminder', bg: 'rgba(59,130,246,0.15)', color: '#3B82F6' }
+  return null
+}
+
+function getDeliveryTooltip(status: string | undefined, error?: string): string {
+  if (!status) return 'Status: Pending \u2013 awaiting delivery confirmation'
+  switch (status) {
+    case 'sent': return 'Status: Sent \u2013 waiting for delivery'
+    case 'delivered': return 'Status: Delivered'
+    case 'read': return 'Status: Read by customer'
+    case 'failed': return `Status: Failed \u2013 ${error || 'unknown error'}`
+    default: return 'Status: Pending \u2013 awaiting delivery confirmation'
+  }
+}
+
+
+function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string }) {
+  // Check for failed state: no delivery confirmation after 10 minutes
+  const isFailed = !deliveredAt && !readAt && createdAt && 
+    (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
+
+  if (isFailed) {
+    // Warning icon
+    return (
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1v10M8 13v2" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  if (readAt) {
+    // Double green tick = read by recipient
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  if (deliveredAt) {
+    // Double amber tick = delivered
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  // Single amber tick = sent (no delivery confirmation)
+  return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 }
 
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [messagesLoading, setMessagesLoading] = useState(false)
@@ -289,11 +387,15 @@ export default function InboxPage() {
   const [showSummary, setShowSummary] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
-  const [leadChannels, setLeadChannels] = useState<string[]>([])
-  const [journeyEvents, setJourneyEvents] = useState<any[]>([])
-  const [journeyLoading, setJourneyLoading] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
+  const [calculatedLeadScore, setCalculatedLeadScore] = useState<number | null>(null)
+  // Map of lead_id → calculated score for the conversation list. The DB
+  // lead_score is often null/0; this lets the list reflect real engagement.
+  const [calculatedConvScores, setCalculatedConvScores] = useState<Record<string, number>>({})
+  const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -350,9 +452,24 @@ export default function InboxPage() {
     setShowSummary(false)
   }, [selectedLeadId])
 
+  // Anonymous-web-visitor right-panel state. true = no all_leads row to
+  // fetch (synthetic 'session:*' key). Distinct from `leadDetails === null`
+  // which the right pane treats as "still loading."
+  const [isAnonymousSession, setIsAnonymousSession] = useState(false)
+
   // Fetch lead details for right panel
   useEffect(() => {
-    if (!selectedLeadId) { setLeadDetails(null); return }
+    if (!selectedLeadId) { setLeadDetails(null); setIsAnonymousSession(false); return }
+
+    // Anonymous web visitor: no all_leads row exists, so skip the fetch
+    // and flag the panel to render a stub instead of the loading spinner.
+    if (selectedLeadId.startsWith('session:')) {
+      setLeadDetails(null)
+      setIsAnonymousSession(true)
+      return
+    }
+    setIsAnonymousSession(false)
+
     async function fetchLeadDetails() {
       try {
         console.log('[RIGHT PANEL] Fetching lead details for:', selectedLeadId)
@@ -381,85 +498,87 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
-  // Fetch distinct channels + journey timeline for selected lead
+  // Team members for the lead-owner dropdown (fetched once).
   useEffect(() => {
-    if (!selectedLeadId) { setLeadChannels([]); setJourneyEvents([]); return }
-    async function fetchJourney() {
-      setJourneyLoading(true)
+    let cancelled = false
+    fetch('/api/dashboard/team-members')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && Array.isArray(d.members)) setTeamMembers(d.members) })
+      .catch(() => { /* non-fatal */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Assign / clear the owner of the currently open lead.
+  const setLeadOwner = async (ownerId: string) => {
+    if (!selectedLeadId) return
+    const member = teamMembers.find((m) => m.id === ownerId) || null
+    const owner = member ? { id: member.id, name: member.name, email: member.email } : null
+    // Optimistic update
+    setLeadDetails((prev: any) => prev ? { ...prev, unified_context: { ...(prev.unified_context || {}), owner: owner ? { ...owner } : null } } : prev)
+    try {
+      await fetch(`/api/dashboard/leads/${selectedLeadId}/owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner }),
+      })
+    } catch { /* non-fatal; optimistic value stays */ }
+  }
+
+  // Recalculate lead score client-side whenever lead details change
+  // (DB lead_score is often stale/0 — calculator looks at messages + context)
+  useEffect(() => {
+    if (!leadDetails?.id) { setCalculatedLeadScore(null); return }
+    let cancelled = false
+    ;(async () => {
       try {
-        // Distinct channels
-        const { data: chanData } = await supabase
-          .from('conversations')
-          .select('channel')
-          .eq('lead_id', selectedLeadId)
-        const distinctChannels = [...new Set((chanData || []).map((r: any) => r.channel).filter(Boolean))]
-        setLeadChannels(distinctChannels)
-
-        // Journey: conversations (first + key messages per channel)
-        const { data: allMsgs } = await supabase
-          .from('conversations')
-          .select('channel, sender, content, created_at, metadata')
-          .eq('lead_id', selectedLeadId)
-          .order('created_at', { ascending: true })
-          .limit(500)
-
-        const events: any[] = []
-
-        // Group by channel and pick first message per channel
-        const seenChannels = new Set<string>()
-        for (const msg of (allMsgs || [])) {
-          if (!seenChannels.has(msg.channel)) {
-            seenChannels.add(msg.channel)
-            events.push({
-              type: 'first_contact',
-              channel: msg.channel,
-              date: msg.created_at,
-              summary: msg.sender === 'customer'
-                ? (msg.content?.substring(0, 80) + (msg.content?.length > 80 ? '...' : ''))
-                : 'Agent initiated',
-            })
-          }
-          // Booking confirmations from task worker
-          if (msg.metadata?.task_type === 'post_booking_confirmation') {
-            events.push({
-              type: 'booking',
-              channel: msg.channel,
-              date: msg.created_at,
-              summary: `Booking confirmed: ${msg.metadata?.booking_date || ''} ${msg.metadata?.booking_time || ''}`.trim(),
-            })
-          }
-        }
-
-        // Voice sessions
-        const { data: voiceSessions } = await supabase
-          .from('voice_sessions')
-          .select('call_duration_seconds, created_at, call_status, conversation_summary')
-          .eq('lead_id', selectedLeadId)
-          .order('created_at', { ascending: true })
-
-        for (const vs of (voiceSessions || [])) {
-          const dur = vs.call_duration_seconds
-          const durStr = dur ? `${Math.floor(dur / 60)}m ${dur % 60}s` : ''
-          events.push({
-            type: 'voice_call',
-            channel: 'voice',
-            date: vs.created_at,
-            summary: `Voice call${durStr ? ` - ${durStr}` : ''}${vs.conversation_summary ? `, ${vs.conversation_summary.substring(0, 60)}` : ''}`,
-          })
-        }
-
-        // Sort chronologically
-        events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        setJourneyEvents(events)
+        const result = await calculateLeadScore(leadDetails)
+        if (!cancelled) setCalculatedLeadScore(result.score)
       } catch (err) {
-        console.error('[Journey] Error:', err)
-      } finally {
-        setJourneyLoading(false)
+        console.error('[RIGHT PANEL] calculateLeadScore failed:', err)
+        if (!cancelled) setCalculatedLeadScore(null)
       }
+    })()
+    return () => { cancelled = true }
+  }, [leadDetails])
+
+  // Calculate scores for every conversation in the list. The DB lead_score
+  // is often null or stale (set to 0 when never recomputed) — without this
+  // the conversation list shows missing or zero scores even for engaged
+  // leads. Runs once per conversations refresh.
+  useEffect(() => {
+    if (!conversations || conversations.length === 0) {
+      setCalculatedConvScores({})
+      return
     }
-    fetchJourney()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLeadId])
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, number> = {}
+      // Run in parallel — each call queries conversations for the lead.
+      // For dozens of leads this is acceptable; if it grows, batch later.
+      await Promise.all(conversations.map(async (conv) => {
+        try {
+          const leadShape: any = {
+            id: conv.lead_id,
+            email: conv.lead_email,
+            phone: conv.lead_phone,
+            unified_context: conv.unified_context || {},
+            last_interaction_at: conv.last_interaction_at || conv.last_message_at,
+            booking_date: conv.booking_date,
+            booking_time: conv.booking_time,
+            timestamp: conv.timestamp || conv.last_message_at,
+            lead_score: conv.lead_score,
+          }
+          const result = await calculateLeadScore(leadShape)
+          next[conv.lead_id] = result.score
+        } catch {
+          // Fall back to whatever the DB has on failure.
+          next[conv.lead_id] = conv.lead_score ?? 0
+        }
+      }))
+      if (!cancelled) setCalculatedConvScores(next)
+    })()
+    return () => { cancelled = true }
+  }, [conversations])
 
   // Fetch messages when conversation selected or channel changes
   useEffect(() => {
@@ -486,21 +605,6 @@ export default function InboxPage() {
           }
         }
       )
-      // Also listen for delivery status updates (UPDATE events)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'conversations' },
-        (payload) => {
-          // If viewing this conversation and it's a delivery status update
-          if (payload.new.lead_id === selectedLeadId) {
-            setMessages(prev => prev.map(msg => 
-              msg.id === payload.new.id 
-                ? { ...msg, delivery_status: payload.new.delivery_status, status_updated_at: payload.new.status_updated_at }
-                : msg
-            ))
-          }
-        }
-      )
       .subscribe()
 
     return () => {
@@ -508,29 +612,6 @@ export default function InboxPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
-
-  // Polling for delivery status updates (every 30 seconds for sent/pending messages)
-  useEffect(() => {
-    if (!selectedLeadId) return;
-    
-    // Poll every 30 seconds to catch webhook updates
-    const pollInterval = setInterval(() => {
-      const hasPendingMessages = messages.some(
-        m => m.channel === 'whatsapp' 
-          && m.sender === 'agent' 
-          && (m.delivery_status === 'sent' || m.delivery_status === 'pending')
-          && new Date(m.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Only last 7 days
-      );
-      
-      if (hasPendingMessages) {
-        console.log('[inbox] Polling for delivery status updates...');
-        fetchMessages(selectedLeadId);
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(pollInterval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLeadId, messages])
 
   async function fetchConversations() {
     setLoading(true)
@@ -565,11 +646,14 @@ export default function InboxPage() {
         }
       }
 
-      // Fetch conversations with valid lead_id
+      // Fetch ALL conversations — including anonymous web chats (lead_id=null).
+      // Anonymous web visitors are grouped below by their session_id (in
+      // metadata) so they surface in the inbox even before they share
+      // phone/email. Without this, 100+ web chats can be active and the
+      // inbox stays empty.
       let query = supabase
         .from('conversations')
-        .select('lead_id, channel, content, sender, created_at')
-        .not('lead_id', 'is', null)
+        .select('lead_id, channel, content, sender, created_at, metadata')
         .order('created_at', { ascending: false })
         .limit(1000) // Limit to prevent performance issues
 
@@ -605,7 +689,7 @@ export default function InboxPage() {
         console.log('Attempting fallback: fetching leads with recent activity...')
         const { data: activeLeads, error: leadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage, booking_date, booking_time')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage')
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
@@ -624,6 +708,7 @@ export default function InboxPage() {
               fbUc?.whatsapp?.profile?.full_name ||
               fbUc?.web?.profile?.full_name ||
               lead.customer_name ||
+              lead.phone ||
               'Unknown';
             const fbBrand =
               fbUc?.web?.what_is_your_brand_name ||
@@ -647,9 +732,14 @@ export default function InboxPage() {
               lead_score: lead.lead_score ?? null,
               lead_stage: lead.lead_stage ?? null,
               city: fbUc?.whatsapp?.profile?.city || fbUc?.web?.profile?.city || null,
-              booking_date: lead.booking_date ?? null,
-              booking_time: lead.booking_time ?? null,
+              booking_date: fbUc?.web?.booking_date || fbUc?.whatsapp?.booking_date || null,
+              booking_time: fbUc?.web?.booking_time || fbUc?.whatsapp?.booking_time || null,
               next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
+              form_data: fbUc?.form_data || null,
+              first_touchpoint: lead.first_touchpoint || null,
+              unified_context: fbUc || null,
+              last_interaction_at: lead.last_interaction_at || null,
+              timestamp: lead.last_interaction_at || null,
             }
           })
 
@@ -669,27 +759,45 @@ export default function InboxPage() {
         content?: string | null
         created_at?: string | null
         sender?: string | null
+        metadata?: any
       }>
       console.log('Sample message:', messages[0])
 
-      // Group by lead_id and collect ALL channels per lead
+      // Group by lead_id. For anonymous rows (lead_id=null), use a synthetic
+      // key based on session_id from metadata so each unique web session
+      // shows as its own conversation row.
       const conversationMap = new Map<string, any>()
+      // Track which keys are anonymous so the render path knows to skip the
+      // lead lookup and render a placeholder name.
+      const anonymousKeys = new Set<string>()
 
       for (const msg of messages) {
-        if (!msg.lead_id) continue
+        // Determine the grouping key
+        let key: string
+        let isAnonymous = false
+        if (msg.lead_id) {
+          key = String(msg.lead_id)
+        } else {
+          const sessionId = msg.metadata?.session_id
+          if (!sessionId) continue // Can't group an anonymous row without a session
+          key = `session:${sessionId}`
+          isAnonymous = true
+          anonymousKeys.add(key)
+        }
 
-        if (!conversationMap.has(msg.lead_id)) {
-          conversationMap.set(msg.lead_id, {
-            lead_id: msg.lead_id,
+        if (!conversationMap.has(key)) {
+          conversationMap.set(key, {
+            lead_id: key,
+            is_anonymous: isAnonymous,
+            session_id: isAnonymous ? msg.metadata?.session_id : null,
             channels: new Set([msg.channel]),
             last_message: msg.content || '(No content)',
             last_message_at: msg.created_at,
-            message_count: 1
+            message_count: 1,
           })
         } else {
-          const conv = conversationMap.get(msg.lead_id)
+          const conv = conversationMap.get(key)
           conv.channels.add(msg.channel)
-          // Update to most recent message
           const msgCreatedAt = msg.created_at ? new Date(msg.created_at) : null
           const convLastAt = conv.last_message_at ? new Date(conv.last_message_at) : null
           if (!convLastAt || (msgCreatedAt && msgCreatedAt > convLastAt)) {
@@ -702,24 +810,47 @@ export default function InboxPage() {
 
       console.log('Unique conversations:', conversationMap.size)
 
-      // Get lead details for all conversations
-      const leadIds = Array.from(conversationMap.keys())
+      // Get lead details for all conversations — but exclude the synthetic
+      // 'session:*' keys (those have no row in all_leads, they're anonymous
+      // web visitors). Only query Supabase for real lead UUIDs.
+      const leadIds = Array.from(conversationMap.keys()).filter((k) => !k.startsWith('session:'))
 
-      if (leadIds.length === 0) {
+      if (conversationMap.size === 0) {
         setConversations([])
         setLoading(false)
         return
       }
 
-      console.log('Looking up lead IDs:', leadIds.length, 'leads')
+      console.log('Looking up lead IDs:', leadIds.length, 'leads (plus', anonymousKeys.size, 'anonymous sessions)')
 
-      const { data: leadsData, error: leadsError } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score')
-        .in('id', leadIds)
+      // Only query Supabase when there are real lead IDs — empty .in() blows
+      // up some Postgres queries. Anonymous sessions skip the lookup entirely.
+      const { data: leadsData, error: leadsError } = leadIds.length > 0
+        ? await supabase
+            .from('all_leads')
+            .select('id, customer_name, email, phone, unified_context, lead_stage, lead_score, first_touchpoint')
+            .in('id', leadIds)
+        : { data: [], error: null }
 
       if (leadsError) {
         console.error('Error fetching leads:', leadsError)
+      }
+
+      // Anonymous web sessions: the visitor has no all_leads row, but the agent
+      // may have captured their NAME in chat (stored on web_sessions.customer_name).
+      // Pull those so the inbox shows "Vivan" instead of "Anonymous Web Visitor".
+      const anonSessionIds = Array.from(conversationMap.values())
+        .filter((c: any) => c.is_anonymous && c.session_id)
+        .map((c: any) => String(c.session_id))
+      const anonNameBySession: Record<string, string> = {}
+      if (anonSessionIds.length > 0) {
+        const { data: sessRows } = await supabase
+          .from('web_sessions')
+          .select('external_session_id, customer_name')
+          .in('external_session_id', anonSessionIds)
+        for (const s of (sessRows || []) as Array<{ external_session_id: string; customer_name: string | null }>) {
+          if (s.customer_name) anonNameBySession[s.external_session_id] = s.customer_name
+        }
       }
 
       console.log('Leads data returned:', leadsData?.length || 0, 'leads')
@@ -752,15 +883,17 @@ export default function InboxPage() {
         email?: string | null
         phone?: string | null
         unified_context?: any
-        booking_date?: string | null
-        booking_time?: string | null
         lead_stage?: string | null
         lead_score?: number | null
       }>
 
       for (const [leadId, convData] of conversationMap) {
-        // Find matching lead - ensure we're comparing strings
-        const lead = typedLeads.find((l) => String(l.id) === String(leadId))
+        // Anonymous web session: no all_leads row to match, render a
+        // placeholder conversation so the operator can see it in the inbox.
+        const isAnonymous = !!convData.is_anonymous
+        const lead = isAnonymous
+          ? undefined
+          : typedLeads.find((l) => String(l.id) === String(leadId))
 
         // Clean the last message content
         const cleanedLastMessage = cleanMessageContent(convData.last_message || '');
@@ -771,9 +904,11 @@ export default function InboxPage() {
           continue;
         }
 
-        // Extract booking status: check direct columns first, then unified_context
+        // Extract booking status from unified_context (booking_date/time live there, not on all_leads)
         const ctx = lead?.unified_context || {};
-        const bookingStatus = (lead?.booking_date ? 'Call Booked' : null)
+        const bookingDateFromCtx = ctx?.web?.booking_date || ctx?.whatsapp?.booking_date || null;
+        const bookingTimeFromCtx = ctx?.web?.booking_time || ctx?.whatsapp?.booking_time || null;
+        const bookingStatus = (bookingDateFromCtx ? 'Call Booked' : null)
           || (lead?.lead_stage === 'Booking Made' ? 'Call Booked' : null)
           || ctx?.whatsapp?.booking_status
           || ctx?.web?.booking_status
@@ -806,11 +941,16 @@ export default function InboxPage() {
 
         // Prefer profile full_name (set by save_lead_profile tool) over customer_name
         // customer_name sometimes has the brand name instead of the person's name
-        const resolvedName =
-          uc?.whatsapp?.profile?.full_name ||
-          uc?.web?.profile?.full_name ||
-          lead?.customer_name ||
-          'Unknown';
+        // Anonymous sessions show "Web visitor · <short session id>" so operators
+        // can still distinguish multiple concurrent anonymous chats.
+        const resolvedName = isAnonymous
+          ? (anonNameBySession[String(convData.session_id || '')]
+             || `Web visitor · ${String(convData.session_id || '').slice(0, 8)}`)
+          : (uc?.whatsapp?.profile?.full_name ||
+             uc?.web?.profile?.full_name ||
+             lead?.customer_name ||
+             lead?.phone ||
+             'Unknown');
 
         const conversation: Conversation = {
           lead_id: leadId,
@@ -826,9 +966,14 @@ export default function InboxPage() {
           lead_score: lead?.lead_score ?? null,
           lead_stage: lead?.lead_stage ?? null,
           city: cityValue,
-          booking_date: lead?.booking_date ?? null,
-          booking_time: lead?.booking_time ?? null,
+          booking_date: bookingDateFromCtx,
+          booking_time: bookingTimeFromCtx,
           next_touchpoint: nextTouchpoint,
+          form_data: uc?.form_data || null,
+          first_touchpoint: (lead as any)?.first_touchpoint || null,
+          unified_context: uc || null,
+          last_interaction_at: (lead as any)?.last_interaction_at || null,
+          timestamp: (lead as any)?.last_interaction_at || null,
         }
 
         console.log('Adding conversation:', {
@@ -864,32 +1009,51 @@ export default function InboxPage() {
 
   async function fetchMessages(leadId: string) {
     setMessagesLoading(true)
+    setMessageChannelFilter('all')
     try {
-      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel, 'filter:', channelFilter)
+      console.log('Fetching all messages for lead:', leadId)
 
-      // When channelFilter is 'all', fetch ALL messages across all channels (unified view)
-      // When a specific channel is selected, filter by it
-      if (channelFilter !== 'all' && selectedChannel) {
-        const { data: channelData, error: channelError } = await supabase
+      // Anonymous web visitor path: the conversation list groups these by
+      // `session:<sid>` synthetic keys because they have no all_leads row.
+      // Skip the lead_id query (it'd be a Postgres UUID parse error on the
+      // 'session:' prefix anyway) and fetch by session_id directly.
+      if (leadId.startsWith('session:')) {
+        const sid = leadId.slice('session:'.length)
+        const { data: anonMsgs, error: anonErr } = await supabase
           .from('conversations')
           .select('*')
-          .eq('lead_id', leadId)
-          .eq('channel', selectedChannel)
+          .is('lead_id', null)
+          .filter('metadata->>session_id', 'eq', sid)
           .order('created_at', { ascending: true })
 
-        if (channelError) {
-          console.error('Error fetching messages by channel:', channelError)
-        } else if (channelData && channelData.length > 0) {
-          console.log('Fetched messages for channel:', selectedChannel, 'count:', channelData.length)
-          setMessages(channelData)
-          setMessagesLoading(false)
+        if (anonErr) {
+          console.error('[fetchMessages] anonymous session fetch failed:', anonErr)
+          setMessages([])
           return
         }
+
+        const messagesData = (anonMsgs || []).map((msg: any): Message => ({
+          id: String(msg?.id ?? ''),
+          lead_id: String(msg?.lead_id ?? ''),
+          channel: String(msg?.channel ?? ''),
+          sender: (msg?.sender ?? 'system') as Message['sender'],
+          content: String(msg?.content ?? ''),
+          message_type: String(msg?.message_type ?? ''),
+          metadata: msg?.metadata ?? null,
+          created_at: String(msg?.created_at ?? ''),
+          delivered_at: msg?.delivered_at ?? null,
+          read_at: msg?.read_at ?? null,
+        }))
+        console.log(`[fetchMessages] anonymous session ${sid}: ${messagesData.length} messages`)
+        if (!selectedChannel && messagesData[0]?.channel) {
+          setSelectedChannel(messagesData[0].channel)
+        }
+        setMessages(messagesData)
+        return
       }
 
-      // Unified view: Fetch all conversations for this lead across all channels
-      console.log('Fetching all conversations for lead (unified multi-channel)')
-      const { data, error } = await supabase
+      // 1. Fetch messages directly linked to this lead
+      const { data: leadMessages, error } = await supabase
         .from('conversations')
         .select('*')
         .eq('lead_id', leadId)
@@ -901,7 +1065,55 @@ export default function InboxPage() {
         throw error
       }
 
-      const messagesData = (data ?? []).map((msg: any): Message => ({
+      let allRaw: any[] = leadMessages ?? []
+
+      // 2. Also fetch anonymous messages that were logged before a lead was created.
+      //    These rows have lead_id = null but carry session_id in their metadata.
+      //    Look up every web_session linked to this lead and pull those rows too.
+      try {
+        const { data: sessions } = await supabase
+          .from('web_sessions')
+          .select('external_session_id')
+          .eq('lead_id', leadId)
+
+        const sessionIds = (sessions ?? [])
+          .map((s: any) => s.external_session_id)
+          .filter(Boolean)
+
+        if (sessionIds.length > 0) {
+          for (const sid of sessionIds) {
+            const { data: anonMsgs } = await supabase
+              .from('conversations')
+              .select('*')
+              .is('lead_id', null)
+              .filter('metadata->>session_id', 'eq', sid)
+              .order('created_at', { ascending: true })
+
+            if (anonMsgs && anonMsgs.length > 0) {
+              console.log(`[fetchMessages] Found ${anonMsgs.length} anonymous messages for session ${sid}`)
+              allRaw = [...allRaw, ...anonMsgs]
+            }
+          }
+
+          // Deduplicate by id and sort chronologically
+          const seen = new Set<string>()
+          allRaw = allRaw
+            .filter((msg: any) => {
+              const key = String(msg.id)
+              if (seen.has(key)) return false
+              seen.add(key)
+              return true
+            })
+            .sort((a: any, b: any) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )
+        }
+      } catch (anonErr) {
+        console.warn('[fetchMessages] Could not fetch anonymous messages:', anonErr)
+        // Non-fatal — we still show the lead messages fetched above
+      }
+
+      const messagesData = allRaw.map((msg: any): Message => ({
         id: String(msg?.id ?? ''),
         lead_id: String(msg?.lead_id ?? ''),
         channel: String(msg?.channel ?? ''),
@@ -910,9 +1122,8 @@ export default function InboxPage() {
         message_type: String(msg?.message_type ?? ''),
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
-        delivery_status: msg?.delivery_status,
-        status_updated_at: msg?.status_updated_at,
-        status_error: msg?.status_error,
+        delivered_at: msg?.delivered_at ?? null,
+        read_at: msg?.read_at ?? null,
       }))
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {
@@ -1000,14 +1211,14 @@ export default function InboxPage() {
       // Transform to match the Lead interface expected by LeadDetailsModal
       const leadData = {
         id: typedLead.id,
-        name: typedLead.customer_name || 'Unknown',
+        name: typedLead.customer_name || typedLead.phone || 'Unknown',
         email: typedLead.email || '',
         phone: typedLead.phone || '',
         source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
         first_touchpoint: typedLead.first_touchpoint || null,
         last_touchpoint: typedLead.last_touchpoint || null,
         timestamp: typedLead.created_at || typedLead.timestamp,
-        status: typedLead.lead_stage || typedWebSession.booking_status || 'New Lead',
+        status: typedLead.status || typedWebSession.booking_status || 'New Lead',
         booking_date: typedWebSession.booking_date || bookingFromContext || null,
         booking_time: bookingTime,
         unified_context: typedLead.unified_context || null,
@@ -1196,6 +1407,23 @@ export default function InboxPage() {
     })
   }
 
+  function formatDateSeparator(timestamp: string) {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const yesterday = new Date(today.getTime() - 86400000)
+    const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+    if (msgDate.getTime() === today.getTime()) return 'Today'
+    if (msgDate.getTime() === yesterday.getTime()) return 'Yesterday'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  function getDateKey(timestamp: string) {
+    const d = new Date(timestamp)
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  }
+
   // Filter conversations by search
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true
@@ -1209,36 +1437,59 @@ export default function InboxPage() {
 
   const selectedConversation = conversations.find((c) => c.lead_id === selectedLeadId)
 
-  // Show skeleton on initial load
-  if (loading && conversations.length === 0) {
-    return <ConversationsSkeleton />
-  }
+  // Filter messages by channel tab selection (client-side)
+  const filteredMessages = messageChannelFilter === 'all'
+    ? messages
+    : messages.filter(m => m.channel === messageChannelFilter)
 
   // Render the inbox UI
   return (
-    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', overflow: 'hidden', background: 'var(--bg-primary)' }}>
+    <div className="flex-1 flex overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)', position: 'absolute', inset: 0 }}>
+      <style>{`
+        .template-status-tag { position: relative; }
+        .template-status-tag::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          bottom: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0;
+          text-transform: none;
+          white-space: nowrap;
+          background: #1a1a1a;
+          color: #e0e0e0;
+          border: 1px solid rgba(255,255,255,0.12);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.15s;
+          z-index: 10;
+        }
+        .template-status-tag:hover::after { opacity: 1; }
+      `}</style>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
         message={loading ? "Loading conversations..." : "Loading messages..."}
       />
 
-      {/* Left Panel - Conversations List */}
+      {/* Left Panel - Conversations List
+          Widened 320 → 352 (~10%) for breathing room per user feedback. */}
       <div
-        className="flex flex-col"
+        className="w-[352px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
-          width: 380,
-          flexShrink: 0,
-          height: '100%',
-          overflow: 'hidden',
           background: 'var(--bg-secondary)',
-          borderRight: '1px solid rgba(255,255,255,0.1)',
+          borderColor: 'var(--border-primary)',
+          minWidth: '300px',
         }}
       >
         {/* Search + Filters - flush at top */}
         <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <div
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-amber-500/50 mb-2"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-[var(--accent-primary)]/50 focus-within:ring-2 focus-within:ring-[var(--accent-primary)]/20 mb-2"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
@@ -1249,19 +1500,19 @@ export default function InboxPage() {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-xs"
+              className="bg-transparent border-none outline-none focus:outline-none flex-1 text-xs"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
           <div className="flex gap-1">
-            {['all', 'web', 'whatsapp', 'voice'].map((ch) => (
+            {['all', 'web', 'whatsapp', 'social'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 style={{
-                  background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
+                  background: channelFilter === ch ? 'var(--button-bg, #fff)' : 'transparent',
+                  color: channelFilter === ch ? 'var(--text-button, #000)' : 'var(--text-muted)',
                 }}
               >
                 {ch}
@@ -1282,7 +1533,7 @@ export default function InboxPage() {
               <button
                 onClick={() => fetchConversations()}
                 className="mt-1 px-3 py-1 text-[10px] rounded"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
+                style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
               >
                 Refresh
               </button>
@@ -1296,10 +1547,16 @@ export default function InboxPage() {
               const isSelected = selectedLeadId === conv.lead_id;
               const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-              // Temperature helpers
-              const scoreColor = conv.lead_score != null
-                ? (conv.lead_score >= 70 ? '#22c55e' : conv.lead_score >= 40 ? '#f59e0b' : conv.lead_score >= 20 ? '#3b82f6' : '#ef4444')
-                : null;
+              // Prefer the live-calculated score over the DB value (which is
+              // frequently null/0). Fall back to whichever is non-null.
+              const calcScore = calculatedConvScores[conv.lead_id]
+              const displayScore: number | null = calcScore != null
+                ? Math.max(calcScore, conv.lead_score ?? 0)
+                : conv.lead_score
+              // Temperature helpers — use the shared scoreVisual so the
+              // conversation list, the right panel, and the lead modal all
+              // agree on what "Warm" looks like.
+              const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
 
               if (isSelected) {
                 // ── SELECTED CARD (minimal) ──
@@ -1322,19 +1579,24 @@ export default function InboxPage() {
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
-                    <div className="px-3 py-2 pl-4">
-                      {/* Line 1: Score Ring + Name + Timestamp + Open */}
+                    <div className="px-4 py-3 pl-5">
+                      {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
-                        <ScoreRing score={conv.lead_score} size={28} />
-                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'white' }}>
+                        <ScoreRing score={displayScore} size={28} />
+                        <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                          {conv.channels.map((ch) => (
+                            <ChannelIcon key={ch} channel={ch} size={14} active={true} />
+                          ))}
+                        </span>
+                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
-                        <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                           {timeAgo(conv.last_message_at)}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); openLeadModal(conv.lead_id); }}
-                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80"
+                          className="p-1 rounded transition-colors flex-shrink-0 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                           style={{ color: 'var(--text-secondary)' }}
                           title="Open lead details"
                         >
@@ -1342,24 +1604,22 @@ export default function InboxPage() {
                         </button>
                       </div>
 
-                      {/* Line 2: Brand · Location · Source */}
-                      <div className="text-xs truncate mt-1 flex items-center gap-1" style={{ color: '#9ca3af', paddingLeft: '38px' }}>
-                        {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
-                        {(conv.brand_name || conv.city) && conv.channels.length > 0 && (
-                          <span className="mx-0.5" style={{ opacity: 0.4 }}>·</span>
-                        )}
-                        <span className="inline-flex items-center gap-0.5">
-                          {conv.channels.map((ch) => (
-                            <ChannelIcon key={ch} channel={ch} size={10} active={true} />
-                          ))}
-                        </span>
-                      </div>
+                      {/* Line 2: Brand · Location */}
+                      {(conv.brand_name || conv.city) && (
+                        <div className="text-xs truncate mt-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
+                          {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
 
-                      {/* Line 3: Event pill (highlighted, only if booking exists) */}
-                      {conv.booking_date && (
+                      {/* Line 3: Event pill (highlighted for upcoming, muted for past) */}
+                      {conv.booking_date && (() => {
+                        const isPast = conv.booking_date < new Date().toISOString().split('T')[0]
+                        return (
                         <div className="mt-1.5" style={{ paddingLeft: '38px' }}>
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
-                            style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            style={isPast
+                              ? { background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: '1px solid var(--border-primary)', opacity: 0.6 }
+                              : { background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
                             <MdEvent size={11} />
                             {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             {conv.booking_time && (() => {
@@ -1371,7 +1631,8 @@ export default function InboxPage() {
                             })()}
                           </span>
                         </div>
-                      )}
+                        )
+                      })()}
                     </div>
                   </div>
                 );
@@ -1389,38 +1650,39 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-[var(--bg-hover)]"
                   style={{
                     borderColor: 'var(--border-primary)',
                   }}
                 >
-                  <div className="px-3 py-2.5">
-                    {/* Line 1: Name + Channel Badges + Timestamp */}
-                    <div className="flex items-center">
+                  <div className="px-4 py-3">
+                    {/* Line 1: Channel icons + Name + Timestamp
+                        (Per design: only the SELECTED row shows a ScoreRing —
+                        unselected rows just show the name to keep the list
+                        scannable.) */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                        {conv.channels.map((ch) => (
+                          <ChannelIcon key={ch} channel={ch} size={13} active={true} />
+                        ))}
+                      </span>
                       <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
-                      {conv.channels && conv.channels.length > 0 && (
-                        <span className="flex items-center gap-0.5 mr-2 flex-shrink-0">
-                          {conv.channels.map((ch: string) => (
-                            <ChannelIcon key={ch} channel={ch} size={10} active={true} />
-                          ))}
-                        </span>
-                      )}
-                      <span className="text-[9px] flex-shrink-0" style={{ color: '#6b7280' }}>
+                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
                     {/* Line 2: Last message preview + EVENT badge */}
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <p className="text-[11px] truncate flex-1" style={{ color: '#6b7280' }}>
+                      <p className="text-[11px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
                         {conv.last_message || '\u00A0'}
                       </p>
                       {conv.booking_status && (
                         <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                           style={{
-                            background: 'rgba(96, 165, 250, 0.15)',
-                            color: '#60a5fa',
+                            background: 'rgba(34,197,94,0.15)',
+                            color: '#16a34a',
                           }}>
                           EVENT
                         </span>
@@ -1435,7 +1697,7 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0, background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -1448,7 +1710,7 @@ export default function InboxPage() {
             {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
-                className="mx-3 mt-2 mb-1 p-3 rounded-lg border flex-shrink-0"
+                className="mx-3 mt-2 mb-1 p-3 rounded-lg border"
                 style={{
                   background: 'var(--bg-tertiary)',
                   borderColor: 'var(--accent-primary)',
@@ -1477,172 +1739,456 @@ export default function InboxPage() {
               </div>
             )}
 
+            {/* Channel filter tabs */}
+            {selectedConversation && selectedConversation.channels.length > 0 && (
+              <div className="px-4 pt-2 pb-1 border-b flex items-center gap-1" style={{ borderColor: 'var(--border-primary)' }}>
+                {['all', ...selectedConversation.channels].map((ch) => {
+                  const isActive = messageChannelFilter === ch
+                  const label = ch === 'all' ? 'All' : ch === 'whatsapp' ? 'WhatsApp' : ch === 'web' ? 'Web' : ch === 'voice' ? 'Voice' : ch === 'social' ? 'Social' : ch
+                  const count = ch === 'all' ? messages.length : messages.filter(m => m.channel === ch).length
+                  return (
+                    <button
+                      key={ch}
+                      onClick={() => setMessageChannelFilter(ch)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all"
+                      style={{
+                        background: isActive ? 'var(--accent-subtle)' : 'transparent',
+                        color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                        borderBottom: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      }}
+                    >
+                      {ch !== 'all' && <ChannelIcon channel={ch} size={12} active={isActive} />}
+                      {label}
+                      <span className="text-[9px] opacity-60">({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
+              className="flex-1 overflow-y-auto px-6 py-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
+            {/* Messages were capped at 700px — too narrow for the chat panel,
+                producing dead space on both sides. Cap raised to 1100px and
+                outer padding bumped to px-6 so messages breathe but don't
+                stretch into long unreadable lines. */}
+            <div className="max-w-[1100px] mx-auto space-y-3">
               {messagesLoading ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
-              ) : messages.length === 0 ? (
-                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>No messages yet</div>
+              ) : filteredMessages.length === 0 ? (
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {messageChannelFilter !== 'all' ? `No ${messageChannelFilter} messages` : 'No messages yet'}
+                </div>
               ) : (
-                messages.map((msg, msgIdx) => {
+                <>
+                {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
+                {messageChannelFilter === 'all' && selectedConversation?.form_data && !parseFormFields(filteredMessages[0]?.content) && (() => {
+                  const fd = selectedConversation.form_data!
+                  const formFields: { label: string; value: string }[] = []
+                  if (fd.brand_name) formFields.push({ label: 'Brand', value: fd.brand_name })
+                  if (fd.has_website === true) formFields.push({ label: 'Website', value: 'Yes' })
+                  else if (fd.has_website === false) formFields.push({ label: 'Website', value: 'No' })
+                  if (fd.monthly_leads) formFields.push({ label: 'Volume', value: fd.monthly_leads })
+                  if (fd.urgency) formFields.push({ label: 'Urgency', value: fd.urgency.replace(/_/g, ' ') })
+                  if (fd.has_ai_systems === true) formFields.push({ label: 'AI Systems', value: 'Yes' })
+                  else if (fd.has_ai_systems === false) formFields.push({ label: 'AI Systems', value: 'No' })
+                  if (formFields.length === 0) return null
+                  return (
+                    <div className="flex justify-start mb-2">
+                      <div className="max-w-[440px] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                              {selectedConversation?.lead_name || 'Lead'}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
+                              Meta Form Submission
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {formFields.map((f, i) => (
+                            <div key={i} className="flex items-baseline gap-1">
+                              <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{f.label}:</span>
+                              <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+                {filteredMessages.map((msg, msgIdx) => {
+                  // Date separator between messages from different days
+                  const showDateSeparator = msgIdx === 0 ||
+                    getDateKey(msg.created_at) !== getDateKey(filteredMessages[msgIdx - 1].created_at);
+
                   // Check if this is a form data message (first customer message with form fields)
                   const isCustomer = msg.sender === 'customer';
                   const formData = isCustomer ? parseFormFields(msg.content) : null;
 
+                  const dateSeparator = showDateSeparator ? (
+                    <div className="flex items-center gap-3 py-2" key={`date-${msg.id}`} style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-primary)' }}>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                      <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateSeparator(msg.created_at)}
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border-primary)' }} />
+                    </div>
+                  ) : null;
+
                   if (formData) {
-                    // Render as compact form data card
-                    const priorityFields = formData.fields.filter(f => {
-                      const k = f.key.toLowerCase();
-                      return k.includes('brand') || k.includes('full name') || k.includes('email') ||
-                             k.includes('phone') || k.includes('city') || k.includes('how fast') ||
-                             k.includes('business type');
-                    });
-                    const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
+                    // Meta-form card — clean, ordered, blue-tinted (so it reads as
+                    // "came from Meta" the way agent bubbles read green).
+                    const withLabels = formData.fields.map(f => ({ value: f.value, label: getFormFieldLabel(f.key) }))
+                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Timeline']
+                    const seen = new Set<typeof withLabels[number]>()
+                    const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)))
+                    const otherOrdered = withLabels.filter(f => !seen.has(f))
+                    // Which form: parent forms ask about "your child"; otherwise student.
+                    const formKind = formData.fields.some(f => f.key.toLowerCase().includes('child')) ? 'Parent' : 'Student'
+                    const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[9px] font-semibold uppercase tracking-wide w-[68px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span className="text-[12px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                      </div>
+                    )
 
                     return (
-                      <div key={msg.id} className="flex justify-start">
+                      <React.Fragment key={msg.id}>
+                      {dateSeparator}
+                      <div className="flex justify-start">
                         <div
-                          className="max-w-[90%] rounded-lg px-3 py-2 border"
-                          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                          className="max-w-[440px] rounded-xl px-3.5 py-2.5 border"
+                          style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
                               <ChannelIcon channel={msg.channel} size={10} active={true} />
                               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                                 {selectedConversation?.lead_name || 'Customer'}
                               </span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                                Form Submission
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
+                                Meta Form
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(59,130,246,0.1)', color: '#93b4f5' }}>
+                                {formKind}
                               </span>
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Compact fields grid */}
-                          <div className="flex flex-wrap gap-x-4 gap-y-1">
-                            {priorityFields.map((f, i) => (
-                              <div key={i} className="flex items-baseline gap-1">
-                                <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                              </div>
-                            ))}
+                          {/* Ordered fields — one per row */}
+                          <div className="space-y-1">
+                            {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
-                          {otherFields.length > 0 && (
-                            <details className="mt-1">
-                              <summary className="text-[9px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>+{otherFields.length} more fields</summary>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                                {otherFields.map((f, i) => (
-                                  <div key={i} className="flex items-baseline gap-1">
-                                    <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
-                                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
-                                  </div>
-                                ))}
+                          {otherOrdered.length > 0 && (
+                            <details className="mt-1.5">
+                              <summary className="text-[10px] cursor-pointer" style={{ color: '#60a5fa' }}>+{otherOrdered.length} more fields</summary>
+                              <div className="space-y-1 mt-1.5">
+                                {otherOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                               </div>
                             </details>
                           )}
                         </div>
                       </div>
+                      </React.Fragment>
                     );
                   }
 
                   // Regular message bubble
-                  const templateName = msg.metadata?.template || null;
-                  const isTemplate = !isCustomer && !!templateName;
-                  const templateButtons: string[] = isTemplate
-                    ? (msg.metadata?.template_buttons || getTemplateButtons(templateName))
-                    : [];
+                  const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
+                  const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
+                  // Template messages render in a compact "card" — narrower,
+                  // smaller padding, distinct from the big chat bubbles. Matches
+                  // the WhatsApp-style template feel (header strip + body + foot).
+                  const isTemplate = !isCustomer && !!msg.metadata?.template_name
 
                   return (
+                    <React.Fragment key={msg.id}>
+                    {dateSeparator}
                     <div
-                      key={msg.id}
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isCustomer
-                          ? 'bg-white dark:bg-[#1A1A2E] border border-gray-200 dark:border-[#1E1E2E]'
-                          : ''}`}
+                        className={isTemplate
+                          ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
+                          : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
                         style={{
-                          background: !isCustomer ? 'var(--accent-subtle)' : undefined,
-                          borderColor: !isCustomer && !isTemplate ? 'var(--accent-primary)' : undefined,
-                          borderWidth: !isCustomer ? '1px' : undefined,
-                          ...(isTemplate ? {
-                            borderLeft: '3px solid var(--template-accent, #E8912D)',
-                            borderTop: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
-                            borderRight: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
-                            borderBottom: '1px solid var(--template-border, rgba(232, 145, 45, 0.25))',
-                          } : {}),
+                          // Three subtle bubble tints so customer / agent /
+                          // template all read as distinct at a glance:
+                          //   Customer      → neutral var(--bg-secondary)
+                          //   PROXe AI      → faint brand-gold tint
+                          //   Template (WA) → WhatsApp-green tint + border
+                          // Opaque + backdropFilter blur(8px) so the chat
+                          // pane's dotted grid pattern doesn't bleed through.
+                          background: isCustomer
+                            ? 'var(--bg-secondary)'
+                            : isTemplate
+                              ? 'rgba(37, 211, 102, 0.10)'
+                              // Faint brand-gold tint for free-form AI replies.
+                              // Subtle enough that templates still dominate
+                              // visually, distinct enough that the eye knows
+                              // "this isn't a customer message".
+                              : 'rgba(201, 169, 97, 0.08)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          borderColor: isCustomer
+                            ? 'var(--border-primary)'
+                            : isTemplate
+                              ? 'rgba(37, 211, 102, 0.45)'
+                              // Matching subtle gold edge so the AI bubble
+                              // has a hint of brand framing.
+                              : 'rgba(201, 169, 97, 0.25)',
+                          borderWidth: '1px',
+                          ...(!isTemplate && msg.metadata?.template_name
+                            ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
+                            : !isTemplate && taskTag
+                            ? { borderLeft: `3px solid ${taskTag.color}` }
+                            : {}),
                         }}
                       >
-                        <div className="flex items-center justify-between gap-3 mb-1">
-                          <div className="flex items-center gap-1">
-                            <ChannelIcon channel={msg.channel} size={9} active={true} />
-                            <span
-                              className="text-[9px] font-bold uppercase tracking-wider"
-                              style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
-                            >
-                              {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
-                            </span>
-                            <span className="text-[8px] uppercase px-1 py-px rounded" style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}>
-                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'voice' ? 'Voice' : msg.channel === 'web' ? 'Web' : msg.channel}
-                            </span>
-                          </div>
-                          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                            {formatTime(msg.created_at)}
-                          </span>
-                        </div>
-                        <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
-                          {renderMarkdown(msg.content)}
-                        </div>
                         {isTemplate && (
-                          <div className="mt-1.5 flex flex-col gap-1">
-                            <div className="flex items-center gap-1">
-                              <span
-                                className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded"
-                                style={{
-                                  color: 'var(--template-accent, #E8912D)',
-                                  background: 'var(--template-badge-bg, rgba(232, 145, 45, 0.1))',
-                                }}
+                          <>
+                            {/* WA-green template header strip — uses the
+                               WhatsApp dark-green header colour so the
+                               bubble instantly reads as a Meta-approved
+                               template (vs a free-form AI reply). */}
+                            <div
+                              className="flex items-center justify-between gap-2 px-2.5 py-1 border-b"
+                              style={{
+                                background: 'rgba(37, 211, 102, 0.18)',
+                                borderColor: 'rgba(37, 211, 102, 0.35)',
+                              }}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <ChannelIcon channel={msg.channel} size={10} active={true} />
+                                <span className="text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ color: '#22c55e' }}>
+                                  Template · {msg.channel === 'whatsapp' ? 'WA' : msg.channel}
+                                </span>
+                                {msg.metadata?.template_name && (
+                                  <span className="text-[8px] truncate" style={{ color: 'var(--text-muted)' }} title={msg.metadata.template_name}>
+                                    · {msg.metadata.template_name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Meta-approved template HEADER text (e.g. "PAT Result" / "Demo Session Booked") */}
+                            {msg.metadata?.template_header && (
+                              <div
+                                className="px-2.5 pt-2 pb-1 text-[13px] font-bold"
+                                style={{ color: 'var(--text-primary)' }}
                               >
-                                {templateName.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} Template
+                                {msg.metadata.template_header}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {!isTemplate && (
+                          <div className="flex items-center justify-between gap-3 mb-1">
+                            <div className="flex items-center gap-1">
+                              <ChannelIcon channel={msg.channel} size={11} active={true} />
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider"
+                                style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                              >
+                                {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                              </span>
+                              <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
+                                {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
                               </span>
                             </div>
-                            {templateButtons.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {templateButtons.map((btn: string, i: number) => (
-                                  <span
-                                    key={i}
-                                    className="text-[9px] px-2 py-0.5 rounded-full"
-                                    style={{
-                                      color: 'var(--text-secondary)',
-                                      background: 'var(--bg-tertiary)',
-                                      border: '1px solid var(--border-primary)',
-                                    }}
-                                  >
-                                    {btn}
-                                  </span>
-                                ))}
-                              </div>
+                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                              {formatTime(msg.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div
+                          className={isTemplate
+                            ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap'
+                            : 'text-[13px] leading-relaxed'}
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {/* Pick the formatter by what the source platform actually
+                             uses. WhatsApp (both templates AND free-form AI replies)
+                             uses single-asterisk *bold*, _italic_, ~strike~. Web/dashboard
+                             messages use Markdown's double-asterisk **bold**. Picking
+                             solely on isTemplate left WA agent replies showing literal
+                             asterisks ("All set, Punith. Your demo is locked in for
+                             *Tuesday, May 26*."). */}
+                          {(isTemplate || msg.channel === 'whatsapp')
+                            ? renderWhatsAppMarkdown(msg.content)
+                            : renderMarkdown(msg.content)}
+                        </div>
+                        {msg.metadata?.template_name && (() => {
+                          const ds = msg.metadata?.delivery_status
+                          const statusStyle = getDeliveryStatusStyle(ds)
+                          const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
+                          // Send-side failure (from inbound auto-templates):
+                          //   metadata.send_succeeded === false + metadata.send_error
+                          // Shows a red FAILED pill with the actual Meta error
+                          // as a hover tooltip.
+                          const sendFailed = msg.metadata?.send_succeeded === false
+                          const sendError = typeof msg.metadata?.send_error === 'string'
+                            ? msg.metadata.send_error
+                            : (msg.metadata?.send_error ? JSON.stringify(msg.metadata.send_error) : null)
+                          // Strip any verbose JSON envelope and pull out Meta's
+                          // human-readable error message if present, else fall
+                          // back to the raw string.
+                          let prettyError: string | null = null
+                          if (sendError) {
+                            try {
+                              const parsed = JSON.parse(sendError)
+                              // Meta's `message` already begins with "(#code)",
+                              // so use it as-is. Only synthesise the prefix when
+                              // the message lacks one.
+                              const msg = parsed?.error?.message
+                              const code = parsed?.error?.code
+                              if (typeof msg === 'string') {
+                                prettyError = /^\(#\d+\)/.test(msg)
+                                  ? msg
+                                  : `(#${code || '?'}) ${msg}`
+                              } else {
+                                prettyError = sendError
+                              }
+                            } catch {
+                              prettyError = sendError
+                            }
+                          }
+                          const isTestSend = msg.metadata?.test_mode === true
+                          const testRecipient = typeof msg.metadata?.test_recipient === 'string'
+                            ? msg.metadata.test_recipient
+                            : null
+                          return (
+                            <div
+                              className={isTemplate
+                                ? 'flex items-center justify-end gap-1.5 px-2.5 pb-1.5 -mt-1 flex-wrap'
+                                : 'flex items-center gap-1.5 mt-1.5 pt-1 border-t flex-wrap'}
+                              style={{ borderColor: 'var(--border-primary)' }}
+                            >
+                              {/* Footer pill carries delivery STATUS (Sent /
+                                  Delivered / Read / Failed). Drop the
+                                  redundant "Template" word — the template
+                                  header strip already labels the bubble as
+                                  a template, and the template_name shows
+                                  right next to this pill. */}
+                              {!isTemplate && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
+                                  style={{ background: statusStyle.bg, color: statusStyle.color }}
+                                  data-tooltip={tooltip}
+                                >
+                                  Template
+                                </span>
+                              )}
+                              {!isTemplate && (
+                                <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                  {msg.metadata.template_name}
+                                </span>
+                              )}
+                              {isTemplate && (
+                                <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                  {formatTime(msg.created_at)}
+                                </span>
+                              )}
+                              {isTestSend && (
+                                <span
+                                  className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                  style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
+                                  title={testRecipient ? `Test send — went to ${testRecipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                                >
+                                  {testRecipient ? `TEST → ${testRecipient}` : 'TEST'}
+                                </span>
+                              )}
+                              {sendFailed && prettyError && (
+                                <span
+                                  className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-help"
+                                  style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
+                                  title={prettyError}
+                                  data-tooltip={prettyError}
+                                >
+                                  Send failed — hover for reason
+                                </span>
+                              )}
+                              {!sendFailed && (
+                                <span className="flex items-center" title={ds || 'pending'}>
+                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                        {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
+                          isTemplate ? (
+                            // WhatsApp-style Quick Reply buttons — stacked, divided by hairlines.
+                            // Theme-aware: uses var(--accent-primary) for label + var(--border-primary)
+                            // for dividers so it renders correctly in light AND dark mode.
+                            <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <div
+                                  key={btnIdx}
+                                  className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
+                                  style={{
+                                    color: 'var(--accent-primary)',
+                                    borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                    background: 'var(--bg-primary)',
+                                  }}
+                                  title={`Quick Reply: ${btn}`}
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+                                    <polyline points="9 17 4 12 9 7" />
+                                    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                  </svg>
+                                  {btn}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                                <span
+                                  key={btnIdx}
+                                  className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                  style={{
+                                    borderColor: 'var(--border-primary)',
+                                    color: 'var(--accent-primary)',
+                                    background: 'var(--accent-subtle)',
+                                  }}
+                                >
+                                  {btn}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        )}
+                        {!msg.metadata?.template_name && taskTag && (
+                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <span
+                              className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{ background: taskTag.bg, color: taskTag.color }}
+                            >
+                              {taskTag.label}
+                            </span>
+                            {msg.metadata?.autonomous && (
+                              <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>Autonomous</span>
                             )}
                           </div>
                         )}
-                        {/* WhatsApp Delivery Status Badge - only for agent messages in last 7 days */}
-                        {!isCustomer && msg.channel === 'whatsapp' && msg.delivery_status && (
-                          new Date(msg.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                        ) && (
+                        {!isCustomer && msg.channel === 'whatsapp' && (
                           <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
-                            {msg.delivery_status === 'failed' && msg.status_error && (
+                            {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
                               <div className="relative group flex items-center">
                                 <span
                                   className="text-[8px] font-mono px-1 py-0.5 rounded cursor-default truncate max-w-[120px]"
                                   style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
                                 >
-                                  {msg.status_error}
+                                  {msg.metadata.delivery_error}
                                 </span>
                                 <div
                                   className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block z-50 pointer-events-none"
@@ -1653,7 +2199,7 @@ export default function InboxPage() {
                                     style={{ background: '#1a1a2e', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
                                   >
                                     <div className="font-semibold mb-0.5" style={{ color: '#EF4444' }}>Delivery Failed</div>
-                                    {msg.status_error}
+                                    {msg.metadata.delivery_error}
                                   </div>
                                   <div className="flex justify-end pr-2">
                                     <div className="w-2 h-2 rotate-45 -mt-1" style={{ background: '#1a1a2e', borderRight: '1px solid rgba(239,68,68,0.4)', borderBottom: '1px solid rgba(239,68,68,0.4)' }} />
@@ -1661,20 +2207,24 @@ export default function InboxPage() {
                                 </div>
                               </div>
                             )}
-                            <span title={`${msg.delivery_status}${msg.status_updated_at ? ` at ${new Date(msg.status_updated_at).toLocaleTimeString()}` : ''}`}>
-                              <DeliveryStatusIcon status={msg.delivery_status} error={msg.status_error} />
+                            <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
+                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
                             </span>
                           </div>
                         )}
                       </div>
                     </div>
+                    </React.Fragment>
                   );
                 })
+                }
+                </>
               )}
+            </div>
             </div>
 
             {/* Message Input - compact */}
-            <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
@@ -1685,13 +2235,32 @@ export default function InboxPage() {
                   className="p-1.5 rounded-lg transition-colors flex-shrink-0"
                   style={{
                     background: isGenerating ? 'var(--accent-primary)' : 'transparent',
-                    color: isGenerating ? 'white' : 'var(--text-secondary)',
+                    color: isGenerating ? 'var(--text-button, #000)' : 'var(--text-secondary)',
                     opacity: messages.length === 0 ? 0.3 : 1,
                   }}
                   title="Generate AI Response"
                 >
                   <MdAutoAwesome size={18} className={isGenerating ? 'animate-spin' : ''} />
                 </button>
+                {/* Approved-template picker — WhatsApp only. Lets the operator
+                    bypass the 24h reply window by sending a Meta-approved
+                    template when the auto-reply path is blocked. */}
+                {selectedChannel === 'whatsapp' && (
+                  <button
+                    onClick={() => setTemplatePickerOpen(true)}
+                    disabled={!selectedLeadId}
+                    className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      opacity: !selectedLeadId ? 0.3 : 1,
+                    }}
+                    title="Send WhatsApp template"
+                    aria-label="Send WhatsApp template"
+                  >
+                    <FaWhatsapp size={18} />
+                  </button>
+                )}
                 <input
                   type="text"
                   placeholder={
@@ -1716,12 +2285,12 @@ export default function InboxPage() {
                   disabled={!replyText.trim() || isSending}
                   className="p-1.5 rounded-lg transition-opacity flex-shrink-0"
                   style={{
-                    background: 'var(--accent-primary)',
+                    background: 'var(--button-bg, #fff)',
                     opacity: !replyText.trim() || isSending ? 0.4 : 1,
                   }}
                   title="Send Message"
                 >
-                  <MdSend size={18} color="white" />
+                  <MdSend size={18} style={{ color: 'var(--text-button, #000)' }} />
                 </button>
               </div>
             </div>
@@ -1732,410 +2301,441 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="hidden lg:flex flex-col"
-          style={{ width: 320, flexShrink: 0, overflowY: 'auto', height: '100%', borderLeft: '1px solid rgba(255,255,255,0.1)', background: 'var(--bg-secondary)' }}
+          className="flex w-[380px] flex-col border-l overflow-y-auto flex-shrink-0"
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
-          {!leadDetails ? (
+          {isAnonymousSession ? (
+            // Anonymous web visitor — no all_leads row to render. Show a
+            // tiny stub so the panel doesn't sit on "Loading details..."
+            // forever. The session id is in selectedConversation.lead_id
+            // (the synthetic 'session:<sid>' key the conversation list uses).
+            <div className="p-4 space-y-3">
+              {(() => {
+                const nm = selectedConversation?.lead_name || ''
+                const hasName = !!nm && !nm.startsWith('Web visitor ·')
+                return (
+                  <>
+                    <p className="text-[11px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                      {hasName ? nm : 'Anonymous web visitor'}
+                    </p>
+                    <p className="text-[12px]" style={{ color: 'var(--text-primary)' }}>
+                      {hasName
+                        ? `${nm} shared their name in chat but hasn't given a phone or email yet, so there's no full lead record.`
+                        : "This visitor hasn't shared a phone or email yet, so there's no lead record to display."}
+                    </p>
+                  </>
+                )
+              })()}
+              {selectedConversation?.lead_id?.startsWith('session:') && (
+                <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                  Session: {selectedConversation.lead_id.slice('session:'.length)}
+                </p>
+              )}
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Once they share contact info in chat, the session will be linked to a real lead automatically.
+              </p>
+            </div>
+          ) : !leadDetails ? (
             <div className="p-4 text-center">
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
             </div>
           ) : (() => {
-            // Extract unified_context fields once
             const uc = leadDetails.unified_context || {}
+            const wc = uc.windchasers || {}
             const webCtx = uc.web || {}
             const waCtx = uc.whatsapp || {}
-            const voiceCtx = uc.voice || {}
-            const bconCtx = uc.bcon || {}
-            const profileCtx = waCtx.profile || webCtx.profile || {}
-
-            const resolvedName = profileCtx.full_name || leadDetails.customer_name || 'Unknown'
-            const brandName = webCtx.what_is_your_brand_name || waCtx.what_is_your_brand_name || bconCtx.brand_name || webCtx.brand_name || waCtx.brand_name || profileCtx.company || null
-            const city = profileCtx.city || bconCtx.city || bconCtx.location || null
-            const initials = resolvedName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-
-            // Stage color mapping
-            const stageColors: Record<string, { bg: string; text: string; ring: string }> = {
-              'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e', ring: '#22c55e' },
-              'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa', ring: '#60a5fa' },
-              'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b', ring: '#f59e0b' },
-              'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7', ring: '#a855f7' },
-              'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af', ring: '#9ca3af' },
+            const profile = webCtx.profile || waCtx.profile || {}
+            const initials = (leadDetails.customer_name || leadDetails.phone || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const stageColors: Record<string, { bg: string; text: string }> = {
+              'New':          { bg: '#3266ad', text: '#E6F1FB' },
+              'Engaged':      { bg: '#3d5fa0', text: '#E6F1FB' },
+              'Qualified':    { bg: '#485693', text: '#F1EFE8' },
+              'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
+              'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
+              'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
+              'Converted':    { bg: '#639922', text: '#EAF3DE' },
+              'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
+              'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
+              'Cold':         { bg: '#993C1D', text: '#FAECE7' },
             }
-            const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--accent-primary)', ring: 'var(--accent-primary)' }
+            const stageAvatarColors: Record<string, string> = {
+              'Converted': '#22c55e', 'Booking Made': '#60a5fa', 'High Intent': '#f59e0b',
+              'Qualified': '#a855f7', 'Engaged': '#6b7280', 'In Sequence': '#8b5cf6',
+            }
+            const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
+            const sc = stageColors[leadDetails.lead_stage] || { bg: '#5F5E5A', text: '#F1EFE8' }
+            // Prefer client-calculated score (live signal from messages + context)
+            // and fall back to the stored lead_score so we never show 0 when a
+            // calculation is still in flight.
+            const dbScore = leadDetails.lead_score ?? 0
+            const score = calculatedLeadScore != null
+              ? Math.max(calculatedLeadScore, dbScore)
+              : dbScore
+            // Same Hot/Warm/Cold scheme as the lead modal — Warm is orange,
+            // not green, regardless of how high the score is below 90.
+            const { color: scoreColor, label: scoreLabel } = scoreVisual(score)
 
-            // Channels from distinct query (all channels lead has ever used)
-            const conv = conversations.find(c => c.lead_id === selectedLeadId)
-            const channels = leadChannels.length > 0 ? leadChannels : (conv?.channels || [])
+            const lastActiveStr = (() => {
+              const d = leadDetails.last_message_at || leadDetails.updated_at
+              if (!d) return null
+              const diff = Date.now() - new Date(d).getTime()
+              const mins = Math.floor(diff / 60000)
+              if (mins < 1) return 'Just now'
+              if (mins < 60) return `${mins}m ago`
+              const hrs = Math.floor(mins / 60)
+              if (hrs < 24) return `${hrs}h ago`
+              return `${Math.floor(hrs / 24)}d ago`
+            })()
 
-            // Business snapshot fields
-            const businessType = bconCtx.type || bconCtx.business_type || webCtx.choose_your_business_type || waCtx.choose_your_business_type || null
-            const urgency = bconCtx.urgency || webCtx.how_fast_do_you_want_to_start || waCtx.how_fast_do_you_want_to_start || null
-            const volume = bconCtx.volume || webCtx.how_many_leads_can_you_handle_per_day || waCtx.how_many_leads_can_you_handle_per_day || null
-            const hasWebsite = bconCtx.has_website ?? webCtx.do_you_have_a_website ?? waCtx.do_you_have_a_website ?? null
-            const hasAI = bconCtx.has_ai ?? webCtx.are_you_currently_using_any_ai_systems ?? waCtx.are_you_currently_using_any_ai_systems ?? null
+            const userType = wc.user_type || webCtx.user_type || waCtx.user_type || profile.user_type
+            const courseInterest = wc.course_interest || webCtx.course_interest || waCtx.course_interest
+            const age = wc.age || webCtx.age || waCtx.age || profile.age
+            const city = wc.city || webCtx.city || waCtx.city || profile.city
+            const source = leadDetails.first_touchpoint || leadDetails.last_touchpoint
+            const intent = wc.student_intent || webCtx.student_intent || waCtx.student_intent
+            const painPoint = wc.pain_point || webCtx.pain_point || waCtx.pain_point
+            const examStatus = wc.exam_status || webCtx.exam_status || waCtx.exam_status
+            const budget = wc.budget || webCtx.budget || waCtx.budget
 
-            // Booking data — separate upcoming vs past
-            const rawBd = leadDetails.booking_date || webCtx.booking_date || waCtx.booking_date
-            const rawBt = leadDetails.booking_time || webCtx.booking_time || waCtx.booking_time
+            const daysInPipeline = leadDetails.created_at
+              ? Math.floor((Date.now() - new Date(leadDetails.created_at).getTime()) / 86400000)
+              : null
+            const agentMsgs = messages.filter(m => m.sender === 'agent').length
+            const customerMsgs = messages.filter(m => m.sender === 'customer').length
+            // Response rate = share of customer messages that got an agent reply
+            // before the customer spoke again (bounded 0–100%). The old formula was
+            // agentMsgs / customerMsgs, which runs over 100% whenever the agent sends
+            // more bubbles than the customer (greetings, follow-ups, split replies) —
+            // a message ratio, not a real "rate".
+            const responseRate = (() => {
+              if (customerMsgs === 0) return null
+              const ordered = [...messages].sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              )
+              let replied = 0
+              for (let i = 0; i < ordered.length; i++) {
+                if (ordered[i].sender !== 'customer') continue
+                for (let j = i + 1; j < ordered.length; j++) {
+                  if (ordered[j].sender === 'customer') break
+                  if (ordered[j].sender === 'agent') { replied++; break }
+                }
+              }
+              return Math.round((replied / customerMsgs) * 100)
+            })()
+
+            const profileRows: { label: string; value: string }[] = []
+            if (userType) profileRows.push({ label: 'Type', value: String(userType) })
+            if (courseInterest) profileRows.push({ label: 'Course', value: String(courseInterest) })
+            if (age) profileRows.push({ label: 'Age', value: String(age) })
+            if (city) profileRows.push({ label: 'City', value: String(city) })
+            if (source) profileRows.push({ label: 'Source', value: String(source).replace(/_/g, ' ') })
+            if (examStatus) profileRows.push({ label: 'Exams', value: String(examStatus) })
+            if (budget) profileRows.push({ label: 'Budget', value: String(budget) })
+            if (intent) profileRows.push({ label: 'Intent', value: String(intent) })
+            if (painPoint) profileRows.push({ label: 'Pain point', value: String(painPoint) })
+
+            // Booking is written to multiple shapes depending on the path that
+            // created it: top-level columns (storeBooking), flat keys under the
+            // channel (web.booking_date), or a nested booking object (web.booking.date,
+            // used by the inbound demo form). Check all of them so a booked lead
+            // never shows as "No upcoming events".
+            const bd = leadDetails.booking_date
+              || webCtx.booking_date || webCtx.booking?.date
+              || waCtx.booking_date || waCtx.booking?.date
+            const bt = leadDetails.booking_time
+              || webCtx.booking_time || webCtx.booking?.time
+              || waCtx.booking_time || waCtx.booking?.time
+            const ml = webCtx.booking_meet_link || webCtx.booking?.meetLink
+              || waCtx.booking_meet_link || waCtx.booking?.meetLink
             const today = new Date().toISOString().split('T')[0]
-            const isUpcoming = rawBd && rawBd >= today
-            const isPast = rawBd && rawBd < today
-            const bd = isUpcoming ? rawBd : null
-            const bt = isUpcoming ? rawBt : null
-            const pastBd = isPast ? rawBd : null
-            const pastBt = isPast ? rawBt : null
-            const ml = isUpcoming ? (webCtx.booking_meet_link || waCtx.booking_meet_link) : null
-            const bookingTitle = webCtx.booking_title || waCtx.booking_title || 'Discovery Call'
-
-            // Pipeline stats
-            const firstTouchpoint = leadDetails.first_touchpoint || null
-            const createdAt = leadDetails.created_at || leadDetails.timestamp || null
-            const totalInteractions = messages.length
-            const daysInPipeline = createdAt ? Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))) : null
-
-            // Phone for action links (clean to digits)
-            const rawPhone = leadDetails.phone || ''
-            const cleanPhone = rawPhone.replace(/[^0-9]/g, '')
+            const isUpcoming = bd && bd >= today
 
             return (
-            <>
-            {/* Section 1 -- Lead Identity */}
-            <div className="p-4 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold mb-2"
-                style={{ background: sc.bg, color: sc.text, border: `2px solid ${sc.ring}` }}
-              >
-                {initials}
+              <>
+              {/* ── HERO HEADER ── */}
+              <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
+                {/* Score ring + name row — the ring REPLACES the old initials-on-coloured-square avatar.
+                    Lead score is shown as the ring fill + number inside; tier label sits with name. */}
+                <div className="flex items-start gap-3 mb-3">
+                  {(() => {
+                    // SVG donut. Circumference = 2πr; arc length = circumference * score/100.
+                    const size = 56
+                    const stroke = 4
+                    const r = (size - stroke) / 2
+                    const c = 2 * Math.PI * r
+                    const pct = Math.max(0, Math.min(100, score || 0))
+                    const dash = (c * pct) / 100
+                    const hasScore = (leadDetails.lead_score != null || calculatedLeadScore != null)
+                    return (
+                      <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+                        <svg width={size} height={size} className="-rotate-90">
+                          <circle
+                            cx={size / 2} cy={size / 2} r={r}
+                            fill="none" stroke="var(--border-primary)" strokeWidth={stroke}
+                          />
+                          {hasScore && (
+                            <circle
+                              cx={size / 2} cy={size / 2} r={r}
+                              fill="none" stroke={scoreColor} strokeWidth={stroke}
+                              strokeDasharray={`${dash} ${c - dash}`}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dasharray 500ms ease' }}
+                            />
+                          )}
+                        </svg>
+                        <div
+                          className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
+                          style={{ color: hasScore ? scoreColor : 'var(--text-muted)' }}
+                        >
+                          {hasScore ? score : '—'}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                        {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
+                      </p>
+                      {lastActiveStr && (
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{lastActiveStr}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {(leadDetails.lead_score != null || calculatedLeadScore != null) && (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: `${scoreColor}22`, color: scoreColor, border: `1px solid ${scoreColor}55` }}
+                          title={`Lead Score: ${score}/100`}
+                        >
+                          {scoreLabel}
+                        </span>
+                      )}
+                      {leadDetails.lead_stage && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ background: sc.bg, color: sc.text }}>
+                          {leadDetails.lead_stage}
+                        </span>
+                      )}
+                      {selectedConversation?.channels?.map(ch => (
+                        <ChannelIcon key={ch} channel={ch} size={12} active={true} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-base font-bold truncate w-full" style={{ color: 'var(--text-primary)' }}>
-                {resolvedName}
-              </p>
-              {brandName && (
-                <p className="text-xs truncate w-full mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                  {brandName}
-                </p>
+
+              {/* ── ACTION BUTTONS ── */}
+              <div className="px-5 py-3 flex gap-2 border-b border-t" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                <button
+                  disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
+                  onClick={async () => {
+                    if (!leadDetails.phone) return;
+                    setCallingLeadId(leadDetails.id);
+                    try {
+                      const res = await fetch('/api/agent/voice/test-call', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone: leadDetails.phone, leadName: leadDetails.customer_name }),
+                      });
+                      const data = await res.json();
+                      if (data.success) alert(`Calling ${leadDetails.customer_name || leadDetails.phone}...`);
+                      else alert(`Call failed: ${JSON.stringify(data.error)}`);
+                    } catch (e: any) {
+                      alert(`Error: ${e.message}`);
+                    } finally {
+                      setCallingLeadId(null);
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all disabled:opacity-30 hover:bg-[rgba(34,197,94,0.08)]"
+                  style={{
+                    borderColor: leadDetails.phone ? 'rgba(34,197,94,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.phone ? '#22C55E' : 'var(--text-muted)',
+                    background: 'transparent',
+                  }}
+                >
+                  <MdPhone size={14} className={callingLeadId === leadDetails.id ? 'animate-pulse' : ''} />
+                  {callingLeadId === leadDetails.id ? 'Calling…' : 'Call'}
+                </button>
+                <a
+                  href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all hover:bg-[rgba(37,211,102,0.08)]"
+                  style={{
+                    borderColor: leadDetails.phone ? 'rgba(37,211,102,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.phone ? '#25D366' : 'var(--text-muted)',
+                    background: 'transparent',
+                    opacity: leadDetails.phone ? 1 : 0.3,
+                    pointerEvents: leadDetails.phone ? 'auto' : 'none',
+                  }}
+                >
+                  <FaWhatsapp size={13} /> WhatsApp
+                </a>
+                <a
+                  href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium border transition-all hover:bg-[rgba(139,92,246,0.08)]"
+                  style={{
+                    borderColor: leadDetails.email ? 'rgba(139,92,246,0.35)' : 'var(--border-primary)',
+                    color: leadDetails.email ? '#8B5CF6' : 'var(--text-muted)',
+                    background: 'transparent',
+                    opacity: leadDetails.email ? 1 : 0.3,
+                    pointerEvents: leadDetails.email ? 'auto' : 'none',
+                  }}
+                >
+                  <MdEmail size={14} /> Email
+                </a>
+              </div>
+
+              {/* ── CONTACT INFO ── */}
+              {(leadDetails.email || leadDetails.phone) && (
+                <div className="px-5 py-3 border-b space-y-2" style={{ borderColor: 'var(--border-primary)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Contact</p>
+                  {leadDetails.email && (
+                    <div className="flex items-center gap-2">
+                      <MdEmail size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <a href={`mailto:${leadDetails.email}`} className="text-[12px] truncate hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                        {leadDetails.email}
+                      </a>
+                    </div>
+                  )}
+                  {leadDetails.phone && (
+                    <div className="flex items-center gap-2">
+                      <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <a href={`tel:${leadDetails.phone}`} className="text-[12px] hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                        {leadDetails.phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
-              <div className="flex items-center gap-2 mt-1.5">
-                {city && (
-                  <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    <MdLocationOn size={12} /> {city}
-                  </span>
-                )}
-                {channels.length > 0 && (
-                  <span className="flex items-center gap-1">
-                    {channels.map((ch) => (
-                      <ChannelIcon key={ch} channel={ch} size={14} active={true} />
+
+              {/* ── QUICK STATS ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    {/* Count agent (PROXe) replies across ALL channels — web chat + whatsapp.
+                        `agentMsgs` is derived from the full `messages` thread (both channels),
+                        so every web-chat and whatsapp agent reply is included. */}
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{agentMsgs}</p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Agent Msgs</p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {responseRate !== null ? `${responseRate}%` : '—'}
+                    </p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Response</p>
+                  </div>
+                  <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
+                    <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {daysInPipeline !== null ? `${daysInPipeline}d` : '—'}
+                    </p>
+                    <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Pipeline</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── LEAD PROFILE ── */}
+              {profileRows.length > 0 && (
+                <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Profile</p>
+                  <div className="space-y-2">
+                    {profileRows.map(r => (
+                      <div key={r.label} className="flex items-start justify-between gap-3">
+                        <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                        <span className="text-[12px] text-right capitalize font-medium" style={{ color: 'var(--text-primary)' }}>{r.value}</span>
+                      </div>
                     ))}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Section 2 -- Score + Stage */}
-            <div className="px-4 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-primary)' }}>
-              <ScoreRing score={leadDetails.lead_score} size={44} />
-              <div className="flex-1 min-w-0">
-                {leadDetails.lead_stage && (
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full inline-block"
-                    style={{ background: sc.bg, color: sc.text }}>
-                    {leadDetails.lead_stage}
-                  </span>
-                )}
-                {leadDetails.last_interaction_at && (
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                    Last active: {timeAgo(leadDetails.last_interaction_at)}
-                  </p>
-                )}
-                {leadDetails.sub_stage && (
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{leadDetails.sub_stage}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Section 3 -- Quick Actions */}
-            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                {cleanPhone && (
-                  <a href={`tel:+${cleanPhone}`}
-                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
-                    style={{ background: 'rgba(34,197,94,0.15)' }}
-                    title="Call">
-                    <MdPhone size={18} style={{ color: '#22c55e' }} />
-                  </a>
-                )}
-                {cleanPhone && (
-                  <a href={`https://wa.me/${cleanPhone}`} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
-                    style={{ background: 'rgba(37,211,102,0.15)' }}
-                    title="WhatsApp">
-                    <img src="/whatsapp-business-stroke-rounded.svg" alt="WhatsApp" width={18} height={18}
-                      style={{ filter: 'invert(1) brightness(2)' }} />
-                  </a>
-                )}
-                {leadDetails.email && (
-                  <a href={`mailto:${leadDetails.email}`}
-                    className="flex items-center justify-center w-10 h-10 rounded-full transition-opacity hover:opacity-80"
-                    style={{ background: 'rgba(96,165,250,0.15)' }}
-                    title="Email">
-                    <MdEmail size={18} style={{ color: '#60a5fa' }} />
-                  </a>
-                )}
-              </div>
-              {/* Quick action pills */}
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                  onClick={() => { if (cleanPhone) window.open(`https://wa.me/${cleanPhone}`, '_blank') }}
-                >
-                  <MdReply size={11} /> Follow-up
-                </button>
-                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                  onClick={() => openLeadModal(selectedLeadId)}
-                >
-                  <MdCalendarMonth size={11} /> Book Call
-                </button>
-                <button className="flex items-center gap-1 text-[10px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition-opacity hover:opacity-80"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-                >
-                  <MdPersonAdd size={11} /> Assign
-                </button>
-              </div>
-            </div>
-
-            {/* Section 3b -- Contact Info */}
-            <div className="px-4 py-3 border-b space-y-1.5" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Contact</p>
-              {leadDetails.phone && (
-                <a href={`tel:${leadDetails.phone}`} className="flex items-center gap-2 hover:opacity-80">
-                  <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
-                </a>
-              )}
-              {leadDetails.email && (
-                <a href={`mailto:${leadDetails.email}`} className="flex items-center gap-2 hover:opacity-80">
-                  <MdEmail size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
-                </a>
-              )}
-            </div>
-
-            {/* Section 3c -- Voice Activity */}
-            {(voiceCtx.call_duration_seconds || voiceCtx.last_call_date || channels.includes('voice')) && (
-              <div className="px-4 py-3 border-b space-y-1.5" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
-                  <img src="/ai-voice-stroke-rounded.svg" alt="Voice" width={10} height={10}
-                    style={{ filter: 'invert(1) brightness(2)', display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                  Voice
-                </p>
-                {voiceCtx.call_duration_seconds && (
-                  <div className="flex items-center gap-2">
-                    <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                      Last call: {Math.floor(voiceCtx.call_duration_seconds / 60)}m {voiceCtx.call_duration_seconds % 60}s
-                    </span>
                   </div>
-                )}
-                {voiceCtx.last_call_date && (
-                  <div className="flex items-center gap-2">
-                    <MdEvent size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date(voiceCtx.last_call_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                  </div>
-                )}
-                {voiceCtx.conversation_summary && (
-                  <p className="text-[11px] leading-relaxed mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    {voiceCtx.conversation_summary.length > 120 ? voiceCtx.conversation_summary.substring(0, 120) + '...' : voiceCtx.conversation_summary}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Section 4 -- Business Snapshot */}
-            {(businessType || urgency || volume || hasWebsite !== null || hasAI !== null) && (
-              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business</p>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {businessType && (
-                    <div className="flex items-center gap-1.5">
-                      <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{businessType}</span>
-                    </div>
-                  )}
-                  {urgency && (
-                    <div className="flex items-center gap-1.5">
-                      <MdSpeed size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{urgency}</span>
-                    </div>
-                  )}
-                  {volume && (
-                    <div className="flex items-center gap-1.5">
-                      <MdGroup size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{volume}</span>
-                    </div>
-                  )}
-                  {hasWebsite !== null && (
-                    <div className="flex items-center gap-1.5">
-                      <MdLanguage size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Website: {String(hasWebsite).toLowerCase() === 'yes' || hasWebsite === true ? 'Yes' : 'No'}</span>
-                    </div>
-                  )}
-                  {hasAI !== null && (
-                    <div className="flex items-center gap-1.5">
-                      <MdSmartToy size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>AI: {String(hasAI).toLowerCase() === 'yes' || hasAI === true ? 'Yes' : 'No'}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
-
-            {/* Section 5 -- Events (Upcoming + Past) */}
-            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
-              {bd ? (
-                <div className="rounded-lg p-2.5 border" style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.2)' }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <MdEventAvailable size={16} style={{ color: '#22c55e' }} />
-                    <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
-                      {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      {bt && (() => {
-                        const tp = bt.toString().split(':')
-                        if (tp.length < 2) return `, ${bt}`
-                        const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
-                        if (isNaN(h) || isNaN(m)) return `, ${bt}`
-                        return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                      })()}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{bookingTitle}</p>
-                  {ml && (
-                    <a href={ml} target="_blank" rel="noopener noreferrer"
-                      className="text-[10px] mt-1.5 inline-flex items-center gap-1 hover:underline" style={{ color: '#60a5fa' }}>
-                      <MdOpenInNew size={10} /> Join Meet
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
               )}
-              {pastBd && (
-                <>
-                  <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>Past Events</p>
-                  <div className="rounded-lg p-2 border" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)', opacity: 0.6 }}>
+
+              {/* ── OWNER ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Owner</p>
+                <select
+                  value={leadDetails?.unified_context?.owner?.id || ''}
+                  onChange={(e) => setLeadOwner(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  // colorScheme makes the native dropdown render dark in dark mode —
+                  // without it the options were white-on-white (only the highlighted
+                  // row showed), so the list looked empty. Options also get explicit
+                  // bg/color for browsers that honour it.
+                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-secondary)', colorScheme: 'light dark' }}
+                >
+                  <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Unassigned</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ── UPCOMING / BOOKING ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming</p>
+                {isUpcoming ? (
+                  <div className="rounded-xl p-3 border" style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.25)' }}>
+                    <div className="flex items-center gap-2">
+                      <MdEvent size={15} style={{ color: '#22c55e' }} />
+                      <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {bt && (() => {
+                          const tp = bt.toString().split(':')
+                          if (tp.length < 2) return ` · ${bt}`
+                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                          if (isNaN(h) || isNaN(m)) return ` · ${bt}`
+                          return ` · ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                        })()}
+                      </span>
+                    </div>
+                    {ml && (
+                      <a href={ml} target="_blank" rel="noopener noreferrer"
+                        className="mt-2 text-[11px] flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+                        <MdOpenInNew size={11} /> Join Meeting
+                      </a>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (!leadDetails?.id) return
+                        if (!window.confirm('Cancel this booking? This removes the Google Calendar event and stops the reminder messages.')) return
+                        try {
+                          const r = await fetch(`/api/dashboard/leads/${leadDetails.id}/cancel-booking`, { method: 'POST' })
+                          if (r.ok) window.location.reload()
+                          else window.alert('Could not cancel the booking. Try again.')
+                        } catch {
+                          window.alert('Could not cancel the booking. Try again.')
+                        }
+                      }}
+                      className="mt-2 text-[11px] hover:underline"
+                      style={{ color: '#ef4444' }}
+                    >
+                      Cancel booking
+                    </button>
+                  </div>
+                ) : bd ? (
+                  <div className="rounded-xl p-3 border" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)', opacity: 0.6 }}>
                     <div className="flex items-center gap-2">
                       <MdEvent size={14} style={{ color: 'var(--text-muted)' }} />
                       <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        {new Date(pastBd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        {pastBt && (() => {
-                          const tp = pastBt.toString().split(':')
-                          if (tp.length < 2) return `, ${pastBt}`
-                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
-                          if (isNaN(h) || isNaN(m)) return `, ${pastBt}`
-                          return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                        })()}
-                        {' — '}{bookingTitle}
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} (past)
                       </span>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-
-            {/* Section 5b -- Pipeline Stats */}
-            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Pipeline</p>
-              <div className="grid grid-cols-3 gap-2">
-                {firstTouchpoint && (
-                  <div className="text-center">
-                    <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>First Touch</p>
-                    <p className="text-[11px] font-semibold capitalize" style={{ color: 'var(--text-secondary)' }}>{firstTouchpoint}</p>
-                    {createdAt && <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{new Date(createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>}
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>Messages</p>
-                  <p className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{totalInteractions}</p>
-                </div>
-                {daysInPipeline && (
-                  <div className="text-center">
-                    <p className="text-[9px] uppercase" style={{ color: 'var(--text-muted)' }}>Days</p>
-                    <p className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{daysInPipeline}d</p>
-                  </div>
+                ) : (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
                 )}
               </div>
-            </div>
 
-            {/* Section 5c -- Customer Journey Timeline */}
-            <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                <MdTimeline size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                Journey
-              </p>
-              {journeyLoading ? (
-                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Loading...</p>
-              ) : journeyEvents.length === 0 ? (
-                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No activity yet</p>
-              ) : (
-                <div style={{ maxHeight: 200, overflowY: 'auto', scrollbarWidth: 'thin' }}>
-                  {journeyEvents.map((evt, i) => (
-                    <div key={i} className="flex gap-2" style={{ paddingBottom: 8, position: 'relative' }}>
-                      {/* Timeline line */}
-                      {i < journeyEvents.length - 1 && (
-                        <div style={{ position: 'absolute', left: 7, top: 16, bottom: 0, width: 1, background: 'rgba(255,255,255,0.08)' }} />
-                      )}
-                      {/* Channel icon dot */}
-                      <div className="flex-shrink-0 mt-0.5" style={{ width: 16, display: 'flex', justifyContent: 'center' }}>
-                        <ChannelIcon channel={evt.channel} size={10} active={true} />
-                      </div>
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                            {new Date(evt.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                          </span>
-                          <span className="text-[8px] uppercase px-1 py-px rounded" style={{
-                            color: evt.type === 'booking' ? '#22c55e' : evt.type === 'voice_call' ? '#a855f7' : 'var(--text-muted)',
-                            background: evt.type === 'booking' ? 'rgba(34,197,94,0.15)' : evt.type === 'voice_call' ? 'rgba(168,85,247,0.15)' : 'var(--bg-tertiary)',
-                          }}>
-                            {evt.channel === 'whatsapp' ? 'WA' : evt.channel === 'voice' ? 'Voice' : evt.channel === 'web' ? 'Web' : evt.channel}
-                          </span>
-                        </div>
-                        <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                          {evt.summary}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Admin Notes (if any) */}
-            {leadDetails.admin_notes && (
-              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  <MdNotes size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                  Notes
-                </p>
-                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  {leadDetails.admin_notes}
-                </p>
+              {/* ── VIEW FULL DETAILS ── */}
+              <div className="px-5 py-4 mt-auto">
+                <button
+                  onClick={() => leadDetails?.id && openLeadModal(leadDetails.id)}
+                  className="w-full text-xs font-semibold py-2.5 rounded-xl transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
+                  style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
+                >
+                  <MdOpenInNew size={14} /> View Full Details
+                </button>
               </div>
-            )}
-
-            {/* Section 6 -- View Full Details Button */}
-            <div className="p-4 mt-auto">
-              <button
-                onClick={() => openLeadModal(selectedLeadId)}
-                className="w-full text-sm font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 hover:opacity-90"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
-              >
-                <MdOpenInNew size={16} /> View Full Details
-              </button>
-            </div>
-            </>
+              </>
             )
           })()}
         </div>
@@ -2153,6 +2753,18 @@ export default function InboxPage() {
           onStatusUpdate={updateLeadStatus}
         />
       )}
+
+      <WhatsAppTemplatePicker
+        open={templatePickerOpen && !!selectedLeadId && selectedChannel === 'whatsapp'}
+        onClose={() => setTemplatePickerOpen(false)}
+        leadId={selectedLeadId || ''}
+        leadName={leadDetails?.customer_name || null}
+        onSent={() => {
+          // Refresh thread + conversation list so the template appears immediately
+          if (selectedLeadId) fetchMessages(selectedLeadId)
+          fetchConversations()
+        }}
+      />
     </div>
   )
 }

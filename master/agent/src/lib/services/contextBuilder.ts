@@ -1,5 +1,5 @@
 /**
- * services/contextBuilder.ts — Cross-channel context assembly
+ * services/contextBuilder.ts - Cross-channel context assembly
  *
  * Extracted from:
  *   - web-agent/src/lib/chatSessions.ts: updateWindchasersProfile() (1685-1835)
@@ -14,7 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp } from './utils';
 import { ensureSession, getChannelTable, type Channel, type UserInput } from './sessionManager';
-import { ensureOrUpdateLead } from './leadManager';
+import { ensureOrUpdateLead, normalizePhone } from './leadManager';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,20 +29,25 @@ export interface CustomerContext {
   whatsappSummary: { summary: string; lastInteraction: string | null } | null;
   voiceSummary: { summary: string; lastInteraction: string | null } | null;
   socialSummary: { summary: string; lastInteraction: string | null } | null;
+  adminNotes: Array<{ text: string; created_by: string; created_at: string }> | null;
 }
 
-export interface WindchasersUserProfile {
+export interface BrandUserProfile {
   name?: string;
   phone?: string;
   email?: string;
-  user_type?: 'student' | 'parent' | 'professional';
-  education?: '12th_completed' | 'in_school';
-  course_interest?: 'pilot' | 'helicopter' | 'drone' | 'cabin';
-  timeline?: 'asap' | '1-3mo' | '6+mo' | '1yr+';
+  user_type?: string;
+  education?: string;
+  course_interest?: string;
+  service_interest?: string;
+  timeline?: string;
   button_clicks?: string[];
   questions_asked?: string[];
   stage?: 'exploration' | 'consideration' | 'ready' | 'booked';
 }
+
+/** @deprecated Use BrandUserProfile instead */
+export type WindchasersUserProfile = BrandUserProfile;
 
 // ─── Topic Extraction ───────────────────────────────────────────────────────
 
@@ -63,9 +68,10 @@ export function extractTopics(summary: string): string[] {
     'implementation', 'setup', 'onboarding',
     'support', 'help', 'assistance',
     'qualification', 'qualify', 'lead',
-    // Aviation-specific (Windchasers)
+    // Industry-specific keywords
     'pilot', 'helicopter', 'drone', 'cabin crew',
     'dgca', 'cpl', 'atpl', 'training', 'license',
+    'ai', 'automation', 'chatbot', 'brand', 'marketing',
   ];
 
   keywords.forEach(keyword => {
@@ -121,7 +127,8 @@ export async function fetchCustomerContext(
   const client = supabase || getServiceClient() || getClient();
   if (!client) return null;
 
-  const normalizedPhone = phone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) return null;
 
   // Fetch lead from all_leads
   const { data: lead, error: leadError } = await client
@@ -143,16 +150,45 @@ export async function fetchCustomerContext(
     whatsappSummary: null,
     voiceSummary: null,
     socialSummary: null,
+    adminNotes: (lead.unified_context?.admin_notes as any[]) || null,
   };
 
-  // Fetch web conversation summary
-  const { data: webSession } = await client
-    .from('web_sessions')
-    .select('conversation_summary, last_message_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Fetch all channel summaries in parallel
+  const [
+    { data: webSession },
+    { data: waSession },
+    { data: voiceSession },
+    { data: socialSession },
+  ] = await Promise.all([
+    client
+      .from('web_sessions')
+      .select('conversation_summary, last_message_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('whatsapp_sessions')
+      .select('conversation_summary, last_message_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('voice_sessions')
+      .select('call_summary, updated_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    client
+      .from('social_sessions')
+      .select('conversation_summary, last_engagement_at')
+      .eq('lead_id', lead.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (webSession?.conversation_summary) {
     context.webSummary = {
@@ -160,22 +196,12 @@ export async function fetchCustomerContext(
       lastInteraction: webSession.last_message_at,
     };
   }
-  // Also check unified_context.web
   if (context.unifiedContext?.web?.conversation_summary) {
     context.webSummary = {
       summary: context.unifiedContext.web.conversation_summary,
       lastInteraction: context.unifiedContext.web.last_interaction,
     };
   }
-
-  // Fetch WhatsApp conversation summary
-  const { data: waSession } = await client
-    .from('whatsapp_sessions')
-    .select('conversation_summary, last_message_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (waSession?.conversation_summary) {
     context.whatsappSummary = {
@@ -190,15 +216,6 @@ export async function fetchCustomerContext(
     };
   }
 
-  // Fetch voice conversation summary
-  const { data: voiceSession } = await client
-    .from('voice_sessions')
-    .select('call_summary, updated_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   if (voiceSession?.call_summary) {
     context.voiceSummary = {
       summary: voiceSession.call_summary,
@@ -211,15 +228,6 @@ export async function fetchCustomerContext(
       lastInteraction: context.unifiedContext.voice.last_interaction,
     };
   }
-
-  // Fetch social conversation summary
-  const { data: socialSession } = await client
-    .from('social_sessions')
-    .select('conversation_summary, last_engagement_at')
-    .eq('lead_id', lead.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (socialSession?.conversation_summary) {
     context.socialSummary = {
@@ -240,12 +248,12 @@ export async function fetchCustomerContext(
 // ─── Brand Profile Updates ──────────────────────────────────────────────────
 
 /**
- * Update brand-specific user profile data (e.g. Windchasers aviation preferences)
+ * Update brand-specific user profile data (e.g. BCON service interests)
  * Syncs to both the channel session and all_leads.unified_context
  */
 export async function updateBrandProfile(
   externalSessionId: string,
-  profileData: Partial<WindchasersUserProfile>,
+  profileData: Partial<BrandUserProfile>,
   channel: Channel = 'web',
   supabase?: SupabaseClient | null,
 ): Promise<void> {
@@ -325,7 +333,7 @@ export async function updateBrandProfile(
     }
   }
 
-  // Update all_leads.unified_context.windchasers
+  // Update all_leads.unified_context.bcon (brand-specific context)
   if (leadId) {
     const { data: leadData } = await client
       .from('all_leads')
@@ -337,8 +345,8 @@ export async function updateBrandProfile(
       const existingCtx = leadData.unified_context || {};
       const updatedCtx = {
         ...existingCtx,
-        windchasers: {
-          ...(existingCtx.windchasers || {}),
+        bcon: {
+          ...(existingCtx.bcon || existingCtx.windchasers || {}),
           ...brandContext,
         },
       };

@@ -22,7 +22,7 @@ function stripHtmlTags(html: string): string {
   return text
 }
 
-// POST /api/knowledge-base/url — Add URL entry with basic scraping
+// POST /api/knowledge-base/url - Add URL entry with basic scraping
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         status = 'pending'
       }
     } catch (fetchError) {
-      // Fetch failed — still save the entry as pending
+      // Fetch failed - still save the entry as pending
       console.warn('URL fetch failed (will retry later):', fetchError instanceof Error ? fetchError.message : fetchError)
       errorMessage = fetchError instanceof Error ? fetchError.message : 'Fetch failed'
       status = 'pending'

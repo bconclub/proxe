@@ -10,12 +10,12 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'WindChasers Dashboard',
-  description: 'WindChasers Aviation Academy - Dashboard for managing leads, bookings, and metrics',
+  title: 'PROXe Windchasers',
+  description: 'Windchasers Dashboard',
   icons: {
-    icon: '/windchasers-icon.png',
-    shortcut: '/windchasers-icon.png',
-    apple: '/windchasers-icon.png',
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
   },
 }
 
@@ -34,13 +34,20 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('theme');
-                  if (theme === 'light') {
-                    document.documentElement.classList.add('light');
-                    document.documentElement.classList.remove('dark');
+                  var t = localStorage.getItem('proxe-theme') || 'bw-dark';
+                  var el = document.documentElement;
+                  if (t === 'bw-light') {
+                    el.setAttribute('data-theme', 'bw-light');
+                    el.classList.add('light');
+                    el.classList.remove('dark');
+                  } else if (t === 'brand') {
+                    el.setAttribute('data-theme', 'aviation-gold');
+                    el.classList.add('dark');
+                    el.classList.remove('light');
                   } else {
-                    document.documentElement.classList.add('dark');
-                    document.documentElement.classList.remove('light');
+                    el.setAttribute('data-theme', 'bw-dark');
+                    el.classList.add('dark');
+                    el.classList.remove('light');
                   }
                 } catch (e) {
                   document.documentElement.classList.add('dark');

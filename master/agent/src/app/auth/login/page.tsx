@@ -5,36 +5,28 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
 import { getBrandConfig } from '@/configs'
 
-/** Brand website URLs */
-const brandWebsites: Record<string, string> = {
-  windchasers: 'https://windchasers.in',
-  bcon: 'https://bconclub.com',
-  proxe: 'https://proxe.ai',
-}
-
-/** Brand taglines for login subtitle */
-const brandTaglines: Record<string, string> = {
-  windchasers: 'WindChasers Aviation Academy',
-  bcon: 'BCON Club',
-  proxe: 'PROXe AI Platform',
-}
+/** Windchasers website (this fork only serves windchasers — no cross-brand maps). */
+const WINDCHASERS_WEBSITE = 'https://windchasers.in'
+const WINDCHASERS_TAGLINE = 'WindChasers Aviation Academy'
 
 export default function LoginPage() {
   const router = useRouter()
 
-  // Brand config — resolved from env var or hostname detection
+  // Brand config (always windchasers in this fork — kept as call for shape stability).
   const brand = useMemo(() => getBrandConfig(), [])
-  const brandId = (brand.brand || 'windchasers').toLowerCase()
   const colors = brand.colors
-  const tagline = brandTaglines[brandId] || brand.name
-  const website = brandWebsites[brandId] || '#'
+  const tagline = WINDCHASERS_TAGLINE
+  const website = WINDCHASERS_WEBSITE
   const logoLetter = brand.name.charAt(0).toUpperCase()
   const logoImage = brand.chatStructure?.avatar?.source
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [darkMode, setDarkMode] = useState(true)
+  // Start false on both server and client to avoid hydration mismatch.
+  // The first useEffect below sets the real value instantly on mount.
+  const [darkMode, setDarkMode] = useState(false)
+  const [checking, setChecking] = useState(true) // hide form until session check done
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
@@ -43,19 +35,18 @@ export default function LoginPage() {
   const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
 
+  // Effect 1: resolve dark mode from storage on mount (runs once, client-only)
   useEffect(() => {
-    // Check system preference or saved preference
-    const savedTheme = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const shouldBeDark = savedTheme ? savedTheme === 'dark' : prefersDark
-    setDarkMode(shouldBeDark)
-    if (shouldBeDark) {
+    const saved = localStorage.getItem('theme')
+    const prefersDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+    setDarkMode(prefersDark)
+    if (prefersDark) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
     }
 
-    // Check for saved rate limit state
+    // Also restore any persisted rate-limit state
     const savedRateLimit = localStorage.getItem('rateLimitUntil')
     if (savedRateLimit) {
       const until = parseInt(savedRateLimit)
@@ -66,23 +57,30 @@ export default function LoginPage() {
         localStorage.removeItem('rateLimitUntil')
       }
     }
+  }, [])
 
-    // Check if user is already logged in and redirect to dashboard
+  // Effect 2: keep the <html> class in sync when darkMode is toggled manually
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [darkMode])
+
+  // Effect 3: check for an existing session once; hide form until resolved
+  useEffect(() => {
     const checkExistingSession = async () => {
       try {
         const supabase = createClient()
-        const { data: { user }, error } = await supabase.auth.getUser()
-
-        if (user && !error) {
-          console.log('✅ User already logged in, redirecting to dashboard')
-          router.push('/dashboard')
-          router.refresh()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user && session?.access_token) {
+          router.replace('/dashboard')
+          return // stay checking=true while redirect fires; component unmounts
         }
-      } catch (err) {
-        console.log('ℹ️ No existing session found, staying on login page')
-      }
+      } catch {}
+      setChecking(false) // no session → show the form
     }
-
     checkExistingSession()
   }, [router])
 
@@ -127,6 +125,23 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
 
+    // Browser autofill (Chrome, Safari, etc.) doesn't always fire React's
+    // onChange handler on controlled inputs. Read directly from the DOM so
+    // autofilled credentials are captured even when React state is still empty.
+    const emailEl = document.getElementById('email') as HTMLInputElement | null
+    const passwordEl = document.getElementById('password') as HTMLInputElement | null
+    const emailValue = emailEl?.value?.trim() || email
+    const passwordValue = passwordEl?.value || password
+
+    // Sync state in case autofill populated the DOM but not state
+    if (emailValue && !email) setEmail(emailValue)
+    if (passwordValue && !password) setPassword(passwordValue)
+
+    if (!emailValue || !passwordValue) {
+      setError('Please enter your email and password.')
+      return
+    }
+
     // Check if we're still rate limited
     const now = Date.now()
     if (rateLimitUntil && now < rateLimitUntil) {
@@ -140,12 +155,7 @@ export default function LoginPage() {
       setRateLimited(false)
       setRateLimitUntil(null)
       setAttemptCount(0)
-    }
-
-    // Client-side rate limiting: prevent too many rapid attempts
-    if (lastAttemptTime && now - lastAttemptTime < 3000) {
-      setError('Please wait a moment before trying again.')
-      return
+      localStorage.removeItem('rateLimitUntil')
     }
 
     setLastAttemptTime(now)
@@ -155,8 +165,8 @@ export default function LoginPage() {
       const supabase = createClient()
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: emailValue,
+        password: passwordValue,
       })
 
       if (error) {
@@ -174,28 +184,21 @@ export default function LoginPage() {
           (error as any).status === 429
 
         if (isRateLimit) {
-          const limitUntil = now + 10 * 60 * 1000
+          const limitUntil = now + 60 * 1000 // 60s cooldown
           setRateLimited(true)
           setRateLimitUntil(limitUntil)
           localStorage.setItem('rateLimitUntil', limitUntil.toString())
-          setError('Rate limited by Supabase. Please wait 10 minutes before trying again.')
+          setError('Too many attempts. Please wait 60 seconds before trying again.')
 
           setTimeout(() => {
             setRateLimited(false)
             setRateLimitUntil(null)
             setAttemptCount(0)
             localStorage.removeItem('rateLimitUntil')
-          }, 10 * 60 * 1000)
+          }, 60 * 1000)
         } else if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please check your credentials and try again.')
-          setAttemptCount(prev => {
-            const newCount = prev + 1
-            if (newCount >= 3) {
-              setError('Multiple failed attempts. Please wait a moment before trying again.')
-              setLastAttemptTime(now + 10000)
-            }
-            return newCount
-          })
+          setAttemptCount(prev => prev + 1)
         } else if (error.message.includes('Email not confirmed')) {
           setError('Please verify your email address before signing in.')
         } else {
@@ -204,113 +207,23 @@ export default function LoginPage() {
 
         setLoading(false)
       } else {
-        // Reset everything on success
+        // Reset rate-limit counters on success
         setAttemptCount(0)
         setLastAttemptTime(null)
         setRateLimited(false)
         setRateLimitUntil(null)
 
-          // Verify session is available
-          if (data?.user && data?.session) {
-            console.log('✅ Login successful, user:', data.user.email)
-
-            // Wait a moment to ensure session is fully established
-            await new Promise(resolve => setTimeout(resolve, 300))
-
-            // Send session to API to set cookies on server
-            try {
-              const syncResponse = await fetch('/api/auth/sync-session', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  access_token: data.session.access_token,
-                  refresh_token: data.session.refresh_token,
-                  expires_at: data.session.expires_at,
-                  expires_in: data.session.expires_in,
-                  token_type: data.session.token_type,
-                  user: data.session.user,
-                }),
-                credentials: 'include',
-              })
-
-              if (!syncResponse.ok) {
-                const errorText = await syncResponse.text()
-                let errorData
-                try {
-                  errorData = JSON.parse(errorText)
-                } catch {
-                  errorData = { error: errorText || 'Unknown error' }
-                }
-                console.error('❌ Sync failed:', {
-                  status: syncResponse.status,
-                  error: errorData,
-                })
-                throw new Error(`Sync failed: ${errorData.error || syncResponse.statusText}`)
-              }
-
-              const result = await syncResponse.json()
-
-              if (syncResponse.ok && result.success) {
-                // Verify session is still available on client
-                const { data: { user: verifyUser } } = await supabase.auth.getUser()
-                if (!verifyUser) {
-                  console.error('❌ Session lost after sync, retrying...')
-                  try {
-                    const retryResponse = await fetch('/api/auth/sync-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        access_token: data.session.access_token,
-                        refresh_token: data.session.refresh_token,
-                        expires_at: data.session.expires_at,
-                        expires_in: data.session.expires_in,
-                        token_type: data.session.token_type,
-                        user: data.session.user,
-                      }),
-                      credentials: 'include',
-                    })
-                    if (retryResponse.ok) {
-                      console.log('✅ Retry sync successful')
-                    }
-                  } catch (retryError) {
-                    console.error('❌ Retry sync failed:', retryError)
-                  }
-                }
-
-                // Wait for cookies to propagate
-                await new Promise(resolve => setTimeout(resolve, 1000))
-
-                // Final verification before redirect
-                const { data: { user: finalVerify } } = await supabase.auth.getUser()
-                if (finalVerify) {
-                  window.location.href = '/dashboard'
-                } else {
-                  console.error('❌ Session verification failed')
-                  setError('Login successful but session not established. Please try again.')
-                  setLoading(false)
-                }
-              } else {
-                const errorMsg = result.error || 'Failed to sync session'
-                setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
-                setLoading(false)
-              }
-            } catch (error: any) {
-              console.error('❌ Sync error:', error)
-              const errorMsg = error?.message || 'Failed to sync session to server'
-              setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
-              setLoading(false)
-            }
-          } else if (data?.user) {
-            console.warn('⚠️ User exists but session not immediately available, redirecting...')
-            router.push('/dashboard')
-            router.refresh()
-          } else {
-            console.error('❌ Login successful but user data not available')
-            setError('Login successful but user data not available. Please try again.')
-            setLoading(false)
-          }
+        if (data?.user && data?.session) {
+          console.log('✅ Login successful, user:', data.user.email)
+          // createBrowserClient automatically wrote the session to cookies —
+          // the server-side createServerClient will see it on the next request.
+          // A full page navigation flushes the in-flight React state cleanly.
+          window.location.href = '/dashboard'
+        } else {
+          console.error('❌ Login successful but session not available')
+          setError('Login successful but session not established. Please try again.')
+          setLoading(false)
+        }
       }
     } catch (err) {
       console.error('Login error:', err)
@@ -318,6 +231,10 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  // Don't render anything until we've confirmed there's no active session.
+  // This prevents the login form from flashing before the redirect fires.
+  if (checking) return null
 
   return (
     <div
@@ -412,11 +329,26 @@ export default function LoginPage() {
                     )}
                   </div>
                 </div>
-                {(error.includes('wait') || error.includes('Rate limited')) && (
-                  <div className={`login-page-error-tip mt-2 text-xs ${
+                {(error.includes('wait') || error.includes('Rate limited') || error.includes('attempts')) && (
+                  <div className={`login-page-error-tip mt-2 text-xs flex items-center gap-2 ${
                     darkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
                     💡 <strong>Tip:</strong> Please wait before trying again.
+                    <button
+                      type="button"
+                      className="underline hover:no-underline ml-1"
+                      style={{ color: colors.primary }}
+                      onClick={() => {
+                        localStorage.removeItem('rateLimitUntil')
+                        setRateLimited(false)
+                        setRateLimitUntil(null)
+                        setRateLimitCountdown(null)
+                        setAttemptCount(0)
+                        setError(null)
+                      }}
+                    >
+                      Clear &amp; retry
+                    </button>
                   </div>
                 )}
               </div>
@@ -455,6 +387,7 @@ export default function LoginPage() {
                 placeholder="email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                suppressHydrationWarning
                 onFocus={(e) => {
                   e.target.style.borderColor = colors.primary
                   e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`
@@ -495,6 +428,7 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  suppressHydrationWarning
                   onFocus={(e) => {
                     e.target.style.borderColor = colors.primary
                     e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`

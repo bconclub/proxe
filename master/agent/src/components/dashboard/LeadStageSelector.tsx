@@ -12,19 +12,18 @@ interface LeadStageSelectorProps {
   disabled?: boolean
 }
 
-const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; scoreRange?: string; isAuto?: boolean }[] = [
+const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; scoreRange?: string }[] = [
   { value: 'New', label: 'New', description: '0-30 score', scoreRange: '0-30' },
   { value: 'Engaged', label: 'Engaged', description: '0-30 score, active chat', scoreRange: '0-30' },
   { value: 'Qualified', label: 'Qualified', description: '31-60 score', scoreRange: '31-60' },
   { value: 'High Intent', label: 'High Intent', description: '61-85 score', scoreRange: '61-85' },
   { value: 'Booking Made', label: 'Booking Made', description: '86-100 score', scoreRange: '86-100' },
-  { value: 'No Show', label: 'No Show', description: 'Booking missed', scoreRange: 'Milestone' },
-  { value: 'Demo Taken', label: 'Demo Taken', description: 'Demo completed', scoreRange: 'Milestone' },
-  { value: 'Proposal Sent', label: 'Proposal Sent', description: 'Proposal delivered', scoreRange: 'Milestone' },
-  { value: 'Converted', label: 'Converted', description: 'Manual close - won', scoreRange: 'Terminal' },
-  { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual close - lost', scoreRange: 'Terminal' },
-  { value: 'In Sequence', label: 'In Sequence', description: 'Auto for <61 score', scoreRange: 'Auto', isAuto: true },
-  { value: 'Cold', label: 'Cold', description: 'Exhausted sequences', scoreRange: 'Auto', isAuto: true },
+  { value: 'Converted', label: 'Converted', description: 'Manual close', scoreRange: 'Manual' },
+  { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual', scoreRange: 'Manual' },
+  { value: 'Not Qualified', label: 'Not Qualified', description: 'Manual', scoreRange: 'Manual' },
+  { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
+  { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
+  { value: 'In Sequence', label: 'In Sequence', description: 'Automated follow-up', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [
@@ -40,13 +39,12 @@ const getStageColor = (stage: LeadStage | null): string => {
     'Qualified': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     'High Intent': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
     'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    'No Show': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    'Demo Taken': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-    'Proposal Sent': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
     'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    'In Sequence': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+    'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
+    'In Sequence': '', // Uses inline styles with CSS variables
     'Cold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    'R&R': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
   }
   return stage ? colors[stage] : colors['New']
 }
@@ -98,6 +96,7 @@ export default function LeadStageSelector({
     note: string
     duration?: number
     next_followup?: string
+    disqualification_reason?: string
   }) => {
     if (!pendingStageChange) return
 
@@ -117,6 +116,7 @@ export default function LeadStageSelector({
           note: activity.note,
           duration_minutes: activity.duration,
           next_followup_date: activity.next_followup,
+          disqualification_reason: activity.disqualification_reason,
         }),
       })
 
@@ -197,24 +197,16 @@ export default function LeadStageSelector({
                 onClick={() => handleStageChange(option.value)}
                 disabled={disabled || isUpdating}
                 className={`
-                  px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  flex items-center justify-between gap-2
+                  px-3 py-2 text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
                   ${stage === option.value
                     ? `${getStageColor(option.value)} ring-2 ring-offset-2 ring-current`
-                    : option.isAuto 
-                      ? 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-gray-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                   }
                   ${disabled || isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 `}
-                title={option.description + (option.isAuto ? ' (Auto-assigned by system)' : '')}
+                title={option.description}
               >
-                <span>{option.label}</span>
-                {option.isAuto && (
-                  <span className="text-[9px] px-1 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-normal">
-                    Auto
-                  </span>
-                )}
+                {option.label}
               </button>
             ))}
           </div>

@@ -1,8 +1,8 @@
 /**
- * POST /api/agent/whatsapp/respond — AI response for WhatsApp
+ * POST /api/agent/whatsapp/respond - AI response for WhatsApp
  *
  * Phase 3 of the Unified Agent Architecture.
- * NEW route — WhatsApp currently has NO AI responses. This enables it.
+ * NEW route - WhatsApp currently has NO AI responses. This enables it.
  *
  * Uses agent-core engine.process() (non-streaming) to generate AI responses
  * with full knowledge base search and cross-channel context awareness.
@@ -21,6 +21,8 @@ import {
   fetchSummary,
   logMessage,
   ensureOrUpdateLead,
+  ensureSession,
+  addUserInput,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +59,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Ensure whatsapp session exists and increment message_count
+    const effectiveSessionId = sessionId || `whatsapp_${Date.now()}`;
+    await ensureSession(effectiveSessionId, 'whatsapp', supabase);
+    await addUserInput(effectiveSessionId, message, 'whatsapp', undefined, {}, supabase);
+
     // Fetch cross-channel context for this customer
     const customerContext = await fetchCustomerContext(phone, name, supabase);
 
@@ -89,12 +96,21 @@ export async function POST(request: NextRequest) {
       })),
       summary: existingSummary,
       usedButtons: [],
+      adminNotes: customerContext?.unifiedContext?.admin_notes || undefined,
     };
 
     // Generate AI response (non-streaming for WhatsApp)
     const aiStartTime = Date.now();
     const result = await processMessage(agentInput, supabase);
     const responseTimeMs = Date.now() - aiStartTime;
+
+    // Sanitize response for WhatsApp: convert **bold** → *bold*, strip HTML tags
+    if (result.response) {
+      result.response = result.response
+        .replace(/\*\*(.+?)\*\*/gs, '*$1*')      // **text** → *text*
+        .replace(/<br\s*\/?>/gi, '\n')            // <br> → newline
+        .replace(/<[^>]+>/g, '');                 // strip remaining HTML
+    }
 
     // Log messages to conversations table if we have a lead
     const responseMetadata = {

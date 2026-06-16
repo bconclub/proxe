@@ -1,5 +1,5 @@
 /**
- * services/ — Shared business logic for the unified PROXe agent
+ * services/ - Shared business logic for the unified PROXe agent
  *
  * Phase 2 of the Unified Agent Architecture.
  * These modules are channel-agnostic and used by both web and WhatsApp adapters.
@@ -18,6 +18,8 @@ export {
   stripHTML,
   formatTimeForDisplay,
   formatDate,
+  isLikelyRealPersonName,
+  cleanDisplayName,
 } from './utils';
 
 // Supabase clients
@@ -60,21 +62,86 @@ export {
 // Booking management
 export {
   type BookingData,
+  type BookingSessionType,
   type ExistingBooking,
   type TimeSlot,
+  getAvailableBookingSlotStarts,
   getGoogleCalendarAuth,
   checkExistingBooking,
+  isAllowedBookingTime,
+  normalizeBookingSessionType,
   storeBooking,
   getAvailableSlots,
   createCalendarEvent,
+  deleteCalendarEvent,
+  cancelBooking,
 } from './bookingManager';
+
+// WhatsApp messaging
+export {
+  sendWhatsAppText,
+  sendWhatsAppTemplate,
+  sendBookingConfirmation,
+  sendBookingReminder,
+  sendMissedCallMessage,
+  renderPATResultBody,
+  renderDemoOnlineBody,
+  renderDemoOfflineBody,
+  TIER_LABELS,
+  TIER_MESSAGES,
+  TEMPLATE_HEADERS,
+  TEMPLATE_BUTTONS,
+  sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
+  sendDemoConfirmation,
+  type DemoFormat,
+  sendPATResult,
+  sendFacebookLeadWelcome,
+  sendWelcomeTemplate,
+  pickWelcomeTemplate,
+  isPilotSource,
+  pickRnrTemplate,
+  sendWhatsAppInteractiveButtons,
+} from './whatsappSender';
+
+// Quick-reply (interactive button) triggers + LLM button extraction
+export {
+  findQuickReplyFor,
+  extractButtonsFromLLMResponse,
+  type QuickReplyConfig,
+} from './quickReplyMap';
 
 // Cross-channel context
 export {
   type CustomerContext,
+  type BrandUserProfile,
   type WindchasersUserProfile,
   extractTopics,
   formatBookingInfo,
   fetchCustomerContext,
   updateBrandProfile,
 } from './contextBuilder';
+
+// Attribution (Source / First Touch / Last Touch)
+export {
+  type AttributionPayload,
+  deriveSource,
+  deriveFirstTouch,
+  buildAttribution,
+} from './attribution';
+
+// Note orchestrator (classify + act)
+export {
+  type CallOutcome,
+  type NoteClassification,
+  type ClassifyAndActInput,
+  type OrchestratorResult,
+  classifyAndAct,
+  classifyNote,
+} from './noteOrchestrator';
+
+// Transactional email (Resend)
+export {
+  type SendResult,
+  sendEmail,
+  sendInvitationEmail,
+} from './email';

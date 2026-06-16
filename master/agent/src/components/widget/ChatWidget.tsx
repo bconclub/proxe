@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
 import type { Message } from '@/hooks/useChatStream';
-import { InfinityLoader } from '@/components/widget/InfinityLoader';
+
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import { CostGuideFormInline } from '@/components/widget/CostGuideFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import type { BrandConfig } from '@/configs';
 import { useDeployModal } from '@/contexts/DeployModalContext';
@@ -34,11 +35,19 @@ import {
   type StorageBrandKey,
 } from '@/lib/chatLocalStorage';
 import { createClient } from '@/lib/supabase/client';
+import Vapi from '@vapi-ai/web';
 
 interface ChatWidgetProps {
   apiUrl?: string;
   widgetStyle?: 'searchbar' | 'bubble';
 }
+
+interface FlowOverrideRule {
+  responseText?: string;
+  followUpButtons: string[];
+}
+
+const FLOW_COUNTRIES = ['USA', 'Canada', 'Hungary', 'New Zealand', 'Thailand', 'Australia'] as const;
 
 // PROXE Logo component (white icon version)
 const PROXELogo = () => (
@@ -54,6 +63,28 @@ const InfinitySymbol = () => (
   </svg>
 );
 
+
+// Connecting ring — gold arc that fills 0→100% over 2.4s (Windchasers brand)
+const ConnectingRingOrb = () => (
+  <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
+    <circle
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="rgba(197, 165, 114, 0.18)"
+      strokeWidth="3"
+    />
+    <circle
+      className={styles.voiceConnectingArc}
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="#C5A572"
+      strokeWidth="3"
+      strokeLinecap="round"
+      pathLength={100}
+      transform="rotate(-90 120 120)"
+    />
+  </svg>
+);
 
 const ICONS = {
   search: (
@@ -86,6 +117,11 @@ const ICONS = {
       <polyline points="6 9 12 15 18 9"></polyline>
     </svg>
   ),
+  chevronUp: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 15 12 9 18 15"></polyline>
+    </svg>
+  ),
   user: (
     <svg viewBox="0 0 24 24" fill="currentColor">
       <circle cx="12" cy="8" r="4"/>
@@ -100,27 +136,52 @@ const ICONS = {
         return <PROXELogo />;
       }
       if (avatarType === 'image' && config.chatStructure.avatar.source) {
-        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
+        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
       }
     }
     // Fallback: Use image logo for Windchasers, infinity symbol for others
     if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
-      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '100%', height: '100%' }} />;
+      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
     }
     return <InfinitySymbol />;
   },
   infinity: <InfinitySymbol />,
+  attachment: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+    </svg>
+  ),
+  mic: (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.32.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
+    </svg>
+  ),
+  sun: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4"></circle>
+      <line x1="12" y1="2" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="22"></line>
+      <line x1="2" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="22" y2="12"></line>
+      <line x1="4.9" y1="4.9" x2="7" y2="7"></line>
+      <line x1="17" y1="17" x2="19.1" y2="19.1"></line>
+      <line x1="17" y1="7" x2="19.1" y2="4.9"></line>
+      <line x1="4.9" y1="19.1" x2="7" y2="17"></line>
+    </svg>
+  ),
+  moon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3c.5 0 .8.54.53.96A7 7 0 1 0 20.04 12.26c.42-.27.96.03.96.53z"></path>
+    </svg>
+  ),
 };
 
-// Brand-aware welcome message
-const welcomeMessages: Record<string, string> = {
-  windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
-  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
-};
-function getWelcomeMessage(brand: string): string {
-  return welcomeMessages[brand] || welcomeMessages['proxe'];
-}
+// Windchasers welcome bubble — three-part Avia intro sequence.
+const windchasersWelcomeSequence = [
+  { text: "Hi, I am Avia,", delay: 0 },
+  { text: "I am Windchasers AI Aviation Counsellor.", delay: 800 },
+  { text: "I am here to help you with your Pilot Career Path. What's on your mind?", delay: 1600 },
+];
 
 // Helper function to clean metadata strings from conversation summary
 const cleanSummary = (summary: string | null | undefined): string => {
@@ -148,11 +209,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [calendarAnchorId, setCalendarAnchorId] = useState<string | null>(null);
   const [pendingCalendar, setPendingCalendar] = useState(false);
   const [forceCalendarFromBookButton, setForceCalendarFromBookButton] = useState(false);
+  const [skipBookingCheck, setSkipBookingCheck] = useState(false);
   const [showDeployForm, setShowDeployForm] = useState<string | null>(null);
   const [bookingCompleted, setBookingCompleted] = useState(false);
+  const [bookedSummary, setBookedSummary] = useState<string>('');
+  const [showCostGuideForm, setShowCostGuideForm] = useState<string | null>(null);
   const [usedButtons, setUsedButtons] = useState<string[]>([]);
   const [showVideo, setShowVideo] = useState<string | null>(null);
   const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
+  const [showPortfolio, setShowPortfolio] = useState<string | null>(null);
+  const [portfolioAnchorId, setPortfolioAnchorId] = useState<string | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
@@ -183,10 +249,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [phoneInput, setPhoneInput] = useState('');
   const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
+  const [flowOverrideButtons, setFlowOverrideButtons] = useState<string[] | null>(null);
+  const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
+  const [welcomeComplete, setWelcomeComplete] = useState(false);
+  const [showMinimalButtons, setShowMinimalButtons] = useState(false);
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
   const SEARCHBAR_KEYBOARD_OFFSET = 20;
   const [isDockedBubble, setIsDockedBubble] = useState(false);
+  const [preLoadedLeadContext, setPreLoadedLeadContext] = useState<{ name?: string; service?: string; brand?: string; lead_id?: string } | null>(null);
   const SEARCHBAR_KEYBOARD_GAP = 5;
   const EMAIL_PROMPT_THRESHOLD = 5;
   const PHONE_PROMPT_THRESHOLD = 7;
@@ -195,6 +267,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const chatInputRef = useRef<HTMLInputElement>(null);
   const quickButtonsRef = useRef<HTMLDivElement>(null);
   const hasEverOpenedRef = useRef(false);
+  const vapiRef = useRef<Vapi | null>(null);
+  const vapiPrewarmedRef = useRef(false);
+  const vapiCallReadyRef = useRef(false);
+  const [isVapiActive, setIsVapiActive] = useState(false);
+  const [vapiConnecting, setVapiConnecting] = useState(false);
+  const [vapiEnding, setVapiEnding] = useState(false);
+  const [vapiError, setVapiError] = useState(false);
+  const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
+  const [vapiVolume, setVapiVolume] = useState(0);
+  const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const [vapiDebugLog, setVapiDebugLog] = useState<string[]>([]);
+  const [micPermission, setMicPermission] = useState<string>('unknown');
+  const vapiTranscriptRef = useRef<HTMLDivElement>(null);
+  const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vapiMicHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vapiCallIdRef = useRef<string | null>(null);
+  const vapiTranscriptSeqRef = useRef(0);
   const chatboxContainerRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const searchbarWrapperRef = useRef<HTMLDivElement>(null);
@@ -210,8 +299,33 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
+  const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
+  const bookingConfirmedRef = useRef(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+
+  const setPendingFlowOverrideState = useCallback((rule: FlowOverrideRule | null) => {
+    pendingFlowOverrideRef.current = rule;
+    setPendingFlowOverride(rule);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      setWidgetTheme(savedTheme);
+    }
+  }, []);
+
+  const toggleWidgetTheme = useCallback(() => {
+    setWidgetTheme((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('windchasers-widget-theme', next);
+      }
+      return next;
+    });
+  }, []);
 
   const handleOpenChat = useCallback(() => {
     setShowCloseConfirm(false);
@@ -233,13 +347,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [isOpen]);
 
-  // Listen for viewport info from parent (for embed widget)
+  // Listen for viewport info and lead context from parent (for embed widget)
   useEffect(() => {
     if (widgetStyle !== 'bubble') return;
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
+      }
+      if (e.data && e.data.type === 'proxe_lead_context') {
+        console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
+        setPreLoadedLeadContext(e.data.lead);
       }
     };
 
@@ -297,6 +415,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           }
           if (typeof storedUser.promptedPhone === 'boolean') {
             setHasAskedPhone(storedUser.promptedPhone);
+          }
+        }
+
+        // Apply pre-loaded lead context from parent page (form submission)
+        if (preLoadedLeadContext && !cancelled) {
+          console.log('[ChatWidget] Applying pre-loaded lead context:', preLoadedLeadContext);
+          const leadProfile: LocalUserProfile = {
+            ...storedUser,
+            name: preLoadedLeadContext.name || storedUser?.name,
+          };
+          setUserProfile(leadProfile);
+          storeUserProfile(leadProfile, brandKey);
+          if (preLoadedLeadContext.name) {
+            setHasAskedName(true);
           }
         }
 
@@ -477,7 +609,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preLoadedLeadContext]);
+
+  // Initialize welcome video visibility from localStorage
+  // Video embed temporarily disabled
+  // useEffect(() => {
+  //   if (typeof window !== 'undefined') {
+  //     const dismissed = window.localStorage.getItem('bcon_video_closed');
+  //     if (dismissed === 'true') {
+  //       setShowWelcomeVideo(false);
+  //     }
+  //   }
+  // }, []);
 
   useEffect(() => {
     if (showNamePrompt) {
@@ -697,6 +840,82 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     },
   });
 
+  const persistWebEvents = useCallback(async (
+    eventMessages: Array<{
+      sender: 'customer' | 'agent' | 'system';
+      content: string;
+      messageType?: string;
+      metadata?: Record<string, any>;
+    }>,
+  ) => {
+    if (!externalSessionId || eventMessages.length === 0) return;
+
+    try {
+      await fetch('/api/agent/web/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+          messages: eventMessages,
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist web event:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
+  const persistVoiceTranscript = useCallback(async (
+    role: 'user' | 'assistant',
+    transcript: string,
+    transcriptType: string = 'final',
+  ) => {
+    const text = transcript.trim();
+    if (!externalSessionId || !text) return;
+
+    try {
+      await fetch('/api/agent/voice/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          callId: vapiCallIdRef.current,
+          role,
+          transcript: text,
+          transcriptType,
+          sequence: vapiTranscriptSeqRef.current,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist voice transcript:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
   const closeCalendarWidget = useCallback(() => {
     setShowCalendly(null);
     setPendingCalendar(false);
@@ -716,6 +935,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setVideoAnchorId(null);
   }, []);
 
+  const closePortfolio = useCallback(() => {
+    setShowPortfolio(null);
+    setPortfolioAnchorId(null);
+  }, []);
+
   const handleCloseChat = useCallback(() => {
     setShowCloseConfirm(false);
     setIsOpen(false);
@@ -727,15 +951,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
+    closePortfolio();
     setDynamicQuickButtons(null);
     setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverrideState(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
     // Only reset if user explicitly resets the chat
     // Notify parent iframe to disable pointer events
     if (window.parent !== window) {
       window.parent.postMessage('wc-chat-close', '*');
     }
-  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm]);
+  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
 
   const handleRequestCloseChat = useCallback(() => {
     setShowCloseConfirm(true);
@@ -764,76 +991,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setShowQuickButtons(false);
   };
 
-  const requestNameBeforeProceed = (message: string, buttons: string[]) => {
-    // Ask for name on first message, before AI responds
-    if (
-      !userProfile.name &&
-      !hasAskedName &&
-      !namePromptDismissed &&
-      !showNamePrompt &&
-      messageCount === 0 // First message
-    ) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Requesting name before first AI response');
-      }
-      setHasAskedName(true);
-      
-      // Add user's message to chat immediately so it shows before the name prompt
-      addUserMessage(message);
-      
-      // Queue the message for AI response after name is provided
-      queuePendingMessage(message, buttons, 'name');
-      
-      // Set flag to skip adding user message again when sending to AI
-      setSkipAddingUserMessage(true);
-      
-      // Ensure chat is open to show the name prompt
-      setIsOpen(true);
-      setIsInputActive(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      
-      setShowNamePrompt(true);
-      return true;
-    }
-    return false;
-  };
-
-  const requestEmailBeforeProceed = (message: string, buttons: string[]) => {
-    if (!userProfile.email && !emailPromptDismissed && !hasAskedEmail && interactionCountRef.current >= EMAIL_PROMPT_THRESHOLD) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Requesting email before proceeding');
-      }
-      queuePendingMessage(message, buttons, 'email');
-      applyLocalProfile({ promptedEmail: true });
-      setHasAskedEmail(true);
-      setShowEmailPrompt(true);
-      return true;
-    }
-    return false;
-  };
-
-  const requestPhoneBeforeProceed = (message: string, buttons: string[]) => {
-    if (!userProfile.phone && !phonePromptDismissed && !hasAskedPhone && interactionCountRef.current >= PHONE_PROMPT_THRESHOLD) {
-      queuePendingMessage(message, buttons, 'phone');
-      applyLocalProfile({ promptedPhone: true });
-      setHasAskedPhone(true);
-      setShowPhonePrompt(true);
-      return true;
-    }
-    return false;
-  };
+  // Upfront contact gates disabled: name/email/phone are collected on the
+  // booking form (BookingDetails) or the callback form, not mid-conversation.
+  const requestNameBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestEmailBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestPhoneBeforeProceed = (_message: string, _buttons: string[]) => false;
 
   const submitMessage = async (rawMessage: string, buttons: string[] = usedButtons) => {
     const trimmed = rawMessage.trim();
     if (!trimmed) return;
     const normalizedTrimmed = trimmed.toLowerCase();
+    const lastAiMessageText =
+      [...messages].reverse().find((message) => message.type === 'ai')?.text?.toLowerCase() || '';
+    const isAffirmativeConsultationReply =
+      /^yes[.!?]*$/.test(normalizedTrimmed) &&
+      (
+        lastAiMessageText.includes('set up a 1:1 consultation') ||
+        lastAiMessageText.includes('book a consultation')
+      );
     const isExactDemoBookingTrigger =
       normalizedTrimmed === 'book a demo session' || normalizedTrimmed === 'book a demo';
     const isBookButtonMessage =
       buttons.some((button) => button.trim().toLowerCase() === normalizedTrimmed) &&
       normalizedTrimmed.includes('book');
-    const shouldForceCalendarFromBookButton = isExactDemoBookingTrigger || isBookButtonMessage;
+    const shouldForceCalendarFromBookButton =
+      isExactDemoBookingTrigger || isBookButtonMessage || isAffirmativeConsultationReply;
 
     if (showCalendly) {
       closeCalendarWidget();
@@ -859,15 +1041,44 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     let contextualMessage = trimmed;
     let displayMessage = trimmed; // Message to show in chat and store
 
+    // Keep quick-button instructions hidden from the visible user bubble.
+    if (/^explore ai marketing solutions$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user for business and industry context before suggesting solutions.] ${trimmed}`;
+    } else if (/^view use cases$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
+    }
+
+    // Age input detection: user typed their age after the "how old are you?" question
+    const lastAiText = [...messages].reverse().find(m => m.type === 'ai')?.text?.toLowerCase() || '';
+    const isAgeQuestion = lastAiText.includes('how old are you') || (lastAiText.includes('quick question') && lastAiText.includes('old'));
+    const ageMatch = trimmed.match(/^(\d{1,2})$/);
+    if (isAgeQuestion && ageMatch) {
+      const age = parseInt(ageMatch[1]);
+      if (age >= 10 && age <= 65) {
+        contextualMessage = `[User's age is ${age}] ${trimmed}`;
+        if (age <= 21) {
+          setPendingFlowOverrideState({ followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'] });
+        } else {
+          setPendingFlowOverrideState({ followUpButtons: ['Studying', 'Working', 'Taking a Break'] });
+        }
+      }
+    }
+
     const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
     if (isBookingRepeat) {
-      contextualMessage = `[Booking already scheduled] ${trimmed}`;
-      // Don't add prefix to display message for booking repeat
+      setInputValue('');
+      addUserMessage(trimmed);
+      const rebookMsg = bookedSummary
+        ? `You already have a call booked for ${bookedSummary}. Would you like to reschedule?`
+        : 'You already have a call booked. Would you like to reschedule?';
+      addAIMessage(rebookMsg);
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+      return;
     }
 
     // Add name context to AI message only (not displayed to user)
     if (nextCount === 1 && userProfile.name) {
-      contextualMessage = `[User's name is ${userProfile.name}] ${trimmed}`;
+      contextualMessage = `[User's name is ${userProfile.name}] ${contextualMessage}`;
       // displayMessage stays as original trimmed message
     }
 
@@ -875,8 +1086,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setMessageCount(nextCount);
     setExploreButtons(null);
     setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
 
-    if ((containsBookingKeywords(trimmed) || isExactDemoBookingTrigger) && !bookingCompleted) {
+    if (
+      (containsBookingKeywords(trimmed) || isExactDemoBookingTrigger || isAffirmativeConsultationReply) &&
+      !bookingCompleted
+    ) {
+      // Open calendar immediately while AI response streams
       setPendingCalendar(true);
       setForceCalendarFromBookButton(shouldForceCalendarFromBookButton);
       const calendarMessageId = `calendar-${Date.now()}`;
@@ -892,6 +1108,31 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // Store the display message (without context prefix) in history
     appendHistory({ role: 'user', content: displayMessage });
     // Note: User input is saved server-side in /api/agent/web/chat route to avoid duplicates
+
+    // For forced calendar opens (book buttons like "Skip and book consultation"), skip the AI.
+    // The calendar widget collects name/email/phone directly, so sending to the AI causes it to
+    // ask for contact info (redundant) and/or generate a conflicting booking confirmation.
+    if (shouldForceCalendarFromBookButton) {
+      addUserMessage(displayMessage);
+      const calendarOpenMessage = 'Let me pull up available slots for you.';
+      addAIMessage(calendarOpenMessage);
+      appendHistory({ role: 'assistant', content: calendarOpenMessage });
+      void persistWebEvents([
+        {
+          sender: 'customer',
+          content: displayMessage,
+          messageType: 'text',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+        {
+          sender: 'agent',
+          content: calendarOpenMessage,
+          messageType: 'booking_prompt',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+      ]);
+      return;
+    }
 
     // Send contextual message (with name context) to AI, but display original message in chat
     sendMessage(contextualMessage, nextCount, buttons, buildRequestPayload(), skipAddingUserMessage, displayMessage);
@@ -1067,9 +1308,26 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleAssistantMessageComplete = async (message: Message) => {
+    const activeFlowOverride = pendingFlowOverrideRef.current;
+    console.log(
+      'DEBUG flowOverride:',
+      activeFlowOverride,
+      'flowOverrideButtons:',
+      flowOverrideButtons,
+    );
+    if (activeFlowOverride) {
+      if (activeFlowOverride.responseText && message.id) {
+        updateMessageText(message.id, activeFlowOverride.responseText);
+      }
+      setFlowOverrideButtons(activeFlowOverride.followUpButtons);
+      setDynamicQuickButtons(null);
+      setPendingFlowOverrideState(null);
+    }
+
     if (message.text) {
       // Strip HTML tags before adding to history for summarization
-      const plainText = message.text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      const finalMessageText = activeFlowOverride?.responseText || message.text;
+      const plainText = finalMessageText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
       appendHistory({ role: 'assistant', content: plainText });
       // Don't store assistant messages - we focus on user inputs and summaries
     }
@@ -1081,29 +1339,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     interactionCountRef.current += 1;
 
     const lastMessageTimestamp = new Date().toISOString();
-
-    const emailThresholdReached =
-      !userProfile.email &&
-      !emailPromptDismissed &&
-      !hasAskedEmail &&
-      interactionCountRef.current >= EMAIL_PROMPT_THRESHOLD;
-    const phoneThresholdReached =
-      !userProfile.phone &&
-      !phonePromptDismissed &&
-      !hasAskedPhone &&
-      interactionCountRef.current >= PHONE_PROMPT_THRESHOLD;
-
-    if (emailThresholdReached) {
-      applyLocalProfile({ promptedEmail: true });
-      setHasAskedEmail(true);
-      setShowEmailPrompt(true);
-    }
-
-    if (phoneThresholdReached) {
-      applyLocalProfile({ promptedPhone: true });
-      setHasAskedPhone(true);
-      setShowPhonePrompt(true);
-    }
 
     const shouldSummarize = interactionCountRef.current > 0 && interactionCountRef.current % 5 === 0;
     if (shouldSummarize) {
@@ -1187,17 +1422,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('bottom', '0', 'important');
       el.style.setProperty('width', '100%', 'important');
       el.style.setProperty('max-width', '100%', 'important');
+      el.style.setProperty('height', '100dvh', 'important');
       el.style.setProperty('height', '100vh', 'important');
+      el.style.setProperty('max-height', '100dvh', 'important');
       el.style.setProperty('max-height', '100vh', 'important');
+      el.style.setProperty('margin', '0', 'important');
     } else {
       el.style.setProperty('right', '24px', 'important');
-      el.style.setProperty('bottom', '104px', 'important');
       el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('top', 'auto', 'important');
+      el.style.setProperty('top', '0', 'important');
+      el.style.setProperty('bottom', '0', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
       el.style.setProperty('height', '580px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
+      el.style.setProperty('margin-top', 'auto', 'important');
+      el.style.setProperty('margin-bottom', 'auto', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -1563,19 +1803,41 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
 
-  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage } = useChat({
+  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage, addStreamingAIMessage, updateMessageText, finishMessage } = useChat({
     brand,
     apiUrl: finalApiUrl,
     onMessageComplete: handleAssistantMessageComplete,
   });
 
+  // Safety net: apply pending flow-override buttons when the AI message
+  // finishes streaming. handleAssistantMessageComplete is the primary path;
+  // this effect fires after every render so it catches any case where the
+  // callback chain misses the override (stale closure, timing race, etc.).
+  useEffect(() => {
+    if (isLoading) return;
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    const pendingOverride = pendingFlowOverrideRef.current;
+    if (!pendingOverride) return;
+
+    pendingFlowOverrideRef.current = null;
+    setPendingFlowOverride(null);
+    if (pendingOverride.responseText && lastMsg.id) {
+      updateMessageText(lastMsg.id, pendingOverride.responseText);
+    }
+    setFlowOverrideButtons(pendingOverride.followUpButtons);
+    setDynamicQuickButtons(null);
+  }, [isLoading, messages, updateMessageText]);
+
   const resetChatState = useCallback(() => {
     closeCalendarWidget();
     closeVideoWidget();
     closeDeployForm();
+    closePortfolio();
     setShowDeployForm(null);
     deployFormScrolledRef.current = false;
     setBookingCompleted(false);
+    bookingConfirmedRef.current = false;
     setUsedButtons([]);
     setMessageCount(0);
     clearMessages();
@@ -1604,6 +1866,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     storeUserProfile({}, brandKey);
     setDynamicQuickButtons(null);
     setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverrideState(null);
+    setWelcomeComplete(false);
+    setShowMinimalButtons(false);
     // Reset conversation restoration flags
     conversationsToRestoreRef.current = [];
     hasRestoredMessagesRef.current = false;
@@ -1616,7 +1882,55 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsSearchbarHovered(false);
     setIsDockedBubble(false);
     hasEverOpenedRef.current = false;
-  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm]);
+  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
+
+  const streamWelcomeMessage = useCallback(async (text: string, charDelay: number = 25) => {
+    const msg = addStreamingAIMessage('');
+    if (!msg) return;
+
+    setTimeout(() => {
+      window.dispatchEvent(new Event('message-updated'));
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+
+    const chars = text.split('');
+    for (let i = 0; i < chars.length; i++) {
+      const chunk = chars.slice(0, i + 1).join('');
+      updateMessageText(msg.id, chunk);
+      if (i % 3 === 0) {
+        window.dispatchEvent(new Event('message-updated'));
+      }
+      await new Promise(resolve => setTimeout(resolve, charDelay));
+    }
+
+    finishMessage(msg.id);
+    window.dispatchEvent(new Event('message-updated'));
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [addStreamingAIMessage, updateMessageText, finishMessage]);
+
+  const playWelcomeSequence = useCallback(async () => {
+    if (hasShownWelcomeRef.current) return;
+    hasShownWelcomeRef.current = true;
+
+    // If pre-loaded lead context exists, stream a single contextual message
+    if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
+      const text = `Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.`;
+      await streamWelcomeMessage(text, 20);
+      setWelcomeComplete(true);
+      return;
+    }
+
+    // Instant bubbles — CSS messageIn handles the fade-up animation
+    for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 120));
+      }
+      addAIMessage(windchasersWelcomeSequence[i].text);
+      window.dispatchEvent(new Event('message-updated'));
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setWelcomeComplete(true);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -1645,7 +1959,63 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
-  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && messages.length <= 1;
+  const hasUserMessage = messages.some((m) => m.type === 'user');
+  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
+  const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
+  const desktopWelcomeEligible =
+    !isMobileViewport &&
+    isOpen &&
+    hasQuickButtons &&
+    welcomeComplete &&
+    !hasUserMessage &&
+    hasShownWelcomeRef.current &&
+    messages.length >= 1 &&
+    messages[0].type === 'ai' &&
+    !messages[0].isStreaming &&
+    conversationsToRestoreRef.current.length === 0;
+  const challengeButtons = ['Leads', 'Engagement', 'Conversion', 'Retention'];
+  const contextualButtons = useMemo(() => {
+    const text = lastAiMessage?.text || '';
+    if (!text) return [] as string[];
+
+    const match = text.match(/is it\s+([^?]+)\?/i);
+    if (!match?.[1]) return [] as string[];
+
+    const cleanedOptions = match[1]
+      .split(/,\s*|\s+or\s+/i)
+      .map((option) =>
+        option
+          .replace(/^(getting|converting|keeping|improving|boosting)\s+/i, '')
+          .replace(/[?.!,]+$/g, '')
+          .trim()
+      )
+      .filter((option) => option.length > 2)
+      .map((option) => option.charAt(0).toUpperCase() + option.slice(1))
+      .slice(0, 4);
+
+    return Array.from(new Set(cleanedOptions));
+  }, [lastAiMessage?.text]);
+  const hasSelectedContextual = usedButtons.some((button) =>
+    contextualButtons.includes(button)
+  );
+  const showContextualButtons =
+    isOpen &&
+    !isLoading &&
+    contextualButtons.length >= 2 &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedContextual;
+  const hasSelectedChallenge = usedButtons.some((button) =>
+    challengeButtons.includes(button)
+  );
+  const showChallengeButtons =
+    isOpen &&
+    !isLoading &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedChallenge &&
+    contextualButtons.length === 0 &&
+    /biggest marketing challenge/i.test(lastAiMessage?.text || '');
 
   const isResponding = useMemo(
     () =>
@@ -1655,6 +2025,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           message.type === 'ai' && (message.isStreaming || !message.hasStreamed)
       ),
     [isLoading, messages]
+  );
+
+  // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
+  const hasStreamingText = useMemo(
+    () => messages.some((m) => m.isStreaming && m.text),
+    [messages]
   );
 
   // Register callback for when Deploy form is submitted
@@ -1775,88 +2151,67 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [isOpen, externalSessionId, messages.length, addUserMessage, addAIMessage, brandKey]);
 
-  // Re-fetch and restore conversations when chat reopens (if messages were cleared)
+  // Show welcome + optionally restore prior conversation when widget opens
   useEffect(() => {
-    if (isOpen && messages.length === 0 && !hasRestoredMessagesRef.current && !hasShownWelcomeRef.current && externalSessionId) {
-      // Re-fetch conversations when chat reopens and there are no messages
-      const fetchConversationsOnReopen = async () => {
+    if (!isOpen || messages.length !== 0 || hasShownWelcomeRef.current) return;
+
+    // ── Show welcome immediately — never block on an async DB check ──────────
+    // This removes the ~500 ms round-trip delay that was visible on first open.
+    playWelcomeSequence();
+
+    // ── Background: restore prior conversation for returning users ───────────
+    // If the session has a linked lead with past messages, swap the welcome
+    // content out (typically < 1 s, invisible to first-time visitors).
+    if (!hasRestoredMessagesRef.current && externalSessionId) {
+      (async () => {
         try {
           const supabase = createClient();
-          if (supabase && externalSessionId) {
-            const { data: sessionData, error: sessionError } = await supabase
-              .from('web_sessions')
-              .select('lead_id')
-              .eq('external_session_id', externalSessionId)
-              .maybeSingle();
-            
-            if (!sessionError && sessionData?.lead_id) {
-              const conversations = await fetchConversations(sessionData.lead_id);
-              if (conversations.length > 0 && addUserMessage && addAIMessage) {
-                // Store conversations to restore
-                conversationsToRestoreRef.current = conversations.map((conv) => ({
-                  id: conv.id,
-                  type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
-                  text: conv.content,
-                  created_at: conv.created_at
-                }));
-                
-                // Restore messages
-                conversations.forEach((conv) => {
-                  if (conv.sender === 'customer') {
-                    addUserMessage(conv.content);
-                  } else {
-                    addAIMessage(conv.content);
-                  }
-                });
-                
-                hasRestoredMessagesRef.current = true;
-                hasShownWelcomeRef.current = true;
-                
-                // Scroll to bottom after restoring
-                setTimeout(() => {
-                  if (messagesEndRef.current) {
-                    messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
-                  }
-                }, 100);
-                
-                return; // Don't show welcome message
-              }
+          if (!supabase) return;
+
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('web_sessions')
+            .select('lead_id')
+            .eq('external_session_id', externalSessionId)
+            .maybeSingle();
+
+          if (sessionError || !sessionData?.lead_id) return;
+
+          const conversations = await fetchConversations(sessionData.lead_id);
+          if (conversations.length === 0) return;
+
+          // Replace welcome with the restored conversation history
+          conversationsToRestoreRef.current = conversations.map((conv) => ({
+            id: conv.id,
+            type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+            text: conv.content,
+            created_at: conv.created_at,
+          }));
+          clearMessages();
+          hasShownWelcomeRef.current = true;
+          hasRestoredMessagesRef.current = true;
+          conversations.forEach((conv) => {
+            if (conv.sender === 'customer') {
+              addUserMessage?.(conv.content);
+            } else {
+              addAIMessage?.(conv.content);
             }
-          }
-          
-          // No conversations found, show welcome message
-          if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
-            hasShownWelcomeRef.current = true;
-          }
+          });
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+          }, 80);
         } catch (err) {
-          console.error('[ChatWidget] Error fetching conversations on reopen:', err);
-          // On error, show welcome message
-          if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
-            hasShownWelcomeRef.current = true;
-          }
+          // Non-fatal — welcome is already visible
+          console.error('[ChatWidget] Background conversation restore failed:', err);
         }
-      };
-      
-      fetchConversationsOnReopen();
-    } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
-      // Show welcome message if no conversations to restore
-      addAIMessage(getWelcomeMessage(brand));
-      hasShownWelcomeRef.current = true;
+      })();
     }
-  }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);
+  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, playWelcomeSequence]);
 
   // Ensure viewport starts at absolute top when chat widget first opens
   useEffect(() => {
-    if (isOpen && messagesAreaRef.current) {
-      // Force scroll to absolute top when chat opens
-      messagesAreaRef.current.scrollTop = 0;
-      
-      // Also ensure the container itself is at top
-      if (chatboxContainerRef.current) {
-        chatboxContainerRef.current.scrollTop = 0;
-      }
+    if (isOpen && messagesEndRef.current) {
+      // Scroll to bottom when chat opens
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [isOpen]);
 
@@ -1882,9 +2237,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             // Fallback: scroll to bottom
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
           }
-        } else if (messages.length <= 2 && messagesAreaRef.current) {
-          // Scroll to top of messages area to show first question header
-          messagesAreaRef.current.scrollTop = 0;
         } else if (messagesEndRef.current) {
           // Scroll to bottom for subsequent messages
           messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -1915,38 +2267,35 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         const timer = setTimeout(async () => {
           setPendingCalendar(false);
           setForceCalendarFromBookButton(false);
-          
-          // Check for existing booking before showing calendar
-          const phone = userProfile.phone;
-          const email = userProfile.email;
-          
-          if (phone || email) {
-            const existingBooking = await checkExistingBookingClient(phone, email);
-            
-            if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
-              // Format date and time for display
-              const date = new Date(existingBooking.bookingDate);
-              const formattedDate = date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              });
-              
-              // Format time (assuming it's in "HH:MM AM/PM" format)
-              const formattedTime = existingBooking.bookingTime;
-              
-              // Show message about existing booking
-              const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-              
-              // Add as AI message using addAIMessage from hook
-              addAIMessage(bookingMessage);
-              setBookingCompleted(true);
-              return; // Don't show calendar
+
+          // Skip booking check when user explicitly chose to reschedule
+          if (!skipBookingCheck) {
+            const phone = userProfile.phone;
+            const email = userProfile.email;
+
+            if (phone || email) {
+              const existingBooking = await checkExistingBookingClient(phone, email);
+
+              if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
+                const date = new Date(existingBooking.bookingDate);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                const formattedTime = existingBooking.bookingTime;
+                const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
+                addAIMessage(bookingMessage);
+                setBookingCompleted(true);
+                return;
+              }
             }
           }
-          
-          // No existing booking, show calendar
+
+          setSkipBookingCheck(false);
+
+          // Show calendar anchored to last message
           const calendarMessageId = `calendar-${Date.now()}`;
           setShowCalendly(calendarMessageId);
           if (lastMessage?.id) {
@@ -1960,10 +2309,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
     }
     
-  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton]);
+  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton, skipBookingCheck]);
 
   // Handle booking completion
   const handleBookingComplete = useCallback(async (bookingData: any) => {
+    if (bookingConfirmedRef.current) return;
+    bookingConfirmedRef.current = true;
     setBookingCompleted(true);
     if (bookingData) {
       // Close any open prompts immediately
@@ -1989,7 +2340,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       // Store booking details in Supabase (include contact info to ensure it's saved)
       if (externalSessionId && bookingData.date && bookingData.time) {
-        await storeBookingClient(
+        const storedBooking = await storeBookingClient(
           externalSessionId,
           {
             date: bookingData.date,
@@ -2012,15 +2363,40 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         });
         const formattedTime = bookingData.time; // Already in "11:00 AM" format
 
-        // Add system message to chat
+        setBookedSummary(`${formattedDate} at ${formattedTime}`);
         const bookingMessage = `Your call is scheduled for ${formattedDate} at ${formattedTime}.`;
         addAIMessage(bookingMessage);
+        await persistWebEvents([
+          {
+            sender: 'system',
+            content: `Booking ${storedBooking ? 'confirmed' : 'attempted'} for ${formattedDate} at ${formattedTime}.`,
+            messageType: 'booking',
+            metadata: {
+              intent: 'booking_complete',
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+          {
+            sender: 'agent',
+            content: bookingMessage,
+            messageType: 'booking_confirmation',
+            metadata: {
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+        ]);
 
         // Note: Booking info will be naturally included in the summary when the AI processes the booking message
         // No need to manually append metadata strings - let the summarize API handle it naturally
       }
     }
-  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary]);
+  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary, persistWebEvents]);
 
   // Check for existing booking before showing calendar
   const checkAndShowBooking = useCallback(async () => {
@@ -2047,13 +2423,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // Format time (assuming it's in "HH:MM AM/PM" format)
       const formattedTime = existingBooking.bookingTime;
       
-      // Show message about existing booking
-      const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
-      
-      // Add as AI message using addAIMessage from hook
+      setBookedSummary(`${formattedDate} at ${formattedTime}`);
+      const bookingMessage = `You already have a call booked for ${formattedDate} at ${formattedTime}. Would you like to reschedule?`;
       addAIMessage(bookingMessage);
       setBookingCompleted(true);
-      
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+
       return false; // Don't show calendar
     }
     
@@ -2100,23 +2475,38 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isOpen]);
 
   // Listen for streaming updates to auto-scroll
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const container = messagesAreaRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handleMessageUpdate = () => {
-      // On first message, keep at top. For subsequent messages, scroll to bottom
-      if (messages.length <= 2 && messagesAreaRef.current) {
-        messagesAreaRef.current.scrollTop = 0;
-      } else if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      // Always keep latest message in focus
+      scrollMessagesToBottom('smooth');
     };
 
     window.addEventListener('message-updated', handleMessageUpdate);
     return () => {
       window.removeEventListener('message-updated', handleMessageUpdate);
     };
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages.length, scrollMessagesToBottom]);
+
+  // Always scroll to bottom when messages change
+  useEffect(() => {
+    if (isOpen) {
+      scrollMessagesToBottom('smooth');
+    }
+  }, [messages, isOpen, scrollMessagesToBottom]);
 
   // Scroll deploy form into view only once when it first appears
   useEffect(() => {
@@ -2132,110 +2522,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
   }, [showDeployForm]);
 
-  // Enable horizontal scrolling with mouse wheel and drag on desktop
-  useEffect(() => {
-    const quickButtonsElement = quickButtonsRef.current;
-    if (!quickButtonsElement) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      // Only handle wheel events if the element is scrollable horizontally
-      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
-        // Check if scrolling horizontally (shift + wheel) or convert vertical to horizontal
-        const isHorizontalScroll = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        
-        if (isHorizontalScroll || Math.abs(e.deltaX) > 0) {
-          // Horizontal scroll - allow default behavior
-          return;
-        }
-        
-        // Convert vertical scroll to horizontal
-        e.preventDefault();
-        quickButtonsElement.scrollBy({
-          left: e.deltaY,
-          behavior: 'auto'
-        });
-      }
-    };
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (quickButtonsElement.scrollWidth > quickButtonsElement.clientWidth) {
-        setIsDragging(true);
-        hasDraggedRef.current = false;
-        dragStartX.current = e.pageX - quickButtonsElement.offsetLeft;
-        dragStartScrollLeft.current = quickButtonsElement.scrollLeft;
-        quickButtonsElement.style.cursor = 'grabbing';
-        quickButtonsElement.style.userSelect = 'none';
-        document.body.style.cursor = 'grabbing';
-        document.body.style.userSelect = 'none';
-        // Don't prevent default yet - wait to see if user drags
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      const x = e.pageX - quickButtonsElement.offsetLeft;
-      const deltaX = Math.abs(x - dragStartX.current);
-      
-      // Only prevent default and scroll if user has moved more than 5px (to distinguish from clicks)
-      if (deltaX > 5) {
-        hasDraggedRef.current = true;
-        e.preventDefault();
-        const walk = (x - dragStartX.current) * 2; // Scroll speed multiplier
-        quickButtonsElement.scrollLeft = dragStartScrollLeft.current - walk;
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (isDragging) {
-        setIsDragging(false);
-        quickButtonsElement.style.cursor = '';
-        quickButtonsElement.style.userSelect = '';
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        
-        // If user dragged, prevent click event on buttons
-        if (hasDraggedRef.current) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        hasDraggedRef.current = false;
-      }
-    };
-
-    const handleMouseLeave = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        quickButtonsElement.style.cursor = '';
-        quickButtonsElement.style.userSelect = '';
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-
-    // Only enable drag on desktop (not touch devices)
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
-    quickButtonsElement.addEventListener('wheel', handleWheel, { passive: false });
-    
-    if (!isTouchDevice) {
-      quickButtonsElement.addEventListener('mousedown', handleMouseDown);
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      quickButtonsElement.addEventListener('mouseleave', handleMouseLeave);
-    }
-    
-    return () => {
-      quickButtonsElement.removeEventListener('wheel', handleWheel);
-      if (!isTouchDevice) {
-        quickButtonsElement.removeEventListener('mousedown', handleMouseDown);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        quickButtonsElement.removeEventListener('mouseleave', handleMouseLeave);
-      }
-    };
-  }, [isExpanded, showQuickButtons, isDragging]);
-
   // Helper function to check if text contains booking keywords (call or demo)
   const containsBookingKeywords = (text: string): boolean => {
     const lowerText = text.toLowerCase().trim();
@@ -2243,12 +2529,218 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return true;
     }
     // Check for booking-related keywords
-    return lowerText.includes('call') || 
-           lowerText.includes('demo') || 
+    return lowerText.includes('call') ||
+           lowerText.includes('demo') ||
            lowerText.includes('book') ||
            lowerText.includes('schedule') ||
            lowerText.includes('meeting') ||
-           lowerText.includes('appointment');
+           lowerText.includes('appointment') ||
+           lowerText.includes('audit') ||
+           lowerText.includes('counsellor') ||
+           lowerText.includes('counselor');
+  };
+
+  const vapiLog = (event: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    const entry = `${ts} ${event}`;
+    console.log('[Vapi]', entry);
+    setVapiDebugLog(prev => [...prev.slice(-20), entry]);
+  };
+
+  const attachVapiListeners = (vapi: Vapi) => {
+    const ensureMicLive = () => {
+      try {
+        if (vapi.isMuted()) {
+          vapi.setMuted(false);
+          vapiLog('mic was muted → force-unmuted');
+        }
+      } catch { /* older SDK versions don't expose isMuted */ }
+    };
+
+    vapi.on('call-start', () => {
+      vapiLog('call-start ✅');
+      if (!vapiCallIdRef.current) {
+        vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
+      vapiCallReadyRef.current = true;
+      setVapiConnecting(false);
+      ensureMicLive();
+      // Periodic health-check: re-unmute every 3 s in case the browser
+      // or Daily.co mutes the track after assistant speech turns.
+      if (vapiMicHealthRef.current) clearInterval(vapiMicHealthRef.current);
+      vapiMicHealthRef.current = setInterval(ensureMicLive, 3000);
+    });
+    vapi.on('call-end', () => {
+      vapiLog('call-end');
+      vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
+      setVapiSpeaker('idle');
+      vapiCallIdRef.current = null;
+      // Flash red ring for 700ms before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
+    });
+    vapi.on('error', (e: any) => {
+      vapiLog(`error ❌ ${JSON.stringify(e)}`);
+      vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
+      vapiCallIdRef.current = null;
+      setVapiSpeaker('idle');
+      // Flash amber ring for 1.2s before overlay unmounts
+      setVapiError(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiError(false);
+        setVapiConnecting(false);
+      }, 1200);
+    });
+    vapi.on('speech-start', () => {
+      vapiLog('speech-start (assistant)');
+      setVapiConnecting(false);
+      setVapiSpeaker('assistant');
+    });
+    vapi.on('speech-end', () => {
+      vapiLog('speech-end');
+      setVapiSpeaker('idle');
+      // Re-confirm mic is live every time the assistant finishes speaking.
+      // Some browsers/Daily.co silently mute the user track during assistant audio.
+      setTimeout(ensureMicLive, 150);
+    });
+    // Volume-level fires continuously with user mic amplitude (0–1).
+    // Drive the on-screen mic bar so we can visually confirm audio capture.
+    vapi.on('volume-level', (level: number) => {
+      setVapiVolume(level);
+    });
+    vapi.on('message', (msg: any) => {
+      vapiLog(`msg type=${msg.type} role=${msg.role} txType=${msg.transcriptType ?? '-'}`);
+      if (msg.type === 'transcript' && msg.role === 'user') {
+        setVapiSpeaker('user');
+        if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
+        userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
+      }
+      if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        const transcript = String(msg.transcript || '').trim();
+        vapiTranscriptSeqRef.current += 1;
+        setVapiTranscript(prev => [...prev, { role, text: transcript }]);
+        void persistVoiceTranscript(role, transcript, msg.transcriptType);
+        setTimeout(() => {
+          vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
+        }, 50);
+      }
+    });
+  };
+
+  // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
+  // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
+  // grant mic permission correctly, especially on iOS Safari and Android Chrome.
+  // Do NOT pre-request getUserMedia here — claiming and releasing the mic before
+  // Vapi grabs it causes the device to reject Vapi's subsequent capture on mobile.
+  const startVapiPrewarm = () => {
+    if (vapiPrewarmedRef.current) return;
+    vapiPrewarmedRef.current = true;
+    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+    vapiRef.current = vapi;
+    attachVapiListeners(vapi);
+  };
+
+  const handleVoiceToggle = async () => {
+    // ── End call ──────────────────────────────────────────────────────────────
+    if (isVapiActive) {
+      // Flash red ring briefly before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setVapiSpeaker('idle');
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
+      try { vapiRef.current?.stop(); } catch {}
+      vapiRef.current = null;
+      vapiPrewarmedRef.current = false;
+      vapiCallReadyRef.current = false;
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
+      return;
+    }
+
+    // ── Start call ─────────────────────────────────────────────────────────────
+    setVapiTranscript([]);
+    setVapiDebugLog([]);
+    vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    vapiTranscriptSeqRef.current = 0;
+    setIsVapiActive(true);
+    setVapiConnecting(true);
+
+    try {
+      // Guard: env key must be present
+      const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
+      if (!publicKey) {
+        vapiLog('error ❌ NEXT_PUBLIC_VAPI_PUBLIC_KEY not set');
+        setIsVapiActive(false);
+        setVapiConnecting(false);
+        return;
+      }
+
+      // Always create a fresh instance — reusing a pre-warmed or stale instance
+      // can cause silent failures on mobile browsers.
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+      vapiPrewarmedRef.current = true;
+
+      // Preflight getUserMedia — must happen BEFORE Vapi's network handshake.
+      // In cross-origin iframes Chrome's transient user-activation window is
+      // ~1 second. Vapi.start() fires a server request before calling
+      // getUserMedia() internally; by then the activation expires and Chrome
+      // silently rejects the mic request with no dialog. Calling getUserMedia()
+      // here, immediately in the click handler, fires the permission dialog
+      // within the activation window. Once the user taps Allow the permission
+      // is stored for this origin and Vapi's own internal getUserMedia() works.
+      // iOS Safari note: iOS 16.4+ also requires the call to stay in the
+      // synchronous part of the user-gesture stack — await here is fine because
+      // we're still inside the same event-loop task initiated by the click.
+      if (navigator.mediaDevices?.getUserMedia) {
+        try {
+          const preflightStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          preflightStream.getTracks().forEach(track => track.stop());
+          vapiLog('mic preflight ✅ permission granted');
+        } catch (micErr: any) {
+          vapiLog(`mic preflight ❌ ${micErr?.message ?? micErr}`);
+          setIsVapiActive(false);
+          setVapiConnecting(false);
+          vapiPrewarmedRef.current = false;
+          return;
+        }
+      }
+
+      const vapi = new Vapi(publicKey);
+      vapiRef.current = vapi;
+      attachVapiListeners(vapi);
+
+      vapiLog('calling vapi.start…');
+      // No client-side overrides — all config lives in the Vapi dashboard.
+      // Passing overrides risks schema-validation rejection on the server side
+      // which silently drops firstMessage and transcriber settings. Match the
+      // VapiOrb pattern: just pass the assistant ID, nothing else.
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      vapiLog('vapi.start() resolved');
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      vapiLog(`start failed ❌ ${msg}`);
+      setIsVapiActive(false);
+      setVapiConnecting(false);
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+    }
   };
 
   const handleSend = () => {
@@ -2279,6 +2771,19 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     if (requestNameBeforeProceed(message, usedButtons)) return;
     if (requestEmailBeforeProceed(message, usedButtons)) return;
     if (requestPhoneBeforeProceed(message, usedButtons)) return;
+
+    // Parent flow: if the user just typed contact info in response to
+    // 'Send me the cost guide' / 'Send me the roadmap', show the
+    // post-capture rail buttons after the bot's "Sent" reply.
+    const lastClick = usedButtons[usedButtons.length - 1]?.toLowerCase() ?? '';
+    if (
+      lastClick === 'send me the cost guide' ||
+      lastClick === 'send me the roadmap'
+    ) {
+      setPendingFlowOverrideState({
+        followUpButtons: ['Talk to a counsellor', 'Ask another question', 'Not right now'],
+      });
+    }
 
     submitMessage(message, usedButtons);
   };
@@ -2322,144 +2827,316 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     const message = buttonText.trim();
     if (!message) return;
 
-    // Define lowerMessage once at the top for use throughout the function
-    const lowerMessage = message.toLowerCase().trim();
-
     setIsDockedBubble(true);
     setIsOpen(true);
     setIsExpanded(false);
     setShowQuickButtons(false);
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[ChatWidget] Quick button clicked', { buttonText, message });
-    }
-
-    // Handle Deploy PROXe button - show deploy form inline
-    // Match variations: "Deploy PROXe", "Deploy Proxe", "deploy proxe", etc.
-    if (lowerMessage.includes('deploy') && (lowerMessage.includes('proxe') || lowerMessage.includes('prox'))) {
-      closeCalendarWidget();
-      closeDeployForm();
-      setPendingCalendar(false);
-      if (showNamePrompt) {
-        setShowNamePrompt(false);
-      }
-      if (showEmailPrompt) {
-        setShowEmailPrompt(false);
-      }
-      if (showPhonePrompt) {
-        setShowPhonePrompt(false);
-      }
-      
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      
-      // Add user message to chat
-      addUserMessage('Deploy PROXe');
-      
-      // Show deploy form after the user message is added
-      // Use a longer timeout to ensure the message is in the array
-      setTimeout(() => {
-        const deployMessageId = `deploy-${Date.now()}`;
-        setShowDeployForm(deployMessageId);
-        deployFormScrolledRef.current = false;
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[ChatWidget] Deploy form opened', { 
-            messagesCount: messages.length,
-            deployMessageId
-          });
-        }
-      }, 300);
-      
-      return;
-    }
-
-    // Handle Watch Video button - show video widget
-    if (message.toLowerCase() === 'watch video') {
-      closeCalendarWidget();
-      closeDeployForm();
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      
-      // Add user message to chat and get the message object
-      const userMessage = addUserMessage('Watch Video');
-      
-      // Show video after the user message
-      setTimeout(() => {
-        const videoMessageId = `video-${Date.now()}`;
-        setShowVideo(videoMessageId);
-        setVideoAnchorId(userMessage.id);
-      }, 100);
-      
-      return;
-    }
-
-    const nextButtons = [...usedButtons, buttonText];
-    const isExploreRequest = lowerMessage === 'explore proxe' || 
-                             lowerMessage === 'explore training options' ||
-                             lowerMessage === 'explore training';
-    const exploreOptions = config?.exploreButtons ?? [];
-
-    if (isExploreRequest && exploreOptions.length > 0) {
-      closeCalendarWidget();
-      setIsOpen(true);
-      setIsExpanded(false);
-      setShowQuickButtons(false);
-      setIsInputActive(false);
-      setUsedButtons(nextButtons);
-      setExploreButtons(exploreOptions);
-      return;
-    }
-
+    setIsInputActive(true);
     setExploreButtons(null);
     setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
+
+    const nextButtons = [...usedButtons, buttonText];
+    setUsedButtons(nextButtons);
+
+    const normalizedButton = message.toLowerCase();
+
+    // Rebook flow — intercept before AI
+    if (normalizedButton === 'yes, reschedule') {
+      setBookingCompleted(false);
+      bookingConfirmedRef.current = false;
+      setBookedSummary('');
+      setSkipBookingCheck(true);
+      addUserMessage(buttonText);
+      addAIMessage('No problem. Pick a new date and time below.');
+      setPendingCalendar(true);
+      return;
+    }
+    if (normalizedButton === 'keep my booking') {
+      addUserMessage(buttonText);
+      addAIMessage(bookedSummary ? `Your call is confirmed for ${bookedSummary}. Anything else I can help with?` : 'Your booking is confirmed. Anything else?');
+      setFlowOverrideButtons([]);
+      return;
+    }
+
+    // Cost guide / roadmap — show inline WhatsApp contact form, skip AI
+    if (normalizedButton === 'send me the cost guide' || normalizedButton === 'send me the roadmap') {
+      addUserMessage(buttonText);
+      const formId = `cost-guide-${Date.now()}`;
+      setShowCostGuideForm(formId);
+      setFlowOverrideButtons([]);
+      return;
+    }
+
+    // Parent path is sticky from the moment the user picks "I am a parent" so
+    // we can disambiguate child-status labels that overlap with the aspirant
+    // activity step (e.g. "Working", "Taking a break").
+    const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
+    const flowRule = (() : FlowOverrideRule | null => {
+      // Pilot Assessment entry — open the assessment in a new tab with chat
+      // context attached. Accept the legacy "take the pat" label as well so
+      // older chat states (mid-session) still route correctly.
+      if (
+        normalizedButton === 'take pilot assessment' ||
+        normalizedButton === 'take the pat'
+      ) {
+        if (typeof window !== 'undefined') {
+          try {
+            const assessmentUrl = new URL('https://windchasers.in/assessment');
+            assessmentUrl.searchParams.set('source', 'chat');
+            if (externalSessionId) {
+              assessmentUrl.searchParams.set('conversation_id', externalSessionId);
+            }
+            window.open(assessmentUrl.toString(), '_blank', 'noopener,noreferrer');
+          } catch {
+            /* noop — popup blocker or invalid URL */
+          }
+        }
+        return {
+          followUpButtons: ['I finished the assessment', 'Skip and book consultation'],
+        };
+      }
+      if (
+        normalizedButton === 'i finished the assessment' ||
+        normalizedButton === 'i finished the pat'
+      ) {
+        return {
+          followUpButtons: ['Book a Consultation'],
+        };
+      }
+      // 'skip and book consultation' contains 'book' so the booking-keyword path
+      // in submitMessage will trigger BookingCalendarWidget; no override needed.
+
+      // Aspirant entry
+      if (normalizedButton === 'i want to become a pilot') {
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'airplane' || normalizedButton === 'helicopter') {
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (normalizedButton === 'yes, completed dgca') {
+        return {
+          followUpButtons: [...FLOW_COUNTRIES],
+        };
+      }
+      if (FLOW_COUNTRIES.some((country) => country.toLowerCase() === normalizedButton)) {
+        return {
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
+        };
+      }
+      if (normalizedButton === 'no, starting fresh') {
+        return {
+          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+        };
+      }
+      if (normalizedButton === 'yes, completed 12th science') {
+        // No buttons — user types their age freely, submitMessage detects it and routes
+        return { followUpButtons: [] };
+      }
+      // Aspirant activity acknowledgement — only fires when not on the parent path.
+      if (
+        !isParentPath && (
+          normalizedButton === 'studying' ||
+          normalizedButton === 'working' ||
+          normalizedButton === 'taking a break'
+        )
+      ) {
+        return {
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
+        };
+      }
+
+      // ── Parent path ────────────────────────────────────────────────────
+      if (normalizedButton === 'i am a parent') {
+        return {
+          followUpButtons: [
+            'Real Cost & Timeline',
+            'Pilot Career Growth',
+            'Just Exploring',
+          ],
+        };
+      }
+      // First-level parent topic answers — every topic ends on the same
+      // 3-button rail so the parent always has the same exits.
+      if (
+        isParentPath && (
+          normalizedButton === 'real cost & timeline' ||
+          normalizedButton === 'pilot career growth'
+        )
+      ) {
+        return {
+          followUpButtons: ['Send me the cost guide', 'Talk to a counsellor', 'Ask another question'],
+        };
+      }
+      if (isParentPath && normalizedButton === 'just exploring') {
+        return {
+          followUpButtons: ['Send me the roadmap', 'Ask a question', 'Maybe later'],
+        };
+      }
+      // Cost guide / roadmap — bot asks for contact; suppress buttons during
+      // the contact-capture turn so the user can type their info.
+      if (
+        isParentPath && (
+          normalizedButton === 'send me the cost guide' ||
+          normalizedButton === 'send me the roadmap'
+        )
+      ) {
+        return { followUpButtons: [] };
+      }
+      // Post-capture acknowledgement rail — the parent has shared contact
+      // and the bot has acknowledged. Offer counsellor / another question / exit.
+      // (Parent must explicitly click these; "ask another question" / "maybe
+      // later" / "not right now" are handled below.)
+
+      // 'Ask another question' / 'Ask a question' — drop into free-form,
+      // no flow override. Bot responds from KB + prompt context.
+      if (
+        isParentPath && (
+          normalizedButton === 'ask another question' ||
+          normalizedButton === 'ask a question'
+        )
+      ) {
+        return null;
+      }
+      // 'Maybe later' / 'Not right now' — graceful exit; bot says the closing
+      // line and we suppress further buttons.
+      if (
+        isParentPath && (
+          normalizedButton === 'maybe later' ||
+          normalizedButton === 'not right now'
+        )
+      ) {
+        return { followUpButtons: [] };
+      }
+
+      // ── Explore Training Options ──────────────────────────────────────
+      // Each sub-program funnels into an existing flow rather than
+      // dead-ending in LLM-improv, fixing the "Cabin Crew got stuck" bug.
+      if (normalizedButton === 'explore training options') {
+        return {
+          followUpButtons: config.exploreButtons ?? [],
+        };
+      }
+      if (normalizedButton === 'pilot training') {
+        // Same downstream as the Aspirant entry.
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'helicopter pilot') {
+        // Skip the airplane/helicopter pick — they already chose helicopter.
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (
+        normalizedButton === 'flight schools' ||
+        normalizedButton === 'cabin crew'
+      ) {
+        // Info-only programs — bot answers from KB, then offers a counsellor
+        // call or a follow-up question. Prevents the "stuck on Yes" bug.
+        return {
+          followUpButtons: ['Talk to a counsellor', 'Ask a question'],
+        };
+      }
+
+      return null;
+    })();
+    setPendingFlowOverrideState(flowRule);
 
     if (requestNameBeforeProceed(message, nextButtons)) return;
     if (requestEmailBeforeProceed(message, nextButtons)) return;
-
-    closeCalendarWidget();
-    setIsOpen(true);
-    setIsInputActive(true);
-    setIsExpanded(false);
-    setShowQuickButtons(false);
-    setUsedButtons(nextButtons);
-
     if (requestPhoneBeforeProceed(message, nextButtons)) return;
 
     submitMessage(message, nextButtons);
   };
 
   const renderWelcomeButtons = useCallback(
-    (wrapperClassName: string) => {
-      // Get quick action buttons from brand config (3 fixed buttons)
-      const quickActions = config.quickButtons || [
-        'Start Pilot Training',
-        'Book a Demo Session',
-        'Explore Training Options'
-      ];
-      
-      return (
-        <div className={wrapperClassName}>
-          <div className={styles.welcomeQuickButtonsContainer}>
-            <div className={styles.welcomeQuickButtonRow}>
-              {quickActions.slice(0, 3).map((buttonText, index) => (
-                <button
-                  key={buttonText}
-                  className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
-                  onClick={() => handleQuickButtonClick(buttonText)}
-                >
-                  {buttonText}
-                </button>
-              ))}
-            </div>
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {quickButtonOptions.slice(0, 3).map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
           </div>
         </div>
-      );
-    },
-    [handleQuickButtonClick, config]
+      </div>
+    ),
+    [handleQuickButtonClick, quickButtonOptions]
+  );
+
+  const renderChallengeButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {challengeButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [challengeButtons, handleQuickButtonClick]
+  );
+
+  const renderContextualButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {contextualButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [contextualButtons, handleQuickButtonClick]
+  );
+
+  const renderFlowOverrideButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {flowOverrideButtons?.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles.flowOverrideBtn} ${styles[`accent-${index % 7}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [flowOverrideButtons, handleQuickButtonClick]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -2468,6 +3145,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
     if (showVideo) {
       closeVideoWidget();
+    }
+    if (showPortfolio) {
+      closePortfolio();
     }
     setIsInputActive(true);
     if (!isOpen) {
@@ -2537,12 +3217,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const handleInputBlur = (e: React.FocusEvent) => {
-    // Don't hide if clicking on a quick button
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
       return;
     }
-    
+
     setTimeout(() => {
       if (!inputValue.trim() && !isOpen) {
         setShowQuickButtons(false);
@@ -2581,6 +3260,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       hasEverOpenedRef.current = true;
     }
   }, [isOpen]);
+
+  // Pre-warm Vapi the moment the widget opens so mic click is instant
+  useEffect(() => {
+    if (!isOpen) return;
+    startVapiPrewarm();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const hasConversation = messages.length > 0;
   const hasExistingConversation = 
@@ -2659,6 +3344,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             if (showDeployForm) {
               closeDeployForm();
             }
+            if (showPortfolio) {
+              closePortfolio();
+            }
               handleSearchWidgetPress();
           }}
           onBlur={handleInputBlur}
@@ -2710,10 +3398,61 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
-          <div className={styles.chatContent}>
+          {isVapiActive && (
+        <div className={styles.voiceOverlay}>
+          {/* Glass orb — speaker state drives halo colour via data-speaker */}
+          <div
+            className={styles.voiceOrbWrap}
+            data-speaker={vapiSpeaker}
+            data-state={vapiConnecting ? 'connecting' : vapiEnding ? 'ending' : vapiError ? 'error' : 'connected'}
+          >
+            {vapiConnecting && <ConnectingRingOrb />}
+            <span className={styles.voiceOrbRingHalo} aria-hidden="true" />
+            <span className={styles.voiceOrbInner} aria-hidden="true" />
+            <span className={styles.voiceOrbShine} aria-hidden="true" />
+            <span className={styles.voiceOrbRim} aria-hidden="true" />
+          </div>
+          <div className={styles.voiceMeta}>
+            <p className={styles.voiceName}>Avia</p>
+            <p className={styles.voiceStatus}>
+              {vapiConnecting ? 'Connecting…'
+                : vapiEnding ? 'Ending…'
+                : vapiError ? 'Connection issue'
+                : vapiSpeaker === 'assistant' ? 'Speaking…'
+                : vapiSpeaker === 'user' ? 'Listening…'
+                : 'Connected'}
+            </p>
+          </div>
+          {/* Mic volume bar — shows live amplitude from user's mic.
+              If this bar never moves when speaking, mic audio isn't reaching Vapi. */}
+          {!vapiConnecting && !vapiEnding && (
+            <div className={styles.voiceMicBar}>
+              <div
+                className={styles.voiceMicBarFill}
+                style={{ width: `${Math.min(100, vapiVolume * 400)}%` }}
+              />
+            </div>
+          )}
+          {vapiTranscript.length > 0 && (
+            <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
+              {vapiTranscript.slice(-2).map((m, i) => (
+                <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAvia}>
+                  {m.text}
+                </p>
+              ))}
+            </div>
+          )}
+          <button className={styles.voiceEndBtn} onClick={handleVoiceToggle} aria-label="End call">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className={styles.chatContent}>
         {showResetConfirm && (
           <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
             <div className={styles.closeConfirmCard}>
@@ -2732,7 +3471,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         {showCloseConfirm && (
           <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
             <div className={styles.closeConfirmCard}>
-              <p className={styles.closeConfirmMessage}>Do you want to end this chat?</p>
+              <p className={styles.closeConfirmMessage}>End this chat?</p>
               <div className={styles.closeConfirmActions}>
                 <button className={styles.closeConfirmEndBtn} onClick={handleConfirmCloseChat}>
                   End Chat
@@ -2749,15 +3488,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>{config.name}</span>
+          <span>Windchasers</span>
         </div>
         <div className={styles.headerActions}>
-          <button 
-            className={styles.resetBtn} 
-            onClick={handleRequestResetChat}
-            title="Reset chat"
+          <button
+            className={styles.themeBtn}
+            onClick={toggleWidgetTheme}
+            aria-label={widgetTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            title={widgetTheme === 'light' ? 'Dark theme' : 'Light theme'}
           >
-            {ICONS.reset}
+            {widgetTheme === 'light' ? ICONS.moon : ICONS.sun}
           </button>
           <button
             className={styles.closeBtn}
@@ -2775,14 +3515,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           // Only close widgets if clicking directly on the messages area, not on messages or buttons
           const target = e.target as HTMLElement;
           const isClickOnMessage = target.closest(`.${styles.message}`);
-          const isClickOnButton = target.closest(`.${styles.quickBtn}`) || target.closest(`.${styles.followUpBtn}`);
           const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
           const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
+          const isClickOnPortfolio = target.closest(`.${styles.portfolioGrid}`);
           
-          if (!isClickOnMessage && !isClickOnButton && !isClickOnCalendar && !isClickOnVideo) {
+          if (!isClickOnMessage && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
             // Close widgets when clicking in empty messages area (clicking away)
             closeCalendarWidget();
             closeVideoWidget();
+            closePortfolio();
           }
         }}
       >
@@ -2791,70 +3532,53 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           const accentIndex = index % 7;
           const accentClass = `accent-${accentIndex}`;
           
+          // When the booking calendar is anchored to this message, the calendar
+          // widget renders its own AI bubble below — so suppress this empty
+          // anchor bubble to avoid a chrome-only "broken bubble" above it.
+          const calendarAnchoredHere = !!showCalendly && calendarAnchorId === message.id;
           return (
           <React.Fragment key={message.id}>
-            <div 
+            {!calendarAnchoredHere && (
+            <div
               className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
               data-message-id={message.id}
             >
               <div className={styles.messageContent}>
-                <div className={styles.bubble}>
-                  {message.isStreaming && !message.text ? (
-                    <InfinityLoader />
-                  ) : (
-                    <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {message.type === 'ai' ? config.name : 'You'}
-                        </span>
+                <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
+                  <div className={styles.bubbleContent}>
+                    {/* Typing indicator for loading state */}
+                    {message.isStreaming && !message.text && !hasStreamingText ? (
+                      <div className={styles.typingIndicator}>
+                        <span />
+                        <span />
+                        <span />
                       </div>
-                      
-                      {/* Message content */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
-                        <div
-                          className={styles.messageText}
-                          style={{ flex: '1 1 auto', minWidth: 0 }}
-                          dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
-                        />
-                        {message.isStreaming && message.text && (
-                          <span className={styles.streamingCursor}>▋</span>
-                        )}
-                      </div>
-                      
-                      {/* Follow-up buttons inside the bubble for AI messages */}
-                      {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
-                        <div className={styles.followUpButtons}>
-                          {message.followUps.map((followUp, followUpIndex) => {
-                            // Rotate through accent colors for follow-up buttons
-                            const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
-                            const buttonAccentClass = `accent-${buttonAccentIndex}`;
-                            
-                            return (
-                            <button
-                              key={followUpIndex}
-                              className={`${styles.followUpBtn} ${styles[buttonAccentClass]}`}
-                              onClick={() => handleQuickButtonClick(followUp)}
-                            >
-                              {followUp}
-                            </button>
-                            );
-                          })}
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                          <div
+                            className={styles.messageText}
+                            style={{ flex: '1 1 auto', minWidth: 0 }}
+                            dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                          />
+                          {message.isStreaming && message.text && (
+                            <span className={styles.streamingCursor}>▋</span>
+                          )}
                         </div>
-                      )}
-                    </div>
+
+
+                    </>
                   )}
+                  </div>
                 </div>
               </div>
             </div>
+            )}
 
             {showCalendly && calendarAnchorId === message.id && (
-              <div 
+              <div
                 key={showCalendly}
-                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']} ${styles.calendarMessage}`}
                 onClick={(e) => e.stopPropagation()}
                 ref={(el) => {
                   if (el) {
@@ -2869,24 +3593,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
                     <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.calendarCloseBtn}
-                      onClick={closeCalendarWidget}
-                      aria-label="Close booking widget"
-                    >
-                      {ICONS.close}
-                    </button>
-                  </div>
-                      
+                      {/* Close button */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closeCalendarWidget}
+                          aria-label="Close booking widget"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
                       {/* Custom Google Calendar widget */}
                   <div
                     className={styles.calendarScrollArea}
@@ -2974,6 +3691,69 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 </div>
               </div>
             )}
+
+            {showPortfolio && portfolioAnchorId === message.id && (
+              <div 
+                key={showPortfolio}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                onClick={(e) => e.stopPropagation()}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closePortfolio}
+                          aria-label="Close portfolio"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      
+                      <div className={styles.portfolioGrid} data-scroll-lock="allow">
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🎯</div>
+                          <div className={styles.portfolioTitle}>Customer Acquisition</div>
+                          <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🎨</div>
+                          <div className={styles.portfolioTitle}>Brand Management</div>
+                          <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>📝</div>
+                          <div className={styles.portfolioTitle}>Content & Ads</div>
+                          <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>🤖</div>
+                          <div className={styles.portfolioTitle}>AI Automation</div>
+                          <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </React.Fragment>
           );
         })}
@@ -2989,7 +3769,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
                   {/* Header with avatar and name inside the bubble */}
-                  <div className={styles.bubbleHeader}>
+                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
                     <div className={styles.bubbleAvatar}>
                       {ICONS.ai(brand, config)}
                     </div>
@@ -3033,64 +3813,25 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
 
-        {exploreButtons && exploreButtons.length > 0 && (
-          <div
-            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
-            ref={(el) => {
-              if (el) {
-                requestAnimationFrame(() => {
-                  setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }, 100);
-                });
-              }
+
+
+        {/* Cost Guide / Roadmap WhatsApp Form */}
+        {showCostGuideForm && (
+          <CostGuideFormInline
+            key={showCostGuideForm}
+            prefillName={userProfile.name || ''}
+            prefillPhone={userProfile.phone || ''}
+            waNumber="918046733388"
+            onContactDraft={handleContactDraft}
+            onSubmit={async (name, phone) => {
+              await handleContactPersist({ name, phone });
+              addAIMessage('Sending the guide now on WhatsApp. Anything else?');
+              setShowCostGuideForm(null);
             }}
-          >
-            <div className={styles.messageContent}>
-              <div className={styles.bubble}>
-                <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
-                  <p className={styles.exploreTitle}>Choose your PROXe</p>
-                  <div className={styles.exploreButtonGroup}>
-                    {exploreButtons.map((option, optionIndex) => {
-                      // Map each PROXe type to its specific color class from "Meet Our PROXes" section
-                      let proxeColorClass = '';
-                      if (option.toLowerCase().includes('web')) {
-                        proxeColorClass = styles.exploreWeb;
-                      } else if (option.toLowerCase().includes('whatsapp')) {
-                        proxeColorClass = styles.exploreWhatsapp;
-                      } else if (option.toLowerCase().includes('voice')) {
-                        proxeColorClass = styles.exploreVoice;
-                      } else if (option.toLowerCase().includes('social')) {
-                        proxeColorClass = styles.exploreSocial;
-                      }
-                      return (
-                        <button
-                          key={optionIndex}
-                          className={`${styles.followUpBtn} ${proxeColorClass}`}
-                          onClick={() => {
-                            setExploreButtons(null);
-                            // Send a message about the specific PROXe type
-                            const proxeMessage = `Tell me more about ${option}`;
-                            handleQuickButtonClick(proxeMessage);
-                          }}
-                        >
-                          {option}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            onClose={() => setShowCostGuideForm(null)}
+            config={config}
+            brand={brand}
+          />
         )}
 
         {/* Inline Name Prompt Card */}
@@ -3110,13 +3851,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
+                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
                     <button
                       type="button"
                       className={styles.inlinePromptClose}
@@ -3256,13 +3991,24 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             </div>
           </div>
         )}
+        {isOpen &&
+          !isLoading &&
+          flowOverrideButtons &&
+          flowOverrideButtons.length > 0 &&
+          !lastAiMessage?.isStreaming &&
+          renderFlowOverrideButtons(styles.welcomeQuickButtons)}
         <div ref={messagesEndRef} />
       </div>
-      {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
+      {desktopWelcomeEligible && renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
+      {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
 
-      {/* Desktop: quick buttons near input when showing welcome message */}
-      {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}
+
+      {/* Welcome video embed temporarily disabled */}
+      {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
+        <div className={styles.videoEmbedContainerBottom}>...</div>
+      )} */}
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
@@ -3274,6 +4020,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         <div className={styles.chatInputRow}>
+          <button
+            className={`${styles.micCta} ${isVapiActive ? styles.micCtaActive : ''}`}
+            aria-label={isVapiActive ? 'End call' : 'Call Avia'}
+            type="button"
+            onClick={handleVoiceToggle}
+          >
+            {ICONS.mic}
+          </button>
           <div className={styles.chatInputWrapper}>
             <input
               ref={chatInputRef}
@@ -3309,6 +4063,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 }
                 if (showDeployForm) {
                   closeDeployForm();
+                }
+                if (showPortfolio) {
+                  closePortfolio();
                 }
                 // Scroll input into view above keyboard on mobile
     const scrollInputIntoView = () => {
@@ -3349,9 +4106,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
         data-brand={brand}
+        data-open={isOpen ? "true" : undefined}
       >
         <div className={styles.bubbleIcon}>
-          {isOpen ? ICONS.chevronDown : ICONS.ai(brand, config)}
+          {isOpen ? ICONS.chevronUp : ICONS.chevronDown}
         </div>
       </button>
     )}

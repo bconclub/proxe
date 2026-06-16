@@ -10,8 +10,10 @@ const ALLOWED_STAGES = [
   'Booking Made',
   'Converted',
   'Closed Lost',
+  'Not Qualified',
   'In Sequence',
-  'Cold'
+  'Cold',
+  'R&R'
 ]
 
 // Sub-stages for High Intent
@@ -27,18 +29,13 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
-    // Use a placeholder user ID for logging (since auth is disabled)
-    const user = { id: 'system' }
-
     const leadId = params.id
     const body = await request.json()
     const { stage, sub_stage, override_reason } = body
@@ -77,10 +74,11 @@ export async function PATCH(
     const oldSubStage = currentLead.sub_stage
     const wasOverridden = currentLead.stage_override
 
-    // Update lead stage and mark as manually overridden
+    // Update lead stage (set both override columns for compatibility)
     const updateData: any = {
       lead_stage: stage,
-      stage_override: true, // Mark as manually overridden - AI will not change this
+      stage_override: true, // Mark as manually overridden
+      is_manual_override: true, // Also set this for compatibility
       updated_at: new Date().toISOString()
     }
 
@@ -188,25 +186,21 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
-    // Use a placeholder user ID for logging (since auth is disabled)
-    const user = { id: 'system' }
-
     const leadId = params.id
 
-    // Remove override flag - return to AI-controlled scoring
+    // Remove override flag (clear both columns for compatibility)
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({
         stage_override: false,
+        is_manual_override: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', leadId)

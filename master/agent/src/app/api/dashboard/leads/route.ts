@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { normalizePhone } from '@/lib/services/leadManager'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
@@ -24,11 +22,26 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const includeNewsletter = searchParams.get('include_newsletter') === 'true'
+    // Free-text search across customer_name, phone, email — used by the
+    // merge-leads picker in the lead modal.
+    const search = searchParams.get('search')?.trim() || null
 
     let query = supabase
-      .from('unified_leads')
+      .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    if (search && search.length >= 2) {
+      // Postgres ILIKE pattern, OR across name/phone/email.
+      const pat = `%${search.replace(/[%_]/g, '')}%`
+      query = query.or(`customer_name.ilike.${pat},phone.ilike.${pat},email.ilike.${pat}`)
+    }
+
+    // Newsletter exclusion is applied AFTER fetch (see below), NOT as a PostgREST
+    // .not(...eq 'newsletter') filter. That filter generates `form_type <> 'newsletter'`,
+    // which is NULL (→ excluded) for every lead whose nested form_type is NULL — i.e.
+    // essentially ALL leads — silently returning 0 rows. JS `!== 'newsletter'` is NULL-safe.
 
     if (source) {
       // Filter by first_touchpoint or last_touchpoint
@@ -60,8 +73,22 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
+    // Map all_leads columns to the shape the frontend expects
+    let leads = (data || []).map((lead: any) => ({
+      ...lead,
+      name: lead.customer_name || lead.name || null,
+      source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
+    }))
+
+    // NULL-safe newsletter exclusion (replaces the broken PostgREST filter above).
+    if (!includeNewsletter) {
+      leads = leads.filter(
+        (lead: any) => lead.unified_context?.web?.form_submission?.form_type !== 'newsletter'
+      )
+    }
+
     return NextResponse.json({
-      leads: data || [],
+      leads,
       pagination: {
         page,
         limit,
@@ -82,106 +109,56 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+// DELETE /api/dashboard/leads - Delete leads by email or id
+export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const body = await request.json()
-    const { name, phone, email, source, context_note, auto_sequence } = body
+    // Service-role client so RLS doesn't silently swallow the delete.
+    const supabase = getServiceClient() || (await createClient())
+    const { searchParams } = new URL(request.url)
+    
+    const id = searchParams.get('id')
+    const email = searchParams.get('email')
+    const phone = searchParams.get('phone')
 
-    if (!name?.trim() || !phone?.trim()) {
-      return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
-    }
-
-    const normalized = normalizePhone(phone)
-    if (!normalized) {
-      return NextResponse.json({ error: 'Invalid phone number — must be at least 10 digits' }, { status: 400 })
-    }
-
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon'
-
-    // Check for duplicate
-    const { data: existing } = await supabase
-      .from('all_leads')
-      .select('id')
-      .eq('customer_phone_normalized', normalized)
-      .eq('brand', brand)
-      .limit(1)
-      .maybeSingle()
-
-    if (existing) {
+    if (!id && !email && !phone) {
       return NextResponse.json(
-        { error: 'Lead with this phone already exists', existing_lead_id: existing.id },
-        { status: 409 }
+        { error: 'Missing id, email, or phone parameter' },
+        { status: 400 }
       )
     }
 
-    const now = new Date().toISOString()
-    const touchpoint = source || 'manual'
+    let query = supabase.from('all_leads').delete()
 
-    // Create lead
-    const { data: newLead, error: insertError } = await supabase
-      .from('all_leads')
-      .insert({
-        customer_name: name.trim(),
-        customer_phone: phone.trim(),
-        customer_phone_normalized: normalized,
-        customer_email: email?.trim() || null,
-        first_touchpoint: touchpoint,
-        last_touchpoint: touchpoint,
-        brand,
-        status: 'New Lead',
-        lead_stage: 'New',
-        lead_score: 10,
-        last_interaction_at: now,
-        unified_context: context_note?.trim()
-          ? { manual: { context_note: context_note.trim(), source: touchpoint, created_at: now } }
-          : { manual: { source: touchpoint, created_at: now } },
-      })
-      .select('id')
-      .single()
-
-    if (insertError || !newLead) {
-      console.error('[POST /leads] Insert error:', insertError?.message)
-      return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
+    if (id) {
+      query = query.eq('id', id)
+    } else if (email) {
+      query = query.eq('email', email)
+    } else if (phone) {
+      query = query.eq('customer_phone_normalized', phone.replace(/\D/g, '').slice(-10))
     }
 
-    // Log context note as first conversation entry
-    if (context_note?.trim()) {
-      await supabase.from('conversations').insert({
-        lead_id: newLead.id,
-        channel: touchpoint,
-        sender: 'system',
-        content: context_note.trim(),
-        message_type: 'admin_note',
-        metadata: { source: 'manual_create', touchpoint },
-      }).then(({ error }) => {
-        if (error) console.error('[POST /leads] Conversation log error:', error.message)
-      })
+    const { data, error } = await query.select()
+
+    if (error) {
+      console.error('[API] Failed to delete lead:', error)
+      return NextResponse.json(
+        { error: 'Failed to delete lead' },
+        { status: 500 }
+      )
     }
 
-    // Create first_outreach task so the sequence starts automatically
-    if (auto_sequence !== false) {
-      await supabase.from('agent_tasks').insert({
-        task_type: 'first_outreach',
-        task_description: `Auto: first_outreach for ${name.trim()}`,
-        lead_id: newLead.id,
-        lead_phone: normalized,
-        lead_name: name.trim(),
-        scheduled_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        status: 'pending',
-        metadata: { source: touchpoint, manual_create: true },
-        created_at: now,
-      }).then(({ error }) => {
-        if (error) console.error('[POST /leads] Task create error:', error.message)
-      })
-    }
-
-    return NextResponse.json({ id: newLead.id }, { status: 201 })
+    return NextResponse.json({ 
+      success: true, 
+      deleted: data?.length || 0,
+      leads: data 
+    })
   } catch (error) {
-    console.error('[POST /leads] Error:', error)
+    console.error('[API] Failed to delete lead:', error)
     return NextResponse.json(
-      { error: 'Failed to create lead' },
+      { error: 'Failed to delete lead' },
       { status: 500 }
     )
   }
 }
+
+

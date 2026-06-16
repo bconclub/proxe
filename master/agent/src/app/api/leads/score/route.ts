@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +12,12 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Prefer service-role client so server-to-server callers (the
+    // message-created webhook) can read/update all_leads regardless of
+    // authenticated session. Falls back to the cookie-based client for
+    // direct dashboard calls.
+    const supabase = getServiceClient() || (await createClient())
 
-    // Allow service role or authenticated users
     const body = await request.json()
     const { lead_id } = body
 
@@ -25,10 +27,10 @@ export async function POST(request: NextRequest) {
 
     console.log('Scoring lead:', lead_id)
 
-    // Fetch lead data
+    // Fetch lead data (booking lives in unified_context, not a column on all_leads)
     const { data: lead, error: leadError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, booking_date, booking_time, stage_override')
+      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, lead_score, unified_context, is_manual_override')
       .eq('id', lead_id)
       .single()
 
@@ -37,8 +39,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
+    const leadUc = lead.unified_context || {}
+    // Bookings are written in several shapes depending on the path that created
+    // them: flat keys under the channel (web.booking_date) OR a nested booking
+    // object (web.booking.date), across web / whatsapp / voice. Check all of them
+    // so every booked lead is detected — previously only web/whatsapp flat keys
+    // were checked, so ~2/3 of booked leads never reached Key Events.
+    const bookingDate =
+      leadUc?.web?.booking_date || leadUc?.web?.booking?.date ||
+      leadUc?.whatsapp?.booking_date || leadUc?.whatsapp?.booking?.date ||
+      leadUc?.voice?.booking_date || leadUc?.voice?.booking?.date ||
+      null
+    const bookingTime =
+      leadUc?.web?.booking_time || leadUc?.web?.booking?.time ||
+      leadUc?.whatsapp?.booking_time || leadUc?.whatsapp?.booking?.time ||
+      leadUc?.voice?.booking_time || leadUc?.voice?.booking?.time ||
+      null
+
     // Check if manual override is active - if so, skip scoring
-    if (lead.stage_override) {
+    if (lead.is_manual_override) {
       console.log('Lead has manual override, skipping scoring')
       return NextResponse.json({ 
         success: true, 
@@ -49,19 +68,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Fetch full conversation thread for this lead
+    // Fetch recent conversation (last 10 messages for scoring - saves tokens on long convos)
     const { data: messages, error: messagesError } = await supabase
       .from('conversations')
       .select('content, sender, created_at, channel')
       .eq('lead_id', lead_id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(10)
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError)
       // Continue with empty messages
     }
 
-    const conversationMessages = messages || []
+    // Reverse to get chronological order + get total count for metrics
+    const conversationMessages = (messages || []).reverse()
+
+    // Also get total message count (cheap COUNT query, no content fetched)
+    const { count: totalMessageCount } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_id', lead_id)
 
     // Fetch activities for this lead
     const { data: activities } = await supabase
@@ -71,16 +98,18 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(10)
 
-    // Calculate activity metrics
+    // Calculate activity metrics (use total count from DB, not just the last 10 fetched)
     const responseCount = conversationMessages.filter(m => m.sender === 'customer').length
-    const totalMessages = conversationMessages.length
+    const totalMessages = totalMessageCount || conversationMessages.length
     const daysSinceStart = lead.created_at 
       ? Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
       : 0
     const touchpoints = activities?.length || 0
 
     // Check for booking
-    const hasBooking = !!(lead.booking_date && lead.booking_time)
+    // A booking_date alone is enough to count as booked (a key event) — some
+    // bookings store only a date, or the time lives in a different shape.
+    const hasBooking = !!bookingDate
 
     // Check if re-engaged after being cold (was inactive > 7 days, now has new message)
     const lastInteraction = lead.last_interaction_at || lead.created_at
@@ -111,7 +140,7 @@ export async function POST(request: NextRequest) {
 5. Business events (10%): booking made (+50), re-engaged after cold (+20)
 
 Conversation:
-${conversationText.substring(0, 3000)} ${conversationText.length > 3000 ? '...' : ''}
+${conversationText.substring(0, 1500)}
 
 Metrics:
 - Response count: ${responseCount}
@@ -140,8 +169,8 @@ Respond with ONLY a JSON object in this exact format:
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 500,
+            model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
+            max_tokens: 300,
             messages: [
               {
                 role: 'user',
@@ -153,6 +182,7 @@ Respond with ONLY a JSON object in this exact format:
 
         if (response.ok) {
           const data = await response.json()
+          await recordTokenUsage('scoring', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const text = data.content?.[0]?.text || ''
           
           // Parse JSON from response
@@ -219,36 +249,27 @@ Respond with ONLY a JSON object in this exact format:
       aiScore = Math.min(100, score)
     }
 
-    // Auto-assign stage based on score
-    let newStage = lead.lead_stage || 'new'
-    
-    // Override: If booking exists, force Booking Made stage
+    // Auto-assign stage — HYBRID (score AND replies).
+    // Auto-staging only ever sets the EARLY, behaviour-detectable stages:
+    //   New → Engaged → Qualified, plus Key Events (Booking Made) when a call is booked.
+    // The post-call stages (Call Done, Proposal Sent, Won/Converted, Lost) are real-world
+    // facts only a human knows — they are MANUAL-only and never set here. Leads in those
+    // stages carry is_manual_override and are skipped at the top of this handler, so we
+    // can never clobber them.
+    //   - Booking exists      → 'Booking Made'  (Key Events — the one event we can detect)
+    //   - 3+ replies AND score ≥ 50 → 'Qualified' (real, sustained interest — both required)
+    //   - 1+ reply            → 'Engaged'        (lead has started replying)
+    //   - otherwise           → 'New'           (form-only / in-sequence / no reply yet)
+    // Thresholds (3 replies, score 50) are intentionally simple — tune as we learn.
+    let newStage: string
     if (hasBooking) {
       newStage = 'Booking Made'
-    } else if (aiScore >= 86) {
-      newStage = 'Booking Made'
-    } else if (aiScore >= 61) {
-      newStage = 'High Intent'
-    } else if (aiScore >= 31) {
+    } else if (responseCount >= 3 && aiScore >= 50) {
       newStage = 'Qualified'
-    } else if (aiScore > 0 || conversationMessages.length > 0) {
-      // First message scoring - don't default to "New"
-      if (conversationMessages.length === 1) {
-        // First message: check for strong intent
-        const firstMessage = conversationMessages[0].content.toLowerCase()
-        const strongIntent = ['book', 'booking', 'schedule', 'interested', 'pricing', 'price'].some(keyword => 
-          firstMessage.includes(keyword)
-        )
-        if (strongIntent && hasBooking) {
-          newStage = 'Booking Made'
-        } else if (strongIntent || aiScore >= 31) {
-          newStage = 'Qualified'
-        } else {
-          newStage = 'New'
-        }
-      } else {
-        newStage = 'New'
-      }
+    } else if (responseCount >= 1) {
+      newStage = 'Engaged'
+    } else {
+      newStage = 'New'
     }
 
     // Get old stage for logging
@@ -260,6 +281,7 @@ Respond with ONLY a JSON object in this exact format:
       .update({
         lead_score: aiScore,
         lead_stage: newStage,
+        last_scored_at: new Date().toISOString(),
         last_interaction_at: new Date().toISOString(),
         response_count: responseCount,
         total_touchpoints: touchpoints,
@@ -285,9 +307,6 @@ Respond with ONLY a JSON object in this exact format:
           change_reason: 'PROXe AI scoring',
         })
     }
-
-    // Update metrics
-    await supabase.rpc('update_lead_metrics', { lead_uuid: lead_id })
 
     return NextResponse.json({
       success: true,

@@ -1,35 +1,51 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
-import { OverviewSkeleton } from './Skeleton'
+import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
+import TodaySnapshotButton from './TodaySnapshotButton'
+import NotificationCenter from './NotificationCenter'
+import DashboardBrain from './DashboardBrain'
 import type { Lead } from '@/types'
 import {
   Sparkline,
-  TrendSparkline,
-  MiniFunnel,
-  ChannelActivityBars,
-  DonutChart,
-  Heatmap,
-  StackedBar,
   ActivityArea,
+  ConversationsTrendChart,
   RadialProgress,
-  MiniBarChart,
 } from './MicroCharts'
+
+type TimeFilter = 'All' | '7D' | '14D' | '30D'
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
-  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
-  totalLeads: { count: number; count7D: number; count14D: number; count30D: number; fromConversations: number; conversionRate: number }
-  engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
-  warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
+  totalConversations: { total: number; count1D?: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
+  totalLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; change7D?: number; change14D?: number; change30D?: number; fromConversations: number; conversionRate: number }
+  engagedLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
+  warmLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
+  leadsRecovered?: { count: number }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
-  leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
-  upcomingBookings: Array<{ id: string; name: string; title?: string | null; date: string; time: string; datetime: string }>
+  leadsNeedingAttention: Array<{
+    id: string
+    name: string
+    score: number
+    lastContact: string
+    stage: string
+    owner?: { name?: string | null; email?: string | null } | null
+    channel?: string | null
+  }>
+  upcomingBookings: Array<{
+    id: string
+    name: string
+    title?: string | null
+    date: string
+    time: string
+    datetime: string
+    owner?: { name?: string | null; email?: string | null } | null
+  }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
   channelPerformance: {
@@ -49,8 +65,6 @@ interface FounderMetrics {
   }
   upcomingBookingsTrend?: Array<{ value: number }>
   hourlyActivity?: Array<{ time: string; value: number }>
-  channelDistribution?: Array<{ name: string; value: number }>
-  heatmapData?: Array<{ hour: number; value: number }>
   radialMetrics?: {
     avgScore: number
     responseRate: number
@@ -63,6 +77,30 @@ interface FounderMetrics {
     bookingRate: Array<{ value: number }>
     avgResponseTime: Array<{ value: number }>
   }
+  trendSeries?: { conversations: Record<TimeFilter, Array<{ value: number }>> }
+}
+
+// "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
+function formatBookingWhen(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
+    const time = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+    return `${date} · ${time}`
+  } catch {
+    return ''
+  }
+}
+
+// Human-readable duration from milliseconds (agent reply latency).
+function fmtMs(ms: number): string {
+  if (!ms || ms <= 0) return '—'
+  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`
+  const h = Math.floor(ms / 3_600_000)
+  const m = Math.round((ms % 3_600_000) / 60_000)
+  return `${h}h ${m}m`
 }
 
 export default function FounderDashboard() {
@@ -71,20 +109,63 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  const [conversationTimeFilter, setConversationTimeFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [warmLeadsFilter, setWarmLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [leadsFilter, setLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  const [hotLeadsFilter, setHotLeadsFilter] = useState<'All' | '7D' | '14D' | '30D'>('All')
-  
+
+  // Per-card date ranges (founder: "put the toggle inside the cards, as we used
+  // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
+  const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
+  // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
+  const [engineRange, setEngineRange] = useState<'All' | '7D' | '14D'>('All')
+  // Top-bar user profile menu.
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  // Pull the signed-in user once for the greeting + profile menu.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (cancelled) return
+        const meta = (user?.user_metadata || {}) as Record<string, unknown>
+        const name = (meta.full_name as string) || (meta.name as string) || ''
+        setUser({ name, email: user?.email || '' })
+      } catch { /* soft-fail — greeting falls back to "Founder" */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Close the profile menu on outside click.
+  useEffect(() => {
+    if (!profileOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [profileOpen])
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch { /* redirect anyway */ }
+    window.location.href = '/auth/login'
+  }
+
   // Hot Leads threshold with localStorage persistence
-  const [hotLeadThreshold, setHotLeadThreshold] = useState<number>(() => {
+  const [hotLeadThreshold] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hot-lead-threshold')
       return saved ? parseInt(saved, 10) : 70
     }
     return 70
   })
-  const [showThresholdDropdown, setShowThresholdDropdown] = useState(false)
+
+  // Fire the soft "ready" chime once, when the home page's first load lands.
+  const readyChimedRef = useRef(false)
 
   const loadMetrics = useCallback(async () => {
     try {
@@ -102,31 +183,22 @@ export default function FounderDashboard() {
       setMetrics(null)
     } finally {
       setLoading(false)
+      if (!readyChimedRef.current) {
+        readyChimedRef.current = true
+        playSound('ready') // once per mount; gated by the Configure toggle + mute
+      }
     }
   }, [hotLeadThreshold])
 
   useEffect(() => {
-    // Initial load
     loadMetrics()
-    
-    // Only poll when component is visible
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadMetrics()
-      }
+      if (document.visibilityState === 'visible') loadMetrics()
     }
-    
-    // Poll every 60 seconds (1 minute) instead of 30 seconds
     const interval = setInterval(() => {
-      // Only poll if page is visible
-      if (document.visibilityState === 'visible') {
-        loadMetrics()
-      }
+      if (document.visibilityState === 'visible') loadMetrics()
     }, 60000)
-    
-    // Listen for visibility changes
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
     return () => {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -140,94 +212,61 @@ export default function FounderDashboard() {
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMins < 60) return `${diffMins}m ago`
     if (diffHours < 24) return `${diffHours}h ago`
     return `${diffDays}d ago`
   }
 
   const openLeadModal = async (leadId: string) => {
-    console.log('🔵 openLeadModal called with leadId:', leadId)
     try {
       const supabase = createClient()
       const { data: lead, error } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, status')
+        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, metadata')
         .eq('id', leadId)
         .single()
 
       if (error) {
-        console.error('❌ Error fetching lead:', error)
+        console.error('Error fetching lead:', error)
         return
       }
+      if (!lead) return
 
-      if (lead) {
-        const typedLead = lead as {
-          id?: string
-          customer_name?: string | null
-          email?: string | null
-          phone?: string | null
-          created_at?: string | null
-          last_interaction_at?: string | null
-          lead_score?: number | null
-          lead_stage?: string | null
-          sub_stage?: string | null
-          status?: string | null
-          first_touchpoint?: string | null
-          last_touchpoint?: string | null
-          metadata?: any
-          unified_context?: {
-            web?: { booking?: any; booking_date?: any; booking_time?: any }
-            whatsapp?: { booking?: any; booking_date?: any; booking_time?: any }
-          }
-        }
-        console.log('✅ Lead fetched:', typedLead.customer_name || 'Unknown')
-        // Get booking data from unified_context
-        const unifiedContext = typedLead.unified_context || {}
-        const webBooking = unifiedContext?.web?.booking || {}
-        const whatsappBooking = unifiedContext?.whatsapp?.booking || {}
-        
-        const bookingDate = 
-          webBooking?.date || 
-          webBooking?.booking_date ||
-          whatsappBooking?.date ||
-          whatsappBooking?.booking_date ||
-          null
-        
-        const bookingTime = 
-          webBooking?.time || 
-          webBooking?.booking_time ||
-          whatsappBooking?.time ||
-          whatsappBooking?.booking_time ||
-          null
+      const typedLead = lead as any
+      const unifiedContext = typedLead.unified_context || {}
+      const webBooking = unifiedContext?.web?.booking || {}
+      const whatsappBooking = unifiedContext?.whatsapp?.booking || {}
+      const bookingDate = webBooking?.date || webBooking?.booking_date || whatsappBooking?.date || whatsappBooking?.booking_date || null
+      const bookingTime = webBooking?.time || webBooking?.booking_time || whatsappBooking?.time || whatsappBooking?.booking_time || null
 
-        // Convert to Lead type expected by LeadDetailsModal
-        const modalLead: Lead = {
-          id: typedLead.id || '',
-          name: typedLead.customer_name || 'Unknown',
-          email: typedLead.email || '',
-          phone: typedLead.phone || '',
-          source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
-          first_touchpoint: typedLead.first_touchpoint || null,
-          last_touchpoint: typedLead.last_touchpoint || null,
-          timestamp: typedLead.created_at || new Date().toISOString(),
-          status: typedLead.status || null,
-          booking_date: bookingDate,
-          booking_time: bookingTime,
-          unified_context: typedLead.unified_context || null,
-          metadata: typedLead.metadata || {},
-        }
-
-        console.log('✅ Setting selected lead and opening modal')
-        setSelectedLead(modalLead)
-        setShowLeadModal(true)
-        console.log('✅ Modal state updated - showLeadModal:', true, 'selectedLead:', modalLead.id)
-      } else {
-        console.warn('⚠️ Lead data is null or undefined')
+      const modalLead: Lead = {
+        id: typedLead.id || '',
+        name: typedLead.customer_name || 'Unknown',
+        email: typedLead.email || '',
+        phone: typedLead.phone || '',
+        source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
+        first_touchpoint: typedLead.first_touchpoint || null,
+        last_touchpoint: typedLead.last_touchpoint || null,
+        timestamp: typedLead.created_at || new Date().toISOString(),
+        status: typedLead.status || null,
+        booking_date: bookingDate,
+        booking_time: bookingTime,
+        unified_context: typedLead.unified_context || null,
+        metadata: typedLead.metadata || {},
       }
+      setSelectedLead(modalLead)
+      setShowLeadModal(true)
     } catch (err) {
-      console.error('❌ Error opening lead modal:', err)
+      console.error('Error opening lead modal:', err)
     }
+  }
+
+  // Recency tint for the countdown chip only: closer = blue, mid = amber, far = muted.
+  const countdownTint = (datetime: string): { bg: string; color: string } => {
+    const h = (new Date(datetime).getTime() - Date.now()) / 3_600_000
+    if (h <= 24) return { bg: 'rgba(59,130,246,0.18)', color: '#60a5fa' }
+    if (h <= 72) return { bg: 'rgba(245,158,11,0.18)', color: '#fbbf24' }
+    return { bg: 'var(--bg-tertiary)', color: 'var(--text-muted)' }
   }
 
   const formatCountdown = (datetime: string) => {
@@ -236,7 +275,6 @@ export default function FounderDashboard() {
     const diffMs = bookingDate.getTime() - now.getTime()
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMs < 0) return 'Past'
     if (diffDays > 0) {
       const hours = Math.floor((diffMs % 86400000) / 3600000)
@@ -247,59 +285,51 @@ export default function FounderDashboard() {
     return `In ${mins}m`
   }
 
-  const getResponseHealthColor = (status: string) => {
-    switch (status) {
-      case 'good': return 'text-green-600 dark:text-green-400'
-      case 'warning': return 'text-yellow-600 dark:text-yellow-400'
-      case 'critical': return 'text-red-600 dark:text-red-400'
-      default: return 'text-gray-600 dark:text-gray-400'
-    }
+  const getInitials = (name: string) =>
+    name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
+
+  // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
+  const intentFor = (score: number): { label: string; color: string; bg: string } => {
+    if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (score >= 50) return { label: 'Comparing', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    return { label: 'Needs follow-up', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
-  const getResponseHealthBg = (status: string) => {
-    switch (status) {
-      case 'good': return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-      case 'warning': return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-      case 'critical': return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-      default: return 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'
-    }
+  // Recommended next step derived from the lead's stage (Phase-1 heuristic;
+  // a later phase wires the real agent_tasks "next action").
+  const nextStepFor = (stage: string): string => {
+    const s = (stage || '').toLowerCase()
+    if (s.includes('booking')) return 'Confirm the slot'
+    if (s.includes('high')) return 'Push to book a call'
+    if (s.includes('qualified')) return 'Share pricing + offers'
+    if (s.includes('engaged')) return 'Share program details'
+    if (s.includes('converted')) return 'Onboard / next steps'
+    if (s.includes('lost') || s.includes('cold')) return 'Re-engage'
+    return 'First outreach'
   }
 
-  // Traffic light colors for At a Glance metrics (B2B warm WhatsApp lead benchmarks)
-  const getMetricColor = (metricType: 'avgScore' | 'responseRate' | 'bookingRate' | 'avgResponseTime', value: number): string => {
-    const GREEN = '#22c55e'
-    const AMBER = '#f59e0b'
-    const RED = '#ef4444'
-
-    switch (metricType) {
-      case 'avgScore':
-        if (value >= 60) return GREEN
-        if (value >= 30) return AMBER
-        return RED
-
-      case 'responseRate':
-        if (value >= 95) return GREEN
-        if (value >= 80) return AMBER
-        return RED
-
-      case 'bookingRate':
-        if (value >= 25) return GREEN
-        if (value >= 15) return AMBER
-        return RED
-
-      case 'avgResponseTime':
-        // Lower is better
-        if (value <= 3000) return GREEN
-        if (value <= 8000) return AMBER
-        return RED
-
-      default:
-        return GREEN
-    }
+  // Status from last-contact recency + score.
+  const statusFor = (lastContact: string, score: number): { label: string; color: string; bg: string } => {
+    const hrs = (Date.now() - new Date(lastContact).getTime()) / 3_600_000
+    if (score >= hotLeadThreshold && hrs > 24) return { label: 'Overdue', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (hrs <= 24) return { label: 'Due today', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    return { label: 'Scheduled', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
   if (loading) {
-    return <OverviewSkeleton />
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
+            <div className="relative animate-pulse">
+              <Image src="/logo.png" alt="Windchasers" width={80} height={80} className="drop-shadow-lg" priority />
+            </div>
+          </div>
+          <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
+        </div>
+      </div>
+    )
   }
 
   if (!metrics) {
@@ -307,790 +337,400 @@ export default function FounderDashboard() {
       <div className="p-6">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
           <p className="text-red-700 dark:text-red-300 font-semibold mb-2">Failed to load metrics</p>
-          <p className="text-sm text-red-600 dark:text-red-400">
-            Please check:
-          </p>
-          <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside mt-2 space-y-1">
-            <li>Server is running (check terminal logs)</li>
-            <li>Database connection is working</li>
-            <li>Check browser console for detailed errors</li>
-          </ul>
-          <button
-            onClick={loadMetrics}
-            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-          >
-            Retry
-          </button>
+          <button onClick={loadMetrics} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm">Retry</button>
         </div>
       </div>
     )
   }
 
+  // ── Derived values for the mockup layout ──────────────────────────────────
+  const rm = metrics.radialMetrics
+  const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
+  const total = metrics.totalLeads?.count || 0
+  const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
+  // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
+  // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
+  // range in the metrics yet).
+  const engTotal = engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
+  const engEngaged = engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
+  const engWarm = engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
+  const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
+  // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
+  // with conversation activity in the window.
+  const tc = metrics.totalConversations
+  const acValue = acRange === '7D' ? tc.count7D : acRange === '14D' ? tc.count14D : (tc.count1D ?? 0)
+  const acLabel = acRange === 'Today' ? 'in the last 24 hours' : acRange === '7D' ? 'in the last 7 days' : 'in the last 14 days'
+  // Conversations Trend — its own toggle (7d / 14d / 30d). Real per-day series
+  // (distinct leads messaged/day); old trends.conversations.data came back ~flat.
+  const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
+  const rangeLabel = `last ${rangeDays} days`
+  const convSeries = (metrics.trendSeries?.conversations?.[range]?.length
+    ? metrics.trendSeries.conversations[range]
+    : metrics.trends?.conversations?.data) || []
+  const convTotal = convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total
+  const dailyAvg = convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0
+  const convChange = range === '14D'
+    ? metrics.totalConversations.trend14D
+    : range === '30D'
+      ? metrics.totalConversations.trend30D
+      : metrics.totalConversations.trend7D
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
+  const firstName = displayName.split(' ')[0] || 'Founder'
+  const profileInitials = getInitials(displayName)
+  // Time-of-day greeting in IST (shifts morning/afternoon/evening/night).
+  const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
+  const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
+  // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
+  const healthColor = metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'
+  // Booked calls + what share of total leads that represents (founder conversion view).
+  const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
+  const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
+
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
-
-      {/* AT A GLANCE - Radial Progress Charts with Trends */}
-      {metrics.radialMetrics && (
-        <div 
-          className="rounded-lg p-4 sm:p-6 border"
-          style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
-          }}
-        >
-          <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={120} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
-            </div>
-          </div>
+    <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
+      {/* Subtle bento entrance — cards fade + rise in, lightly staggered. Plays
+          once on mount (DOM persists across the 60s metric refresh, so it doesn't
+          replay). Respects reduced-motion. */}
+      <style>{`
+        @keyframes wcBentoIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: no-preference) {
+          .wc-bento > * { animation: wcBentoIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+          .wc-bento > *:nth-child(2) { animation-delay: 0.05s; }
+          .wc-bento > *:nth-child(3) { animation-delay: 0.10s; }
+          .wc-bento > *:nth-child(4) { animation-delay: 0.15s; }
+          .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
+        }
+      `}</style>
+      {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
+      <header className="flex items-center justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
+            {greeting}, {firstName} <span aria-hidden>👋</span>
+          </h1>
         </div>
-      )}
-
-      {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        {/* Card 1: Total Conversations */}
-        <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
-          style={{
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-          }}
-        >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdChatBubble className="text-blue-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
-              {conversationTimeFilter === 'All' && (metrics.totalConversations.total ?? 0)}
-              {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
-              {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
-              {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
-            </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              {metrics.totalConversations.trend7D !== 0 && (
-                <div className="flex items-center gap-1">
-                  {metrics.totalConversations.trend7D > 0 ? (
-                    <>
-                      <MdTrendingUp className="text-green-600" size={16} />
-                      <span className="text-sm text-green-600 font-medium">↑ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  ) : (
-                    <>
-                      <MdTrendingDown className="text-red-600" size={16} />
-                      <span className="text-sm text-red-600 font-medium">↓ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-                    </>
-                  )}
-                </div>
-              )}
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                {metrics.totalConversations.total} all time
-              </p>
-              {metrics.trends?.conversations && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.conversations.data}
-                    color="#3B82F6"
-                    height={28}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
+              icon on the right next to the profile. */}
+          <TodaySnapshotButton inline label="Snapshot" />
+          <DashboardBrain inline label="Ask PROXe" />
+          <NotificationCenter inline />
+          {/* Profile menu */}
+          <div className="relative" ref={profileRef}>
             <button
-              onClick={() => router.push('/dashboard/inbox')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#3B82F6' }}
+              onClick={() => setProfileOpen((o) => !o)}
+              className="flex items-center gap-1 rounded-full pl-1 pr-1.5 py-1 border transition-colors hover:opacity-90"
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              title={user?.email || 'Account'}
             >
-              View All <MdArrowForward size={14} />
+              <span className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                {profileInitials}
+              </span>
+              <MdArrowDropDown size={18} style={{ color: 'var(--text-secondary)' }} />
             </button>
-            <div className="flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
+                <div className="px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Signed in as</div>
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }} title={user?.email}>{displayName}</div>
+                  {user?.email && <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{user.email}</div>}
+                </div>
+                <div style={{ height: 1, backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
                 <button
-                  key={period}
-                  onClick={() => setConversationTimeFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    conversationTimeFilter === period ? 'text-white' : ''
-                  }`}
-                  style={conversationTimeFilter === period
-                    ? { backgroundColor: '#3B82F6' }
-                    : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#3B82F6'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
+                  onClick={() => { setProfileOpen(false); router.push('/dashboard/settings') }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                 >
-                  {period}
+                  <MdSettings size={17} /> Settings
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Engaged Leads - Stage-based engagement */}
-        <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
-          style={{
-            backgroundColor: 'rgba(34, 197, 94, 0.05)',
-            borderColor: 'rgba(34, 197, 94, 0.2)',
-          }}
-        >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdLocalFireDepartment className="text-green-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
-              {metrics.engagedLeads?.count ?? 0}
-            </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
-                {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% of total
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                From {metrics.engagedLeads?.total ?? metrics.totalLeads.count} leads
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="#22C55E"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-          {/* View All */}
-          <button
-            onClick={() => router.push('/dashboard/leads?filter=engaged')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline mt-2"
-            style={{ color: '#22C55E' }}
-          >
-            View All <MdArrowForward size={14} />
-          </button>
-        </div>
-
-        {/* Card 3: Warm Leads - Score 40-69, warming up */}
-        <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
-          style={{
-            backgroundColor: 'rgba(249, 115, 22, 0.05)',
-            borderColor: 'rgba(249, 115, 22, 0.2)',
-          }}
-        >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdLocalFireDepartment className="text-orange-500" size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
-              {warmLeadsFilter === 'All' && (metrics.warmLeads?.count ?? 0)}
-              {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
-              {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
-              {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
-            </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#F97316' }}>
-                Score 40-69
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                From {metrics.totalLeads.count} total leads
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="#F97316"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => router.push('/dashboard/leads?filter=warm')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#F97316' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
-            <div className="flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
                 <button
-                  key={period}
-                  onClick={() => setWarmLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    warmLeadsFilter === period ? 'text-white' : ''
-                  }`}
-                  style={warmLeadsFilter === period
-                    ? { backgroundColor: '#F97316' }
-                    : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#F97316'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                 >
-                  {period}
+                  <MdLogout size={17} /> Sign out
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Total Leads */}
-        <div
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg"
-          style={{
-            backgroundColor: 'var(--accent-subtle)',
-            borderColor: 'var(--accent-primary)',
-          }}
-        >
-          {/* Title */}
-          <div className="flex items-center gap-2 mb-3">
-            <MdPeople style={{ color: 'var(--accent-primary)' }} size={20} />
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
-          </div>
-          {/* Two-column layout: Big number left, details right */}
-          <div className="flex items-center gap-4">
-            {/* Left: Big Number */}
-            <p className="text-3xl sm:text-4xl font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>
-              {leadsFilter === 'All' && metrics.totalLeads.count}
-              {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
-              {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
-              {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
-            </p>
-            {/* Right: Details */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>
-                {metrics.totalLeads.count} all time
-              </p>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                {metrics.totalLeads.fromConversations} from conversations
-              </p>
-              {metrics.trends?.leads && (
-                <div className="w-full" style={{ height: '28px' }}>
-                  <Sparkline
-                    data={metrics.trends.leads.data}
-                    color="var(--accent-primary)"
-                    height={28}
-                    showGradient={true}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Footer: View All + Filter */}
-          <div className="flex items-center justify-between mt-2">
-            <button
-              onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
-            <div className="flex gap-1">
-              {(['All', '7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setLeadsFilter(period)}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                    leadsFilter === period ? 'text-white' : ''
-                  }`}
-                  style={leadsFilter === period
-                    ? { backgroundColor: 'var(--accent-primary)' }
-                    : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-primary)'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Upcoming Events - Full width below cards */}
-      <div
-        className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg mb-6"
-        style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.05)',
-          borderColor: 'rgba(59, 130, 246, 0.2)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Upcoming Events</h3>
-            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-              {metrics.upcomingBookings.length}
-            </span>
-          </div>
-          <button
-            onClick={() => router.push('/dashboard/bookings')}
-            className="text-xs font-medium flex items-center gap-1 hover:underline"
-            style={{ color: '#3B82F6' }}
-          >
-            View All <MdArrowForward size={14} />
-          </button>
-        </div>
-        {metrics.upcomingBookings.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {metrics.upcomingBookings.slice(0, 4).map((booking) => (
-              <div
-                key={booking.id}
-                onClick={() => openLeadModal(booking.id)}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border"
-                style={{
-                  borderColor: 'rgba(59, 130, 246, 0.2)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  borderRadius: '8px',
-                  borderWidth: '1px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                  e.currentTarget.style.borderColor = '#3B82F6'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
-                }}
-              >
-                <MdEvent
-                  className="flex-shrink-0"
-                  size={18}
-                  style={{ color: '#3B82F6' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {booking.name}
-                  </p>
-                  {booking.title && (
-                    <p className="text-xs truncate" style={{ color: 'var(--text-primary)', opacity: 0.7 }}>
-                      {booking.title}
-                    </p>
-                  )}
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {formatCountdown(booking.datetime)}
-                  </p>
-                </div>
-                <MdArrowForward
-                  className="flex-shrink-0"
-                  size={16}
-                  style={{ color: '#3B82F6' }}
-                />
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
-        )}
+        </div>
+      </header>
+
+      {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
+      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
+        {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 7%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 22%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>Active Conversations</span>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['Today', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={(e) => { e.stopPropagation(); setAcRange(p) }}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: acRange === p ? '#3B82F6' : 'var(--text-muted)', backgroundColor: acRange === p ? 'rgba(59,130,246,0.14)' : 'transparent' }}
+                >
+                  {p === 'Today' ? '24h' : p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
+            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{acValue}</span>
+          </div>
+          {(() => {
+            // Sparkline tracks the selected window (Today shows the 7-day context).
+            const acSeries = metrics.trendSeries?.conversations?.[acRange === 'Today' ? '7D' : acRange]
+            return acSeries && acSeries.length > 1 ? (
+              <div className="w-full mt-2" style={{ height: 30 }}>
+                <Sparkline data={acSeries} color="#3B82F6" height={30} showGradient />
+              </div>
+            ) : (
+              <div style={{ height: 30 }} />
+            )
+          })()}
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
+        </div>
+        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
+        <KpiCard
+          icon={<MdLocalFireDepartment size={15} />} iconColor="#ef4444"
+          label="High Intent Leads"
+          value={metrics.hotLeads?.count ?? 0}
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#ef4444"
+          sub="flagged high-intent by PROXe"
+          onClick={() => router.push('/dashboard/leads?filter=hot')}
+        />
+        {/* Follow-up Health — status + ring; whole card follows the status colour. */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{metrics.responseHealth.status === 'good' ? <MdFavorite size={15} /> : metrics.responseHealth.status === 'warning' ? <MdWarning size={15} /> : <MdWarning size={15} />}</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <div>
+              <div className="text-2xl sm:text-3xl font-bold leading-none capitalize" style={{ color: metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444' }}>
+                {metrics.responseHealth.status === 'good' ? 'Good' : metrics.responseHealth.status === 'warning' ? 'Fair' : 'Needs work'}
+              </div>
+            </div>
+            <RadialProgress value={Math.round(rm?.responseRate ?? 0)} size={48} color={metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'} showPercentage={false} label="" />
+          </div>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(rm?.responseRate ?? 0)}% reply rate · on track</span>
+        </div>
+        <KpiCard
+          icon={<MdEvent size={15} />} iconColor="#a855f7"
+          label="Booked Calls / Events"
+          value={bookedVal}
+          delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
+          sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
+          sub="vs last 7 days"
+          onClick={() => router.push('/dashboard/bookings')}
+        />
+        <KpiCard
+          icon={<MdSpeed size={15} />} iconColor="#3B82F6"
+          label="Avg Response Time"
+          value={fmtMs(metrics.responseHealth.avgMs)}
+          delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
+          sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
+        />
       </div>
 
-      {/* BOTTOM ROW - Leads Needing Attention & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Leads Needing Attention */}
-        <div 
-          className="rounded-lg p-4 sm:p-6 border"
-          style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Leads Needing Attention</h2>
-            <button 
-              onClick={() => router.push('/dashboard/inbox')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {metrics.leadsNeedingAttention.length === 0 ? (
-              <p className="text-sm text-center py-4" style={{ color: 'var(--text-secondary)' }}>No leads need attention</p>
-            ) : (
-              metrics.leadsNeedingAttention.slice(0, 5).map((lead) => (
-                <div
-                  key={lead.id}
-                  className="flex items-center justify-between gap-3 rounded-lg cursor-pointer transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-tertiary)',
-                    padding: '10px 12px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                  }}
-                  onClick={(e) => {
-                    console.log('🟢 Clicked on lead row:', lead.name, 'leadId:', lead.id)
-                    e.stopPropagation()
-                    openLeadModal(lead.id)
-                  }}
+      {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+        {/* Engine Overview funnel */}
+        <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-2 shrink-0">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['All', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setEngineRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: engineRange === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: engineRange === p ? 'var(--accent-subtle)' : 'transparent' }}
                 >
-                  {/* Left: Name, Score, Stage */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{lead.name}</span>
-                    <span 
-                      className="text-xs px-1.5 py-0.5 rounded font-medium"
-                      style={{ 
-                        backgroundColor: 'var(--accent-subtle)',
-                        color: 'var(--accent-primary)'
-                      }}
-                    >
-                      {lead.score}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{lead.stage}</span>
-                  </div>
-                  {/* Right: Time and Reply Button */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {formatTimeAgo(lead.lastContact)}
-                    </span>
-                    <button 
-                    className="px-3 py-1.5 text-white text-xs rounded-lg transition-colors flex-shrink-0"
-                    style={{ backgroundColor: 'var(--accent-primary)' }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openLeadModal(lead.id)
-                    }}
-                    >
-                      Reply
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+          {/* Funnel fills the card's height so there's no dead space at the bottom */}
+          <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engTotal} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engEngaged} label="Engaged" sub={engPct(engEngaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engWarm} label="Warm" sub={engPct(engWarm)} />
+            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
+            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
+          </div>
+          <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
+            {metrics.responseHealth.status === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+          </div>
+        </section>
 
-        {/* Recent Activity Feed */}
-        <div 
-          className="rounded-lg p-6 border"
-          style={{ 
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--accent-subtle)'
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
-            <button 
-              onClick={() => router.push('/dashboard/inbox')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
+        {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
+        <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
+            <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              View all <MdArrowForward size={13} />
             </button>
           </div>
-          <div className="space-y-3">
-            {metrics.recentActivity.length === 0 ? (
-              <p className="text-sm text-center py-4" style={{ color: 'var(--text-secondary)' }}>No recent activity</p>
-            ) : (
-              metrics.recentActivity.slice(0, 10).map((activity, index) => {
-                // Comprehensive icon + color system for Recent Activity
-                const getActivityIcon = (text: string, channel: string, type: string) => {
-                  const textLower = (text || '').toLowerCase()
-                  const channelLower = (channel || '').toLowerCase()
-                  
-                  // ========================================================================
-                  // PRIORITY 1: EVENT-SPECIFIC ICONS (Override channel icons)
-                  // ========================================================================
-                  
-                  // 1. SCORE CHANGES
-                  if (textLower.includes('score jumped')) {
-                    return { 
-                      icon: MdShowChart, 
-                      color: '#F59E0B', // Orange
-                      bgColor: '#F59E0B',
-                      opacity: 0.2
-                    }
-                  }
-                  if (textLower.includes('hot lead') || textLower.includes('became a hot lead') || type === 'hot_lead') {
-                    return { 
-                      icon: MdLocalFireDepartment, 
-                      color: '#EF4444', // Red
-                      bgColor: '#EF4444',
-                      opacity: 0.2
-                    }
-                  }
-                  
-                  // 2. BOOKINGS
-                  if (textLower.includes('booked') || textLower.includes('scheduled') || type === 'booking_made') {
-                    return { 
-                      icon: MdEvent, 
-                      color: '#10B981', // Green
-                      bgColor: '#10B981',
-                      opacity: 0.2
-                    }
-                  }
-                  if (textLower.includes('cancelled') && (textLower.includes('booking') || textLower.includes('call') || textLower.includes('event'))) {
-                    return { 
-                      icon: MdEventBusy, 
-                      color: '#EF4444', // Red
-                      bgColor: '#EF4444',
-                      opacity: 0.2
-                    }
-                  }
-                  
-                  // 3. STAGE CHANGES — color-coded by target stage
-                  if (textLower.includes('entered') && textLower.includes('stage') || textLower.includes('moved from') || type === 'stage_change') {
-                    // Determine color based on the NEW stage
-                    const stageColorMap: Record<string, { color: string; icon: any }> = {
-                      'high intent':   { color: '#EF4444', icon: MdTrendingUp },    // Red
-                      'booking made':  { color: '#10B981', icon: MdEvent },          // Green
-                      'converted':     { color: '#10B981', icon: MdTrendingUp },     // Green
-                      'qualified':     { color: '#F97316', icon: MdArrowUpward },    // Orange
-                      'engaged':       { color: '#8B5CF6', icon: MdArrowUpward },    // Purple
-                      'in sequence':   { color: '#3B82F6', icon: MdArrowUpward },    // Blue
-                      'new':           { color: '#6B7280', icon: MdArrowUpward },    // Gray
-                      'lost':          { color: '#EF4444', icon: MdTrendingDown },   // Red
-                      'cold':          { color: '#6B7280', icon: MdTrendingDown },   // Gray
-                    }
-                    // Match stage from text
-                    let stageStyle = { color: '#8B5CF6', icon: MdArrowUpward } // purple default
-                    for (const [stage, style] of Object.entries(stageColorMap)) {
-                      if (textLower.includes(stage)) {
-                        stageStyle = style
-                        break
-                      }
-                    }
-                    return {
-                      icon: stageStyle.icon,
-                      color: stageStyle.color,
-                      bgColor: stageStyle.color,
-                      opacity: 0.2
-                    }
-                  }
-                  
-                  // 4. NEW LEAD / NEW MESSAGE
-                  if (type === 'new_lead_scored' || (textLower.includes('scored') && textLower.includes('entered'))) {
-                    return {
-                      icon: MdFlashOn,
-                      color: '#8B5CF6', // Purple
-                      bgColor: '#8B5CF6',
-                      opacity: 0.2
-                    }
-                  }
-                  if (type === 'new_lead' || textLower.includes('arrived via')) {
-                    return {
-                      icon: MdPeople,
-                      color: '#3B82F6', // Blue
-                      bgColor: '#3B82F6',
-                      opacity: 0.2
-                    }
-                  }
-                  if (type === 'new_message' || textLower.includes('sent a message')) {
-                    return {
-                      icon: MdChatBubble,
-                      color: '#6366F1', // Indigo
-                      bgColor: '#6366F1',
-                      opacity: 0.2
-                    }
-                  }
-                  if (type === 'went_cold' || textLower.includes('went cold')) {
-                    return {
-                      icon: MdWarning,
-                      color: '#F59E0B', // Amber
-                      bgColor: '#F59E0B',
-                      opacity: 0.2
-                    }
-                  }
-
-                  // 5. ENGAGEMENT (Channel-specific, but text-based)
-                  if (textLower.includes('engaged via whatsapp')) {
-                    return { 
-                      icon: MdWhatsapp, 
-                      color: '#25D366', // Green
-                      bgColor: '#25D366',
-                      opacity: 0.2
-                    }
-                  }
-                  if (textLower.includes('engaged via web')) {
-                    return { 
-                      icon: MdLanguage, 
-                      color: '#3B82F6', // Blue
-                      bgColor: '#3B82F6',
-                      opacity: 0.2
-                    }
-                  }
-                  
-                  // ========================================================================
-                  // PRIORITY 2: CHANNEL-BASED ICONS (Fallback if no event-specific match)
-                  // ========================================================================
-                  
-                  if (channelLower === 'whatsapp') {
-                    return { 
-                      icon: MdWhatsapp, 
-                      color: '#25D366', // Green
-                      bgColor: '#25D366',
-                      opacity: 0.2
-                    }
-                  }
-                  if (channelLower === 'web') {
-                    return { 
-                      icon: MdLanguage, 
-                      color: '#3B82F6', // Blue
-                      bgColor: '#3B82F6',
-                      opacity: 0.2
-                    }
-                  }
-                  
-                  // ========================================================================
-                  // PRIORITY 3: GENERAL FALLBACK
-                  // ========================================================================
-                  
-                  return { 
-                    icon: MdNotifications, 
-                    color: '#6B7280', // Gray
-                    bgColor: '#6B7280',
-                    opacity: 0.2
-                  }
-                }
-
-                const activityIconData = getActivityIcon(activity.content || '', activity.channel || '', activity.type || '')
-                const { icon: ActivityIcon, color: iconColor, bgColor, opacity } = activityIconData
-                const channelLabel = activity.channel === 'whatsapp' ? 'WhatsApp' : activity.channel === 'web' ? 'Web' : activity.channel || 'System'
-
-                // Convert hex color to rgba for opacity, or handle CSS variables
-                const getBackgroundColor = (color: string, alpha: number) => {
-                  if (color.startsWith('#')) {
-                    const r = parseInt(color.slice(1, 3), 16)
-                    const g = parseInt(color.slice(3, 5), 16)
-                    const b = parseInt(color.slice(5, 7), 16)
-                    return `rgba(${r}, ${g}, ${b}, ${alpha})`
-                  }
-                  // For CSS variables, use the fallback bgColor (which should be hex)
-                  if (bgColor && bgColor.startsWith('#')) {
-                    const r = parseInt(bgColor.slice(1, 3), 16)
-                    const g = parseInt(bgColor.slice(3, 5), 16)
-                    const b = parseInt(bgColor.slice(5, 7), 16)
-                    return `rgba(${r}, ${g}, ${b}, ${alpha})`
-                  }
-                  // Ultimate fallback
-                  return `rgba(139, 92, 246, ${alpha})`
-                }
-
-                return (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 rounded-lg cursor-pointer transition-all"
-                    style={{
-                      backgroundColor: 'var(--bg-tertiary)',
-                      padding: '12px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                    }}
-                    onClick={() => openLeadModal(activity.id)}
-                  >
-                    <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{
-                        backgroundColor: getBackgroundColor(iconColor, opacity),
-                        color: iconColor
-                      }}
-                    >
-                      <ActivityIcon 
-                        size={20}
-                        style={{ color: iconColor }}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{activity.content}</p>
-                      {/* Show score badge for stage changes and score events */}
-                      {activity.metadata?.score && (activity.type === 'stage_change' || activity.type === 'new_lead_scored') && (
-                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', color: '#A78BFA' }}>
-                          Score: {activity.metadata.score}
+          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
+            {metrics.upcomingBookings.length > 0 ? (
+              metrics.upcomingBookings.map((booking) => (
+                <button
+                  key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
+                  className="w-full flex items-start gap-2 p-2 text-left rounded-lg transition-all border"
+                  style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                    {getInitials(booking.name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {/* Line 1 — name · date · owner, with the recency-coloured
+                        countdown chip on the right (only thing that's coloured). */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-[13px] font-semibold truncate shrink-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                        <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
+                        <span className="text-[9px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>· {booking.owner?.name || 'Unassigned'}</span>
+                      </div>
+                      {(() => { const t = countdownTint(booking.datetime); return (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
+                          {formatCountdown(booking.datetime)}
                         </span>
-                      )}
-                      {activity.type === 'score_change' && activity.metadata?.oldScore != null && activity.metadata?.newScore != null && (
-                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{
-                          backgroundColor: activity.metadata.scoreDiff > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: activity.metadata.scoreDiff > 0 ? '#34D399' : '#F87171'
-                        }}>
-                          {activity.metadata.oldScore} → {activity.metadata.newScore} ({activity.metadata.scoreDiff > 0 ? '+' : ''}{activity.metadata.scoreDiff})
-                        </span>
-                      )}
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                        {formatTimeAgo(activity.timestamp)} • {channelLabel}
-                      </p>
+                      ) })()}
                     </div>
+                    {/* Line 2 — event title (only when present). No third line. */}
+                    {booking.title && (
+                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                    )}
                   </div>
-                )
-              })
+                </button>
+              ))
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
             )}
           </div>
-        </div>
+        </section>
+      </div>
+
+      {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+        {/* Priority Lead Queue */}
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Leads that need your attention now</p>
+            </div>
+            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              View Leads <MdArrowForward size={13} />
+            </button>
+          </div>
+          {metrics.leadsNeedingAttention.length > 0 ? (
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    <th className="px-4 py-2 font-medium">Lead</th>
+                    <th className="px-3 py-2 font-medium">Intent</th>
+                    <th className="px-3 py-2 font-medium hidden md:table-cell">Recommended Next Step</th>
+                    <th className="px-3 py-2 font-medium hidden lg:table-cell">Due</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {metrics.leadsNeedingAttention.slice(0, 6).map((lead) => {
+                    const intent = intentFor(lead.score)
+                    const status = statusFor(lead.lastContact, lead.score)
+                    return (
+                      <tr key={lead.id} onClick={() => openLeadModal(lead.id)} className="group cursor-pointer border-t transition-colors" style={{ borderColor: 'var(--border-primary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3 min-w-[150px]">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{getInitials(lead.name)}</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
+                              <p className="text-[11px] truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} · score {lead.score}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-semibold whitespace-nowrap" style={{ backgroundColor: intent.bg, color: intent.color }}>{intent.label}</span>
+                        </td>
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nextStepFor(lead.stage)}</span>
+                        </td>
+                        <td className="px-3 py-3 hidden lg:table-cell">
+                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{formatTimeAgo(lead.lastContact)}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No priority leads right now.</div>
+          )}
+        </section>
+
+        {/* Conversations Trend */}
+        <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['7D', '14D', '30D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            {convSeries.length > 1 ? (
+              <ConversationsTrendChart data={convSeries} days={rangeDays} color="#afd510" />
+            ) : (
+              <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+            <div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
+            </div>
+            <div>
+              <KpiDelta change={convChange} />
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {rangeDays}d</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dailyAvg}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {/* Lead Details Modal */}
@@ -1098,22 +738,83 @@ export default function FounderDashboard() {
         <LeadDetailsModal
           lead={selectedLead}
           isOpen={showLeadModal}
-          onClose={() => {
-            console.log('🔴 Closing modal')
-            setShowLeadModal(false)
-            setSelectedLead(null)
-          }}
-          onStatusUpdate={async () => {
-            await loadMetrics()
-          }}
+          onClose={() => { setShowLeadModal(false); setSelectedLead(null) }}
+          onStatusUpdate={async () => { await loadMetrics() }}
         />
       )}
-      {/* Debug: Show modal state */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black/80 text-white text-xs p-2 rounded z-50">
-          Modal: {showLeadModal ? 'OPEN' : 'CLOSED'} | Lead: {selectedLead?.id || 'NONE'}
-        </div>
-      )}
     </div>
+  )
+}
+
+// ── Home-page building blocks (mockup layout) ──────────────────────────────
+
+function KpiDelta({ change, goodWhenUp = true, suffix = '%' }: { change?: number; goodWhenUp?: boolean; suffix?: string }) {
+  if (change == null || !isFinite(change) || change === 0) return null
+  const up = change > 0
+  const good = up === goodWhenUp
+  const color = good ? '#22c55e' : '#ef4444'
+  const Icon = up ? MdTrendingUp : MdTrendingDown
+  return (
+    <span className="inline-flex items-center gap-0.5 text-xs font-semibold" style={{ color }}>
+      <Icon size={13} />{Math.abs(Math.round(change))}{suffix}
+    </span>
+  )
+}
+
+function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkColor, onClick }: {
+  icon: React.ReactNode
+  iconColor: string
+  label: string
+  value: React.ReactNode
+  sub?: string
+  delta?: React.ReactNode
+  sparkData?: Array<{ value: number }>
+  sparkColor?: string
+  onClick?: () => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
+      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
+        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </div>
+      <div className="flex items-end gap-2 mt-2">
+        <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
+        {delta}
+      </div>
+      {sparkData && sparkData.length > 1 ? (
+        <div className="w-full mt-2" style={{ height: 30 }}>
+          <Sparkline data={sparkData} color={sparkColor || iconColor} height={30} showGradient />
+        </div>
+      ) : (
+        <div style={{ height: 30 }} />
+      )}
+      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{sub || 'vs last 7 days'}</span>
+    </div>
+  )
+}
+
+function EngineNode({ icon, color, count, label, sub, last }: {
+  icon: React.ReactNode
+  color: string
+  count: number
+  label: string
+  sub?: string
+  last?: boolean
+}) {
+  return (
+    <>
+      <div className="flex flex-col items-center text-center flex-1 min-w-[64px]">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full mb-3" style={{ backgroundColor: `${color}1f`, color }}>{icon}</span>
+        <span className="text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{count}</span>
+        <span className="text-xs mt-1.5 leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        {sub && <span className="text-[11px] mt-0.5 font-medium" style={{ color }}>{sub}</span>}
+      </div>
+      {!last && <MdArrowForward className="shrink-0 mx-0.5 hidden sm:block" size={18} style={{ color: 'var(--text-muted)' }} />}
+    </>
   )
 }

@@ -7,7 +7,7 @@
 // pdfjs-dist expects browser globals (DOMMatrix, Path2D) that don't exist server-side
 
 if (typeof globalThis.DOMMatrix === 'undefined') {
-  // Minimal DOMMatrix polyfill — pdf.js uses it for transform calculations
+  // Minimal DOMMatrix polyfill - pdf.js uses it for transform calculations
   class DOMMatrixPolyfill {
     m11 = 1; m12 = 0; m13 = 0; m14 = 0
     m21 = 0; m22 = 1; m23 = 0; m24 = 0
@@ -185,7 +185,7 @@ export function chunkText(
     // Move position forward, accounting for overlap
     position = end - overlap
 
-    // Prevent infinite loops — if we didn't advance, force forward
+    // Prevent infinite loops - if we didn't advance, force forward
     if (position <= (chunks.length > 0 ? chunks[chunks.length - 1].charStart : -1)) {
       position = end
     }

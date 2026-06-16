@@ -1,5 +1,5 @@
 /**
- * services/leadManager.ts — Lead creation, deduplication, and profile updates
+ * services/leadManager.ts - Lead creation, deduplication, and profile updates
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  *   - normalizePhone()       (lines 105-158)
@@ -12,6 +12,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BRAND_ID } from '@/configs';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp, cleanSummary } from './utils';
 import { ensureSession, getChannelTable, type Channel } from './sessionManager';
@@ -132,87 +133,105 @@ export async function ensureOrUpdateLead(
             booking_time: sessionData.booking_time || null,
             user_inputs: userInputs,
           },
-          ...(Object.keys(brandData).length > 0 ? { windchasers: brandData } : {}),
+          ...(Object.keys(brandData).length > 0 ? { bcon: brandData } : {}),
         };
       }
     }
 
-    // ── Look up existing lead ──────────────────────────────────────────────
+    // ── Lead Deduplication Logic ───────────────────────────────────────────
+    // 1. Normalize phone (last 10 digits)
+    // 2. Check by normalized_phone + brand first
+    // 3. If found: UPDATE not INSERT
+    // 4. Else check by email + brand
+    // 5. If found: UPDATE
+    // 6. Only INSERT if nothing matches
+    // 7. On unique constraint violation: catch and UPDATE instead
 
-    let existing: any = null;
+    const brand = BRAND_ID;
+    let existingLead: any = null;
 
-    // Try by normalized phone first
+    // 2. Check by normalized_phone + brand first
     const { data: byPhone, error: phoneErr } = await client
       .from('all_leads')
       .select('id, unified_context, email, customer_name, phone')
       .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', brand)
       .maybeSingle();
 
-    if (phoneErr && phoneErr.code === '42P01') {
-      console.log('[leadManager] all_leads table not found');
-      return null;
+    if (phoneErr) {
+      if (phoneErr.code === '42P01') {
+        console.log('[leadManager] all_leads table not found');
+        return null;
+      }
+      console.error('[leadManager] Error querying by phone', { code: phoneErr.code, msg: phoneErr.message, normalizedPhone, brand });
     }
 
-    existing = byPhone;
+    existingLead = byPhone;
 
-    // Fallback: try by email
-    if (!existing && email) {
+    // 4. If not found by phone, check by email + brand
+    if (!existingLead && email) {
       const { data: byEmail } = await client
         .from('all_leads')
         .select('id, unified_context, email, customer_name, phone')
         .eq('email', email)
+        .eq('brand', brand)
         .maybeSingle();
 
-      if (byEmail) existing = byEmail;
+      if (byEmail) existingLead = byEmail;
     }
 
-    // ── Update existing lead ───────────────────────────────────────────────
+    // Helper function to build merged context
+    const buildMergedContext = (existingCtx: any) => ({
+      ...existingCtx,
+      [channel]: {
+        ...(existingCtx[channel] || {}),
+        ...(unifiedContext[channel] || {}),
+      },
+      bcon: {
+        ...(existingCtx.bcon || existingCtx.windchasers || {}),
+        ...(unifiedContext.bcon || {}),
+      },
+    });
 
-    if (existing) {
-      const existingCtx = existing.unified_context || {};
-      const mergedContext = {
-        ...existingCtx,
-        [channel]: {
-          ...(existingCtx[channel] || {}),
-          ...(unifiedContext[channel] || {}),
-        },
-        windchasers: {
-          ...(existingCtx.windchasers || {}),
-          ...(unifiedContext.windchasers || {}),
-        },
-      };
-
+    // Helper function to build update payload
+    const buildUpdates = (existingCtx: any) => {
+      const mergedContext = buildMergedContext(existingCtx);
       const updates: any = {
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
         unified_context: Object.keys(mergedContext).length > 0 ? mergedContext : undefined,
       };
-
       if (customerName) updates.customer_name = customerName;
       if (email) updates.email = email;
       if (phone) updates.phone = phone;
       if (normalizedPhone) updates.customer_phone_normalized = normalizedPhone;
+      return updates;
+    };
+
+    // 3 & 5. If found: UPDATE not INSERT
+    if (existingLead) {
+      const updates = buildUpdates(existingLead.unified_context || {});
 
       const { error: updateError } = await client
         .from('all_leads')
         .update(updates)
-        .eq('id', existing.id);
+        .eq('id', existingLead.id);
 
       if (updateError) {
-        console.error('[leadManager] Failed to update lead', { error: updateError, leadId: existing.id });
+        console.error('[leadManager] Failed to update lead', { error: updateError, leadId: existingLead.id });
         return null;
       }
 
-      return existing.id;
+      return existingLead.id;
     }
 
-    // ── Create new lead ────────────────────────────────────────────────────
-
+    // 6. Only INSERT if nothing matches
     const insertData: any = {
       customer_name: customerName,
       email: email,
       phone: phone,
       customer_phone_normalized: normalizedPhone,
+      brand: brand,
       first_touchpoint: channel,
       last_touchpoint: channel,
       last_interaction_at: new Date().toISOString(),
@@ -225,27 +244,46 @@ export async function ensureOrUpdateLead(
       .select('id')
       .single();
 
+    // 7. On unique constraint violation: catch and UPDATE instead
     if (createError) {
-      // Duplicate — fetch existing
       if (createError.code === '23505' || createError.message?.includes('duplicate')) {
+        console.log('[leadManager] Duplicate key violation on insert, fetching existing lead to update');
+        
+        // Try to find the existing lead again (may have been created concurrently)
         let dup: any = null;
+        
+        // Try by phone first
         const { data: d1 } = await client
           .from('all_leads')
-          .select('id')
+          .select('id, unified_context')
           .eq('customer_phone_normalized', normalizedPhone)
+          .eq('brand', brand)
           .maybeSingle();
         dup = d1;
 
+        // Fallback to email
         if (!dup && email) {
           const { data: d2 } = await client
             .from('all_leads')
-            .select('id')
+            .select('id, unified_context')
             .eq('email', email)
+            .eq('brand', brand)
             .maybeSingle();
           dup = d2;
         }
 
-        if (dup) return dup.id;
+        if (dup) {
+          // Update the existing lead
+          const updates = buildUpdates(dup.unified_context || {});
+          const { error: updateError } = await client.from('all_leads').update(updates).eq('id', dup.id);
+          
+          if (updateError) {
+            console.error('[leadManager] Failed to update lead after duplicate conflict', { error: updateError, leadId: dup.id });
+            return null;
+          }
+          
+          return dup.id;
+        }
       }
 
       console.error('[leadManager] Failed to create lead', {
@@ -263,7 +301,7 @@ export async function ensureOrUpdateLead(
     console.log('[leadManager] New lead created', { leadId: created.id });
     return created.id;
   } catch (error) {
-    console.warn('[leadManager] Error in ensureOrUpdateLead', error);
+    console.error('[leadManager] Exception in ensureOrUpdateLead', { error: String(error), phone, normalizedPhone: normalizePhone(phone), brand: BRAND_ID });
     return null;
   }
 }
@@ -370,73 +408,4 @@ export async function updateLeadProfile(
   }
 
   return leadId;
-}
-
-/**
- * Clear stage override for a lead, allowing AI to resume automatic stage calculation
- * 
- * @param leadId - The lead UUID
- * @param supabase - Optional Supabase client
- * @returns Result object with success status and new stage info
- */
-export async function clearStageOverride(
-  leadId: string,
-  supabase?: SupabaseClient | null,
-): Promise<{ success: boolean; message: string; newStage?: string; newScore?: number; error?: string }> {
-  const client = supabase || getServiceClient() || getClient();
-  if (!client) {
-    return { success: false, message: 'No database connection', error: 'No Supabase client' };
-  }
-
-  try {
-    // Clear override flag
-    const { error: updateError } = await client
-      .from('all_leads')
-      .update({
-        stage_override: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', leadId);
-
-    if (updateError) {
-      console.error('[leadManager] Failed to clear stage override:', updateError);
-      return { success: false, message: 'Failed to clear override', error: updateError.message };
-    }
-
-    // Trigger recalculation using RPC
-    const { data: recalcResult, error: recalcError } = await client.rpc(
-      'update_lead_score_and_stage',
-      {
-        lead_uuid: leadId,
-        user_uuid: null,
-      }
-    );
-
-    if (recalcError) {
-      console.error('[leadManager] Failed to recalculate after clearing override:', recalcError);
-      return { 
-        success: true, 
-        message: 'Override cleared but recalculation failed',
-        error: recalcError.message 
-      };
-    }
-
-    // Parse result
-    const result = recalcResult as any;
-    console.log('[leadManager] Stage override cleared, new stage:', result?.new_stage);
-
-    return {
-      success: true,
-      message: 'Stage override cleared, AI control resumed',
-      newStage: result?.new_stage,
-      newScore: result?.new_score,
-    };
-  } catch (error) {
-    console.error('[leadManager] Error clearing stage override:', error);
-    return { 
-      success: false, 
-      message: 'Exception while clearing override',
-      error: (error as Error).message 
-    };
-  }
 }

@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react'
 import BookingsCalendar from '@/components/dashboard/BookingsCalendar'
-import { BookingsSkeleton } from '@/components/dashboard/Skeleton'
 
 function BookingsPageContent() {
   return (
@@ -12,8 +11,10 @@ function BookingsPageContent() {
 
 export default function BookingsPage() {
   return (
-    <Suspense fallback={<BookingsSkeleton />}>
+    <Suspense fallback={<div>Loading...</div>}>
       <BookingsPageContent />
     </Suspense>
   )
 }
+
+

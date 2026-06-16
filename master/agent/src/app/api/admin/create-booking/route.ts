@@ -1,6 +1,6 @@
 /**
- * POST /api/admin/create-booking — Manually create a booking + Google Calendar event
- * For admin use only — creates a booking for a lead that was promised one but
+ * POST /api/admin/create-booking - Manually create a booking + Google Calendar event
+ * For admin use only - creates a booking for a lead that was promised one but
  * the tool wasn't called during the WhatsApp conversation.
  */
 
@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
         .from('all_leads')
         .update({
           unified_context: mergedCtx,
+          booking_date: date,
+          booking_time: time,
           last_interaction_at: new Date().toISOString(),
           metadata: {
             ...(existingLead?.metadata || {}),

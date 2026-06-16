@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,17 +26,12 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
-
-    // Use a placeholder user ID for logging (since auth is disabled)
-    const user = { id: 'system' }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const leadId = params.id
     const { searchParams } = new URL(request.url)
@@ -63,14 +59,124 @@ export async function GET(
     const bookingTime = lead.unified_context?.web?.booking_time || lead.unified_context?.web?.booking?.time || null
 
     // ============================================
+    // STEP 0: Hallucination guard — refuse to summarize with no real signal
+    // ============================================
+    // A lead with only outbound outreach (no reply) and no captured profile,
+    // key info, or booking has nothing to honestly summarize. Letting Claude
+    // run here invents facts ("no info about their business shared", "still
+    // waiting for reply") — so we short-circuit with an honest line. This runs
+    // before the cached-summary step so a previously-fabricated cached summary
+    // is replaced too.
+    const guardProfile = {
+      ...(lead.unified_context?.web?.profile || {}),
+      ...(lead.unified_context?.whatsapp?.profile || {}),
+    }
+    const guardHasProfile = !!(guardProfile.company || guardProfile.business_type || guardProfile.city || guardProfile.notes)
+    const guardHasKeyInfo = !!(
+      lead.unified_context?.budget ||
+      lead.unified_context?.service_interest ||
+      lead.unified_context?.pain_points ||
+      lead.unified_context?.web?.service_interest ||
+      lead.unified_context?.whatsapp?.service_interest ||
+      lead.unified_context?.bcon?.business_type ||
+      lead.unified_context?.bcon?.timeline
+    )
+    const guardHasBooking = !!(bookingDate || bookingTime)
+
+    let guardInbound = 0
+    let guardTotal = 0
+    try {
+      const { count: inb } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('lead_id', leadId)
+        .eq('sender', 'customer')
+      guardInbound = inb || 0
+      const { count: tot } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('lead_id', leadId)
+      guardTotal = tot || 0
+    } catch (e) {
+      console.error('Summary context-check failed, proceeding without guard:', e)
+      guardInbound = 1 // on error, don't block a legit summary with a false "not enough context"
+    }
+
+    const hasEnoughContext = guardInbound > 0 || guardHasProfile || guardHasKeyInfo || guardHasBooking
+
+    if (!hasEnoughContext) {
+      const stageLabel = `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
+      const honestSummary = `Not enough context yet to summarize ${lead.customer_name || 'this lead'} — no reply or details captured so far${guardTotal > 0 ? ' (only outreach sent)' : ''}. Currently in the ${stageLabel} stage.`
+
+      const lastInteraction = lead.last_interaction_at || lead.created_at
+      const daysInactive = lastInteraction
+        ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / 86400000))
+        : 0
+
+      // Best-effort attribution from the most recent stage change / activity
+      let attribution = ''
+      const { data: lastStageChangeData } = await supabase
+        .from('lead_stage_changes')
+        .select('changed_by, created_at, new_stage')
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
+      const { data: guardActivities } = await supabase
+        .from('activities')
+        .select('activity_type, created_at, created_by, dashboard_users:created_by (name, email)')
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (lastStageChange) {
+        let actorName = 'PROXe AI'
+        if (lastStageChange.changed_by !== 'PROXe AI' && lastStageChange.changed_by !== 'system') {
+          const { data: u } = await supabase.from('dashboard_users').select('name, email').eq('id', lastStageChange.changed_by).single()
+          if (u) actorName = u.name || u.email || 'Team Member'
+        }
+        attribution = `Last updated by ${actorName} ${formatTimeAgo(lastStageChange.created_at)} - changed stage to ${lastStageChange.new_stage}`
+      } else if (guardActivities && guardActivities.length > 0) {
+        const a = guardActivities[0]
+        const creator = Array.isArray(a.dashboard_users) ? a.dashboard_users[0] : a.dashboard_users
+        attribution = `Last updated by ${creator?.name || creator?.email || 'Team Member'} ${formatTimeAgo(a.created_at)} - ${a.activity_type}`
+      }
+
+      console.log('Insufficient context for summary — returning honest placeholder for lead:', leadId)
+      return NextResponse.json({
+        summary: honestSummary,
+        attribution,
+        data: {
+          leadName: lead.customer_name || 'Customer',
+          lastMessage: null,
+          conversationStatus: guardInbound > 0 ? 'Active' : 'No response yet',
+          responseRate: guardTotal > 0 ? Math.round((guardInbound / guardTotal) * 100) : 0,
+          daysInactive,
+          nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
+          keyInfo: {},
+          leadStage: lead.lead_stage,
+          subStage: lead.sub_stage,
+          bookingDate,
+          bookingTime,
+          insufficientContext: true,
+        },
+      })
+    }
+
+    // ============================================
     // STEP 1: Check unified_context for existing summaries
     // ============================================
     const unifiedSummary = lead.unified_context?.unified_summary
     const webSummary = lead.unified_context?.web?.conversation_summary
     const whatsappSummary = lead.unified_context?.whatsapp?.conversation_summary
 
-    // Priority 1: Use unified_summary if it exists (unless forced refresh)
-    if (unifiedSummary && !forceRefresh) {
+    // Check if cached summary is stale: new activity since last generation
+    const summaryGeneratedAt = lead.unified_context?.unified_summary_generated_at
+    const lastInteractionAt = lead.last_interaction_at
+    const summaryIsStale = unifiedSummary && summaryGeneratedAt && lastInteractionAt &&
+      new Date(lastInteractionAt).getTime() > new Date(summaryGeneratedAt).getTime()
+
+    // Priority 1: Use unified_summary if it exists, is not stale, and not forced refresh
+    if (unifiedSummary && !forceRefresh && !summaryIsStale) {
       console.log('Using unified_summary from unified_context for lead:', leadId)
 
       // Still need to fetch activities and stage history for attribution
@@ -291,24 +397,28 @@ export async function GET(
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `Summarize this lead conversation in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
-Sentence 1: Who they are and what they do.
-Sentence 2: What their problem is and what was discussed.
-Sentence 3: What happened (booked/pending/lost) and what to do next.
-If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
+          const prompt = `Summarize this lead for an aviation training academy (Windchasers) in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
+Sentence 1: Who they are and which course/program they're interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.
+Sentence 2: What they asked about or what was discussed.
+Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
+If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
+IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
+
+CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
+If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
 
 Example:
-Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
+Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.
 
 Another example:
-Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
+Meera asked about cabin crew training cost and duration. Tried to book a call for Monday 3 PM but the slot didn't confirm and she went quiet - reach out to help her lock a time.
 
-Keep it under 50 words. Be specific. No fluff.
+Keep it under 50 words. Be specific to what was actually said. No fluff.
 
 Lead: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
 ${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-
+${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
 ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}`
 
           // Add timeout to prevent hanging
@@ -349,6 +459,7 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
 
           if (response.ok) {
             const data = await response.json()
+            await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
             const unifiedSummary = data.content?.[0]?.text || ''
             if (unifiedSummary) {
               // Build attribution
@@ -400,7 +511,8 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
               try {
                 const newUnifiedContext = {
                   ...(lead.unified_context || {}),
-                  unified_summary: unifiedSummary
+                  unified_summary: unifiedSummary,
+                  unified_summary_generated_at: new Date().toISOString()
                 };
                 await supabase
                   .from('all_leads')
@@ -661,24 +773,28 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
         if (waProfile.city || webProfile.city) profileInfo.push(`City: ${waProfile.city || webProfile.city}`)
         if (waProfile.notes || webProfile.notes) profileInfo.push(`Notes: ${waProfile.notes || webProfile.notes}`)
 
-        const prompt = `Summarize this lead conversation in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
-Sentence 1: Who they are and what they do.
-Sentence 2: What their problem is and what was discussed.
-Sentence 3: What happened (booked/pending/lost) and what to do next.
-If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
+        const prompt = `Summarize this lead for an aviation training academy (Windchasers) in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
+Sentence 1: Who they are and which course/program they're interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.
+Sentence 2: What they asked about or what was discussed.
+Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
+If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
+IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
+
+CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
+If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
 
 Example:
-Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
+Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.
 
 Another example:
-Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
+Meera asked about cabin crew training cost and duration. Tried to book a call for Monday 3 PM but the slot didn't confirm and she went quiet - reach out to help her lock a time.
 
-Keep it under 50 words. Be specific. No fluff.
+Keep it under 50 words. Be specific to what was actually said. No fluff.
 
 Lead: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
 ${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-
+${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
 CONVERSATION (${conversationMessages.length} messages):
 ${conversationContext || 'No messages yet'}`
 
@@ -720,13 +836,15 @@ ${conversationContext || 'No messages yet'}`
 
         if (response.ok) {
           const data = await response.json()
+          await recordTokenUsage('notes_summary', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const aiSummary = data.content?.[0]?.text || ''
           if (aiSummary) {
             // Save the new summary to the database
             try {
               const newUnifiedContext = {
                 ...(lead.unified_context || {}),
-                unified_summary: aiSummary
+                unified_summary: aiSummary,
+                unified_summary_generated_at: new Date().toISOString()
               };
               await supabase
                 .from('all_leads')

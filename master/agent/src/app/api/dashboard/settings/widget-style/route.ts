@@ -7,14 +7,12 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     // Fetch widget style setting
     const { data: setting, error } = await supabase
@@ -49,14 +47,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     // Admin check disabled since auth is disabled
     // Use system user ID for tracking

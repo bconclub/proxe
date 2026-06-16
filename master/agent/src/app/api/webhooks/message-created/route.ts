@@ -20,13 +20,15 @@ export async function POST(request: NextRequest) {
 
     console.log('Webhook: New message created for lead:', lead_id)
 
-    // Call scoring endpoint
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const scoreResponse = await fetch(`${appUrl}/api/dashboard/leads/${lead_id}/score`, {
+    // Call AI scoring endpoint on the *same* server this webhook is running on
+    // so dev (localhost:4002) and prod both work without env tweaking.
+    const appUrl = new URL(request.url).origin
+    const scoreResponse = await fetch(`${appUrl}/api/leads/score`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ lead_id }),
     })
 
     if (!scoreResponse.ok) {

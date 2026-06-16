@@ -45,12 +45,17 @@ export async function POST(request: NextRequest) {
     const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
 
     if (!serviceAccountEmail || !privateKey) {
+      // Not an error — Google Calendar simply isn't connected. Return 200 with a
+      // typed `configured: false` flag so the dashboard can stay quiet instead of
+      // flashing a red "Sync Failed" banner on every page load. (Bookings are
+      // recorded in our own DB regardless; the calendar sync is optional.)
       return NextResponse.json(
         {
-          error: 'Google Calendar credentials not configured',
-          details: 'Please set up GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY environment variables.',
+          configured: false,
+          message: 'Google Calendar is not connected.',
+          details: 'Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY to enable calendar sync.',
         },
-        { status: 503 }
+        { status: 200 }
       )
     }
 
@@ -303,7 +308,7 @@ export async function POST(request: NextRequest) {
             updated++
           } catch (updateError: any) {
             if (updateError.code === 404) {
-              // Event was deleted from calendar — re-create
+              // Event was deleted from calendar - re-create
               const newEvent = await calendar.events.insert({
                 calendarId: CALENDAR_ID,
                 requestBody: eventData,
@@ -315,14 +320,14 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // No tracked googleEventId — check if a matching event already exists
+          // No tracked googleEventId - check if a matching event already exists
           // by matching name + date + hour (fingerprint dedup)
           const bookingName = (booking.name || '').toLowerCase().trim()
           const fingerprint = `${bookingName}|${bookingDate}|${hour.toString().padStart(2, '0')}`
           const existingMatch = existingEventsByFingerprint.get(fingerprint)
 
           if (existingMatch?.id) {
-            // Event already exists on calendar — link it, don't create a duplicate
+            // Event already exists on calendar - link it, don't create a duplicate
             console.log(`[calendar/sync] Linking existing event ${existingMatch.id} to booking ${booking.id} (${booking.name})`)
             await updateBookingMetadata(supabase, booking, existingMatch.id)
             // Also update the event details to latest
@@ -335,7 +340,7 @@ export async function POST(request: NextRequest) {
             } catch (_) { /* best effort update */ }
             updated++
           } else {
-            // Truly new booking — create event
+            // Truly new booking - create event
             try {
               const newEvent = await calendar.events.insert({
                 calendarId: CALENDAR_ID,

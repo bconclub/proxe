@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './BookingCalendarWidget.module.css';
 import type { BrandConfig } from '@/configs';
 
@@ -23,6 +23,7 @@ interface BookingData {
   name: string;
   email: string;
   phone: string;
+  sessionType?: 'online' | 'offline';
   googleEventId?: string;
 }
 
@@ -32,15 +33,22 @@ interface TimeSlot {
   available: boolean;
 }
 
-// Available time slots: 11:00 AM, 1:00 PM, 3:00 PM, 4:00 PM, 5:00 PM, 6:00 PM
-const AVAILABLE_SLOTS = [
-  '11:00 AM',
-  '1:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-  '6:00 PM',
+const FALLBACK_ONLINE_SLOTS = ['3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM'];
+const FALLBACK_OFFLINE_SLOTS = [
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+  '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM',
+  '5:00 PM', '5:30 PM', '6:00 PM',
 ];
+
+const getFallbackSlots = (sessionType: 'online' | 'offline'): TimeSlot[] => {
+  const slots = sessionType === 'offline' ? FALLBACK_OFFLINE_SLOTS : FALLBACK_ONLINE_SLOTS;
+  return slots.map((slot) => ({
+    time: slot,
+    displayTime: slot,
+    available: true,
+  }));
+};
 
 export function BookingCalendarWidget({
   onClose,
@@ -64,6 +72,7 @@ export function BookingCalendarWidget({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [showTimeSlots, setShowTimeSlots] = useState(false);
+  const timeSlotsRef = useRef<HTMLDivElement>(null);
   const [showForm, setShowForm] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -74,7 +83,7 @@ export function BookingCalendarWidget({
     name: prefillName || '',
     email: prefillEmail || '',
     phone: cleanPhoneNumber(prefillPhone),
-    sessionType: '' as 'online' | 'offline' | '',
+    sessionType: 'online' as 'online' | 'offline',
   });
   useEffect(() => {
     setFormData((prev) => {
@@ -121,6 +130,15 @@ export function BookingCalendarWidget({
     }
   }, [selectedDate]);
 
+  // Auto-scroll time slots into view when they appear
+  useEffect(() => {
+    if (showTimeSlots && timeSlotsRef.current) {
+      setTimeout(() => {
+        timeSlotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
+    }
+  }, [showTimeSlots, selectedDate]);
+
   const checkAvailability = async () => {
     if (!selectedDate) return;
 
@@ -136,7 +154,7 @@ export function BookingCalendarWidget({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ date: dateStr }),
+        body: JSON.stringify({ date: dateStr, sessionType: formData.sessionType }),
       });
 
       const data = await response.json().catch(() => ({ error: 'Failed to parse response' }));
@@ -156,20 +174,11 @@ export function BookingCalendarWidget({
         setIsWarning(false);
       }
 
-      // Map API response to our time slots
-      const slots: TimeSlot[] = AVAILABLE_SLOTS.map((slot) => {
-        // Find matching slot from API response (API returns displayTime format)
-        const apiSlot = data.slots.find((s: any) => {
-          const apiTime = s.time || s.displayTime || '';
-          return apiTime.trim() === slot;
-        });
-
-        return {
-          time: slot,
-          displayTime: slot,
-          available: apiSlot ? apiSlot.available : true, // Default to available if not found
-        };
-      });
+      const slots: TimeSlot[] = (data.slots || []).map((slot: any) => ({
+        time: slot.time || slot.displayTime,
+        displayTime: slot.displayTime || slot.time,
+        available: !!slot.available,
+      })).filter((slot: TimeSlot) => !!slot.time);
 
       setTimeSlots(slots);
       setShowTimeSlots(true);
@@ -177,12 +186,8 @@ export function BookingCalendarWidget({
       const errorMessage = error.message || 'Failed to check availability. Please check your Google Calendar configuration.';
       setBookingError(errorMessage);
       setIsWarning(false);
-      // Default to all slots available if API fails
-      setTimeSlots(AVAILABLE_SLOTS.map(slot => ({
-        time: slot,
-        displayTime: slot,
-        available: true,
-      })));
+      // Default to the allowed Windchasers window if API fails.
+      setTimeSlots(getFallbackSlots(formData.sessionType));
       setShowTimeSlots(true);
     } finally {
       setLoadingAvailability(false);
@@ -225,17 +230,20 @@ export function BookingCalendarWidget({
       return;
     }
 
-    // Require session type selection
-    if (!formData.sessionType) {
-      setBookingError('Please select session type (Online or Facility Visit)');
-      return;
-    }
-
     setBookingError(null);
     setIsWarning(false);
 
     try {
       const dateStr = formatDateForAPI(selectedDate);
+      
+      console.log('[BookingCalendar] Creating booking:', {
+        date: dateStr,
+        time: selectedTime,
+        name: formData.name,
+        email: formData.email,
+        hasSessionId: !!sessionId,
+        hasBrand: !!brand,
+      });
 
       const response = await fetch(getApiUrl('/api/agent/calendar/book'), {
         method: 'POST',
@@ -249,6 +257,7 @@ export function BookingCalendarWidget({
           email: formData.email,
           phone: formData.phone,
           sessionType: formData.sessionType,
+
           ...(sessionId && { sessionId }),
           ...(brand && { brand }),
         }),
@@ -268,6 +277,7 @@ export function BookingCalendarWidget({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        sessionType: formData.sessionType,
         googleEventId: data.eventId, // Include Google Calendar event ID
       };
 
@@ -371,10 +381,10 @@ export function BookingCalendarWidget({
     const startStr = formatGoogleDate(startDate);
     const endStr = formatGoogleDate(endDate);
 
-    const eventTitle = config?.name ? `${config.name} Consultation` : 'Aviation Consultation';
+    const eventTitle = config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit';
     const title = encodeURIComponent(eventTitle);
     const details = encodeURIComponent(`Consultation Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
-    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)');
+    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)');
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
   };
@@ -404,17 +414,17 @@ export function BookingCalendarWidget({
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Windchasers//Booking Calendar//EN',
+      'PRODID:-//BCON//Booking Calendar//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      `UID:${Date.now()}@windchasers.in`,
+      `UID:${Date.now()}@bconclub.com`,
       `DTSTAMP:${nowStr}`,
       `DTSTART:${startStr}`,
       `DTEND:${endStr}`,
-      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'Aviation Consultation'}`,
+      `SUMMARY:${config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit'}`,
       `DESCRIPTION:Consultation Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
-      `LOCATION:${formData.sessionType === 'offline' ? 'Windchasers Aviation Academy Facility' : 'Online Session (Video Call)'}`,
+      `LOCATION:${formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)'}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',
@@ -537,62 +547,6 @@ export function BookingCalendarWidget({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="sessionType" style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
-                Session Type <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  padding: '10px 16px',
-                  border: `2px solid ${formData.sessionType === 'online' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '8px',
-                  backgroundColor: formData.sessionType === 'online' ? '#eff6ff' : 'transparent',
-                  transition: 'all 0.2s',
-                  flex: '1',
-                  minWidth: '120px'
-                }}>
-                  <input
-                    type="radio"
-                    id="sessionType-online"
-                    name="sessionType"
-                    value="online"
-                    checked={formData.sessionType === 'online'}
-                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
-                    style={{ marginRight: '8px' }}
-                    required
-                  />
-                  <span>Online Session</span>
-                </label>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  padding: '10px 16px',
-                  border: `2px solid ${formData.sessionType === 'offline' ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: '8px',
-                  backgroundColor: formData.sessionType === 'offline' ? '#eff6ff' : 'transparent',
-                  transition: 'all 0.2s',
-                  flex: '1',
-                  minWidth: '120px'
-                }}>
-                  <input
-                    type="radio"
-                    id="sessionType-offline"
-                    name="sessionType"
-                    value="offline"
-                    checked={formData.sessionType === 'offline'}
-                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
-                    style={{ marginRight: '8px' }}
-                    required
-                  />
-                  <span>Facility Visit</span>
-                </label>
-              </div>
-            </div>
-
             <div className={styles.formActions}>
               <button
                 type="button"
@@ -633,7 +587,6 @@ export function BookingCalendarWidget({
       )}
 
       <div className={styles.calendarLayout}>
-        {/* Calendar Section */}
         <div className={styles.calendarSection}>
           <div className={styles.calendarHeader}>
             <button onClick={() => navigateMonth('prev')} className={styles.navButton}>
@@ -675,31 +628,38 @@ export function BookingCalendarWidget({
           </div>
         </div>
 
-        {/* Time Slots Section */}
-        <div className={styles.timeSlotsSection}>
-          <h3 className={styles.timeSlotsTitle}>Time</h3>
-          {loadingAvailability ? (
-            <div className={styles.loadingText}>Checking availability...</div>
-          ) : selectedDate ? (
-            <div className={styles.timeSlotsList}>
-              {timeSlots.map((slot) => (
-                <button
-                  key={slot.time}
-                  className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
-                  onClick={() => handleTimeClick(slot.time)}
-                  disabled={!slot.available}
-                  title={!slot.available ? 'This slot is already booked' : ''}
-                >
-                  {slot.displayTime}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className={styles.timeSlotsPlaceholder}>
-              Select a date to see available times
-            </div>
-          )}
-        </div>
+        {selectedDate && (
+          <div className={styles.timeSlotsSection} ref={timeSlotsRef}>
+            <h3 className={styles.timeSlotsTitle}>
+              {selectedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </h3>
+            {loadingAvailability ? (
+              <div className={styles.loadingText}>Checking availability...</div>
+            ) : showTimeSlots ? (
+              <div className={styles.timeSlotsList}>
+                {timeSlots.map((slot) => (
+                  <button
+                    key={slot.time}
+                    className={`${styles.timeSlot} ${selectedTime === slot.time ? styles.timeSlotSelected : ''} ${!slot.available ? styles.timeSlotUnavailable : ''}`}
+                    onClick={() => handleTimeClick(slot.time)}
+                    disabled={!slot.available}
+                    title={!slot.available ? 'This slot is already booked' : ''}
+                  >
+                    {slot.displayTime}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.timeSlotsPlaceholder}>
+                Select a date to see available times
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

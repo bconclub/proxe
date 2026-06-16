@@ -136,8 +136,8 @@ export default function KnowledgeBaseClient() {
                     onClick={() => setActiveTab(tab.id)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                     style={{
-                      backgroundColor: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: activeTab === tab.id ? 'white' : 'var(--text-secondary)',
+                      backgroundColor: activeTab === tab.id ? 'var(--button-bg)' : 'var(--bg-tertiary)',
+                      color: activeTab === tab.id ? 'var(--text-button)' : 'var(--text-secondary)',
                     }}
                   >
                     <Icon size={16} />

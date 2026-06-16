@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { BRAND_ID } from '@/configs'
 
 /** Resolve brand-specific Supabase URL */
 function resolveSupabaseUrl(): string {
-  const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
-  return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || ''
+  const bp = BRAND_ID.toUpperCase()
+  return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 }
 
 // Service role client for webhooks (bypasses RLS)

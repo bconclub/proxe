@@ -178,8 +178,8 @@ export default function TextInput({ onSubmit }: TextInputProps) {
         <button
           type="submit"
           disabled={submitting || !question.trim() || !answer.trim()}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-50"
-          style={{ background: 'var(--accent-primary)' }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--text-button)] transition-opacity disabled:opacity-50"
+          style={{ background: 'var(--button-bg)' }}
         >
           <MdAdd size={18} />
           {submitting ? 'Saving...' : 'Add Q&A Entry'}

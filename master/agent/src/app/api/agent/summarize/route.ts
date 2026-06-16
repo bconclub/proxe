@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/summarize — Conversation summary generation
+ * POST /api/agent/summarize - Conversation summary generation
  *
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/chat/summarize/route.ts.

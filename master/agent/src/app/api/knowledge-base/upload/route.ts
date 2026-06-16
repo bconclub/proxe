@@ -13,7 +13,7 @@ const ALLOWED_TYPES: Record<string, string> = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-// POST /api/knowledge-base/upload — Upload file (PDF, DOC, DOCX, TXT)
+// POST /api/knowledge-base/upload - Upload file (PDF, DOC, DOCX, TXT)
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()

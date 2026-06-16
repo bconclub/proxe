@@ -32,7 +32,7 @@ export default function PageTransitionLoader() {
       }}
     >
       <div className="page-transition-loader-content flex flex-col items-center">
-        {/* Windchasers Icon with Animation */}
+        {/* Brand Icon with Animation */}
         <div className="page-transition-loader-icon-container relative">
           {/* Pulse effect with transparent accent color */}
           <div
@@ -46,7 +46,7 @@ export default function PageTransitionLoader() {
           />
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
             <Image
-              src="/windchasers-icon.png"
+              src="/logo.png"
               alt="Windchasers"
               width={80}
               height={80}

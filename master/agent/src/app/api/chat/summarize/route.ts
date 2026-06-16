@@ -1,5 +1,5 @@
 /**
- * POST /api/chat/summarize — Backward-compatibility proxy
+ * POST /api/chat/summarize - Backward-compatibility proxy
  *
  * Phase 4 of the Unified Agent Architecture.
  * Proxies requests from the old /api/chat/summarize endpoint to the new

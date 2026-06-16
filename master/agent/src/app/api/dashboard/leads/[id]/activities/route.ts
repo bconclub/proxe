@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,19 +14,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    // AUTHENTICATION DISABLED - No auth check needed
-    // const {
-    //   data: { user },
-    // } = await supabase.auth.getUser()
-
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    const authClient = await createClient()
+    // Auth gate: every dashboard API requires a logged-in Supabase session.
+    // No role check here — viewer vs admin enforcement is done at write sites.
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const supabase = getServiceClient() || authClient
     
-    // Use a placeholder user ID for logging (since auth is disabled)
-    const user = { id: 'system' }
-
     const leadId = params.id
 
     // Fetch all activities for this lead
@@ -75,43 +72,46 @@ export async function GET(
       })
     }
 
-    // 2. Team actions: logged activities (from activities table)
+    // 2. Team actions: logged activities (from activities table).
+    // Select only the columns we know exist on every brand's activities table.
+    // Older WC schemas lack duration_minutes / next_followup_date, and the
+    // previous select-then-throw made the WHOLE activity feed 500 — which made
+    // the modal fall back to conversations only, hiding logged calls/notes.
+    // Degrade gracefully instead: a team-query failure just omits team rows.
     const { data: teamActivities, error: teamError } = await supabase
       .from('activities')
-      .select(`
-        id,
-        activity_type,
-        note,
-        duration_minutes,
-        next_followup_date,
-        created_at,
-        created_by,
-        dashboard_users:created_by (
-          id,
-          name,
-          email
-        )
-      `)
+      .select('id, activity_type, note, created_at, created_by')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
 
-    if (!teamError && teamActivities) {
+    if (teamError) {
+      console.error('Error fetching team activities (continuing without them):', teamError.message)
+    }
+
+    if (teamActivities) {
       for (const activity of teamActivities) {
-        // dashboard_users is an array from the relation query, get first element
-        const creator = Array.isArray(activity.dashboard_users) 
-          ? activity.dashboard_users[0] 
-          : activity.dashboard_users
+        // `created_by` historically stored an email string (e.g.
+        // "user@example.com") so the dashboard_users join on
+        // `created_by → id` returned nothing. Fall back: if creator
+        // is missing but created_by looks like an email, surface the
+        // local part as the actor name.
+        const rawCreatedBy = activity.created_by as string | null | undefined
+        const fallbackActor = rawCreatedBy && typeof rawCreatedBy === 'string' && rawCreatedBy.includes('@')
+          ? rawCreatedBy
+          : null
         activities.push({
           id: activity.id,
           type: 'team',
-          actor: creator?.name || creator?.email || 'Team Member',
-          action: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
+          actor: fallbackActor || rawCreatedBy || 'Team Member',
+          // Friendly default; LeadDetailsModal Activity tab overrides this
+          // to "Call · Connected" / "Call · No Answer" / etc. for call logs.
+          action: activity.activity_type === 'manual_call'
+            ? 'Call logged'
+            : activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1).replace(/_/g, ' '),
           content: activity.note,
-          duration_minutes: activity.duration_minutes,
-          next_followup_date: activity.next_followup_date,
           timestamp: activity.created_at,
           icon: activity.activity_type,
-          color: '#3B82F6', // Blue
+          color: '#F59E0B', // Amber — distinct from PROXe (purple) + Customer (green)
           user_id: activity.created_by,
         })
       }
@@ -171,6 +171,59 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error fetching activities:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * POST /api/dashboard/leads/[id]/activities
+ * Create a new activity/note for a lead
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServiceClient() || authClient
+    const leadId = params.id
+    const body = await request.json()
+    const { activity_type, note, duration_minutes, next_followup_date, next_followup } = body
+
+    if (!note?.trim()) {
+      return NextResponse.json({ error: 'Note is required' }, { status: 400 })
+    }
+
+    const createdBy = user.email || user.id || 'system'
+
+    const { data, error } = await supabase
+      .from('activities')
+      .insert({
+        lead_id: leadId,
+        activity_type: activity_type || 'note',
+        note: note.trim(),
+        duration_minutes: duration_minutes || null,
+        next_followup_date: next_followup_date || next_followup || null,
+        created_by: createdBy,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true, activity: data })
+  } catch (error) {
+    console.error('Error creating activity:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

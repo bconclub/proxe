@@ -1,5 +1,5 @@
 /**
- * services/bookingManager.ts — Booking storage + Google Calendar integration
+ * services/bookingManager.ts - Booking storage + Google Calendar integration
  *
  * Extracted from:
  *   - web-agent/src/lib/chatSessions.ts: storeBooking() (1321-1492), checkExistingBooking() (1495-1669)
@@ -22,15 +22,85 @@ import { updateLeadProfile } from './leadManager';
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata';
 
-// Available time slots (Asia/Kolkata)
-const AVAILABLE_SLOTS = [
-  '11:00', // 11:00 AM
-  '13:00', // 1:00 PM
-  '15:00', // 3:00 PM
-  '16:00', // 4:00 PM
-  '17:00', // 5:00 PM
-  '18:00', // 6:00 PM
-];
+export type BookingSessionType = 'online' | 'offline';
+
+// Online runs three fixed start times only — 3:00, 4:00, 5:00 PM (hourly step,
+// last start 5 PM since each session is 60 min). Offline keeps 30-min granularity.
+const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string; stepMinutes: number }> = {
+  online: { start: '15:00', end: '18:00', stepMinutes: 60 },
+  offline: { start: '11:00', end: '19:00', stepMinutes: 30 },
+};
+const BOOKING_DURATION_MINUTES = 60;
+
+export function normalizeBookingSessionType(sessionType?: string | null): BookingSessionType {
+  return sessionType === 'offline' ? 'offline' : 'online';
+}
+
+function timeToMinutes(time24: string): number {
+  const [hour, minute] = time24.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function normalizeBookingTime(time: string): string | null {
+  if (!time) return null;
+  const trimmed = time.trim();
+
+  if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    const [hour, minute] = trimmed.split(':').map(Number);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    }
+    return null;
+  }
+
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const period = match[3].toUpperCase();
+
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
+export function getAvailableBookingSlotStarts(sessionType?: string | null): string[] {
+  const { start, end, stepMinutes } = BOOKING_WINDOWS[normalizeBookingSessionType(sessionType)];
+  const slots: string[] = [];
+  const lastStart = timeToMinutes(end) - BOOKING_DURATION_MINUTES;
+  for (let minutes = timeToMinutes(start); minutes <= lastStart; minutes += stepMinutes) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+  }
+  return slots;
+}
+
+export function isAllowedBookingTime(time: string, sessionType?: string | null): boolean {
+  const normalizedTime = normalizeBookingTime(time);
+  return !!normalizedTime && getAvailableBookingSlotStarts(sessionType).includes(normalizedTime);
+}
+
+/**
+ * Slot starts that are still bookable for a SPECIFIC date.
+ * For any future date this is the full window. For TODAY (IST) we drop slots
+ * whose start time has already passed — otherwise a customer messaging at
+ * 8:30 PM would be offered (or booked into) a 3:00 PM slot that is long gone.
+ */
+export function getBookableSlotStartsForDate(dateStr: string, sessionType?: string | null): string[] {
+  const all = getAvailableBookingSlotStarts(sessionType);
+  const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+  if (dateStr !== todayIST) return all;
+  const hm = new Date().toLocaleTimeString('en-GB', {
+    hour12: false, hour: '2-digit', minute: '2-digit', timeZone: TIMEZONE,
+  });
+  const [h, m] = hm.split(':').map(Number);
+  const nowMinutes = h * 60 + m;
+  return all.filter(slot => timeToMinutes(slot) > nowMinutes);
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -71,7 +141,7 @@ export interface TimeSlot {
  * Get Google Calendar auth client (JWT with service account)
  */
 export async function getGoogleCalendarAuth(): Promise<any> {
-  // Dynamic import — googleapis is only needed when calendar features are used
+  // Dynamic import - googleapis is only needed when calendar features are used
   const { google } = await import('googleapis');
 
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -188,23 +258,36 @@ export async function storeBooking(
 
   const tableName = getChannelTable(channel);
 
-  // Update session profile if contact info is provided
+  // Update session profile if contact info is provided. Wrapped — updateLeadProfile
+  // resolves the session by external_session_id, which whatsapp_sessions doesn't
+  // have, so it can fail/throw for WhatsApp; that must NOT abort the booking save.
   let currentLeadId: string | null = null;
   if (booking.name || booking.email || booking.phone) {
     const profileUpdates: { userName?: string; email?: string; phone?: string } = {};
     if (booking.name) profileUpdates.userName = booking.name;
     if (booking.email) profileUpdates.email = booking.email;
     if (booking.phone) profileUpdates.phone = booking.phone;
-
-    currentLeadId = await updateLeadProfile(externalSessionId, profileUpdates, channel, client);
+    try {
+      currentLeadId = await updateLeadProfile(externalSessionId, profileUpdates, channel, client);
+    } catch (e: any) {
+      console.error('[bookingManager] updateLeadProfile failed (non-fatal):', e?.message || e);
+    }
   }
 
-  // Fetch current session for merging
-  const { data: currentSession } = await client
-    .from(tableName)
-    .select('metadata, conversation_summary, lead_id, user_inputs_summary')
-    .eq('external_session_id', externalSessionId)
-    .maybeSingle();
+  // Fetch current session for merging. whatsapp_sessions has neither `metadata`
+  // nor `external_session_id`, so this select errors there — keep it best-effort.
+  let currentSession: any = null;
+  try {
+    const sel = tableName === 'web_sessions'
+      ? 'metadata, conversation_summary, lead_id, user_inputs_summary'
+      : 'conversation_summary, lead_id, user_inputs_summary';
+    const res = tableName === 'web_sessions'
+      ? await client.from(tableName).select(sel).eq('external_session_id', externalSessionId).maybeSingle()
+      : { data: null };
+    currentSession = res.data;
+  } catch (e: any) {
+    console.error('[bookingManager] session fetch failed (non-fatal):', e?.message || e);
+  }
 
   // Build booking metadata
   const bookingMetadata: Record<string, any> = {
@@ -232,7 +315,7 @@ export async function storeBooking(
   // Update session
   const bookingUpdate: Record<string, any> = {
     booking_date: booking.date,
-    booking_time: booking.time,
+    booking_time: toTime24(booking.time),
     google_event_id: booking.googleEventId ?? null,
     booking_status: booking.status ?? 'Call Booked',
     booking_created_at: getISTTimestamp(),
@@ -252,68 +335,21 @@ export async function storeBooking(
 
   if (error) {
     console.error('[bookingManager] Failed to store booking in session table', error);
-    // Session update failed — but DON'T return early.
+    // Session update failed - but DON'T return early.
     // We still need to save booking data to all_leads below.
   } else if (data && data.length > 0) {
     sessionData = data[0];
   }
 
-  // Create autonomous task worker entries for reminders + confirmation
-  try {
-    const bookingDateTime = new Date(`${booking.date}T${booking.time}`);
-    const taskPhone = booking.phone || '';
-    const taskName = booking.name || 'Lead';
-    const taskRefId = externalSessionId;
-
-    const reminderOffsets = [
-      { type: 'reminder_24h', offset: 24 * 60 * 60 * 1000 },
-      { type: 'reminder_1h', offset: 1 * 60 * 60 * 1000 },
-      { type: 'reminder_30m', offset: 30 * 60 * 1000 },
-    ];
-
-    for (const r of reminderOffsets) {
-      const scheduledAt = new Date(bookingDateTime.getTime() - r.offset);
-      if (scheduledAt > new Date()) {
-        await client.from('agent_tasks').insert({
-          task_type: r.type,
-          task_description: `Auto: ${r.type} for ${taskName}`,
-          lead_id: sessionData?.lead_id || currentLeadId || null,
-          lead_phone: taskPhone,
-          lead_name: taskName,
-          scheduled_at: scheduledAt.toISOString(),
-          status: 'pending',
-          metadata: { booking_date: booking.date, booking_time: booking.time, session_id: taskRefId },
-          created_at: new Date().toISOString()
-        }).then(({ error: taskErr }) => {
-          if (taskErr) console.error(`[bookingManager] Task creation error (${r.type}):`, taskErr);
-        });
-      }
-    }
-
-    // Post-booking confirmation task (fire immediately)
-    await client.from('agent_tasks').insert({
-      task_type: 'post_booking_confirmation',
-      task_description: `Auto: post_booking_confirmation for ${taskName}`,
-      lead_id: sessionData?.lead_id || currentLeadId || null,
-      lead_phone: taskPhone,
-      lead_name: taskName,
-      scheduled_at: new Date().toISOString(),
-      status: 'pending',
-      metadata: { booking_date: booking.date, booking_time: booking.time, session_id: taskRefId },
-      created_at: new Date().toISOString()
-    }).then(({ error: taskErr }) => {
-      if (taskErr) console.error('[bookingManager] Confirmation task error:', taskErr);
-    });
-  } catch (taskErr) {
-    console.error('[bookingManager] Failed to create task worker entries:', taskErr);
-  }
-
-  // Sync to all_leads — ALWAYS attempt this, even if session update failed.
+  // Sync to all_leads - ALWAYS attempt this, even if session update failed.
   // Resolve lead_id from session data, or from profile update, or by looking up the session.
   let leadId = sessionData?.lead_id || currentLeadId;
 
-  // If we don't have a lead_id yet (session update failed), look it up directly
-  if (!leadId) {
+  // If we don't have a lead_id yet, look it up by session.
+  // NOTE: whatsapp_sessions has NO external_session_id column (it's keyed by
+  // id / customer_phone_normalized), so this lookup silently fails for WhatsApp.
+  // Guarded to web_sessions where the column actually exists.
+  if (!leadId && tableName === 'web_sessions') {
     const { data: sessionLookup } = await client
       .from(tableName)
       .select('lead_id')
@@ -322,13 +358,46 @@ export async function storeBooking(
     leadId = sessionLookup?.lead_id || null;
   }
 
+  // Phone fallback — the reliable resolver for WhatsApp (phone is always known)
+  // and a safety net for any channel where the session lookup didn't resolve a
+  // lead. Without this the booking is silently dropped: leadId stays null, the
+  // all_leads update below is skipped, and nothing is ever saved.
+  if (!leadId && booking.phone) {
+    const normalizedPhone = (booking.phone || '').replace(/\D/g, '').slice(-10);
+    if (normalizedPhone) {
+      const { data: leadByPhone } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .maybeSingle();
+      leadId = leadByPhone?.id || null;
+    }
+  }
+
+  // Final fallback: WhatsApp session ids encode the phone (wa_meta_<phone>).
+  // Bulletproof resolver when booking.phone is somehow empty.
+  if (!leadId && externalSessionId && externalSessionId.startsWith('wa_')) {
+    const sidPhone = externalSessionId.replace(/\D/g, '').slice(-10);
+    if (sidPhone.length === 10) {
+      const { data: leadBySid } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('customer_phone_normalized', sidPhone)
+        .maybeSingle();
+      leadId = leadBySid?.id || null;
+    }
+  }
+
   if (leadId) {
     const unifiedContext = {
       [channel]: {
         conversation_summary: cleanSummary(sessionData?.conversation_summary || currentSession?.conversation_summary) || null,
         booking_status: booking.status ?? 'Call Booked',
         booking_date: booking.date,
-        booking_time: booking.time,
+        booking_time: toTime24(booking.time),
+        // When the booking was MADE (IST). Lets the snapshot window "demos
+        // booked today" precisely instead of falling back to lead creation.
+        booking_created_at: getISTTimestamp(),
         booking_meet_link: booking.meetLink || null,
         booking_title: booking.title || null,
         user_inputs: sessionData?.user_inputs_summary || currentSession?.user_inputs_summary || [],
@@ -357,21 +426,36 @@ export async function storeBooking(
       },
     };
 
-    await client
+    // all_leads has NO scalar booking_date/booking_time columns — the booking
+    // lives in unified_context.<channel>.booking_date (set in mergedCtx above),
+    // which is exactly what the dashboard/pipeline/score routes read. Previously
+    // this update also set booking_date/booking_time, and because those columns
+    // don't exist Supabase rejected the ENTIRE update — so unified_context never
+    // got written and the booking silently vanished (agent said "Done", nothing
+    // saved). The error wasn't even checked. Persist via unified_context only.
+    const { error: leadUpdateError } = await client
       .from('all_leads')
       .update({
         unified_context: mergedCtx,
-        booking_date: booking.date,
-        booking_time: booking.time,
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
         metadata: { ...existingLeadMeta, ...mergedMetadata },
       })
       .eq('id', leadId);
 
+    // THROW on a failed persist so the caller (book_consultation) knows the
+    // booking did NOT save and can return success:false — otherwise the agent
+    // confirms "recorded" while nothing was stored.
+    if (leadUpdateError) {
+      console.error('[bookingManager] Failed to persist booking to all_leads', { leadId, error: leadUpdateError });
+      throw new Error(`Failed to persist booking to all_leads: ${leadUpdateError.message || leadUpdateError}`);
+    }
     console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
-    console.error('[bookingManager] Could not find lead_id to save booking — data may be lost', { externalSessionId, channel });
+    // No lead resolved despite phone + sessionId fallbacks — the booking cannot
+    // be saved. THROW so the agent does not falsely confirm it.
+    console.error('[bookingManager] CRITICAL: could not resolve lead for booking', { externalSessionId, channel, phone: booking.phone });
+    throw new Error('Could not resolve a lead to save the booking');
   }
 }
 
@@ -381,17 +465,83 @@ export async function storeBooking(
  * Check available calendar slots for a given date
  * Returns array of time slots with availability status
  */
-export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
+/** Normalize a stored booking_time ("4:00 PM", "16:00", "16:00:00") to "HH:MM" 24h. */
+function toTime24(t: string): string {
+  const s = (t || '').trim();
+  const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const p = ampm[3].toUpperCase();
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${ampm[2]}`;
+  }
+  const hm = s.match(/^(\d{1,2}):(\d{2})/);
+  return hm ? `${hm[1].padStart(2, '0')}:${hm[2]}` : s;
+}
+
+/**
+ * Slots already taken by an EXISTING booking on this date (any lead, any channel).
+ * Google Calendar free/busy is not a reliable conflict source here (it's often
+ * unconfigured, which made every slot "available" and allowed two leads to book
+ * the same time). We check our own DB instead.
+ */
+async function getBookedTime24sForDate(dateStr: string): Promise<Set<string>> {
+  const taken = new Set<string>();
+  const client = getServiceClient() || getClient();
+  if (!client) return taken;
+  try {
+    const { data: leads } = await client
+      .from('all_leads')
+      .select('unified_context')
+      .not('unified_context', 'is', null);
+    for (const l of (leads || []) as Array<{ unified_context: any }>) {
+      const uc = l.unified_context || {};
+      for (const ch of ['web', 'whatsapp', 'voice']) {
+        const c = uc[ch] || {};
+        const bd = c.booking_date || c.booking?.date;
+        const bt = c.booking_time || c.booking?.time;
+        if (bd === dateStr && bt) taken.add(toTime24(String(bt)));
+      }
+    }
+    const { data: sess } = await client
+      .from('web_sessions')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+    for (const s of (sess || []) as Array<{ booking_time: string | null }>) {
+      if (s.booking_time) taken.add(toTime24(String(s.booking_time)));
+    }
+  } catch (e) {
+    console.error('[bookingManager] getBookedTime24sForDate failed', e);
+  }
+  return taken;
+}
+
+export async function getAvailableSlots(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
+  const dateStr = date.split('T')[0];
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  if (dayOfWeek === 0) return [];
+
+  // Drop slots already in the past when the requested date is today (IST).
+  const allowedSlots = getBookableSlotStartsForDate(dateStr, sessionType);
+  if (allowedSlots.length === 0) return [];
+
+  // DB-level conflict check — a slot already booked by ANY lead is unavailable.
+  // This is what prevents two customers being booked into the same time.
+  const bookedTimes = await getBookedTime24sForDate(dateStr);
+
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!hasCredentials) {
-    // Return all slots as available when credentials are not configured
-    return AVAILABLE_SLOTS.map(slot => ({
+    // No calendar configured — availability is driven purely by existing DB bookings.
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
-      available: true,
+      available: !bookedTimes.has(slot),
       displayTime: formatTimeForDisplay(slot),
     }));
   }
@@ -401,7 +551,6 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
     const auth = await getGoogleCalendarAuth();
     const calendar = google.calendar({ version: 'v3', auth });
 
-    const dateStr = date.split('T')[0];
     const startOfDayUTC = new Date(`${dateStr}T00:00:00+05:30`).toISOString();
     const endOfDayUTC = new Date(`${dateStr}T23:59:59+05:30`).toISOString();
 
@@ -416,7 +565,7 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
 
     const events = response.data.items || [];
 
-    return AVAILABLE_SLOTS.map(slot => {
+    return allowedSlots.map(slot => {
       const [hour, minute] = slot.split(':').map(Number);
       const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
       const slotEnd = new Date(`${dateStr}T${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
@@ -445,27 +594,28 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
       return {
         time: formatTimeForDisplay(slot),
         time24: slot,
-        available: !hasConflict,
+        available: !hasConflict && !bookedTimes.has(slot),
         displayTime: formatTimeForDisplay(slot),
       };
     });
   } catch (error) {
     console.error('[bookingManager] Google Calendar check failed, falling back to Supabase', error);
     // Fallback: check Supabase for existing bookings on this date
-    return checkAvailabilityFromSupabase(date);
+    return checkAvailabilityFromSupabase(date, sessionType);
   }
 }
 
 /**
  * Fallback: check availability from Supabase bookings when Google Calendar is unavailable
  */
-async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> {
+async function checkAvailabilityFromSupabase(date: string, sessionType?: string | null): Promise<TimeSlot[]> {
+  const allowedSlots = getBookableSlotStartsForDate(date.split('T')[0], sessionType);
   try {
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !supabaseKey) {
-      return AVAILABLE_SLOTS.map(slot => ({
+      return allowedSlots.map(slot => ({
         time: formatTimeForDisplay(slot),
         time24: slot,
         available: true,
@@ -502,7 +652,7 @@ async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> 
 
     console.log(`[bookingManager] Supabase fallback: ${bookedTimes.size} booked slots on ${dateStr}:`, Array.from(bookedTimes));
 
-    return AVAILABLE_SLOTS.map(slot => ({
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: !bookedTimes.has(slot),
@@ -510,7 +660,7 @@ async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> 
     }));
   } catch (err) {
     console.error('[bookingManager] Supabase availability check failed', err);
-    return AVAILABLE_SLOTS.map(slot => ({
+    return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: true,
@@ -542,6 +692,7 @@ export async function createCalendarEvent(booking: {
     const calendar = google.calendar({ version: 'v3', auth });
 
     const dateStr = booking.date.split('T')[0];
+    const sessionType = normalizeBookingSessionType(booking.sessionType);
 
     // Parse time
     let hour: number, minute: number;
@@ -552,6 +703,16 @@ export async function createCalendarEvent(booking: {
       minute = m;
     } else {
       [hour, minute] = booking.time.split(':').map(Number);
+    }
+
+    const bookingTime24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    if (!isAllowedBookingTime(bookingTime24, sessionType)) {
+      console.error('[bookingManager] Refusing booking outside allowed window', {
+        date: dateStr,
+        time: bookingTime24,
+        sessionType,
+      });
+      return null;
     }
 
     const eventStart = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`;
@@ -569,19 +730,17 @@ export async function createCalendarEvent(booking: {
         ? courseNameMap[booking.courseInterest.toLowerCase()]
         : booking.courseInterest || 'Aviation Course Inquiry';
 
-    // Event title — use AI-generated title if provided, otherwise auto-generate
+    // Event title - use AI-generated title if provided, otherwise auto-generate
     let eventTitle: string;
     if (booking.title) {
       eventTitle = booking.title;
     } else {
       eventTitle = `${booking.name} - ${courseDisplayName}`;
-      if (booking.sessionType) {
-        const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
-        eventTitle += ` [${label}]`;
-      }
+      const label = sessionType === 'offline' ? 'Facility Visit' : 'Online';
+      eventTitle += ` [${label}]`;
     }
 
-    // Description — brand-aware
+    // Description - brand-aware
     const brandName = (() => {
       try {
         const { getBrandConfig, getCurrentBrandId } = require('@/configs');
@@ -594,10 +753,8 @@ export async function createCalendarEvent(booking: {
     if (courseDisplayName !== 'Aviation Course Inquiry') {
       description += `Course Interest: ${courseDisplayName}\n\n`;
     }
-    if (booking.sessionType) {
-      const display = booking.sessionType === 'offline' ? 'Offline / Facility Visit' : 'Online Session';
-      description += `Session Type: ${display}\n\n`;
-    }
+    const display = sessionType === 'offline' ? 'Offline / Facility Visit' : 'Online Session';
+    description += `Session Type: ${display}\n\n`;
     if (booking.conversationSummary) {
       description += `Conversation Summary:\n${booking.conversationSummary}\n\n`;
     }
@@ -608,18 +765,19 @@ export async function createCalendarEvent(booking: {
       !booking.email.includes('noemail@') &&
       booking.email.includes('@');
 
+    // Service accounts can only create Hangouts Meet conferences on Google
+    // Workspace calendars (with Domain-Wide Delegation). On a personal Gmail
+    // calendar (CALENDAR_ID ends in @gmail.com) the events.insert call throws
+    // and we lose the whole event. Skip conferenceData for Gmail calendars and
+    // include a Meet link in the description manually if you need one.
+    const isPersonalGmailCalendar = /@gmail\.com$/i.test(CALENDAR_ID || '')
+
     const event: any = {
       summary: eventTitle,
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
-      conferenceData: {
-        createRequest: {
-          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          conferenceSolutionKey: { type: 'hangoutsMeet' },
-        },
-      },
-      // No attendees — service account lacks Domain-Wide Delegation; customers get details via WhatsApp
+      // No attendees - service account lacks Domain-Wide Delegation; customers get details via WhatsApp
       reminders: {
         useDefault: false,
         overrides: [
@@ -629,16 +787,27 @@ export async function createCalendarEvent(booking: {
       },
     };
 
-    if (booking.sessionType === 'offline') {
+    if (!isPersonalGmailCalendar) {
+      event.conferenceData = {
+        createRequest: {
+          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      }
+    }
+
+    if (sessionType === 'offline') {
       event.location = `${brandName} Facility`;
-    } else if (booking.sessionType === 'online') {
+    } else if (sessionType === 'online') {
       event.location = 'Online Session (Video Call)';
     }
 
     const createdEvent = await calendar.events.insert({
       calendarId: CALENDAR_ID,
       requestBody: event,
-      conferenceDataVersion: 1,
+      // Only request conference creation on Workspace calendars; harmless to
+      // pass on Gmail but keeps the call clean.
+      ...(isPersonalGmailCalendar ? {} : { conferenceDataVersion: 1 }),
     });
 
     if (!createdEvent?.data?.id) return null;
@@ -658,4 +827,102 @@ export async function createCalendarEvent(booking: {
     console.error('[bookingManager] Failed to create calendar event', error);
     return null;
   }
+}
+
+/**
+ * Delete a Google Calendar event by id. Returns true on success (or if the
+ * event is already gone — 404/410). Best-effort; never throws.
+ */
+export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+  if (!eventId) return false;
+  try {
+    const { google } = await import('googleapis');
+    const auth = await getGoogleCalendarAuth();
+    const calendar = google.calendar({ version: 'v3', auth });
+    await calendar.events.delete({ calendarId: CALENDAR_ID, eventId });
+    console.log('[bookingManager] Deleted calendar event', eventId);
+    return true;
+  } catch (error: any) {
+    const code = error?.code || error?.response?.status;
+    if (code === 404 || code === 410) {
+      console.warn('[bookingManager] Calendar event already gone', eventId);
+      return true;
+    }
+    console.error('[bookingManager] Failed to delete calendar event', eventId, error?.message || error);
+    return false;
+  }
+}
+
+/**
+ * Cancel a lead's booking completely:
+ *   1. Delete the Google Calendar event (if we have its id).
+ *   2. Clear the booking from unified_context.<channel> (status → cancelled,
+ *      date/time nulled) so it drops out of Upcoming / pipeline.
+ *   3. Clear booking columns on web_sessions (the only session table with them).
+ *   4. Cancel pending booking_reminder_24h / _30m tasks so no reminder fires.
+ *
+ * Used by the dashboard "Cancel booking" action and the agent's cancel_booking
+ * tool. Best-effort per step; returns what happened.
+ */
+export async function cancelBooking(
+  leadId: string,
+  supabase: SupabaseClient,
+): Promise<{ ok: boolean; calendarDeleted: boolean; remindersCancelled: number; error?: string }> {
+  const { data: lead, error } = await supabase
+    .from('all_leads')
+    .select('unified_context, metadata')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (error || !lead) {
+    return { ok: false, calendarDeleted: false, remindersCancelled: 0, error: 'Lead not found' };
+  }
+
+  const uc: Record<string, any> = lead.unified_context || {};
+  const meta: Record<string, any> = lead.metadata || {};
+
+  // Resolve the calendar event id from any place it might live.
+  const eventId =
+    meta.googleEventId || meta.google_event_id ||
+    uc.web?.booking?.eventId || uc.web?.google_event_id ||
+    uc.whatsapp?.booking?.eventId || uc.whatsapp?.google_event_id ||
+    uc.voice?.booking?.eventId || uc.social?.booking?.eventId || null;
+
+  let calendarDeleted = false;
+  if (eventId) calendarDeleted = await deleteCalendarEvent(eventId);
+
+  // Clear the booking from every channel block.
+  const newUc: Record<string, any> = { ...uc };
+  for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
+    const blk = newUc[ch];
+    if (blk && (blk.booking_date || blk.booking)) {
+      newUc[ch] = {
+        ...blk,
+        booking_status: 'cancelled',
+        booking_date: null,
+        booking_time: null,
+        booking_cancelled_at: getISTTimestamp(),
+        ...(blk.booking ? { booking: { ...blk.booking, status: 'cancelled', date: null, time: null } } : {}),
+      };
+    }
+  }
+  await supabase.from('all_leads').update({ unified_context: newUc }).eq('id', leadId);
+
+  // web_sessions is the only session table with booking columns — clear it too
+  // so founder-metrics' session-booking fallback doesn't resurrect it.
+  await supabase
+    .from('web_sessions')
+    .update({ booking_date: null, booking_time: null, booking_status: 'cancelled' })
+    .eq('lead_id', leadId)
+    .then(({ error: e }) => { if (e) console.warn('[cancelBooking] web_sessions clear failed:', e.message); });
+
+  // Cancel pending reminder tasks.
+  const { count } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'cancelled', completed_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('lead_id', leadId)
+    .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
+    .in('status', ['pending', 'queued', 'awaiting_approval']);
+
+  console.log(`[cancelBooking] lead=${leadId} calendarDeleted=${calendarDeleted} remindersCancelled=${count ?? 0}`);
+  return { ok: true, calendarDeleted, remindersCancelled: count ?? 0 };
 }

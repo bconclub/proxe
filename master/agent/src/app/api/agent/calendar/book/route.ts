@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/calendar/book — Create a booking + Google Calendar event
+ * POST /api/agent/calendar/book - Create a booking + Google Calendar event
  *
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/calendar/book/route.ts.
@@ -17,6 +17,9 @@ import {
   getClient,
   formatDate,
   formatTimeForDisplay,
+  getAvailableSlots,
+  isAllowedBookingTime,
+  normalizeBookingSessionType,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +36,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       courseInterest,
       sessionType,
-      brand = 'windchasers',
+      brand = 'bcon',
       checkOnly = false,
     } = body;
 
@@ -60,6 +63,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedSessionType = normalizeBookingSessionType(sessionType);
+    if (!isAllowedBookingTime(time, normalizedSessionType)) {
+      return NextResponse.json(
+        { error: `Selected time is outside Windchasers ${normalizedSessionType} booking hours.` },
+        { status: 400 },
+      );
+    }
+
     const supabase = getServiceClient() || getClient();
 
     // Check for existing booking
@@ -76,13 +87,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const slots = await getAvailableSlots(date, normalizedSessionType);
+    const matchingSlot = slots.find((slot) => {
+      const display = formatTimeForDisplay(slot.time24);
+      return slot.time24 === time || display === time;
+    });
+
+    if (!matchingSlot?.available) {
+      return NextResponse.json(
+        { error: 'Selected time is no longer available on Google Calendar.' },
+        { status: 409 },
+      );
+    }
+
     // Check credentials
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+      console.error('[agent/calendar/book] Missing Google Service Account credentials');
       return NextResponse.json(
         { error: 'Google Calendar credentials not configured' },
         { status: 503 },
       );
     }
+
+    // Log and validate GOOGLE_CALENDAR_ID
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
+    console.log('[agent/calendar/book] Using calendar ID:', calendarId, '(from env:', !!process.env.GOOGLE_CALENDAR_ID, ')');
 
     // Create Google Calendar event
     const calendarResult = await createCalendarEvent({
@@ -92,7 +121,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       courseInterest,
-      sessionType,
+      sessionType: normalizedSessionType,
     });
 
     if (!calendarResult) {
@@ -116,14 +145,14 @@ export async function POST(request: NextRequest) {
             email,
             phone,
             courseInterest,
-            sessionType,
+            sessionType: normalizedSessionType,
           },
           'web',
           supabase,
         );
       } catch (storeError) {
         console.error('[agent/calendar/book] Failed to save booking to DB:', storeError);
-        // Don't fail — calendar event was created successfully
+        // Don't fail - calendar event was created successfully
       }
     }
 

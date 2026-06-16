@@ -1,5 +1,5 @@
 /**
- * services/conversationLogger.ts — Message logging + summary management
+ * services/conversationLogger.ts - Message logging + summary management
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  *   - addUserInput()      (lines 1067-1175)
@@ -264,21 +264,23 @@ export async function fetchSummary(
 
 /**
  * Log a message to the conversations table (used by Dashboard Inbox)
- * Requires leadId — use leadManager.ensureOrUpdateLead() first
+ * Requires leadId - use leadManager.ensureOrUpdateLead() first
  */
 export async function logMessage(
-  leadId: string,
+  leadId: string | null,
   channel: Channel,
   sender: 'customer' | 'agent' | 'system',
   content: string,
   messageType: string = 'text',
   metadata: any = {},
   supabase?: SupabaseClient | null,
-  deliveryStatus?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null,
-  statusError?: string | null,
 ): Promise<any | null> {
-  if (!leadId || !content) {
-    console.log('[conversationLogger] Missing leadId or content, skipping');
+  // leadId is optional — anonymous web-chat sessions log conversations
+  // without a lead until the visitor identifies themselves. The
+  // conversations.lead_id column is nullable; the session_id stored in
+  // metadata is the linking key for those rows.
+  if (!content) {
+    console.log('[conversationLogger] Missing content, skipping');
     return null;
   }
 
@@ -289,9 +291,8 @@ export async function logMessage(
   }
 
   const cleanedContent = stripHTML(content);
-  const now = new Date().toISOString();
 
-  const insertData: any = {
+  const insertData = {
     lead_id: leadId,
     channel: channel,
     sender: sender,
@@ -299,33 +300,27 @@ export async function logMessage(
     message_type: messageType,
     metadata: {
       ...metadata,
-      logged_at: now,
+      logged_at: new Date().toISOString(),
       topic: 'chat',
       extension: channel,
-      ...(deliveryStatus ? { delivery_status: deliveryStatus } : {}),
     },
   };
 
-  // Add delivery status columns if provided (WhatsApp tracking)
-  if (deliveryStatus) {
-    insertData.delivery_status = deliveryStatus;
-    insertData.status_updated_at = now;
-  }
-  if (statusError) {
-    insertData.status_error = statusError;
-  }
-
   try {
-    // Verify lead exists (foreign key constraint)
-    const { data: leadCheck } = await client
-      .from('all_leads')
-      .select('id')
-      .eq('id', leadId)
-      .maybeSingle();
+    // Verify lead exists when leadId is provided. Anonymous chats (leadId=null)
+    // skip the check — the conversations.lead_id column is nullable and the FK
+    // only fires for non-null values.
+    if (leadId) {
+      const { data: leadCheck } = await client
+        .from('all_leads')
+        .select('id')
+        .eq('id', leadId)
+        .maybeSingle();
 
-    if (!leadCheck) {
-      console.error('[conversationLogger] Lead does not exist', { leadId });
-      return null;
+      if (!leadCheck) {
+        console.error('[conversationLogger] Lead does not exist', { leadId });
+        return null;
+      }
     }
 
     const { data, error } = await client
@@ -344,7 +339,7 @@ export async function logMessage(
       });
 
       if (error.code === '23503') {
-        console.error('[conversationLogger] Foreign key constraint — lead_id not in all_leads');
+        console.error('[conversationLogger] Foreign key constraint - lead_id not in all_leads');
       }
       return null;
     }
