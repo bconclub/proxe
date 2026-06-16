@@ -313,6 +313,10 @@ export async function GET(request: NextRequest) {
       const created = new Date(lead.created_at)
       return (now.getTime() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000
     }).length
+    const totalLeads1D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 24 * 60 * 60 * 1000
+    }).length
 
     // Per-period deltas: this period vs the PRIOR equal-length period, so each
     // toggle (7D/14D/30D) shows its own real change (not one reused 7-day number).
@@ -331,9 +335,11 @@ export async function GET(request: NextRequest) {
     // PRIMARY: Count unique lead_ids from conversations table (all platforms)
     // This is the most accurate count since it tracks every real conversation
     const uniqueLeadIds = new Set<string>()
+    const uniqueLeadIds1D = new Set<string>()
     const uniqueLeadIds7D = new Set<string>()
     const uniqueLeadIds14D = new Set<string>()
     const uniqueLeadIds30D = new Set<string>()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
     if (messages && messages.length > 0) {
       messages.forEach((msg: any) => {
@@ -344,10 +350,12 @@ export async function GET(request: NextRequest) {
         if (msgDate >= thirtyDaysAgo) uniqueLeadIds30D.add(msg.lead_id)
         if (msgDate >= fourteenDaysAgo) uniqueLeadIds14D.add(msg.lead_id)
         if (msgDate >= sevenDaysAgo) uniqueLeadIds7D.add(msg.lead_id)
+        if (msgDate >= oneDayAgo) uniqueLeadIds1D.add(msg.lead_id)
       })
     }
 
     // Use conversations table counts (primary), fall back to session counts if empty
+    const conversations1D = uniqueLeadIds1D.size
     let conversations7D = uniqueLeadIds7D.size || uniqueConversations7D
     let conversations14D = uniqueLeadIds14D.size || uniqueConversations14D
     let conversations30D = uniqueLeadIds30D.size || uniqueConversations30D
@@ -1126,6 +1134,7 @@ export async function GET(request: NextRequest) {
       return (now.getTime() - lastActive.getTime()) <= days * 24 * 60 * 60 * 1000
     }
     const engagedLeadsCount = engagedLeadsList.length
+    const engagedLeads1D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 1))
     const engagedLeads7D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 7))
     const engagedLeads14D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 14))
     const engagedLeads30D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 30))
@@ -1139,6 +1148,10 @@ export async function GET(request: NextRequest) {
       return score >= 40 && score < 70
     }
     const warmLeadsList = safeLeads.filter(isWarmLead)
+    const warmLeads1D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 1)
+    })
     const warmLeads7D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
       return isActiveWithinDays(lead, 7)
@@ -1528,6 +1541,7 @@ export async function GET(request: NextRequest) {
       },
       totalConversations: {
         total: totalConversationsCount,
+        count1D: conversations1D,
         count7D: conversations7D,
         count14D: conversations14D,
         count30D: conversations30D,
@@ -1537,6 +1551,7 @@ export async function GET(request: NextRequest) {
       },
       totalLeads: {
         count: totalLeadsCount,
+        count1D: totalLeads1D,
         count7D: totalLeads7D,
         count14D: totalLeads14D,
         count30D: totalLeads30D,
@@ -1548,6 +1563,7 @@ export async function GET(request: NextRequest) {
       },
       engagedLeads: {
         count: engagedLeadsCount,
+        count1D: engagedLeads1D.length,
         count7D: engagedLeads7D.length,
         count14D: engagedLeads14D.length,
         count30D: engagedLeads30D.length,
@@ -1557,6 +1573,7 @@ export async function GET(request: NextRequest) {
       },
       warmLeads: {
         count: warmLeadsList.length,
+        count1D: warmLeads1D.length,
         count7D: warmLeads7D.length,
         count14D: warmLeads14D.length,
         count30D: warmLeads30D.length,

@@ -233,12 +233,11 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
         style={{
           // Floating: stacked beneath the snapshot "eye" button. Inline: sits in
           // the dashboard top bar (no fixed positioning).
-          ...(inline ? {} : { top: '54px', right: '20px' }),
+          ...(inline
+            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
+            : { top: '54px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           width: '36px',
           height: '36px',
-          backgroundColor: 'var(--button-bg)',
-          border: '1px solid var(--border-primary)',
-          color: 'var(--text-button)',
         }}
         aria-label="Notifications"
         title="Notifications"

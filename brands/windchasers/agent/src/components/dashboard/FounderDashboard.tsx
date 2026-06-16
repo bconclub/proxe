@@ -21,10 +21,10 @@ type TimeFilter = 'All' | '7D' | '14D' | '30D'
 
 interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
-  totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
-  totalLeads: { count: number; count7D: number; count14D: number; count30D: number; change7D?: number; change14D?: number; change30D?: number; fromConversations: number; conversionRate: number }
-  engagedLeads: { count: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
-  warmLeads: { count: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
+  totalConversations: { total: number; count1D?: number; count7D: number; count14D: number; count30D: number; trend7D: number; trend14D: number; trend30D: number }
+  totalLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; change7D?: number; change14D?: number; change30D?: number; fromConversations: number; conversionRate: number }
+  engagedLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
+  warmLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{
     id: string
@@ -108,10 +108,10 @@ export default function FounderDashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
 
-  // Global date-range for the top bar — drives the Conversations Trend (founder:
-  // "in the last 7 days or last 14 days we can quickly click there"). KPI cards
-  // keep their own behaviour for now per the founder's "keep the cards as is".
-  const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
+  // Global date-range for the top bar — drives the volume KPI cards (New Leads,
+  // Engaged) + Conversations Trend (founder: "the whole thing should change based
+  // on that"). Default 30 days ("let it start from 30 days").
+  const [range, setRange] = useState<'Today' | '7D' | '14D' | '30D'>('30D')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -339,15 +339,24 @@ export default function FounderDashboard() {
   // Use the real per-day conversation series (distinct leads messaged/day) — the
   // old trends.conversations.data was session-based and came back ~flat. The
   // series follows the top-bar range so the trend reacts to 7D / 14D / 30D.
-  const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
-  const convSeries = (metrics.trendSeries?.conversations?.[range]?.length
-    ? metrics.trendSeries.conversations[range]
+  const rangeDays = range === 'Today' ? 1 : range === '14D' ? 14 : range === '30D' ? 30 : 7
+  const rangeLabel = range === 'Today' ? 'today' : `last ${rangeDays} days`
+  // Pick a per-range value from the API's count1D / count7D / 14D / 30D fields.
+  const pickCount = (o?: { count1D?: number; count7D: number; count14D: number; count30D: number }) =>
+    !o ? 0 : range === 'Today' ? (o.count1D ?? 0) : range === '14D' ? o.count14D : range === '30D' ? o.count30D : o.count7D
+  // Trend chart: a single-day "Today" line is meaningless, so show the 7-day
+  // context line for Today; the headline numbers below still reflect today.
+  const seriesKey: '7D' | '14D' | '30D' = range === 'Today' ? '7D' : range
+  const convSeries = (metrics.trendSeries?.conversations?.[seriesKey]?.length
+    ? metrics.trendSeries.conversations[seriesKey]
     : metrics.trends?.conversations?.data) || []
-  const convTotal = convSeries.length
-    ? convSeries.reduce((a, b) => a + (b.value || 0), 0)
-    : metrics.totalConversations.total
-  const dailyAvg = convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0
-  const convChange = range === '14D'
+  const convTotal = range === 'Today'
+    ? (metrics.totalConversations.count1D ?? 0)
+    : (convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total)
+  const dailyAvg = range === 'Today'
+    ? convTotal
+    : (convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0)
+  const convChange = range === 'Today' ? undefined : range === '14D'
     ? metrics.totalConversations.trend14D
     : range === '30D'
       ? metrics.totalConversations.trend30D
@@ -367,12 +376,11 @@ export default function FounderDashboard() {
           <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
             Welcome back, {firstName} <span aria-hidden>👋</span>
           </h1>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Here&apos;s what&apos;s happening across your pipeline</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Global date-range quick toggle */}
           <div className="hidden sm:flex items-center rounded-lg border p-0.5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-            {(['7D', '14D', '30D'] as const).map((r) => (
+            {(['Today', '7D', '14D', '30D'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
@@ -381,7 +389,7 @@ export default function FounderDashboard() {
                   ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
                   : { backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
               >
-                {r === '7D' ? '7 Days' : r === '14D' ? '14 Days' : '30 Days'}
+                {r === 'Today' ? 'Today' : r === '7D' ? '7 Days' : r === '14D' ? '14 Days' : '30 Days'}
               </button>
             ))}
           </div>
@@ -438,13 +446,13 @@ export default function FounderDashboard() {
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
-        <NewLeadsCard metrics={metrics} onOpen={() => router.push('/dashboard/leads')} />
+        <NewLeadsCard metrics={metrics} range={range} rangeLabel={rangeLabel} value={pickCount(metrics.totalLeads)} onOpen={() => router.push('/dashboard/leads')} />
         <KpiCard
           icon={<MdPeople size={15} />} iconColor="#22c55e"
           label="Engaged Leads"
-          value={metrics.engagedLeads?.count ?? 0}
+          value={pickCount(metrics.engagedLeads)}
           sparkData={metrics.trends?.leads?.data} sparkColor="#22c55e"
-          sub={total > 0 ? `of ${total} total leads` : 'engaged'}
+          sub={total > 0 ? `${rangeLabel} · of ${total} total leads` : 'engaged'}
           onClick={() => router.push('/dashboard/leads?filter=engaged')}
         />
         {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
@@ -485,8 +493,11 @@ export default function FounderDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
         <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
+            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>All-time</span>
+          </div>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Current pipeline snapshot — how leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub="top of funnel" />
@@ -621,7 +632,7 @@ export default function FounderDashboard() {
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
               <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>Last {rangeDays} days</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{rangeLabel}</span>
           </div>
           <div className="flex-1 min-h-[120px]">
             {convSeries.length > 1 ? (
@@ -712,41 +723,28 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
   )
 }
 
-// New Leads KPI with an inline period toggle (7D / 14D / 30D / All). Clicking the
-// number opens the leads list; the pills swap the count without leaving the page.
-function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: () => void }) {
-  const [period, setPeriod] = useState<'7D' | '14D' | '30D' | 'All'>('7D')
+// New Leads KPI — driven by the global top-bar range (Today / 7D / 14D / 30D).
+// Clicking the number opens the leads list.
+function NewLeadsCard({ metrics, range, rangeLabel, value, onOpen }: {
+  metrics: FounderMetrics
+  range: 'Today' | '7D' | '14D' | '30D'
+  rangeLabel: string
+  value: number
+  onOpen: () => void
+}) {
   const tl = metrics.totalLeads
-  const value = period === '7D' ? tl.count7D : period === '14D' ? tl.count14D : period === '30D' ? tl.count30D : tl.count
-  // Per-period change (vs the prior equal-length window). 'All' has no comparison.
-  const change = period === '7D' ? tl.change7D : period === '14D' ? tl.change14D : period === '30D' ? tl.change30D : undefined
-  const periods: Array<'7D' | '14D' | '30D' | 'All'> = ['7D', '14D', '30D', 'All']
+  // Per-window change vs the prior equal window (Today has no comparison yet).
+  const change = range === '7D' ? tl.change7D : range === '14D' ? tl.change14D : range === '30D' ? tl.change30D : undefined
   const spark = metrics.trends?.leads?.data
 
   return (
     <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdPeople size={15} /></span>
-          <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>New Leads</span>
-        </div>
-        <div className="flex items-center gap-0.5">
-          {periods.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setPeriod(p) }}
-              className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
-              style={{ color: period === p ? '#3B82F6' : 'var(--text-muted)', backgroundColor: period === p ? 'rgba(59,130,246,0.14)' : 'transparent' }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdPeople size={15} /></span>
+        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>New Leads</span>
       </div>
       <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={onOpen}>
         <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</span>
-        {/* Real per-period change (this window vs the prior equal window). */}
         {change != null && <KpiDelta change={change} />}
       </div>
       {spark && spark.length > 1 ? (
@@ -756,9 +754,7 @@ function NewLeadsCard({ metrics, onOpen }: { metrics: FounderMetrics; onOpen: ()
       ) : (
         <div style={{ height: 30 }} />
       )}
-      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-        {period === 'All' ? 'all time' : `last ${period.replace('D', ' days')}`}
-      </span>
+      <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{rangeLabel}</span>
     </div>
   )
 }

@@ -82,12 +82,11 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
         onClick={() => setOpen(true)}
         className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full hover:opacity-90 transition`}
         style={{
-          ...(inline ? {} : { top: '14px', right: '20px' }),
+          ...(inline
+            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
+            : { top: '14px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           width: '36px',
           height: '36px',
-          backgroundColor: 'var(--button-bg)',
-          border: '1px solid var(--border-primary)',
-          color: 'var(--text-button)',
         }}
         aria-label="Open today's snapshot"
         title="Today's snapshot"

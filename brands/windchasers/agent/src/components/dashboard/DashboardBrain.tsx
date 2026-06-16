@@ -186,12 +186,11 @@ export default function DashboardBrain({ inline = false }: { inline?: boolean })
         onClick={() => setOpen(true)}
         className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
         style={{
-          ...(inline ? {} : { top: '94px', right: '20px' }),
+          ...(inline
+            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
+            : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           width: '36px',
           height: '36px',
-          backgroundColor: 'var(--button-bg)',
-          color: 'var(--text-button)',
-          border: '1px solid var(--border-primary)',
         }}
         aria-label="Ask PROXe"
         title="Ask PROXe"
