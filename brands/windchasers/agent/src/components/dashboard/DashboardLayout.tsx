@@ -932,8 +932,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
 
         {/* Page content */}
-        {pathname === '/dashboard/inbox' ? (
-          <main className="dashboard-layout-main-content-wrapper flex-1" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+        {/* Home (/dashboard) + inbox render in a NON-scrolling full-height main
+            so the home page fits exactly one viewport (founder: "one VH completely").
+            FounderDashboard handles its own padding + internal scroll. */}
+        {pathname === '/dashboard/inbox' || pathname === '/dashboard' ? (
+          <main className="dashboard-layout-main-content-wrapper flex-1 min-h-0" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
             {children}
           </main>
         ) : (

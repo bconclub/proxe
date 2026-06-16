@@ -299,14 +299,14 @@ export default function FounderDashboard() {
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 p-4 sm:p-6 min-h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
       {/* Floating controls — home page only */}
       <TodaySnapshotButton />
       <NotificationCenter />
       <DashboardBrain />
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
         <NewLeadsCard metrics={metrics} onOpen={() => router.push('/dashboard/leads')} />
         <KpiCard
           icon={<MdPeople size={15} />} iconColor="#22c55e"
@@ -358,9 +358,9 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
@@ -378,14 +378,14 @@ export default function FounderDashboard() {
         </section>
 
         {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-          <div className="flex items-center justify-between gap-3 mb-3">
+        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
               View all <MdArrowForward size={13} />
             </button>
           </div>
-          <div className="flex-1 space-y-2.5">
+          <div className="flex-1 space-y-2.5 overflow-y-auto min-h-0">
             {metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.slice(0, 5).map((booking) => (
                 <button
@@ -425,9 +425,9 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
@@ -438,7 +438,7 @@ export default function FounderDashboard() {
             </button>
           </div>
           {metrics.leadsNeedingAttention.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto flex-1 min-h-0">
               <table className="min-w-full text-left">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
@@ -491,8 +491,8 @@ export default function FounderDashboard() {
         </section>
 
         {/* Conversations Trend */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-          <div className="flex items-center justify-between gap-3 mb-3">
+        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
             <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>7D</span>
           </div>
