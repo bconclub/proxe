@@ -31,6 +31,9 @@ import {
   fetchCustomerContext,
   fetchSummary,
   normalizePhone,
+  sendWhatsAppInteractiveButtons,
+  findQuickReplyFor,
+  extractButtonsFromLLMResponse,
   type AttributionSignal,
 } from '@/lib/services';
 
@@ -96,6 +99,31 @@ async function sendWhatsAppReply(to: string, message: string): Promise<string | 
     console.error('[meta/webhook] Failed to send reply:', err);
     return null;
   }
+}
+
+/**
+ * Send either an interactive quick-reply button message (when 1-3 button labels
+ * are supplied) or a plain text reply. Mirrors the Windchasers webhook: reuses
+ * the shared sendWhatsAppInteractiveButtons sender and falls back to plain text
+ * if the interactive send fails. Returns the WA message ID on success.
+ */
+async function sendReplyMaybeButtons(
+  to: string,
+  message: string,
+  buttons?: string[],
+): Promise<string | null> {
+  if (buttons && buttons.length > 0) {
+    const result = await sendWhatsAppInteractiveButtons(to, message, buttons);
+    if (result.success) {
+      return result.messageId || null;
+    }
+    console.error(
+      '[meta/webhook] Interactive send failed for', to,
+      '- falling back to text:', result.error,
+    );
+    return sendWhatsAppReply(to, message);
+  }
+  return sendWhatsAppReply(to, message);
 }
 
 /** Mark a message as "read" so the customer sees blue ticks */
@@ -174,14 +202,28 @@ export async function POST(request: NextRequest) {
 
     // Process each message (usually just one)
     for (const msg of messages) {
-      // Only handle text messages for now
-      if (msg.type !== 'text') {
-        console.log(`[meta/webhook] Skipping non-text message type: ${msg.type}`);
+      // Resolve the inbound text. Plain text messages carry it in text.body.
+      // When a customer TAPS a quick-reply button, Meta echoes the label back as
+      // a button / interactive message — we extract that label so it flows
+      // through as the next "message", and flag it so we don't re-fire another
+      // quick-reply menu on it (that would loop).
+      let messageText: string | undefined;
+      let isCustomerButtonTap = false;
+      if (msg.type === 'text') {
+        messageText = msg.text?.body;
+      } else if (msg.type === 'button') {
+        messageText = msg.button?.text || msg.button?.payload;
+        isCustomerButtonTap = true;
+      } else if (msg.type === 'interactive') {
+        const inter = msg.interactive || {};
+        messageText = inter.button_reply?.title || inter.list_reply?.title;
+        isCustomerButtonTap = true;
+      } else {
+        console.log(`[meta/webhook] Skipping unsupported message type: ${msg.type}`);
         continue;
       }
 
       const customerPhone = msg.from; // e.g. "919876543210"
-      const messageText = msg.text?.body;
       const whatsappMessageId = msg.id;
       const timestamp = msg.timestamp;
       // Sanitize the WhatsApp display name before greeting/DB write — Meta
@@ -216,6 +258,7 @@ export async function POST(request: NextRequest) {
         whatsappMessageId,
         timestamp,
         brand,
+        isCustomerButtonTap,
         // Click-to-WhatsApp ad referral (present only on the first message from
         // an ad click). Carries the marketing source for attribution.
         referral: msg.referral || null,
@@ -398,6 +441,8 @@ interface IncomingMessage {
   whatsappMessageId: string;
   timestamp: string;
   brand: string;
+  /** True when this inbound is the customer tapping a quick-reply button (label echo). */
+  isCustomerButtonTap?: boolean;
   /**
    * Click-to-WhatsApp ad referral (Meta sends this on the FIRST message after
    * an ad click): { source_url, source_id, source_type, headline, body,
@@ -414,6 +459,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     whatsappMessageId,
     timestamp,
     brand,
+    isCustomerButtonTap,
     referral,
   } = msg;
 
@@ -552,6 +598,43 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
     console.log(`[meta/webhook] lead=${leadId} messageCount=${userMessageCount} historyLen=${conversationHistory.length}`);
 
+    // 6b. QUICK-REPLY SHORT-CIRCUIT (deterministic, no LLM).
+    // For SHORT inbound messages (<= 4 words) that match a keyword trigger, send
+    // a pre-defined interactive button message instead of calling Claude —
+    // faster + deterministic. Skipped for button TAPS (the echoed label would
+    // otherwise re-fire a menu and loop). The customer message is already logged
+    // above; here we send + log the quick reply and return early.
+    if (!isCustomerButtonTap) {
+      const quickReply = findQuickReplyFor(messageText);
+      if (quickReply) {
+        console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);
+        const waReplyId = await sendReplyMaybeButtons(
+          customerPhone,
+          quickReply.body,
+          quickReply.buttons,
+        );
+        if (waReplyId) {
+          updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
+        }
+        await logMessage(
+          leadId,
+          'whatsapp',
+          'agent',
+          quickReply.body,
+          'text',
+          {
+            session_id: sessionId,
+            quick_reply_trigger: quickReply.triggerKey,
+            quick_reply_buttons: quickReply.buttons,
+            source: 'meta_cloud_api',
+            wa_message_id: waReplyId || undefined,
+          },
+          supabase,
+        );
+        return;
+      }
+    }
+
     // 7. Build AgentInput and generate AI response
     const agentInput: AgentInput = {
       channel: 'whatsapp',
@@ -577,8 +660,20 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 8. Send reply via Meta Graph API (send first to get WA message ID)
-    const waReplyId = await sendWhatsAppReply(customerPhone, result.response);
+    // 8. Send reply via Meta Graph API (send first to get WA message ID).
+    // Strip any [BTN: X] markers Claude may have appended (the prompt teaches it
+    // to emit these when 2-3 distinct options apply). If found, route as an
+    // interactive button message; otherwise plain text.
+    const { text: cleanedText, buttons: llmButtons } = extractButtonsFromLLMResponse(result.response);
+    const responseTextToSend = cleanedText || result.response;
+    if (llmButtons.length > 0) {
+      console.log(`[meta/webhook] LLM emitted ${llmButtons.length} buttons: [${llmButtons.join(',')}] lead=${leadId}`);
+    }
+    const waReplyId = await sendReplyMaybeButtons(
+      customerPhone,
+      responseTextToSend,
+      llmButtons.length > 0 ? llmButtons : undefined,
+    );
     if (!waReplyId) {
       console.error('[meta/webhook] Failed to send reply to', customerPhone);
     } else {
@@ -591,7 +686,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       leadId,
       'whatsapp',
       'agent',
-      result.response,
+      responseTextToSend,
       'text',
       {
         session_id: sessionId,
@@ -600,6 +695,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         source: 'meta_cloud_api',
         input_to_output_gap_ms: responseTimeMs,
         wa_message_id: waReplyId || undefined,
+        ...(llmButtons.length > 0 ? { quick_reply_buttons: llmButtons, quick_reply_trigger: 'llm_extracted' } : {}),
       },
       supabase,
     );
