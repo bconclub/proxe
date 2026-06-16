@@ -114,6 +114,8 @@ export default function FounderDashboard() {
   // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
   const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
+  // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
+  const [engineRange, setEngineRange] = useState<'All' | '7D' | '14D'>('All')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -338,6 +340,14 @@ export default function FounderDashboard() {
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
+  // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
+  // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
+  // range in the metrics yet).
+  const engTotal = engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
+  const engEngaged = engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
+  const engWarm = engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
+  const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
   // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
   const tc = metrics.totalConversations
@@ -522,16 +532,25 @@ export default function FounderDashboard() {
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
         <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
-            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>All-time</span>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['All', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setEngineRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: engineRange === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: engineRange === p ? 'var(--accent-subtle)' : 'transparent' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Current pipeline snapshot — how leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub="top of funnel" />
-            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engTotal} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engEngaged} label="Engaged" sub={engPct(engEngaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engWarm} label="Warm" sub={engPct(engWarm)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
             <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
           </div>
