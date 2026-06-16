@@ -661,7 +661,7 @@ export default function FounderDashboard() {
               ))}
             </div>
           </div>
-          <div className="flex-1 min-h-[180px]">
+          <div className="flex-1 min-h-0">
             {convSeries.length > 1 ? (
               <ConversationsTrendChart data={convSeries} days={rangeDays} color="#afd510" />
             ) : (
