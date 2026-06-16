@@ -2905,7 +2905,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         })),
                         ...activities
                           .filter(activity => {
-                            if (activity.type !== 'team' && activity.type !== 'proxe') return false
+                            // Notes tab is HUMAN-ONLY. Automation / agent (proxe)
+                            // entries belong in the Activity tab, never here — the
+                            // founder only wants what a person actually wrote, with
+                            // their name + note type.
+                            if (activity.type !== 'team') return false
+                            if (activity.icon === 'automation' || activity.actor === 'PROXe') return false
                             if (!activity.content) return false
                             const key = `${activity.content}|${activity.timestamp || ''}`
                             return !adminNoteKeys.has(key)
