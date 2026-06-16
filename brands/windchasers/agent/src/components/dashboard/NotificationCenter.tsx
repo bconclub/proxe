@@ -113,6 +113,17 @@ export default function NotificationCenter() {
   const seenAtRef = useRef<string>('1970-01-01T00:00:00.000Z')
   const mutedRef = useRef(false)
 
+  // Reveal toasts ONE AT A TIME with a slide-in stagger, instead of dropping
+  // them all in at once (founder: "the notification has to come one by one
+  // slide in"). Each item appears ~600ms after the previous.
+  const enqueueToasts = useCallback((items: NotificationEvent[]) => {
+    items.forEach((t, i) => {
+      setTimeout(() => {
+        setToasts((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev].slice(0, 3)))
+      }, i * 600)
+    })
+  }, [])
+
   // Load persisted prefs (mute + last-seen). Sounds are owned by the shared
   // sound-prefs helper, which also honours the per-event Configure toggles.
   useEffect(() => {
@@ -154,7 +165,7 @@ export default function NotificationCenter() {
         const seenAt = new Date(seenAtRef.current).getTime()
         const missed = incoming.filter((e) => new Date(e.timestamp).getTime() > seenAt)
         if (missed.length > 0) {
-          setToasts(missed.slice(0, 2))
+          enqueueToasts(missed.slice(0, 3))
           playSound(missed.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
         }
         return
@@ -166,7 +177,7 @@ export default function NotificationCenter() {
         // Only ever surface the latest TWO as toasts — newest on top. Anything
         // beyond that lives behind the "View all notifications" button. Keeps
         // the corner stack from blasting 3-4 cards at once.
-        setToasts((prev) => [...fresh.slice(0, 2), ...prev].slice(0, 2))
+        enqueueToasts(fresh.slice(0, 3))
         // New leads take sound priority over plain updates.
         playSound(fresh.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
       }
@@ -334,7 +345,7 @@ export default function NotificationCenter() {
           Narrow + clean (reference panel was too wide). */}
       {toasts.length > 0 && (
         <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', width: '340px', maxWidth: 'calc(100vw - 32px)' }}>
-          {toasts.slice(0, 2).map((t) => {
+          {toasts.slice(0, 3).map((t) => {
             const v = eventVisual(t)
             const chan = channelLabel(t.channel)
             return (
