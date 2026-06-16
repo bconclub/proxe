@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-16 19:05 IST · Windchasers home: fix click-through on Upcoming Events + Priority Queue
+
+- **Bug fix — clicking a lead opened nothing:** `openLeadModal` selected a non-existent `all_leads.status` column, so the query 400'd (`42703 column does not exist`) and silently returned. Dropped `status` from the select (added `metadata`, which exists). Clicking an Upcoming Event or Priority Lead Queue row now opens that lead's detail modal.
+- User-facing: Upcoming Events and Priority Lead Queue rows are now clickable and take you to the lead.
+
 ## 2026-06-16 18:40 IST · Windchasers home: fix Active Conversations (conversations fetch cap), redefine Leads Recovered, per-card toggles
 
 - **Bug fix — Active Conversations always 0:** the founder-metrics conversations query fetched ascending with no date filter, so PostgREST's 1000-row cap returned the 1000 *oldest* rows and no recent activity. Now paginates the most-recent ~45 days newest-first, so 24h / 7d / 14d / 30d counts are accurate (live data: 153 conversations in last 24h, 1854 in last 7d).

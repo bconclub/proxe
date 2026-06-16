@@ -219,7 +219,7 @@ export default function FounderDashboard() {
       const supabase = createClient()
       const { data: lead, error } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, status')
+        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, metadata')
         .eq('id', leadId)
         .single()
 
