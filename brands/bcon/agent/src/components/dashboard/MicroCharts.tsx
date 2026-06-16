@@ -1,6 +1,6 @@
 'use client'
 
-import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
+import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, CartesianGrid, XAxis, YAxis, LabelList } from 'recharts'
 
 // Helper to get theme accent color
 const getAccentColor = () => {
@@ -397,5 +397,75 @@ export function RadialProgress({
       {/* Label below circle - hidden when empty */}
       {label && <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>{label}</p>}
     </div>
+  )
+}
+
+export function ConversationsTrendChart({ data, color, days, animate = true }: {
+  data: Array<{ value: number }>,
+  color?: string,
+  days?: number,
+  animate?: boolean,
+}) {
+  const stroke = color || getAccentColor()
+  const n = data.length
+  const today = new Date()
+  const chartData = data.map((d, i) => {
+    const dt = new Date(today)
+    dt.setDate(dt.getDate() - (n - 1 - i))
+    return { label: `${dt.getDate()} ${dt.toLocaleString('en-US', { month: 'short' })}`, value: d.value }
+  })
+  const max = Math.max(...data.map((d) => d.value), 1)
+  const niceMax = Math.max(5, Math.ceil(max / 20) * 20)
+  const yTicks = [0, niceMax / 4, niceMax / 2, (niceMax * 3) / 4, niceMax]
+  // Per-point value labels only read cleanly when the points are sparse (≈ a
+  // week); for 14/30-day ranges they'd collide, so drop them and thin the axis.
+  const showLabels = n <= 10
+  const xInterval = n <= 8 ? 0 : Math.max(1, Math.floor(n / 7))
+  const gradientId = `convgrad-${stroke.replace(/[^a-zA-Z0-9]/g, '')}`
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 22, right: 14, bottom: 2, left: -6 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity={0.22} />
+            <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} stroke="var(--border-primary)" strokeOpacity={0.6} />
+        <XAxis
+          dataKey="label"
+          interval={xInterval}
+          tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
+          tickLine={false}
+          axisLine={false}
+          dy={4}
+        />
+        <YAxis
+          scale="sqrt"
+          domain={[0, niceMax]}
+          ticks={yTicks}
+          tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
+          tickLine={false}
+          axisLine={false}
+          width={32}
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke={stroke}
+          strokeWidth={2}
+          fill={`url(#${gradientId})`}
+          dot={{ r: 2.5, fill: stroke, strokeWidth: 0 }}
+          activeDot={{ r: 4 }}
+          isAnimationActive={animate}
+          style={{ filter: `drop-shadow(0 0 3px ${stroke}66)` }}
+        >
+          {showLabels && (
+            <LabelList dataKey="value" position="top" offset={8} fill="var(--text-primary)" style={{ fontSize: 9, fontWeight: 600 }} />
+          )}
+        </Area>
+      </AreaChart>
+    </ResponsiveContainer>
   )
 }

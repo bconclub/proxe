@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdSchedule, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -13,6 +13,7 @@ import type { Lead } from '@/types'
 import {
   Sparkline,
   ActivityArea,
+  ConversationsTrendChart,
   RadialProgress,
 } from './MicroCharts'
 
@@ -108,9 +109,12 @@ export default function FounderDashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
 
-  // Global date-range for the top bar — drives the volume KPI cards + the
-  // Conversations Trend. Default 30 days.
-  const [range, setRange] = useState<'Today' | '7D' | '14D' | '30D'>('30D')
+  // Per-card date ranges (founder: "put the toggle inside the cards, as we used
+  // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
+  const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
+  // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
+  const [engineRange, setEngineRange] = useState<'All' | '7D' | '14D'>('All')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -217,7 +221,7 @@ export default function FounderDashboard() {
       const supabase = createClient()
       const { data: lead, error } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, status')
+        .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_score, lead_stage, sub_stage, unified_context, first_touchpoint, last_touchpoint, metadata')
         .eq('id', leadId)
         .single()
 
@@ -275,14 +279,15 @@ export default function FounderDashboard() {
   const getInitials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
 
-  // Intent label from score.
+  // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
   const intentFor = (score: number): { label: string; color: string; bg: string } => {
     if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
     if (score >= 50) return { label: 'Comparing', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
     return { label: 'Needs follow-up', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
-  // Recommended next step derived from the lead's stage.
+  // Recommended next step derived from the lead's stage (Phase-1 heuristic;
+  // a later phase wires the real agent_tasks "next action").
   const nextStepFor = (stage: string): string => {
     const s = (stage || '').toLowerCase()
     if (s.includes('booking')) return 'Confirm the slot'
@@ -329,26 +334,34 @@ export default function FounderDashboard() {
     )
   }
 
-  // ── Derived values for the layout ─────────────────────────────────────────
+  // ── Derived values for the mockup layout ──────────────────────────────────
   const rm = metrics.radialMetrics
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
-  const rangeDays = range === 'Today' ? 1 : range === '14D' ? 14 : range === '30D' ? 30 : 7
-  const rangeLabel = range === 'Today' ? 'today' : `last ${rangeDays} days`
-  // A single-day "Today" line is meaningless, so show the 7-day context line for
-  // Today; the headline numbers below still reflect today.
-  const seriesKey: '7D' | '14D' | '30D' = range === 'Today' ? '7D' : range
-  const convSeries = (metrics.trendSeries?.conversations?.[seriesKey]?.length
-    ? metrics.trendSeries.conversations[seriesKey]
+  // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
+  // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
+  // range in the metrics yet).
+  const engTotal = engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
+  const engEngaged = engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
+  const engWarm = engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
+  const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
+  const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
+  // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
+  // with conversation activity in the window.
+  const tc = metrics.totalConversations
+  const acValue = acRange === '7D' ? tc.count7D : acRange === '14D' ? tc.count14D : (tc.count1D ?? 0)
+  const acLabel = acRange === 'Today' ? 'in the last 24 hours' : acRange === '7D' ? 'in the last 7 days' : 'in the last 14 days'
+  // Conversations Trend — its own toggle (7d / 14d / 30d). Real per-day series
+  // (distinct leads messaged/day); old trends.conversations.data came back ~flat.
+  const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
+  const rangeLabel = `last ${rangeDays} days`
+  const convSeries = (metrics.trendSeries?.conversations?.[range]?.length
+    ? metrics.trendSeries.conversations[range]
     : metrics.trends?.conversations?.data) || []
-  const convTotal = range === 'Today'
-    ? (metrics.totalConversations.count1D ?? 0)
-    : (convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total)
-  const dailyAvg = range === 'Today'
-    ? convTotal
-    : (convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0)
-  const convChange = range === 'Today' ? undefined : range === '14D'
+  const convTotal = convSeries.length ? convSeries.reduce((a, b) => a + (b.value || 0), 0) : metrics.totalConversations.total
+  const dailyAvg = convSeries.length ? Math.round((convTotal / convSeries.length) * 10) / 10 : 0
+  const convChange = range === '14D'
     ? metrics.totalConversations.trend14D
     : range === '30D'
       ? metrics.totalConversations.trend30D
@@ -356,12 +369,25 @@ export default function FounderDashboard() {
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
   const firstName = displayName.split(' ')[0] || 'Founder'
   const profileInitials = getInitials(displayName)
-  // Booked calls/events + share of total leads.
+  // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
+      {/* Subtle bento entrance — cards fade + rise in, lightly staggered. Plays
+          once on mount (DOM persists across the 60s metric refresh, so it doesn't
+          replay). Respects reduced-motion. */}
+      <style>{`
+        @keyframes wcBentoIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: no-preference) {
+          .wc-bento > * { animation: wcBentoIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+          .wc-bento > *:nth-child(2) { animation-delay: 0.05s; }
+          .wc-bento > *:nth-child(3) { animation-delay: 0.10s; }
+          .wc-bento > *:nth-child(4) { animation-delay: 0.15s; }
+          .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
+        }
+      `}</style>
       {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
       <header className="flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
@@ -370,22 +396,7 @@ export default function FounderDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Global date-range quick toggle */}
-          <div className="hidden sm:flex items-center rounded-lg border p-0.5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-            {(['Today', '7D', '14D', '30D'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
-                style={range === r
-                  ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
-                  : { backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
-              >
-                {r === 'Today' ? 'Today' : r === '7D' ? '7 Days' : r === '14D' ? '14 Days' : '30 Days'}
-              </button>
-            ))}
-          </div>
-          {/* Controls cluster (eye / bell) — hosted in the bar */}
+          {/* Controls cluster (eye / bell / Ask PROXe) — now hosted in the bar */}
           <TodaySnapshotButton inline />
           <NotificationCenter inline />
           {/* Profile menu */}
@@ -393,7 +404,7 @@ export default function FounderDashboard() {
             <button
               onClick={() => setProfileOpen((o) => !o)}
               className="flex items-center gap-1 rounded-full pl-1 pr-1.5 py-1 border transition-colors hover:opacity-90"
-              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
               aria-haspopup="menu"
               aria-expanded={profileOpen}
               title={user?.email || 'Account'}
@@ -404,7 +415,7 @@ export default function FounderDashboard() {
               <MdArrowDropDown size={18} style={{ color: 'var(--text-secondary)' }} />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
+              <div className="absolute right-0 mt-2 rounded-xl border shadow-lg py-1 z-[65]" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minWidth: 220 }}>
                 <div className="px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Signed in as</div>
                   <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }} title={user?.email}>{displayName}</div>
@@ -436,29 +447,58 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
-        {/* Card 1 — Active Conversations: chats with activity in the last 24h. */}
+      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
+        {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>Active Conversations</span>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['Today', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={(e) => { e.stopPropagation(); setAcRange(p) }}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: acRange === p ? '#3B82F6' : 'var(--text-muted)', backgroundColor: acRange === p ? 'rgba(59,130,246,0.14)' : 'transparent' }}
+                >
+                  {p === 'Today' ? '24h' : p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
+            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{acValue}</span>
+          </div>
+          {(() => {
+            // Sparkline tracks the selected window (Today shows the 7-day context).
+            const acSeries = metrics.trendSeries?.conversations?.[acRange === 'Today' ? '7D' : acRange]
+            return acSeries && acSeries.length > 1 ? (
+              <div className="w-full mt-2" style={{ height: 30 }}>
+                <Sparkline data={acSeries} color="#3B82F6" height={30} showGradient />
+              </div>
+            ) : (
+              <div style={{ height: 30 }} />
+            )
+          })()}
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
+        </div>
+        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
         <KpiCard
-          icon={<MdChatBubble size={15} />} iconColor="#3B82F6"
-          label="Active Conversations"
-          value={metrics.totalConversations.count1D ?? 0}
-          sparkData={metrics.trendSeries?.conversations?.['7D']} sparkColor="#3B82F6"
-          sub="in the last 24 hours"
-          onClick={() => router.push('/dashboard/inbox')}
-        />
-        {/* Card 2 — Leads Recovered: went cold/lost and were brought back. */}
-        <KpiCard
-          icon={<MdRefresh size={15} />} iconColor="#22c55e"
-          label="Leads Recovered"
-          value={metrics.leadsRecovered?.count ?? 0}
-          sparkColor="#22c55e"
-          sub="followed up & brought back"
-          onClick={() => router.push('/dashboard/leads')}
+          icon={<MdLocalFireDepartment size={15} />} iconColor="#ef4444"
+          label="High Intent Leads"
+          value={metrics.hotLeads?.count ?? 0}
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#ef4444"
+          sub="flagged high-intent by PROXe"
+          onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
         {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><MdFavorite size={15} /></span>
+            {(() => {
+              const hc = metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'
+              return <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${hc}1f`, color: hc }}><MdFavorite size={15} /></span>
+            })()}
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
           </div>
           <div className="flex items-center justify-between mt-1">
@@ -477,7 +517,7 @@ export default function FounderDashboard() {
           value={bookedVal}
           delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
           sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
-          sub={bookedPctOfLeads}
+          sub="vs last 7 days"
           onClick={() => router.push('/dashboard/bookings')}
         />
         <KpiCard
@@ -490,19 +530,28 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 sm:p-6 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-          <div className="flex items-center gap-2">
+        <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
-            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>All-time</span>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['All', '7D', '14D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setEngineRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: engineRange === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: engineRange === p ? 'var(--accent-subtle)' : 'transparent' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Current pipeline snapshot — how leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub="top of funnel" />
-            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engTotal} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engEngaged} label="Engaged" sub={engPct(engEngaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engWarm} label="Warm" sub={engPct(engWarm)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
             <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={flow.booked || 0} label="Booked" sub="This week" last />
           </div>
@@ -513,14 +562,14 @@ export default function FounderDashboard() {
         </section>
 
         {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
               View all <MdArrowForward size={13} />
             </button>
           </div>
-          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0">
+          <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
             {metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.map((booking) => (
                 <button
@@ -534,26 +583,36 @@ export default function FounderDashboard() {
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name + countdown chip */}
+                    {/* Line 1 — name + countdown. When there's no event title, the
+                        date + owner ride on this same line to keep it one row. */}
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                        {!booking.title && (
+                          <>
+                            <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap shrink-0" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                          </>
+                        )}
+                      </div>
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
                         {formatCountdown(booking.datetime)}
                       </span>
                     </div>
-                    {/* Line 2 — event heading */}
+                    {/* Titled events expand: heading, then date + owner chips. */}
                     {booking.title && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                      <>
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                            {formatBookingWhen(booking.datetime)}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                            {booking.owner?.name ? booking.owner.name : 'Unassigned'}
+                          </span>
+                        </div>
+                      </>
                     )}
-                    {/* Line 3 — when + owner chips */}
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                        {formatBookingWhen(booking.datetime)}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                        {booking.owner?.name ? booking.owner.name : 'Unassigned'}
-                      </span>
-                    </div>
                   </div>
                 </button>
               ))
@@ -565,9 +624,9 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
@@ -631,22 +690,32 @@ export default function FounderDashboard() {
         </section>
 
         {/* Conversations Trend */}
-        <section className="xl:col-span-5 rounded-xl p-4 sm:p-5 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
               <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{rangeLabel}</span>
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(['7D', '14D', '30D'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setRange(p)}
+                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                  style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex-1 min-h-[120px]">
+          <div className="flex-1 min-h-0">
             {convSeries.length > 1 ? (
-              <ActivityArea data={convSeries.map((d, i) => ({ time: String(i), value: d.value }))} color="var(--accent-primary)" />
+              <ConversationsTrendChart data={convSeries} days={rangeDays} color="var(--accent-primary)" />
             ) : (
               <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+          <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
             <div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
@@ -676,7 +745,7 @@ export default function FounderDashboard() {
   )
 }
 
-// ── Home-page building blocks ──────────────────────────────────────────────
+// ── Home-page building blocks (mockup layout) ──────────────────────────────
 
 function KpiDelta({ change, goodWhenUp = true, suffix = '%' }: { change?: number; goodWhenUp?: boolean; suffix?: string }) {
   if (change == null || !isFinite(change) || change === 0) return null
@@ -706,7 +775,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+      style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
