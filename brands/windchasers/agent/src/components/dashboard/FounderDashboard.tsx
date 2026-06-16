@@ -472,7 +472,7 @@ export default function FounderDashboard() {
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 7%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 22%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 4%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 14%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
@@ -508,15 +508,15 @@ export default function FounderDashboard() {
         </div>
         {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
         <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor="#ef4444"
+          icon={<MdLocalFireDepartment size={15} />} iconColor="#22c55e"
           label="High Intent Leads"
           value={metrics.hotLeads?.count ?? 0}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#ef4444"
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#22c55e"
           sub="flagged high-intent by PROXe"
           onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
         {/* Follow-up Health — status + ring; whole card follows the status colour. */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{metrics.responseHealth.status === 'good' ? <MdFavorite size={15} /> : metrics.responseHealth.status === 'warning' ? <MdWarning size={15} /> : <MdWarning size={15} />}</span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
@@ -606,10 +606,13 @@ export default function FounderDashboard() {
                     {/* Line 1 — name · date · owner, with the recency-coloured
                         countdown chip on the right (only thing that's coloured). */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-[13px] font-semibold truncate shrink-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                        <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
-                        <span className="text-[9px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>· {booking.owner?.name || 'Unassigned'}</span>
+                      <div className="flex items-baseline gap-2.5 min-w-0">
+                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                        <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                          <span>{formatBookingWhen(booking.datetime)}</span>
+                          <span style={{ opacity: 0.4 }}>·</span>
+                          <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                        </span>
                       </div>
                       {(() => { const t = countdownTint(booking.datetime); return (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
@@ -783,7 +786,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
