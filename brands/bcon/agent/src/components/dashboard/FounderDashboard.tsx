@@ -260,6 +260,14 @@ export default function FounderDashboard() {
     }
   }
 
+  // Recency tint for the countdown chip only: closer = blue, mid = amber, far = muted.
+  const countdownTint = (datetime: string): { bg: string; color: string } => {
+    const h = (new Date(datetime).getTime() - Date.now()) / 3_600_000
+    if (h <= 24) return { bg: 'rgba(59,130,246,0.18)', color: '#60a5fa' }
+    if (h <= 72) return { bg: 'rgba(245,158,11,0.18)', color: '#fbbf24' }
+    return { bg: 'var(--bg-tertiary)', color: 'var(--text-muted)' }
+  }
+
   const formatCountdown = (datetime: string) => {
     const bookingDate = new Date(datetime)
     const now = new Date()
@@ -369,6 +377,11 @@ export default function FounderDashboard() {
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
   const firstName = displayName.split(' ')[0] || 'Founder'
   const profileInitials = getInitials(displayName)
+  // Time-of-day greeting in IST (shifts morning/afternoon/evening/night).
+  const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
+  const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
+  // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
+  const healthColor = metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'
   // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
@@ -392,12 +405,13 @@ export default function FounderDashboard() {
       <header className="flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
-            Welcome back, {firstName} <span aria-hidden>👋</span>
+            {greeting}, {firstName} <span aria-hidden>👋</span>
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Controls cluster (eye / bell / Ask PROXe) — now hosted in the bar */}
-          <TodaySnapshotButton inline />
+          {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
+              icon on the right next to the profile. */}
+          <TodaySnapshotButton inline label="Snapshot" />
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
@@ -449,7 +463,7 @@ export default function FounderDashboard() {
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 7%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 22%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
@@ -492,13 +506,10 @@ export default function FounderDashboard() {
           sub="flagged high-intent by PROXe"
           onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
-        {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        {/* Follow-up Health — status + ring; whole card follows the status colour. */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
-            {(() => {
-              const hc = metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'
-              return <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${hc}1f`, color: hc }}><MdFavorite size={15} /></span>
-            })()}
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{metrics.responseHealth.status === 'good' ? <MdFavorite size={15} /> : metrics.responseHealth.status === 'warning' ? <MdWarning size={15} /> : <MdWarning size={15} />}</span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
           </div>
           <div className="flex items-center justify-between mt-1">
@@ -583,35 +594,23 @@ export default function FounderDashboard() {
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name + countdown. When there's no event title, the
-                        date + owner ride on this same line to keep it one row. */}
+                    {/* Line 1 — name · date · owner, with the recency-coloured
+                        countdown chip on the right (only thing that's coloured). */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                        {!booking.title && (
-                          <>
-                            <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap shrink-0" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
-                          </>
-                        )}
+                        <p className="text-[13px] font-semibold truncate shrink-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                        <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
+                        <span className="text-[9px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>· {booking.owner?.name || 'Unassigned'}</span>
                       </div>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
-                        {formatCountdown(booking.datetime)}
-                      </span>
+                      {(() => { const t = countdownTint(booking.datetime); return (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
+                          {formatCountdown(booking.datetime)}
+                        </span>
+                      ) })()}
                     </div>
-                    {/* Titled events expand: heading, then date + owner chips. */}
+                    {/* Line 2 — event title (only when present). No third line. */}
                     {booking.title && (
-                      <>
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                            {formatBookingWhen(booking.datetime)}
-                          </span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap" style={{ background: 'var(--bg-secondary)', color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                            {booking.owner?.name ? booking.owner.name : 'Unassigned'}
-                          </span>
-                        </div>
-                      </>
+                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
                     )}
                   </div>
                 </button>
@@ -775,7 +774,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>
