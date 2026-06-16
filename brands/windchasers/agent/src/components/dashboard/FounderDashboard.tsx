@@ -365,7 +365,7 @@ export default function FounderDashboard() {
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>How leads are moving through your follow-up engine</p>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub={metrics.trends?.leads?.change ? `${metrics.trends.leads.change > 0 ? '+' : ''}${Math.round(metrics.trends.leads.change)}%` : 'top of funnel'} />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={metrics.totalLeads?.count ?? 0} label="Total Leads" sub="top of funnel" />
             <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={metrics.engagedLeads?.count ?? flow.engaged} label="Engaged" sub={pct(metrics.engagedLeads?.count ?? flow.engaged)} />
             <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={metrics.warmLeads?.count ?? 0} label="Warm" sub={pct(metrics.warmLeads?.count ?? 0)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={metrics.staleLeads?.count ?? 0} label="Follow-up Due" sub={(metrics.staleLeads?.count ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
