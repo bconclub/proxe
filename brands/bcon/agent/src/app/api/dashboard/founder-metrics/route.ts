@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { cleanDisplayName } from '@/lib/services/utils'
+
+// Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
+// decorative junk so the dashboard reads as a professional B2B system. Falls back
+// to the raw trimmed value (then 'Unknown') if cleaning empties it.
+const dn = (raw?: string | null): string => {
+  const cleaned = cleanDisplayName(raw || '')
+  return cleaned || (raw || '').trim() || 'Unknown'
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +62,7 @@ export async function GET(request: NextRequest) {
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
       supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, created_at, first_touchpoint, last_touchpoint')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
         .order('lead_score', { ascending: false }),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       supabase
@@ -303,13 +312,19 @@ export async function GET(request: NextRequest) {
       const created = new Date(lead.created_at)
       return (now.getTime() - created.getTime()) <= 30 * 24 * 60 * 60 * 1000
     }).length
-    
+    const totalLeads1D = safeLeads.filter(lead => {
+      const created = new Date(lead.created_at)
+      return (now.getTime() - created.getTime()) <= 24 * 60 * 60 * 1000
+    }).length
+
     // PRIMARY: Count unique lead_ids from conversations table (all platforms)
     // This is the most accurate count since it tracks every real conversation
     const uniqueLeadIds = new Set<string>()
+    const uniqueLeadIds1D = new Set<string>()
     const uniqueLeadIds7D = new Set<string>()
     const uniqueLeadIds14D = new Set<string>()
     const uniqueLeadIds30D = new Set<string>()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
     if (messages && messages.length > 0) {
       messages.forEach((msg: any) => {
@@ -320,9 +335,12 @@ export async function GET(request: NextRequest) {
         if (msgDate >= thirtyDaysAgo) uniqueLeadIds30D.add(msg.lead_id)
         if (msgDate >= fourteenDaysAgo) uniqueLeadIds14D.add(msg.lead_id)
         if (msgDate >= sevenDaysAgo) uniqueLeadIds7D.add(msg.lead_id)
+        if (msgDate >= oneDayAgo) uniqueLeadIds1D.add(msg.lead_id)
       })
     }
 
+    // Active Conversations (24h): distinct leads messaged in the last day.
+    const conversations1D = uniqueLeadIds1D.size
     // Use conversations table counts (primary), fall back to session counts if empty
     let conversations7D = uniqueLeadIds7D.size || uniqueConversations7D
     let conversations14D = uniqueLeadIds14D.size || uniqueConversations14D
@@ -441,50 +459,65 @@ export async function GET(request: NextRequest) {
         return score > 0 && daysSinceInteraction < 14
       })
       .sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
-      .slice(0, 5)
+      .slice(0, 8)
       .map(lead => ({
         id: lead.id,
-        name: lead.customer_name || 'Unknown',
+        name: dn(lead.customer_name),
         score: lead.lead_score || 0,
         lastContact: lead.last_interaction_at || lead.created_at,
         stage: lead.lead_stage || 'New',
+        owner: lead.unified_context?.owner
+          ? {
+              name: lead.unified_context.owner.name || null,
+              email: lead.unified_context.owner.email || null,
+            }
+          : null,
+        channel: lead.last_touchpoint || lead.first_touchpoint || 'unknown',
       }))
 
-    // 6. Upcoming Bookings (next 10)
+    // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
+    // list matches the card countdown. One canonical IST parser fixes
+    // filter/sort/datetime (12h "4:00 PM" strings + missing-time fallback).
+    const parseBookingIST = (date: string | null, time: string | null): Date | null => {
+      if (!date) return null
+      let hhmm = '12:00'
+      const t = String(time || '').trim()
+      const ampm = t.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+      if (ampm) {
+        let h = parseInt(ampm[1], 10) % 12
+        if (/p/i.test(ampm[3])) h += 12
+        hhmm = `${String(h).padStart(2, '0')}:${ampm[2] || '00'}`
+      } else if (/^\d{1,2}:\d{2}/.test(t)) {
+        hhmm = t.slice(0, 5)
+      }
+      const d = new Date(`${date}T${hhmm}:00+05:30`)
+      return isNaN(d.getTime()) ? null : d
+    }
+
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
-        return { lead, bookingDate, bookingTime }
+        return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }
       })
-      .filter(({ bookingDate, bookingTime }) => {
-        if (!bookingDate) return false
-        try {
-          const bookingDateTime = new Date(`${bookingDate}T${bookingTime || '23:59:59'}`)
-          return bookingDateTime >= now && !isNaN(bookingDateTime.getTime())
-        } catch {
-          return false
-        }
-      })
-      .sort((a, b) => {
-        try {
-          const dateA = new Date(`${a.bookingDate}T${a.bookingTime || '12:00:00'}`)
-          const dateB = new Date(`${b.bookingDate}T${b.bookingTime || '12:00:00'}`)
-          return dateA.getTime() - dateB.getTime()
-        } catch {
-          return 0
-        }
-      })
+      .filter(({ dt }) => dt !== null && dt >= now)
+      .sort((a, b) => a.dt!.getTime() - b.dt!.getTime())
       .slice(0, 10)
-      .map(({ lead, bookingDate, bookingTime }) => {
+      .map(({ lead, bookingDate, bookingTime, dt }) => {
         const uc = lead.unified_context || {}
         const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
         return {
           id: lead.id,
-          name: lead.customer_name || 'Unknown',
+          name: dn(lead.customer_name),
           title,
           date: bookingDate,
           time: bookingTime,
-          datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}+05:30`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
+          datetime: dt!.toISOString(),
+          owner: lead.unified_context?.owner
+            ? {
+                name: lead.unified_context.owner.name || null,
+                email: lead.unified_context.owner.email || null,
+              }
+            : null,
         }
       })
 
@@ -1366,6 +1399,118 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime) }) // Round to whole ms
     }
 
+    // ============================================================================
+    // TREND SERIES — per-day series that follow the home top-bar range toggle
+    // (Today/7D/14D/30D). Conversations Trend reads trendSeries.conversations.
+    // ============================================================================
+    const periodWindows = {
+      All: null,
+      '7D': 7,
+      '14D': 14,
+      '30D': 30,
+    } as const
+
+    const allTrendDates = [
+      ...safeLeads.map((lead: any) => lead.created_at),
+      ...messages.map((msg: any) => msg.created_at),
+      ...safeWebSessions.map((session: any) => session.last_message_at || session.created_at),
+      ...safeWhatsappSessions.map((session: any) => session.last_message_at || session.created_at),
+    ].filter(Boolean)
+
+    const earliestTrendDate = allTrendDates.length > 0
+      ? new Date(Math.min(...allTrendDates.map((date: string) => new Date(date).getTime())))
+      : now
+
+    const getDayStart = (date: Date) => {
+      const day = new Date(date)
+      day.setHours(0, 0, 0, 0)
+      return day
+    }
+
+    const trendStartForPeriod = (period: keyof typeof periodWindows) => {
+      if (period === 'All') return getDayStart(earliestTrendDate)
+      const start = new Date(now)
+      start.setDate(start.getDate() - ((periodWindows[period] || 1) - 1))
+      return getDayStart(start)
+    }
+
+    const buildDailyTrend = (
+      period: keyof typeof periodWindows,
+      countForDay: (dayStart: Date, dayEnd: Date) => number,
+    ) => {
+      const values: Array<{ value: number }> = []
+      const cursor = trendStartForPeriod(period)
+      const end = getDayStart(now)
+
+      while (cursor <= end) {
+        const dayStart = new Date(cursor)
+        const dayEnd = new Date(cursor)
+        dayEnd.setDate(dayEnd.getDate() + 1)
+        values.push({ value: countForDay(dayStart, dayEnd) })
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      return values
+    }
+
+    const hasConversationMessages = messages.some((msg: any) => msg.lead_id && msg.sender !== 'system')
+    const countConversationsForDay = (dayStart: Date, dayEnd: Date) => {
+      if (hasConversationMessages) {
+        const leadIds = new Set<string>()
+        messages.forEach((msg: any) => {
+          if (!msg.lead_id || msg.sender === 'system') return
+          const msgDate = new Date(msg.created_at)
+          if (msgDate >= dayStart && msgDate < dayEnd) {
+            leadIds.add(msg.lead_id)
+          }
+        })
+        return leadIds.size
+      }
+
+      const countSessions = (sessions: any[]) => sessions.filter((session: any) => {
+        const activityAt = session.last_message_at || session.created_at
+        if (!activityAt) return false
+        const sessionDate = new Date(activityAt)
+        return sessionDate >= dayStart && sessionDate < dayEnd
+      }).length
+
+      return countSessions(safeWebSessions) + countSessions(safeWhatsappSessions)
+    }
+
+    const trendSeries = {
+      conversations: {
+        All: buildDailyTrend('All', countConversationsForDay),
+        '7D': buildDailyTrend('7D', countConversationsForDay),
+        '14D': buildDailyTrend('14D', countConversationsForDay),
+        '30D': buildDailyTrend('30D', countConversationsForDay),
+      },
+    }
+
+    // LEADS RECOVERED: distinct leads that went cold / lost / dormant and were
+    // brought BACK to an active stage — the core PROXe value (a follow-up, or a
+    // lead that drifted off and got re-engaged). Uses the full stage-transition
+    // history (not the recent-50 slice the activity feed uses).
+    let leadsRecoveredCount = 0
+    try {
+      const { data: allStageChanges } = await supabase
+        .from('lead_stage_changes')
+        .select('lead_id, old_stage, new_stage')
+        .order('created_at', { ascending: false })
+        .limit(5000)
+      const COLD = ['cold', 'lost', 'dormant', 'stale', 'nurture', 're-engage', 'reengage', 'in sequence', 'follow-up', 'followup', 'inactive', 'closed']
+      const ACTIVE = ['engaged', 'qualified', 'warm', 'high intent', 'booking', 'booked', 'demo', 'converted', 'interested', 'active', 'call done']
+      const lc = (s: string) => (s || '').toLowerCase()
+      const isCold = (s: string) => COLD.some(c => lc(s).includes(c))
+      const isActive = (s: string) => ACTIVE.some(a => lc(s).includes(a))
+      const recovered = new Set<string>()
+      ;(allStageChanges || []).forEach((c: any) => {
+        if (c.lead_id && isCold(c.old_stage) && isActive(c.new_stage)) recovered.add(c.lead_id)
+      })
+      leadsRecoveredCount = recovered.size
+    } catch {
+      // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1374,6 +1519,7 @@ export async function GET(request: NextRequest) {
       },
       totalConversations: {
         total: totalConversationsCount,
+        count1D: conversations1D,
         count7D: conversations7D,
         count14D: conversations14D,
         count30D: conversations30D,
@@ -1383,6 +1529,7 @@ export async function GET(request: NextRequest) {
       },
       totalLeads: {
         count: totalLeadsCount,
+        count1D: totalLeads1D,
         count7D: totalLeads7D,
         count14D: totalLeads14D,
         count30D: totalLeads30D,
@@ -1410,6 +1557,7 @@ export async function GET(request: NextRequest) {
         bookings: todayBookings.length,
         newLeads: todayNewLeads.length,
       },
+      leadsRecovered: { count: leadsRecoveredCount },
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
@@ -1436,6 +1584,7 @@ export async function GET(request: NextRequest) {
         hotLeads: { data: hotLeadsTrend, change: 0 }, // Daily hot leads count
         responseTime: { data: responseTimeTrend, change: responseTimeChange },
       },
+      trendSeries,
       // Upcoming bookings per day (next 7 days) for sparkline
       upcomingBookingsTrend: (() => {
         const upcomingTrend = []

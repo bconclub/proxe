@@ -84,7 +84,7 @@ function eventVisual(ev: { type: string; content: string; metadata?: any }): Vis
   return { Icon: MdArrowUpward, color: '#8B5CF6', kind: 'update', label: 'UPDATE' }
 }
 
-export default function NotificationCenter() {
+export default function NotificationCenter({ inline = false }: { inline?: boolean }) {
   const router = useRouter()
   const [events, setEvents] = useState<NotificationEvent[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -185,15 +185,13 @@ export default function NotificationCenter() {
       {/* Bell — fixed top-right, sits beneath the snapshot button. */}
       <button
         onClick={openDrawer}
-        className="fixed z-[60] flex items-center justify-center rounded-full shadow-lg transition hover:opacity-90"
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
         style={{
-          top: '54px',
-          right: '20px',
+          ...(inline
+            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
+            : { top: '54px', right: '20px', backgroundColor: '#3B82F6', border: '1px solid rgba(255,255,255,0.6)', color: '#ffffff' }),
           width: '36px',
           height: '36px',
-          backgroundColor: '#3B82F6',
-          border: '1px solid rgba(255,255,255,0.6)',
-          color: '#ffffff',
         }}
         aria-label="Notifications"
         title="Notifications"
