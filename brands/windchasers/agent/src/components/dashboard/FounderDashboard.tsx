@@ -457,14 +457,14 @@ export default function FounderDashboard() {
           )}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
-        {/* Card 2 — Leads Recovered: went cold/lost and were brought back. */}
+        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
         <KpiCard
-          icon={<MdRefresh size={15} />} iconColor="#22c55e"
-          label="Leads Recovered"
-          value={metrics.leadsRecovered?.count ?? 0}
-          sparkColor="#22c55e"
-          sub="followed up & brought back"
-          onClick={() => router.push('/dashboard/leads')}
+          icon={<MdLocalFireDepartment size={15} />} iconColor="#ef4444"
+          label="High Intent Leads"
+          value={metrics.hotLeads?.count ?? 0}
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#ef4444"
+          sub="flagged high-intent by PROXe"
+          onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
         {/* Follow-up Health — status + ring (also shows the reply/response rate) */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>

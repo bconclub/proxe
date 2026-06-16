@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-16 19:20 IST · Windchasers home: card 2 → High Intent Leads
+
+- Replaced the "Leads Recovered" card (low/redundant signal) with **High Intent Leads** = `hotLeads.count` (leads PROXe scored ≥ the hot threshold). Active Conversations and an engaged-today count were effectively the same set, so this surfaces a distinct, valuable number instead.
+- User-facing: top row now reads Active Conversations · High Intent Leads · Follow-up Health · Booked · Avg Response.
+
 ## 2026-06-16 19:05 IST · Windchasers home: fix click-through on Upcoming Events + Priority Queue
 
 - **Bug fix — clicking a lead opened nothing:** `openLeadModal` selected a non-existent `all_leads.status` column, so the query 400'd (`42703 column does not exist`) and silently returned. Dropped `status` from the select (added `metadata`, which exists). Clicking an Upcoming Event or Priority Lead Queue row now opens that lead's detail modal.
