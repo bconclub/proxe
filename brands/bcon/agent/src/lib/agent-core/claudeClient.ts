@@ -4,6 +4,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { recordTokenUsage, usageFrom, type TokenCategory } from '@/lib/token-usage';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -76,15 +77,30 @@ export async function* streamResponse(
     throw lastError || new Error('Failed to create stream after retries');
   }
 
-  for await (const chunk of stream) {
-    if (chunk.type === 'content_block_delta' &&
-        'delta' in chunk &&
-        chunk.delta?.type === 'text_delta') {
-      const text = chunk.delta.text || '';
-      if (text && typeof text === 'string') {
-        yield text;
+  // Capture token usage from the stream events so streaming chat is metered too
+  // (it was previously the one un-metered path). input_tokens arrive on
+  // message_start, output_tokens accumulate on message_delta.
+  let tuInput = 0;
+  let tuOutput = 0;
+  try {
+    for await (const chunk of stream) {
+      if (chunk.type === 'message_start') {
+        const u = chunk.message?.usage || {};
+        tuInput = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+      } else if (chunk.type === 'message_delta' && chunk.usage?.output_tokens != null) {
+        tuOutput = chunk.usage.output_tokens;
+      } else if (chunk.type === 'content_block_delta' &&
+          'delta' in chunk &&
+          chunk.delta?.type === 'text_delta') {
+        const text = chunk.delta.text || '';
+        if (text && typeof text === 'string') {
+          yield text;
+        }
       }
     }
+  } finally {
+    // Fires even if the consumer stops early — best-effort metering.
+    await recordTokenUsage('chat', model, tuInput, tuOutput);
   }
 }
 
@@ -95,10 +111,12 @@ export async function* streamResponse(
 export async function generateResponse(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens: number = 768
+  maxTokens: number = 768,
+  modelOverride?: string,
+  category: TokenCategory = 'chat'
 ): Promise<string> {
   const anthropic = getClient();
-  const model = getModel();
+  const model = modelOverride || getModel();
 
   // Retry logic
   const maxRetries = 3;
@@ -117,6 +135,9 @@ export async function generateResponse(
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
+
+      const { input, output } = usageFrom(response);
+      await recordTokenUsage(category, model, input, output);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {
@@ -163,7 +184,8 @@ export async function generateResponseWithTools(
   systemPrompt: string,
   userPrompt: string,
   toolOptions: ToolUseOptions,
-  maxTokens: number = 1024
+  maxTokens: number = 1024,
+  category: TokenCategory = 'chat'
 ): Promise<string> {
   const anthropic = getClient();
   const model = getModel();
@@ -204,6 +226,9 @@ export async function generateResponseWithTools(
     }
 
     if (!response) throw lastError || new Error('Failed after retries');
+
+    const { input: tuIn, output: tuOut } = usageFrom(response);
+    await recordTokenUsage(category, model, tuIn, tuOut);
 
     // Extract text from this response (may accompany tool_use blocks)
     const textBlocks = response.content.filter((b: any) => b.type === 'text');
@@ -282,6 +307,76 @@ export async function generateShort(
   return generateResponse(systemPrompt, userPrompt, maxTokens);
 }
 
+// ─── Vision: extract structured data from an image ────────────────────────────
+
+export type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+/**
+ * Send an image + a system/user prompt to Claude and return the raw text reply.
+ * Vision-capable models only (Haiku 4.5 / Sonnet / Opus all qualify). Used by
+ * the "add lead from screenshot" flow to read WhatsApp chats. Shares the same
+ * client + overloaded-retry logic as the text helpers above.
+ */
+export async function generateFromImage(
+  systemPrompt: string,
+  userPrompt: string,
+  imageBase64: string,
+  mediaType: VisionMediaType = 'image/png',
+  maxTokens: number = 1024
+): Promise<string> {
+  const anthropic = getClient();
+  const model = getModel();
+
+  const maxRetries = 3;
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+
+      const response = await (anthropic.messages.create as any)({
+        model,
+        max_tokens: maxTokens,
+        system: cacheable(systemPrompt),
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+              },
+              { type: 'text', text: userPrompt },
+            ],
+          },
+        ],
+      });
+
+      const { input, output } = usageFrom(response);
+      await recordTokenUsage('vision', model, input, output);
+
+      const content = response.content?.[0];
+      if (content && content.type === 'text') {
+        return content.text.trim();
+      }
+      return '';
+    } catch (error: any) {
+      lastError = error;
+      const isOverloaded =
+        error?.error?.type === 'overloaded_error' ||
+        error?.message?.includes('overloaded');
+      if (!isOverloaded || attempt >= maxRetries) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to generate from image after retries');
+}
+
 /**
  * Check if Claude API is configured
  */
@@ -329,69 +424,4 @@ export function getErrorMessage(error: any): string {
   }
 
   return claudeErrorMessage || errorMessage;
-}
-
-// ─── Vision: extract structured data from an image ────────────────────────────
-
-export type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-
-/**
- * Send an image + a system/user prompt to Claude and return the raw text reply.
- * Vision-capable models only. Used by the "add lead from screenshot" flow.
- */
-export async function generateFromImage(
-  systemPrompt: string,
-  userPrompt: string,
-  imageBase64: string,
-  mediaType: VisionMediaType = 'image/png',
-  maxTokens: number = 1024,
-): Promise<string> {
-  const anthropic = getClient();
-  const model = getModel();
-
-  const maxRetries = 3;
-  let lastError: any = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise((resolve) => setTimeout(resolve, retryDelay));
-      }
-
-      const response = await (anthropic.messages.create as any)({
-        model,
-        max_tokens: maxTokens,
-        system: cacheable(systemPrompt),
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mediaType, data: imageBase64 },
-              },
-              { type: 'text', text: userPrompt },
-            ],
-          },
-        ],
-      });
-
-      const content = response.content?.[0];
-      if (content && content.type === 'text') {
-        return content.text.trim();
-      }
-      return '';
-    } catch (error: any) {
-      lastError = error;
-      const isOverloaded =
-        error?.error?.type === 'overloaded_error' ||
-        error?.message?.includes('overloaded');
-      if (!isOverloaded || attempt >= maxRetries) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError || new Error('Failed to generate from image after retries');
 }

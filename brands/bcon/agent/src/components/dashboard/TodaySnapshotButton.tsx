@@ -2,25 +2,35 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdToday, MdClose, MdRefresh } from 'react-icons/md'
+import { MdVisibility, MdClose, MdRefresh } from 'react-icons/md'
 
 /**
  * TodaySnapshotButton — top-right floating button that opens a quick-glance
- * popup of recent activity (default: today, midnight IST → now). Ported from
- * Windchasers, trimmed to BCON's business context (no aviation PAT / demo /
- * parent-student concepts). Theme-aware accent instead of WC's brand gold.
+ * popup showing today's activity (midnight IST → now). Designed for the
+ * founder to click once and immediately see what happened today.
  */
 
 interface SnapshotData {
   window: { startIso: string; endIso: string; label: string; range?: string }
-  leads: { total: number; bySource: Record<string, number> }
+  leads: { total: number; bySource: Record<string, number>; byType?: Record<string, number> }
   events: {
-    bookings: number
+    pat_submitted: number
+    demo_booked: number
     calls_logged: number
     agent_replies: number
   }
   scoreHistogram: { hot: number; warm: number; cold: number; unscored: number }
+  callsByUser?: Array<{ name: string; count: number }>
   topActive: Array<{ id: string; name: string; phone: string | null; score: number | null; messageCount: number }>
+}
+
+function formatHHMM(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  } catch {
+    return ''
+  }
 }
 
 type RangeKey = 'today' | '7d' | '14d' | '28d'
@@ -31,7 +41,7 @@ const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: '28d',   label: '28d' },
 ]
 
-export default function TodaySnapshotButton({ inline = false }: { inline?: boolean }) {
+export default function TodaySnapshotButton({ inline = false, label }: { inline?: boolean; label?: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<SnapshotData | null>(null)
@@ -64,22 +74,25 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
 
   return (
     <>
-      {/* Trigger — small icon-only button, top-right. Theme-aware accent. */}
+      {/* Trigger — small icon-only button, top-right. No text label.
+          User feedback: 'A button is too far away from the actual design.
+          We can just have an eye button.' */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full hover:opacity-90 transition`}
+        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center gap-1.5 rounded-full hover:opacity-90 transition`}
         style={{
           ...(inline
-            ? { background: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
-            : { top: '14px', right: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', backdropFilter: 'blur(8px)' }),
-          width: '36px',
+            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
+            : { top: '14px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           height: '36px',
+          ...(inline && label ? { padding: '0 12px' } : { width: '36px' }),
         }}
         aria-label="Open today's snapshot"
         title="Today's snapshot"
       >
-        <MdToday size={16} />
+        <MdVisibility size={18} />
+        {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
       </button>
 
       {!open ? null : (
@@ -91,7 +104,7 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
-          {/* Modal — centered */}
+          {/* Modal — centered on desktop */}
           <div
             role="dialog"
             aria-label="Today's snapshot"
@@ -113,7 +126,7 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
               className="flex items-center gap-2 px-3 py-2.5 border-b"
               style={{ borderColor: 'var(--border-primary)' }}
             >
-              <MdToday size={16} style={{ color: 'var(--accent-primary)' }} />
+              <MdVisibility size={16} style={{ color: '#C9A961' }} />
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-semibold leading-tight truncate">
                   {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
@@ -145,10 +158,8 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                       onClick={() => setRange(opt.key)}
                       className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
                       style={{
-                        // accent-primary is white in dark mode, so white text would
-                        // vanish — use bg-primary (the inverse) for the active label.
-                        color: active ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                        background: active ? 'var(--accent-primary)' : 'transparent',
+                        color: active ? '#1a1a1a' : 'var(--text-secondary)',
+                        background: active ? '#C9A961' : 'transparent',
                       }}
                       disabled={loading && active}
                     >
@@ -193,12 +204,12 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
 
               {data && (
                 <>
-                  {/* Top KPI strip — 4 hero numbers */}
+                  {/* Top KPI strip — 4 hero numbers across */}
                   <div className="grid grid-cols-4 gap-2 mb-1">
-                    <KpiCell label="New leads" value={data.leads.total} accent="#8B5CF6" />
-                    <KpiCell label="Bookings" value={data.events.bookings} accent="#22c55e" />
+                    <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
+                    <KpiCell label="PAT done" value={data.events.pat_submitted} accent="#a5b4fc" />
+                    <KpiCell label="Demos booked" value={data.events.demo_booked} accent="#22c55e" />
                     <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
-                    <KpiCell label="Calls logged" value={data.events.calls_logged} accent="#f59e0b" />
                   </div>
 
                   {/* 2-column grid: source + score / events + top active */}
@@ -211,7 +222,7 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                       <SectionLabel>By source</SectionLabel>
                       {Object.keys(data.leads.bySource).length === 0 ? (
                         <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          No leads yet in this window.
+                          No leads yet today.
                         </div>
                       ) : (
                         <ul className="space-y-1.5">
@@ -223,13 +234,28 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                                 <li key={src} className="flex items-center gap-2">
                                   <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{src}</span>
                                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--accent-primary)' }} />
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#a5b4fc' }} />
                                   </div>
                                   <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{n}</span>
                                 </li>
                               )
                             })}
                         </ul>
+                      )}
+
+                      {/* Lead type — Parent vs Student */}
+                      {data.leads.byType && (
+                        <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Lead type</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>Parent</span>
+                            <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#a5b4fc' }}>{data.leads.byType.Parent || 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>Student</span>
+                            <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#22c55e' }}>{data.leads.byType.Student || 0}</span>
+                          </div>
+                        </div>
                       )}
                     </section>
 
@@ -254,10 +280,24 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                     >
                       <SectionLabel>Activity</SectionLabel>
                       <div className="grid grid-cols-2 gap-1.5">
-                        <EventCell label="Bookings" value={data.events.bookings} />
+                        <EventCell label="PAT submitted" value={data.events.pat_submitted} />
+                        <EventCell label="Demos booked" value={data.events.demo_booked} />
                         <EventCell label="Agent replies" value={data.events.agent_replies} />
                         <EventCell label="Calls logged" value={data.events.calls_logged} />
                       </div>
+
+                      {/* Who logged calls + how many each */}
+                      {data.callsByUser && data.callsByUser.length > 0 && (
+                        <div className="mt-2.5 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Calls by</p>
+                          {data.callsByUser.map((u) => (
+                            <div key={u.name} className="flex items-center justify-between">
+                              <span className="text-[11px] truncate" style={{ color: 'var(--text-primary)' }}>{u.name}</span>
+                              <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{u.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </section>
 
                     {/* Top active leads */}
@@ -268,7 +308,7 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                       <SectionLabel>{range === 'today' ? 'Most active today' : 'Most active'}</SectionLabel>
                       {data.topActive.length === 0 ? (
                         <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          No customer messages yet in this window.
+                          No customer messages yet today.
                         </div>
                       ) : (
                         <ul className="space-y-1">
@@ -291,7 +331,7 @@ export default function TodaySnapshotButton({ inline = false }: { inline?: boole
                                 </div>
                                 <span
                                   className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                                  style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                                  style={{ background: 'rgba(201,169,97,0.18)', color: '#C9A961' }}
                                 >
                                   {l.messageCount} msg
                                 </span>
@@ -316,7 +356,10 @@ function KpiCell({ label, value, accent }: { label: string; value: number; accen
   return (
     <div
       className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
-      style={{ background: `${accent}10`, borderColor: `${accent}40` }}
+      style={{
+        background: `${accent}10`,
+        borderColor: `${accent}40`,
+      }}
     >
       <span className="text-[22px] font-bold leading-none tabular-nums" style={{ color: accent }}>{value}</span>
       <span className="text-[9px] mt-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{label}</span>
@@ -360,42 +403,89 @@ function EventCell({ label, value }: { label: string; value: number }) {
   )
 }
 
+function ScorePill({ label, n, color }: { label: string; n: number; color: string }) {
+  return (
+    <span
+      className="text-[10px] font-medium px-2 py-0.5 rounded-full border"
+      style={{ background: `${color}1f`, borderColor: `${color}66`, color }}
+    >
+      {label}: {n}
+    </span>
+  )
+}
+
 /**
  * Full-layout skeleton for the snapshot modal — mirrors the final shape
- * (4-KPI strip + 2×2 section grid) with a rotating status line.
+ * (4-KPI strip + 2×2 section grid) so the modal "expands into" the real
+ * data instead of jumping from a tiny "Loading…" box. A rotating status
+ * line at the bottom tells the user what's being fetched so the wait
+ * feels intentional rather than stalled.
  */
 function SnapshotSkeleton({ range }: { range: RangeKey }) {
-  const base = range === 'today' ? "today's leads" : range === '7d' ? 'leads from the last 7 days' : range === '14d' ? 'leads from the last 14 days' : 'leads from the last 28 days'
-  const messages = [
-    `Pulling ${base}…`,
-    'Counting bookings & replies…',
-    'Sorting by lead score…',
-    'Ranking most active conversations…',
-  ]
+  // Status messages cycle every 700ms while loading. Picked to match what
+  // the snapshot endpoint actually does in order — see /api/dashboard/
+  // today-snapshot/route.ts (leads → events → score histogram → top active).
+  const MESSAGES: Record<RangeKey, string[]> = {
+    today: [
+      "Pulling today's leads…",
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '7d': [
+      'Pulling leads from the last 7 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '14d': [
+      'Pulling leads from the last 14 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+    '28d': [
+      'Pulling leads from the last 28 days…',
+      'Counting PAT submissions & demos booked…',
+      'Sorting by lead score…',
+      'Ranking most active conversations…',
+    ],
+  }
+  const messages = MESSAGES[range] || MESSAGES.today
   const [msgIdx, setMsgIdx] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setMsgIdx((i) => (i + 1) % messages.length), 700)
     return () => clearInterval(id)
   }, [messages.length])
 
+  // Shared pulse box — uses bg-tokens so it works in both themes.
   const SkelBox = ({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
-    <div className={`animate-pulse rounded ${className}`} style={{ background: 'rgba(255,255,255,0.06)', ...style }} />
+    <div
+      className={`animate-pulse rounded ${className}`}
+      style={{ background: 'rgba(255,255,255,0.06)', ...style }}
+    />
   )
 
   return (
     <>
+      {/* KPI strip — 4 cells matching real layout */}
       <div className="grid grid-cols-4 gap-2 mb-1">
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
             className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
-            style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border-primary)' }}
+            style={{
+              background: 'rgba(255,255,255,0.02)',
+              borderColor: 'var(--border-primary)',
+            }}
           >
             <SkelBox className="h-6 w-10 mb-2" />
             <SkelBox className="h-2 w-16" />
           </div>
         ))}
       </div>
+
+      {/* 2×2 section grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {[0, 1, 2, 3].map((sec) => (
           <section
@@ -415,9 +505,17 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
           </section>
         ))}
       </div>
+
+      {/* Rotating status line — the "what's happening" hint */}
       <div className="flex items-center justify-center gap-2 pt-3 pb-1" aria-live="polite">
-        <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent-primary)' }} aria-hidden="true" />
-        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{messages[msgIdx]}</span>
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{ background: '#C9A961' }}
+          aria-hidden="true"
+        />
+        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {messages[msgIdx]}
+        </span>
       </div>
     </>
   )

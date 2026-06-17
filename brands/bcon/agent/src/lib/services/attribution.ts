@@ -1,14 +1,12 @@
 /**
- * services/attribution.ts — Source / First Touch resolution (BCON)
+ * services/attribution.ts — Source / First Touch resolution
  *
- * Ported from the Windchasers core, trimmed to BCON's business context
- * (no aviation/PAT first-touch labels). Three orthogonal concepts:
- *   SOURCE       — marketing channel that drove them to us (Meta, Google,
- *                  Instagram, Facebook, Direct, ...). Set ONCE on lead
- *                  creation. Never updated.
- *   FIRST TOUCH  — first interface/form they engaged with (Lead Form, Demo,
- *                  Contact, WhatsApp, ...). Set ONCE on lead creation.
- *   LAST TOUCH   — most recent channel (mutates; handled by `last_touchpoint`).
+ * Three orthogonal concepts:
+ *   SOURCE       — marketing channel that drove them to us (Instagram, Google, Direct, ...)
+ *                  Set ONCE on lead creation. Never updated.
+ *   FIRST TOUCH  — first interface/form they engaged with (Demo Form, PAT, WhatsApp Form, ...)
+ *                  Set ONCE on lead creation. Never updated.
+ *   LAST TOUCH   — most recent channel (mutates over time, handled by `last_touchpoint` column)
  *
  * Stored at: unified_context.attribution
  *
@@ -26,9 +24,11 @@ const SOURCE_LABELS: Record<string, string> = {
   fb_ads: 'Facebook Ads',
   meta: 'Meta',
   meta_ads: 'Meta Ads',
-  meta_forms: 'Meta Forms',
   meta_forms_clickthrough: 'Meta Forms',
-  google: 'Google',
+  // Plain 'google' = organic (came via a google.com referrer with no gclid/UTM).
+  // Paid clicks resolve to google_ads (gclid/utm_medium=cpc), kept separate.
+  google: 'Google Organic',
+  google_organic: 'Google Organic',
   google_ads: 'Google Ads',
   googleads: 'Google Ads',
   youtube: 'YouTube',
@@ -50,20 +50,25 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const FIRST_TOUCH_LABELS: Record<string, string> = {
-  // Form-based entries (business context — no aviation/PAT)
+  // Form-based entries
   demo_form: 'Demo Form',
   demo_booked: 'Demo Form',
-  demo: 'Demo',
+  pat_assessment: 'PAT',
+  pilot_aptitude_test: 'PAT',
+  pat: 'PAT',
+  whatsapp_prelaunch: 'WA Popup',
+  whatsapp_button: 'WA Popup',
+  // Accept the space-separated form_type the website actually sends
+  // (e.g. "WhatsApp Prelaunch" → "whatsapp prelaunch" after lowercase)
+  'whatsapp prelaunch': 'WA Popup',
+  'whatsapp popup': 'WA Popup',
+  'whatsapp pop-up': 'WA Popup',
+  'whatsapp pop up': 'WA Popup',
   meta_lead_form: 'Meta Lead Form',
   facebook_lead: 'Meta Lead Form',
-  whatsapp_clickthrough: 'WA Click Through',
-  whatsapp_button: 'WA Popup',
-  whatsapp_prelaunch: 'WA Popup',
-  'whatsapp popup': 'WA Popup',
   newsletter: 'Newsletter',
   contact: 'Contact Form',
   landing_page: 'Landing Page',
-  guide_download: 'Guide Download',
   // Channel-level (used when no form_type)
   whatsapp: 'WhatsApp',
   voice_call: 'Voice Call',
@@ -80,14 +85,18 @@ function titleCase(s: string): string {
 
 /**
  * Channels that represent a marketing source (the place that DROVE the lead
- * to us). Platform channels like 'whatsapp' or 'web' are NOT here — they
- * describe the surface the lead used to message us, not what brought them.
+ * to us). Acceptable as the SOURCE column value.
+ *
+ * Platform channels like 'whatsapp' or 'web' are NOT in this set — they
+ * describe the surface the lead used to message us, not what brought them
+ * here. A WA-Popup lead has channel='whatsapp' but the marketing source
+ * is whatever ad they came from (Instagram, Facebook Ads, etc.).
  */
 const MARKETING_CHANNELS = new Set([
   'ig', 'instagram',
   'fb', 'facebook', 'facebook_ads', 'fb_ads',
-  'meta', 'meta_ads', 'meta_forms', 'meta_forms_clickthrough',
-  'google', 'google_ads', 'googleads',
+  'meta', 'meta_ads', 'meta_forms_clickthrough',
+  'google', 'google_ads', 'googleads', 'google_organic',
   'bing', 'bing_ads',
   'youtube', 'yt',
   'linkedin', 'linkedin_ads',
@@ -98,32 +107,63 @@ const MARKETING_CHANNELS = new Set([
   'referral', 'organic',
 ]);
 
+export const META_FORM_CLICKTHROUGH_SOURCE = 'meta_forms_clickthrough';
+export const META_FORM_CLICKTHROUGH_LABEL = 'Meta Forms';
+// First-touch (the SOURCE sub-line): these leads clicked through from a Meta
+// lead form into WhatsApp, so the sub-line reads "WA Click Through".
+export const META_FORM_CLICKTHROUGH_FIRST_TOUCH = 'whatsapp_clickthrough';
+export const META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL = 'WA Click Through';
+
+/**
+ * Detects a Meta lead-form "Chat on WhatsApp" click-through. Such leads arrive
+ * as a normal WhatsApp inbound whose FIRST message is the form prefill, e.g.
+ *   "Hello! I filled out your form ... what_is_your_concern?: ... first name: ..."
+ * They carry no UTM and no marketing channel, so without this they get tagged
+ * 'Direct'. We relabel them 'Meta Forms Click-through' (distinct from a native
+ * Meta Lead Form integration).
+ */
+export function isMetaFormClickThrough(text: string | null | undefined): boolean {
+  if (!text) return false;
+  // Meta's prefill copy varies: "filled out your form", "filled in your form",
+  // "filled up the form", "filled your form", etc.
+  if (/filled\s*(in|out|up)?\s*(your|the)?\s*form\b/i.test(text)) return true;
+  // Fallback: 2+ snake_case form-field keys like "what_is_your_x?:"
+  const keys = text.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\??\s*:/gi);
+  return !!keys && keys.length >= 2;
+}
+
 export function deriveSource(
   utmSource: string | null | undefined,
   channelFallback?: string,
   resolvedChannel?: string | null,
 ): { source: string; source_label: string } {
   // PRIORITY 1: utm_source (explicit marketing tracking — the gold signal).
+  // When a UTM is present the lead came from a tracked campaign and that's
+  // unambiguously the marketing source.
   const utm = (utmSource || '').toLowerCase().trim();
   if (utm && utm !== 'direct') {
     return { source: utm, source_label: SOURCE_LABELS[utm] || titleCase(utm) };
   }
 
   // PRIORITY 2: resolvedChannel — but ONLY if it's a marketing channel.
+  // The website's `channel` field also fills in 'whatsapp' / 'web' / 'direct'
+  // for un-tracked traffic; those are platforms, not marketing sources, so
+  // we reject them here. Useful values that DO win: facebook_ads (resolved
+  // from fbclid), google_ads (from gclid), ig/fb/etc. when explicit.
   const rc = (resolvedChannel || '').toLowerCase().trim();
   if (rc && MARKETING_CHANNELS.has(rc)) {
     return { source: rc, source_label: SOURCE_LABELS[rc] || titleCase(rc) };
   }
 
-  // PRIORITY 3: channelFallback (inbound endpoint's leadSource enum, only
+  // PRIORITY 3: channelFallback (inbound endpoint's `leadSource` enum, only
   // for non-ambiguous marketing-ish values like 'facebook' or 'google').
   const ch = (channelFallback || '').toLowerCase().trim();
   if (ch && MARKETING_CHANNELS.has(ch)) {
     return { source: ch, source_label: SOURCE_LABELS[ch] || titleCase(ch) };
   }
 
-  // PRIORITY 4: 'direct' — no marketing signal at all. Platforms
-  // (whatsapp / web / voice) are deliberately NOT surfaced as a source.
+  // PRIORITY 4: 'direct' — no marketing signal at all. We deliberately do
+  // NOT surface 'whatsapp' / 'web' here as a source value (they're platforms).
   return { source: 'direct', source_label: 'Direct' };
 }
 
@@ -159,7 +199,6 @@ export interface AttributionPayload {
     term?: string | null;
   };
   page_url?: string | null;
-  /** Referring URL (e.g. CTWA ad source_url) — surfaced as 'Referrer' in the modal. */
   referrer?: string | null;
   captured_at: string;
 }
@@ -169,8 +208,10 @@ export function buildAttribution(input: {
   formType?: string | null;
   channel?: string | null;
   /**
-   * Resolved channel (e.g. fbclid → facebook_ads, gclid → google_ads) —
-   * takes priority over utm_source when present.
+   * Website's resolved channel (custom_fields.channel) — takes priority over
+   * utm_source when present. The website resolves fbclid → facebook_ads,
+   * gclid → google_ads, etc., so this catches Meta-ad leads that arrive
+   * without UTM tagging.
    */
   resolvedChannel?: string | null;
   utm?: AttributionPayload['utm'];

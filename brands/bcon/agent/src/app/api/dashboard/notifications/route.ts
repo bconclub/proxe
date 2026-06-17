@@ -8,13 +8,17 @@ export const dynamic = 'force-dynamic'
  * GET /api/dashboard/notifications
  *
  * Lightweight feed of lead status-change events for the site-wide notification
- * bell + toasts, sourced from lead_stage_changes:
+ * bell + toasts. This is the same set of events the dashboard's old "Recent
+ * Activity" card showed, sourced from lead_stage_changes:
  *   - new_lead_scored : a lead's first stage assignment (old_stage is null)
  *   - stage_change    : a lead moved between stages (incl. → Booking Made)
  *   - score_change    : a lead's score jumped/dropped by ≥20
  *
+ * Bookings surface as the "Booking Made" stage transition; the Upcoming Events
+ * card still lists the bookings themselves.
+ *
  * Auth: logged-in session. Read uses service-role (consistent with other
- * dashboard reads).
+ * dashboard reads that join across tables).
  */
 export type NotificationEvent = {
   id: string
@@ -66,7 +70,7 @@ export async function GET(_request: NextRequest) {
 
     const events: NotificationEvent[] = []
 
-    // Stage changes + new-lead-scored.
+    // Stage changes + new-lead-scored (mirror founder-metrics wording).
     rows.forEach((change: any) => {
       const lead = leadMap.get(change.lead_id)
       if (!lead) return
@@ -115,7 +119,7 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json({ events: events.slice(0, 30) })
   } catch (error: any) {
-    console.error('[notifications] error:', error?.message || error)
+    console.error('[notifications] Error:', error?.message || error)
     return NextResponse.json({ events: [] })
   }
 }

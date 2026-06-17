@@ -90,8 +90,20 @@ export default function ThemeProvider({
   }, [applyTheme]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-    const mode = saved && ['brand', 'bw-dark', 'bw-light'].includes(saved) ? saved : 'bw-dark';
+    // Dark is the default for EVERYONE. One-time migration: flip any existing
+    // light/brand preference to dark once (so all current users go black now),
+    // then respect whatever they choose afterwards. New users default to dark
+    // via the fallback below.
+    const FORCE_KEY = 'proxe-theme-default-dark-v1';
+    let mode: ThemeMode;
+    if (!localStorage.getItem(FORCE_KEY)) {
+      mode = 'bw-dark';
+      localStorage.setItem(STORAGE_KEY, 'bw-dark');
+      localStorage.setItem(FORCE_KEY, '1');
+    } else {
+      const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+      mode = saved && ['brand', 'bw-dark', 'bw-light'].includes(saved) ? saved : 'bw-dark';
+    }
     setThemeState(mode);
     applyTheme(mode);
   }, [applyTheme]);

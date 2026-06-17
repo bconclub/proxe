@@ -35,7 +35,7 @@ export async function PATCH(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    
     const leadId = params.id
     const body = await request.json()
     const { stage, sub_stage, override_reason } = body
@@ -192,7 +192,7 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    
     const leadId = params.id
 
     // Remove override flag (clear both columns for compatibility)

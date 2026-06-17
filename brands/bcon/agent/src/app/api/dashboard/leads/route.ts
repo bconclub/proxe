@@ -33,14 +33,15 @@ export async function GET(request: NextRequest) {
       .order('last_interaction_at', { ascending: false })
 
     if (search && search.length >= 2) {
+      // Postgres ILIKE pattern, OR across name/phone/email.
       const pat = `%${search.replace(/[%_]/g, '')}%`
       query = query.or(`customer_name.ilike.${pat},phone.ilike.${pat},email.ilike.${pat}`)
     }
 
-    // Exclude newsletter signups by default
-    if (!includeNewsletter) {
-      query = query.not('unified_context->web->form_submission->>form_type', 'eq', 'newsletter')
-    }
+    // Newsletter exclusion is applied AFTER fetch (see below), NOT as a PostgREST
+    // .not(...eq 'newsletter') filter. That filter generates `form_type <> 'newsletter'`,
+    // which is NULL (→ excluded) for every lead whose nested form_type is NULL — i.e.
+    // essentially ALL leads — silently returning 0 rows. JS `!== 'newsletter'` is NULL-safe.
 
     if (source) {
       // Filter by first_touchpoint or last_touchpoint
@@ -73,11 +74,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Map all_leads columns to the shape the frontend expects
-    const leads = (data || []).map((lead: any) => ({
+    let leads = (data || []).map((lead: any) => ({
       ...lead,
       name: lead.customer_name || lead.name || null,
       source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
     }))
+
+    // NULL-safe newsletter exclusion (replaces the broken PostgREST filter above).
+    if (!includeNewsletter) {
+      leads = leads.filter(
+        (lead: any) => lead.unified_context?.web?.form_submission?.form_type !== 'newsletter'
+      )
+    }
 
     return NextResponse.json({
       leads,

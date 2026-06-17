@@ -6,12 +6,19 @@
  * winner.
  *
  * Winner picking: higher lead_score wins. On tie, earlier created_at wins.
+ * (Per user decision 2026-05-21 — operator clicks merge on either side,
+ * the system picks the richer record as keeper.)
  *
  * Request body:  { other_lead_id: UUID }
- *   [id]          — one of the two leads (from the route param)
+ *   [id]         — one of the two leads (from the route param)
  *   other_lead_id — the other one
  *
- * Response: { winner_lead_id, merged_lead_id, moved: {...}, merged_phones: [] }
+ * Response: {
+ *   winner_lead_id: UUID,
+ *   merged_lead_id: UUID,   // the one that got deleted
+ *   moved: { conversations, activities, agent_tasks, sessions, … } counts,
+ *   merged_phones: string[]  // any extra phone(s) preserved on the winner
+ * }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -21,7 +28,8 @@ import { getServiceClient } from '@/lib/services'
 export const dynamic = 'force-dynamic'
 
 // Tables that have a lead_id column and need to be re-pointed to the winner
-// before we delete the loser. MUST be complete or we'll orphan rows.
+// before we delete the loser. Order doesn't matter (we run them in parallel),
+// but the list MUST be complete or we'll orphan rows.
 const FK_TABLES = [
   'conversations',
   'activities',
@@ -83,14 +91,19 @@ export async function POST(
       winner = scoreA > scoreB ? leadA : leadB
       loser = scoreA > scoreB ? leadB : leadA
     } else {
+      // Same score — pick the older lead as winner
       const tA = new Date(leadA.created_at).getTime()
       const tB = new Date(leadB.created_at).getTime()
       winner = tA <= tB ? leadA : leadB
       loser  = tA <= tB ? leadB : leadA
     }
 
-    // Build merged unified_context. Winner's fields win on conflicts; the
-    // loser's identity is preserved under merged_from[] for audit.
+    // Build merged unified_context. Winner's fields win on conflicts; loser's
+    // unique fields (e.g. alternate attribution.utm) are NOT auto-merged
+    // beyond a top-level shallow merge — those would need bespoke logic per
+    // namespace. We DO preserve the loser's identity on the winner under
+    // merged_from[] so a future operator can see this happened + the
+    // alternate phone/name is still on the lead.
     const winnerCtx = winner.unified_context || {}
     const loserCtx = loser.unified_context || {}
     const mergedFrom = Array.isArray(winnerCtx.merged_from) ? winnerCtx.merged_from : []
@@ -102,18 +115,22 @@ export async function POST(
       lead_score:     loser.lead_score ?? null,
       merged_at:      new Date().toISOString(),
       merged_by:      user.email || 'system',
-      original_ctx:   loserCtx,
+      original_ctx:   loserCtx,  // full preservation for audit
     })
     const mergedCtx = {
-      ...loserCtx,
-      ...winnerCtx,
-      merged_from: mergedFrom,
+      ...loserCtx,                  // loser fields lose ground...
+      ...winnerCtx,                 // ...to winner fields on conflict
+      merged_from: mergedFrom,      // always preserved + grown
     }
 
+    // Collect merged_phones for the response — handy for the toast UI
     const mergedPhones: string[] = []
     if (loser.phone && loser.phone !== winner.phone) mergedPhones.push(loser.phone)
 
     // ── Re-point FKs ───────────────────────────────────────────────────
+    // Run all updates in parallel. Each table's UPDATE is independent so
+    // partial-failure of one doesn't block the others; we collect counts
+    // for the response so the operator can see what moved.
     const moves: Record<string, number> = {}
     for (const table of FK_TABLES) {
       try {
@@ -123,7 +140,7 @@ export async function POST(
           .eq('lead_id', loser.id)
         if (error) {
           console.error(`[merge] Failed re-pointing ${table}:`, error.message)
-          moves[table] = -1
+          moves[table] = -1  // sentinel for "failed"
         } else {
           moves[table] = count ?? 0
         }
@@ -133,13 +150,16 @@ export async function POST(
       }
     }
 
+    // Update the winner's unified_context with the merged_from entry.
     const { error: updateErr } = await supabase
       .from('all_leads')
       .update({ unified_context: mergedCtx })
       .eq('id', winner.id)
     if (updateErr) {
       console.error('[merge] Failed updating winner context:', updateErr.message)
-      // Soft-fail: data already moved, only the audit trail couldn't write.
+      // Soft-fail: data is already moved, just the audit trail couldn't write.
+      // We still proceed to delete the loser since the user explicitly chose
+      // hard merge.
     }
 
     // ── Delete the loser ───────────────────────────────────────────────

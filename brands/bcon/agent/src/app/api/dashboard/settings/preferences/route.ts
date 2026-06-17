@@ -1,10 +1,11 @@
 /**
- * Global dashboard preferences — ONE config shared by every user. (BCON)
+ * Global dashboard preferences — ONE config shared by every user.
  *
- * Ported from Windchasers. Sound + theme prefs live server-side
- * (dashboard_settings, key 'dashboard_prefs') instead of per-browser
- * localStorage, so any logged-in user's change applies to all users on their
- * next load. Once we add roles we can gate writes to admins.
+ * Founder request: "Whatever setting changes I'm making on the dashboard should
+ * be for all users until we make a differentiation of users." So sound + theme
+ * prefs live server-side (dashboard_settings, key 'dashboard_prefs') instead of
+ * per-browser localStorage. Any logged-in user can change them today; once we
+ * add roles we can gate writes to admins.
  *
  * GET  → { prefs }              (read; cookie-auth)
  * POST → merge partial → { prefs } (write; service-role so it applies globally)

@@ -412,7 +412,7 @@ export async function storeBooking(
  * Check available calendar slots for a given date
  * Returns array of time slots with availability status
  */
-export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
+export async function getAvailableSlots(date: string, _sessionType?: string | null): Promise<TimeSlot[]> {
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;

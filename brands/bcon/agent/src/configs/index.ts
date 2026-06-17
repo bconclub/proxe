@@ -53,5 +53,11 @@ export function getCurrentBrandId(): string {
   return getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
 }
 
+/**
+ * Compile/runtime brand id alias. Mirrors the other forks' `BRAND_ID` const so
+ * shared core files synced from WC compile unchanged. Resolves from env at load.
+ */
+export const BRAND_ID = getCurrentBrandId();
+
 export { proxeConfig, windchasersConfig, bconConfig };
 export type { BrandConfig };

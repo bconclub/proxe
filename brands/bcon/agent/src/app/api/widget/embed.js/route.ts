@@ -26,6 +26,8 @@ export async function GET() {
   var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
   iframe.src = baseUrl + '/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
+  iframe.setAttribute('allow', 'microphone; camera; autoplay; clipboard-write');
+  iframe.setAttribute('allowusermedia', '');
 
   // Widget shows immediately on page load
   iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
@@ -104,7 +106,7 @@ export async function GET() {
   return new NextResponse(embedCode, {
     headers: {
       'Content-Type': 'application/javascript',
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Access-Control-Allow-Origin': '*',
     },
   });

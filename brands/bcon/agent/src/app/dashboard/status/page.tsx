@@ -39,41 +39,41 @@ export default function StatusPage() {
     try {
       setLoading(true)
       setError(null)
-
+      
       // Fetch status from API
       const response = await fetch('/api/status', {
         credentials: 'include',
       })
-
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch status: ${response.statusText}`)
       }
-
+      
       const data = await response.json()
-
+      
       // Determine system health
-      const systemHealth: 'OK' | 'ERROR' =
-        data.systemHealth?.status === 'ok' &&
-        data.database?.status === 'connected'
-          ? 'OK'
+      const systemHealth: 'OK' | 'ERROR' = 
+        data.systemHealth?.status === 'ok' && 
+        data.database?.status === 'connected' 
+          ? 'OK' 
           : 'ERROR'
-
+      
       // Determine dashboard status (if API responds, it's online)
       const dashboardStatus: 'ONLINE' | 'OFFLINE' = response.ok ? 'ONLINE' : 'OFFLINE'
-
+      
       // Determine web agent status (check if there are recent web sessions or if endpoint is accessible)
       let webAgentStatus: 'ACTIVE' | 'INACTIVE' = 'INACTIVE'
       let webAgentError: ErrorDetail | undefined
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-
+        
         const webResponse = await fetch('/api/dashboard/web/messages', {
           credentials: 'include',
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
-
+        
         if (webResponse.ok) {
           webAgentStatus = 'ACTIVE'
         } else {
@@ -94,20 +94,20 @@ export default function StatusPage() {
           webAgentStatus = 'ACTIVE'
         }
       }
-
+      
       // Determine WhatsApp agent status
       let whatsappAgentStatus: 'ACTIVE' | 'INACTIVE' = 'INACTIVE'
       let whatsappAgentError: ErrorDetail | undefined
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-
+        
         const whatsappResponse = await fetch('/api/dashboard/whatsapp/messages', {
           credentials: 'include',
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
-
+        
         if (whatsappResponse.ok) {
           whatsappAgentStatus = 'ACTIVE'
         } else {
@@ -128,11 +128,11 @@ export default function StatusPage() {
           whatsappAgentStatus = 'ACTIVE'
         }
       }
-
+      
       // Determine database status
-      const databaseStatus: 'OK' | 'ERROR' =
+      const databaseStatus: 'OK' | 'ERROR' = 
         data.database?.status === 'connected' ? 'OK' : 'ERROR'
-
+      
       // Log errors for agents if they fail
       if (webAgentStatus === 'INACTIVE') {
         // Could log here if needed
@@ -140,14 +140,14 @@ export default function StatusPage() {
       if (whatsappAgentStatus === 'INACTIVE') {
         // Could log here if needed
       }
-
+      
       // Merge error details from API with client-side detected errors
       const errorDetails = {
         ...data.errorDetails,
         ...(webAgentError && { webAgent: webAgentError }),
         ...(whatsappAgentError && { whatsappAgent: whatsappAgentError }),
       }
-
+      
       setStatus({
         systemHealth,
         buildVersion: data.systemHealth?.version || '0.0.1',
@@ -223,19 +223,19 @@ export default function StatusPage() {
     setLogsModalOpen(true)
   }
 
-  const StatusCard = ({
-    title,
-    status,
-    errorDetail,
-    componentName
-  }: {
+  const StatusCard = ({ 
+    title, 
+    status, 
+    errorDetail, 
+    componentName 
+  }: { 
     title: string
     status: string
     errorDetail?: ErrorDetail
     componentName: string
   }) => {
     const isError = status === 'ERROR' || status === 'INACTIVE' || status === 'OFFLINE'
-
+    
     return (
       <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
         <div className="flex items-center justify-between mb-2">

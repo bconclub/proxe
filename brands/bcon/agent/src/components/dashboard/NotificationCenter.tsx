@@ -3,18 +3,20 @@
 /**
  * NotificationCenter — site-wide status-change notifications.
  *
- *   1. A bell (fixed, top-right) with an unread count → slide-out activity
- *      drawer listing recent status changes.
+ * Lives once in DashboardLayout, so it's on every page. Three parts:
+ *   1. A bell (fixed, top-right) with an unread count. Click → slide-out
+ *      activity drawer listing ALL recent status changes.
  *   2. Toasts that pop bottom-right when NEW status changes arrive.
- *   3. A sound on each new change (distinct tones for NEW LEADS vs UPDATES),
- *      with a persisted mute toggle.
+ *   3. A sound on each new change — distinct tones for NEW LEADS vs UPDATES,
+ *      with a mute toggle (persisted).
  *
  * Data: polls /api/dashboard/notifications (lead_stage_changes-backed). The
- * first poll sets a baseline so a backlog doesn't blast you on load.
+ * first poll sets a baseline so a backlog doesn't blast you on load — only
+ * events arriving AFTER the page is open pop + play a sound.
  *
  * Sounds + mute/enable prefs are owned by @/lib/sound-prefs (shared with the
- * Settings "Notifications & Sounds" panel and the page-ready cue). Sound files
- * live in public/sounds/ (new-lead.mp3, update.mp3, page-load.mp3).
+ * home-page "ready" cue and the Settings panel). Regenerate the WAVs via
+ * scripts/gen_notification_sounds.py.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -35,8 +37,8 @@ import {
 } from 'react-icons/md'
 
 const POLL_MS = 30_000
-const SEEN_AT_KEY = 'bcon-notif-seen-at'
-const MUTED_KEY = 'bcon-notif-muted'
+const SEEN_AT_KEY = 'wc-notif-seen-at'
+const MUTED_KEY = 'wc-notif-muted'
 
 type NotificationEvent = {
   id: string
@@ -62,6 +64,20 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
+// Humanise the channel for the neutral chip (skip generic/system values).
+function channelLabel(ch?: string): string | null {
+  const c = (ch || '').trim().toLowerCase()
+  if (!c || c === 'system' || c === 'internal' || c === 'unknown') return null
+  const map: Record<string, string> = {
+    web: 'Web Form', webform: 'Web Form', web_form: 'Web Form',
+    whatsapp: 'WhatsApp', wa: 'WhatsApp', email: 'Email',
+    call: 'Call', phone: 'Call', score: 'Score Update', score_update: 'Score Update',
+  }
+  if (map[c]) return map[c]
+  return c.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
+}
+
+// New leads read green with a NEW LEAD tag; updates keep stage/score colours.
 function eventVisual(ev: { type: string; content: string; metadata?: any }): Visual {
   if (ev.type === 'new_lead_scored') {
     return { Icon: MdPersonAdd, color: '#22C55E', kind: 'new', label: 'NEW LEAD' }
@@ -97,8 +113,19 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   const seenAtRef = useRef<string>('1970-01-01T00:00:00.000Z')
   const mutedRef = useRef(false)
 
+  // Reveal toasts ONE AT A TIME with a slide-in stagger, instead of dropping
+  // them all in at once (founder: "the notification has to come one by one
+  // slide in"). Each item appears ~600ms after the previous.
+  const enqueueToasts = useCallback((items: NotificationEvent[]) => {
+    items.forEach((t, i) => {
+      setTimeout(() => {
+        setToasts((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev].slice(0, 3)))
+      }, i * 600)
+    })
+  }, [])
+
   // Load persisted prefs (mute + last-seen). Sounds are owned by the shared
-  // sound-prefs helper, which also honours the per-event Settings toggles.
+  // sound-prefs helper, which also honours the per-event Configure toggles.
   useEffect(() => {
     try {
       const m = localStorage.getItem(MUTED_KEY) === '1'
@@ -126,17 +153,32 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
       const incoming: NotificationEvent[] = Array.isArray(data.events) ? data.events : []
 
       if (!baselineSetRef.current) {
+        // First poll after a (re)load. Don't blast the whole backlog, but DO
+        // surface what you missed while away: toast the latest UNSEEN events
+        // (newer than the persisted last-seen), capped at 2. Everything older
+        // stays in the bell drawer with the unread badge. Founder: "whatever
+        // notification I miss should come in — latest two, older in the list."
         incoming.forEach((e) => knownIdsRef.current.add(e.id))
         baselineSetRef.current = true
         setEvents(incoming)
         recomputeUnread(incoming)
+        const seenAt = new Date(seenAtRef.current).getTime()
+        const missed = incoming.filter((e) => new Date(e.timestamp).getTime() > seenAt)
+        if (missed.length > 0) {
+          enqueueToasts(missed.slice(0, 3))
+          playSound(missed.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
+        }
         return
       }
 
       const fresh = incoming.filter((e) => !knownIdsRef.current.has(e.id))
       if (fresh.length > 0) {
         fresh.forEach((e) => knownIdsRef.current.add(e.id))
-        setToasts((prev) => [...fresh.slice(0, 3), ...prev].slice(0, 4))
+        // Only ever surface the latest TWO as toasts — newest on top. Anything
+        // beyond that lives behind the "View all notifications" button. Keeps
+        // the corner stack from blasting 3-4 cards at once.
+        enqueueToasts(fresh.slice(0, 3))
+        // New leads take sound priority over plain updates.
         playSound(fresh.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
       }
       setEvents(incoming)
@@ -144,6 +186,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
     } catch { /* network blip — retry next tick */ }
   }, [playSound, recomputeUnread])
 
+  // Poll on mount + interval (visible only) + on tab focus.
   useEffect(() => {
     poll()
     const id = setInterval(() => { if (document.visibilityState === 'visible') poll() }, POLL_MS)
@@ -152,6 +195,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [poll])
 
+  // Auto-dismiss toasts after 6s.
   useEffect(() => {
     if (toasts.length === 0) return
     const timers = toasts.map((t) =>
@@ -182,14 +226,16 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
 
   return (
     <>
-      {/* Bell — fixed top-right, sits beneath the snapshot button. */}
+      {/* Bell — fixed top-right, sits left of the home page's snapshot button. */}
       <button
         onClick={openDrawer}
         className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
         style={{
+          // Floating: stacked beneath the snapshot "eye" button. Inline: sits in
+          // the dashboard top bar (no fixed positioning).
           ...(inline
             ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
-            : { top: '54px', right: '20px', backgroundColor: '#3B82F6', border: '1px solid rgba(255,255,255,0.6)', color: '#ffffff' }),
+            : { top: '54px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           width: '36px',
           height: '36px',
         }}
@@ -210,11 +256,13 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
       {/* Slide-out activity drawer */}
       {open && (
         <div className="fixed inset-0 z-[70]" aria-modal="true" role="dialog">
+          {/* Backdrop */}
           <div
             className="absolute inset-0"
-            style={{ backgroundColor: 'rgba(0,0,0,0.45)', animation: 'bcon-fade-in 160ms ease' }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)', animation: 'wc-fade-in 160ms ease' }}
             onClick={() => setOpen(false)}
           />
+          {/* Panel — full-height, right side (the nav rail owns the left edge) */}
           <div
             className="absolute top-0 right-0 h-full flex flex-col shadow-2xl"
             style={{
@@ -222,7 +270,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
               maxWidth: '92vw',
               backgroundColor: 'var(--bg-secondary)',
               borderLeft: '1px solid var(--border-primary)',
-              animation: 'bcon-slide-in 220ms cubic-bezier(0.2,0,0,1)',
+              animation: 'wc-slide-in 220ms cubic-bezier(0.2,0,0,1)',
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
@@ -290,59 +338,87 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
         </div>
       )}
 
-      {/* Toast stack — bottom-right. */}
-      <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', maxWidth: 'calc(100vw - 40px)' }}>
-        {toasts.map((t) => {
-          const v = eventVisual(t)
-          return (
-            <div
-              key={t.id}
-              onClick={goToLead}
-              className="flex items-start gap-3 px-4 py-3 rounded-xl shadow-2xl cursor-pointer"
-              style={{
-                width: '320px',
-                maxWidth: 'calc(100vw - 40px)',
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-primary)',
-                borderLeft: `3px solid ${v.color}`,
-                animation: 'bcon-notif-in 220ms cubic-bezier(0.2,0,0,1)',
-              }}
-            >
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
-                <v.Icon size={16} />
-              </span>
-              <span className="flex-1 min-w-0">
-                {v.kind === 'new' && (
-                  <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded mb-1" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
-                    {v.label}
-                  </span>
-                )}
-                <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
-                <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>just now</span>
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
-                className="p-0.5 rounded flex-shrink-0"
-                style={{ color: 'var(--text-secondary)' }}
-                aria-label="Dismiss"
+      {/* Toast stack — bottom-right. At most the latest TWO cards, then a
+          frosted "View all notifications" button that opens the full drawer.
+          Narrow + clean (reference panel was too wide). */}
+      {toasts.length > 0 && !open && (
+        <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', width: '340px', maxWidth: 'calc(100vw - 32px)' }}>
+          {toasts.slice(0, 3).map((t) => {
+            const v = eventVisual(t)
+            const chan = channelLabel(t.channel)
+            return (
+              <div
+                key={t.id}
+                onClick={goToLead}
+                className="flex items-start gap-3 px-3.5 py-3 rounded-xl shadow-2xl cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  borderLeft: `3px solid ${v.color}`,
+                  animation: 'wc-notif-in 220ms cubic-bezier(0.2,0,0,1)',
+                }}
               >
-                <MdClose size={16} />
-              </button>
-            </div>
-          )
-        })}
-      </div>
+                <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
+                  <v.Icon size={16} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  {/* top row: time + dismiss */}
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="block text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
+                      className="p-0.5 -mt-0.5 -mr-0.5 rounded flex-shrink-0"
+                      style={{ color: 'var(--text-secondary)' }}
+                      aria-label="Dismiss"
+                    >
+                      <MdClose size={15} />
+                    </button>
+                  </span>
+                  {/* chips */}
+                  <span className="flex items-center gap-1.5 mt-1.5">
+                    <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
+                      {v.label}
+                    </span>
+                    {chan && (
+                      <span className="inline-block text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                        {chan}
+                      </span>
+                    )}
+                    <span className="ml-auto text-[11px]" style={{ color: 'var(--text-secondary)' }}>{timeAgo(t.timestamp)}</span>
+                  </span>
+                  {/* action */}
+                  <span className="block text-[11px] font-medium mt-1.5 hover:underline" style={{ color: v.color }}>View lead →</span>
+                </span>
+              </div>
+            )
+          })}
+          <button
+            onClick={openDrawer}
+            className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-medium transition hover:opacity-90"
+            style={{
+              background: 'color-mix(in srgb, var(--bg-secondary) 65%, transparent)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--text-primary)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+            }}
+          >
+            View all notifications{unread > 0 ? ` (${unread})` : ''} →
+          </button>
+        </div>
+      )}
 
       <style jsx global>{`
-        @keyframes bcon-notif-in {
+        @keyframes wc-notif-in {
           from { opacity: 0; transform: translateY(8px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        @keyframes bcon-slide-in {
+        @keyframes wc-slide-in {
           from { transform: translateX(100%); }
           to   { transform: translateX(0); }
         }
-        @keyframes bcon-fade-in {
+        @keyframes wc-fade-in {
           from { opacity: 0; }
           to   { opacity: 1; }
         }

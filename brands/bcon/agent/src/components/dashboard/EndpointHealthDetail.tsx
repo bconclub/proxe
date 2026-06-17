@@ -27,7 +27,7 @@ interface ServiceHealth {
 
 interface HealthResponse {
   now: string
-  thresholds: { failure_rate_red: number; failure_rate_amber: number; db_ok_max_ms: number; db_degraded_max_ms: number }
+  thresholds: { amber_after_min: number; red_after_min: number; failure_rate_per_hour: number }
   services: Record<string, ServiceHealth>
 }
 
@@ -198,7 +198,7 @@ export default function EndpointHealthDetail() {
       )}
 
       <div className="mt-2 text-[9px]" style={{ color: 'var(--text-muted)' }}>
-        Failure-driven: Outbound flags amber on &ge;{data.thresholds.failure_rate_amber} and red on &ge;{data.thresholds.failure_rate_red} send failures/hour · DB degraded over {data.thresholds.db_ok_max_ms}ms, down over {data.thresholds.db_degraded_max_ms}ms · Idle time shown as info only. Refreshes every 60s.
+        Amber: &gt;{data.thresholds.amber_after_min}min idle · Red: &gt;{data.thresholds.red_after_min}min idle · Outbound also flags amber on &gt;{data.thresholds.failure_rate_per_hour} failures/hour. Refreshes every 60s.
       </div>
     </div>
   )

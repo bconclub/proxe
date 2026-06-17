@@ -4,6 +4,14 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-17 · Catch up to Windchasers: token metering + clean-core sync
+
+- **Token metering shipped** (was entirely missing — WC had it, BCON recorded nothing): `lib/token-usage.ts` + claudeClient now records usage, `/api/dashboard/token-usage` route, and the `/tokens` page. Stored as a key/value row (`dashboard_settings.key='token_usage'`) — no schema migration; already handles the `updated_by` UUID gotcha.
+- **47 clean shared-core files re-synced from WC** (real improvements with no brand content, so they render with BCON's own theme = pixel-parity): MicroCharts, NotificationCenter, TodaySnapshotButton, WhatsAppTemplatePicker, EndpointHealthDetail, BookingsCalendar, ThemeProvider, founder-metrics, notifications/preferences/tasks/leads routes, attribution, businessCrawler, conversationLogger, dashboard-prefs, sound-prefs, claudeClient, status pages, calendar routes, etc.
+- BCON-specific fixes so the synced core compiles cleanly: added `BRAND_ID` export to configs; kept `referrer` on `AttributionPayload`; `getAvailableSlots` accepts an optional (ignored) sessionType (BCON booking is single-type).
+- `next build` VERCEL=1 EXIT 0, 46/46 pages (new `/tokens` page).
+- Brand identity preserved — brand-touched files (home accent/copy, lead fields, prompts, whatsappSender templates) NOT touched; reconciled separately.
+
 ## 2026-06-17 · Cross-brand versioning + changelog
 
 - BCON now auto-versions on commit like the other brands (was frozen at 0.0.20 — its build-time `increment-build.js` never committed back). `prebuild` dropped `increment-build.js`; committed `package.json` version (bumped by the shared pre-commit hook) is the single source of truth. First real bump: **0.0.20 → 0.0.21**.

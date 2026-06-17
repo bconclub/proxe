@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { formatDate, formatTime } from '@/lib/utils'
 import CalendarView from './CalendarView'
-import { MdSync, MdCheckCircle, MdError } from 'react-icons/md'
+import { MdSync, MdCheckCircle, MdError, MdInfoOutline } from 'react-icons/md'
 
 interface Booking {
   id: string
@@ -31,6 +31,8 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     message: string
     details?: string
     errorList?: string[]
+    /** Google Calendar isn't connected — a benign, info-level state, NOT a failure. */
+    notConfigured?: boolean
   } | null>(null)
   const [showErrors, setShowErrors] = useState(false)
 
@@ -67,15 +69,15 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     fetchBookings()
   }, [fetchBookings])
 
-  // Auto-sync with Google Calendar on page load
+  // Auto-sync with Google Calendar on page load (silent — never alarms)
   useEffect(() => {
     if (view === 'calendar' || view === 'full') {
-      handleSyncCalendar()
+      handleSyncCalendar(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSyncCalendar = async () => {
+  const handleSyncCalendar = async (isAuto = false) => {
     setSyncing(true)
     setSyncStatus(null)
 
@@ -95,6 +97,14 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
         throw new Error('Calendar sync failed - unexpected server response')
       }
 
+      // Google Calendar isn't connected — a benign state, not a failure.
+      // Stay completely silent on auto-load; show a quiet neutral note only if
+      // the user clicked Sync themselves. Never the red "Sync Failed" banner.
+      if (data && data.configured === false) {
+        setSyncStatus(isAuto ? null : { success: false, notConfigured: true, message: data.message || 'Google Calendar is not connected.' })
+        return
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to sync calendar')
       }
@@ -112,10 +122,14 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       // Refresh bookings after sync
       setTimeout(() => { fetchBookings() }, 2000)
     } catch (error: any) {
-      setSyncStatus({
-        success: false,
-        message: error.message || 'Failed to sync calendar',
-      })
+      // Don't alarm on the silent page-load sync — only surface a real failure
+      // when the user clicked Sync themselves.
+      if (!isAuto) {
+        setSyncStatus({
+          success: false,
+          message: error.message || 'Failed to sync calendar',
+        })
+      }
     } finally {
       setSyncing(false)
     }
@@ -126,7 +140,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     const syncBar = (
       <div className="flex items-center gap-2">
         <button
-          onClick={handleSyncCalendar}
+          onClick={() => handleSyncCalendar()}
           disabled={syncing}
           className={`
             flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
@@ -141,14 +155,16 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
           <div className="relative">
             <div
               className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] ${
-                syncStatus.success
-                  ? 'bg-green-500/10 text-green-500'
-                  : syncStatus.errorList && syncStatus.errorList.length > 0
-                    ? 'bg-amber-500/10 text-amber-500'
-                    : 'bg-red-500/10 text-red-500'
+                syncStatus.notConfigured
+                  ? 'bg-gray-500/10 text-gray-400'
+                  : syncStatus.success
+                    ? 'bg-green-500/10 text-green-500'
+                    : syncStatus.errorList && syncStatus.errorList.length > 0
+                      ? 'bg-amber-500/10 text-amber-500'
+                      : 'bg-red-500/10 text-red-500'
               }`}
             >
-              {syncStatus.success ? <MdCheckCircle size={14} /> : <MdError size={14} />}
+              {syncStatus.notConfigured ? <MdInfoOutline size={14} /> : syncStatus.success ? <MdCheckCircle size={14} /> : <MdError size={14} />}
               <span>{syncStatus.message}</span>
               {syncStatus.details && <span className="opacity-75">({syncStatus.details})</span>}
               {syncStatus.errorList && syncStatus.errorList.length > 0 && (
@@ -175,8 +191,9 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       </div>
     )
 
-    // Error banner for failed sync
-    const errorBanner = syncStatus && !syncStatus.success && !syncing ? (
+    // Error banner for failed sync — never shown for the benign "not connected"
+    // state (that only surfaces as a quiet neutral pill on manual sync).
+    const errorBanner = syncStatus && !syncStatus.success && !syncStatus.notConfigured && !syncing ? (
       <div className="mb-4 p-3 rounded-lg border-l-4 bg-red-500/10 border-red-500">
         <div className="flex items-center gap-2">
           <MdError className="text-red-500" size={18} />

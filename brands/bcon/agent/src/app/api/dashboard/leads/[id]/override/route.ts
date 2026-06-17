@@ -20,7 +20,7 @@ export async function POST(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    
     const leadId = params.id
     const body = await request.json()
     const {
@@ -143,6 +143,34 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
     }
 
+    let cancelledTaskCount = 0
+    if (new_stage === 'Closed Lost' || new_stage === 'Not Qualified' || new_stage === 'Converted') {
+      const { data: cancelledTasks, error: cancelError } = await supabase
+        .from('agent_tasks')
+        .update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: `Cancelled: lead manually moved to ${new_stage}`,
+        })
+        .eq('lead_id', leadId)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id')
+
+      if (cancelError) {
+        console.error('Error cancelling pending tasks after override:', cancelError)
+      } else {
+        cancelledTaskCount = cancelledTasks?.length || 0
+        if (cancelledTaskCount > 0) {
+          await supabase.from('activities').insert({
+            lead_id: leadId,
+            activity_type,
+            note: `Autonomous follow-ups stopped: ${cancelledTaskCount} pending task${cancelledTaskCount === 1 ? '' : 's'} cancelled after stage changed to ${new_stage}.`,
+            created_by: user.id,
+          })
+        }
+      }
+    }
+
     // Log to lead_stage_changes
     if (oldStage !== new_stage) {
       await supabase
@@ -201,6 +229,7 @@ export async function POST(
       lead_id: leadId,
       old_stage: oldStage,
       new_stage: new_stage,
+      cancelled_tasks: cancelledTaskCount,
       activity,
     })
   } catch (error) {

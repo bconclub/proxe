@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 
@@ -39,8 +40,21 @@ export async function POST(request: NextRequest) {
     }
 
     const leadUc = lead.unified_context || {}
-    const bookingDate = leadUc?.web?.booking_date || leadUc?.whatsapp?.booking_date || null
-    const bookingTime = leadUc?.web?.booking_time || leadUc?.whatsapp?.booking_time || null
+    // Bookings are written in several shapes depending on the path that created
+    // them: flat keys under the channel (web.booking_date) OR a nested booking
+    // object (web.booking.date), across web / whatsapp / voice. Check all of them
+    // so every booked lead is detected — previously only web/whatsapp flat keys
+    // were checked, so ~2/3 of booked leads never reached Key Events.
+    const bookingDate =
+      leadUc?.web?.booking_date || leadUc?.web?.booking?.date ||
+      leadUc?.whatsapp?.booking_date || leadUc?.whatsapp?.booking?.date ||
+      leadUc?.voice?.booking_date || leadUc?.voice?.booking?.date ||
+      null
+    const bookingTime =
+      leadUc?.web?.booking_time || leadUc?.web?.booking?.time ||
+      leadUc?.whatsapp?.booking_time || leadUc?.whatsapp?.booking?.time ||
+      leadUc?.voice?.booking_time || leadUc?.voice?.booking?.time ||
+      null
 
     // Check if manual override is active - if so, skip scoring
     if (lead.is_manual_override) {
@@ -93,7 +107,9 @@ export async function POST(request: NextRequest) {
     const touchpoints = activities?.length || 0
 
     // Check for booking
-    const hasBooking = !!(bookingDate && bookingTime)
+    // A booking_date alone is enough to count as booked (a key event) — some
+    // bookings store only a date, or the time lives in a different shape.
+    const hasBooking = !!bookingDate
 
     // Check if re-engaged after being cold (was inactive > 7 days, now has new message)
     const lastInteraction = lead.last_interaction_at || lead.created_at
@@ -166,6 +182,7 @@ Respond with ONLY a JSON object in this exact format:
 
         if (response.ok) {
           const data = await response.json()
+          await recordTokenUsage('scoring', data.model || '', usageFrom(data).input, usageFrom(data).output)
           const text = data.content?.[0]?.text || ''
           
           // Parse JSON from response
@@ -232,36 +249,27 @@ Respond with ONLY a JSON object in this exact format:
       aiScore = Math.min(100, score)
     }
 
-    // Auto-assign stage based on score
-    let newStage = lead.lead_stage || 'new'
-    
-    // Override: If booking exists, force Booking Made stage
+    // Auto-assign stage — HYBRID (score AND replies).
+    // Auto-staging only ever sets the EARLY, behaviour-detectable stages:
+    //   New → Engaged → Qualified, plus Key Events (Booking Made) when a call is booked.
+    // The post-call stages (Call Done, Proposal Sent, Won/Converted, Lost) are real-world
+    // facts only a human knows — they are MANUAL-only and never set here. Leads in those
+    // stages carry is_manual_override and are skipped at the top of this handler, so we
+    // can never clobber them.
+    //   - Booking exists      → 'Booking Made'  (Key Events — the one event we can detect)
+    //   - 3+ replies AND score ≥ 50 → 'Qualified' (real, sustained interest — both required)
+    //   - 1+ reply            → 'Engaged'        (lead has started replying)
+    //   - otherwise           → 'New'           (form-only / in-sequence / no reply yet)
+    // Thresholds (3 replies, score 50) are intentionally simple — tune as we learn.
+    let newStage: string
     if (hasBooking) {
       newStage = 'Booking Made'
-    } else if (aiScore >= 86) {
-      newStage = 'Booking Made'
-    } else if (aiScore >= 61) {
-      newStage = 'High Intent'
-    } else if (aiScore >= 31) {
+    } else if (responseCount >= 3 && aiScore >= 50) {
       newStage = 'Qualified'
-    } else if (aiScore > 0 || conversationMessages.length > 0) {
-      // First message scoring - don't default to "New"
-      if (conversationMessages.length === 1) {
-        // First message: check for strong intent
-        const firstMessage = conversationMessages[0].content.toLowerCase()
-        const strongIntent = ['book', 'booking', 'schedule', 'interested', 'pricing', 'price'].some(keyword => 
-          firstMessage.includes(keyword)
-        )
-        if (strongIntent && hasBooking) {
-          newStage = 'Booking Made'
-        } else if (strongIntent || aiScore >= 31) {
-          newStage = 'Qualified'
-        } else {
-          newStage = 'New'
-        }
-      } else {
-        newStage = 'New'
-      }
+    } else if (responseCount >= 1) {
+      newStage = 'Engaged'
+    } else {
+      newStage = 'New'
     }
 
     // Get old stage for logging

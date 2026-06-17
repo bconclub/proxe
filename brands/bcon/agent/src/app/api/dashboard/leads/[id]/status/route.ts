@@ -24,7 +24,7 @@ export async function PATCH(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    
     const { status } = await request.json()
     const leadId = params.id
 

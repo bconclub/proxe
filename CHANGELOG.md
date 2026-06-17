@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-17 · bcon: catch up to Windchasers (token metering + clean-core sync)
+
+- **bcon** was behind WC beyond the home page. Shipped token metering (`/tokens`, `token-usage.ts`, claudeClient recording, route — WC had it, bcon recorded nothing) and re-synced 47 clean shared-core files from WC (MicroCharts, NotificationCenter, TodaySnapshot, founder-metrics, attribution, claudeClient, dashboard routes, etc.) — brand-agnostic, so they render with bcon's own theme (pixel-parity). Brand-touched files (accent/copy/fields/prompts/templates) left intact, reconciled separately. `next build` green, 46/46.
+
 ## 2026-06-17 · Infra: cross-brand versioning + changelog
 
 - **Versioning is now cross-brand, not Windchasers-only.** The pre-commit hook used to bump only `brands/windchasers/agent`; bcon was stuck (build-time `increment-build.js` only ran ephemerally on Vercel, committed version frozen at 0.0.20), and master/proxe had no bumper. The hook now loops every agent (`bcon`, `windchasers`, `proxe`, `master`) and bumps each one this commit touches — so the deploy version climbs for changes in **any** repo, and the bump rides along when changes flow brand → master → branches.

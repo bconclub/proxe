@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, buildAttribution } from '@/lib/services';
+import { getServiceClient, normalizePhone } from '@/lib/services';
 
 // Auth check
 function isAuthorized(req: NextRequest): boolean {
@@ -63,45 +63,13 @@ export async function POST(req: NextRequest) {
     // Normalize identifiers
     const normalizedPhone = normalizePhone(phone || '');
     const normalizedBrand = brand.toString().toLowerCase().trim();
-
-    // ── Parse the composite message field ────────────────────────────────────
-    // The website packs the visitor's selections into `message` as
-    //   "<service-slug> - Brand: <visitor brand>"
-    // e.g. "ai-customer-acquisition - Brand: BCON Club". Parse them out so the
-    // welcome template + dashboard show what was actually submitted instead of
-    // falling back to "General Inquiry" / hardcoded "BCON".
-    const rawMessage = (message || '').toString();
-    let serviceSlug = rawMessage.trim();
-    let visitorBrand = '';
-    const brandSep = rawMessage.indexOf(' - Brand: ');
-    if (brandSep !== -1) {
-      serviceSlug = rawMessage.slice(0, brandSep).trim();
-      visitorBrand = rawMessage.slice(brandSep + ' - Brand: '.length).trim();
-    }
-    const humanizeService = (s: string): string =>
-      s.replace(/[-_]+/g, ' ').trim().split(/\s+/).map((w) => {
-        const lw = w.toLowerCase();
-        if (lw === 'ai') return 'AI';
-        if (['in', 'of', 'and', 'for', 'the', 'a', 'to'].includes(lw)) return lw;
-        return w.charAt(0).toUpperCase() + w.slice(1);
-      }).join(' ');
-    // Treat the leading chunk as a service only when it looks like a slug /
-    // short phrase, not a long free-text message.
-    const parsedService = serviceSlug && serviceSlug.length <= 60 ? humanizeService(serviceSlug) : '';
-    // Explicit field wins if the website ever sends one.
-    const resolvedServiceInterest = (body.service_interest || '').toString().trim() || parsedService;
-
+    
     // Build unified_context
     const unifiedContext = {
-      // Visitor's own business name — same key the inbound route uses, so the
-      // leads table shows "Brand · City" for web leads like it does for WhatsApp.
-      ...(visitorBrand ? { company: visitorBrand } : {}),
       web: {
         form_submission: {
           form_type: form_type || 'contact',
           message: message || '',
-          service_interest: resolvedServiceInterest || null,
-          visitor_brand: visitorBrand || null,
           page_url: page_url || '',
           submitted_at: new Date().toISOString()
         },
@@ -118,23 +86,6 @@ export async function POST(req: NextRequest) {
       },
       admin_notes: []
     };
-
-    // ── Attribution (source / first-touch) — resolved once per lead ─────────
-    // The website form already sends utm_source/medium/campaign + form_type +
-    // page_url. Promote them into unified_context.attribution so the dashboard
-    // SOURCE column shows the marketing source (Meta / Google / …), not just
-    // "Web". Without this the UTM only lived in web.utm and never surfaced.
-    const attribution = buildAttribution({
-      utmSource: utm_source || null,
-      formType: form_type || 'contact',
-      channel: 'web',
-      utm: {
-        source: utm_source || null,
-        medium: utm_medium || null,
-        campaign: utm_campaign || null,
-      },
-      pageUrl: page_url || null,
-    });
 
     // Check for existing lead (phone优先, then email)
     let existingLead = null;
@@ -166,10 +117,6 @@ export async function POST(req: NextRequest) {
       // Update existing lead
       const updatedContext = {
         ...existingLead.unified_context,
-        // Set attribution once — preserve the original origin if already present.
-        attribution: existingLead.unified_context?.attribution || attribution,
-        // Refresh the visitor's business name if this submission carries one.
-        ...(visitorBrand ? { company: visitorBrand } : {}),
         web: {
           ...existingLead.unified_context?.web,
           ...unifiedContext.web,
@@ -214,7 +161,7 @@ export async function POST(req: NextRequest) {
           last_touchpoint: 'web',
           last_interaction_at: new Date().toISOString(),
           brand: normalizedBrand,
-          unified_context: { ...unifiedContext, attribution },
+          unified_context: unifiedContext,
           lead_stage: 'New',
         })
         .select('id')
@@ -231,9 +178,8 @@ export async function POST(req: NextRequest) {
       (async () => {
         try {
           if (normalizedPhone) {
-            // Determine probe_question based on the service the visitor actually
-            // picked (parsed from the composite message field above).
-            const serviceInterest = resolvedServiceInterest;
+            // Determine probe_question based on service_interest
+            const serviceInterest = body.service_interest || '';
             let probeQuestion: string;
             if (serviceInterest === 'AI in Marketing') {
               probeQuestion = 'Ready to plug an AI system into your marketing?';
@@ -266,9 +212,7 @@ export async function POST(req: NextRequest) {
                       parameters: [
                         { type: 'text', parameter_name: 'customer_name', text: name },
                         { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
-                        // The template reads "…about {{service_interest}} for {{brand_name}}"
-                        // — brand_name is the VISITOR's business, not ours.
-                        { type: 'text', parameter_name: 'brand_name', text: visitorBrand || 'BCON' },
+                        { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
                         { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
                       ]
                     }]

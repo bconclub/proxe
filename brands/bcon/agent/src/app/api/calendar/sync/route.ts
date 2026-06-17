@@ -45,12 +45,17 @@ export async function POST(request: NextRequest) {
     const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
 
     if (!serviceAccountEmail || !privateKey) {
+      // Not an error — Google Calendar simply isn't connected. Return 200 with a
+      // typed `configured: false` flag so the dashboard can stay quiet instead of
+      // flashing a red "Sync Failed" banner on every page load. (Bookings are
+      // recorded in our own DB regardless; the calendar sync is optional.)
       return NextResponse.json(
         {
-          error: 'Google Calendar credentials not configured',
-          details: 'Please set up GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY environment variables.',
+          configured: false,
+          message: 'Google Calendar is not connected.',
+          details: 'Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY to enable calendar sync.',
         },
-        { status: 503 }
+        { status: 200 }
       )
     }
 

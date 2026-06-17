@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
+import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,14 +14,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
     // No role check here — viewer vs admin enforcement is done at write sites.
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await authClient.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
+    const supabase = getServiceClient() || authClient
+    
     const leadId = params.id
 
     // Fetch all activities for this lead
@@ -72,47 +73,45 @@ export async function GET(
     }
 
     // 2. Team actions: logged activities (from activities table).
-    // created_by is a TEXT label (default 'system'), NOT a FK to
-    // dashboard_users — so we can't PostgREST-embed the creator. Select the
-    // scalar columns and resolve the actor name in a second query only for
-    // rows whose created_by is a real dashboard_users UUID.
+    // Select only the columns we know exist on every brand's activities table.
+    // Older WC schemas lack duration_minutes / next_followup_date, and the
+    // previous select-then-throw made the WHOLE activity feed 500 — which made
+    // the modal fall back to conversations only, hiding logged calls/notes.
+    // Degrade gracefully instead: a team-query failure just omits team rows.
     const { data: teamActivities, error: teamError } = await supabase
       .from('activities')
-      .select('id, activity_type, note, duration_minutes, next_followup_date, created_at, created_by')
+      .select('id, activity_type, note, created_at, created_by')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
 
-    if (!teamError && teamActivities) {
-      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      const creatorIds = Array.from(new Set(
-        teamActivities
-          .map((a: any) => a.created_by)
-          .filter((v: any) => typeof v === 'string' && UUID_RE.test(v))
-      ))
-      const nameById: Record<string, string> = {}
-      if (creatorIds.length > 0) {
-        const { data: creators } = await supabase
-          .from('dashboard_users')
-          .select('id, name, email')
-          .in('id', creatorIds)
-        for (const u of (creators || []) as Array<{ id: string; name: string | null; email: string | null }>) {
-          nameById[u.id] = u.name || u.email || 'Team Member'
-        }
-      }
+    if (teamError) {
+      console.error('Error fetching team activities (continuing without them):', teamError.message)
+    }
+
+    if (teamActivities) {
       for (const activity of teamActivities) {
-        const cb = activity.created_by
-        const actor = (cb && nameById[cb]) || (cb && cb !== 'system' ? cb : 'Team Member')
+        // `created_by` historically stored an email string (e.g.
+        // "user@example.com") so the dashboard_users join on
+        // `created_by → id` returned nothing. Fall back: if creator
+        // is missing but created_by looks like an email, surface the
+        // local part as the actor name.
+        const rawCreatedBy = activity.created_by as string | null | undefined
+        const fallbackActor = rawCreatedBy && typeof rawCreatedBy === 'string' && rawCreatedBy.includes('@')
+          ? rawCreatedBy
+          : null
         activities.push({
           id: activity.id,
           type: 'team',
-          actor,
-          action: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
+          actor: fallbackActor || rawCreatedBy || 'Team Member',
+          // Friendly default; LeadDetailsModal Activity tab overrides this
+          // to "Call · Connected" / "Call · No Answer" / etc. for call logs.
+          action: activity.activity_type === 'manual_call'
+            ? 'Call logged'
+            : activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1).replace(/_/g, ' '),
           content: activity.note,
-          duration_minutes: activity.duration_minutes,
-          next_followup_date: activity.next_followup_date,
           timestamp: activity.created_at,
           icon: activity.activity_type,
-          color: '#3B82F6', // Blue
+          color: '#F59E0B', // Amber — distinct from PROXe (purple) + Customer (green)
           user_id: activity.created_by,
         })
       }
@@ -188,21 +187,24 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
     const {
       data: { user },
-    } = await supabase.auth.getUser()
+    } = await authClient.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const supabase = getServiceClient() || authClient
     const leadId = params.id
     const body = await request.json()
-    const { activity_type, note, duration_minutes } = body
+    const { activity_type, note, duration_minutes, next_followup_date, next_followup } = body
 
     if (!note?.trim()) {
       return NextResponse.json({ error: 'Note is required' }, { status: 400 })
     }
+
+    const createdBy = user.email || user.id || 'system'
 
     const { data, error } = await supabase
       .from('activities')
@@ -211,15 +213,13 @@ export async function POST(
         activity_type: activity_type || 'note',
         note: note.trim(),
         duration_minutes: duration_minutes || null,
-        created_by: 'system',
+        next_followup_date: next_followup_date || next_followup || null,
+        created_by: createdBy,
       })
       .select()
       .single()
 
     if (error) throw error
-
-    // Logging an activity = "I'm working this lead now" → become the owner.
-    await assignOwnerOnTouch(supabase, leadId, user)
 
     return NextResponse.json({ success: true, activity: data })
   } catch (error) {

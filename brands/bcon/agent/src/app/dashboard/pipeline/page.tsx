@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { MdSearch, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
+import type { Lead as ScoredLead } from '@/types'
 
 // --- Types ---
 
@@ -32,14 +33,18 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
+  // Auto stages (set by AI scoring): New → Engaged → Qualified → Key Events (booking).
+  // 'High Intent' is a LEGACY auto stage we no longer produce — fold it into Qualified
+  // so existing leads still show until they're re-scored. 'In Sequence' → New.
   { id: 'new',           dbValues: ['New', '', 'In Sequence'], label: 'New',     bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
-  { id: 'engaged',       dbValues: ['Engaged', 'Nurture'], label: 'Engaged',     bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
-  { id: 'qualified',     dbValues: ['Qualified'],        label: 'Qualified',     bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
+  { id: 'engaged',       dbValues: ['Engaged'],          label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
+  { id: 'qualified',     dbValues: ['Qualified', 'High Intent'], label: 'Qualified', bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
   { id: 'key_events',    dbValues: ['Booking Made'],     label: 'Key Events',    bg: '#534AB7', text: '#EEEDFE', sub: '#b0ace0' },
-  { id: 'call_done',     dbValues: ['High Intent', 'Demo Taken'], label: 'Call Done', bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
+  // Manual-only stages (set by the team — never auto): Call Done, Proposal Sent, Won, Lost.
+  { id: 'call_done',     dbValues: ['Call Done'],        label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
   { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
-  { id: 'won',           dbValues: ['Converted'],        label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
-  { id: 'lost',          dbValues: ['Cold', 'Closed Lost'], label: 'Lost',       bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
+  { id: 'won',           dbValues: ['Converted', 'Won'], label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
+  { id: 'lost',          dbValues: ['Cold', 'Closed Lost', 'Lost', 'Not Qualified'], label: 'Lost', bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
 ]
 
 function mapLeadToStageId(lead: Lead): string {
@@ -145,6 +150,11 @@ function Skeleton() {
 
 export default function PipelinePage() {
   const [leads, setLeads] = useState<Lead[]>([])
+  // Same client-side score the leads table + lead detail show. The stored
+  // lead_score column is 0/stale for many leads (AI scoring didn't run), so
+  // reading it directly made the pipeline show 0 while the lead detail showed
+  // the real (calculated) score. Compute it here too so they match.
+  const [calcScores, setCalcScores] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [activeStage, setActiveStage] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -153,10 +163,6 @@ export default function PipelinePage() {
   const perPage = 20
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
-  // Stored lead_score is 0/stale for many leads (AI scoring didn't run), which
-  // made the pipeline show 0 while the lead detail showed the real score.
-  // Compute the same client-side score here so they match.
-  const [calcScores, setCalcScores] = useState<Record<string, number>>({})
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -170,8 +176,8 @@ export default function PipelinePage() {
     }
   }, [])
 
-  // Compute the displayed score the same way the leads table / lead detail do.
-  // Falls back to the stored lead_score on error.
+  // Compute the displayed score the same way the leads table does (async,
+  // message-aware). Falls back to the stored lead_score on error.
   useEffect(() => {
     if (leads.length === 0) return
     let cancelled = false
@@ -180,7 +186,7 @@ export default function PipelinePage() {
       await Promise.all(
         leads.map(async (lead) => {
           try {
-            const r = await calculateLeadScore(lead as any)
+            const r = await calculateLeadScore(lead as unknown as ScoredLead)
             scores[lead.id] = r.score
           } catch {
             scores[lead.id] = lead.lead_score ?? 0

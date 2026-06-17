@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/services'
 import { cleanDisplayName } from '@/lib/services/utils'
 
 // Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
-// decorative junk so the dashboard reads as a professional B2B system. Falls back
-// to the raw trimmed value (then 'Unknown') if cleaning empties it.
+// decorative junk so the dashboard reads as a professional system. Falls back to
+// the raw trimmed value (then 'Unknown') if cleaning empties it.
 const dn = (raw?: string | null): string => {
   const cleaned = cleanDisplayName(raw || '')
   return cleaned || (raw || '').trim() || 'Unknown'
@@ -26,6 +27,15 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+
+    const authClient = await createClient()
+    const {
+      data: { user },
+    } = await authClient.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     // Check cache
     const cacheNow = Date.now()
@@ -44,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Cache miss - proceed with database queries
-    const supabase = await createClient()
+    const supabase = getServiceClient() || authClient
 
     // ============================================================================
     // PERFORMANCE: All queries run in parallel via Promise.all
@@ -56,7 +66,6 @@ export async function GET(request: NextRequest) {
       { data: whatsappSessions },
       { data: voiceSessions },
       { data: socialSessions },
-      { data: conversationsData, error: conversationsError },
       { data: stageChanges },
     ] = await Promise.all([
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
@@ -80,12 +89,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('social_sessions')
         .select('lead_id'),
-      // 6. conversations - messages for response time + activity (ONE query)
-      supabase
-        .from('conversations')
-        .select('lead_id, sender, created_at, metadata, channel')
-        .order('created_at', { ascending: true }),
-      // 7. lead_stage_changes - recent stage transitions
+      // 6. lead_stage_changes - recent stage transitions
       supabase
         .from('lead_stage_changes')
         .select('lead_id, old_stage, new_stage, new_score, created_at, changed_by')
@@ -126,14 +130,33 @@ export async function GET(request: NextRequest) {
     // Ensure leads is an array
     const safeLeads = leads || []
 
-    // Use conversations data from Promise.all (already fetched above)
+    // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
+    // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
+    // last 24h / 7d) was never fetched and Active Conversations read 0. Paginate
+    // the most-recent ~45 days, newest-first, so every window count is accurate.
     let messages: any[] = []
-    if (conversationsError) {
-      console.warn('Error fetching conversations:', conversationsError)
-      messages = []
-    } else {
-      messages = conversationsData || []
+    try {
+      const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      const PAGE = 1000
+      for (let page = 0; page < 20; page++) {
+        const { data: chunk, error: convErr } = await supabase
+          .from('conversations')
+          .select('lead_id, sender, created_at, metadata, channel')
+          .gte('created_at', convCutoff)
+          .order('created_at', { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1)
+        if (convErr) { console.warn('Error fetching conversations page', page, convErr.message); break }
+        if (!chunk || chunk.length === 0) break
+        messages.push(...chunk)
+        if (chunk.length < PAGE) break
+      }
+    } catch (e: any) {
+      console.warn('Conversations pagination failed:', e?.message)
     }
+    // We fetched newest-first (for the row cap); restore ascending order — the
+    // response-rate + response-time calcs below scan each conversation forward in
+    // time for the agent's reply, so they REQUIRE chronological order.
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     const now = new Date()
     const todayStart = new Date(now)
@@ -317,6 +340,20 @@ export async function GET(request: NextRequest) {
       return (now.getTime() - created.getTime()) <= 24 * 60 * 60 * 1000
     }).length
 
+    // Per-period deltas: this period vs the PRIOR equal-length period, so each
+    // toggle (7D/14D/30D) shows its own real change (not one reused 7-day number).
+    const DAY_MS = 24 * 60 * 60 * 1000
+    const leadsInWindow = (fromDays: number, toDays: number) =>
+      safeLeads.filter(lead => {
+        const age = now.getTime() - new Date(lead.created_at).getTime()
+        return age > fromDays * DAY_MS && age <= toDays * DAY_MS
+      }).length
+    const pctChange = (cur: number, prev: number) =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : (cur > 0 ? 100 : 0)
+    const newLeadsChange7D = pctChange(totalLeads7D, leadsInWindow(7, 14))
+    const newLeadsChange14D = pctChange(totalLeads14D, leadsInWindow(14, 28))
+    const newLeadsChange30D = pctChange(totalLeads30D, leadsInWindow(30, 60))
+    
     // PRIMARY: Count unique lead_ids from conversations table (all platforms)
     // This is the most accurate count since it tracks every real conversation
     const uniqueLeadIds = new Set<string>()
@@ -339,9 +376,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Active Conversations (24h): distinct leads messaged in the last day.
-    const conversations1D = uniqueLeadIds1D.size
     // Use conversations table counts (primary), fall back to session counts if empty
+    const conversations1D = uniqueLeadIds1D.size
     let conversations7D = uniqueLeadIds7D.size || uniqueConversations7D
     let conversations14D = uniqueLeadIds14D.size || uniqueConversations14D
     let conversations30D = uniqueLeadIds30D.size || uniqueConversations30D
@@ -476,8 +512,10 @@ export async function GET(request: NextRequest) {
       }))
 
     // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
-    // list matches the card countdown. One canonical IST parser fixes
-    // filter/sort/datetime (12h "4:00 PM" strings + missing-time fallback).
+    // list matches the card countdown. The old filter parsed without a timezone
+    // and fell back to 23:59:59 for missing times, so same-day-past bookings (and
+    // 12h "4:00 PM" strings that parse to Invalid Date) leaked in and rendered as
+    // "Past" inside "Upcoming". One canonical IST parser fixes filter/sort/datetime.
     const parseBookingIST = (date: string | null, time: string | null): Date | null => {
       if (!date) return null
       let hhmm = '12:00'
@@ -1027,29 +1065,38 @@ export async function GET(request: NextRequest) {
     let totalScore = 0
     let leadsWithScores = 0
 
-    // Batch-calculate scores for leads with no real score (parallel RPC calls).
-    // `!lead.lead_score` deliberately catches null, undefined AND literal 0 —
-    // phantom zeros (from crashed prior writes / pre-scoring leads) otherwise
-    // drag the average down materially. Matches Windchasers.
+    // Batch-calculate scores for leads with null OR zero scores.
+    // Previously we only refreshed nulls — but ~half of leads have
+    // lead_score stored as literal 0 (calculation crashed mid-flight on an
+    // earlier write, or the lead was created before scoring was wired).
+    // Those need to be re-evaluated too, otherwise the dashboard's Avg Lead
+    // Score is dragged down by phantom zeros for leads that actually have
+    // 10-40+ when the RPC runs. Caught it on 2026-05-20: dashboard showed
+    // 26% but the real average (with RPC backfill on the zero leads) is ~39%.
     const leadsNeedingScores = safeLeads.filter(
-      (lead) => !lead.lead_score
+      (lead) => !lead.lead_score  // null, undefined, OR 0
     )
 
     if (leadsNeedingScores.length > 0) {
       const scoreResults = await Promise.all(
-        leadsNeedingScores.map((lead) =>
-          supabase
-            .rpc('calculate_lead_score', { lead_uuid: lead.id })
-            .then(({ data, error }) => ({
+        leadsNeedingScores.map(async (lead) => {
+          try {
+            const { data, error } = await supabase
+              .rpc('calculate_lead_score', { lead_uuid: lead.id })
+
+            return {
               leadId: lead.id,
               score: !error && data != null ? (typeof data === 'number' ? data : parseFloat(data)) : 0,
-            }))
-            .catch(() => ({ leadId: lead.id, score: 0 }))
-        )
+            }
+          } catch {
+            return { leadId: lead.id, score: 0 }
+          }
+        })
       )
 
-      // Apply calculated scores back to leads in memory
-      const scoreMap = new Map(scoreResults.map((r) => [r.leadId, r.score]))
+      // Apply calculated scores back to leads in memory (NOT persisted — this is
+      // a read-side backfill only, so we never overwrite the stored score base).
+      const scoreMap = new Map<string, number>(scoreResults.map((r) => [r.leadId, r.score]))
       leadsNeedingScores.forEach((lead) => {
         const calculated = scoreMap.get(lead.id)
         if (calculated !== undefined && !isNaN(calculated)) {
@@ -1104,25 +1151,17 @@ export async function GET(request: NextRequest) {
       if (bookingDate) return true
       return false
     })
-    const engagedLeadsCount = engagedLeadsList.length
-    const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
-    console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
-
-    // Time-filtered engaged counts for the 7D/14D/30D dashboard card (mirrors
-    // warm-leads). Same engaged predicate as engagedLeadsList above.
-    const isEngagedLead = (lead: any) => {
-      if (engagedStages.includes(lead.lead_stage || '')) return true
-      const { bookingDate } = getBookingData(lead)
-      return !!bookingDate
-    }
-    const engagedWithin = (days: number) => safeLeads.filter(lead => {
-      if (!isEngagedLead(lead)) return false
+    const isActiveWithinDays = (lead: any, days: number) => {
       const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
       return (now.getTime() - lastActive.getTime()) <= days * 24 * 60 * 60 * 1000
-    }).length
-    const engagedLeads7D = engagedWithin(7)
-    const engagedLeads14D = engagedWithin(14)
-    const engagedLeads30D = engagedWithin(30)
+    }
+    const engagedLeadsCount = engagedLeadsList.length
+    const engagedLeads1D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 1))
+    const engagedLeads7D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 7))
+    const engagedLeads14D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 14))
+    const engagedLeads30D = engagedLeadsList.filter(lead => isActiveWithinDays(lead, 30))
+    const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
+    console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
 
     // WARM LEADS: Leads with score 40-69 (warming up, need attention)
     // Time-filtered counts for 7D/14D/30D dashboard card
@@ -1131,20 +1170,21 @@ export async function GET(request: NextRequest) {
       return score >= 40 && score < 70
     }
     const warmLeadsList = safeLeads.filter(isWarmLead)
+    const warmLeads1D = safeLeads.filter(lead => {
+      if (!isWarmLead(lead)) return false
+      return isActiveWithinDays(lead, 1)
+    })
     const warmLeads7D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 7 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 7)
     })
     const warmLeads14D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 14 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 14)
     })
     const warmLeads30D = safeLeads.filter(lead => {
       if (!isWarmLead(lead)) return false
-      const lastActive = lead.last_interaction_at ? new Date(lead.last_interaction_at) : new Date(lead.created_at)
-      return (now.getTime() - lastActive.getTime()) <= 30 * 24 * 60 * 60 * 1000
+      return isActiveWithinDays(lead, 30)
     })
     console.log(`📊 Warm Leads: 7D=${warmLeads7D.length} 14D=${warmLeads14D.length} 30D=${warmLeads30D.length} total=${warmLeadsList.length}`)
 
@@ -1165,13 +1205,15 @@ export async function GET(request: NextRequest) {
     // A higher rate indicates better customer service responsiveness.
     // Note: This is NOT the same as "customer response rate" (how often customers reply).
     const customerMessages = messages?.filter(m => m.sender === 'customer').length || 0
-    // (agent-message total no longer needed — response rate is conversation-aware below)
-    // Conversation-aware response rate: count customer messages that got an agent
-    // reply in the SAME conversation before the customer spoke again (bounded
-    // 0-100%). The old formula (agentReplies / customerMessages) exceeded 100%
-    // whenever the agent sent more bubbles than the customer (greetings, split
-    // replies) — that's a message ratio, not a response rate. `messages` is
-    // ordered created_at asc; anonymous web rows (lead_id null) group by session_id.
+    const agentReplies = messages?.filter(m => m.sender === 'agent').length || 0
+    // Response rate = share of customer messages that received an agent reply
+    // in the same conversation before the customer spoke again (bounded 0–100%).
+    // The old formula (agentReplies / customerMessages) exceeded 100% whenever the
+    // agent sent more bubbles than the customer (greetings, follow-ups, split
+    // replies) — that's a message ratio, not a real response rate.
+    // `messages` is already ordered by created_at asc (see query above), so each
+    // conversation group stays chronological. Anonymous web rows (lead_id = null)
+    // are grouped by their session_id from metadata.
     const convoKeyOf = (m: any) => m.lead_id || m.metadata?.session_id || 'unknown'
     const messagesByConvo: Record<string, any[]> = {}
     for (const m of (messages || [])) {
@@ -1353,8 +1395,10 @@ export async function GET(request: NextRequest) {
       }) || []
       const customerMessages = dailyMessages.filter((m: any) => m.sender === 'customer')
       const agentReplies = dailyMessages.filter((m: any) => m.sender === 'agent')
+      // Daily trend point for the Response Rate sparkline. Bounded to 100% so the
+      // trend line matches the headline metric (which can no longer exceed 100%).
       const dailyResponseRate = customerMessages.length > 0
-        ? (agentReplies.length / customerMessages.length) * 100
+        ? Math.min(100, (agentReplies.length / customerMessages.length) * 100)
         : 0
 
       // Daily booking rate
@@ -1399,10 +1443,6 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime) }) // Round to whole ms
     }
 
-    // ============================================================================
-    // TREND SERIES — per-day series that follow the home top-bar range toggle
-    // (Today/7D/14D/30D). Conversations Trend reads trendSeries.conversations.
-    // ============================================================================
     const periodWindows = {
       All: null,
       '7D': 7,
@@ -1477,6 +1517,17 @@ export async function GET(request: NextRequest) {
       return countSessions(safeWebSessions) + countSessions(safeWhatsappSessions)
     }
 
+    const countLeadsForDay = (leadsForTrend: any[], dateField: 'created_at' | 'lastActive') => (
+      dayStart: Date,
+      dayEnd: Date,
+    ) => leadsForTrend.filter((lead: any) => {
+      const rawDate = dateField === 'created_at'
+        ? lead.created_at
+        : (lead.last_interaction_at || lead.created_at)
+      const leadDate = new Date(rawDate)
+      return leadDate >= dayStart && leadDate < dayEnd
+    }).length
+
     const trendSeries = {
       conversations: {
         All: buildDailyTrend('All', countConversationsForDay),
@@ -1484,28 +1535,52 @@ export async function GET(request: NextRequest) {
         '14D': buildDailyTrend('14D', countConversationsForDay),
         '30D': buildDailyTrend('30D', countConversationsForDay),
       },
+      totalLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(safeLeads, 'created_at')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(safeLeads, 'created_at')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(safeLeads, 'created_at')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(safeLeads, 'created_at')),
+      },
+      engagedLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(engagedLeadsList, 'lastActive')),
+      },
+      warmLeads: {
+        All: buildDailyTrend('All', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '7D': buildDailyTrend('7D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '14D': buildDailyTrend('14D', countLeadsForDay(warmLeadsList, 'lastActive')),
+        '30D': buildDailyTrend('30D', countLeadsForDay(warmLeadsList, 'lastActive')),
+      },
     }
 
-    // LEADS RECOVERED: distinct leads that went cold / lost / dormant and were
-    // brought BACK to an active stage — the core PROXe value (a follow-up, or a
-    // lead that drifted off and got re-engaged). Uses the full stage-transition
-    // history (not the recent-50 slice the activity feed uses).
+    // LEADS RECOVERED: leads that went quiet and came BACK — the core PROXe value.
+    // There's no explicit "cold" stage in the data, so we detect re-engagement
+    // from the conversation timeline: a CUSTOMER (inbound) message that lands
+    // after >= 7 days of silence for that lead, with the comeback inside the last
+    // 30 days. Counts distinct leads.
     let leadsRecoveredCount = 0
     try {
-      const { data: allStageChanges } = await supabase
-        .from('lead_stage_changes')
-        .select('lead_id, old_stage, new_stage')
-        .order('created_at', { ascending: false })
-        .limit(5000)
-      const COLD = ['cold', 'lost', 'dormant', 'stale', 'nurture', 're-engage', 'reengage', 'in sequence', 'follow-up', 'followup', 'inactive', 'closed']
-      const ACTIVE = ['engaged', 'qualified', 'warm', 'high intent', 'booking', 'booked', 'demo', 'converted', 'interested', 'active', 'call done']
-      const lc = (s: string) => (s || '').toLowerCase()
-      const isCold = (s: string) => COLD.some(c => lc(s).includes(c))
-      const isActive = (s: string) => ACTIVE.some(a => lc(s).includes(a))
+      const GAP_MS = 7 * 24 * 60 * 60 * 1000
+      const recentMs = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const byLead: Record<string, Array<{ t: number; cust: boolean }>> = {}
+      for (const m of messages) {
+        if (!m.lead_id) continue
+        const t = new Date(m.created_at).getTime()
+        if (isNaN(t)) continue
+        ;(byLead[m.lead_id] ||= []).push({ t, cust: m.sender === 'customer' })
+      }
       const recovered = new Set<string>()
-      ;(allStageChanges || []).forEach((c: any) => {
-        if (c.lead_id && isCold(c.old_stage) && isActive(c.new_stage)) recovered.add(c.lead_id)
-      })
+      for (const [leadId, arr] of Object.entries(byLead)) {
+        arr.sort((a, b) => a.t - b.t)
+        for (let i = 1; i < arr.length; i++) {
+          if (arr[i].cust && arr[i].t - arr[i - 1].t >= GAP_MS && arr[i].t >= recentMs) {
+            recovered.add(leadId)
+            break
+          }
+        }
+      }
       leadsRecoveredCount = recovered.size
     } catch {
       // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
@@ -1559,20 +1634,25 @@ export async function GET(request: NextRequest) {
         count7D: totalLeads7D,
         count14D: totalLeads14D,
         count30D: totalLeads30D,
+        change7D: newLeadsChange7D,
+        change14D: newLeadsChange14D,
+        change30D: newLeadsChange30D,
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
       },
       engagedLeads: {
         count: engagedLeadsCount,
-        count7D: engagedLeads7D,
-        count14D: engagedLeads14D,
-        count30D: engagedLeads30D,
+        count1D: engagedLeads1D.length,
+        count7D: engagedLeads7D.length,
+        count14D: engagedLeads14D.length,
+        count30D: engagedLeads30D.length,
         total: totalLeadsCount,
         engagementRate: engagementRate,
         leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       warmLeads: {
         count: warmLeadsList.length,
+        count1D: warmLeads1D.length,
         count7D: warmLeads7D.length,
         count14D: warmLeads14D.length,
         count30D: warmLeads30D.length,

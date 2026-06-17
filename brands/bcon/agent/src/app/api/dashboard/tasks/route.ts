@@ -51,10 +51,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Query 1: pending and in_queue tasks (no date filter)
-    // The explicit cancelled/completed neqs + completed_at IS NULL are
-    // belt-and-suspenders: cancelled/completed rows have leaked into Next
-    // Actions in the wild (suspected PostgREST/connection caching quirk),
-    // so these guarantee they never show even if .in() misbehaves.
+    // The explicit `.neq('status','cancelled')` is belt-and-suspenders: we've
+    // seen cancelled rows leak into Next Actions in the wild (suspected
+    // PostgREST/connection caching quirk), so the extra filter guarantees
+    // cancelled tasks never show up here even if .in() misbehaves.
     let pendingQuery = supabase
       .from('agent_tasks')
       .select('*')

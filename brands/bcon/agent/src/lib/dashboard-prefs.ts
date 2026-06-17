@@ -1,11 +1,10 @@
 /**
- * Client helper for the GLOBAL dashboard preferences (sounds + theme). (BCON)
+ * Client helper for the GLOBAL dashboard preferences (sounds + theme).
  *
- * Ported from Windchasers. The server
- * (/api/dashboard/settings/preferences) is the source of truth; this just
- * fetches it, pushes changes, and mirrors the sound prefs into the same
- * localStorage keys the sound-prefs helper reads — so one user's setting
- * reaches every user on their next load.
+ * The server (/api/dashboard/settings/preferences) is the source of truth; this
+ * just fetches it, pushes changes, and mirrors the sound prefs into the same
+ * localStorage keys the existing sound-prefs helper reads — so one founder's
+ * setting reaches every user on their next load.
  */
 
 import { setMuted, setEventEnabled, type SoundEvent } from './sound-prefs'

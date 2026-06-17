@@ -20,9 +20,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Auth check via cookie-bound client (so we can capture user.email for the
-    // note's created_by). DB writes use service-role to stay consistent with
-    // the other dashboard routes and avoid RLS quirks swallowing writes.
+    // Auth check via cookie-bound client (so we can capture user.email
+    // for the note's created_by). DB writes use service-role to bypass RLS
+    // — the cookie client occasionally returns 0 affected rows + no error
+    // when RLS quirks (e.g. PostgREST scoping) hit, leaving the note in
+    // limbo. Service-role is consistent with other dashboard routes.
     const authClient = await createClient()
     const {
       data: { user },
@@ -90,13 +92,14 @@ export async function POST(
       .eq('id', leadId)
     if (updateError) throw updateError
 
-    // 4. Insert into activities table. BCON's activities.created_by is a text
-    // column, so the readable author (email/'system') goes straight in.
+    // 4. Insert into activities table. created_by is a UUID column — pass the
+    // user id or null, never the email/'system' (that throws 22P02 and 500s).
+    // The readable author lives on the unified_context.admin_notes entry above.
     const { error: activityError } = await supabase.from('activities').insert({
       lead_id: leadId,
       activity_type: 'note',
       note: trimmedNote,
-      created_by: createdBy,
+      created_by: user?.id || null,
     })
     if (activityError) throw activityError
 
@@ -135,6 +138,8 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    // Same service-role bypass as POST — RLS occasionally swallows the
+    // update without surfacing an error.
     const supabase = getServiceClient() || (await createClient())
     const leadId = params.id
     const body = await request.json()

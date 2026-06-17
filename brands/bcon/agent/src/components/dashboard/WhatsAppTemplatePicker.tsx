@@ -10,8 +10,6 @@ import { FaWhatsapp } from 'react-icons/fa'
  * in the inbox reply bar as a fallback when the 24h conversation window has
  * expired (templates are the only sanctioned way to re-open the window).
  *
- * Ported from Windchasers (brand-neutral; only the cache key differs).
- *
  * The template list is fetched lazily on first open and cached in localStorage
  * for 10 minutes — Meta's API is slow and the list rarely changes.
  *
@@ -20,7 +18,7 @@ import { FaWhatsapp } from 'react-icons/fa'
  * and render an input field per variable so the operator can fill them in.
  */
 
-const TEMPLATE_CACHE_KEY = 'bcon-wa-template-cache-v1'
+const TEMPLATE_CACHE_KEY = 'wc-wa-template-cache-v1'
 const TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
 /**
@@ -92,7 +90,9 @@ function saveCache(templates: MetaTemplate[]) {
  *   {{customer_name}}, …  (named — what Meta's "named params" templates use)
  *
  * Returns the ordered, deduped list. Numbered placeholders are kept in numeric
- * order; named placeholders in first-appearance order.
+ * order; named placeholders in first-appearance order. If a template mixes
+ * both styles (shouldn't happen with Meta, but defensive), positional are
+ * listed first.
  */
 interface TemplateVariable {
   key: string         // '1' or 'customer_name'
@@ -248,7 +248,7 @@ export default function WhatsAppTemplatePicker({
           channel: 'whatsapp',
           action: 'send_template',
           templateName: selectedTemplate.name,
-          languageCode: selectedTemplate.language || 'en',
+          languageCode: selectedTemplate.language || 'en_US',
           ...(positional ? { bodyParams: positional } : {}),
           ...(named ? { bodyParamsNamed: named } : {}),
           // Override the recipient when test mode is on
@@ -448,7 +448,7 @@ export default function WhatsAppTemplatePicker({
                     Variables ({variables.length})
                   </div>
                   <div className="space-y-1.5">
-                    {variables.map((v) => (
+                    {variables.map((v, i) => (
                       <div key={v.key} className="flex items-center gap-2">
                         <span
                           className="text-[10px] font-mono"
