@@ -36,13 +36,15 @@ export async function POST(req: NextRequest) {
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
   console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl, callerPhone, callUUID });
 
-  // Pass lead context to Vapi as custom SIP headers (VoBiz requires the X-VH-
-  // prefix + alphanumeric keys + URL-encoded values, comma-separated). Vapi
-  // strips the leading "X-" and maps the rest to assistant template variables.
+  // Pass lead context to Vapi as custom SIP headers. VoBiz AUTO-PREFIXES keys
+  // with "X-VH-" and only allows [A-Za-z0-9] in key names (dashes => silently
+  // dropped), so we send PLAIN alphanumeric keys. On the wire VoBiz sends e.g.
+  // "X-VH-contactname"; Vapi lowercases + strips the leading "X-" => the assistant
+  // template variable {{vh-contactname}} (Vapi keeps the dash, cf. "account-sid").
   const ctx: string[] = [];
-  if (leadName) ctx.push(`X-VH-contactname=${encodeURIComponent(leadName)}`);
-  if (business) ctx.push(`X-VH-businessname=${encodeURIComponent(business)}`);
-  if (industry) ctx.push(`X-VH-industry=${encodeURIComponent(industry)}`);
+  if (leadName) ctx.push(`contactname=${encodeURIComponent(leadName)}`);
+  if (business) ctx.push(`businessname=${encodeURIComponent(business)}`);
+  if (industry) ctx.push(`industry=${encodeURIComponent(industry)}`);
   const sipHeadersAttr = ctx.length ? ` sipHeaders="${ctx.join(',')}"` : '';
 
   // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
