@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   const leadName = urlParams.get('lead_name') || '';
   // For outbound/cold_intro: we pass lead_phone explicitly in the URL so we don't rely on Vobiz params
   const leadPhoneFromUrl = urlParams.get('lead_phone') || '';
+  // Lead context for the Vapi agent (passed by voice/test-call). Forwarded to Vapi
+  // as custom SIP headers; Vapi maps them to assistant template variables.
+  const business = urlParams.get('business') || '';
+  const industry = urlParams.get('industry') || '';
 
   const formData = await req.text();
   const params = new URLSearchParams(formData);
@@ -32,10 +36,19 @@ export async function POST(req: NextRequest) {
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
   console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl, callerPhone, callUUID });
 
+  // Pass lead context to Vapi as custom SIP headers (VoBiz requires the X-VH-
+  // prefix + alphanumeric keys + URL-encoded values, comma-separated). Vapi
+  // strips the leading "X-" and maps the rest to assistant template variables.
+  const ctx: string[] = [];
+  if (leadName) ctx.push(`X-VH-contactname=${encodeURIComponent(leadName)}`);
+  if (business) ctx.push(`X-VH-businessname=${encodeURIComponent(business)}`);
+  if (industry) ctx.push(`X-VH-industry=${encodeURIComponent(industry)}`);
+  const sipHeadersAttr = ctx.length ? ` sipHeaders="${ctx.join(',')}"` : '';
+
   // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
   // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
   // callerId presents the BCON number on the Vapi leg.
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"><User>${vapiSipUri}</User></Dial></Response>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"${sipHeadersAttr}><User>${vapiSipUri}</User></Dial></Response>`;
 
   return new NextResponse(xml, {
     headers: { 'Content-Type': 'text/xml' },

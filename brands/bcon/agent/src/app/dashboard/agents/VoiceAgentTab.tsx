@@ -4,21 +4,32 @@ import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
 
 export default function VoiceAgentTab() {
   const [phone, setPhone] = useState('');
+  const [personName, setPersonName] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [industry, setIndustry] = useState('');
   const [status, setStatus] = useState('');
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const voiceNumber = '+918046733388';
+  // All four are required — the agent only calls with full context.
+  const canCall = !!(phone.trim() && personName.trim() && businessName.trim() && industry.trim());
 
   async function triggerCall() {
-    if (!phone.trim()) return;
+    if (!canCall) return;
     setCalling(true);
     setStatus('');
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), direction: 'cold_intro' }),
+        body: JSON.stringify({
+          phone: phone.trim(),
+          direction: 'cold_intro',
+          contactName: personName.trim(),
+          businessName: businessName.trim(),
+          industry: industry.trim(),
+        }),
       });
       const data = await res.json();
       setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
@@ -113,31 +124,39 @@ export default function VoiceAgentTab() {
           <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
           <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            PROXE will call this number and introduce itself
+            PROXE will call and talk with full context — all fields required
           </p>
-          <input
-            type="text"
-            placeholder="Enter phone number"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && triggerCall()}
-            className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
-            style={{
-              backgroundColor: 'var(--bg-primary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
-              maxWidth: '300px',
-              textAlign: 'center',
-            }}
-          />
+          {[
+            { ph: 'Contact name', val: personName, set: setPersonName },
+            { ph: 'Business name', val: businessName, set: setBusinessName },
+            { ph: 'Industry', val: industry, set: setIndustry },
+            { ph: 'Phone number (e.g. 9731660933)', val: phone, set: setPhone, isPhone: true },
+          ].map((f) => (
+            <input
+              key={f.ph}
+              type="text"
+              placeholder={f.ph}
+              value={f.val}
+              onChange={(e) => f.set(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }}
+              className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
+              style={{
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                maxWidth: '320px',
+                textAlign: 'center',
+              }}
+            />
+          ))}
           <button
             onClick={triggerCall}
-            disabled={calling || !phone.trim()}
+            disabled={calling || !canCall}
             className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{
               backgroundColor: 'var(--button-bg)',
               color: 'var(--text-button)',
-              cursor: (calling || !phone.trim()) ? 'not-allowed' : 'pointer',
+              cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
             }}
           >
             {calling ? 'Calling...' : 'Call'}

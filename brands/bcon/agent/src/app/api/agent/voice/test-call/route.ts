@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { phone, leadName, direction = 'outbound' } = await req.json();
+  const { phone, leadName, contactName, businessName, industry, direction = 'outbound' } = await req.json();
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+  const name = contactName || leadName || '';
 
   try {
     const authId = process.env.VOBIZ_AUTH_ID;
@@ -15,7 +16,11 @@ export async function POST(req: NextRequest) {
     const digits = String(phone).replace(/\D/g, '');
     const cleanPhone = digits.slice(-10);
     const toNumber = digits.length === 12 && digits.startsWith('91') ? digits : `91${cleanPhone}`;
-    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}&lead_name=${encodeURIComponent(leadName || '')}&lead_phone=${cleanPhone}`;
+    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}`
+      + `&lead_name=${encodeURIComponent(name)}`
+      + `&lead_phone=${cleanPhone}`
+      + `&business=${encodeURIComponent(businessName || '')}`
+      + `&industry=${encodeURIComponent(industry || '')}`;
 
     const res = await fetch(
       `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,
