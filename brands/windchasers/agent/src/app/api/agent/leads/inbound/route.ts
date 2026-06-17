@@ -6,6 +6,8 @@ import {
   createCalendarEvent,
   sendDemoConfirmation,
   sendPATResult,
+  sendWelcomeTemplate,
+  pickWelcomeTemplate,
   buildAttribution,
   renderPATResultBody,
   renderDemoOnlineBody,
@@ -634,10 +636,53 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    // NOTE: generic first-outreach for new non-PAT, non-demo leads is DISABLED.
-    // The 'windchasers_followup' template was never approved in Meta, so every
-    // send was failing silently. Path removed until we set up real responses.
-    // Re-enable by approving a template in Meta and restoring the branch.
+    // ── Welcome for new non-PAT, non-demo callback leads (Google Ads / web /
+    // manual) — re-enabled now that the v2 welcome templates are Meta-approved
+    // (the old windchasers_followup was unapproved → silent fails). Pilot-source
+    // leads (campaign / source / form / interest mentions pilot/cpl/dgca/flying)
+    // get windchasers_pilot_welcome_v2; everyone else windchasers_generic_welcome_v1.
+    // NEW leads only (once per lead), and AWAITED so Vercel doesn't drop the send.
+    if (phone && isNew && !isPatSubmission && !isDemoBooking) {
+      const welcomeTpl = pickWelcomeTemplate(
+        leadSource, normalizedSource, campaign,
+        cf2.utm_campaign, cf2.utm_source, cf2.form_type,
+        cf2.course_interest, brandCtxData.course_interest, notes,
+      )
+      const firstName = (leadName || 'there').split(' ')[0]
+      try {
+        const result = await sendWelcomeTemplate(phone, leadName, welcomeTpl)
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: result.success
+            ? `Hi ${firstName}! (${welcomeTpl})`
+            : `[Template send FAILED: ${welcomeTpl}]`,
+          message_type: 'template',
+          metadata: {
+            template_name: welcomeTpl,
+            template_language: 'en',
+            template_header: TEMPLATE_HEADERS[welcomeTpl] || null,
+            template_buttons: TEMPLATE_BUTTONS[welcomeTpl] || [],
+            auto_sent: true,
+            trigger: 'inbound_callback_lead',
+            sent_by: 'system (inbound webhook)',
+            source: leadSource,
+            send_succeeded: !!result.success,
+            send_error: result.success ? null : (result.error || 'unknown'),
+          },
+        })
+        if (!result.success) {
+          console.error(`[inbound] welcome WA send FAILED lead=${leadId} phone=${phone} template=${welcomeTpl} error=${result.error}`)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        } else {
+          console.log(`[inbound] welcome WA OK lead=${leadId} phone=${phone} template=${welcomeTpl}`)
+        }
+      } catch (err: any) {
+        console.error(`[inbound] welcome WA EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
+        await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+      }
+    }
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
     const preferredTime = cfields.preferred_time || cfields.preferredTime || null

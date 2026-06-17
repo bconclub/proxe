@@ -36,6 +36,13 @@
 - **Lighter KPI card tint** (7%→4% fill, 22%→14% border) across all cards; **High Intent Leads** card is now green (not red); **Upcoming Events** name gets breathing room (baseline row, date · owner grouped).
 - Ports WC's `ed1cbc7a` + `8735fa16` + `0cf5c08d` onto bcon (brand theme/accent untouched). master already carried these from its WC sync.
 
+## 2026-06-17 01:05 IST · Windchasers: auto-welcome WhatsApp for inbound callback leads
+
+- `/api/agent/leads/inbound` (Google Ads / website / manual callback leads) now sends a WhatsApp welcome template on NEW lead creation — previously this branch was disabled because the old `windchasers_followup` template was unapproved in Meta (silent fails). Re-enabled with the approved v2 templates.
+- Pilot-source leads (campaign / source / form / interest mentions pilot/cpl/ppl/chpl/dgca/flying) → `windchasers_pilot_welcome_v2`; everyone else → `windchasers_generic_welcome_v1` (via `pickWelcomeTemplate`).
+- New leads only (skips existing leads), awaited so the Vercel lambda doesn't drop the send, logged to conversations (success + failure), and flags `needs_human_followup` on failure. PAT + demo flows keep their own templates unchanged.
+- User-facing: people who fill the Google-Ads callback form now get a pilot welcome on WhatsApp so the conversation can continue.
+
 ## 2026-06-17 00:10 IST · Windchasers home: time greeting, card tints, labelled controls, colour-coded events
 
 - **Greeting** now shifts by IST time of day — Good morning / afternoon / evening / night (was always "Welcome back").
