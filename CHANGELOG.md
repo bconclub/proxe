@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-17 · bcon: more WC catch-up (known-contact prompt + web-chat/modal bug fixes)
+
+- **bcon**: ported WC's promptBuilder KNOWN-CONTACT block (don't re-ask captured name/phone/email) + userEmail/userPhone; fixed a real web-chat bug where `postProcess()` referenced out-of-scope `messageCount`/`attributionSignal` (web-lead capture/attribution/summaries were silently failing); fixed duplicate `className` on LeadDetailsModal admin-note buttons. `next build` green, 46/46.
+
 ## 2026-06-17 · bcon: catch up to Windchasers (token metering + clean-core sync)
 
 - **bcon** was behind WC beyond the home page. Shipped token metering (`/tokens`, `token-usage.ts`, claudeClient recording, route — WC had it, bcon recorded nothing) and re-synced 47 clean shared-core files from WC (MicroCharts, NotificationCenter, TodaySnapshot, founder-metrics, attribution, claudeClient, dashboard routes, etc.) — brand-agnostic, so they render with bcon's own theme (pixel-parity). Brand-touched files (accent/copy/fields/prompts/templates) left intact, reconciled separately. `next build` green, 46/46.

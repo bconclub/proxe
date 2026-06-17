@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-17 · More WC catch-up: known-contact prompt + web-chat & modal bug fixes
+
+- **promptBuilder**: ported WC's KNOWN CONTACT block + `userEmail`/`userPhone` (tells the LLM which of name/phone/email are already captured so it never re-asks), keeping bcon's brand-switch + B2B form note.
+- **web/chat bug fixed**: `postProcess()` referenced `messageCount` + `attributionSignal` that weren't its parameters (left out of scope by a refactor) — so web-lead capture, attribution, and summaries silently failed at runtime. Threaded both through. (bcon-specific drift; WC wasn't affected.)
+- **LeadDetailsModal bug fixed**: admin-note mic + save buttons each had a duplicate `className` (React kept only the last → focus-ring class was dropped).
+
 ## 2026-06-17 · Catch up to Windchasers: token metering + clean-core sync
 
 - **Token metering shipped** (was entirely missing — WC had it, BCON recorded nothing): `lib/token-usage.ts` + claudeClient now records usage, `/api/dashboard/token-usage` route, and the `/tokens` page. Stored as a key/value row (`dashboard_settings.key='token_usage'`) — no schema migration; already handles the `updated_by` UUID gotcha.

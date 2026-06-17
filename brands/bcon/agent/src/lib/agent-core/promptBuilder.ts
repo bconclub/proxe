@@ -7,10 +7,13 @@ import { Channel, HistoryEntry } from './types';
 import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
 import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
 import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
+import { isLikelyRealPersonName } from '../services/utils';
 
 interface PromptOptions {
   channel: Channel;
   userName?: string | null;
+  userEmail?: string | null;
+  userPhone?: string | null;
   summary?: string;
   history?: HistoryEntry[];
   knowledgeBase?: string;
@@ -46,6 +49,8 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   const {
     channel,
     userName,
+    userEmail,
+    userPhone,
     summary,
     history,
     knowledgeBase,
@@ -61,7 +66,7 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
-  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -98,10 +103,34 @@ function buildSystemPrompt(
   channel?: Channel,
   crossChannelContext?: string,
   formData?: Record<string, any> | null,
+  userEmail?: string | null,
+  userPhone?: string | null,
 ): string {
-  const nameLine = userName
+  // Guard: only inject the name when it looks like a real person, not a brand
+  // label, UI string, or other junk that leaked into the customer_name column.
+  const nameLine = isLikelyRealPersonName(userName)
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
     : '';
+
+  // KNOWN CONTACT block — tells the LLM exactly which fields are already captured
+  // so it never re-asks for them.
+  const knownContactBlock = (() => {
+    const isKnown = (v?: string | null) => !!(v && String(v).trim());
+    const nameKnown = isLikelyRealPersonName(userName);
+    const emailKnown = isKnown(userEmail);
+    const phoneKnown = isKnown(userPhone);
+    const missing: string[] = [];
+    if (!nameKnown) missing.push('name');
+    if (!phoneKnown) missing.push('phone');
+    if (!emailKnown) missing.push('email');
+    const fmtMissing =
+      missing.length === 0 ? '(none — all three captured)'
+      : missing.length === 1 ? missing[0]
+      : missing.length === 2 ? `${missing[0]} and ${missing[1]}`
+      : `${missing[0]}, ${missing[1]}, and ${missing[2]}`;
+
+    return `\n\n=================================================================================\nKNOWN CONTACT (do not re-ask for fields marked KNOWN)\n=================================================================================\n- Name:  ${nameKnown ? `${userName} (KNOWN)` : '(missing)'}\n- Phone: ${phoneKnown ? '(KNOWN)' : '(missing)'}\n- Email: ${emailKnown ? '(KNOWN)' : '(missing)'}\n- Missing fields: ${fmtMissing}\n\nWhen any flow rule asks you to "drop your name, phone, and email" or similar, ONLY ask for the fields marked (missing). If all three are KNOWN, skip the contact ask entirely and proceed directly to the next step. Never re-ask for a KNOWN field. Never use exclamation marks or emojis in this ask.`;
+  })();
 
   // Channel-specific adjustments
   const channelNote = getChannelInstructions(channel, brand);
@@ -127,7 +156,7 @@ function buildSystemPrompt(
     }
   }
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + channelNote + crossChannelNote + formDataNote;
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
