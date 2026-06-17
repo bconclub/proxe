@@ -11,7 +11,10 @@ import { NextRequest, NextResponse } from 'next/server';
 //   outbound – backend triggers a VoBiz call (voice/test-call) -> on answer
 //              VoBiz fetches this URL -> bridged to Vapi
 export async function POST(req: NextRequest) {
-  const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:bcon-proxy@sip.vapi.ai';
+  // Trusted Vapi BYO-SIP-trunk URI: {number}@{credentialId}.sip.vapi.ai. Vapi
+  // accepts the INVITE because VoBiz's gateway IP is allowlisted on the trunk
+  // credential, then routes to the assistant bound to this BYO number.
+  const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:918046733388@98d57c1f-9133-4f15-a333-b9edff75f2f9.sip.vapi.ai';
   const callerId = process.env.VOBIZ_FROM_NUMBER || '';
 
   const urlParams = req.nextUrl.searchParams;
