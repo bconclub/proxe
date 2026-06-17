@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// VoBiz call -> Vapi voice agent bridge.
+// VoBiz owns the number (+918046733388) and is the carrier; the agent
+// ("PROXe Outbound Caller") lives on Vapi behind a SIP address. This route
+// returns dial-XML that hands the VoBiz leg to that SIP address, so VoBiz
+// bridges the caller <-> Vapi. Replaces the old custom voice-server stream
+// (wss://voiceproxe.bconclub.com — Deepgram/ElevenLabs), now retired.
+// Same XML serves both directions:
+//   inbound  – caller dials the DID -> VoBiz fetches this URL -> bridged to Vapi
+//   outbound – backend triggers a VoBiz call (voice/test-call) -> on answer
+//              VoBiz fetches this URL -> bridged to Vapi
 export async function POST(req: NextRequest) {
-  const voiceServerUrl = process.env.VOICE_SERVER_WSS_URL || 'wss://voiceproxe.bconclub.com';
+  const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:bcon-proxy@sip.vapi.ai';
+  const callerId = process.env.VOBIZ_FROM_NUMBER || '';
 
   const urlParams = req.nextUrl.searchParams;
   const direction = urlParams.get('direction') || 'inbound';
@@ -16,10 +27,12 @@ export async function POST(req: NextRequest) {
     ? (params.get('From') || params.get('from') || '')
     : (leadPhoneFromUrl || params.get('To') || params.get('to') || params.get('From') || params.get('from') || '');
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
-  console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl });
+  console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl, callerPhone, callUUID });
 
-  const extraHeaders = `callerPhone=${callerPhone},callUUID=${callUUID},direction=${direction},leadName=${encodeURIComponent(leadName)}`;
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" extraHeaders="${extraHeaders}">${voiceServerUrl}/ws</Stream></Response>`;
+  // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
+  // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
+  // callerId presents the BCON number on the Vapi leg.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"><User>${vapiSipUri}</User></Dial></Response>`;
 
   return new NextResponse(xml, {
     headers: { 'Content-Type': 'text/xml' },
