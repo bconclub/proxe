@@ -1,6 +1,10 @@
 {
   "name": "proxe-agent-master",
+<<<<<<< HEAD
   "version": "0.0.30",
+=======
+  "version": "0.0.24",
+>>>>>>> 1304c684 (bcon voice: bridge VoBiz call leg into Vapi agent over SIP)
   "private": true,
   "scripts": {
     "dev": "next dev -p 4002",

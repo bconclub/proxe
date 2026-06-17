@@ -11,10 +11,14 @@ import { NextRequest, NextResponse } from 'next/server';
 //   outbound – backend triggers a VoBiz call (voice/test-call) -> on answer
 //              VoBiz fetches this URL -> bridged to Vapi
 export async function POST(req: NextRequest) {
+<<<<<<< HEAD
   // Trusted Vapi BYO-SIP-trunk URI: {number}@{credentialId}.sip.vapi.ai. Vapi
   // accepts the INVITE because VoBiz's gateway IP is allowlisted on the trunk
   // credential, then routes to the assistant bound to this BYO number.
   const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:918046733388@98d57c1f-9133-4f15-a333-b9edff75f2f9.sip.vapi.ai';
+=======
+  const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:bcon-proxy@sip.vapi.ai';
+>>>>>>> 1304c684 (bcon voice: bridge VoBiz call leg into Vapi agent over SIP)
   const callerId = process.env.VOBIZ_FROM_NUMBER || '';
 
   const urlParams = req.nextUrl.searchParams;
@@ -36,6 +40,7 @@ export async function POST(req: NextRequest) {
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
   console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl, callerPhone, callUUID });
 
+<<<<<<< HEAD
   // Pass lead context to Vapi as custom SIP headers. VoBiz AUTO-PREFIXES keys
   // with "X-VH-" and only allows [A-Za-z0-9] in key names (dashes => silently
   // dropped), so we send PLAIN alphanumeric keys. On the wire VoBiz sends e.g.
@@ -51,6 +56,12 @@ export async function POST(req: NextRequest) {
   // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
   // callerId presents the BCON number on the Vapi leg.
   const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"${sipHeadersAttr}><User>${vapiSipUri}</User></Dial></Response>`;
+=======
+  // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
+  // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
+  // callerId presents the BCON number on the Vapi leg.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"><User>${vapiSipUri}</User></Dial></Response>`;
+>>>>>>> 1304c684 (bcon voice: bridge VoBiz call leg into Vapi agent over SIP)
 
   return new NextResponse(xml, {
     headers: { 'Content-Type': 'text/xml' },
