@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
     const authToken = process.env.VOBIZ_AUTH_TOKEN;
     const fromNumber = process.env.VOBIZ_FROM_NUMBER;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    // Normalize the destination to a routable country-coded number. The form may
+    // send a bare 10-digit number (e.g. 9731660933); VoBiz needs the country code
+    // to route (the `from` is 918046733388). Default 10-digit input to India (91).
+    const digits = String(phone).replace(/\D/g, '');
+    const cleanPhone = digits.slice(-10);
+    const toNumber = digits.length === 12 && digits.startsWith('91') ? digits : `91${cleanPhone}`;
     const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}&lead_name=${encodeURIComponent(leadName || '')}&lead_phone=${cleanPhone}`;
 
     const res = await fetch(
@@ -21,7 +26,7 @@ export async function POST(req: NextRequest) {
           'X-Auth-Token': authToken || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST', caller_name: 'BCON Club' }),
+        body: JSON.stringify({ from: fromNumber, to: toNumber, answer_url: answerUrl, answer_method: 'POST', caller_name: 'BCON Club' }),
       }
     );
 
