@@ -1,43 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Outbound calls are ORIGINATED by Vapi (Vapi -> VoBiz BYO trunk -> PSTN), NOT by
+// the VoBiz Call API. This is the only path that carries lead context: the old
+// VoBiz->Vapi bridge drops all custom SIP headers, so the agent never saw the name.
+// Originating from Vapi lets us pass name/business/industry as assistantOverrides
+// variableValues -> the prompt's {{vh-contactname}} / {{vh-businessname}} /
+// {{vh-industry}} -> the agent greets the lead by name with full context.
+//
+// Requires (Vercel env): VAPI_PRIVATE_API_KEY. The phone number + assistant ids
+// default to the live BCON outbound number (on the VoBiz "Vapi Outbound" trunk
+// credential, outboundLeadingPlusEnabled MUST be false) and the PROXe assistant.
+
+const VAPI_OUTBOUND_PHONE_NUMBER_ID =
+  process.env.VAPI_OUTBOUND_PHONE_NUMBER_ID || 'e03b4b96-a3ce-4b4f-91d3-de9ad5c70529';
+const VAPI_ASSISTANT_ID =
+  process.env.VAPI_ASSISTANT_ID || '999bf28c-6c2e-402d-8b05-a24899749a22';
+
 export async function POST(req: NextRequest) {
-  const { phone, leadName, contactName, businessName, industry, direction = 'outbound' } = await req.json();
+  const { phone, leadName, contactName, businessName, industry } = await req.json();
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+
   const name = contactName || leadName || '';
+  const vapiKey = process.env.VAPI_PRIVATE_API_KEY;
+  if (!vapiKey) {
+    return NextResponse.json(
+      { success: false, error: 'VAPI_PRIVATE_API_KEY not set in environment' },
+      { status: 500 },
+    );
+  }
+
+  // Normalize the destination to E.164 India. Form may send a bare 10-digit number.
+  const digits = String(phone).replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
 
   try {
-    const authId = process.env.VOBIZ_AUTH_ID;
-    const authToken = process.env.VOBIZ_AUTH_TOKEN;
-    const fromNumber = process.env.VOBIZ_FROM_NUMBER;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
-    // Normalize the destination to a routable country-coded number. The form may
-    // send a bare 10-digit number (e.g. 9731660933); VoBiz needs the country code
-    // to route (the `from` is 918046733388). Default 10-digit input to India (91).
-    const digits = String(phone).replace(/\D/g, '');
-    const cleanPhone = digits.slice(-10);
-    const toNumber = digits.length === 12 && digits.startsWith('91') ? digits : `91${cleanPhone}`;
-    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}`
-      + `&lead_name=${encodeURIComponent(name)}`
-      + `&lead_phone=${cleanPhone}`
-      + `&business=${encodeURIComponent(businessName || '')}`
-      + `&industry=${encodeURIComponent(industry || '')}`;
-
-    const res = await fetch(
-      `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,
-      {
-        method: 'POST',
-        headers: {
-          'X-Auth-ID': authId || '',
-          'X-Auth-Token': authToken || '',
-          'Content-Type': 'application/json',
+    const res = await fetch('https://api.vapi.ai/call', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${vapiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phoneNumberId: VAPI_OUTBOUND_PHONE_NUMBER_ID,
+        assistantId: VAPI_ASSISTANT_ID,
+        assistantOverrides: {
+          variableValues: {
+            'vh-contactname': name,
+            'vh-businessname': businessName || '',
+            'vh-industry': industry || '',
+          },
         },
-        body: JSON.stringify({ from: fromNumber, to: toNumber, answer_url: answerUrl, answer_method: 'POST', caller_name: 'BCON Club' }),
-      }
-    );
+        customer: { number: e164 },
+      }),
+    });
 
     const data = await res.json();
-    if (!res.ok) return NextResponse.json({ success: false, error: data }, { status: res.status });
-    return NextResponse.json({ success: true, callId: data?.request_uuid });
+    if (!res.ok) {
+      return NextResponse.json({ success: false, error: data?.message || data }, { status: res.status });
+    }
+    return NextResponse.json({ success: true, callId: data?.id });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
