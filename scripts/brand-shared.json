@@ -1,6 +1,9 @@
 {
   "_comment": "Files identical across master+bcon+wc = the shared core. propagate-from-master.js overwrites these in every brand from master/agent. Brand-specific files (configs, prompts, brand-facts, brand-divergent components/routes) are NOT listed and never touched. Move a file OUT the moment a brand must diverge it; move one IN once it is brand-neutral.",
-  "brands": ["bcon", "windchasers"],
+  "brands": [
+    "bcon",
+    "windchasers"
+  ],
   "sharedCore": [
     "app/admin/page.tsx",
     "app/api/admin/backfill-calendar/route.ts",
@@ -8,8 +11,6 @@
     "app/api/admin/create-booking/route.ts",
     "app/api/agent/calendar/availability/route.ts",
     "app/api/agent/summarize/route.ts",
-    "app/api/agent/voice/answer/route.ts",
-    "app/api/agent/voice/test-call/route.ts",
     "app/api/agent/voice/transcript/route.ts",
     "app/api/agent/wa-prelaunch/route.ts",
     "app/api/agent/web/events/route.ts",
@@ -74,7 +75,6 @@
     "app/auth/callback/route.ts",
     "app/auth/logout/route.ts",
     "app/auth/signup/page.tsx",
-    "app/dashboard/agents/VoiceAgentTab.tsx",
     "app/dashboard/agents/WhatsAppAgentTab.tsx",
     "app/dashboard/audience/page.tsx",
     "app/dashboard/bookings/page.tsx",
@@ -153,7 +153,6 @@
     "lib/services/instagramSender.ts",
     "lib/services/leadOwnership.ts",
     "lib/services/templateLibrary.ts",
-    "lib/sound-prefs.ts",
     "lib/supabase/client.ts",
     "lib/supabase/middleware.ts",
     "lib/supabase/server.ts",
