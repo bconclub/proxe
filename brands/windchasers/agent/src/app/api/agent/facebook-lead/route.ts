@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, renderWelcomeBody, TEMPLATE_BUTTONS, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
@@ -203,9 +203,9 @@ export async function POST(request: NextRequest) {
           leadId,
           'whatsapp',
           'agent',
-          `Welcome message sent to ${name.split(' ')[0]}.`,
+          renderWelcomeBody(welcomeTpl, name) || `Welcome message sent to ${name.split(' ')[0]}.`,
           'template',
-          { source: 'facebook_lead', template_name: welcomeTpl, ...facebookMeta },
+          { source: 'facebook_lead', template_name: welcomeTpl, template_language: 'en', template_buttons: TEMPLATE_BUTTONS[welcomeTpl] || [], ...facebookMeta },
           supabase,
         );
       }

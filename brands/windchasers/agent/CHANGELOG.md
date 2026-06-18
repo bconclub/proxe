@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Inbox shows the ACTUAL welcome template body
+
+- Added `renderWelcomeBody(templateName, name)` with the Meta-approved body copy for `windchasers_generic_welcome_v1` + `windchasers_pilot_welcome_v2` (verified against the Graph API), and their quick-reply buttons in `TEMPLATE_BUTTONS`.
+- Inbound + Facebook-lead welcome sends now log the **rendered template body** (e.g. "Hi Sanjay, welcome to *Windchasers.* You're one step closer to the cockpit…") with the real buttons — instead of the "Welcome message sent to X" placeholder.
+- Backfilled 14 existing welcome rows to the real body + buttons.
+
 ## 2026-06-18 · Fix founder-metrics 504 timeout (Failed to load metrics)
 
 - The conversations fetch was paginating ~45 days **sequentially**, which 504-timed-out the route on cold starts ("Failed to load metrics"). Now: count first, fetch all pages **in parallel**, window narrowed 45d → 30d (still covers every UI window + recovered), capped at 12 pages.

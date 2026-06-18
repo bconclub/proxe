@@ -8,6 +8,7 @@ import {
   sendPATResult,
   sendWelcomeTemplate,
   pickWelcomeTemplate,
+  renderWelcomeBody,
   buildAttribution,
   renderPATResultBody,
   renderDemoOnlineBody,
@@ -656,8 +657,8 @@ export async function POST(request: NextRequest) {
           channel: 'whatsapp',
           sender: 'agent',
           content: result.success
-            ? `Welcome message sent to ${firstName}.`
-            : `Welcome message failed to send to ${firstName}.`,
+            ? (renderWelcomeBody(welcomeTpl, leadName) || `Welcome message sent to ${firstName}.`)
+            : `[Welcome failed to send] ${renderWelcomeBody(welcomeTpl, leadName) || welcomeTpl}`,
           message_type: 'template',
           metadata: {
             template_name: welcomeTpl,

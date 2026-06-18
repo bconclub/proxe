@@ -286,7 +286,29 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   windchasers_pat_result_v2:    ['Book a Demo Class', 'Plan My Pilot Career'],
   windchasers_demo_online_v2:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
   windchasers_demo_offline_v2:  ['Get Directions', 'Join Pilot Community'],
+  windchasers_generic_welcome_v1: ['Pilot Training', 'Cabin Crew', 'Other'],
+  windchasers_pilot_welcome_v2:   ['Pilot Training Details', 'Visit Academy', 'Book a Demo Class'],
 };
+
+/**
+ * Meta-approved welcome template BODY copy (verified against the Graph API),
+ * with the {{customer_name}} placeholder. Used to log the ACTUAL message the
+ * customer received into the inbox (not a placeholder). Keep in sync with Meta.
+ */
+const WELCOME_BODIES: Record<string, string> = {
+  windchasers_generic_welcome_v1:
+    'Hi {{customer_name}}, welcome to *Windchasers*. We are here to guide you with your Aviation Career.\n\nWhat are you looking to explore?',
+  windchasers_pilot_welcome_v2:
+    "Hi {{customer_name}}, welcome to *Windchasers.*\n\nYou're one step closer to the cockpit. Where would you like to start?",
+};
+
+/** Render a welcome template's real body with the lead's first name filled in. */
+export function renderWelcomeBody(templateName: string, name: string): string {
+  const tpl = WELCOME_BODIES[templateName]
+  if (!tpl) return ''
+  const first = (name || 'there').split(' ')[0]
+  return tpl.replace(/\{\{\s*customer_name\s*\}\}/g, first)
+}
 
 /**
  * Send a booking confirmation message.

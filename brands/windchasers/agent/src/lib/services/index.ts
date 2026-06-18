@@ -98,6 +98,7 @@ export {
   sendFacebookLeadWelcome,
   sendWelcomeTemplate,
   pickWelcomeTemplate,
+  renderWelcomeBody,
   isPilotSource,
   isCabinCrewSource,
   pickRnrTemplate,
