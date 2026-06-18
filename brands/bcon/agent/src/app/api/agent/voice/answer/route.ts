@@ -49,10 +49,19 @@ export async function POST(req: NextRequest) {
   if (industry) ctx.push(`industry=${encodeURIComponent(industry)}`);
   const sipHeadersAttr = ctx.length ? ` sipHeaders="${ctx.join(',')}"` : '';
 
+  // Retry-on-busy: VoBiz spreads outbound SIP across egress IPs; one of them
+  // (3.111.255.163) is refused by Vapi with USER_BUSY, dropping ~half of calls.
+  // <Dial action> re-invokes /dial-status after the bridge ends; on a busy/failed
+  // result it re-dials, VoBiz re-rolls the egress IP, so a retry usually lands on
+  // a good one. Context rides in the action URL so retries keep name/business.
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
+  const ctxQuery = `lead_name=${encodeURIComponent(leadName)}&business=${encodeURIComponent(business)}&industry=${encodeURIComponent(industry)}`;
+  const actionUrl = `${baseUrl}/api/agent/voice/dial-status?attempt=2&${ctxQuery}`.replace(/&/g, '&amp;');
+
   // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
   // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
-  // callerId presents the BCON number on the Vapi leg.
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"><User${sipHeadersAttr}>${vapiSipUri}</User></Dial></Response>`;
+  // callerId presents the BCON number on the Vapi leg; sipHeaders ride on <User>.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30" action="${actionUrl}" method="POST"><User${sipHeadersAttr}>${vapiSipUri}</User></Dial></Response>`;
 
   return new NextResponse(xml, {
     headers: { 'Content-Type': 'text/xml' },
