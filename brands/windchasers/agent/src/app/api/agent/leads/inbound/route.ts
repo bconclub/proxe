@@ -656,8 +656,8 @@ export async function POST(request: NextRequest) {
           channel: 'whatsapp',
           sender: 'agent',
           content: result.success
-            ? `Hi ${firstName}! (${welcomeTpl})`
-            : `[Template send FAILED: ${welcomeTpl}]`,
+            ? `Welcome message sent to ${firstName}.`
+            : `Welcome message failed to send to ${firstName}.`,
           message_type: 'template',
           metadata: {
             template_name: welcomeTpl,
