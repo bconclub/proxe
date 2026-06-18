@@ -96,8 +96,10 @@ export async function POST(req: NextRequest) {
     const rawCustomer = msg.customer?.number || call.customer?.number || null;
     let { full: phone, norm } = normalizePhone(rawCustomer);
     const bconNorm = normalizePhone(process.env.VOBIZ_FROM_NUMBER || '918046733388').norm;
+    const callType = String(call.type || '');
     let direction: 'inbound' | 'outbound';
     if (norm && bconNorm && norm === bconNorm) {
+      // Old VoBiz->Vapi bridge: customer.number is OUR number; recover the real lead.
       direction = 'outbound';
       const rec = await recoverOutboundDestination(startedAt);
       if (rec.norm) {
@@ -106,6 +108,9 @@ export async function POST(req: NextRequest) {
         console.warn('[vapi-webhook] outbound bridge but could not recover lead number; not filing under BCON number');
         phone = null; norm = null; // better unlinked than mis-filed under our own number
       }
+    } else if (/outbound/i.test(callType)) {
+      // Vapi-originated outbound: customer.number is already the lead's real number.
+      direction = 'outbound';
     } else {
       direction = 'inbound';
     }
