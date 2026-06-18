@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-18 · Settings: surface the token-usage link (was unreachable)
+
+- BCON had the token-usage feature (`/tokens` → `/dashboard/tokens`) but no link to it — the Settings page still showed an "Other Settings… coming soon" placeholder. Replaced that with the **Token usage** card (matches WC) so it's reachable. Page + metering were already there; this just surfaces it.
+
 ## 2026-06-17 · More WC catch-up: known-contact prompt + web-chat & modal bug fixes
 
 - **promptBuilder**: ported WC's KNOWN CONTACT block + `userEmail`/`userPhone` (tells the LLM which of name/phone/email are already captured so it never re-asks), keeping bcon's brand-switch + B2B form note.

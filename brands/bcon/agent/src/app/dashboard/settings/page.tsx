@@ -682,17 +682,29 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Other Settings Placeholder */}
+        {/* Token usage */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Other Settings
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            Token usage
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>Test</span>
           </h2>
-          
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              More settings coming soon...
-            </p>
-          </div>
+          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+            See roughly how much Claude spend goes to agent chat, scoring, and notes/summaries.
+          </p>
+          <a
+            href="/tokens"
+            className="block p-5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Open token usage</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Spend by area · experimental</div>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
         </div>
       </div>
     </DashboardLayout>
