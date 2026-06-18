@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Custom dashboard sounds (team-supplied)
+
+- New cues in `public/sounds/`: `notification.mp3` (new lead + lead update) and `page-load.mp3` (page-ready). Replaces the old pop.wav / long-pop.wav mappings.
+- Page-load gain raised 0.18 → 0.7 (the old value was suppressing a too-loud file; the new cue is the chosen one). Tunable in `sound-prefs.ts`.
+
 ## 2026-06-18 · Cabin-crew welcome routing + agent stops dumping the full menu to cabin leads
 
 - `pickWelcomeTemplate` is now 3-way (cabin → pilot → generic) via a new `isCabinCrewSource()` helper. The cabin path is **flag-gated** (`CABIN_WELCOME_TEMPLATE`, currently null) so it's safe to deploy — cabin leads keep getting the generic welcome until the Meta-approved cabin template name is filled in (an unapproved name would fail-send). Flip the constant to activate.

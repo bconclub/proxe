@@ -13,9 +13,9 @@
 export type SoundEvent = 'new' | 'update' | 'ready'
 
 export const SOUND_FILES: Record<SoundEvent, string> = {
-  new: '/sounds/pop.wav', // custom POP cue supplied by the team
-  update: '/sounds/pop.wav', // custom POP cue (same as new-lead)
-  ready: '/sounds/long-pop.wav', // custom "long pop" cue supplied by the team
+  new: '/sounds/notification.mp3', // team-supplied notification cue (new lead)
+  update: '/sounds/notification.mp3', // same notification cue for lead updates
+  ready: '/sounds/page-load.mp3', // team-supplied page-load cue
 }
 
 export const SOUND_LABELS: Record<SoundEvent, string> = {
@@ -24,12 +24,13 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
   ready: 'Page ready',
 }
 
-// Per-event playback gain (0..1). Page-ready mp3 is loud — turn it down hard
-// (founder: "the homepage reload sound is too loud"). Halved from 0.35 → 0.18.
+// Per-event playback gain (0..1). All three now use team-supplied cues, played
+// near full so they're clearly audible. Lower `ready` if the page-load cue feels
+// too loud.
 const SOUND_VOLUME: Record<SoundEvent, number> = {
   new: 1.0,
   update: 1.0,
-  ready: 0.18,
+  ready: 0.7,
 }
 
 // Master mute key kept as-is for back-compat with the existing bell toggle.
