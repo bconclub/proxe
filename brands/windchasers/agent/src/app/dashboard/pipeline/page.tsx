@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { MdSearch, MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import type { Lead as ScoredLead } from '@/types'
 
@@ -318,6 +319,9 @@ export default function PipelinePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── SECTION 0: FUNNEL SUMMARY (pre-key / key event / post-key / exit + rates) ── */}
+      <PipelineFunnel />
 
       {/* ── SECTION 1: CHEVRON FLOW ── */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 2, paddingBottom: 2 }}>

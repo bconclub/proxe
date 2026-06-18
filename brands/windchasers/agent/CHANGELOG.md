@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Pipeline page: funnel-summary view
+
+- New `PipelineFunnel` component at the top of `/dashboard/pipeline` (kanban kept below): Pre-Key (New / Engaged / Qualified, blue) → Key Event banner ("Demo Booked" = Booking Made, purple) → Post-Key (Demo Done / Offer Made / Won, green) → Exit States (No Show amber / Parked gray / Closed-Lost red), plus a metrics row (Key Event Rate, Show-up Rate, True Win Rate, Revivable).
+- Counts via per-stage Supabase count queries (no row-cap issues). Cards click through to the leads list filtered by stage.
+- Note: Demo Done / Offer Made / Won / No Show / Parked have no DB stage yet, so they read 0 (matches the design); add those stages to make them live.
+
 ## 2026-06-18 · Custom dashboard sounds (team-supplied)
 
 - New cues in `public/sounds/`: `notification.mp3` (new lead + lead update) and `page-load.mp3` (page-ready). Replaces the old pop.wav / long-pop.wav mappings.
