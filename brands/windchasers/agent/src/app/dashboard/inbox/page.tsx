@@ -391,6 +391,8 @@ export default function InboxPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
+  // Only admins may (re)assign a lead's owner; non-admins see it read-only.
+  const [isAdmin, setIsAdmin] = useState(false)
   const [calculatedLeadScore, setCalculatedLeadScore] = useState<number | null>(null)
   // Map of lead_id → calculated score for the conversation list. The DB
   // lead_score is often null/0; this lets the list reflect real engagement.
@@ -503,7 +505,7 @@ export default function InboxPage() {
     let cancelled = false
     fetch('/api/dashboard/team-members')
       .then((r) => r.json())
-      .then((d) => { if (!cancelled && Array.isArray(d.members)) setTeamMembers(d.members) })
+      .then((d) => { if (cancelled) return; if (Array.isArray(d.members)) setTeamMembers(d.members); setIsAdmin(d?.isAdmin === true) })
       .catch(() => { /* non-fatal */ })
     return () => { cancelled = true }
   }, [])
@@ -2652,21 +2654,28 @@ export default function InboxPage() {
               {/* ── OWNER ── */}
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Owner</p>
-                <select
-                  value={leadDetails?.unified_context?.owner?.id || ''}
-                  onChange={(e) => setLeadOwner(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                  // colorScheme makes the native dropdown render dark in dark mode —
-                  // without it the options were white-on-white (only the highlighted
-                  // row showed), so the list looked empty. Options also get explicit
-                  // bg/color for browsers that honour it.
-                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-secondary)', colorScheme: 'light dark' }}
-                >
-                  <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Unassigned</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{m.name}</option>
-                  ))}
-                </select>
+                {isAdmin ? (
+                  <select
+                    value={leadDetails?.unified_context?.owner?.id || ''}
+                    onChange={(e) => setLeadOwner(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    // colorScheme makes the native dropdown render dark in dark mode —
+                    // without it the options were white-on-white (only the highlighted
+                    // row showed), so the list looked empty. Options also get explicit
+                    // bg/color for browsers that honour it.
+                    style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-secondary)', colorScheme: 'light dark' }}
+                  >
+                    <option value="" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Unassigned</option>
+                    {teamMembers.map((m) => (
+                      <option key={m.id} value={m.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  // Non-admins: owner is read-only (assignment is admin-only).
+                  <div className="w-full px-2.5 py-1.5 text-xs rounded-md border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-secondary)' }}>
+                    {leadDetails?.unified_context?.owner?.name || 'Unassigned'}
+                  </div>
+                )}
               </div>
 
               {/* ── UPCOMING / BOOKING ── */}

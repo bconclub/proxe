@@ -25,6 +25,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const owner = body?.owner
 
     const supabase = getServiceClient() || authClient
+
+    // Owner assignment is ADMIN-ONLY — the dropdown is hidden for non-admins,
+    // but enforce it here too so the API can't be called directly to bypass it.
+    const { data: me } = await supabase
+      .from('dashboard_users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (me?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden — owner assignment is admin-only' }, { status: 403 })
+    }
+
     const { data: lead, error: readErr } = await supabase
       .from('all_leads')
       .select('unified_context')

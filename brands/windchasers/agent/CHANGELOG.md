@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Owner assignment is admin-only
+
+- Inbox lead panel: the OWNER dropdown now renders only for admins; non-admins see the owner as a read-only label ("Unassigned" / name). Everyone can still SEE the owner.
+- `/api/dashboard/team-members` returns `isAdmin` (caller's role) for the gate.
+- `/api/dashboard/leads/[id]/owner` now rejects non-admins (403) — server-side enforcement so the hidden UI can't be bypassed.
+- Auto-assign-on-touch (owner = whoever replies/logs) is unchanged — that's the separate "you own what you work" behavior, not manual reassignment.
+
 ## 2026-06-18 · Token usage: time-window toggle (24h / 7d / 14d / 30d / All)
 
 - Metering now also writes **per-IST-day buckets** (`byDay`) alongside the cumulative total, so /tokens can sum windows.
