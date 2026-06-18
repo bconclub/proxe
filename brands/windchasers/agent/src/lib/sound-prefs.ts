@@ -30,7 +30,7 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
 const SOUND_VOLUME: Record<SoundEvent, number> = {
   new: 1.0,
   update: 1.0,
-  ready: 0.7,
+  ready: 0.5,
 }
 
 // Master mute key kept as-is for back-compat with the existing bell toggle.
