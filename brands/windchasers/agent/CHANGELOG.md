@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Fix founder-metrics 504 timeout (Failed to load metrics)
+
+- The conversations fetch was paginating ~45 days **sequentially**, which 504-timed-out the route on cold starts ("Failed to load metrics"). Now: count first, fetch all pages **in parallel**, window narrowed 45d → 30d (still covers every UI window + recovered), capped at 12 pages.
+- Added `maxDuration = 60` to the route for headroom (effective on Pro).
+- Combined with the client-side cache shipped earlier, the home should stop showing the red error.
+
 ## 2026-06-18 · Home loads instantly (client cache for founder-metrics)
 
 - The home now paints from a cached snapshot in `localStorage` immediately, then revalidates in the background — no more blocking on the heavy `/api/dashboard/founder-metrics` fetch (which cold-starts miss the in-memory server cache on Vercel).

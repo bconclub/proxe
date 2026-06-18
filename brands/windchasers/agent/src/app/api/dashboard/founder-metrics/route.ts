@@ -12,6 +12,9 @@ const dn = (raw?: string | null): string => {
 }
 
 export const dynamic = 'force-dynamic'
+// Give the heavy aggregation headroom past the default function timeout (applies
+// on Pro; Hobby caps lower, so the parallel-fetch speedup above is the real fix).
+export const maxDuration = 60
 
 // In-memory cache for metrics (5 minutes TTL)
 interface CachedMetrics {
@@ -134,21 +137,32 @@ export async function GET(request: NextRequest) {
     // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
     // last 24h / 7d) was never fetched and Active Conversations read 0. Paginate
     // the most-recent ~45 days, newest-first, so every window count is accurate.
+    // 30 days covers every window the UI shows (24h / 7d / 14d / 30d trends +
+    // recovered). Count first, then fetch all pages IN PARALLEL — sequential
+    // pagination over ~thousands of rows was 504-timing-out the route on cold
+    // starts. Capped at 12 pages (12k rows) as a runaway guard.
     let messages: any[] = []
     try {
-      const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      const convCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       const PAGE = 1000
-      for (let page = 0; page < 20; page++) {
-        const { data: chunk, error: convErr } = await supabase
-          .from('conversations')
-          .select('lead_id, sender, created_at, metadata, channel')
-          .gte('created_at', convCutoff)
-          .order('created_at', { ascending: false })
-          .range(page * PAGE, page * PAGE + PAGE - 1)
-        if (convErr) { console.warn('Error fetching conversations page', page, convErr.message); break }
-        if (!chunk || chunk.length === 0) break
-        messages.push(...chunk)
-        if (chunk.length < PAGE) break
+      const { count: convCount } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', convCutoff)
+      const pages = Math.min(Math.ceil((convCount || 0) / PAGE) || 1, 12)
+      const pageResults = await Promise.all(
+        Array.from({ length: pages }, (_, p) =>
+          supabase
+            .from('conversations')
+            .select('lead_id, sender, created_at, metadata, channel')
+            .gte('created_at', convCutoff)
+            .order('created_at', { ascending: false })
+            .range(p * PAGE, p * PAGE + PAGE - 1),
+        ),
+      )
+      for (const { data: chunk, error: convErr } of pageResults) {
+        if (convErr) { console.warn('Error fetching conversations page:', convErr.message); continue }
+        if (chunk) messages.push(...chunk)
       }
     } catch (e: any) {
       console.warn('Conversations pagination failed:', e?.message)
