@@ -14,6 +14,7 @@ export default function VoiceAgentTab() {
   const [status, setStatus] = useState('');
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
 
   const voiceNumber = '+918046733388';
   // All four are required — the agent only calls with full context.
@@ -38,12 +39,48 @@ export default function VoiceAgentTab() {
         body: JSON.stringify({ ...vals, direction: 'cold_intro' }),
       });
       const data = await res.json();
-      setStatus(data.success ? `✓ Calling +91 ${vals.phone}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
+      if (data.success && data.callId) {
+        setStatus(`Dialing +91 ${vals.phone}`);
+        setLive({ status: 'queued' });
+        pollStatus(String(data.callId));
+      } else {
+        setStatus(`Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
+        setLive(null);
+      }
     } catch {
       setStatus('Error — check server logs');
+      setLive(null);
     } finally {
       setCalling(false);
     }
+  }
+
+  // Poll our backend (which proxies Vapi) for live call status until it ends, so
+  // the card shows ringing -> connected -> ended instead of fire-and-forget.
+  async function pollStatus(id: string) {
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const r = await fetch(`/api/agent/voice/call-status?id=${encodeURIComponent(id)}`);
+        const d = await r.json();
+        if (d && d.status) {
+          setLive({ status: d.status, reasonText: d.reasonText, durationSeconds: d.durationSeconds });
+          if (d.ended) break;
+        }
+      } catch { /* transient — keep polling */ }
+    }
+  }
+
+  // Friendly live badge text/color from the polled status.
+  function liveBadge(l: NonNullable<typeof live>): { txt: string; color: string } {
+    if (l.status === 'queued' || l.status === 'ringing') return { txt: '📞 Ringing…', color: '#eab308' };
+    if (l.status === 'in-progress') return { txt: '🟢 Connected — on the call', color: '#22c55e' };
+    if (l.status === 'ended') {
+      const dur = l.durationSeconds != null ? ` · ${l.durationSeconds}s` : '';
+      const bad = /busy|no answer|timeout|unavailable|error|credit/i.test(l.reasonText || '');
+      return { txt: `${bad ? '✗' : '✓'} ${l.reasonText || 'Call ended'}${dur}`, color: bad ? '#ef4444' : '#22c55e' };
+    }
+    return { txt: l.status, color: 'var(--text-secondary)' };
   }
 
   // One-click dial to myself: restore the default details, then call them directly
@@ -230,10 +267,20 @@ export default function VoiceAgentTab() {
               {calling ? 'Calling...' : 'Call'}
             </button>
           </div>
-          {status && (
-            <p className="text-sm" style={{ color: status.startsWith('✓') ? '#22c55e' : '#ef4444' }}>
+          {status && !live && (
+            <p className="text-sm" style={{ color: status.startsWith('Failed') || status.startsWith('Error') ? '#ef4444' : 'var(--text-secondary)' }}>
               {status}
             </p>
+          )}
+          {live && (
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-sm font-semibold" style={{ color: liveBadge(live).color }}>
+                {liveBadge(live).txt}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {live.status === 'ended' ? 'Logged to the lead — open the inbox to see the full call.' : status}
+              </p>
+            </div>
           )}
         </div>
       </div>
