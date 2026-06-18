@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `master/agent/` (pre-commit hook). Current line: 0.0.6+.
 
+## 2026-06-18 · Config-driven divergence #2: lead-modal tabs editable from dashboard
+
+- Second brand-divergence-as-data move. Which tabs show in the lead-detail modal (Summary / Activity / Notes / Score Breakdown / Interaction / Attribution) is now chosen at **Configure → Lead Modal** (`/dashboard/settings/lead-modal`), stored in `dashboard_settings['lead_modal']` (per-brand DB).
+- `lib/leadModalConfig.ts` (new): get/save tab visibility + `isTabEnabled` helper. The modal fetches the config and hides any tab set to false (defaults all ON; if the active tab is hidden it falls to the first visible). API: `/api/dashboard/settings/lead-modal` (GET catalog+saved, PUT).
+- New brand-neutral files added to the propagate manifest; the LeadDetailsModal gating is applied per brand (brand-divergent file). `next build` green, 50/50.
+
 ## 2026-06-18 · Config-driven divergence #1: agent prompt editable from dashboard
 
 - First of four moves to turn brand divergence from CODE into DB-config edited in the dashboard Configure section (so the code becomes one shared core).

@@ -327,6 +327,22 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
+  // Lead-modal tab visibility — configured per brand at Configure → Lead Modal.
+  // Defaults every tab ON; only an explicit `false` hides one.
+  const [leadTabCfg, setLeadTabCfg] = useState<Record<string, boolean>>({})
+  const tabOn = (k: string) => leadTabCfg[k] !== false
+  useEffect(() => {
+    fetch('/api/dashboard/settings/lead-modal')
+      .then((r) => r.json())
+      .then((d) => {
+        const tabs = d?.tabs || {}
+        setLeadTabCfg(tabs)
+        // If the default/active tab is hidden, fall to the first visible one.
+        const order = ['summary', 'activity', 'notes', 'breakdown', 'interaction', 'attribution'] as const
+        setActiveTab((cur) => (tabs[cur] !== false ? cur : (order.find((t) => tabs[t] !== false) || cur)))
+      })
+      .catch(() => {})
+  }, [])
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showAttribution, setShowAttribution] = useState(false)
@@ -2544,6 +2560,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
+              style={{ display: tabOn('summary') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -2557,6 +2574,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('activity')}
+              style={{ display: tabOn('activity') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -2570,6 +2588,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('notes')}
+              style={{ display: tabOn('notes') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-notes px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'notes'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -2583,6 +2602,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('breakdown')}
+              style={{ display: tabOn('breakdown') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -2596,6 +2616,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('interaction')}
+              style={{ display: tabOn('interaction') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -2609,6 +2630,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             </button>
             <button
               onClick={() => setActiveTab('attribution')}
+              style={{ display: tabOn('attribution') ? undefined : 'none' }}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-attribution px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'attribution'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
