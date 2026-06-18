@@ -174,14 +174,17 @@ export default function FounderDashboard() {
       if (response.ok) {
         const data = await response.json()
         setMetrics(data)
+        // Cache the snapshot so the next load paints instantly (the metrics
+        // route is heavy + Vercel cold-starts miss the server cache).
+        try { localStorage.setItem('wc-founder-metrics', JSON.stringify(data)) } catch { /* quota/private mode */ }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Error loading metrics:', response.status, errorData)
-        setMetrics(null)
+        // Keep showing the last good data on a failed refresh (don't wipe to error).
       }
     } catch (error) {
       console.error('Error loading metrics:', error)
-      setMetrics(null)
+      // Keep the last good data on a network blip.
     } finally {
       setLoading(false)
       if (!readyChimedRef.current) {
@@ -192,6 +195,12 @@ export default function FounderDashboard() {
   }, [hotLeadThreshold])
 
   useEffect(() => {
+    // Paint instantly from the last cached snapshot, then revalidate in the
+    // background — the home no longer blocks on the heavy metrics fetch.
+    try {
+      const cached = localStorage.getItem('wc-founder-metrics')
+      if (cached) { setMetrics(JSON.parse(cached)); setLoading(false) }
+    } catch { /* ignore */ }
     loadMetrics()
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') loadMetrics()

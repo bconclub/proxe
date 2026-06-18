@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Home loads instantly (client cache for founder-metrics)
+
+- The home now paints from a cached snapshot in `localStorage` immediately, then revalidates in the background — no more blocking on the heavy `/api/dashboard/founder-metrics` fetch (which cold-starts miss the in-memory server cache on Vercel).
+- A failed/blipped refresh keeps the last good data instead of wiping to the error screen.
+
 ## 2026-06-18 · Owner assignment is admin-only
 
 - Inbox lead panel: the OWNER dropdown now renders only for admins; non-admins see the owner as a read-only label ("Unassigned" / name). Everyone can still SEE the owner.
