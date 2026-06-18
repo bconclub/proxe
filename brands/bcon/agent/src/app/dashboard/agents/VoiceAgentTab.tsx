@@ -3,10 +3,14 @@ import { useState } from 'react';
 import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
 
 export default function VoiceAgentTab() {
-  const [phone, setPhone] = useState('');
-  const [personName, setPersonName] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [industry, setIndustry] = useState('');
+  // Default "call myself" details — prefilled so one click dials without re-typing.
+  // Edit any field to call someone else; "Call myself" resets back to these.
+  const DEFAULT_ME = { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' };
+
+  const [phone, setPhone] = useState(DEFAULT_ME.phone);
+  const [personName, setPersonName] = useState(DEFAULT_ME.name);
+  const [businessName, setBusinessName] = useState(DEFAULT_ME.business);
+  const [industry, setIndustry] = useState(DEFAULT_ME.industry);
   const [status, setStatus] = useState('');
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -15,29 +19,46 @@ export default function VoiceAgentTab() {
   // All four are required — the agent only calls with full context.
   const canCall = !!(phone.trim() && personName.trim() && businessName.trim() && industry.trim());
 
-  async function triggerCall() {
-    if (!canCall) return;
+  type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
+
+  async function triggerCall(override?: CallVals) {
+    const vals: CallVals = override || {
+      phone: phone.trim(),
+      contactName: personName.trim(),
+      businessName: businessName.trim(),
+      industry: industry.trim(),
+    };
+    if (!override && !canCall) return;
     setCalling(true);
     setStatus('');
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: phone.trim(),
-          direction: 'cold_intro',
-          contactName: personName.trim(),
-          businessName: businessName.trim(),
-          industry: industry.trim(),
-        }),
+        body: JSON.stringify({ ...vals, direction: 'cold_intro' }),
       });
       const data = await res.json();
-      setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
+      setStatus(data.success ? `✓ Calling +91 ${vals.phone}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
     } catch {
       setStatus('Error — check server logs');
     } finally {
       setCalling(false);
     }
+  }
+
+  // One-click dial to myself: restore the default details, then call them directly
+  // (pass values explicitly so we don't wait on async state updates).
+  function callMyself() {
+    setPersonName(DEFAULT_ME.name);
+    setBusinessName(DEFAULT_ME.business);
+    setIndustry(DEFAULT_ME.industry);
+    setPhone(DEFAULT_ME.phone);
+    triggerCall({
+      phone: DEFAULT_ME.phone,
+      contactName: DEFAULT_ME.name,
+      businessName: DEFAULT_ME.business,
+      industry: DEFAULT_ME.industry,
+    });
   }
 
   function copyNumber() {
@@ -130,7 +151,6 @@ export default function VoiceAgentTab() {
             { ph: 'Contact name', val: personName, set: setPersonName },
             { ph: 'Business name', val: businessName, set: setBusinessName },
             { ph: 'Industry', val: industry, set: setIndustry },
-            { ph: 'Phone number (e.g. 9731660933)', val: phone, set: setPhone, isPhone: true },
           ].map((f) => (
             <input
               key={f.ph}
@@ -149,18 +169,67 @@ export default function VoiceAgentTab() {
               }}
             />
           ))}
-          <button
-            onClick={triggerCall}
-            disabled={calling || !canCall}
-            className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{
-              backgroundColor: 'var(--button-bg)',
-              color: 'var(--text-button)',
-              cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {calling ? 'Calling...' : 'Call'}
-          </button>
+
+          {/* Phone with fixed +91 India code (route prepends 91 for routing) */}
+          <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '320px' }}>
+            <span
+              className="rounded-lg px-3 text-sm font-semibold"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+              }}
+            >
+              +91
+            </span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="9731660933"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(-10))}
+              onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }}
+              className="rounded-lg px-4 py-2.5 text-sm outline-none"
+              style={{
+                flex: 1,
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                textAlign: 'center',
+              }}
+            />
+          </div>
+
+          {/* Buttons: one-click dial-myself + dial whoever is in the fields */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={callMyself}
+              disabled={calling}
+              className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-primary)',
+                cursor: calling ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <MdPhone size={16} /> Call myself
+            </button>
+            <button
+              onClick={() => triggerCall()}
+              disabled={calling || !canCall}
+              className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{
+                backgroundColor: 'var(--button-bg)',
+                color: 'var(--text-button)',
+                cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {calling ? 'Calling...' : 'Call'}
+            </button>
+          </div>
           {status && (
             <p className="text-sm" style={{ color: status.startsWith('✓') ? '#22c55e' : '#ef4444' }}>
               {status}
