@@ -1,10 +1,6 @@
 {
   "name": "proxe-platform",
-<<<<<<< HEAD
   "version": "0.0.10",
-=======
-  "version": "0.0.4",
->>>>>>> 1304c684 (bcon voice: bridge VoBiz call leg into Vapi agent over SIP)
   "private": true,
   "scripts": {
     "dev": "npx concurrently -n \"wc,proxe,bcon\" -c \"cyan,green,magenta\" \"npm run dev:windchasers\" \"npm run dev:proxe\" \"npm run dev:bcon\"",

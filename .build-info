@@ -1,10 +1,5 @@
 {
-<<<<<<< HEAD
   "version": "0.0.10",
   "timestamp": "2026-06-17T18:06:35.545Z",
-=======
-  "version": "0.0.4",
-  "timestamp": "2026-06-17T15:30:02.036Z",
->>>>>>> 1304c684 (bcon voice: bridge VoBiz call leg into Vapi agent over SIP)
   "scope": "company"
 }
