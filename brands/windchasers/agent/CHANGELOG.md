@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · WA agent: pilot fork = airplane vs helicopter + Visit-Academy sends map
+
+- **Pilot leads no longer asked "pilot / helicopter / cabin crew".** A lead who came via the pilot welcome / pilot assessment / pilot source is already known to want pilot — the qualifier now offers only the real fork, **Airplane vs Helicopter** (`[Airplane][Helicopter]`), and never offers Cabin Crew. Genuinely-unknown leads still get the 3-way path question.
+- **"Visit the academy" now sends the academy details + Google Maps link first**, then asks to lock a day — instead of jumping straight to date-picking. Added `location.mapUrl` to brand-facts (swap for the exact Google Business share link when available).
+
 ## 2026-06-17 · Home refinements
 
 - **Greeting** shifts by IST time of day; **KPI cards** get a subtle accent tint + matching border; **Follow-up Health** follows its status across the whole card.

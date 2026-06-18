@@ -23,6 +23,9 @@ export const BRAND_IDENTITY = {
     fullAddress:
       'Site No 1, Opp Poorna Prajna Education Center, 3rd floor, New Airport Road, Hennur Bagalur Main Road, Kothanur, Bengaluru, Karnataka 560077',
     neighborhood: 'Kothanur',
+    // Google Maps link sent to leads who want to visit the academy. Swap for the
+    // exact Google Business "share" link if/when available for a precise pin.
+    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Windchasers+Aviation+Academy+Kothanur+Bengaluru+560077',
   },
   contact: {
     phonePrimary: '+91 9591004043',
