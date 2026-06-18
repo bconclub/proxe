@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Cabin-crew welcome routing + agent stops dumping the full menu to cabin leads
+
+- `pickWelcomeTemplate` is now 3-way (cabin → pilot → generic) via a new `isCabinCrewSource()` helper. The cabin path is **flag-gated** (`CABIN_WELCOME_TEMPLATE`, currently null) so it's safe to deploy — cabin leads keep getting the generic welcome until the Meta-approved cabin template name is filled in (an unapproved name would fail-send). Flip the constant to activate.
+- WA agent: a KNOWN cabin-crew lead (cabin-crew page/form/course interest) no longer gets the full "pilot / helicopter / cabin / type rating — which interests you?" menu on a broad question; it goes straight to cabin crew with Eligibility / What's covered / How to apply buttons.
+- **Pending (Meta side):** create + approve a cabin-crew welcome template (single `customer_name` body param, language `en`), then set `CABIN_WELCOME_TEMPLATE` to its name.
+
 ## 2026-06-18 · WA agent: pilot fork = airplane vs helicopter + Visit-Academy sends map
 
 - **Pilot leads no longer asked "pilot / helicopter / cabin crew".** A lead who came via the pilot welcome / pilot assessment / pilot source is already known to want pilot — the qualifier now offers only the real fork, **Airplane vs Helicopter** (`[Airplane][Helicopter]`), and never offers Cabin Crew. Genuinely-unknown leads still get the 3-way path question.

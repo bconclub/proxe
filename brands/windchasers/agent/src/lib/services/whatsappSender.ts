@@ -462,7 +462,22 @@ export function isPilotSource(...signals: Array<string | null | undefined>): boo
   return /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
 }
 
+/** Cabin-crew lead — came from the cabin-crew page/form/interest. */
+export function isCabinCrewSource(...signals: Array<string | null | undefined>): boolean {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  return /cabin[-_ ]?crew|\bcabin\b|air[-_ ]?hostess|flight[-_ ]?attendant/.test(hay)
+}
+
+// The Meta-approved cabin-crew welcome template name. Stays null until the
+// template is created + APPROVED in Meta — sending an unapproved name fails, so
+// until then cabin-crew leads fall back to the generic welcome. Flip this to the
+// approved name (e.g. 'windchasers_cabin_welcome_v1') to activate the cabin path.
+const CABIN_WELCOME_TEMPLATE: string | null = null
+
 export function pickWelcomeTemplate(...signals: Array<string | null | undefined>): string {
+  // Cabin-crew leads take priority over pilot (a "cabin crew pilot" mix is not a
+  // thing) — but only when the cabin template is live; else fall through.
+  if (CABIN_WELCOME_TEMPLATE && isCabinCrewSource(...signals)) return CABIN_WELCOME_TEMPLATE
   return isPilotSource(...signals) ? 'windchasers_pilot_welcome_v2' : 'windchasers_generic_welcome_v1'
 }
 

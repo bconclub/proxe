@@ -99,6 +99,7 @@ export {
   sendWelcomeTemplate,
   pickWelcomeTemplate,
   isPilotSource,
+  isCabinCrewSource,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
