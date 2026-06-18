@@ -20,6 +20,41 @@ function normalizePhone(raw?: string | null): { full: string | null; norm: strin
   return { full: String(raw).startsWith('+') ? String(raw) : `+${digits}`, norm };
 }
 
+// On an OUTBOUND bridge (VoBiz -> Vapi) both SIP ends are the BCON number, so Vapi's
+// customer.number is OUR number, not the lead's — and the two VoBiz legs are NOT
+// parent-linked, so we recover the real destination from the VoBiz CDR by matching
+// the human leg whose time is closest to the Vapi leg's start. Good enough at current
+// (low-concurrency) volume; the clean long-term fix is to originate via the Vapi API.
+async function recoverOutboundDestination(startedAtIso: string | null): Promise<{ full: string | null; norm: string | null }> {
+  const AID = process.env.VOBIZ_AUTH_ID, TOK = process.env.VOBIZ_AUTH_TOKEN;
+  if (!AID || !TOK) return { full: null, norm: null };
+  try {
+    const res = await fetch(`https://api.vobiz.ai/api/v1/Account/${AID}/Call/?limit=20`, {
+      headers: { 'X-Auth-ID': AID, 'X-Auth-Token': TOK },
+    });
+    if (!res.ok) return { full: null, norm: null };
+    const data: any = await res.json();
+    const legs = (data?.objects || []).filter((o: any) => {
+      const to = String(o.to_number || '');
+      return o.call_direction === 'outbound' && !to.includes('sip:') && /^\+?\d{10,15}$/.test(to.replace(/\s/g, ''));
+    });
+    if (!legs.length) return { full: null, norm: null };
+    const target = startedAtIso ? new Date(startedAtIso).getTime() : Date.now();
+    let best: any = null, bestDelta = Infinity;
+    for (const o of legs) {
+      const t = new Date(o.answer_time || o.initiation_time || o.created_at).getTime();
+      if (!Number.isFinite(t)) continue;
+      const delta = Math.abs(t - target);
+      if (delta < bestDelta) { bestDelta = delta; best = o; }
+    }
+    if (best && bestDelta <= 120000) return normalizePhone(String(best.to_number));
+    return { full: null, norm: null };
+  } catch (e: any) {
+    console.error('[vapi-webhook] recoverOutboundDestination failed:', e?.message);
+    return { full: null, norm: null };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Optional shared-secret auth. Set VAPI_WEBHOOK_SECRET (Vercel) + the same
@@ -46,11 +81,6 @@ export async function POST(req: NextRequest) {
 
     const call = msg.call || {};
     const callId = call.id || msg.callId || null;
-    const customerNumber = msg.customer?.number || call.customer?.number || null;
-    const { full: phone, norm } = normalizePhone(customerNumber);
-
-    const callType = String(call.type || '');
-    const direction = /inbound/i.test(callType) ? 'inbound' : 'outbound';
 
     const startedAt = msg.startedAt || call.startedAt || null;
     const endedAt = msg.endedAt || call.endedAt || null;
@@ -59,6 +89,26 @@ export async function POST(req: NextRequest) {
       durationSecs = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
     }
     durationSecs = Number.isFinite(durationSecs) ? durationSecs : 0;
+
+    // Resolve the real party. customer.number is reliable for INBOUND. For OUTBOUND
+    // it is the BCON number itself (bridge artifact) — detect that and recover the
+    // actual destination from the VoBiz CDR so the call files under the lead, not us.
+    const rawCustomer = msg.customer?.number || call.customer?.number || null;
+    let { full: phone, norm } = normalizePhone(rawCustomer);
+    const bconNorm = normalizePhone(process.env.VOBIZ_FROM_NUMBER || '918046733388').norm;
+    let direction: 'inbound' | 'outbound';
+    if (norm && bconNorm && norm === bconNorm) {
+      direction = 'outbound';
+      const rec = await recoverOutboundDestination(startedAt);
+      if (rec.norm) {
+        phone = rec.full; norm = rec.norm;
+      } else {
+        console.warn('[vapi-webhook] outbound bridge but could not recover lead number; not filing under BCON number');
+        phone = null; norm = null; // better unlinked than mis-filed under our own number
+      }
+    } else {
+      direction = 'inbound';
+    }
 
     const endedReason = msg.endedReason || null;
     const summary = msg.summary || msg.analysis?.summary || null;
