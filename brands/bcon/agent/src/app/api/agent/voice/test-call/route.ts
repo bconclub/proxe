@@ -34,6 +34,13 @@ export async function POST(req: NextRequest) {
   const last10 = digits.slice(-10);
   const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
 
+  // Current India/IST time so the agent books realistic slots (11 AM–5 PM, not now,
+  // after-hours -> next day). Passed as the {{vh-now}} prompt variable.
+  const istNow = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  }).format(new Date());
+
   try {
     const res = await fetch('https://api.vapi.ai/call', {
       method: 'POST',
@@ -49,6 +56,7 @@ export async function POST(req: NextRequest) {
             'vh-contactname': name,
             'vh-businessname': businessName || '',
             'vh-industry': industry || '',
+            'vh-now': istNow,
           },
         },
         customer: { number: e164 },
