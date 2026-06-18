@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-18 · Token usage: time-window toggle (24h / 7d / 14d / 30d / All)
+
+- Metering now also writes **per-IST-day buckets** (`byDay`) alongside the cumulative total, so /tokens can sum windows.
+- `/api/dashboard/token-usage?range=` sums the last N days; `All` = cumulative since metering began.
+- /tokens page got a 24h / 7D / 14D / 30D / All toggle — cost, tokens, calls and the per-area table all refilter to the window.
+- Note: per-day buckets start accumulating from this deploy, so 24h/7d show data from now forward; "All" still reflects the full history.
+
 ## 2026-06-18 · Pipeline page: funnel-summary view
 
 - New `PipelineFunnel` component at the top of `/dashboard/pipeline` (kanban kept below): Pre-Key (New / Engaged / Qualified, blue) → Key Event banner ("Demo Booked" = Booking Made, purple) → Post-Key (Demo Done / Offer Made / Won, green) → Exit States (No Show amber / Parked gray / Closed-Lost red), plus a metrics row (Key Event Rate, Show-up Rate, True Win Rate, Revivable).

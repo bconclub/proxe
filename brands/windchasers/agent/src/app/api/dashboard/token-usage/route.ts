@@ -7,18 +7,54 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getTokenUsage, resetTokenUsage, CATEGORY_LABELS, type TokenCategory } from '@/lib/token-usage'
+import { getTokenUsage, resetTokenUsage, CATEGORY_LABELS, type TokenCategory, type UsageBucket } from '@/lib/token-usage'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+// Range → number of IST calendar days to sum (null = all-time / cumulative).
+const RANGE_DAYS: Record<string, number | null> = { Today: 1, '7D': 7, '14D': 14, '30D': 30, All: null }
+
+// The last N IST day-keys ('YYYY-MM-DD'), newest first.
+function lastNDayKeys(n: number): string[] {
+  const keys: string[] = []
+  for (let i = 0; i < n; i++) {
+    keys.push(new Date(Date.now() - i * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))
+  }
+  return keys
+}
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const range = new URL(request.url).searchParams.get('range') || 'All'
+    const rangeDays = range in RANGE_DAYS ? RANGE_DAYS[range] : null
+
     const doc = await getTokenUsage()
-    const byCategory = doc?.byCategory || {}
+
+    // All-time → cumulative byCategory. A window → sum the per-day buckets.
+    let byCategory: Partial<Record<TokenCategory, UsageBucket>>
+    if (rangeDays == null) {
+      byCategory = doc?.byCategory || {}
+    } else {
+      const byDay = doc?.byDay || {}
+      const keys = new Set(lastNDayKeys(rangeDays))
+      byCategory = {}
+      for (const dayKey of Object.keys(byDay)) {
+        if (!keys.has(dayKey)) continue
+        for (const cat of Object.keys(byDay[dayKey]) as TokenCategory[]) {
+          const src = byDay[dayKey][cat]!
+          const dst = byCategory[cat] || { input_tokens: 0, output_tokens: 0, calls: 0, cost_usd: 0 }
+          dst.input_tokens += src.input_tokens
+          dst.output_tokens += src.output_tokens
+          dst.calls += src.calls
+          dst.cost_usd += src.cost_usd
+          byCategory[cat] = dst
+        }
+      }
+    }
 
     const rows = (Object.keys(byCategory) as TokenCategory[]).map((cat) => {
       const b = byCategory[cat]!
@@ -47,6 +83,7 @@ export async function GET() {
     return NextResponse.json({
       rows,
       totals,
+      range,
       since: doc?.since || null,
       updatedAt: doc?.updatedAt || null,
     })

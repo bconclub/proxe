@@ -31,12 +31,13 @@ export default function TokenUsagePage() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState<'Today' | '7D' | '14D' | '30D' | 'All'>('All')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/dashboard/token-usage', { credentials: 'include' })
+      const res = await fetch(`/api/dashboard/token-usage?range=${range}`, { credentials: 'include' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `Failed (${res.status})`)
       const d = await res.json()
       setRows(d.rows || [])
@@ -48,7 +49,7 @@ export default function TokenUsagePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [range])
 
   useEffect(() => { load() }, [load])
 
@@ -93,10 +94,25 @@ export default function TokenUsagePage() {
           </div>
         </div>
 
-        <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
           {since ? `Since ${new Date(since).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : 'No data yet'}
           {updatedAt ? ` · updated ${new Date(updatedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}
         </p>
+
+        {/* Window toggle — sums per-day buckets (All = cumulative since metering began) */}
+        <div className="inline-flex items-center rounded-lg border p-0.5 mb-5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+          {(['Today', '7D', '14D', '30D', 'All'] as const).map((r) => (
+            <button
+              key={r} type="button" onClick={() => setRange(r)}
+              className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
+              style={range === r
+                ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
+                : { backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
+            >
+              {r === 'Today' ? '24h' : r}
+            </button>
+          ))}
+        </div>
 
         {error && (
           <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{error}</div>
