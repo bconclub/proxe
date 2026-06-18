@@ -36,24 +36,23 @@ export async function POST(req: NextRequest) {
   const callUUID = params.get('CallUUID') || params.get('callUUID') || '';
   console.log('Vobiz answer POST params:', Object.fromEntries(params), { direction, leadName, leadPhoneFromUrl, callerPhone, callUUID });
 
-  // Pass lead context to Vapi as custom SIP headers. VoBiz forwards `sipHeaders`
-  // only for keys that ALREADY start with "X-" (it does NOT auto-prefix — the old
-  // bare "contactname=" keys were silently dropped, so Vapi saw empty vars and the
-  // agent bailed with "wrong details"). We send single-dash "X-Contactname" etc.;
-  // Vapi strips the leading "X-" + lowercases => template vars {{contactname}},
-  // {{businessname}}, {{industry}} (cf. how it maps X-Account-Sid -> account-sid).
-  // Single dash only — extra dashes inside the key (e.g. X-VH-contactname) can be
-  // dropped by VoBiz's attribute parser.
+  // Pass lead context to Vapi as custom SIP headers. Per VoBiz <Dial> docs the
+  // `sipHeaders` attribute goes on the <User>/<Number> element (NOT on <Dial> —
+  // that was silently dropped), VoBiz AUTO-PREFIXES every key with "X-VH-", and
+  // only [A-Za-z0-9] is allowed in key names (values may be URL-encoded). So we
+  // send PLAIN alphanumeric keys; on the wire VoBiz emits e.g. "X-VH-contactname",
+  // and Vapi strips the leading "X-" + lowercases => template var {{vh-contactname}}
+  // (likewise {{vh-businessname}}, {{vh-industry}}).
   const ctx: string[] = [];
-  if (leadName) ctx.push(`X-Contactname=${encodeURIComponent(leadName)}`);
-  if (business) ctx.push(`X-Businessname=${encodeURIComponent(business)}`);
-  if (industry) ctx.push(`X-Industry=${encodeURIComponent(industry)}`);
+  if (leadName) ctx.push(`contactname=${encodeURIComponent(leadName)}`);
+  if (business) ctx.push(`businessname=${encodeURIComponent(business)}`);
+  if (industry) ctx.push(`industry=${encodeURIComponent(industry)}`);
   const sipHeadersAttr = ctx.length ? ` sipHeaders="${ctx.join(',')}"` : '';
 
   // Bridge the call into the Vapi agent over SIP. VoBiz dials a SIP URI via a
   // <User> element nested in <Dial> (Plivo-style; VoBiz has no <Sip> noun).
   // callerId presents the BCON number on the Vapi leg.
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"${sipHeadersAttr}><User>${vapiSipUri}</User></Dial></Response>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30"><User${sipHeadersAttr}>${vapiSipUri}</User></Dial></Response>`;
 
   return new NextResponse(xml, {
     headers: { 'Content-Type': 'text/xml' },
