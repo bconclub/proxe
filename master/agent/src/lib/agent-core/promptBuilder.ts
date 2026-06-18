@@ -24,7 +24,14 @@ interface PromptOptions {
   crossChannelContext?: string;
   /** Explicit brand override; falls back to NEXT_PUBLIC_BRAND_ID/BRAND env, then 'windchasers'. */
   brand?: string;
+  /** Dashboard-configured prompt (from dashboard_settings via getPromptOverride). When set, replaces the hardcoded brand prompt file. */
+  promptOverride?: string | null;
   formData?: Record<string, any> | null;
+}
+
+/** The hardcoded brand prompt file output — the default/seed shown in the Configure editor when no DB override is saved. Exported for the settings API. */
+export function getDefaultBrandPrompt(brand: string, channel?: Channel, context = ''): string {
+  return getBrandSystemPrompt(brand, context, undefined, channel);
 }
 
 /**
@@ -63,14 +70,15 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     messageCount,
     crossChannelContext,
     brand,
+    promptOverride,
     formData,
   } = options;
 
   // Resolve brand: explicit param > env var > default (windchasers)
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
-  // Build the core system prompt (brand-specific)
-  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
+  // Build the core system prompt (dashboard override if set, else brand prompt file)
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone, promptOverride);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -109,6 +117,7 @@ function buildSystemPrompt(
   formData?: Record<string, any> | null,
   userEmail?: string | null,
   userPhone?: string | null,
+  promptOverride?: string | null,
 ): string {
   // Guard: only inject the name when it looks like a real person, not a brand
   // label, UI string, or other junk that leaked into the customer_name column.
@@ -165,7 +174,11 @@ function buildSystemPrompt(
     }
   }
 
-  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
+  // Dashboard-configured prompt (Configure section) wins over the brand file.
+  const basePrompt = (promptOverride && promptOverride.trim())
+    ? promptOverride + (knowledgeBase ? `\n\n${knowledgeBase}` : '')
+    : getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel);
+  return basePrompt + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**

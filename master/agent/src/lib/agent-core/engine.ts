@@ -7,6 +7,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AgentInput, AgentOutput, KnowledgeResult, StreamChunk } from './types';
 import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
+import { getPromptOverride } from '../promptConfig';
 import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
 import { extractIntent, isBookingIntent, isBookingFlowStep, extractPainPoint, detectObjection } from './intentExtractor';
@@ -86,6 +87,7 @@ User's message: ${input.message}`
     } catch { /* non-critical */ }
   }
 
+  const promptOverride = await getPromptOverride(input.channel);
   const { systemPrompt, userPrompt } = buildPrompt({
     channel: input.channel,
     userName: input.userProfile.name,
@@ -99,6 +101,7 @@ User's message: ${input.message}`
     messageCount: input.messageCount,
     brand: brandId,
     crossChannelContext: crossChannelContext || undefined,
+    promptOverride,
     formData,
   });
 
@@ -344,6 +347,7 @@ User's message: ${input.message}`
       } catch { /* non-critical */ }
     }
 
+    const promptOverride = await getPromptOverride(input.channel);
     const { systemPrompt, userPrompt } = buildPrompt({
       channel: input.channel,
       userName: input.userProfile.name,
@@ -357,6 +361,7 @@ User's message: ${input.message}`
       messageCount: input.messageCount,
       brand: brandId,
       crossChannelContext: crossChannelContext || undefined,
+      promptOverride,
       formData,
     });
 
