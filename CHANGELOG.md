@@ -13,6 +13,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-17 · Infra: master→brands propagation (changes land on master, flow everywhere)
+
+- **The "edit core once → it's in every brand" mechanism is live.** `master/agent` is the source of truth for shared core; `scripts/propagate-from-master.js` copies the shared-core files into every brand, **never touching** each brand's own layer (configs, prompts, brand-facts, brand-divergent components/routes), so brand identity (colour/copy/fields/templates) is preserved.
+- `scripts/brand-shared.json` = the manifest: 160 shared-core files (the set currently identical across master+bcon+wc). Move a file OUT the moment a brand must diverge it; move one IN once it's brand-neutral.
+- Defaults to dry-run (reports only); `--apply` writes; `--apply <brand>` for one. After apply, commit per brand — the pre-commit hook bumps each brand's version + the company version. Verified end-to-end: a master edit to a shared file correctly flags both bcon + windchasers to update.
+- The remaining ~53 brand-divergent files (FounderDashboard, LeadDetailsModal, whatsappSender, prompts, etc.) still sync manually until their brand bits are extracted into the config layer — that extraction is what shrinks the skip-set toward zero (the road to a single shared-core package).
+
 ## 2026-06-17 · bcon: more WC catch-up (known-contact prompt + web-chat/modal bug fixes)
 
 - **bcon**: ported WC's promptBuilder KNOWN-CONTACT block (don't re-ask captured name/phone/email) + userEmail/userPhone; fixed a real web-chat bug where `postProcess()` referenced out-of-scope `messageCount`/`attributionSignal` (web-lead capture/attribution/summaries were silently failing); fixed duplicate `className` on LeadDetailsModal admin-note buttons. `next build` green, 46/46.
