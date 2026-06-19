@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -52,6 +52,17 @@ interface FounderMetrics {
     web: { total: number; booked: number }
     whatsapp: { total: number; booked: number }
     voice: { total: number; booked: number }
+  }
+  calls?: {
+    total: number
+    inbound: number
+    outbound: number
+    today: number
+    todayInbound: number
+    todayOutbound: number
+    count7D: number
+    trend7D: number
+    trend: { data: Array<{ value: number }>; change: number }
   }
   scoreDistribution: { hot: number; warm: number; cold: number }
   recentActivity: Array<{ id: string; channel: string; type: string; timestamp: string; content: string; metadata?: any }>
@@ -468,7 +479,7 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
+      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 4%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 14%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
@@ -544,6 +555,16 @@ export default function FounderDashboard() {
           value={fmtMs(metrics.responseHealth.avgMs)}
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
+        />
+        {/* Calls — inbound + outbound voice volume (links to the Calls view). */}
+        <KpiCard
+          icon={<MdCall size={15} />} iconColor="#06b6d4"
+          label="Calls"
+          value={metrics.calls?.total ?? 0}
+          delta={<KpiDelta change={metrics.calls?.trend?.change} />}
+          sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
+          sub={`${metrics.calls?.inbound ?? 0} in · ${metrics.calls?.outbound ?? 0} out`}
+          onClick={() => router.push('/dashboard/calls')}
         />
       </div>
 

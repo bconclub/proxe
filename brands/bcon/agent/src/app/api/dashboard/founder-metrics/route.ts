@@ -81,10 +81,11 @@ export async function GET(request: NextRequest) {
       supabase
         .from('whatsapp_sessions')
         .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name'),
-      // 4. voice_sessions - lead linkage only (no booking columns on this table)
+      // 4. voice_sessions - lead linkage + call facts (direction/status/duration)
+      //    for the Calls overview tile.
       supabase
         .from('voice_sessions')
-        .select('lead_id'),
+        .select('lead_id, call_direction, call_status, call_duration_seconds, created_at'),
       // 5. social_sessions - lead linkage only (no booking columns on this table)
       supabase
         .from('social_sessions')
@@ -1613,6 +1614,45 @@ export async function GET(request: NextRequest) {
     }
 
     // Prepare response data
+    // ============================================================================
+    // CALLS OVERVIEW — inbound/outbound counts + today/7d windows + 7-day trend
+    // ============================================================================
+    const allCalls = voiceSessions || []
+    const isOutbound = (c: any) => String(c.call_direction || '').toLowerCase() === 'outbound'
+    const callsInWindow = (from: Date) => allCalls.filter((c: any) => c.created_at && new Date(c.created_at) >= from)
+    const callsToday = callsInWindow(oneDayAgo)
+    const calls7D = callsInWindow(sevenDaysAgo)
+    const callsPrev7D = allCalls.filter((c: any) => {
+      if (!c.created_at) return false
+      const d = new Date(c.created_at)
+      return d >= previous7DaysStart && d < sevenDaysAgo
+    })
+    const callsTrend = (() => {
+      const prev = callsPrev7D.length
+      return prev > 0 ? Math.round(((calls7D.length - prev) / prev) * 100) : (calls7D.length > 0 ? 100 : 0)
+    })()
+    // 7-day per-day call volume for the sparkline.
+    const callsTrendSeries: Array<{ value: number }> = []
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(now)
+      day.setDate(day.getDate() - i)
+      const dayStr = day.toISOString().split('T')[0]
+      callsTrendSeries.push({
+        value: allCalls.filter((c: any) => c.created_at && new Date(c.created_at).toISOString().split('T')[0] === dayStr).length,
+      })
+    }
+    const calls = {
+      total: allCalls.length,
+      inbound: allCalls.filter((c: any) => !isOutbound(c)).length,
+      outbound: allCalls.filter(isOutbound).length,
+      today: callsToday.length,
+      todayInbound: callsToday.filter((c: any) => !isOutbound(c)).length,
+      todayOutbound: callsToday.filter(isOutbound).length,
+      count7D: calls7D.length,
+      trend7D: callsTrend,
+      trend: { data: callsTrendSeries, change: callsTrend },
+    }
+
     const responseData = {
       hotLeads: {
         count: hotLeads.length,
@@ -1676,6 +1716,7 @@ export async function GET(request: NextRequest) {
         leads: staleLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown' })),
       },
       leadFlow,
+      calls,
       channelPerformance,
       scoreDistribution,
       recentActivity,

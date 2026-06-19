@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-19 · Calls dashboard view + overview Calls KPI
+
+- New **Calls** section: nav entry (Chats → Calls → Pipeline) + `/dashboard/calls` page listing inbound/outbound voice calls (direction, contact, duration, status, transcript turns, recording). Row → slide-in drawer with `<audio>` player + full transcript + summary.
+- APIs `GET /api/dashboard/calls` (direction/status/search/date filters) and `GET /api/dashboard/calls/[id]`. Read-only over existing data: merges `voice_sessions` with `conversations` channel=voice rows (recording/summary/transcript) by `metadata.call_id === voice_sessions.external_session_id`.
+- Overview: new **Calls** KPI card (in/out + 7-day sparkline) → `/dashboard/calls`; `founder-metrics` returns a `calls` block. No DB/schema change — pure view layer over the existing Vapi voice backend.
+
 ## 2026-06-18 · Settings: surface the token-usage link (was unreachable)
 
 - BCON had the token-usage feature (`/tokens` → `/dashboard/tokens`) but no link to it — the Settings page still showed an "Other Settings… coming soon" placeholder. Replaced that with the **Token usage** card (matches WC) so it's reachable. Page + metering were already there; this just surfaces it.

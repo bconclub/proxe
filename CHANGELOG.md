@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-19 03:58 IST · bcon: Calls dashboard view + overview Calls KPI
+
+- **bcon (Vercel):** new **Calls** section in the dashboard — inbound + outbound voice calls with recordings and transcripts. Nav entry added in the primary group (Chats → Calls → Pipeline). `/dashboard/calls` lists calls (direction, contact, when, duration, status, transcript turns, recording); a row opens a slide-in drawer with an `<audio>` player + full transcript + summary. User-facing: founders can see who called / who was called and play back any recording.
+- **bcon (Vercel):** new read-only APIs `GET /api/dashboard/calls` (filters: direction / status / search / date) and `GET /api/dashboard/calls/[id]` (one call + transcript). No schema change — merges `voice_sessions` (call facts) with `conversations` channel=voice rows (recording / summary / transcript), joined by `metadata.call_id === voice_sessions.external_session_id`.
+- **bcon (Vercel):** Overview gained a **Calls** KPI card (inbound/outbound counts + 7-day trend sparkline) linking to `/dashboard/calls`; `founder-metrics` now returns a `calls` block (extended the `voice_sessions` select to carry direction/status/duration/created_at).
+
 ## 2026-06-19 03:32 IST · bcon: kill retired-model 404, brand pronunciation on calls, tighter web replies
 
 - **bcon (Vercel):** retired Anthropic model `claude-sonnet-4-20250514` now 404s. Added a runtime guard in `claudeClient.getModel()` that remaps retired IDs → `claude-sonnet-4-5-20250929`, so the web chat widget recovers **even with the stale `CLAUDE_MODEL` env var** (no dashboard change required). User-facing: clears the `Error: 404 not_found_error` shown in the chat bubble.

@@ -24,6 +24,7 @@ import {
   MdLightMode,
   MdDarkMode,
   MdChatBubbleOutline,
+  MdCall,
   MdMonitorHeart,
   MdFavorite,
   MdMoreHoriz,
@@ -51,6 +52,7 @@ const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
+  { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
@@ -63,8 +65,8 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 3), after Flow (index 6)
-const DIVIDER_AFTER_INDICES = [3, 6]
+// Divider positions: after Pipeline (index 4), after Flow (index 7)
+const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
