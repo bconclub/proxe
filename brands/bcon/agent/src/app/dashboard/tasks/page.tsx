@@ -357,11 +357,150 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
   )
 }
 
+// --- Board view helpers (redesigned page) ---
+
+type BoardTask = {
+  id: string; lead_id: string | null; lead_name: string | null; task_type: string
+  status: string; scheduled_at: string | null; channel?: string; preview?: string
+  actor?: { label: string; kind: 'human' | 'proxe' }; reason?: string
+  sequence_label?: string | null; action?: string
+}
+
+function chanIcon(channel?: string) {
+  if (channel === 'voice') return <MdPhoneInTalk size={13} style={{ color: '#8b5cf6' }} />
+  if (channel === 'web') return <MdLanguage size={13} style={{ color: '#3b82f6' }} />
+  return <MdWhatsapp size={13} style={{ color: '#22c55e' }} />
+}
+
+function fmtCountdown(ms: number | null): string {
+  if (ms == null) return '—'
+  const m = Math.round(ms / 60000)
+  if (m < 1) return 'now'
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60), rm = m % 60
+  return rm ? `${h}h ${rm}m` : `${h}h`
+}
+
+const boardBtn = (bg: string, color: string): React.CSSProperties => ({
+  fontSize: 11, fontWeight: 600, padding: '4px 11px', borderRadius: 6,
+  border: 'none', cursor: 'pointer', background: bg, color, whiteSpace: 'nowrap',
+})
+
+function KpiCard({ label, value, sub, icon, accent }: { label: string; value: string; sub?: string; icon: React.ReactNode; accent: string }) {
+  return (
+    <div style={{ flex: '1 1 0', minWidth: 160, background: 'var(--bg-secondary, rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: `${accent}1f`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>{label}</div>
+        <div style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
+        {sub && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
+function FireCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string, a: string, s?: string) => void; onLead: (t: BoardTask) => void }) {
+  const [reSched, setReSched] = useState(false)
+  const [reTime, setReTime] = useState('')
+  return (
+    <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
+          {chanIcon(t.channel)}
+          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+        </div>
+        {typeBadge(t.task_type)}
+      </div>
+      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button style={boardBtn('rgba(34,197,94,0.15)', '#22c55e')} onClick={() => onAction(t.id, 'send_now')}>Send now</button>
+          <button style={boardBtn('rgba(59,130,246,0.15)', '#3b82f6')} onClick={() => setReSched(v => !v)}>Reschedule</button>
+          <button style={boardBtn('rgba(148,163,184,0.15)', '#94a3b8')} onClick={() => onAction(t.id, 'skip')}>Skip</button>
+        </div>
+        <CountdownTimer scheduledAt={t.scheduled_at} />
+      </div>
+      {reSched && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
+          <input type="datetime-local" value={reTime} onChange={e => setReTime(e.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', flex: 1 }} />
+          <button style={boardBtn('rgba(59,130,246,0.25)', '#3b82f6')} onClick={() => { if (reTime) { onAction(t.id, 'reschedule', new Date(reTime).toISOString()); setReSched(false) } }}>Confirm</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string, a: string, s?: string) => void; onLead: (t: BoardTask) => void }) {
+  const ACTIONS: Record<string, { label: string; bg: string; color: string; act: string }> = {
+    approve: { label: 'Approve', bg: 'rgba(34,197,94,0.15)', color: '#22c55e', act: 'send_now' },
+    retry: { label: 'Retry', bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', act: 'retry' },
+    fix_template: { label: 'Fix template', bg: 'rgba(239,68,68,0.15)', color: '#ef4444', act: 'fix_template' },
+    update_contact: { label: 'Update contact', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', act: 'update_contact' },
+  }
+  const a = ACTIONS[t.action || 'approve'] || ACTIONS.approve
+  const isFail = t.status === 'failed' || t.status === 'failed_24h_window'
+  return (
+    <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
+          {chanIcon(t.channel)}
+          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+        </div>
+        {statusPill(t.status)}
+      </div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{typeBadge(t.task_type)} <span style={{ marginLeft: 6 }}>{t.reason}</span></div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {a.act === 'fix_template' ? (
+          <span style={{ ...boardBtn(a.bg, a.color), cursor: 'default' }} title="Fix this template in Meta WhatsApp Manager">{a.label} (in Meta)</span>
+        ) : a.act === 'update_contact' ? (
+          <button style={boardBtn(a.bg, a.color)} onClick={() => onLead(t)}>{a.label}</button>
+        ) : (
+          <button style={boardBtn(a.bg, a.color)} onClick={() => onAction(t.id, a.act)}>{a.label}</button>
+        )}
+        {isFail && t.action !== 'retry' && <button style={boardBtn('rgba(59,130,246,0.12)', '#3b82f6')} onClick={() => onAction(t.id, 'retry')}>Retry</button>}
+        <button style={boardBtn('rgba(148,163,184,0.12)', '#94a3b8')} onClick={() => onAction(t.id, 'skip')}>Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
+function UpcomingGroup({ title, items, onLead }: { title: string; items: BoardTask[]; onLead: (t: BoardTask) => void }) {
+  if (!items.length) return null
+  return (
+    <div>
+      <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '8px 14px 4px' }}>{title} · {items.length}</div>
+      {items.map(t => (
+        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 52, flexShrink: 0 }}>{formatTime(t.scheduled_at)}</span>
+          {chanIcon(t.channel)}
+          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 12, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{t.task_type.replace(/_/g, ' ')}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const colBox: React.CSSProperties = {
+  background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+  border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, flex: 1, overflow: 'auto',
+}
+
+function Empty({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
+      {icon}
+      <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{text}</span>
+    </div>
+  )
+}
+
 // --- Main Page ---
 
 export default function TasksPage() {
   const router = useRouter()
   const [tasks, setTasks] = useState<AgentTask[]>([])
+  const [board, setBoard] = useState<any>(null)
   const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, firingNextHour: 0, successRate: 100 })
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<any>(null)
@@ -375,6 +514,7 @@ export default function TasksPage() {
       const res = await fetch('/api/dashboard/tasks')
       const data = await res.json()
       setTasks(data.tasks || [])
+      setBoard(data.board || null)
       if (data.stats) setStats(data.stats)
     } catch (err) {
       console.error('Failed to fetch tasks:', err)
@@ -457,35 +597,12 @@ export default function TasksPage() {
   }, [fetchTasks])
 
   // Column 1: Completed / Failed / Failed 24h window
-  const completedTasks = tasks
-    .filter((t) => t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window')
-    .filter((t) => {
-      if (completedFilter === 'completed') return t.status === 'completed'
-      if (completedFilter === 'failed') return t.status === 'failed' || t.status === 'failed_24h_window'
-      return true
-    })
-    .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
-
-  // Column 2: Next 24 hours (pending within 24h) + queued (regardless of time)
-  const next24hTasks = tasks
-    .filter((t) => (t.status === 'pending' && isWithin24Hours(t.scheduled_at)) || t.status === 'queued')
-    .filter((t) => {
-      if (next24hFilter === 'pending') return t.status === 'pending'
-      if (next24hFilter === 'queued') return t.status === 'queued'
-      return true
-    })
-    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
-
-  // Column 3: Upcoming (pending tasks beyond 24h)
-  const upcomingTasks = tasks
-    .filter((t) => t.status === 'pending' && !isWithin24Hours(t.scheduled_at))
-    .filter((t) => {
-      if (upcomingFilter === 'reminders') return t.task_type.includes('reminder') || t.task_type.includes('booking_reminder')
-      if (upcomingFilter === 'nudges') return t.task_type.includes('nudge') || t.task_type.includes('push_to_book')
-      if (upcomingFilter === 'follow_ups') return t.task_type.includes('follow') || t.task_type.includes('re_engage') || t.task_type.includes('post_booking')
-      return true
-    })
-    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
+  // Board payload (KPIs + buckets + previews) from the tasks API.
+  const b = board || { kpis: {}, nextToFire: [], needsAttention: [], upcoming: {}, activity: [] }
+  const up = b.upcoming || {}
+  const onLead = (t: BoardTask) => handleLeadClick({ lead_id: t.lead_id, lead_name: t.lead_name, lead_phone: null } as any)
+  void tasks; void stats; void completedFilter; void next24hFilter; void upcomingFilter
+  void setCompletedFilter; void setNext24hFilter; void setUpcomingFilter
 
   if (loading) {
     return (
@@ -501,179 +618,78 @@ export default function TasksPage() {
 
       <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
 
-      {/* Stats Row */}
+      {/* KPI Row */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <StatCard label="Completed Today" value={stats.completedToday} color="#22c55e" />
-        <StatCard label="Pending" value={stats.pendingCount} color="#f59e0b" />
-        <StatCard label="Queued" value={stats.queuedCount} color="#a855f7" />
-        <StatCard label="Firing Next Hour" value={stats.firingNextHour} color="#9ca3af" />
-        <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
+        <KpiCard label="Next task fires in" value={b.kpis?.nextFiresInMs != null ? fmtCountdown(b.kpis.nextFiresInMs) : '—'} icon={<MdSchedule size={20} />} accent="#22c55e" />
+        <KpiCard label="Tasks due today" value={String(b.kpis?.dueToday?.total ?? 0)} sub={`${b.kpis?.dueToday?.pending ?? 0} pending · ${b.kpis?.dueToday?.queued ?? 0} queued`} icon={<MdScheduleSend size={20} />} accent="#3b82f6" />
+        <KpiCard label="Awaiting approval" value={String(b.kpis?.awaitingApproval ?? 0)} sub="Needs your review" icon={<MdNotifications size={20} />} accent="#f59e0b" />
+        <KpiCard label="Automation success" value={`${b.kpis?.successRate7d ?? 100}%`} sub="Last 7 days" icon={<MdBarChart size={20} />} accent="#a855f7" />
       </div>
 
-      {/* 3-Column Layout */}
+      {/* Three columns: Next to Fire / Needs Attention / Upcoming Queue */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-        {/* Column 1 — Completed */}
+        {/* Next to Fire */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Completed
+            Next to Fire <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>· firing soon</span>
           </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-            {([['all', 'All'], ['completed', 'Completed'], ['failed', 'Failed']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setCompletedFilter(key)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
-                  fontSize: 12, fontWeight: completedFilter === key ? 700 : 400,
-                  color: completedFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderBottom: completedFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div
-            style={{
-              background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8,
-              flex: 1,
-              overflow: 'auto',
-            }}
-          >
-            {completedTasks.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>
-                No completed tasks
-              </div>
-            ) : (
-              completedTasks.map((task) => (
-                <div
-                  key={task.id}
-                  style={{
-                    display: 'flex',
-                    gap: 12,
-                    padding: '12px 16px',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 60, paddingTop: 2, flexShrink: 0 }}>
-                    <div>{formatTime(task.completed_at || task.created_at)}</div>
-                    <div style={{ opacity: 0.6 }}>{formatDate(task.completed_at || task.created_at)}</div>
-                  </div>
-                  <div style={{ color: 'var(--text-secondary)', paddingTop: 1, flexShrink: 0 }}>
-                    {taskTypeIcon(task.task_type)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: 'var(--text-primary)', fontSize: 13, lineHeight: '18px' }}>
-                      {task.task_description}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                      {channelIcon(task.metadata)}
-                      {task.lead_name && (
-                        <span
-                          onClick={() => handleLeadClick(task)}
-                          style={{ color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.15)', textUnderlineOffset: 2 }}
-                        >
-                          {task.lead_name} {task.lead_phone ? `(${task.lead_phone})` : ''}
-                        </span>
-                      )}
-                    </div>
-                    {(() => { const ctx = getContextLine(task); return ctx ? <div style={{ color: 'var(--text-secondary)', fontSize: 11, opacity: 0.6, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctx}</div> : null })()}
-                  </div>
-                  <div style={{ flexShrink: 0 }}>{statusPill(task.status, task.error_message)}</div>
-                </div>
-              ))
-            )}
+          <div style={colBox}>
+            {b.nextToFire.length === 0
+              ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="Nothing approved to fire" />
+              : b.nextToFire.map((t: BoardTask) => <FireCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
           </div>
         </div>
 
-        {/* Column 2 — Next 24 Hours */}
+        {/* Needs Attention */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Next 24 Hours
+            Needs Attention <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>· {b.needsAttention.length}</span>
           </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-            {([['all', 'All'], ['pending', 'Pending'], ['queued', 'Awaiting Approval']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setNext24hFilter(key)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
-                  fontSize: 12, fontWeight: next24hFilter === key ? 700 : 400,
-                  color: next24hFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderBottom: next24hFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div
-            style={{
-              background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8,
-              flex: 1,
-              overflow: 'auto',
-            }}
-          >
-            {next24hTasks.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
-                <MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No tasks in the next 24 hours</span>
-              </div>
-            ) : (
-              next24hTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
-            )}
+          <div style={colBox}>
+            {b.needsAttention.length === 0
+              ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="All clear" />
+              : b.needsAttention.map((t: BoardTask) => <AttnCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
           </div>
         </div>
 
-        {/* Column 3 — Upcoming */}
+        {/* Upcoming Queue */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Upcoming
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-            {([['all', 'All'], ['reminders', 'Reminders'], ['nudges', 'Nudges'], ['follow_ups', 'Follow-ups']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setUpcomingFilter(key)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
-                  fontSize: 12, fontWeight: upcomingFilter === key ? 700 : 400,
-                  color: upcomingFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderBottom: upcomingFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div
-            style={{
-              background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8,
-              flex: 1,
-              overflow: 'auto',
-            }}
-          >
-            {upcomingTasks.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
-                <MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No upcoming tasks</span>
-              </div>
-            ) : (
-              upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
-            )}
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Upcoming Queue</div>
+          <div style={colBox}>
+            {((up.soon?.length || 0) + (up.today?.length || 0) + (up.tomorrow?.length || 0) + (up.later?.length || 0)) === 0
+              ? <Empty icon={<MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />} text="No upcoming tasks" />
+              : (<>
+                  <UpcomingGroup title="Next 4 hours" items={up.soon || []} onLead={onLead} />
+                  <UpcomingGroup title="Later today" items={up.today || []} onLead={onLead} />
+                  <UpcomingGroup title="Tomorrow" items={up.tomorrow || []} onLead={onLead} />
+                  <UpcomingGroup title="Later" items={up.later || []} onLead={onLead} />
+                </>)}
           </div>
         </div>
 
       </div>
 
+      {/* Automation Activity feed */}
+      <div>
+        <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Automation Activity</div>
+        <div style={{ ...colBox, maxHeight: 240, flex: 'none' }}>
+          {b.activity.length === 0
+            ? <Empty icon={<MdScheduleSend size={24} style={{ opacity: 0.4 }} />} text="No recent activity" />
+            : b.activity.map((a: any) => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 52, flexShrink: 0 }}>{formatTime(a.at)}</span>
+                  {chanIcon(a.channel)}
+                  <span onClick={() => onLead(a)} style={{ color: 'var(--text-primary)', fontSize: 12, cursor: 'pointer', flex: '0 0 130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.lead_name || 'Unknown'}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(a.task_type || '').replace(/_/g, ' ')} — {a.outcome}</span>
+                  {statusPill(a.status)}
+                  <span style={{ color: a.actor?.kind === 'human' ? '#f59e0b' : '#8b5cf6', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{a.actor?.label || 'Automation'}</span>
+                </div>
+              ))}
+        </div>
+      </div>
+
+      
       {selectedLead && (
         <LeadDetailsModal
           lead={selectedLead}
