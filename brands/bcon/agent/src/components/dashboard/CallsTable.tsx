@@ -138,11 +138,12 @@ export default function CallsTable() {
     load()
   }, [load])
 
-  // Refresh while the tab is visible (calls land via webhook).
+  // Auto-refresh while the tab is visible so calls (incl. live in-progress ones)
+  // appear without a manual reload. 15s balances freshness vs. request volume.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') load()
-    }, 60_000)
+    }, 15_000)
     return () => clearInterval(id)
   }, [load])
 
@@ -179,7 +180,6 @@ export default function CallsTable() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg sm:text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>Calls</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Inbound &amp; outbound voice calls — recordings and transcripts</p>
         </div>
         <button
           onClick={load}

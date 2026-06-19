@@ -19,6 +19,13 @@
 - **bcon (Vercel):** new read-only APIs `GET /api/dashboard/calls` (filters: direction / status / search / date) and `GET /api/dashboard/calls/[id]` (one call + transcript). No schema change — merges `voice_sessions` (call facts) with `conversations` channel=voice rows (recording / summary / transcript), joined by `metadata.call_id === voice_sessions.external_session_id`.
 - **bcon (Vercel):** Overview gained a **Calls** KPI card (inbound/outbound counts + 7-day trend sparkline) linking to `/dashboard/calls`; `founder-metrics` now returns a `calls` block (extended the `voice_sessions` select to carry direction/status/duration/created_at).
 
+## 2026-06-19 06:14 IST · bcon: inbound Lead Machine welcome + Calls ingestion hardening + anti-flush guard
+
+- **bcon (VPS task-worker):** inbound `first_outreach` now sends the approved-in-review `bcon_lead_machine_meta_welcome_v1` (params `customer_name` + `brand_name`, `your brand` fallback, buttons Yes Book a Demo / Tell me more in chat). Send-time **gate** skips the welcome if the lead already started a WhatsApp chat (don't double-message click-to-WhatsApp leads). **Anti-backlog-flush staleness guard** (`STALE_TASK_HOURS`, default 6h) so a worker restart can't blast an overdue backlog.
+- **bcon (inbound API):** `brand` normalized to lowercase — stops `BCON`/`bcon` **duplicate leads**. `first_outreach` scheduled **+2 min** (grace window: if the lead messages on WhatsApp first, the gate suppresses the welcome).
+- **bcon (Vapi webhook):** `voice_sessions` row written **first + idempotent** so every call reliably appears on the Calls dashboard (was silently dropping); handles `status-update` for live in-progress calls; lead-scoring moved last so it can't drop the call.
+- **bcon (Calls UI):** auto-refresh 60s→15s; removed the subtitle.
+
 ## 2026-06-19 03:32 IST · bcon: kill retired-model 404, brand pronunciation on calls, tighter web replies
 
 - **bcon (Vercel):** retired Anthropic model `claude-sonnet-4-20250514` now 404s. Added a runtime guard in `claudeClient.getModel()` that remaps retired IDs → `claude-sonnet-4-5-20250929`, so the web chat widget recovers **even with the stale `CLAUDE_MODEL` env var** (no dashboard change required). User-facing: clears the `Error: 404 not_found_error` shown in the chat bubble.

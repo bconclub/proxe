@@ -120,7 +120,10 @@ export async function POST(request: NextRequest) {
     // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
     // The original raw source is preserved in agent_tasks.metadata.source below.
     const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
-    const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND || 'bcon'
+    // Normalize brand to lowercase — Pabbly/forms sometimes send "BCON", which is
+    // case-sensitively != "bcon" in the dedup query and silently creates a DUPLICATE
+    // lead for a phone that already exists under the lowercase brand.
+    const leadBrand = String(brand || process.env.NEXT_PUBLIC_BRAND || 'bcon').trim().toLowerCase()
 
     const supabase = getServiceClient() || getClient()
     if (!supabase) {
@@ -350,7 +353,11 @@ export async function POST(request: NextRequest) {
       lead_phone: normalizedPhone,
       lead_name: leadName,
       status: 'pending',
-      scheduled_at: now,
+      // 2-minute grace: a click-to-WhatsApp lead often fills the form AND messages
+      // on WhatsApp seconds apart. Delay the welcome 2 min so, if they start a chat
+      // in that window, the send-time gate in executeFirstOutreach skips this and we
+      // don't double-message. If no message arrives, the welcome fires.
+      scheduled_at: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
       metadata: {
         source: leadSource,
         original_source: normalizedSource || null,

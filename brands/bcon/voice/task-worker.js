@@ -2271,11 +2271,36 @@ async function createColdLeadTasks() {
 async function processPendingTasks() {
   const now = new Date().toISOString();
 
+  // ── Anti-backlog-flush guard ────────────────────────────────────────────────
+  // Never fire a task that is long overdue. Without this, a backlog of `pending`
+  // tasks with a past scheduled_at (accumulated while the worker was down, or
+  // never sent) all match `scheduled_at <= now` and blast at once the moment the
+  // worker restarts — e.g. on a redeploy. Bulk-expire anything older than the
+  // staleness window up front, so the send loop below only ever sees fresh,
+  // genuinely-due tasks. Reminders/outreach that are this overdue are useless or
+  // spammy anyway. Tune with STALE_TASK_HOURS (default 6h).
+  const STALE_TASK_HOURS = Number(process.env.STALE_TASK_HOURS) || 6;
+  const staleCutoff = new Date(Date.now() - STALE_TASK_HOURS * 60 * 60 * 1000).toISOString();
+  const { count: expiredCount } = await supabase
+    .from('agent_tasks')
+    .update({
+      status: 'expired',
+      completed_at: now,
+      error_message: `Stale: >${STALE_TASK_HOURS}h overdue at worker run — expired, not sent (anti-backlog-flush guard)`,
+    }, { count: 'exact' })
+    .eq('status', 'pending')
+    .lt('scheduled_at', staleCutoff)
+    .select('id', { count: 'exact', head: true });
+  if (expiredCount && expiredCount > 0) {
+    console.log(`[ProcessTasks] Anti-flush guard: expired ${expiredCount} stale task(s) (>${STALE_TASK_HOURS}h overdue, scheduled before ${staleCutoff})`);
+  }
+
   const { data: tasks } = await supabase
     .from('agent_tasks')
     .select('*')
     .eq('status', 'pending')
     .lte('scheduled_at', now)
+    .gte('scheduled_at', staleCutoff)
     .order('scheduled_at', { ascending: true })
     .limit(20);
 
@@ -2796,6 +2821,25 @@ async function executeHumanCallback(task, waPhone) {
  * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
+  // ── Gate: only welcome inbound leads who have NOT already started a WhatsApp chat ──
+  // The welcome is for leads that came through the inbound API (Pabbly / Facebook
+  // "AI Lead Machine") and never messaged us. If the lead already messaged us on
+  // WhatsApp (click-to-WhatsApp or direct), we already have the conversation — the
+  // Meta webhook is handling them — so this business-initiated welcome is redundant.
+  if (task.lead_id) {
+    const { data: inboundWa } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'customer')
+      .limit(1);
+    if (inboundWa && inboundWa.length > 0) {
+      console.log(`[FirstOutreach] Skip welcome for ${task.lead_name} — lead already messaging on WhatsApp (we have the contact)`);
+      return { skipped: true, reason: 'Lead already started a WhatsApp conversation — welcome not sent' };
+    }
+  }
+
   // Always send template directly - new leads have no 24h window
   const { templateName, renderedText, wamid } = await sendWhatsAppTemplate(waPhone, {
     ...task,
@@ -3404,6 +3448,7 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_followup_engaged': 2,      // name, service
   'bcon_proxe_followup_noengage': 2,     // name, service
   'bcon_proxe_rnr': 1,                   // name
+  'bcon_lead_machine_meta_welcome_v1': 2,     // customer_name, brand_name
 };
 
 // Template quick reply button labels matching Meta-approved templates
@@ -3414,6 +3459,7 @@ const TEMPLATE_BUTTONS = {
   'bcon_proxe_booking_reminder_30m': ['I\'m ready!'],
   'bcon_proxe_reengagement_engaged': ['Yes, let\'s talk'],
   'bcon_proxe_reengagement_noengage': ['Yes Lets Talk'],
+  'bcon_lead_machine_meta_welcome_v1': ['Yes, Book a Demo', 'Tell me more in chat'],
 };
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
@@ -3427,6 +3473,7 @@ const TEMPLATE_BODIES = {
   'bcon_proxe_followup_engaged': `Hi {{customer_name}}, we were talking about {{service_interest}} for your business. Let's continue where we left off?`,
   'bcon_proxe_followup_noengage': `Hi {{customer_name}}, you reached out to us recently about {{service_interest}}. Would you like to know how we can help?`,
   'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`, // NOT YET SUBMITTED TO META — placeholder text
+  'bcon_lead_machine_meta_welcome_v1': `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}.\n\nWe help businesses like yours capture, qualify and convert more leads on autopilot, fully done for you.\n\nWant to see it in action?`,
 };
 
 /**
@@ -3486,7 +3533,23 @@ async function getTemplatePreview(task, lead) {
     }
     return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'first_outreach') {
-    return { name: 'bcon_proxe_first_outreach', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
+    // Inbound (Pabbly / Facebook "AI Lead Machine") welcome — the lead never
+    // messaged us, so this is the business-initiated greeting. Uses the approved
+    // bcon_lead_machine_meta_welcome_v1. brand_name falls back to "your brand" when the
+    // lead gave no company name, so the copy still reads naturally.
+    const ctx = lead?.unified_context || {};
+    const brandName =
+      task.metadata?.brand_name ||
+      ctx.company ||
+      ctx.form_data?.brand_name ||
+      'your brand';
+    return {
+      name: 'bcon_lead_machine_meta_welcome_v1',
+      params: [
+        { label: 'Name', parameter_name: 'customer_name', value: leadName },
+        { label: 'Brand', parameter_name: 'brand_name', value: brandName },
+      ],
+    };
   } else if (taskType === 'post_call_followup') {
     return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {

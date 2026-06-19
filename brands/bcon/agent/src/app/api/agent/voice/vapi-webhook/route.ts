@@ -3,12 +3,22 @@ import { getServiceClient, getClient } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
 
-// Vapi end-of-call webhook. Vapi POSTs an `end-of-call-report` here when a call
-// finishes; we persist it into PROXe (all_leads + voice_sessions + conversations)
-// so calls show up in the dashboard. Column shapes mirror the retired voice
-// server (server.js) — the generated DB types are stale and under-report them.
-// IMPORTANT: every DB write is awaited before responding — on Vercel a fire-and-
-// forget write after the response is dropped when the lambda freezes.
+// Vapi voice webhook. Handles two event types:
+//   • status-update     → write/refresh a voice_sessions row WHILE the call is
+//                         live (queued/ringing/in-progress) so the dashboard can
+//                         show a call as it happens, not only after it ends.
+//                         (Requires the Vapi assistant's serverMessages to include
+//                         "status-update"; harmless if it doesn't.)
+//   • end-of-call-report→ persist the finished call (voice_sessions + conversations
+//                         transcript + summary/recording) + score the lead.
+//
+// HARDENING: the voice_sessions row is written FIRST — before lead resolution, the
+// VoBiz CDR recovery fetch, and lead scoring — each of which can be slow or fail.
+// Previously those ran before the session insert, so a downstream timeout/error
+// dropped the call from the dashboard even though its transcript was logged. The
+// session write now runs up front, in its own try/catch with loud error logging,
+// and is enriched (lead/phone/direction) once those are resolved.
+// Join key: conversations.metadata.call_id === voice_sessions.external_session_id.
 
 function normalizePhone(raw?: string | null): { full: string | null; norm: string | null } {
   if (!raw) return { full: null, norm: null };
@@ -20,11 +30,45 @@ function normalizePhone(raw?: string | null): { full: string | null; norm: strin
   return { full: String(raw).startsWith('+') ? String(raw) : `+${digits}`, norm };
 }
 
+// Idempotent voice_sessions upsert keyed on external_session_id (the Vapi call id).
+// Null/undefined fields are dropped so an early/sparse write is never clobbered by
+// a later enrich pass (and vice-versa). Errors are logged loudly with the full
+// Postgres message/details/hint so any constraint/RLS issue is visible immediately.
+async function upsertSession(
+  supabase: any,
+  callId: string,
+  fields: Record<string, any> & { createdAtIfNew?: string },
+): Promise<void> {
+  try {
+    const { createdAtIfNew, ...rest } = fields;
+    const row: Record<string, any> = { ...rest, updated_at: new Date().toISOString() };
+    Object.keys(row).forEach((k) => (row[k] == null) && delete row[k]);
+
+    const { data: sess, error: selErr } = await supabase
+      .from('voice_sessions')
+      .select('id')
+      .eq('external_session_id', callId)
+      .maybeSingle();
+    if (selErr) console.error('[vapi-webhook] session SELECT failed:', selErr.message);
+
+    if (sess?.id) {
+      const { error } = await supabase.from('voice_sessions').update(row).eq('id', sess.id);
+      if (error) console.error('[vapi-webhook] session UPDATE failed:', error.message, error.details, error.hint);
+    } else {
+      const insertRow: Record<string, any> = { external_session_id: callId, brand: 'bcon', ...row };
+      insertRow.created_at = createdAtIfNew || new Date().toISOString();
+      const { error } = await supabase.from('voice_sessions').insert(insertRow);
+      if (error) console.error('[vapi-webhook] session INSERT failed:', error.message, error.details, error.hint);
+    }
+  } catch (e: any) {
+    console.error('[vapi-webhook] upsertSession threw:', e?.message);
+  }
+}
+
 // On an OUTBOUND bridge (VoBiz -> Vapi) both SIP ends are the BCON number, so Vapi's
 // customer.number is OUR number, not the lead's — and the two VoBiz legs are NOT
 // parent-linked, so we recover the real destination from the VoBiz CDR by matching
-// the human leg whose time is closest to the Vapi leg's start. Good enough at current
-// (low-concurrency) volume; the clean long-term fix is to originate via the Vapi API.
+// the human leg whose time is closest to the Vapi leg's start.
 async function recoverOutboundDestination(startedAtIso: string | null): Promise<{ full: string | null; norm: string | null }> {
   const AID = process.env.VOBIZ_AUTH_ID, TOK = process.env.VOBIZ_AUTH_TOKEN;
   if (!AID || !TOK) return { full: null, norm: null };
@@ -69,10 +113,6 @@ export async function POST(req: NextRequest) {
     const msg = body?.message || body || {};
     const type = msg?.type;
 
-    if (type !== 'end-of-call-report') {
-      return NextResponse.json({ ok: true, ignored: type || 'unknown' });
-    }
-
     const supabase = getServiceClient() || getClient();
     if (!supabase) {
       console.error('[vapi-webhook] no supabase client');
@@ -81,6 +121,27 @@ export async function POST(req: NextRequest) {
 
     const call = msg.call || {};
     const callId = call.id || msg.callId || null;
+    const callType = String(call.type || '');
+    const provisionalDir: 'inbound' | 'outbound' = /outbound/i.test(callType) ? 'outbound' : 'inbound';
+
+    // ── Live, in-progress call → show it on the dashboard before it ends ──────────
+    if (type === 'status-update') {
+      const status = String(msg.status || '').toLowerCase();
+      // Vapi statuses: queued | ringing | in-progress | forwarding | ended.
+      // 'ended' is handled by end-of-call-report; everything else is "live".
+      if (callId && status && status !== 'ended') {
+        await upsertSession(supabase, callId, {
+          call_status: status === 'in-progress' ? 'in-progress' : status,
+          call_direction: provisionalDir,
+          createdAtIfNew: call.createdAt || new Date().toISOString(),
+        });
+      }
+      return NextResponse.json({ ok: true, status: msg.status || null });
+    }
+
+    if (type !== 'end-of-call-report') {
+      return NextResponse.json({ ok: true, ignored: type || 'unknown' });
+    }
 
     const startedAt = msg.startedAt || call.startedAt || null;
     const endedAt = msg.endedAt || call.endedAt || null;
@@ -90,26 +151,35 @@ export async function POST(req: NextRequest) {
     }
     durationSecs = Number.isFinite(durationSecs) ? durationSecs : 0;
 
+    // ── GUARANTEE the session row up front ───────────────────────────────────────
+    // Runs before lead lookup / VoBiz recovery / scoring so none of those can drop
+    // the call from the dashboard. Enriched with lead+phone+final direction below.
+    if (callId) {
+      await upsertSession(supabase, callId, {
+        call_status: 'completed',
+        call_direction: provisionalDir,
+        call_duration_seconds: durationSecs,
+        createdAtIfNew: startedAt || new Date().toISOString(),
+      });
+    }
+
     // Resolve the real party. customer.number is reliable for INBOUND. For OUTBOUND
     // it is the BCON number itself (bridge artifact) — detect that and recover the
     // actual destination from the VoBiz CDR so the call files under the lead, not us.
     const rawCustomer = msg.customer?.number || call.customer?.number || null;
     let { full: phone, norm } = normalizePhone(rawCustomer);
     const bconNorm = normalizePhone(process.env.VOBIZ_FROM_NUMBER || '918046733388').norm;
-    const callType = String(call.type || '');
     let direction: 'inbound' | 'outbound';
     if (norm && bconNorm && norm === bconNorm) {
-      // Old VoBiz->Vapi bridge: customer.number is OUR number; recover the real lead.
       direction = 'outbound';
       const rec = await recoverOutboundDestination(startedAt);
       if (rec.norm) {
         phone = rec.full; norm = rec.norm;
       } else {
         console.warn('[vapi-webhook] outbound bridge but could not recover lead number; not filing under BCON number');
-        phone = null; norm = null; // better unlinked than mis-filed under our own number
+        phone = null; norm = null;
       }
     } else if (/outbound/i.test(callType)) {
-      // Vapi-originated outbound: customer.number is already the lead's real number.
       direction = 'outbound';
     } else {
       direction = 'inbound';
@@ -154,31 +224,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2) Upsert the voice session (only columns proven to exist)
+    // 2) Enrich the session row now that lead + final direction + phone are known.
     if (callId) {
-      const { data: sess } = await supabase
-        .from('voice_sessions')
-        .select('id')
-        .eq('external_session_id', callId)
-        .maybeSingle();
-      const sessRow: any = {
+      await upsertSession(supabase, callId, {
         lead_id: leadId,
-        external_session_id: callId,
         customer_phone: phone,
         customer_phone_normalized: norm,
         call_status: 'completed',
         call_direction: direction,
-        brand: 'bcon',
         call_duration_seconds: durationSecs,
-        updated_at: new Date().toISOString(),
-      };
-      if (sess?.id) {
-        await supabase.from('voice_sessions').update(sessRow).eq('id', sess.id);
-      } else {
-        sessRow.created_at = startedAt || new Date().toISOString();
-        const { error: sErr } = await supabase.from('voice_sessions').insert(sessRow);
-        if (sErr) console.error('[vapi-webhook] voice_session insert error:', sErr.message);
-      }
+      });
     }
 
     // 3) Log transcript turns into conversations (idempotent per call_id)
@@ -228,7 +283,9 @@ export async function POST(req: NextRequest) {
       if (smErr) console.error('[vapi-webhook] summary insert error:', smErr.message);
     }
 
-    // 5) Trigger lead scoring (awaited so it survives the serverless freeze)
+    // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the
+    //    Vercel lambda freezes) but it runs LAST — all call persistence above is
+    //    already committed, so even if scoring is slow/times out the call is saved.
     if (leadId) {
       try {
         const origin = new URL(req.url).origin;
@@ -251,5 +308,5 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true, route: 'vapi-webhook', expects: 'POST end-of-call-report' });
+  return NextResponse.json({ ok: true, route: 'vapi-webhook', expects: 'POST status-update | end-of-call-report' });
 }
