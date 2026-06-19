@@ -2279,18 +2279,26 @@ async function processPendingTasks() {
   // below only ever sees human-approved tasks. Runs BEFORE the staleness guard
   // so parked tasks waiting for approval are never auto-expired.
   // Set REQUIRE_APPROVAL=false (env) to restore fully-automatic sending.
+  //
+  // PER-TYPE automation: AUTO_APPROVED_TASK_TYPES is a comma-separated list of
+  // task_types that fire automatically (no approval needed) even while the gate
+  // is on — so you can flip types to auto one at a time, e.g.
+  //   AUTO_APPROVED_TASK_TYPES=follow_up_day1,nudge_waiting
+  // Anything NOT in the list still parks as Awaiting Approval.
   const REQUIRE_APPROVAL = process.env.REQUIRE_APPROVAL !== 'false';
+  const AUTO_TYPES = (process.env.AUTO_APPROVED_TASK_TYPES || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
   if (REQUIRE_APPROVAL) {
     const { data: unapproved } = await supabase
       .from('agent_tasks')
-      .select('id, metadata')
+      .select('id, task_type, metadata')
       .eq('status', 'pending');
     const toPark = (unapproved || [])
-      .filter((t) => !(t.metadata && t.metadata.approved))
+      .filter((t) => !(t.metadata && t.metadata.approved) && !AUTO_TYPES.includes(t.task_type))
       .map((t) => t.id);
     if (toPark.length > 0) {
       await supabase.from('agent_tasks').update({ status: 'queued' }).in('id', toPark);
-      console.log(`[ProcessTasks] Approval gate ON: parked ${toPark.length} task(s) as awaiting-approval`);
+      console.log(`[ProcessTasks] Approval gate ON: parked ${toPark.length} task(s) as awaiting-approval` + (AUTO_TYPES.length ? ` (auto types: ${AUTO_TYPES.join(',')})` : ''));
     }
   }
 

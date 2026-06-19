@@ -994,15 +994,22 @@ export async function GET(request: NextRequest) {
       responseTimeTrend.push({ value: dayAvgResponse })
     }
     
-    // Calculate % changes
-    const leadChange = leadTrend.length >= 2 
-      ? Math.round(((leadTrend[leadTrend.length - 1].value - leadTrend[0].value) / Math.max(leadTrend[0].value, 1)) * 100)
-      : 0
-    const bookingChange = bookingTrend.length >= 2
-      ? Math.round(((bookingTrend[bookingTrend.length - 1].value - bookingTrend[0].value) / Math.max(bookingTrend[0].value, 1)) * 100)
-      : 0
-    const responseTimeChange = responseTimeTrend.length >= 2
-      ? Math.round(((responseTimeTrend[0].value - responseTimeTrend[responseTimeTrend.length - 1].value) / Math.max(responseTimeTrend[0].value, 1)) * 100)
+    // Calculate % changes. When the baseline is 0, a real % is undefined — show
+    // +100 if we went from nothing to something, else 0 (never a divide-by-1
+    // explosion). Clamped to a sane range.
+    const pctChangeTrend = (first: number, last: number) => {
+      if (first <= 0) return last > 0 ? 100 : 0
+      return Math.max(-999, Math.min(999, Math.round(((last - first) / first) * 100)))
+    }
+    const leadChange = leadTrend.length >= 2 ? pctChangeTrend(leadTrend[0].value, leadTrend[leadTrend.length - 1].value) : 0
+    const bookingChange = bookingTrend.length >= 2 ? pctChangeTrend(bookingTrend[0].value, bookingTrend[bookingTrend.length - 1].value) : 0
+    // Only compute a % change when the baseline day actually has response data.
+    // The old Math.max(value,1) denominator turned a 0ms baseline into a
+    // divide-by-1, so a recent 7500ms read as -750000% (the "712055" bug).
+    const rtFirst = responseTimeTrend[0]?.value || 0
+    const rtLast = responseTimeTrend[responseTimeTrend.length - 1]?.value || 0
+    const responseTimeChange = (responseTimeTrend.length >= 2 && rtFirst >= 100)
+      ? Math.max(-999, Math.min(999, Math.round(((rtFirst - rtLast) / rtFirst) * 100)))
       : 0
 
     // 14. 24-hour activity for sparkline
