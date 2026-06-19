@@ -48,9 +48,13 @@ export function getBrandConfig(brand?: string): BrandConfig {
 
 /**
  * Get current brand ID from env vars, hostname detection, or fallback.
+ * Always lowercase — this is the brand IDENTITY written to the DB (all_leads.brand,
+ * voice_sessions.brand, etc.). A stray uppercase env (NEXT_PUBLIC_BRAND="BCON")
+ * must NOT produce mixed-case brand values that split a lead into duplicates.
+ * Callers that need an env-var PREFIX uppercase it themselves (e.g. BRAND_ID.toUpperCase()).
  */
 export function getCurrentBrandId(): string {
-  return getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
+  return (getBrandFromEnv() || detectBrandFromHostname() || 'bcon').toLowerCase();
 }
 
 /**

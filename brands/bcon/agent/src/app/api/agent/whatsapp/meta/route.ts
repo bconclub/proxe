@@ -198,7 +198,8 @@ export async function POST(request: NextRequest) {
     }
 
     const contacts = value.contacts || [];
-    const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+    // Lowercase — env NEXT_PUBLIC_BRAND may be "BCON"; mixed case splits leads into dupes.
+    const brand = String(process.env.NEXT_PUBLIC_BRAND || 'bcon').toLowerCase();
 
     // Process each message (usually just one)
     for (const msg of messages) {

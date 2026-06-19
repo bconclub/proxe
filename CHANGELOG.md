@@ -19,6 +19,12 @@
 - **bcon (Vercel):** new read-only APIs `GET /api/dashboard/calls` (filters: direction / status / search / date) and `GET /api/dashboard/calls/[id]` (one call + transcript). No schema change — merges `voice_sessions` (call facts) with `conversations` channel=voice rows (recording / summary / transcript), joined by `metadata.call_id === voice_sessions.external_session_id`.
 - **bcon (Vercel):** Overview gained a **Calls** KPI card (inbound/outbound counts + 7-day trend sparkline) linking to `/dashboard/calls`; `founder-metrics` now returns a `calls` block (extended the `voice_sessions` select to carry direction/status/duration/created_at).
 
+## 2026-06-19 06:30 IST · bcon: fix brand-casing split (BCON vs bcon duplicate leads)
+
+- Root cause: `NEXT_PUBLIC_BRAND` env = `BCON` (uppercase); lead-writers wrote that verbatim, so the same phone split into `BCON` + `bcon` records (dedup is case-sensitive). Fix env to `bcon` AND harden code so it can't recur:
+- `getCurrentBrandId()` now returns lowercase (brand IDENTITY for DB writes); callers needing an env prefix still `.toUpperCase()` themselves, so `BCON_SUPABASE_URL` lookups are unaffected.
+- `whatsapp/meta` lead-writer lowercases the brand (was the source of the uppercase WhatsApp leads). `leads/inbound` + `vapi-webhook` already lowercase.
+
 ## 2026-06-19 06:14 IST · bcon: inbound Lead Machine welcome + Calls ingestion hardening + anti-flush guard
 
 - **bcon (VPS task-worker):** inbound `first_outreach` now sends the approved-in-review `bcon_lead_machine_meta_welcome_v1` (params `customer_name` + `brand_name`, `your brand` fallback, buttons Yes Book a Demo / Tell me more in chat). Send-time **gate** skips the welcome if the lead already started a WhatsApp chat (don't double-message click-to-WhatsApp leads). **Anti-backlog-flush staleness guard** (`STALE_TASK_HOURS`, default 6h) so a worker restart can't blast an overdue backlog.
