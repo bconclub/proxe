@@ -108,24 +108,12 @@ export function useRealtimeLeads() {
 
     fetchLeads()
 
-    // Subscribe to real-time changes on all_leads (FIXED: was unified_leads)
-    const channel = supabase
-      .channel('all_leads_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'all_leads',
-        },
-        () => {
-          fetchLeads()
-        }
-      )
-      .subscribe()
+    // Poll every 30s — Realtime postgres_changes on all_leads caused 19s lock
+    // contention that made the entire DB unresponsive (ShareLock death spiral)
+    const interval = setInterval(fetchLeads, 30_000)
 
     return () => {
-      supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [])
 

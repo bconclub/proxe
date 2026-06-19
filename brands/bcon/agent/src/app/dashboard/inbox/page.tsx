@@ -550,27 +550,12 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, selectedChannel])
 
-  // Real-time subscription for new messages
+  // Poll for new messages every 10s — replaced Realtime to avoid DB lock contention
   useEffect(() => {
-    const channel = supabase
-      .channel('messages-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'conversations' },
-        (payload) => {
-          // Refresh conversations list
-          fetchConversations()
-          // If viewing this conversation, add message
-          if (payload.new.lead_id === selectedLeadId) {
-            setMessages(prev => [...prev, payload.new as Message])
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    const interval = setInterval(() => {
+      fetchConversations()
+    }, 10_000)
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
