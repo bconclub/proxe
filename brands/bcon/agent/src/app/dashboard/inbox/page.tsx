@@ -328,12 +328,14 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
 }
 
 
-function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string }) {
-  // Check for failed state: no delivery confirmation after 10 minutes
-  const isFailed = !deliveredAt && !readAt && createdAt && 
+function DeliveryStatusIcon({ deliveredAt, readAt, createdAt, deliveryStatus, waMessageId }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string; deliveryStatus?: string | null; waMessageId?: string | null }) {
+  // Confirmed sent = Meta accepted the message (has a wa_message_id or explicit 'sent' status)
+  const confirmedSent = deliveryStatus === 'sent' || !!waMessageId;
+  // Only show ! when not confirmed sent AND no delivery receipt after 10 min
+  const isFailed = !confirmedSent && !deliveredAt && !readAt && createdAt &&
     (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
 
-  if (isFailed) {
+  if (isFailed || deliveryStatus === 'failed') {
     // Warning icon
     return (
       <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
@@ -1836,7 +1838,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[78%] rounded-xl px-3.5 py-2.5 border"
+                          className="max-w-[440px] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
@@ -1857,7 +1859,7 @@ export default function InboxPage() {
                             {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
                           {otherOrdered.length > 0 && (
-                            <details className="mt-1.5">
+                            <details open className="mt-1.5">
                               <summary className="text-[10px] cursor-pointer" style={{ color: '#60a5fa' }}>+{otherOrdered.length} more fields</summary>
                               <div className="space-y-1 mt-1.5">
                                 {otherOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
@@ -2037,7 +2039,7 @@ export default function InboxPage() {
                               )}
                               {!sendFailed && (
                                 <span className="flex items-center" title={ds || 'pending'}>
-                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} />
                                 </span>
                               )}
                             </div>
@@ -2121,7 +2123,7 @@ export default function InboxPage() {
                               </div>
                             )}
                             <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
-                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} />
                             </span>
                           </div>
                         )}
