@@ -3,6 +3,57 @@ import { getServiceClient, getClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
+// Approved template bodies (mirror of the worker's TEMPLATE_BODIES) so the board
+// can show the actual outgoing message preview per task. Keep in sync with
+// brands/bcon/voice/task-worker.js.
+const TEMPLATE_BODIES: Record<string, string> = {
+  bcon_lead_machine_meta_welcome_v1_: `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}. We help businesses like yours capture, qualify and convert more leads on autopilot. Want to see it in action?`,
+  bcon_proxe_followup_engaged: `Hi {{customer_name}}, we were talking about {{service_interest}} for your business. Let's continue where we left off?`,
+  bcon_proxe_followup_noengage: `Hi {{customer_name}}, you reached out recently about {{service_interest}}. Would you like to know how we can help?`,
+  bcon_proxe_booking_reminder_24h: `Hi {{customer_name}}, your call with the BCON Team is tomorrow at {{booking_time}}. We'll cover {{service_interest}} for your business.`,
+  bcon_proxe_booking_reminder_30m: `Hi {{customer_name}}, 30 minutes to go. Your call with the BCON Team is at {{booking_time}}.`,
+  bcon_proxe_reengagement_engaged: `Hi {{customer_name}}, you mentioned {{pain_point}} was a challenge. If that's still the case, we should chat.`,
+  bcon_proxe_reengagement_noengage: `Hi {{customer_name}}, we connected a while back but didn't dig into details. Want to see how we help businesses like yours grow?`,
+}
+
+/** Render a short outgoing-message preview for a task. */
+function renderPreview(t: any): string {
+  const name = (t.lead_name || 'there').split(' ')[0]
+  const md = t.metadata || {}
+  const tmpl = md.template_name || md.template
+  if (tmpl && TEMPLATE_BODIES[tmpl]) {
+    return TEMPLATE_BODIES[tmpl]
+      .replace(/\{\{\s*customer_name\s*\}\}/g, name)
+      .replace(/\{\{\s*brand_name\s*\}\}/g, md.brand_name || 'your brand')
+      .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || 'your goals')
+      .replace(/\{\{\s*booking_time\s*\}\}/g, md.booking_time || 'your slot')
+      .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
+  }
+  // AI-dynamic tasks: message is generated at send time — use the stored
+  // preview / description / angle as the best available hint.
+  return md.preview || md.message_preview || t.task_description || md.completed_action ||
+    `${String(t.task_type || 'task').replace(/_/g, ' ')} to ${t.lead_name || 'lead'}`
+}
+
+/** Who acted / will act: human name (approved/sent) vs PROXe automation. */
+function deriveActor(t: any): { label: string; kind: 'human' | 'proxe' } {
+  const md = t.metadata || {}
+  if (md.approved && md.approved_by) return { label: md.approved_by, kind: 'human' }
+  if (md.sent_by === 'founder' || md.approved) return { label: 'You', kind: 'human' }
+  return { label: 'Automation', kind: 'proxe' }
+}
+
+/** Human-readable reason a task needs attention. */
+function deriveStatusReason(t: any): string {
+  const err = String(t.error_message || '')
+  if (t.status === 'queued') return 'Awaiting your approval to send'
+  if (/template/i.test(err)) return 'Template not found — needs setup'
+  if (/24h|window/i.test(err)) return 'Outside 24h window — needs template'
+  if (/phone|number|not synced|recipient/i.test(err)) return 'Phone number missing'
+  if (/deliver|unreachable|failed to send/i.test(err)) return 'Delivery failed'
+  return err || 'Needs attention'
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Use service role client to bypass RLS on agent_tasks table
@@ -185,8 +236,84 @@ export async function GET(request: NextRequest) {
       low: pendingWithConfidence.filter((t: any) => t.metadata.confidence_score < 50).length,
     }
 
+    // ── Board view: KPIs + buckets + previews for the redesigned Tasks page ──
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const [comp7d, fail7d] = await Promise.all([
+      supabase.from('agent_tasks').select('id', { count: 'exact', head: true })
+        .eq('status', 'completed').gte('completed_at', sevenDaysAgo.toISOString()),
+      supabase.from('agent_tasks').select('id', { count: 'exact', head: true })
+        .in('status', ['failed', 'failed_24h_window']).gte('completed_at', sevenDaysAgo.toISOString()),
+    ])
+    const c7 = comp7d.count || 0, f7 = fail7d.count || 0
+    const successRate7d = c7 + f7 > 0 ? Math.round((c7 / (c7 + f7)) * 100) : 100
+
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+    const tomorrowEnd = new Date(todayEnd.getTime() + 24 * 60 * 60 * 1000)
+    const pend = (pendingResult.data || [])
+    const slim = (t: any) => ({
+      id: t.id, lead_id: t.lead_id, lead_name: t.lead_name, task_type: t.task_type,
+      status: t.status, scheduled_at: t.scheduled_at, channel: t.metadata?.channel || 'whatsapp',
+      preview: renderPreview(t), actor: deriveActor(t), reason: deriveStatusReason(t),
+      sequence_label: t.metadata?.sequence ? `Step ${t.metadata.step} of ${t.metadata.total_steps || 4}` : null,
+    })
+
+    // Next to fire: APPROVED-and-pending tasks due within 60 min (these actually send)
+    const nextToFire = pend
+      .filter((t: any) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) <= oneHourFromNow)
+      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+      .map(slim)
+
+    // Needs attention: awaiting approval (queued) + recent failures/blocked
+    const needsAttention = [
+      ...pend.filter((t: any) => t.status === 'queued'),
+      ...(historyResult.data || []).filter((t: any) =>
+        (t.status === 'failed' || t.status === 'failed_24h_window') &&
+        t.completed_at && new Date(t.completed_at) >= todayStart),
+    ].map((t: any) => ({ ...slim(t), action: t.status === 'queued' ? 'approve' : (/template/i.test(t.error_message || '') ? 'fix_template' : /phone|number/i.test(t.error_message || '') ? 'update_contact' : 'retry') }))
+
+    // Upcoming: pending beyond 60 min, grouped by horizon
+    const upcomingPend = pend
+      .filter((t: any) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) > oneHourFromNow)
+      .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+    const upcoming = {
+      nextHour: [] as any[], // (none — those are in nextToFire); kept for shape parity
+      soon: upcomingPend.filter((t: any) => new Date(t.scheduled_at) <= fourHoursFromNow).map(slim),
+      today: upcomingPend.filter((t: any) => { const d = new Date(t.scheduled_at); return d > fourHoursFromNow && d < todayEnd }).map(slim),
+      tomorrow: upcomingPend.filter((t: any) => { const d = new Date(t.scheduled_at); return d >= todayEnd && d < tomorrowEnd }).map(slim),
+      later: upcomingPend.filter((t: any) => new Date(t.scheduled_at) >= tomorrowEnd).map(slim),
+    }
+
+    // Activity feed: recent completed/failed
+    const activity = (historyResult.data || [])
+      .slice(0, 25)
+      .map((t: any) => ({
+        id: t.id, lead_id: t.lead_id, lead_name: t.lead_name, task_type: t.task_type,
+        channel: t.metadata?.channel || 'whatsapp', status: t.status,
+        outcome: t.status === 'completed' ? (t.metadata?.completed_action || 'Message sent') : (t.error_message || 'Failed'),
+        actor: deriveActor(t), at: t.completed_at || t.created_at,
+      }))
+
+    const nextFires = nextToFire[0]?.scheduled_at
+    const nextFiresInMs = nextFires ? Math.max(0, new Date(nextFires).getTime() - now.getTime()) : null
+    const dueToday = pend.filter((t: any) => t.scheduled_at && new Date(t.scheduled_at) < todayEnd)
+
+    const board = {
+      kpis: {
+        nextFiresInMs,
+        dueToday: { total: dueToday.length, pending: dueToday.filter((t: any) => t.status === 'pending').length, queued: dueToday.filter((t: any) => t.status === 'queued').length },
+        awaitingApproval: queuedCount,
+        successRate7d,
+      },
+      nextToFire,
+      needsAttention,
+      upcoming,
+      activity,
+    }
+
     return NextResponse.json({
       tasks,
+      board,
       stats: {
         completedToday,
         failedToday,

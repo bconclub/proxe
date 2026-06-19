@@ -17,8 +17,8 @@ export async function POST(
     const body = await request.json()
     const { action, scheduled_at } = body
 
-    if (!action || !['cancel', 'reschedule', 'send_now'].includes(action)) {
-      return NextResponse.json({ error: 'Invalid action. Must be cancel, reschedule, or send_now' }, { status: 400 })
+    if (!action || !['cancel', 'reschedule', 'send_now', 'retry', 'skip'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid action. Must be cancel, reschedule, send_now, retry, or skip' }, { status: 400 })
     }
 
     // Fetch the task
@@ -32,8 +32,45 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
-    if (task.status !== 'pending' && task.status !== 'queued') {
+    const isFailed = task.status === 'failed' || task.status === 'failed_24h_window'
+    // retry acts on failed tasks; everything else on pending/queued.
+    if (action === 'retry') {
+      if (!isFailed) {
+        return NextResponse.json({ error: `Can only retry a failed task (status "${task.status}")` }, { status: 400 })
+      }
+    } else if (task.status !== 'pending' && task.status !== 'queued') {
       return NextResponse.json({ error: `Cannot modify task with status "${task.status}"` }, { status: 400 })
+    }
+
+    if (action === 'retry') {
+      // Put a failed task back into the approval queue (cleared error), so the
+      // operator can review and approve it again. Does NOT auto-send.
+      const { error } = await supabase
+        .from('agent_tasks')
+        .update({
+          status: 'queued',
+          completed_at: null,
+          error_message: null,
+          scheduled_at: new Date().toISOString(),
+          metadata: { ...(task as any).metadata, approved: false, timing_reason: 'Retried from dashboard — awaiting approval' },
+        })
+        .eq('id', taskId)
+      if (error) throw error
+      return NextResponse.json({ success: true, message: `Retried — ${task.task_type} for ${task.lead_name} back in Awaiting Approval` })
+    }
+
+    if (action === 'skip') {
+      // Skip = dismiss without sending.
+      const { error } = await supabase
+        .from('agent_tasks')
+        .update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: 'Skipped from dashboard',
+        })
+        .eq('id', taskId)
+      if (error) throw error
+      return NextResponse.json({ success: true, message: `Skipped ${task.task_type} for ${task.lead_name}` })
     }
 
     if (action === 'cancel') {
