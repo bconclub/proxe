@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-19 · Token usage daily graph + Upcoming Events program chips
+
+- **Token usage page:** added a daily trend bar chart between the hero cards and the table — see day-by-day spend at a glance. Metric toggle (Cost / Tokens / Calls), per-bar hover tooltip (date + cost + tokens + calls), first/mid/last x-axis labels. Follows the existing window toggle (24h/7D/14D/30D/All). Reuses the stored `byDay` buckets — no new data, no migration. API (`/api/dashboard/token-usage`) now returns a `daily[]` series (zero-filled per window; all recorded days for "All").
+- **Upcoming Events (home):** program **category chips** derived from the event title — Cabin Crew (violet), Flight Training (green), Pilot Training (blue), CPL/PPL Path (amber); no match → no chip. Restructured line 1 so the date · owner is pushed to the right edge (`ml-auto`) instead of sitting tight against the name; full title still on line 2.
+- User-facing: founder can now track per-day Claude spend, and scan upcoming bookings by program type.
+
 ## 2026-06-18 · Inbox shows the ACTUAL welcome template body
 
 - Added `renderWelcomeBody(templateName, name)` with the Meta-approved body copy for `windchasers_generic_welcome_v1` + `windchasers_pilot_welcome_v2` (verified against the Graph API), and their quick-reply buttons in `TEMPLATE_BUTTONS`.

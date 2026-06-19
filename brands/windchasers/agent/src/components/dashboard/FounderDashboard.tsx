@@ -298,6 +298,19 @@ export default function FounderDashboard() {
   const getInitials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
 
+  // Program category chip derived from an event title (Cabin Crew / Pilot /
+  // Flight Training / CPL / PPL). Returns null when nothing matches.
+  const eventCategory = (title?: string | null): { label: string; color: string; bg: string } | null => {
+    const t = (title || '').toLowerCase()
+    if (!t) return null
+    if (t.includes('cabin crew')) return { label: 'Cabin Crew', color: '#a855f7', bg: 'rgba(168,85,247,0.14)' }
+    if (t.includes('flight training')) return { label: 'Flight Training', color: '#10b981', bg: 'rgba(16,185,129,0.14)' }
+    if (t.includes('pilot')) return { label: 'Pilot Training', color: '#60a5fa', bg: 'rgba(59,130,246,0.16)' }
+    if (t.includes('cpl')) return { label: 'CPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
+    if (t.includes('ppl')) return { label: 'PPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
+    return null
+  }
+
   // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
   const intentFor = (score: number): { label: string; color: string; bg: string } => {
     if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
@@ -612,17 +625,20 @@ export default function FounderDashboard() {
                     {getInitials(booking.name)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name · date · owner, with the recency-coloured
-                        countdown chip on the right (only thing that's coloured). */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-2.5 min-w-0">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                        <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                          <span>{formatBookingWhen(booking.datetime)}</span>
-                          <span style={{ opacity: 0.4 }}>·</span>
-                          <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                    {/* Line 1 — name + category chip on the left; date · owner
+                        pushed to the right (ml-auto); recency countdown chip last. */}
+                    <div className="flex items-center gap-2">
+                      <p className="text-[13px] font-semibold truncate min-w-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                      {(() => { const c = eventCategory(booking.title); return c && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0" style={{ background: c.bg, color: c.color }}>
+                          {c.label}
                         </span>
-                      </div>
+                      ) })()}
+                      <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap ml-auto pl-2" style={{ color: 'var(--text-secondary)' }}>
+                        <span>{formatBookingWhen(booking.datetime)}</span>
+                        <span style={{ opacity: 0.4 }}>·</span>
+                        <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                      </span>
                       {(() => { const t = countdownTint(booking.datetime); return (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
                           {formatCountdown(booking.datetime)}

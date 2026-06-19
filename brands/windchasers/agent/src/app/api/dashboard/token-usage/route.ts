@@ -23,6 +23,21 @@ function lastNDayKeys(n: number): string[] {
   return keys
 }
 
+// Sum a single day's category buckets into one daily totals point.
+function sumDay(day: Partial<Record<TokenCategory, UsageBucket>> | undefined) {
+  const acc = { input_tokens: 0, output_tokens: 0, total_tokens: 0, calls: 0, cost_usd: 0 }
+  if (!day) return acc
+  for (const cat of Object.keys(day) as TokenCategory[]) {
+    const b = day[cat]!
+    acc.input_tokens += b.input_tokens
+    acc.output_tokens += b.output_tokens
+    acc.total_tokens += b.input_tokens + b.output_tokens
+    acc.calls += b.calls
+    acc.cost_usd += b.cost_usd
+  }
+  return acc
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -80,9 +95,22 @@ export async function GET(request: NextRequest) {
       { input_tokens: 0, output_tokens: 0, total_tokens: 0, calls: 0, cost_usd: 0 },
     )
 
+    // Daily series for the trend chart. For a window, show exactly that many
+    // days (oldest→newest, zero-filling days with no spend so gaps are visible).
+    // For "All", show every recorded day in order.
+    const byDay = doc?.byDay || {}
+    let dayKeys: string[]
+    if (rangeDays == null) {
+      dayKeys = Object.keys(byDay).sort()
+    } else {
+      dayKeys = lastNDayKeys(rangeDays).reverse()
+    }
+    const daily = dayKeys.map((date) => ({ date, ...sumDay(byDay[date]) }))
+
     return NextResponse.json({
       rows,
       totals,
+      daily,
       range,
       since: doc?.since || null,
       updatedAt: doc?.updatedAt || null,
