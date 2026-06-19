@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-19 · Follow-up Health colour follows the reply rate
+
+- The card's colour + label now key off the **reply rate shown** (≥90% = green/Good, below = amber/Fair) instead of the response-TIME status. Previously colour and the % were decoupled, so "Fair/amber" kept jumping independent of the number. 90% now reads green/Good.
+- Ring, icon, label, and the "· on track / · needs attention" note all follow the same signal. Engine footer message aligned to it too.
+
 ## 2026-06-19 · Quieter page-load sound
 
 - Home page-load "ready" cue volume halved (0.5 → 0.25) — it was too loud. New-lead / lead-update cues unchanged.

@@ -410,8 +410,14 @@ export default function FounderDashboard() {
   // Time-of-day greeting in IST (shifts morning/afternoon/evening/night).
   const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
   const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
-  // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
-  const healthColor = metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'
+  // Follow-up Health colour + label follow the REPLY RATE shown on the card
+  // (≥90% = green/Good, below = amber/Fair) so the colour can't drift away from
+  // the number — previously it keyed off response-time status and "jumped".
+  const replyRate = Math.round(rm?.responseRate ?? 0)
+  const healthIsGood = replyRate >= 90
+  const healthColor = healthIsGood ? '#22c55e' : '#f59e0b'
+  const healthLabel = healthIsGood ? 'Good' : 'Fair'
+  const healthNote = healthIsGood ? 'on track' : 'needs attention'
   // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
@@ -540,18 +546,18 @@ export default function FounderDashboard() {
         {/* Follow-up Health — status + ring; whole card follows the status colour. */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{metrics.responseHealth.status === 'good' ? <MdFavorite size={15} /> : metrics.responseHealth.status === 'warning' ? <MdWarning size={15} /> : <MdWarning size={15} />}</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthIsGood ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <div>
-              <div className="text-2xl sm:text-3xl font-bold leading-none capitalize" style={{ color: metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444' }}>
-                {metrics.responseHealth.status === 'good' ? 'Good' : metrics.responseHealth.status === 'warning' ? 'Fair' : 'Needs work'}
+              <div className="text-2xl sm:text-3xl font-bold leading-none capitalize" style={{ color: healthColor }}>
+                {healthLabel}
               </div>
             </div>
-            <RadialProgress value={Math.round(rm?.responseRate ?? 0)} size={48} color={metrics.responseHealth.status === 'good' ? '#22c55e' : metrics.responseHealth.status === 'warning' ? '#f59e0b' : '#ef4444'} showPercentage={false} label="" />
+            <RadialProgress value={replyRate} size={48} color={healthColor} showPercentage={false} label="" />
           </div>
-          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(rm?.responseRate ?? 0)}% reply rate · on track</span>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {healthNote}</span>
         </div>
         <KpiCard
           icon={<MdEvent size={15} />} iconColor="#a855f7"
@@ -599,7 +605,7 @@ export default function FounderDashboard() {
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
-            {metrics.responseHealth.status === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+            {healthIsGood ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
           </div>
         </section>
 
