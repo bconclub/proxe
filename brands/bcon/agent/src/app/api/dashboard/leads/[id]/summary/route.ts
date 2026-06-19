@@ -326,7 +326,7 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
                 'anthropic-version': '2023-06-01',
               },
               body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-sonnet-4-5-20250929',
                 max_tokens: 200,
                 messages: [
                   {
@@ -698,7 +698,7 @@ ${conversationContext || 'No messages yet'}`
               'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-              model: 'claude-sonnet-4-20250514',
+              model: 'claude-sonnet-4-5-20250929',
               max_tokens: 200, // Increased from 400 to allow for more comprehensive summaries
               messages: [
                 {

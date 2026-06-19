@@ -13,6 +13,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-19 03:32 IST · bcon: kill retired-model 404, brand pronunciation on calls, tighter web replies
+
+- **bcon (Vercel):** retired Anthropic model `claude-sonnet-4-20250514` now 404s. Added a runtime guard in `claudeClient.getModel()` that remaps retired IDs → `claude-sonnet-4-5-20250929`, so the web chat widget recovers **even with the stale `CLAUDE_MODEL` env var** (no dashboard change required). User-facing: clears the `Error: 404 not_found_error` shown in the chat bubble.
+- **bcon (Vercel):** swapped the same dead ID → Sonnet 4.5 in the hardcoded dashboard routes (`dashboard/summarize`, `dashboard/leads/[id]/summary`) and the env example files.
+- **bcon (Vercel):** web chat style — replies now 1-2 sentences and MUST end on a single open question (momentum over monologue). User-facing: shorter, faster back-and-forth in the widget.
+- **bcon (VPS voice):** brand mispronunciation on calls. Added `speechSafeBrand()` at the TTS chokepoint (both ElevenLabs + Sarvam, incl. greeting preload) — rewrites every variant of `PROXe`/`BCON` → `Proxy`/`Beacon` before audio. User-facing: the caller always hears the brand pronounced correctly regardless of what the model emits.
+
 ## 2026-06-17 · Infra: master→brands propagation (changes land on master, flow everywhere)
 
 - **The "edit core once → it's in every brand" mechanism is live.** `master/agent` is the source of truth for shared core; `scripts/propagate-from-master.js` copies the shared-core files into every brand, **never touching** each brand's own layer (configs, prompts, brand-facts, brand-divergent components/routes), so brand identity (colour/copy/fields/templates) is preserved.

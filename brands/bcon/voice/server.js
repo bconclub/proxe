@@ -637,7 +637,22 @@ async function sarvamSTT(audioBuffer) {
   }
 }
 
+// Force correct brand pronunciation at the TTS layer. Whatever the model emits
+// ("BCON", "Prox-ee", "Bee-Con", "PROXe"...) gets rewritten to the phonetic
+// spelling the voice reads correctly. Single chokepoint — every audio path
+// (greeting preload, live speak, Sarvam fallback) runs through this.
+function speechSafeBrand(text) {
+  if (!text) return text;
+  return text
+    // PROXe / Prox-ee / Proxe / "PROX C" / "PROX-C" → Proxy
+    .replace(/\bPROX[\s-]?(?:ee|e|c)\b/gi, 'Proxy')
+    // BCON / B-CON / BEE-kun / Bee-Con / Beacon variants → Beacon
+    .replace(/\bB[\s-]?CON\b/gi, 'Beacon')
+    .replace(/\bBee[\s-]?(?:Con|kun)\b/gi, 'Beacon');
+}
+
 async function elevenLabsTTS(text) {
+  text = speechSafeBrand(text);
   const ttsStart = Date.now();
   try {
     const res = await fetch(
@@ -672,6 +687,7 @@ async function elevenLabsTTS(text) {
 }
 
 async function sarvamTTS(text, language = 'en-IN') {
+  text = speechSafeBrand(text);
   const ttsStart = Date.now();
   try {
     if (!process.env.SARVAM_API_KEY) return null;
