@@ -20,6 +20,19 @@ export async function GET() {
     }
 
     const supabase = getServiceClient() || authClient
+
+    // Is the caller an admin? Only admins may (re)assign lead owners; everyone
+    // can still SEE the list (read-only owner label + owner filters).
+    let isAdmin = false
+    try {
+      const { data: me } = await supabase
+        .from('dashboard_users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      isAdmin = me?.role === 'admin'
+    } catch { /* default non-admin */ }
+
     const { data, error } = await supabase
       .from('dashboard_users')
       .select('id, full_name, email')
@@ -28,7 +41,7 @@ export async function GET() {
 
     if (error) {
       console.error('[team-members] query failed:', error.message)
-      return NextResponse.json({ members: [] })
+      return NextResponse.json({ members: [], isAdmin })
     }
 
     const members = (data || []).map((u: any) => ({
@@ -36,7 +49,7 @@ export async function GET() {
       name: u.full_name || (u.email ? u.email.split('@')[0] : 'User'),
       email: u.email || null,
     }))
-    return NextResponse.json({ members })
+    return NextResponse.json({ members, isAdmin })
   } catch (error: any) {
     console.error('[team-members] Error:', error?.message || error)
     return NextResponse.json({ members: [] })

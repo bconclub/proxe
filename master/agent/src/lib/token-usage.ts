@@ -43,8 +43,32 @@ export interface UsageBucket {
 
 export interface TokenUsageDoc {
   byCategory: Partial<Record<TokenCategory, UsageBucket>>
+  // Per-IST-day buckets so the /tokens page can sum windows (24h / 7d / 30d).
+  // Keyed 'YYYY-MM-DD'. byCategory stays the all-time cumulative ("All").
+  byDay?: Record<string, Partial<Record<TokenCategory, UsageBucket>>>
   since: string
   updatedAt: string
+}
+
+/** IST calendar day key, e.g. "2026-06-18". */
+function istDayKey(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+}
+
+/** Add a call's tokens into a bucket map under `key`, returning the map. */
+function addToBucket(
+  map: Partial<Record<TokenCategory, UsageBucket>>,
+  category: TokenCategory,
+  inputTokens: number,
+  outputTokens: number,
+  model: string,
+): void {
+  const b: UsageBucket = map[category] || { input_tokens: 0, output_tokens: 0, calls: 0, cost_usd: 0 }
+  b.input_tokens += inputTokens || 0
+  b.output_tokens += outputTokens || 0
+  b.calls += 1
+  b.cost_usd += estimateCost(model, inputTokens || 0, outputTokens || 0)
+  map[category] = b
 }
 
 /** Rough USD per 1M tokens (input, output) by model family. */
@@ -87,19 +111,15 @@ export async function recordTokenUsage(
 
     const nowIso = new Date().toISOString()
     const cur: TokenUsageDoc =
-      (data?.value as TokenUsageDoc) || { byCategory: {}, since: nowIso, updatedAt: nowIso }
+      (data?.value as TokenUsageDoc) || { byCategory: {}, byDay: {}, since: nowIso, updatedAt: nowIso }
 
-    const b: UsageBucket = cur.byCategory[category] || {
-      input_tokens: 0,
-      output_tokens: 0,
-      calls: 0,
-      cost_usd: 0,
-    }
-    b.input_tokens += inputTokens || 0
-    b.output_tokens += outputTokens || 0
-    b.calls += 1
-    b.cost_usd += estimateCost(model, inputTokens || 0, outputTokens || 0)
-    cur.byCategory[category] = b
+    // All-time cumulative bucket.
+    addToBucket(cur.byCategory, category, inputTokens, outputTokens, model)
+    // Per-IST-day bucket (for windowed views).
+    if (!cur.byDay) cur.byDay = {}
+    const dayKey = istDayKey()
+    if (!cur.byDay[dayKey]) cur.byDay[dayKey] = {}
+    addToBucket(cur.byDay[dayKey], category, inputTokens, outputTokens, model)
     cur.updatedAt = nowIso
 
     await svc
@@ -148,7 +168,7 @@ export async function resetTokenUsage(): Promise<void> {
       .upsert(
         {
           key: SETTINGS_KEY,
-          value: { byCategory: {}, since: nowIso, updatedAt: nowIso } as TokenUsageDoc,
+          value: { byCategory: {}, byDay: {}, since: nowIso, updatedAt: nowIso } as TokenUsageDoc,
           description: 'TEST: Claude token usage by category',
           // NB: dashboard_settings.updated_by is a UUID column — passing the
           // string 'system' 400s (22P02) and silently drops the write. Omit it.

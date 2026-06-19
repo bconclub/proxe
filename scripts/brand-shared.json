@@ -128,6 +128,7 @@
     "components/dashboard/MetricsDashboard.tsx",
     "components/dashboard/MicroCharts.tsx",
     "components/dashboard/NotificationCenter.tsx",
+    "components/dashboard/PipelineFunnel.tsx",
     "components/dashboard/ThemeProvider.tsx",
     "components/dashboard/TodaySnapshotButton.tsx",
     "components/dashboard/WebMetrics.tsx",
