@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-19 · Quieter page-load sound
+
+- Home page-load "ready" cue volume halved (0.5 → 0.25) — it was too loud. New-lead / lead-update cues unchanged.
+
 ## 2026-06-19 · Token usage daily graph + Upcoming Events program chips
 
 - **Token usage page:** added a daily trend bar chart between the hero cards and the table — see day-by-day spend at a glance. Metric toggle (Cost / Tokens / Calls), per-bar hover tooltip (date + cost + tokens + calls), first/mid/last x-axis labels. Follows the existing window toggle (24h/7D/14D/30D/All). Reuses the stored `byDay` buckets — no new data, no migration. API (`/api/dashboard/token-usage`) now returns a `daily[]` series (zero-filled per window; all recorded days for "All").
