@@ -19,6 +19,10 @@
 - **bcon (Vercel):** new read-only APIs `GET /api/dashboard/calls` (filters: direction / status / search / date) and `GET /api/dashboard/calls/[id]` (one call + transcript). No schema change — merges `voice_sessions` (call facts) with `conversations` channel=voice rows (recording / summary / transcript), joined by `metadata.call_id === voice_sessions.external_session_id`.
 - **bcon (Vercel):** Overview gained a **Calls** KPI card (inbound/outbound counts + 7-day trend sparkline) linking to `/dashboard/calls`; `founder-metrics` now returns a `calls` block (extended the `voice_sessions` select to carry direction/status/duration/created_at).
 
+## 2026-06-19 06:45 IST · bcon: SOURCE column parity with Windchasers (Meta Forms badge)
+
+- LeadsTable `sourceConfig` was a stripped subset (web/whatsapp/voice/social only), so a Meta-Forms / Facebook / Google lead with no UTM + `attribution.source=direct` fell through to `unknown` = "-" on the top badge. WC's channelConfig has all channels. Added `meta_forms`/`facebook`/`google`/`ads`/`pabbly`/`referral`/`organic`/`manual`/`form` so the SOURCE column shows the channel badge (e.g. **Meta**) on top + the first-touch sub-label (**Meta Forms**) underneath — matching Windchasers. Data was already present (attribution.first_touch_label); this was render-only.
+
 ## 2026-06-19 06:30 IST · bcon: fix brand-casing split (BCON vs bcon duplicate leads)
 
 - Root cause: `NEXT_PUBLIC_BRAND` env = `BCON` (uppercase); lead-writers wrote that verbatim, so the same phone split into `BCON` + `bcon` records (dedup is case-sensitive). Fix env to `bcon` AND harden code so it can't recur:

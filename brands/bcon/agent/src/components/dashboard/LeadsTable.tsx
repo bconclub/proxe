@@ -691,11 +691,24 @@ export default function LeadsTable({
                   uc?.voice?.booking_time || uc?.voice?.booking?.time ||
                   uc?.social?.booking_time || uc?.social?.booking?.time
 
+                // Channel → badge. Mirrors Windchasers' channelConfig so the SOURCE
+                // column reads the same: a Meta-Forms / Facebook / Google lead shows
+                // its channel badge on top, not "-". (BCON was missing meta_forms etc.,
+                // so direct-attribution form leads fell through to unknown "-".)
                 const sourceConfig: Record<string, { label: string; color: string }> = {
                   web: { label: 'Web', color: '#3B82F6' },
+                  form: { label: 'Web', color: '#3B82F6' },
                   whatsapp: { label: 'WA', color: '#22C55E' },
                   voice: { label: 'Voice', color: '#8B5CF6' },
                   social: { label: 'Social', color: '#EC4899' },
+                  meta_forms: { label: 'Meta', color: '#1877F2' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  google: { label: 'Google', color: '#EA4335' },
+                  ads: { label: 'Ads', color: '#F97316' },
+                  pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  manual: { label: 'Manual', color: '#6B7280' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
 
