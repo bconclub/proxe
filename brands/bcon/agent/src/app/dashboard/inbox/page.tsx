@@ -1833,7 +1833,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[440px] rounded-xl px-3.5 py-2.5 border"
+                          className="w-[500px] max-w-[88%] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}

@@ -114,6 +114,28 @@ export async function POST(request: NextRequest) {
       await ensureSession(externalSessionId, 'web', supabase);
     }
 
+    // Load real conversation history from the DB by session_id, rather than
+    // trusting the client's memory.recentHistory. As a web chat grows, the
+    // client window drops the earliest turns, so the AI re-asked things it was
+    // already told (e.g. "what's the business?" after the visitor said "laptop
+    // repair service"). The conversations table has every prior turn — use it.
+    let dbHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+    if (!isHealthCheck) {
+      try {
+        const { data: hist } = await supabase
+          .from('conversations')
+          .select('sender, content, created_at')
+          .eq('channel', 'web')
+          .eq('metadata->>session_id', externalSessionId)
+          .order('created_at', { ascending: true })
+          .limit(40);
+        dbHistory = (hist || [])
+          .filter((m: any) => m.content && (m.sender === 'customer' || m.sender === 'agent'))
+          .map((m: any) => ({ role: m.sender === 'customer' ? 'user' as const : 'assistant' as const, content: m.content }));
+      } catch { /* fall back to client-supplied memory below */ }
+    }
+    const conversationHistory = dbHistory.length > 0 ? dbHistory : (memory.recentHistory || []);
+
     // Build AgentInput
     const agentInput: AgentInput = {
       channel: 'web',
@@ -125,7 +147,7 @@ export async function POST(request: NextRequest) {
         email: userProfile.email,
         phone: userProfile.phone,
       },
-      conversationHistory: memory.recentHistory || [],
+      conversationHistory,
       summary: memory.summary || '',
       usedButtons,
     };
