@@ -1807,7 +1807,19 @@ export default function InboxPage() {
                     // lead's first message reads as "came from Meta" the way agent
                     // bubbles read green). Ported from Windchasers, trimmed to BCON's
                     // business fields (no aviation student/parent concepts).
-                    const withLabels = formData.fields.map(f => ({ value: f.value, label: getFormFieldLabel(f.key) }));
+                    // The logged form message sometimes carries an empty Name / bare
+                    // "+" Phone even though the lead record has them — fall back to the
+                    // resolved lead, and drop any field that's still blank so the card
+                    // never shows empty rows.
+                    const withLabels = formData.fields
+                      .map(f => {
+                        const label = getFormFieldLabel(f.key);
+                        let value = (f.value || '').trim();
+                        if (label === 'Name' && !value) value = (selectedConversation?.lead_name || '').trim();
+                        if (label === 'Phone' && value.replace(/\D/g, '').length < 7) value = (selectedConversation?.lead_phone || value).trim();
+                        return { value, label };
+                      })
+                      .filter(f => f.value && f.value !== '+');
                     const ORDER = ['Name', 'Email', 'Phone', 'City', 'Brand', 'Type', 'Urgency'];
                     const seen = new Set<typeof withLabels[number]>();
                     const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)));

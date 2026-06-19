@@ -22,8 +22,6 @@ interface PromptOptions {
   messageCount?: number;
   crossChannelContext?: string;
   brand?: string;
-  /** Dashboard-configured prompt (from dashboard_settings via getPromptOverride). When set, replaces the hardcoded brand prompt file. */
-  promptOverride?: string | null;
   formData?: Record<string, any> | null;
 }
 
@@ -45,15 +43,6 @@ function getBrandSystemPrompt(brand: string, context: string, messageCount?: num
 }
 
 /**
- * The default (hardcoded) brand prompt for a channel — what the agent uses when
- * no dashboard override is set. Used by the Configure → Prompt page to show the
- * baseline operators can edit.
- */
-export function getDefaultBrandPrompt(brand: string, channel?: Channel, context = ''): string {
-  return getBrandSystemPrompt(brand, context, undefined, channel);
-}
-
-/**
  * Build system prompt + user prompt for Claude
  */
 export function buildPrompt(options: PromptOptions): { systemPrompt: string; userPrompt: string } {
@@ -70,15 +59,14 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     messageCount,
     crossChannelContext,
     brand,
-    promptOverride,
     formData,
   } = options;
 
   // Resolve brand: explicit param > env var > default
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
-  // Build the core system prompt (dashboard override if set, else brand-specific)
-  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone, promptOverride);
+  // Build the core system prompt (brand-specific)
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -117,7 +105,6 @@ function buildSystemPrompt(
   formData?: Record<string, any> | null,
   userEmail?: string | null,
   userPhone?: string | null,
-  promptOverride?: string | null,
 ): string {
   // Guard: only inject the name when it looks like a real person, not a brand
   // label, UI string, or other junk that leaked into the customer_name column.
@@ -158,6 +145,11 @@ function buildSystemPrompt(
   if (formData && Object.keys(formData).length > 0) {
     const lines: string[] = [];
     if (formData.brand_name) lines.push(`Brand/Company: ${formData.brand_name}`);
+    if (formData.business_type) lines.push(`What their business does: ${formData.business_type}`);
+    if (formData.customer_type) lines.push(`Who their customers are: ${formData.customer_type}`);
+    if (formData.lead_volume) lines.push(`Leads per month: ${formData.lead_volume}`);
+    if (formData.current_system) lines.push(`How they manage leads now: ${formData.current_system}`);
+    if (formData.marketing_spend) lines.push(`Monthly marketing spend: ${formData.marketing_spend}`);
     if (formData.has_website === true) lines.push('Has website: Yes');
     else if (formData.has_website === false) lines.push('Has website: No (still setting up)');
     if (formData.monthly_leads) lines.push(`Monthly leads they can handle: ${formData.monthly_leads}`);
@@ -169,11 +161,7 @@ function buildSystemPrompt(
     }
   }
 
-  // Dashboard-configured prompt (Configure section) wins over the brand file.
-  const basePrompt = (promptOverride && promptOverride.trim())
-    ? promptOverride + (knowledgeBase ? `\n\n${knowledgeBase}` : '')
-    : getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel);
-  return basePrompt + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
+  return getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel) + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**

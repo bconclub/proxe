@@ -67,6 +67,17 @@ export async function POST(request: NextRequest) {
 
     const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
 
+    // Capture EVERY extra field Pabbly / the form sent beyond the known ones
+    // (qualifier answers like business_type, who_are_your_customers, monthly_spend,
+    // etc.), whether they arrive as flat params or nested custom_fields. Without
+    // this they were silently dropped — so the lead record had no business context
+    // and the AI's first reply was generic ("what do you guys do?").
+    const KNOWN_KEYS = new Set(['name', 'phone', 'email', 'source', 'campaign', 'brand', 'city', 'brand_name', 'urgency', 'notes', 'custom_fields'])
+    const extraFields: Record<string, any> = {}
+    for (const [k, v] of Object.entries(body)) {
+      if (!KNOWN_KEYS.has(k) && v != null && String(v).trim() !== '') extraFields[k] = v
+    }
+
     // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
     let notes: string | null = null
     try {
@@ -143,8 +154,32 @@ export async function POST(request: NextRequest) {
       return null
     }
 
-    const cf = custom_fields || {}
+    // Merge nested custom_fields + flat extra params so a qualifier is captured
+    // however Pabbly sends it.
+    const cf: Record<string, any> = {
+      ...(custom_fields && typeof custom_fields === 'object' ? custom_fields : {}),
+      ...extraFields,
+    }
     const formData: Record<string, any> = {}
+    // Business qualifiers (Meta form answers) → structured form_data for AI
+    // personalization. Alias the raw Meta field names + our short keys.
+    const pickCf = (...keys: string[]): string | null => {
+      for (const k of keys) {
+        const v = cf[k]
+        if (v != null && String(v).trim() !== '') return String(v).trim()
+      }
+      return null
+    }
+    const businessType = pickCf('business_type', 'what_does_your_business_do', 'what_does_your_business_do?')
+    if (businessType) formData.business_type = businessType
+    const customerType = pickCf('customer_type', 'who_are_your_customers', 'who_are_your_customers?')
+    if (customerType) formData.customer_type = customerType
+    const leadVolume = pickCf('lead_volume', 'how_many_leads_do_you_get_per_month', 'how_many_leads_do_you_get_per_month?', 'monthly_leads')
+    if (leadVolume) formData.lead_volume = leadVolume
+    const currentSystem = pickCf('current_system', 'how_are_you_currently_managing_leads', 'how_are_you_currently_managing_leads?')
+    if (currentSystem) formData.current_system = currentSystem
+    const marketingSpend = pickCf('marketing_spend', 'whats_your_current_monthly_marketing_spend', "what's_your_current_monthly_marketing_spend?", 'monthly_marketing_spend')
+    if (marketingSpend) formData.marketing_spend = marketingSpend
     // "Do You Have Your Website Ready"
     const hasWebsiteRaw = cf['Do You Have Your Website Ready'] ?? cf['has_website'] ?? cf['website_ready']
     if (hasWebsiteRaw != null) formData.has_website = parsePabblyBool(hasWebsiteRaw)
@@ -166,9 +201,10 @@ export async function POST(request: NextRequest) {
     if (brand_name) inboundContext.company = brand_name.trim()
     if (urgency) inboundContext.urgency = (urgencyRaw ? String(urgencyRaw).trim().toLowerCase().replace(/\s+/g, '_') : urgency?.trim())
     if (Object.keys(formData).length > 0) inboundContext.form_data = formData
-    if (custom_fields && typeof custom_fields === 'object') {
-      // Store raw custom_fields separately for reference
-      inboundContext.raw_form_fields = custom_fields
+    // Store the full merged field set (nested custom_fields + flat extra params)
+    // so every form answer is preserved for the inbox view + AI context.
+    if (Object.keys(cf).length > 0) {
+      inboundContext.raw_form_fields = cf
     }
 
     // ── Brand-namespaced context (powers dashboard TYPE / COURSE columns) ───

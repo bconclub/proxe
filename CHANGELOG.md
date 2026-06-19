@@ -19,6 +19,11 @@
 - **bcon (Vercel):** new read-only APIs `GET /api/dashboard/calls` (filters: direction / status / search / date) and `GET /api/dashboard/calls/[id]` (one call + transcript). No schema change — merges `voice_sessions` (call facts) with `conversations` channel=voice rows (recording / summary / transcript), joined by `metadata.call_id === voice_sessions.external_session_id`.
 - **bcon (Vercel):** Overview gained a **Calls** KPI card (inbound/outbound counts + 7-day trend sparkline) linking to `/dashboard/calls`; `founder-metrics` now returns a `calls` block (extended the `voice_sessions` select to carry direction/status/duration/created_at).
 
+## 2026-06-19 07:15 IST · bcon: capture all form qualifiers + feed them to the AI opener; inbox card fallback
+
+- **Responses use form context:** inbound API now captures EVERY field Pabbly sends (flat params or nested custom_fields) into `raw_form_fields`, and maps the qualifiers (business_type / customer_type / lead_volume / current_system / marketing_spend) into structured `form_data`. promptBuilder's FORM DATA block now renders those, so the AI's first reply opens with the lead's business/context instead of a generic "what do you guys do?". Previously flat qualifier params were silently dropped (raw_form_fields=null).
+- **Inbox card:** the Meta-Form card parses fields from the logged message, which sometimes has an empty Name / bare "+" Phone — now falls back to the resolved lead record for Name/Phone and drops any still-blank field so no empty rows show.
+
 ## 2026-06-19 06:45 IST · bcon: SOURCE column parity with Windchasers (Meta Forms badge)
 
 - LeadsTable `sourceConfig` was a stripped subset (web/whatsapp/voice/social only), so a Meta-Forms / Facebook / Google lead with no UTM + `attribution.source=direct` fell through to `unknown` = "-" on the top badge. WC's channelConfig has all channels. Added `meta_forms`/`facebook`/`google`/`ads`/`pabbly`/`referral`/`organic`/`manual`/`form` so the SOURCE column shows the channel badge (e.g. **Meta**) on top + the first-touch sub-label (**Meta Forms**) underneath — matching Windchasers. Data was already present (attribution.first_touch_label); this was render-only.
