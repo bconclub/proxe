@@ -24,7 +24,7 @@ export async function POST(
     // Fetch the task
     const { data: task, error: fetchError } = await supabase
       .from('agent_tasks')
-      .select('id, status, task_type, lead_name')
+      .select('id, status, task_type, lead_name, metadata')
       .eq('id', taskId)
       .maybeSingle()
 
@@ -67,16 +67,26 @@ export async function POST(
     }
 
     if (action === 'send_now') {
+      // Approve & send: flip to 'pending' and stamp metadata.approved so the
+      // worker's approval gate lets it through (it parks every UN-approved
+      // pending task as 'queued'). scheduled_at = now so it fires next tick and
+      // isn't caught by the staleness guard.
       const { error } = await supabase
         .from('agent_tasks')
         .update({
+          status: 'pending',
           scheduled_at: new Date().toISOString(),
-          metadata: { ...(task as any).metadata, timing_reason: 'Sent now from dashboard' },
+          metadata: {
+            ...(task as any).metadata,
+            approved: true,
+            approved_at: new Date().toISOString(),
+            timing_reason: 'Approved & sent from dashboard',
+          },
         })
         .eq('id', taskId)
 
       if (error) throw error
-      return NextResponse.json({ success: true, message: `${task.task_type} for ${task.lead_name} will fire on next worker run` })
+      return NextResponse.json({ success: true, message: `Approved — ${task.task_type} for ${task.lead_name} will fire on next worker run` })
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

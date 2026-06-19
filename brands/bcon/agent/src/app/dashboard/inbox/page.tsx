@@ -231,9 +231,16 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
-  // Match snake_case keys AND common plain labels (first name, phone, email…) +
-  // Meta's trailing "?_" quirk, so Meta lead forms parse regardless of style.
-  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|\w+(?:[_ '][a-z0-9]+)+[?_]*)\s*:\s*/gi;
+  // Meta "click to WhatsApp" forms arrive as ONE run-on line:
+  //   "Question?: answer Question?: answer Full name: X City: Y ..."
+  // with no delimiter between an answer and the next question. A generic
+  // "word word…:" matcher swallows answers into the next key (e.g.
+  // "Real Estate / Property Developers How are you managing leads" became one
+  // key). Fix: a key is EITHER a question that STARTS with a question-word and
+  // ends in "?", OR one of the known plain labels. Anchoring questions to a
+  // leading question-word lets the parser skip over multi-word answers and only
+  // break at real field boundaries. Also supports snake_case (Pabbly) keys.
+  const fieldPattern = /((?:Who|What|When|Where|Why|Which|How|Do|Does|Are|Is)\b[^:?]*\?|Full name|First name|Last name|Company name|Brand name|Business name|Phone number|Phone|Email|City|State|Location|Name|\w+(?:_\w+)+)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -259,13 +266,16 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
 /** Extract a short label for a form field */
 function getFormFieldLabel(key: string): string {
   const k = key.toLowerCase();
-  if (k.includes('brand name') || k.includes('business name')) return 'Brand';
-  if (k.includes('full name') || k === 'name') return 'Name';
+  if (k.includes('brand name') || k.includes('business name') || k.includes('company name')) return 'Brand';
+  if (k.includes('full name') || k === 'name' || k === 'first name') return 'Name';
   if (k.includes('email')) return 'Email';
   if (k.includes('phone')) return 'Phone';
   if (k.includes('city') || k.includes('location')) return 'City';
-  if (k.includes('how fast') || k.includes('urgency')) return 'Urgency';
-  if (k.includes('business type') || k.includes('choose business')) return 'Type';
+  if (k.includes('how fast') || k.includes('how soon') || k.includes('want to start') || k.includes('urgency')) return 'Urgency';
+  if (k.includes('who are your customers') || k.includes('customers')) return 'Customers';
+  if (k.includes('what does your business') || k.includes('business do') || k.includes('business type') || k.includes('choose business')) return 'Business';
+  if (k.includes('managing leads') || k.includes('currently managing') || k.includes('current system')) return 'Current System';
+  if (k.includes('marketing spend') || k.includes('marketing budget') || k.includes('spend')) return 'Spend';
   if (k.includes('website')) return 'Website';
   if (k.includes('leads') || k.includes('handle')) return 'Volume';
   if (k.includes('ai system')) return 'AI Systems';
@@ -1807,7 +1817,7 @@ export default function InboxPage() {
                         return { value, label };
                       })
                       .filter(f => f.value && f.value !== '+');
-                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Brand', 'Type', 'Urgency'];
+                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Brand', 'Business', 'Customers', 'Volume', 'Spend', 'Current System', 'Type', 'Urgency'];
                     const seen = new Set<typeof withLabels[number]>();
                     const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)));
                     const otherOrdered = withLabels.filter(f => !seen.has(f));

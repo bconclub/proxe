@@ -157,7 +157,16 @@ function buildSystemPrompt(
     if (formData.has_ai_systems === true) lines.push('Already has AI systems running');
     else if (formData.has_ai_systems === false) lines.push('No AI systems yet (opportunity)');
     if (lines.length > 0) {
-      formDataNote = `\n\n=================================================================================\nFORM DATA (lead filled this out before chatting)\n=================================================================================\n${lines.join('\n')}\n\nUse this to personalize your conversation. Do NOT ask questions they already answered in the form. Do NOT repeat this data back verbatim - weave it naturally into conversation.`;
+      // First-message override: the lead's form answers (and the inline form
+      // text in their first WhatsApp message) tempt the model into a
+      // domain-specific opener like "what kind of real estate projects do you
+      // handle?" — the exact hallucination we forbid. On message 1, do NOT let
+      // the "personalize/weave" instruction fire; force the generic opener.
+      const isFirst = messageCount === 0 || messageCount === 1;
+      const usage = isFirst
+        ? `\n\nTHIS IS THE FIRST MESSAGE. Do NOT reference any of the above yet, and NEVER ask a question derived from their business type (e.g. never "what kind of real estate projects", "what kind of policies"). Your first reply is ONLY: greet them by name + a GENERIC opener such as "what do you guys do?". Begin weaving these details in from your SECOND message onward.`
+        : `\n\nUse this to personalize your conversation. Do NOT ask questions they already answered in the form. Do NOT repeat this data back verbatim - weave it naturally into conversation.`;
+      formDataNote = `\n\n=================================================================================\nFORM DATA (lead filled this out before chatting)\n=================================================================================\n${lines.join('\n')}${usage}`;
     }
   }
 

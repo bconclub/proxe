@@ -2271,6 +2271,29 @@ async function createColdLeadTasks() {
 async function processPendingTasks() {
   const now = new Date().toISOString();
 
+  // ── Manual-approval gate ────────────────────────────────────────────────────
+  // When REQUIRE_APPROVAL is on (default), nothing fires until a human approves
+  // it from the dashboard. Park every not-yet-approved pending task as 'queued'
+  // (shown as "Awaiting Approval" in the UI). The dashboard "Send Now" action
+  // flips it back to pending with metadata.approved = true, so the send loop
+  // below only ever sees human-approved tasks. Runs BEFORE the staleness guard
+  // so parked tasks waiting for approval are never auto-expired.
+  // Set REQUIRE_APPROVAL=false (env) to restore fully-automatic sending.
+  const REQUIRE_APPROVAL = process.env.REQUIRE_APPROVAL !== 'false';
+  if (REQUIRE_APPROVAL) {
+    const { data: unapproved } = await supabase
+      .from('agent_tasks')
+      .select('id, metadata')
+      .eq('status', 'pending');
+    const toPark = (unapproved || [])
+      .filter((t) => !(t.metadata && t.metadata.approved))
+      .map((t) => t.id);
+    if (toPark.length > 0) {
+      await supabase.from('agent_tasks').update({ status: 'queued' }).in('id', toPark);
+      console.log(`[ProcessTasks] Approval gate ON: parked ${toPark.length} task(s) as awaiting-approval`);
+    }
+  }
+
   // ── Anti-backlog-flush guard ────────────────────────────────────────────────
   // Never fire a task that is long overdue. Without this, a backlog of `pending`
   // tasks with a past scheduled_at (accumulated while the worker was down, or
@@ -3448,7 +3471,7 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_followup_engaged': 2,      // name, service
   'bcon_proxe_followup_noengage': 2,     // name, service
   'bcon_proxe_rnr': 1,                   // name
-  'bcon_lead_machine_meta_welcome_v1': 2,     // customer_name, brand_name
+  'bcon_lead_machine_meta_welcome_v1_': 2,     // customer_name, brand_name
 };
 
 // Template quick reply button labels matching Meta-approved templates
@@ -3459,7 +3482,7 @@ const TEMPLATE_BUTTONS = {
   'bcon_proxe_booking_reminder_30m': ['I\'m ready!'],
   'bcon_proxe_reengagement_engaged': ['Yes, let\'s talk'],
   'bcon_proxe_reengagement_noengage': ['Yes Lets Talk'],
-  'bcon_lead_machine_meta_welcome_v1': ['Yes, Book a Demo', 'Tell me more in chat'],
+  'bcon_lead_machine_meta_welcome_v1_': ['Yes, Book a Demo', 'Tell me more in chat'],
 };
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
@@ -3473,7 +3496,7 @@ const TEMPLATE_BODIES = {
   'bcon_proxe_followup_engaged': `Hi {{customer_name}}, we were talking about {{service_interest}} for your business. Let's continue where we left off?`,
   'bcon_proxe_followup_noengage': `Hi {{customer_name}}, you reached out to us recently about {{service_interest}}. Would you like to know how we can help?`,
   'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`, // NOT YET SUBMITTED TO META — placeholder text
-  'bcon_lead_machine_meta_welcome_v1': `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}.\n\nWe help businesses like yours capture, qualify and convert more leads on autopilot, fully done for you.\n\nWant to see it in action?`,
+  'bcon_lead_machine_meta_welcome_v1_': `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}.\n\nWe help businesses like yours capture, qualify and convert more leads on autopilot, fully done for you.\n\nWant to see it in action?`,
 };
 
 /**
@@ -3544,7 +3567,7 @@ async function getTemplatePreview(task, lead) {
       ctx.form_data?.brand_name ||
       'your brand';
     return {
-      name: 'bcon_lead_machine_meta_welcome_v1',
+      name: 'bcon_lead_machine_meta_welcome_v1_',
       params: [
         { label: 'Name', parameter_name: 'customer_name', value: leadName },
         { label: 'Brand', parameter_name: 'brand_name', value: brandName },
