@@ -17,8 +17,10 @@ export default function VoiceAgentTab() {
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
 
   const voiceNumber = '+918046733388';
-  // All four are required — the agent only calls with full context.
-  const canCall = !!(phone.trim() && personName.trim() && businessName.trim() && industry.trim());
+  // Contact name is OPTIONAL: with a name the agent greets the person; without
+  // one it confirms the business and asks to be put through. Business + industry
+  // + phone are still required for context.
+  const canCall = !!(phone.trim() && businessName.trim() && industry.trim());
 
   type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
 
@@ -182,10 +184,10 @@ export default function VoiceAgentTab() {
           <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
           <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            PROXE will call and talk with full context — all fields required
+            PROXE will call with full context — contact name optional (it asks for the right person if blank)
           </p>
           {[
-            { ph: 'Contact name', val: personName, set: setPersonName },
+            { ph: 'Contact name (optional)', val: personName, set: setPersonName },
             { ph: 'Business name', val: businessName, set: setBusinessName },
             { ph: 'Industry', val: industry, set: setIndustry },
           ].map((f) => (

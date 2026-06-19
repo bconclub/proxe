@@ -20,7 +20,15 @@ export async function POST(req: NextRequest) {
   const { phone, leadName, contactName, businessName, industry } = await req.json();
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
 
-  const name = contactName || leadName || '';
+  const name = (contactName || leadName || '').trim();
+  const business = (businessName || '').trim();
+  // Greeting target: confirm the person if we have a name, else the company.
+  // ("Hi, is this Thanzeel?" vs "Hi, is this AB Developers?"). When there's no
+  // person, vh-contactname stays empty so the agent asks to be put through.
+  const greetingName = name || business;
+  if (!greetingName) {
+    return NextResponse.json({ error: 'A contact name or business name is required' }, { status: 400 });
+  }
   const vapiKey = process.env.VAPI_PRIVATE_API_KEY;
   if (!vapiKey) {
     return NextResponse.json(
@@ -54,7 +62,8 @@ export async function POST(req: NextRequest) {
         assistantOverrides: {
           variableValues: {
             'vh-contactname': name,
-            'vh-businessname': businessName || '',
+            'vh-greetingname': greetingName,
+            'vh-businessname': business,
             'vh-industry': industry || '',
             'vh-now': istNow,
           },
