@@ -928,38 +928,30 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   };
 
   const requestNameBeforeProceed = (message: string, buttons: string[]) => {
-    // Ask for name on first message, before AI responds
-    if (
-      !userProfile.name &&
-      !hasAskedName &&
-      !namePromptDismissed &&
-      !showNamePrompt &&
-      messageCount === 0 // First message
-    ) {
+    // REQUIRED gate: ask for name + WhatsApp number on the first message, before
+    // the AI responds, so every web chat becomes a reachable lead (founder:
+    // "otherwise people are just talking"). This blocks unconditionally while
+    // either is missing — typing in the main input can't bypass it.
+    const needContact = (!userProfile.name || !userProfile.phone) && messageCount === 0;
+    if (!needContact) return false;
+
+    // (Re)show the combined card if it isn't already up. Only queue the pending
+    // message once, on first show, to avoid duplicating it on re-gate.
+    if (!showNamePrompt) {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('[ChatWidget] Requesting name before first AI response');
+        console.log('[ChatWidget] Requesting name + phone before first AI response');
       }
       setHasAskedName(true);
-      
-      // Add user's message to chat immediately so it shows before the name prompt
       addUserMessage(message);
-      
-      // Queue the message for AI response after name is provided
       queuePendingMessage(message, buttons, 'name');
-      
-      // Set flag to skip adding user message again when sending to AI
       setSkipAddingUserMessage(true);
-      
-      // Ensure chat is open to show the name prompt
       setIsOpen(true);
       setIsInputActive(true);
       setIsExpanded(false);
       setShowQuickButtons(false);
-      
       setShowNamePrompt(true);
-      return true;
     }
-    return false;
+    return true; // always gate while contact info is missing
   };
 
   const requestEmailBeforeProceed = (message: string, buttons: string[]) => {
@@ -1098,39 +1090,29 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     submitMessage,
   ]);
 
-  const flushPendingMessage = () => {
-    if (!pendingUserMessage) return;
-    const message = pendingUserMessage;
-    const buttons = pendingButtons.length ? pendingButtons : usedButtons;
-    setPendingUserMessage(null);
-    setPendingButtons([]);
-    setPendingRequirement(null);
-    submitMessage(message, buttons);
-  };
-
   const handleNameSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!nameInput.trim()) return;
+    // Name + WhatsApp number both required to start the chat. Basic phone
+    // validation: keep +/digits, need at least 8 digits to count as real.
+    const cleanPhone = phoneInput.replace(/[^\d+]/g, '');
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+    if (!nameInput.trim() || phoneDigits.length < 8) return;
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[ChatWidget] Name submitted', { name: nameInput.trim() });
+      console.log('[ChatWidget] Name + phone submitted', { name: nameInput.trim() });
     }
-    // Set flag immediately to prevent re-asking
     setHasAskedName(true);
+    setHasAskedPhone(true);
     setNamePromptDismissed(false);
     setShowNamePrompt(false);
-    
+
     await persistUserProfile({
       name: nameInput.trim(),
-      phoneSkipped: userProfile.phoneSkipped,
+      phone: cleanPhone,
       promptedName: true,
+      promptedPhone: true,
     });
     setNameInput('');
-  };
-
-  const handleNameDismiss = () => {
-    setNamePromptDismissed(true);
-    setShowNamePrompt(false);
-    flushPendingMessage();
+    setPhoneInput('');
   };
 
   const handleEmailSubmit = async (event: React.FormEvent) => {
@@ -3246,16 +3228,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                     <span className={styles.bubbleName}>
                       {config.name}
                     </span>
-                    <button
-                      type="button"
-                      className={styles.inlinePromptClose}
-                      onClick={handleNameDismiss}
-                      aria-label="Close name prompt"
-                    >
-                      {ICONS.close}
-                    </button>
                   </div>
-                  <p className={styles.inlinePromptText}>What should we call you?</p>
+                  <p className={styles.inlinePromptText}>Quick intro before we dive in — your name and WhatsApp number so we can follow up.</p>
                   <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
                     <div className={styles.inlinePromptInputWrapper}>
                       <input
@@ -3265,7 +3239,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                         value={nameInput}
                         onChange={(event) => setNameInput(event.target.value)}
                       />
-                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!nameInput.trim()}>
+                    </div>
+                    <div className={styles.inlinePromptInputWrapper} style={{ marginTop: '8px' }}>
+                      <input
+                        className={styles.inlinePromptInput}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="WhatsApp number"
+                        value={phoneInput}
+                        onChange={(event) => setPhoneInput(event.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className={styles.inlinePromptSendBtn}
+                        disabled={!nameInput.trim() || phoneInput.replace(/\D/g, '').length < 8}
+                      >
                         {ICONS.send}
                       </button>
                     </div>
