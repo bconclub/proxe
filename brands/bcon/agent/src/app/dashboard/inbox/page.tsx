@@ -560,48 +560,25 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId, selectedChannel])
 
-  // Poll for new messages every 10s — replaced Realtime to avoid DB lock contention
+  // Poll for new activity every 20s — SILENT (no loading flicker, no DB count
+  // query, no filter reset). Refreshes the conversation list and, if a thread is
+  // open, that thread's messages — only re-rendering when something changed.
+  // Replaced Realtime to avoid DB lock contention; silent + 20s keeps Nano load low.
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchConversations()
-    }, 10_000)
+      fetchConversations(true)
+      if (selectedLeadId) fetchMessages(selectedLeadId, true)
+    }, 20_000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLeadId])
+  }, [selectedLeadId, selectedChannel, channelFilter])
 
-  async function fetchConversations() {
-    setLoading(true)
+  async function fetchConversations(silent = false) {
+    // silent = background poll: don't flip the loading state (no visible
+    // "reload" flicker) and skip the debug count(*) query. Only the initial /
+    // manual load shows the loader.
+    if (!silent) setLoading(true)
     try {
-      console.log('Fetching conversations...')
-
-      // First, try a simple count to see if messages exist
-      const { count: messageCount, error: countError } = await supabase
-        .from('conversations')
-        .select('*', { count: 'exact', head: true })
-
-      console.log('Total messages in database:', messageCount, countError ? `Error: ${countError.message}` : '')
-
-      // If we get an RLS error, log it clearly
-      if (countError) {
-        console.error('❌ RLS Error - Conversations table may be blocked:', countError.message)
-        if (countError.message.includes('permission') || countError.message.includes('policy')) {
-          console.error('⚠️  RLS Policy Error: Make sure migration 018_disable_auth_requirements.sql has been run!')
-        }
-      } else if (messageCount === 0) {
-        // No RLS error but 0 messages - check if we can actually query the table
-        console.log('⚠️  No messages found. Testing RLS access...')
-        const { data: testData, error: testError } = await supabase
-          .from('messages')
-          .select('id')
-          .limit(1)
-
-        if (testError) {
-          console.error('❌ RLS Test Failed - Cannot query conversations table:', testError.message)
-        } else {
-          console.log('✅ RLS Test Passed - Can query conversations table (it\'s just empty)')
-        }
-      }
-
       // Fetch ALL conversations — including anonymous web chats (lead_id=null).
       // Anonymous web visitors are grouped below by their session_id (in
       // metadata) so they surface in the inbox even before they share
@@ -964,11 +941,26 @@ export default function InboxPage() {
     }
   }
 
-  async function fetchMessages(leadId: string) {
-    setMessagesLoading(true)
-    setMessageChannelFilter('all')
+  // silent = background poll: don't show the loader, don't reset the channel
+  // filter, and only replace messages if something actually changed (so the
+  // open thread doesn't flicker/scroll-jump every poll).
+  function applyMessages(next: Message[], silent: boolean) {
+    if (!silent) { setMessages(next); return }
+    setMessages(prev => {
+      const a = prev[prev.length - 1]
+      const b = next[next.length - 1]
+      if (prev.length === next.length && a?.id === b?.id) return prev
+      return next
+    })
+  }
+
+  async function fetchMessages(leadId: string, silent = false) {
+    if (!silent) {
+      setMessagesLoading(true)
+      setMessageChannelFilter('all')
+    }
     try {
-      console.log('Fetching all messages for lead:', leadId)
+      if (!silent) console.log('Fetching all messages for lead:', leadId)
 
       // Anonymous web visitor path: the conversation list groups these by
       // `session:<sid>` synthetic keys because they have no all_leads row.
@@ -985,7 +977,7 @@ export default function InboxPage() {
 
         if (anonErr) {
           console.error('[fetchMessages] anonymous session fetch failed:', anonErr)
-          setMessages([])
+          if (!silent) setMessages([])
           return
         }
 
@@ -1005,7 +997,7 @@ export default function InboxPage() {
         if (!selectedChannel && messagesData[0]?.channel) {
           setSelectedChannel(messagesData[0].channel)
         }
-        setMessages(messagesData)
+        applyMessages(messagesData, silent)
         return
       }
 
@@ -1094,12 +1086,12 @@ export default function InboxPage() {
         console.log('No messages found for lead:', leadId)
       }
 
-      setMessages(messagesData)
+      applyMessages(messagesData, silent)
     } catch (err) {
       console.error('Error in fetchMessages:', err)
-      setMessages([])
+      if (!silent) setMessages([])
     } finally {
-      setMessagesLoading(false)
+      if (!silent) setMessagesLoading(false)
     }
   }
 
