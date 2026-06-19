@@ -722,14 +722,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const leadUpdate: Record<string, any> = {
       last_touchpoint: 'whatsapp',
       last_interaction_at: new Date().toISOString(),
-    };
-
-    if (Object.keys(intentUpdate).length > 0) {
-      leadUpdate.unified_context = {
+      // PROXe just auto-replied → stamp it as the last actor for the leads-table
+      // "Last Touch" badge (@proxe). A later human touch overwrites this.
+      unified_context: {
         ...existingCtx,
-        [brand]: { ...existingBrandCtx, ...intentUpdate },
-      };
-    }
+        ...(Object.keys(intentUpdate).length > 0
+          ? { [brand]: { ...existingBrandCtx, ...intentUpdate } }
+          : {}),
+        last_actor: { type: 'proxe', at: new Date().toISOString() },
+      },
+    };
 
     await supabase
       .from('all_leads')

@@ -2434,6 +2434,17 @@ async function processPendingTasks() {
         metadata: { ...task.metadata, completed_action: completedAction },
       }).eq('id', task.id);
       console.log(`[ProcessTasks] Completed: ${task.task_type} for ${task.lead_name}`);
+      // Stamp PROXe as the last actor so the leads-table "Last Touch" badge reads
+      // @proxe after an auto-send. A later human touch overwrites it.
+      if (task.lead_id) {
+        try {
+          const { data: lr } = await supabase.from('all_leads').select('unified_context').eq('id', task.lead_id).maybeSingle();
+          const lctx = lr?.unified_context || {};
+          await supabase.from('all_leads').update({
+            unified_context: { ...lctx, last_actor: { type: 'proxe', at: new Date().toISOString() } },
+          }).eq('id', task.lead_id);
+        } catch (e) { /* non-fatal */ }
+      }
       await notifyTaskResult(task, true);
     } catch (err) {
       const status = err.is24hWindow ? 'failed_24h_window' : 'failed';

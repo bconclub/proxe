@@ -891,6 +891,11 @@ export default function LeadsTable({
                           let pathOnly = pageUrl.split('?')[0].split('#')[0]
                           try {
                             const u = new URL(pageUrl)
+                            // Click redirectors (fb.me, wa.me, m.me, l.facebook.com) carry a
+                            // meaningless short-link id as their path — e.g. a WhatsApp
+                            // Clickthrough lead's "/9qqSZr45W". Don't show it.
+                            const REDIRECTOR_HOSTS = ['fb.me', 'wa.me', 'm.me', 'l.facebook.com', 'lm.facebook.com']
+                            if (REDIRECTOR_HOSTS.includes(u.hostname.replace(/^www\./, ''))) return null
                             pathOnly = u.pathname || pathOnly
                           } catch {
                             // already stripped above for relative URLs
