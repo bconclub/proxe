@@ -17,6 +17,9 @@
     "src/app/api/cron/booking-reminders/route.ts": {
       "maxDuration": 30
     },
+    "src/app/api/dashboard/founder-metrics/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/**/*.ts": {
       "maxDuration": 10
     }

@@ -137,9 +137,9 @@ export async function GET(request: NextRequest) {
     // the most-recent ~45 days, newest-first, so every window count is accurate.
     let messages: any[] = []
     try {
-      const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      const convCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       const PAGE = 1000
-      for (let page = 0; page < 20; page++) {
+      for (let page = 0; page < 12; page++) {
         const { data: chunk, error: convErr } = await supabase
           .from('conversations')
           .select('lead_id, sender, created_at, metadata, channel')
@@ -1079,8 +1079,10 @@ export async function GET(request: NextRequest) {
     )
 
     if (leadsNeedingScores.length > 0) {
+      // Cap at 20 RPC calls per request — scoring 100+ leads in parallel exhausts
+      // the DB connection pool under load. Unscored leads beyond the cap stay at 0.
       const scoreResults = await Promise.all(
-        leadsNeedingScores.map(async (lead) => {
+        leadsNeedingScores.slice(0, 20).map(async (lead) => {
           try {
             const { data, error } = await supabase
               .rpc('calculate_lead_score', { lead_uuid: lead.id })
