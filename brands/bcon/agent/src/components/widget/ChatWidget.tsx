@@ -1105,12 +1105,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setNamePromptDismissed(false);
     setShowNamePrompt(false);
 
+    // sync:false — save name+phone LOCALLY only; do NOT create the lead from the
+    // browser here. The contact rides along in userProfile to /api/agent/web/chat,
+    // which creates the single lead server-side. Creating it both here AND on the
+    // server raced and produced duplicate leads (same phone, ~2s apart).
     await persistUserProfile({
       name: nameInput.trim(),
       phone: cleanPhone,
       promptedName: true,
       promptedPhone: true,
-    });
+    }, { sync: false });
     setNameInput('');
     setPhoneInput('');
   };
