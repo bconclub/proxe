@@ -3229,7 +3229,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       {config.name}
                     </span>
                   </div>
-                  <p className={styles.inlinePromptText}>Quick intro before we dive in — your name and WhatsApp number so we can follow up.</p>
+                  <p className={styles.inlinePromptText}>A quick intro before we dive in.</p>
                   <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
                     <div className={styles.inlinePromptInputWrapper}>
                       <input
