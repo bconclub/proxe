@@ -3,6 +3,13 @@ import type { BrandConfig } from './proxe.config';
 export const bconConfig: BrandConfig = {
   name: 'BCON',
   brand: 'bcon',
+  // BCON runs the Vapi voice/calls stack and the dashboard extras.
+  features: {
+    voice: true,
+    brain: true,
+    pipelineFunnel: true,
+    followUpSequence: false,
+  },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
     path: '@/api/prompts/bcon-prompt',

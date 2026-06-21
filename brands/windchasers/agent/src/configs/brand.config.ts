@@ -3,6 +3,14 @@ import type { BrandConfig } from './types';
 export const windchasersConfig: BrandConfig = {
   name: 'Windchasers',
   brand: 'windchasers',
+  // Voice/Calls code ships here but stays OFF until Windchasers wants outbound
+  // calling — flip voice:true to surface the Calls dashboard + Vapi webhook.
+  features: {
+    voice: false,
+    brain: true,
+    pipelineFunnel: true,
+    followUpSequence: false,
+  },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
     path: '@/api/prompts/windchasers-prompt',

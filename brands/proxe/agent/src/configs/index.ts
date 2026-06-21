@@ -53,5 +53,12 @@ export function getCurrentBrandId(): string {
   return getBrandFromEnv() || detectBrandFromHostname() || 'windchasers';
 }
 
+/**
+ * Compile/runtime brand id alias.
+ * Mirrors WC's `BRAND_ID` const so ported core files compile unchanged.
+ * In this multi-brand template it resolves from env at module load.
+ */
+export const BRAND_ID = getCurrentBrandId();
+
 export { proxeConfig, windchasersConfig, bconConfig };
 export type { BrandConfig };
