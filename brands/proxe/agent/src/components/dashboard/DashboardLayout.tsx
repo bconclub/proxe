@@ -25,7 +25,9 @@ import {
   MdTimeline,
   MdChecklist,
   MdViewKanban,
+  MdCall,
 } from 'react-icons/md'
+import { getBrandConfig } from '@/configs'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -45,6 +47,7 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
+  { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
@@ -57,11 +60,17 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 3), after Flow (index 6)
-const DIVIDER_AFTER_INDICES = [3, 6]
+// Divider positions: after Pipeline (index 4), after Flow (index 7).
+// Calls sits at index 2 (gated off for brands without voice); its array slot is
+// counted here so the dividers land in the same rendered position whether or not
+// Calls is shown.
+const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  // Per-brand feature toggles — hides nav entries for features this brand has
+  // switched off (e.g. PROXe keeps Voice/Calls off until enabled).
+  const brandFeatures = getBrandConfig().features || {}
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -395,6 +404,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
+              // Feature toggle: hide Calls when this brand has voice switched off.
+              if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               const isActive = pathname === item.href || (item.children && item.children.some(child => pathname === child.href))

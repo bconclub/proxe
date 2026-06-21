@@ -28,8 +28,10 @@ import {
   MdTimeline,
   MdChecklist,
   MdViewKanban,
+  MdCall,
   MdLogout,
 } from 'react-icons/md'
+import { getBrandConfig } from '@/configs'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -50,6 +52,7 @@ const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
+  { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
@@ -62,11 +65,17 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 3), after Flow (index 6)
-const DIVIDER_AFTER_INDICES = [3, 6]
+// Divider positions: after Pipeline (index 4), after Flow (index 7).
+// Calls sits at index 3 (gated off for brands without voice); its array slot is
+// counted here so the dividers land in the same rendered position whether or not
+// Calls is shown.
+const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  // Per-brand feature toggles — hides nav entries for features this brand has
+  // switched off (e.g. Windchasers keeps Voice/Calls off).
+  const brandFeatures = getBrandConfig().features || {}
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
@@ -462,6 +471,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
+              // Feature toggle: hide Calls when this brand has voice switched off.
+              if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
