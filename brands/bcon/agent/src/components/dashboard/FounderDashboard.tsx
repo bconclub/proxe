@@ -9,6 +9,8 @@ import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMe
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
+import DashboardBrain from './DashboardBrain'
+import { getBrandConfig } from '@/configs'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -435,6 +437,7 @@ export default function FounderDashboard() {
           {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
               icon on the right next to the profile. */}
           <TodaySnapshotButton inline label="Snapshot" />
+          {getBrandConfig().features?.brain && <DashboardBrain inline label="Ask PROXe" />}
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
