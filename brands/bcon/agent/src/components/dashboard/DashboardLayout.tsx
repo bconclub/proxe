@@ -10,6 +10,7 @@ import { getBuildDate } from '@/lib/buildInfo'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
+import { getBrandConfig } from '@/configs'
 import {
   MdInbox,
   MdDashboard,
@@ -70,6 +71,9 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  // Per-brand feature toggles — hides nav entries for features this brand has
+  // switched off (e.g. Windchasers keeps Voice/Calls off).
+  const brandFeatures = getBrandConfig().features || {}
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
@@ -457,6 +461,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
             {navigation.map((item, index) => {
+              // Feature toggle: hide Calls when this brand has voice switched off.
+              if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when pathname matches the href OR

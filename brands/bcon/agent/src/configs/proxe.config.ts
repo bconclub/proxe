@@ -1,6 +1,16 @@
 export interface BrandConfig {
   name: string;
   brand: string;
+  // Per-brand feature toggles. Code for these features ships to ALL brands
+  // (promoted via master), but each brand switches them on/off here — e.g.
+  // Windchasers carries the Voice/Calls code but keeps voice:false until they
+  // want outbound calling, BCON runs voice:true.
+  features?: {
+    voice?: boolean;            // Vapi outbound calls + /dashboard/calls
+    brain?: boolean;            // Dashboard Brain insights
+    pipelineFunnel?: boolean;   // Pipeline funnel widget
+    followUpSequence?: boolean; // re-engagement follow-up cron (needs approved template)
+  };
   apiUrl?: string;
   supabase?: {
     url?: string;
