@@ -10,7 +10,7 @@ import { getBuildDate } from '@/lib/buildInfo'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
-import { getBrandConfig } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import {
   MdInbox,
   MdDashboard,
@@ -71,9 +71,10 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
-  // Per-brand feature toggles — hides nav entries for features this brand has
-  // switched off (e.g. Windchasers keeps Voice/Calls off).
-  const brandFeatures = getBrandConfig().features || {}
+  // Per-brand feature toggles (runtime, from Settings → Features) — hides nav
+  // entries for features switched off. Starts at the config default, then
+  // overrides from the DB once it loads.
+  const brandFeatures = useFeatureFlags()
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)

@@ -13,6 +13,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 12:12 IST · bcon: runtime feature toggles (Settings → Features) + Voice/Calls + Brain promoted to all brands
+
+- **all brands (master, windchasers, proxe):** **Voice/Calls** code (Calls dashboard page + `CallsTable`, `api/dashboard/calls{,/[id]}`, `api/agent/voice/{call-status,vapi-webhook}`) and **Dashboard Brain** now ship to every tree, gated by a per-brand `features` flag. Switched ON for BCON, OFF for Windchasers/proxe — their sidebars render byte-identical (the Calls nav slot is divider-compensated). `vapi-webhook` was made brand-neutral (`BRAND_ID`, env-only VoBiz number). proxe excluded from Brain (dormant template).
+- **bcon (Vercel):** new **Settings → Features** panel (`/dashboard/settings/features`) with on/off toggle switches for Voice/Calls, Dashboard Brain, Pipeline Funnel and Follow-up Sequence. User-facing: founders flip a feature on or off themselves — it applies to everyone on the brand on the next page load, **no redeploy**.
+- **bcon (Vercel):** feature flags are now **runtime**, not compile-time. New `GET/POST /api/dashboard/settings/features` stores overrides in `dashboard_settings` (key `feature_flags`), merged over the brand-config defaults (service-role write, global per brand — mirrors `settings/preferences`). New `useFeatureFlags()` hook seeds from the config default (no flash) then overrides from the DB; the nav, Calls page and Brain button gates now read it.
+- DashboardLayout / FounderDashboard / Calls page (bcon) switched from `getBrandConfig().features` to the runtime hook. WC/master/proxe keep the compile-time gate for now (to be propagated once the toggle UX is confirmed).
+- (34d8576b)
+
 ## 2026-06-19 03:58 IST · bcon: Calls dashboard view + overview Calls KPI
 
 - **bcon (Vercel):** new **Calls** section in the dashboard — inbound + outbound voice calls with recordings and transcripts. Nav entry added in the primary group (Chats → Calls → Pipeline). `/dashboard/calls` lists calls (direction, contact, when, duration, status, transcript turns, recording); a row opens a slide-in drawer with an `<audio>` player + full transcript + summary. User-facing: founders can see who called / who was called and play back any recording.
