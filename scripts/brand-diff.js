@@ -298,7 +298,9 @@ function BrandNode({ data: d }) {
 }
 
 const nodeTypes = { brand: BrandNode };
-const NX = { master:{x:420,y:20}, bcon:{x:40,y:380}, windchasers:{x:420,y:380}, proxe:{x:800,y:380} };
+// Generous gaps so the (tall) nodes never overlap: master up top, brands on a
+// row well below it, ~140px horizontal spacing between the 262px-wide cards.
+const NX = { master:{x:470,y:0}, bcon:{x:30,y:520}, windchasers:{x:470,y:520}, proxe:{x:910,y:520} };
 const nodes = [
   { id:'master', type:'brand', position:NX.master, data:DATA.master, draggable:true },
   ...DATA.brands.map(b => ({ id:b.tree, type:'brand', position:NX[b.tree], data:b, draggable:true })),
