@@ -304,6 +304,8 @@ export async function GET(request: NextRequest) {
         dueToday: { total: dueToday.length, pending: dueToday.filter((t: any) => t.status === 'pending').length, queued: dueToday.filter((t: any) => t.status === 'queued').length },
         awaitingApproval: queuedCount,
         successRate7d,
+        completedToday,
+        queued: queuedCount,
       },
       nextToFire,
       needsAttention,
