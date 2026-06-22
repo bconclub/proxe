@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 · bcon: WhatsApp template builder — Number/Named variables + Copy-code button (Meta parity)
+
+- **Type of variable** selector (matches Meta): **Number** (`{{1}}`) or **Named** (`{{order_id}}`). The +Add-variable action and per-variable sample inputs adapt to the chosen style; switching clears the body so the two never mix. The create API builds the right `example` shape — `body_text`/`header_text` for numbered, `body_text_named_params`/`header_text_named_params` for named.
+- **Buttons** match Meta's menu labels and add **Copy offer code** (`COPY_CODE`, with an example code) alongside Custom (quick reply) / Visit website (URL) / Call phone number. Live preview renders it.
+- Kept in Settings; carries the visible-button fix.
+
 ## 2026-06-21 · bcon: WhatsApp message-template builder (for Meta Tech Provider review)
 
 - **bcon (Vercel):** new **Settings → WhatsApp Templates** (`/dashboard/settings/whatsapp-templates`) — a Meta-style composer to **create** a WhatsApp message template from the dashboard and submit it to Meta for approval, plus a list of existing templates with status (Approved / Pending / Rejected). Composer: name, category (Marketing/Utility/Authentication), language, optional text header (1 var), body with `+ Add variable` and per-variable sample values, optional footer, up to 3 buttons (quick-reply / URL / phone), and a **live WhatsApp-bubble preview**. Linked from the Settings root.

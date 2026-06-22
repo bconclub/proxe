@@ -52,8 +52,6 @@ async function resolveWaba(c: { phoneNumberId: string; accessToken: string; waba
   }
 }
 
-const VAR_RE = /\{\{\s*\d+\s*\}\}/g
-
 export async function POST(request: NextRequest) {
   try {
     const c = creds()
@@ -78,29 +76,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Body text is required.' }, { status: 400 })
     }
 
+    // Variable format — Meta supports either positional {{1}} (NUMBER) or
+    // named {{order_id}} (NAMED). A template uses one style throughout.
+    const varType = String(b.varType || 'NUMBER').toUpperCase() === 'NAMED' ? 'NAMED' : 'NUMBER'
+    const NUM_RE = /\{\{\s*\d+\s*\}\}/g
+    const NAME_RE = /\{\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g
+    const namedExamplesFrom = (input: any) => {
+      const arr = Array.isArray(input) ? input : []
+      return new Map(arr.map((p: any) => [String(p.param_name || ''), String(p.example ?? '')]))
+    }
+
     const components: any[] = []
 
-    // HEADER (TEXT only here) — at most one variable, needs a sample if present.
+    // HEADER (TEXT) — optional, at most one variable.
     if (b.header && String(b.header.text || '').trim()) {
       const headerText = String(b.header.text).trim()
-      const headerVars = headerText.match(VAR_RE) || []
       const comp: any = { type: 'HEADER', format: 'TEXT', text: headerText }
-      if (headerVars.length > 0) {
-        if (!b.header.example) return NextResponse.json({ error: 'Header has a variable — provide a sample value.' }, { status: 400 })
-        comp.example = { header_text: [String(b.header.example)] }
+      if (varType === 'NAMED') {
+        const names = Array.from(headerText.matchAll(NAME_RE)).map((m) => m[1])
+        if (names.length) {
+          const ne = b.header.namedExample || {}
+          if (!ne.param_name || !String(ne.example || '').trim()) return NextResponse.json({ error: 'Header variable needs a name and a sample value.' }, { status: 400 })
+          comp.example = { header_text_named_params: [{ param_name: String(ne.param_name), example: String(ne.example) }] }
+        }
+      } else {
+        const vars = headerText.match(NUM_RE) || []
+        if (vars.length) {
+          if (!b.header.example) return NextResponse.json({ error: 'Header has a variable — provide a sample value.' }, { status: 400 })
+          comp.example = { header_text: [String(b.header.example)] }
+        }
       }
       components.push(comp)
     }
 
-    // BODY — variables need one sample value each (example.body_text is an array of one row).
-    const bodyVars = bodyText.match(VAR_RE) || []
+    // BODY — variables need a sample value each.
     const bodyComp: any = { type: 'BODY', text: bodyText }
-    if (bodyVars.length > 0) {
-      const ex = Array.isArray(b.bodyExample) ? b.bodyExample.map((s: any) => String(s)) : []
-      if (ex.length !== bodyVars.length || ex.some((s: string) => !s.trim())) {
-        return NextResponse.json({ error: `Body has ${bodyVars.length} variable(s) — provide a sample value for each.` }, { status: 400 })
+    if (varType === 'NAMED') {
+      const names = Array.from(new Set(Array.from(bodyText.matchAll(NAME_RE)).map((m) => m[1])))
+      if (names.length) {
+        const map = namedExamplesFrom(b.bodyNamedExamples)
+        if (names.some((n) => !String(map.get(n) || '').trim())) {
+          return NextResponse.json({ error: `Provide a sample value for each named variable: ${names.map((n) => `{{${n}}}`).join(', ')}` }, { status: 400 })
+        }
+        bodyComp.example = { body_text_named_params: names.map((n) => ({ param_name: n, example: String(map.get(n)) })) }
       }
-      bodyComp.example = { body_text: [ex] }
+    } else {
+      const vars = bodyText.match(NUM_RE) || []
+      if (vars.length) {
+        const ex = Array.isArray(b.bodyExample) ? b.bodyExample.map((s: any) => String(s)) : []
+        if (ex.length !== vars.length || ex.some((s: string) => !s.trim())) {
+          return NextResponse.json({ error: `Body has ${vars.length} variable(s) — provide a sample value for each.` }, { status: 400 })
+        }
+        bodyComp.example = { body_text: [ex] }
+      }
     }
     components.push(bodyComp)
 
@@ -109,14 +137,16 @@ export async function POST(request: NextRequest) {
       components.push({ type: 'FOOTER', text: String(b.footer).trim() })
     }
 
-    // BUTTONS.
+    // BUTTONS — quick reply (Custom), URL (Visit website), phone (Call), and
+    // copy-code (Copy offer code). Up to 10 (Meta shows >3 as a list).
     if (Array.isArray(b.buttons) && b.buttons.length > 0) {
       const buttons = b.buttons.slice(0, 10).map((btn: any) => {
         const t = String(btn.type || '').toUpperCase()
         if (t === 'URL') return { type: 'URL', text: String(btn.text || '').slice(0, 25), url: String(btn.url || '') }
         if (t === 'PHONE_NUMBER') return { type: 'PHONE_NUMBER', text: String(btn.text || '').slice(0, 25), phone_number: String(btn.phone_number || '') }
+        if (t === 'COPY_CODE') return { type: 'COPY_CODE', example: String(btn.example || btn.text || '').slice(0, 15) }
         return { type: 'QUICK_REPLY', text: String(btn.text || '').slice(0, 25) }
-      }).filter((btn: any) => btn.text)
+      }).filter((btn: any) => (btn.type === 'COPY_CODE' ? btn.example : btn.text))
       if (buttons.length) components.push({ type: 'BUTTONS', buttons })
     }
 
