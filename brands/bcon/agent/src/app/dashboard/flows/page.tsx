@@ -952,7 +952,6 @@ export default function FlowsPage() {
             <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Flows</h1>
             <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>Triggers &amp; sequences — what fires for every lead, and the template each uses.</p>
           </div>
-          <FlowsViewToggle view={view} setView={setView} />
         </header>
         <FlowsAutomation />
       </div>

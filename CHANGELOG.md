@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Flows = Triggers + Sequences only (drop the Stages tab)
+
+- Removed the **Stages** view toggle from Flows so the page is just **Triggers + Sequences** — per the founder's model: triggers are the event-fired automations, sequences are the multi-step chains, and "stages" were really just sequences shown a second way. Stages live in the **Pipeline** (lead-level view comes later), so Flows no longer duplicates them.
+- `flows/page.tsx`: dropped `<FlowsViewToggle>` from the (default) automation view; the old stages/board/overview render paths are now unreachable (dead — left in place for a separate cleanup, not ripped out). No change to `FlowsAutomation` content.
+
 ## 2026-06-22 · bcon: Flows → Triggers + Sequences view (shows what fires for every lead)
 
 - New **Triggers & Sequences** view on Flows (now default; toggle to the old **Stages** funnel) — answers "what message goes when", which the funnel never showed.

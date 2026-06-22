@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-22 · Flows = Triggers + Sequences only (Stages tab removed)
+
+- Flows now shows just **Triggers** (event-fired automations) + **Sequences** (multi-step chains); removed the toggle into the redundant 9-stage funnel view. Stages belong to the Pipeline, and the "sequences" already are the stage chains. Old stages/board/overview code is now unreachable (left for a later cleanup).
+
 ## 2026-06-22 · Flows page restyled to match the dashboard
 
 - Brought `/dashboard/flows` (the 9-stage view) up to the dashboard's visual language: active card borders `2px → 1px`, detail-panel containers given a subtle `bg-tertiary` tint (were transparent/flat on the #000 page), active tint softened to `color-mix(… 7%)`, card radius unified to `12`, and legacy hardcoded `rgba(255,255,255,*)` borders swapped for `var(--border-primary)`. Pure styling; no behavior change.
