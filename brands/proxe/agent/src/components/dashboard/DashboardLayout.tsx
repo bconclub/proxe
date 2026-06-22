@@ -27,7 +27,7 @@ import {
   MdViewKanban,
   MdCall,
 } from 'react-icons/md'
-import { getBrandConfig } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. PROXe keeps Voice/Calls off until enabled).
-  const brandFeatures = getBrandConfig().features || {}
+  const brandFeatures = useFeatureFlags()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [isHovered, setIsHovered] = useState(false)

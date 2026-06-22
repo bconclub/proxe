@@ -31,7 +31,7 @@ import {
   MdCall,
   MdLogout,
 } from 'react-icons/md'
-import { getBrandConfig } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. Windchasers keeps Voice/Calls off).
-  const brandFeatures = getBrandConfig().features || {}
+  const brandFeatures = useFeatureFlags()
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)

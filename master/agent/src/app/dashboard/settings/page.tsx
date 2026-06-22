@@ -374,6 +374,28 @@ export default function SettingsPage() {
             </div>
           </a>
         </section>
+        {/* ── Features (runtime on/off toggles) ───────────────────────── */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            Features
+          </h2>
+          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+            Switch features like Voice/Calls and the Dashboard Brain on or off for this brand — no redeploy.
+          </p>
+          <a
+            href="/dashboard/settings/features"
+            className="block p-5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Feature toggles</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Voice/Calls, Dashboard Brain, and more</div>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </section>
       </div>
     </DashboardLayout>
   );

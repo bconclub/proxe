@@ -10,7 +10,7 @@ import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
 import DashboardBrain from './DashboardBrain'
-import { getBrandConfig } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -106,6 +106,8 @@ function fmtMs(ms: number): string {
 
 export default function FounderDashboard() {
   const router = useRouter()
+  // Runtime feature flags (Settings → Features) gate the Brain button.
+  const features = useFeatureFlags()
   const [metrics, setMetrics] = useState<FounderMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -414,7 +416,7 @@ export default function FounderDashboard() {
           {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
               icon on the right next to the profile. */}
           <TodaySnapshotButton inline label="Snapshot" />
-          {getBrandConfig().features?.brain && <DashboardBrain inline label="Ask PROXe" />}
+          {features.brain && <DashboardBrain inline label="Ask PROXe" />}
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>

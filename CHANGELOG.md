@@ -13,6 +13,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 · all brands: promote runtime feature toggle (Settings → Features) to master, Windchasers, proxe
+
+- **windchasers + master + proxe:** ported the runtime feature-toggle stack from BCON — `useFeatureFlags()` hook, `GET/POST /api/dashboard/settings/features` (overrides in `dashboard_settings.feature_flags`, merged over config defaults), and the `/dashboard/settings/features` on/off panel. The nav (DashboardLayout), Calls page and Brain button gates now read the hook instead of `getBrandConfig().features`. **User-facing: Windchasers now has the Voice/Calls on/off toggle** (and Brain/Funnel/Follow-up) — flip it from Settings → Features, no redeploy.
+- **windchasers + master:** Settings root gained a **Features** card linking to the toggle panel. (proxe's settings page is differently structured + dormant — toggle reachable by direct URL there; link deferred.)
+- `app/dashboard/calls/page.tsx` aligned byte-identical across all 4 trees (shared-core manifest file).
+- Registered 3 now-shared files in `brand-shared.json`: `lib/useFeatureFlags.ts`, `api/dashboard/settings/features/route.ts`, `app/dashboard/settings/features/page.tsx` (sharedCore 171 → 174).
+- Type-checked master/WC/proxe: no new errors.
+
 ## 2026-06-21 12:12 IST · bcon: runtime feature toggles (Settings → Features) + Voice/Calls + Brain promoted to all brands
 
 - **all brands (master, windchasers, proxe):** **Voice/Calls** code (Calls dashboard page + `CallsTable`, `api/dashboard/calls{,/[id]}`, `api/agent/voice/{call-status,vapi-webhook}`) and **Dashboard Brain** now ship to every tree, gated by a per-brand `features` flag. Switched ON for BCON, OFF for Windchasers/proxe — their sidebars render byte-identical (the Calls nav slot is divider-compensated). `vapi-webhook` was made brand-neutral (`BRAND_ID`, env-only VoBiz number). proxe excluded from Brain (dormant template).
