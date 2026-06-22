@@ -1,6 +1,6 @@
 {
   "name": "proxe-platform",
-  "version": "0.0.67",
+  "version": "0.0.68",
   "private": true,
   "scripts": {
     "dev": "npx concurrently -n \"wc,proxe,bcon\" -c \"cyan,green,magenta\" \"npm run dev:windchasers\" \"npm run dev:proxe\" \"npm run dev:bcon\"",
@@ -14,7 +14,9 @@
     "build:proxe": "cd brands/proxe/agent && npm run build",
     "build:bcon": "cd brands/bcon/agent && npm run build",
     "sync": "bash scripts/sync-all-brands.sh",
-    "kill-ports": "bash scripts/kill-build-ports.sh"
+    "kill-ports": "bash scripts/kill-build-ports.sh",
+    "flow": "node scripts/brand-diff.js --serve",
+    "brand-diff": "node scripts/brand-diff.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

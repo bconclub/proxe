@@ -13,6 +13,8 @@
  */
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const { exec } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'brand-shared.json'), 'utf8'));
@@ -218,4 +220,27 @@ console.log('master features:', DATA.master.features.map(f => f.label + ':' + f.
 for (const b of DATA.brands) {
   console.log(`${b.tree.padEnd(12)} sync ${b.sync.pct}%  (${b.sync.identical}/${b.sync.total}, ${b.sync.drift} drift, ${b.sync.missing} missing)  | ` +
     b.features.map(f => f.label + ':' + f.state).join(', '));
+}
+
+// ── --serve: host the page locally and pop it open in the default browser ─────
+if (process.argv.includes('--serve')) {
+  const PORT = Number((process.argv.find(a => a.startsWith('--port=')) || '').split('=')[1]) || 8777;
+  const file = path.join(ROOT, 'scripts', 'brand-diff.html');
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(fs.readFileSync(file)); // re-read each request so a regen shows on refresh
+  });
+  server.on('error', (e) => {
+    console.error(e.code === 'EADDRINUSE'
+      ? `Port ${PORT} is busy — try: node scripts/brand-diff.js --serve --port=8778`
+      : String(e));
+    process.exit(1);
+  });
+  server.listen(PORT, '127.0.0.1', () => {
+    const url = `http://127.0.0.1:${PORT}/brand-diff.html`;
+    console.log(`\nBrand Diff Flow → ${url}\n(Ctrl+C to stop)`);
+    const open = process.platform === 'win32' ? `start "" "${url}"`
+      : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
+    exec(open, () => {});
+  });
 }

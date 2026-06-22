@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 · tooling: one-command launcher for the brand-diff flow
+
+- `scripts/brand-diff.js` gained `--serve [--port=N]` — regenerates from the live trees, hosts on `http://127.0.0.1:8777/brand-diff.html`, and pops it open in the default browser (cross-platform). Re-reads the file per request so a regen shows on refresh.
+- Root `package.json`: **`npm run flow`** (generate + serve + open) and `npm run brand-diff` (generate only).
+- `.claude/commands/proxe-flow.md` — type **`/proxe-flow`** in Claude Code to launch it without leaving the session.
+
 ## 2026-06-21 · tooling: brand-diff flow visualizer (React Flow)
 
 - New `scripts/brand-diff.js` — reads the live trees + `brand-shared.json` and generates a self-contained `scripts/brand-diff.html`: a React Flow diagram of master (canonical) → each brand, color-coded by sync % (identical / drift / missing) with per-feature pills (Calls / Toggle / Brain / Funnel / Follow-up) showing present-on (green) / present-off (slate) / absent (red). Edges carry the drift+missing count. Re-run `node scripts/brand-diff.js` to refresh — nothing hand-maintained. Internal dev tool (lives in `scripts/`, no brand build impact). User-facing intent: a simple "are the brands in sync, and what differs" picture, far lighter than the Understand graph.
