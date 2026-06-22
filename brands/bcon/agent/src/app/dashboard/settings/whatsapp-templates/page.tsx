@@ -108,6 +108,54 @@ export default function WhatsAppTemplatesPage() {
     return m ? m[1] : null
   }, [headerText, effType])
 
+  // ── Pre-flight validation — mirror Meta's rules so an invalid template can
+  // NEVER be submitted. Rejections hurt the WhatsApp number's quality rating,
+  // so we block locally instead of letting Meta reject it.
+  const errors = useMemo(() => {
+    const e: string[] = []
+    const bt = body.trim()
+    if (!name) e.push('Add a template name.')
+    else if (!/^[a-z0-9_]+$/.test(name)) e.push('Name: lowercase letters, digits and underscores only — no spaces or capitals.')
+    if (category === 'AUTHENTICATION') e.push('Authentication templates need Meta’s special OTP format (not supported here yet) — use Marketing or Utility.')
+    if (!bt) e.push('Body text is required.')
+    if (bt.length > 1024) e.push('Body is too long (max 1024 characters).')
+    if (mixedVars) e.push('Don’t mix named ({{name}}) and numbered ({{1}}) variables — pick one style.')
+    if (/\}\}\s*\{\{/.test(bt)) e.push('Two variables can’t be back-to-back — put some text between them.')
+    if (bodyVars.length) {
+      const stripped = bt.replace(effType === 'NAMED' ? /\{\{\s*[a-zA-Z][a-zA-Z0-9_]*\s*\}\}/g : /\{\{\s*\d+\s*\}\}/g, '').trim()
+      if (!stripped) e.push('Body can’t be only variables — add some words around them.')
+    }
+    if (effType === 'NUMBER' && bodyVars.length) {
+      const nums = bodyVars.map(Number)
+      if (nums.some((n, i) => n !== i + 1)) e.push('Numbered variables must run in order from {{1}} with no gaps (e.g. {{1}}, {{2}}, {{3}}).')
+    }
+    for (const k of bodyVars) {
+      const v = (samples[k] || '').trim()
+      if (!v) e.push(`Add a sample value for {{${k}}}.`)
+      else if (/[\n\t]/.test(v)) e.push(`Sample for {{${k}}} can’t contain line breaks.`)
+    }
+    if (headerText.trim()) {
+      if (headerText.trim().length > 60) e.push('Header is too long (max 60 characters).')
+      const hv = headerText.match(effType === 'NAMED' ? /\{\{\s*[a-zA-Z][a-zA-Z0-9_]*\s*\}\}/g : /\{\{\s*\d+\s*\}\}/g) || []
+      if (hv.length > 1) e.push('Header can have at most one variable.')
+      if (headerVarKey && !headerSample.trim()) e.push('Add a sample value for the header variable.')
+    }
+    if (footer.trim()) {
+      if (footer.trim().length > 60) e.push('Footer is too long (max 60 characters).')
+      if (/\{\{/.test(footer)) e.push('Footer can’t contain variables.')
+    }
+    if (buttons.length > 10) e.push('Too many buttons (max 10).')
+    buttons.forEach((b, i) => {
+      const n = i + 1
+      if (b.type === 'COPY_CODE') { if (!(b.example || '').trim()) e.push(`Button ${n}: add the offer code.`) }
+      else if (!b.text.trim()) e.push(`Button ${n}: add the button text.`)
+      else if (b.text.length > 25) e.push(`Button ${n}: text too long (max 25 characters).`)
+      if (b.type === 'URL') { const u = (b.url || '').trim(); if (!u) e.push(`Button ${n}: add the website URL.`); else if (!/^https?:\/\/.+/i.test(u)) e.push(`Button ${n}: URL must start with http:// or https://`) }
+      if (b.type === 'PHONE_NUMBER') { const p = (b.phone_number || '').trim().replace(/[\s-]/g, ''); if (!p) e.push(`Button ${n}: add the phone number.`); else if (!/^\+?\d{6,15}$/.test(p)) e.push(`Button ${n}: enter a valid phone number with country code.`) }
+    })
+    return e
+  }, [name, category, body, effType, mixedVars, bodyVars, samples, headerText, headerVarKey, headerSample, footer, buttons])
+
   const addVariable = () => {
     if (effType === 'NAMED') {
       setBody((b) => b + `{{variable_${bodyVars.length + 1}}}`)
@@ -124,11 +172,9 @@ export default function WhatsAppTemplatesPage() {
 
   const submit = async () => {
     setSubmitError(null); setSubmitOk(null)
-    if (!/^[a-z0-9_]+$/.test(name)) { setSubmitError('Name: lowercase letters, digits and underscores only.'); return }
-    if (!body.trim()) { setSubmitError('Body text is required.'); return }
-    if (mixedVars) { setSubmitError('Don’t mix named ({{name}}) and numbered ({{1}}) variables — pick one style.'); return }
-    if (bodyVars.some((k) => !(samples[k] || '').trim())) { setSubmitError('Fill a sample value for every body variable.'); return }
-    if (headerVarKey && !headerSample.trim()) { setSubmitError('Header has a variable — add a sample value.'); return }
+    // Never send an invalid template to Meta — a rejection hurts the number's
+    // quality rating. The issues are listed in the panel above the button.
+    if (errors.length) { setSubmitError(`Fix ${errors.length} issue${errors.length > 1 ? 's' : ''} before submitting (listed above).`); return }
 
     setSubmitting(true)
     try {
@@ -327,9 +373,21 @@ export default function WhatsAppTemplatesPage() {
               </div>
             </div>
 
+            {/* Pre-flight issues — block submission until clean so Meta never rejects it */}
+            {errors.length > 0 && (!!name || !!body.trim()) && (
+              <div className="rounded-lg px-3 py-2.5 text-sm" style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)' }}>
+                <p className="text-xs font-semibold mb-1.5 flex items-center gap-1" style={{ color: '#ef4444' }}><MdError size={14} /> Fix before submitting ({errors.length})</p>
+                <ul className="space-y-1">
+                  {errors.map((er, i) => <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}><span style={{ color: '#ef4444' }}>•</span> {er}</li>)}
+                </ul>
+              </div>
+            )}
+            {errors.length === 0 && !!name && !!body.trim() && (
+              <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-1.5" style={{ background: 'rgba(34,197,94,.1)', color: '#22c55e' }}><MdCheckCircle size={14} /> Looks good — passes Meta’s basic checks.</div>
+            )}
             {submitError && <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>{submitError}</div>}
-            <button onClick={submit} disabled={submitting} className="w-full rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={ctaStyle}>
-              {submitting ? 'Submitting to Meta…' : 'Submit for approval'}
+            <button onClick={submit} disabled={submitting || errors.length > 0} className="w-full rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={ctaStyle}>
+              {submitting ? 'Submitting to Meta…' : errors.length > 0 ? `Fix ${errors.length} issue${errors.length > 1 ? 's' : ''} to submit` : 'Submit for approval'}
             </button>
           </div>
 
