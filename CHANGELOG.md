@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 · tooling: brand-diff flow visualizer (React Flow)
+
+- New `scripts/brand-diff.js` — reads the live trees + `brand-shared.json` and generates a self-contained `scripts/brand-diff.html`: a React Flow diagram of master (canonical) → each brand, color-coded by sync % (identical / drift / missing) with per-feature pills (Calls / Toggle / Brain / Funnel / Follow-up) showing present-on (green) / present-off (slate) / absent (red). Edges carry the drift+missing count. Re-run `node scripts/brand-diff.js` to refresh — nothing hand-maintained. Internal dev tool (lives in `scripts/`, no brand build impact). User-facing intent: a simple "are the brands in sync, and what differs" picture, far lighter than the Understand graph.
+
 ## 2026-06-21 · all brands: promote runtime feature toggle (Settings → Features) to master, Windchasers, proxe
 
 - **windchasers + master + proxe:** ported the runtime feature-toggle stack from BCON — `useFeatureFlags()` hook, `GET/POST /api/dashboard/settings/features` (overrides in `dashboard_settings.feature_flags`, merged over config defaults), and the `/dashboard/settings/features` on/off panel. The nav (DashboardLayout), Calls page and Brain button gates now read the hook instead of `getBrandConfig().features`. **User-facing: Windchasers now has the Voice/Calls on/off toggle** (and Brain/Funnel/Follow-up) — flip it from Settings → Features, no redeploy.
