@@ -175,6 +175,10 @@ export async function POST(request: NextRequest) {
       name,
       status: data.status || 'PENDING',
       category: data.category || category,
+      // Echo what we actually sent Meta so the operator can verify every
+      // component (header / body+examples / footer / buttons) made it.
+      submittedComponents: components.map((c: any) => c.type),
+      payload,
     })
   } catch (error) {
     console.error('[whatsapp/templates/create] error:', error)

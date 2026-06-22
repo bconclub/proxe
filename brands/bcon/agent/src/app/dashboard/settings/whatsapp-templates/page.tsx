@@ -82,22 +82,33 @@ export default function WhatsAppTemplatesPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  // variable keys present in the body, per chosen type
+  // AUTO-DETECT the variable style from what's actually typed, so the sample
+  // fields always match. (Bug: a Number-mode default + a named {{customer_name}}
+  // showed NO sample fields → submitted with no examples → Meta auto-rejected.)
+  // Body content wins; the dropdown only seeds the style while the body is empty.
+  const effType: VarType = useMemo(() => {
+    if (/\{\{\s*[a-zA-Z]/.test(body)) return 'NAMED'
+    if (/\{\{\s*\d/.test(body)) return 'NUMBER'
+    return varType
+  }, [body, varType])
+  const mixedVars = /\{\{\s*[a-zA-Z]/.test(body) && /\{\{\s*\d/.test(body)
+
+  // variable keys present in the body, per detected style
   const bodyVars = useMemo(() => {
     const out: string[] = []
-    const re = varType === 'NAMED' ? new RegExp(NAME_RE) : new RegExp(NUM_RE)
+    const re = effType === 'NAMED' ? new RegExp(NAME_RE) : new RegExp(NUM_RE)
     let m: RegExpExecArray | null
     while ((m = re.exec(body))) { if (!out.includes(m[1])) out.push(m[1]) }
-    return varType === 'NUMBER' ? out.sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) : out
-  }, [body, varType])
+    return effType === 'NUMBER' ? out.sort((a, b) => parseInt(a, 10) - parseInt(b, 10)) : out
+  }, [body, effType])
 
   const headerVarKey = useMemo(() => {
-    const m = headerText.match(varType === 'NAMED' ? /\{\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/ : /\{\{\s*(\d+)\s*\}\}/)
+    const m = headerText.match(effType === 'NAMED' ? /\{\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/ : /\{\{\s*(\d+)\s*\}\}/)
     return m ? m[1] : null
-  }, [headerText, varType])
+  }, [headerText, effType])
 
   const addVariable = () => {
-    if (varType === 'NAMED') {
+    if (effType === 'NAMED') {
       setBody((b) => b + `{{variable_${bodyVars.length + 1}}}`)
     } else {
       const next = (bodyVars.length ? Math.max(...bodyVars.map(Number)) : 0) + 1
@@ -114,19 +125,20 @@ export default function WhatsAppTemplatesPage() {
     setSubmitError(null); setSubmitOk(null)
     if (!/^[a-z0-9_]+$/.test(name)) { setSubmitError('Name: lowercase letters, digits and underscores only.'); return }
     if (!body.trim()) { setSubmitError('Body text is required.'); return }
+    if (mixedVars) { setSubmitError('Don’t mix named ({{name}}) and numbered ({{1}}) variables — pick one style.'); return }
     if (bodyVars.some((k) => !(samples[k] || '').trim())) { setSubmitError('Fill a sample value for every body variable.'); return }
     if (headerVarKey && !headerSample.trim()) { setSubmitError('Header has a variable — add a sample value.'); return }
 
     setSubmitting(true)
     try {
-      const payload: any = { name, category, language, varType, body: body.trim() }
-      if (varType === 'NAMED') payload.bodyNamedExamples = bodyVars.map((k) => ({ param_name: k, example: samples[k] || '' }))
+      const payload: any = { name, category, language, varType: effType, body: body.trim() }
+      if (effType === 'NAMED') payload.bodyNamedExamples = bodyVars.map((k) => ({ param_name: k, example: samples[k] || '' }))
       else payload.bodyExample = bodyVars.map((k) => samples[k] || '')
 
       if (headerText.trim()) {
         payload.header = { text: headerText.trim() }
         if (headerVarKey) {
-          if (varType === 'NAMED') payload.header.namedExample = { param_name: headerVarKey, example: headerSample.trim() }
+          if (effType === 'NAMED') payload.header.namedExample = { param_name: headerVarKey, example: headerSample.trim() }
           else payload.header.example = headerSample.trim()
         }
       }
@@ -142,7 +154,8 @@ export default function WhatsAppTemplatesPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.error || 'Submission failed.')
-      setSubmitOk(`“${data.name}” submitted — status ${String(data.status || 'PENDING').toLowerCase()}. Meta is reviewing it.`)
+      const sent = Array.isArray(data.submittedComponents) ? data.submittedComponents.join(' + ') : ''
+      setSubmitOk(`“${data.name}” submitted — status ${String(data.status || 'PENDING').toLowerCase()}.${sent ? ` Sent to Meta: ${sent}.` : ''} Meta is reviewing it.`)
       resetForm()
       await load()
       setComposerOpen(false)
