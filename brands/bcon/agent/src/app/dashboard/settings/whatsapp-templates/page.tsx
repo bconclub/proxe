@@ -153,8 +153,16 @@ export default function WhatsAppTemplatesPage() {
       const res = await fetch('/api/whatsapp/templates/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || 'Submission failed.')
+      // Parse defensively — a 504/500 returns a non-JSON page, and res.json()
+      // would throw a cryptic "Unexpected token" instead of a useful message.
+      const text = await res.text()
+      let data: any = {}
+      try { data = text ? JSON.parse(text) : {} } catch {
+        throw new Error(res.status === 504
+          ? 'Timed out talking to Meta — please try again (the server was waking up).'
+          : `Server error (${res.status}). Please try again.`)
+      }
+      if (!res.ok || !data.success) throw new Error(data.error || `Submission failed (${res.status}).`)
       // resetForm FIRST (it clears submitOk), THEN set the confirmation so it
       // actually shows. (Bug: the old order nulled the banner immediately.)
       resetForm()

@@ -27,6 +27,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+// Without this the route falls through to the ~10s catch-all and a cold start +
+// Meta round-trip 504s (Vercel then returns a non-JSON "An error occurred" page,
+// which the UI can't parse). Give it headroom.
+export const maxDuration = 30
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 
@@ -44,6 +48,7 @@ async function resolveWaba(c: { phoneNumberId: string; accessToken: string; waba
   try {
     const r = await fetch(`${GRAPH}/${c.phoneNumberId}?fields=whatsapp_business_account`, {
       headers: { Authorization: `Bearer ${c.accessToken}` },
+      signal: AbortSignal.timeout(8000),
     })
     const d = await r.json()
     return d?.whatsapp_business_account?.id || null
@@ -160,6 +165,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: { Authorization: `Bearer ${c.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000),
     })
     const data = await res.json()
 
