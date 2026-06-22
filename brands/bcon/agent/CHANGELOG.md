@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-22 · Config page (phase 1 — admin-only visibility)
+
+- New **Config** nav entry + `/dashboard/config`: admin-only view of every integration's status + non-secret identifiers + whether each secret is set (never the value), plus lead sources, connected channels, and lead fields. New admin-gated `GET /api/dashboard/config` reads status from env. Phase 2 = write-only token editing (next).
+
 ## 2026-06-22 · Flows Triggers + Sequences → master-detail (match Stages hero)
 
 - Rebuilt both tabs as left list + right detail panel like the Stages page: list rows with a status dot, detail panel as a lifted `bg-secondary` card with `bg-tertiary` section cards. Sequences detail shows a numbered vertical step chain (template + Meta status per step) + an `N/total ready` count; Triggers detail shows event, timing, and the template fired.

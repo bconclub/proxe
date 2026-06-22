@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Config page (phase 1 — admin-only visibility of all config)
+
+- New **Config** nav entry → `/dashboard/config`: one admin-only place to SEE the whole setup — every integration's connection status (Connected / Partial / Not set), its non-secret identifiers (URLs, phone/account IDs, from-addresses…), whether each **secret is set** (shown as `•••• set` / `not set` — values are never sent to the client), plus the lead **sources**, connected **channels**, and **lead fields** the agent uses.
+- New `GET /api/dashboard/config` (admin-gated via the same `requireAdmin` + `dashboard_users.role` check as users): computes status from `process.env`, returns non-secret values + `set` booleans only. Integration map mirrors the env template (Supabase, Claude, WhatsApp, Instagram, Voice, Google Calendar, Resend).
+- Phase 2 (write-only token editing with runtime override) is next — phase 1 ships the visibility safely first (a token field that doesn't take effect would be worse than none).
+
 ## 2026-06-22 · bcon: Flows Triggers + Sequences rebuilt as master-detail (match Stages)
 
 - Per the founder: the Sequences and Triggers tabs now use the **same master-detail shape as the Stages hero** — a left selectable list (each trigger / each sequence, with a status dot) + a right detail panel (lifted `bg-secondary` card + soft shadow, `bg-tertiary` inner section cards). Triggers detail shows the event, timing badge, and the template fired + its Meta status; Sequences detail shows the who/stop rules, an `N/total templates ready` count, and a numbered vertical step chain with each step's template + status. All three Flows tabs now read as one designed surface.
