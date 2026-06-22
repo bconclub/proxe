@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-22 · Flows lands on Stages + Triggers/Sequences cards lifted
+
+- Default view → **Stages** (the hero); toggle order Stages · Sequences · Triggers. Triggers + Sequences cards lifted to `bg-secondary` + soft shadow (were flat `bg-tertiary`), step chips nest on `bg-tertiary` — first pass to make the three tabs visually cohesive.
+
 ## 2026-06-22 · Flows = Sequences (default) · Triggers · Stages
 
 - Reinstated **Stages** and split the page into three toggles: **Sequences** (default landing), **Triggers**, **Stages**. `FlowsAutomation` gained a `section` prop (renders sequences-only or triggers-only); `flows/page.tsx` defaults to the Sequences view. Corrects the earlier change that removed Stages.

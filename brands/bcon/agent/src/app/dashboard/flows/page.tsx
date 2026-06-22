@@ -561,7 +561,7 @@ function countdown(dateStr: string | null): string {
 // ── Main Page ─────────────────────────────────────────────────────
 
 export default function FlowsPage() {
-  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'sequences' | 'triggers'>('sequences')
+  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'sequences' | 'triggers'>('stages')
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
   const [selectedFlowName, setSelectedFlowName] = useState('')
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -1455,9 +1455,9 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 // Triggers, and the Stages funnel view.
 function FlowsViewToggle({ view, setView }: { view: string; setView: (v: any) => void }) {
   const tabs: { v: string; label: string }[] = [
+    { v: 'stages', label: 'Stages' },
     { v: 'sequences', label: 'Sequences' },
     { v: 'triggers', label: 'Triggers' },
-    { v: 'stages', label: 'Stages' },
   ]
   return (
     <div style={{ display: 'flex', gap: 4, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', borderRadius: 10, padding: 4 }}>

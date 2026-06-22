@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Flows lands on Stages (hero) + Triggers/Sequences cards lifted to match
+
+- Flows now **opens on Stages** (the hero view), toggle order **Stages · Sequences · Triggers**.
+- First pass aligning the Triggers + Sequences tabs to the Stages look: their cards moved from flat `bg-tertiary` (no shadow) to **lifted `bg-secondary` + soft shadow** (`0 6px 18px rgba(0,0,0,0.22)`), and the sequence step chips nest on `bg-tertiary` — so all three tabs read as the same designed surface instead of grey blocks. (More redesign to follow.)
+
 ## 2026-06-22 · bcon: Flows = Sequences (default) · Triggers · Stages — 3-way toggle
 
 - Corrects the previous entry: **Stages is back**, and Triggers + Sequences are now **separate toggles** instead of one combined page. Flows opens on **Sequences** (the default landing), with a segmented toggle to **Triggers** and **Stages**.

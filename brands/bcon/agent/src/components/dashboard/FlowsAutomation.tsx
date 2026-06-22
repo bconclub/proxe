@@ -120,7 +120,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
           {TRIGGERS.map((t) => {
             const Icon = t.icon
             return (
-              <div key={t.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-tertiary)' }}>
+              <div key={t.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-secondary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
                 <div className="flex items-start gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}><Icon size={18} /></span>
                   <div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
         </h2>
         <div className="space-y-3">
           {SEQUENCES.map((s) => (
-            <div key={s.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-tertiary)' }}>
+            <div key={s.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-secondary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.segment}</p>
                 {s.gated && <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>Gated off</span>}
@@ -157,7 +157,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
               <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
                 {s.steps.map((step, i) => (
                   <div key={i} className="flex items-center gap-2 shrink-0">
-                    <div className="rounded-lg p-2.5 min-w-[170px]" style={{ border: cardBorder, background: 'var(--bg-primary)' }}>
+                    <div className="rounded-lg p-2.5 min-w-[170px]" style={{ border: cardBorder, background: 'var(--bg-tertiary)' }}>
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</span>
                         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{step.delay}</span>
