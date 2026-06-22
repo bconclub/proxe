@@ -156,6 +156,14 @@ export default function WhatsAppTemplatesPage() {
     return e
   }, [name, category, body, effType, mixedVars, bodyVars, samples, headerText, headerVarKey, headerSample, footer, buttons])
 
+  // Category vs content — transactional copy (appointment/order/booking/OTP)
+  // gets REJECTED under Marketing; nudge to Utility. Non-blocking (a judgment
+  // call), but prominent, since a rejection hurts the number's quality rating.
+  const categoryWarning = category === 'MARKETING'
+    && /\b(appointment|confirm(ed|ation|s)?|order|booking|booked|reschedul|cancel|reminder|receipt|invoice|delivery|deliver(ed|y)|shipp(ed|ing)|otp|passcode|verification|payment|due|schedule[d]?)\b/i.test(`${body} ${headerText}`)
+    ? 'This reads like a transactional message (appointment / order / booking / reminder). Meta usually REJECTS this under Marketing — Utility is the right category.'
+    : null
+
   const addVariable = () => {
     if (effType === 'NAMED') {
       setBody((b) => b + `{{variable_${bodyVars.length + 1}}}`)
@@ -306,6 +314,12 @@ export default function WhatsAppTemplatesPage() {
                     </button>
                   ))}
                 </div>
+                {categoryWarning && (
+                  <div className="mt-2 rounded-lg px-3 py-2 text-xs flex items-start justify-between gap-3" style={{ background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.35)' }}>
+                    <span style={{ color: '#f59e0b' }}>⚠ {categoryWarning}</span>
+                    <button onClick={() => setCategory('UTILITY')} className="shrink-0 font-semibold whitespace-nowrap" style={{ color: '#f59e0b', textDecoration: 'underline' }}>Switch to Utility</button>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={labelStyle}>Type of variable</label>
