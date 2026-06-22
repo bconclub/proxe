@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-21 · bcon: WhatsApp message-template builder (for Meta Tech Provider review)
+
+- **bcon (Vercel):** new **Settings → WhatsApp Templates** (`/dashboard/settings/whatsapp-templates`) — a Meta-style composer to **create** a WhatsApp message template from the dashboard and submit it to Meta for approval, plus a list of existing templates with status (Approved / Pending / Rejected). Composer: name, category (Marketing/Utility/Authentication), language, optional text header (1 var), body with `+ Add variable` and per-variable sample values, optional footer, up to 3 buttons (quick-reply / URL / phone), and a **live WhatsApp-bubble preview**. Linked from the Settings root.
+- **bcon:** new `POST /api/whatsapp/templates/create` — submits to the WhatsApp Business Management API (`POST /{waba-id}/message_templates`), building the components array (HEADER/BODY/FOOTER/BUTTONS) with Meta's required `example` samples; validates name/category/variables locally and surfaces Meta's error verbatim. WABA id from `META_WHATSAPP_WABA_ID` (falls back to phone-edge lookup). Existing GET (list) + send-test route untouched.
+- Demo-facing: this is the `whatsapp_business_management` proof for Tech Provider — record creating a template here; the Chats/Inbox page covers the live-conversation proof.
+
 ## 2026-06-21 · tooling: one-command launcher for the brand-diff flow
 
 - `scripts/brand-diff.js` gained `--serve [--port=N]` — regenerates from the live trees, hosts on `http://127.0.0.1:8777/brand-diff.html`, and pops it open in the default browser (cross-platform). Re-reads the file per request so a regen shows on refresh.
