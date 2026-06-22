@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Flows Triggers + Sequences rebuilt as master-detail (match Stages)
+
+- Per the founder: the Sequences and Triggers tabs now use the **same master-detail shape as the Stages hero** — a left selectable list (each trigger / each sequence, with a status dot) + a right detail panel (lifted `bg-secondary` card + soft shadow, `bg-tertiary` inner section cards). Triggers detail shows the event, timing badge, and the template fired + its Meta status; Sequences detail shows the who/stop rules, an `N/total templates ready` count, and a numbered vertical step chain with each step's template + status. All three Flows tabs now read as one designed surface.
+- `FlowsAutomation.tsx` rewritten (still driven by the `section` prop); `flows/page.tsx` unchanged this step.
+
 ## 2026-06-22 · bcon: Flows lands on Stages (hero) + Triggers/Sequences cards lifted to match
 
 - Flows now **opens on Stages** (the hero view), toggle order **Stages · Sequences · Triggers**.

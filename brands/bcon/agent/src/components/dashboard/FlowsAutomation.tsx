@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import {
-  MdBolt, MdRepeat, MdWavingHand, MdEventAvailable, MdNotificationsActive, MdPhoneMissed,
-  MdCallReceived, MdArrowForward, MdCheckCircle, MdSchedule, MdError, MdHelpOutline, MdRefresh,
+  MdBolt, MdRepeat, MdWavingHand, MdNotificationsActive, MdPhoneMissed,
+  MdCallReceived, MdCheckCircle, MdSchedule, MdError, MdRefresh, MdChevronRight,
 } from 'react-icons/md'
 
 // ── The real BCON automation, organised as the user asked: Triggers + Sequences.
-// Each step names the Meta template it fires; the live template list (GET
-// /api/whatsapp/templates) annotates each with its approval status, so a missing
-// or unapproved template is obvious — nothing is hidden.
+// Each view is a master-detail (left list → right detail), mirroring the Stages
+// page so all three Flows tabs read as one designed surface. Each step names the
+// Meta template it fires; the live template list (GET /api/whatsapp/templates)
+// annotates each with its approval status, so a missing/unapproved template is
+// obvious — nothing is hidden.
 
 type Trigger = { id: string; icon: any; event: string; when: string; template: string | null; desc: string }
 type Step = { label: string; delay: string; template: string }
@@ -69,6 +71,19 @@ function templateStatus(name: string | null, map: Map<string, string>): Status |
   return { label: s ? s.charAt(0) + s.slice(1).toLowerCase() : 'Pending', bg: 'rgba(245,158,11,.13)', color: '#f59e0b', icon: MdSchedule }
 }
 
+// Status dot colour for a list row (worst step wins, so a row flags problems).
+function dotColor(name: string | null, map: Map<string, string>): string {
+  const st = templateStatus(name, map)
+  if (!st) return 'var(--text-muted)'
+  return st.color
+}
+function worstStepColor(steps: Step[], map: Map<string, string>): string {
+  const colors = steps.map(s => dotColor(s.template, map))
+  if (colors.includes('#ef4444')) return '#ef4444'
+  if (colors.includes('#f59e0b')) return '#f59e0b'
+  return '#22c55e'
+}
+
 function TemplateChip({ name, map }: { name: string | null; map: Map<string, string> }) {
   if (!name) return <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>no template — routes internally</span>
   const st = templateStatus(name, map)!
@@ -81,9 +96,116 @@ function TemplateChip({ name, map }: { name: string | null; map: Map<string, str
   )
 }
 
+const CARD = '1px solid var(--border-primary)'
+const SHADOW = '0 6px 18px rgba(0,0,0,0.22)'
+
+// ── Left-list selectable row (mirrors the Stages stage-list card) ─────────────
+function ListRow({ icon, title, sub, dot, selected, onClick }: {
+  icon: any; title: string; sub: string; dot: string; selected: boolean; onClick: () => void
+}) {
+  const Icon = icon
+  return (
+    <button type="button" onClick={onClick} style={{
+      textAlign: 'left', cursor: 'pointer', width: '100%',
+      border: selected ? '1px solid var(--accent-primary)' : CARD,
+      background: selected ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
+      borderRadius: 10, padding: 11, display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <span style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={17} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
+        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>
+      </span>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      <MdChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+    </button>
+  )
+}
+
+// ── Detail-panel section card (mirrors the Stages FlowDetailPanel sections) ────
+function DetailCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ border: CARD, borderRadius: 10, padding: 14, background: 'var(--bg-tertiary)', marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function TriggerDetail({ t, map }: { t: Trigger; map: Map<string, string> }) {
+  const Icon = t.icon
+  return (
+    <aside style={{ border: CARD, borderRadius: 12, background: 'var(--bg-secondary)', boxShadow: SHADOW, padding: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={24} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>{t.event}</h2>
+            <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{t.when}</span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>{t.desc}</p>
+        </div>
+      </div>
+
+      <DetailCard title="Template fired">
+        {t.template
+          ? <TemplateChip name={t.template} map={map} />
+          : <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>No WhatsApp template — this trigger routes internally (kicks off a sequence or schedules a task).</p>}
+      </DetailCard>
+
+      <DetailCard title="When it fires">
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+          Fires once, <strong style={{ color: 'var(--text-primary)' }}>{t.when.toLowerCase()}</strong>, on this event.
+        </p>
+      </DetailCard>
+    </aside>
+  )
+}
+
+function SequenceDetail({ s, map }: { s: Sequence; map: Map<string, string> }) {
+  const approved = s.steps.filter(st => (map.get(st.template) || '').toUpperCase() === 'APPROVED').length
+  return (
+    <aside style={{ border: CARD, borderRadius: 12, background: 'var(--bg-secondary)', boxShadow: SHADOW, padding: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>{s.segment}</h2>
+        {s.gated && <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', padding: '3px 8px', borderRadius: 6, background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>Gated off</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{approved}/{s.steps.length} templates ready</span>
+      </div>
+      <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>{s.who}</p>
+      <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{s.stop}</p>
+
+      <DetailCard title={`Steps (${s.steps.length})`}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {s.steps.map((step, i) => (
+            <div key={i}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+                <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--bg-secondary)', border: CARD, color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{step.label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{step.delay}</span>
+                  </div>
+                  <TemplateChip name={step.template} map={map} />
+                </div>
+              </div>
+              {i < s.steps.length - 1 && <div style={{ marginLeft: 12, height: 12, borderLeft: '2px dotted var(--border-primary)' }} />}
+            </div>
+          ))}
+        </div>
+      </DetailCard>
+    </aside>
+  )
+}
+
 export default function FlowsAutomation({ section }: { section?: 'triggers' | 'sequences' }) {
   const [map, setMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [selTrigger, setSelTrigger] = useState<string>(TRIGGERS[0].id)
+  const [selSequence, setSelSequence] = useState<string>(SEQUENCES[0].id)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,86 +219,43 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
   }, [])
   useEffect(() => { load() }, [load])
 
-  const cardBorder = '1px solid var(--border-primary)'
+  const mode: 'triggers' | 'sequences' = section === 'triggers' ? 'triggers' : 'sequences'
+
+  const trigger = TRIGGERS.find(t => t.id === selTrigger) || TRIGGERS[0]
+  const sequence = SEQUENCES.find(s => s.id === selSequence) || SEQUENCES[0]
 
   return (
-    <div className="space-y-7">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          The full BCON automation — every event-based <b style={{ color: 'var(--text-primary)' }}>trigger</b> and every multi-step <b style={{ color: 'var(--text-primary)' }}>sequence</b>, with the WhatsApp template each one fires and its Meta status.
-        </p>
-        <button onClick={load} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border shrink-0" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>
-          <MdRefresh size={14} /> {loading ? 'Checking…' : 'Refresh status'}
-        </button>
+    <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 12, alignItems: 'start', minHeight: 'calc(100vh - 170px)', color: 'var(--text-primary)' }}>
+      {/* ── LEFT LIST ──────────────────────────────────────────────────────── */}
+      <div style={{ border: CARD, borderRadius: 12, background: 'var(--bg-secondary)', boxShadow: SHADOW, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '12px 14px', borderBottom: CARD, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, letterSpacing: '0.4px', color: 'var(--text-secondary)' }}>
+            {mode === 'triggers' ? <><MdBolt size={15} /> TRIGGERS · ON AN EVENT</> : <><MdRepeat size={15} /> SEQUENCES · BY LEAD STATE</>}
+          </span>
+          <button type="button" onClick={load} aria-label="Refresh template status" title="Refresh template status" style={{ border: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex' }}>
+            <MdRefresh size={16} />
+          </button>
+        </div>
+        <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {mode === 'triggers'
+            ? TRIGGERS.map(t => (
+                <ListRow key={t.id} icon={t.icon} title={t.event} sub={t.when}
+                  dot={dotColor(t.template, map)} selected={t.id === selTrigger} onClick={() => setSelTrigger(t.id)} />
+              ))
+            : SEQUENCES.map(s => (
+                <ListRow key={s.id} icon={MdRepeat} title={s.segment} sub={`${s.steps.length} step${s.steps.length === 1 ? '' : 's'}${s.gated ? ' · gated' : ''}`}
+                  dot={worstStepColor(s.steps, map)} selected={s.id === selSequence} onClick={() => setSelSequence(s.id)} />
+              ))}
+        </div>
       </div>
 
-      {/* ── TRIGGERS ─────────────────────────────────────────────────────── */}
-      {section !== 'sequences' && (
-      <section>
-        <h2 className="flex items-center gap-2 text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-          <MdBolt size={18} style={{ color: 'var(--accent-primary)' }} /> Triggers <span className="font-normal" style={{ color: 'var(--text-muted)' }}>· fire once, on an event</span>
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {TRIGGERS.map((t) => {
-            const Icon = t.icon
-            return (
-              <div key={t.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-secondary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
-                <div className="flex items-start gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}><Icon size={18} /></span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t.event}</p>
-                      <span className="text-[11px] whitespace-nowrap px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>{t.when}</span>
-                    </div>
-                    <p className="text-xs mt-1 mb-2" style={{ color: 'var(--text-secondary)' }}>{t.desc}</p>
-                    <TemplateChip name={t.template} map={map} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-      )}
-
-      {/* ── SEQUENCES ────────────────────────────────────────────────────── */}
-      {section !== 'triggers' && (
-      <section>
-        <h2 className="flex items-center gap-2 text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-          <MdRepeat size={18} style={{ color: 'var(--accent-primary)' }} /> Sequences <span className="font-normal" style={{ color: 'var(--text-muted)' }}>· multi-step chains by lead state, auto-stop on reply</span>
-        </h2>
-        <div className="space-y-3">
-          {SEQUENCES.map((s) => (
-            <div key={s.id} className="rounded-xl p-4" style={{ border: cardBorder, background: 'var(--bg-secondary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{s.segment}</p>
-                {s.gated && <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>Gated off</span>}
-              </div>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{s.who}</p>
-              <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>{s.stop}</p>
-              <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
-                {s.steps.map((step, i) => (
-                  <div key={i} className="flex items-center gap-2 shrink-0">
-                    <div className="rounded-lg p-2.5 min-w-[170px]" style={{ border: cardBorder, background: 'var(--bg-tertiary)' }}>
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{step.label}</span>
-                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{step.delay}</span>
-                      </div>
-                      <TemplateChip name={step.template} map={map} />
-                    </div>
-                    {i < s.steps.length - 1 && <MdArrowForward size={16} style={{ color: 'var(--text-muted)' }} className="shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      )}
-
-      <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-        <MdHelpOutline size={13} /> Templates marked “Not created” or “Pending” won’t send — create/approve them in Settings → Message templates.
-      </p>
+      {/* ── RIGHT DETAIL ───────────────────────────────────────────────────── */}
+      <div style={{ minWidth: 0 }}>
+        {mode === 'triggers' ? <TriggerDetail t={trigger} map={map} /> : <SequenceDetail s={sequence} map={map} />}
+        <p style={{ margin: '12px 2px 0', fontSize: 11, color: 'var(--text-muted)' }}>
+          {loading ? 'Checking template status…' : 'Templates marked “Not created” or “Pending” won’t send — create/approve them in Settings → Message templates.'}
+        </p>
+      </div>
     </div>
   )
 }
