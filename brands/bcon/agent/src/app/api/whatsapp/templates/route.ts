@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30 // template-create forward + Meta round-trip needs headroom
 
 const GRAPH_API_VERSION = 'v21.0'
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`
@@ -197,6 +198,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // A template-CREATION payload (carries a components array, or name+category,
+    // and no recipient) belongs to the create endpoint — forward it there rather
+    // than failing with "Missing to". The 'to' check below is for SENDING only.
+    if (!body?.to && (Array.isArray(body?.components) || (body?.name && body?.category))) {
+      const origin = new URL(request.url).origin
+      const fwd = await fetch(`${origin}/api/whatsapp/templates/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
+      })
+      const text = await fwd.text()
+      return new NextResponse(text, { status: fwd.status, headers: { 'Content-Type': 'application/json' } })
+    }
+
     const {
       to,
       templateName = 'hello_world',

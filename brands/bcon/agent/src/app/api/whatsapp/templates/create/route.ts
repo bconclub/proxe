@@ -77,6 +77,26 @@ export async function POST(request: NextRequest) {
     if (!['MARKETING', 'UTILITY', 'AUTHENTICATION'].includes(category)) {
       return NextResponse.json({ error: 'Category must be MARKETING, UTILITY or AUTHENTICATION.' }, { status: 400 })
     }
+
+    // PASSTHROUGH: if the caller already built a components array, submit it
+    // verbatim — don't strip or rebuild anything (the BODY example values etc.
+    // are already inside). Used when a full payload is forwarded in.
+    if (Array.isArray(b.components) && b.components.length) {
+      const wabaId = await resolveWaba(c)
+      if (!wabaId) return NextResponse.json({ error: 'Could not resolve WABA id. Set META_WHATSAPP_WABA_ID on Vercel.' }, { status: 400 })
+      const payload = { name, language, category, components: b.components }
+      const res = await fetch(`${GRAPH}/${wabaId}/message_templates`, {
+        method: 'POST', headers: { Authorization: `Bearer ${c.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(20000),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const msg = data?.error?.error_user_msg || data?.error?.message || 'Meta rejected the template.'
+        return NextResponse.json({ success: false, error: msg, meta: data?.error, payload }, { status: 400 })
+      }
+      return NextResponse.json({ success: true, id: data.id, name, status: data.status || 'PENDING', category: data.category || category, submittedComponents: (b.components as any[]).map((x: any) => x.type), payload })
+    }
+
     if (!bodyText) {
       return NextResponse.json({ error: 'Body text is required.' }, { status: 400 })
     }
