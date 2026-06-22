@@ -13,6 +13,15 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 16:30 IST · bcon: Flows page visual parity with the dashboard
+
+- **Borders thinned** — active funnel + stage cards dropped from `2px` to `1px` (color now conveys selection, not weight); matches the dashboard, which never uses 2px.
+- **Containers lightly tinted** — the flat/transparent detail-panel cards (Channels, Coverage, Lead Progress, Template Schedule, Performance, Templates) now sit on `var(--bg-tertiary)`, and inactive stage cards moved off `bg-primary` (invisible on the #000 page) onto `bg-tertiary`. Reads as soft lifted surfaces like the dashboard.
+- **Active tint softened** — selectors went from a heavy `${color}12` to `color-mix(in srgb, ${color} 7%, var(--bg-secondary))`, echoing the dashboard's ~4% KPI-card tint.
+- **Radius unified** to `12` (funnel cards / stage-list panel / detail aside were `14`).
+- **Theme-correctness** — legacy board/overview borders swapped from hardcoded `rgba(255,255,255,.06–.1)` to `var(--border-primary)` so they follow the theme.
+- No logic changes; only the rendered stages view + detail panel restyled. User-facing: Flows now matches the dashboard's look. Dead helper components (FunnelSection/FlowStageCard/etc.) left untouched.
+
 ## 2026-06-21 · bcon: WhatsApp template builder — Number/Named variables + Copy-code button (Meta parity)
 
 - **Type of variable** selector (matches Meta): **Number** (`{{1}}`) or **Named** (`{{order_id}}`). The +Add-variable action and per-variable sample inputs adapt to the chosen style; switching clears the body so the two never mix. The create API builds the right `example` shape — `body_text`/`header_text` for numbered, `body_text_named_params`/`header_text_named_params` for named.

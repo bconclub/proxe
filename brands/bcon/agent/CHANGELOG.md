@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-22 · Flows page restyled to match the dashboard
+
+- Brought `/dashboard/flows` (the 9-stage view) up to the dashboard's visual language: active card borders `2px → 1px`, detail-panel containers given a subtle `bg-tertiary` tint (were transparent/flat on the #000 page), active tint softened to `color-mix(… 7%)`, card radius unified to `12`, and legacy hardcoded `rgba(255,255,255,*)` borders swapped for `var(--border-primary)`. Pure styling; no behavior change.
+
 ## 2026-06-19 · Calls dashboard view + overview Calls KPI
 
 - New **Calls** section: nav entry (Chats → Calls → Pipeline) + `/dashboard/calls` page listing inbound/outbound voice calls (direction, contact, duration, status, transcript turns, recording). Row → slide-in drawer with `<audio>` player + full transcript + summary.
