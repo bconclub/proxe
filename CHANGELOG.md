@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Flows = Sequences (default) · Triggers · Stages — 3-way toggle
+
+- Corrects the previous entry: **Stages is back**, and Triggers + Sequences are now **separate toggles** instead of one combined page. Flows opens on **Sequences** (the default landing), with a segmented toggle to **Triggers** and **Stages**.
+- `FlowsAutomation` takes a `section?: 'sequences' | 'triggers'` prop and renders just that section; `flows/page.tsx` default view is `sequences`, and `FlowsViewToggle` now lists Sequences / Triggers / Stages. The Stages funnel view (restored) is reachable again via the toggle.
+
 ## 2026-06-22 · bcon: Flows = Triggers + Sequences only (drop the Stages tab)
 
 - Removed the **Stages** view toggle from Flows so the page is just **Triggers + Sequences** — per the founder's model: triggers are the event-fired automations, sequences are the multi-step chains, and "stages" were really just sequences shown a second way. Stages live in the **Pipeline** (lead-level view comes later), so Flows no longer duplicates them.

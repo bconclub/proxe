@@ -81,7 +81,7 @@ function TemplateChip({ name, map }: { name: string | null; map: Map<string, str
   )
 }
 
-export default function FlowsAutomation() {
+export default function FlowsAutomation({ section }: { section?: 'triggers' | 'sequences' }) {
   const [map, setMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
 
@@ -111,6 +111,7 @@ export default function FlowsAutomation() {
       </div>
 
       {/* ── TRIGGERS ─────────────────────────────────────────────────────── */}
+      {section !== 'sequences' && (
       <section>
         <h2 className="flex items-center gap-2 text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
           <MdBolt size={18} style={{ color: 'var(--accent-primary)' }} /> Triggers <span className="font-normal" style={{ color: 'var(--text-muted)' }}>· fire once, on an event</span>
@@ -136,8 +137,10 @@ export default function FlowsAutomation() {
           })}
         </div>
       </section>
+      )}
 
       {/* ── SEQUENCES ────────────────────────────────────────────────────── */}
+      {section !== 'triggers' && (
       <section>
         <h2 className="flex items-center gap-2 text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
           <MdRepeat size={18} style={{ color: 'var(--accent-primary)' }} /> Sequences <span className="font-normal" style={{ color: 'var(--text-muted)' }}>· multi-step chains by lead state, auto-stop on reply</span>
@@ -169,6 +172,7 @@ export default function FlowsAutomation() {
           ))}
         </div>
       </section>
+      )}
 
       <p className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
         <MdHelpOutline size={13} /> Templates marked “Not created” or “Pending” won’t send — create/approve them in Settings → Message templates.

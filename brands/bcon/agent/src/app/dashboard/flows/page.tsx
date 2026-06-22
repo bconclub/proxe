@@ -561,7 +561,7 @@ function countdown(dateStr: string | null): string {
 // ── Main Page ─────────────────────────────────────────────────────
 
 export default function FlowsPage() {
-  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'automation'>('automation')
+  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'sequences' | 'triggers'>('sequences')
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
   const [selectedFlowName, setSelectedFlowName] = useState('')
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -943,17 +943,22 @@ export default function FlowsPage() {
     await reloadFlows()
   }
 
-  // ── Automation view: Triggers + Sequences (what fires for every lead) ──────
-  if (view === 'automation') {
+  // ── Sequences view (default landing) + Triggers view — toggle to either, or Stages ──
+  if (view === 'sequences' || view === 'triggers') {
     return (
       <div style={{ minHeight: 'calc(100vh - 48px)', color: 'var(--text-primary)' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Flows</h1>
-            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>Triggers &amp; sequences — what fires for every lead, and the template each uses.</p>
+            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+              {view === 'sequences'
+                ? 'Sequences — the multi-step chains a lead runs through, and the template each step fires.'
+                : 'Triggers — the one-off automations that fire on an event, and the template each uses.'}
+            </p>
           </div>
+          <FlowsViewToggle view={view} setView={setView} />
         </header>
-        <FlowsAutomation />
+        <FlowsAutomation section={view === 'sequences' ? 'sequences' : 'triggers'} />
       </div>
     )
   }
@@ -1446,11 +1451,12 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-// Segmented toggle: switch the Flows page between the Automation view
-// (Triggers + Sequences) and the Stages funnel view.
+// Segmented toggle: switch the Flows page between Sequences (default),
+// Triggers, and the Stages funnel view.
 function FlowsViewToggle({ view, setView }: { view: string; setView: (v: any) => void }) {
   const tabs: { v: string; label: string }[] = [
-    { v: 'automation', label: 'Triggers & Sequences' },
+    { v: 'sequences', label: 'Sequences' },
+    { v: 'triggers', label: 'Triggers' },
     { v: 'stages', label: 'Stages' },
   ]
   return (

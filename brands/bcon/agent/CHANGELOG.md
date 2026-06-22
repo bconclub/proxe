@@ -4,6 +4,10 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-06-22 · Flows = Sequences (default) · Triggers · Stages
+
+- Reinstated **Stages** and split the page into three toggles: **Sequences** (default landing), **Triggers**, **Stages**. `FlowsAutomation` gained a `section` prop (renders sequences-only or triggers-only); `flows/page.tsx` defaults to the Sequences view. Corrects the earlier change that removed Stages.
+
 ## 2026-06-22 · Flows = Triggers + Sequences only (Stages tab removed)
 
 - Flows now shows just **Triggers** (event-fired automations) + **Sequences** (multi-step chains); removed the toggle into the redundant 9-stage funnel view. Stages belong to the Pipeline, and the "sequences" already are the stage chains. Old stages/board/overview code is now unreachable (left for a later cleanup).
