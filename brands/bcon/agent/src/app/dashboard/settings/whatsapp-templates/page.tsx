@@ -65,6 +65,7 @@ export default function WhatsAppTemplatesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitOk, setSubmitOk] = useState<string | null>(null)
+  const [sentPayload, setSentPayload] = useState<any>(null) // exact payload Meta received (verification)
 
   const load = useCallback(async () => {
     setLoading(true); setLoadError(null)
@@ -118,7 +119,7 @@ export default function WhatsAppTemplatesPage() {
 
   const resetForm = () => {
     setName(''); setCategory('MARKETING'); setLanguage('en_US'); setVarType('NUMBER'); setHeaderText(''); setHeaderSample('')
-    setBody(''); setSamples({}); setFooter(''); setButtons([]); setSubmitError(null); setSubmitOk(null)
+    setBody(''); setSamples({}); setFooter(''); setButtons([]); setSubmitError(null); setSubmitOk(null); setSentPayload(null)
   }
 
   const submit = async () => {
@@ -154,11 +155,13 @@ export default function WhatsAppTemplatesPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.error || 'Submission failed.')
-      const sent = Array.isArray(data.submittedComponents) ? data.submittedComponents.join(' + ') : ''
-      setSubmitOk(`“${data.name}” submitted — status ${String(data.status || 'PENDING').toLowerCase()}.${sent ? ` Sent to Meta: ${sent}.` : ''} Meta is reviewing it.`)
+      // resetForm FIRST (it clears submitOk), THEN set the confirmation so it
+      // actually shows. (Bug: the old order nulled the banner immediately.)
       resetForm()
       await load()
       setComposerOpen(false)
+      setSentPayload(data.payload || null)
+      setSubmitOk(`“${data.name}” submitted — status ${String(data.status || 'PENDING').toLowerCase()}. Meta is reviewing it.`)
     } catch (e: any) {
       setSubmitError(e?.message || 'Submission failed.')
     } finally {
@@ -197,7 +200,27 @@ export default function WhatsAppTemplatesPage() {
         Create and submit message templates straight to Meta for approval{phone?.verifiedName ? ` · ${phone.verifiedName}${phone.displayNumber ? ` (${phone.displayNumber})` : ''}` : ''}.
       </p>
 
-      {submitOk && <div className="mb-4 rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ background: 'rgba(34,197,94,.12)', color: '#22c55e' }}><MdCheckCircle size={18} /> {submitOk}</div>}
+      {submitOk && <div className="mb-3 rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ background: 'rgba(34,197,94,.12)', color: '#22c55e' }}><MdCheckCircle size={18} /> {submitOk}</div>}
+
+      {/* Exactly what Meta received — so there's zero doubt about category + components. */}
+      {sentPayload && (
+        <div className="mb-5 rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Sent to Meta — verification</p>
+          <div className="text-[12px] space-y-1" style={{ color: 'var(--text-primary)' }}>
+            <div><span style={{ color: 'var(--text-muted)' }}>category:</span> <b>{sentPayload.category}</b> · <span style={{ color: 'var(--text-muted)' }}>language:</span> {sentPayload.language}</div>
+            {(sentPayload.components || []).map((c: any, i: number) => {
+              const ex = c.example?.body_text_named_params?.length || c.example?.body_text?.[0]?.length || c.example?.header_text_named_params?.length || (c.example?.header_text ? 1 : 0)
+              const btns = c.buttons ? c.buttons.map((b: any) => b.type).join(', ') : ''
+              return (
+                <div key={i} className="flex items-start gap-2">
+                  <MdCheckCircle size={14} style={{ color: '#22c55e', marginTop: 2 }} />
+                  <span><b>{c.type}</b>{c.type === 'BUTTONS' ? ` (${btns})` : ''}{ex ? ` — ${ex} example value${ex > 1 ? 's' : ''}` : ''}{c.text ? `: “${String(c.text).slice(0, 60)}${String(c.text).length > 60 ? '…' : ''}”` : ''}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Composer ── */}
       {composerOpen && (
