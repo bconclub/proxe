@@ -144,7 +144,7 @@ export default function WhatsAppTemplatesPage() {
           <button onClick={load} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>
             <MdRefresh size={15} /> Refresh
           </button>
-          <button onClick={() => { resetForm(); setComposerOpen((v) => !v) }} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+          <button onClick={() => { resetForm(); setComposerOpen((v) => !v) }} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}>
             {composerOpen ? <><MdClose size={15} /> Close</> : <><MdAdd size={16} /> Create template</>}
           </button>
         </div>
@@ -242,7 +242,7 @@ export default function WhatsAppTemplatesPage() {
             </div>
 
             {submitError && <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>{submitError}</div>}
-            <button onClick={submit} disabled={submitting} className="w-full rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--accent-primary)', color: '#fff' }}>
+            <button onClick={submit} disabled={submitting} className="w-full rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}>
               {submitting ? 'Submitting to Meta…' : 'Submit for approval'}
             </button>
           </div>
