@@ -42,6 +42,7 @@ import {
   MdRadioButtonUnchecked,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import FlowsAutomation from '@/components/dashboard/FlowsAutomation'
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -560,7 +561,7 @@ function countdown(dateStr: string | null): string {
 // ── Main Page ─────────────────────────────────────────────────────
 
 export default function FlowsPage() {
-  const [view, setView] = useState<'overview' | 'board' | 'stages'>('stages')
+  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'automation'>('automation')
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
   const [selectedFlowName, setSelectedFlowName] = useState('')
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -942,6 +943,22 @@ export default function FlowsPage() {
     await reloadFlows()
   }
 
+  // ── Automation view: Triggers + Sequences (what fires for every lead) ──────
+  if (view === 'automation') {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 48px)', color: 'var(--text-primary)' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Flows</h1>
+            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>Triggers &amp; sequences — what fires for every lead, and the template each uses.</p>
+          </div>
+          <FlowsViewToggle view={view} setView={setView} />
+        </header>
+        <FlowsAutomation />
+      </div>
+    )
+  }
+
   // ── Loading state ───────────────────────────────────────────────
 
   if (loading && view === 'stages') {
@@ -988,9 +1005,12 @@ export default function FlowsPage() {
               Pick a funnel to see its stages, templates and coverage.
             </p>
           </div>
-          <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
-            <MdRefresh size={18} /> Refresh
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <FlowsViewToggle view={view} setView={setView} />
+            <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
+              <MdRefresh size={18} /> Refresh
+            </button>
+          </div>
         </header>
 
         {/* Go-Live readiness — kept at top so you always see what's going on */}
@@ -1424,6 +1444,27 @@ function LegendItem({ color, label }: { color: string; label: string }) {
       <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
       {label}
     </span>
+  )
+}
+
+// Segmented toggle: switch the Flows page between the Automation view
+// (Triggers + Sequences) and the Stages funnel view.
+function FlowsViewToggle({ view, setView }: { view: string; setView: (v: any) => void }) {
+  const tabs: { v: string; label: string }[] = [
+    { v: 'automation', label: 'Triggers & Sequences' },
+    { v: 'stages', label: 'Stages' },
+  ]
+  return (
+    <div style={{ display: 'flex', gap: 4, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', borderRadius: 10, padding: 4 }}>
+      {tabs.map((t) => (
+        <button key={t.v} type="button" onClick={() => setView(t.v)}
+          style={{ border: 0, borderRadius: 7, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: view === t.v ? 'var(--accent-subtle)' : 'transparent',
+            color: view === t.v ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+          {t.label}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -13,6 +13,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · bcon: Flows → Triggers + Sequences view (shows what fires for every lead)
+
+- New **Triggers & Sequences** view on Flows (now default; toggle to the old **Stages** funnel) — answers "what message goes when", which the funnel never showed.
+  - **Triggers** (fire once): new-lead **welcome** (`bcon_proxe_first_outreach`), booking reminders **1 day / 1 hour / 30 min before** (`bcon_proxe_booking_reminder_24h/1h/30m`), voice-no-answer → starts No-response sequence, callback.
+  - **Sequences** (multi-step by lead state, auto-stop on reply): No-response/cold (missed-call → Day1/3/5 → re-engage; gated), Engaged-not-booked (nudge → push to book), Long-tail (Day 3/7/30/90).
+  - Each step names its WhatsApp template + shows the template's **Meta status** (Approved/Pending/Not created) from `GET /api/whatsapp/templates`, so silently-missing templates are visible. New `components/dashboard/FlowsAutomation.tsx`; `flows/page.tsx` gains the view + toggle.
+
 ## 2026-06-22 16:30 IST · bcon: Flows page visual parity with the dashboard
 
 - **Borders thinned** — active funnel + stage cards dropped from `2px` to `1px` (color now conveys selection, not weight); matches the dashboard, which never uses 2px.
