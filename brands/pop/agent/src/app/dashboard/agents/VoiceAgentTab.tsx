@@ -18,7 +18,7 @@ export default function VoiceAgentTab() {
   const [copied, setCopied] = useState(false);
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
 
-  const voiceNumber = '+918046733388';
+  const voiceNumber = process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending';
   // Contact name is OPTIONAL: with a name the agent greets the person; without
   // one it confirms the business and asks to be put through. Business + industry
   // + phone are still required for context.
@@ -125,7 +125,7 @@ export default function VoiceAgentTab() {
         <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#22c55e' }} />
         <div>
           <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Voice Agent</p>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{voiceNumber} · voiceproxe.bconclub.com</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{voiceNumber} · {getBrandConfig().name}</p>
         </div>
       </div>
 
@@ -228,7 +228,7 @@ export default function VoiceAgentTab() {
             <input
               type="tel"
               inputMode="numeric"
-              placeholder="9731660933"
+              placeholder="Enter phone number"
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(-10))}
               onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }}

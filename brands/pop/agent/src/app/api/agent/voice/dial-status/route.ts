@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (industry) ctx.push(`industry=${encodeURIComponent(industry)}`);
   const sipHeadersAttr = ctx.length ? ` sipHeaders="${ctx.join(',')}"` : '';
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const ctxQuery = `lead_name=${encodeURIComponent(leadName)}&business=${encodeURIComponent(business)}&industry=${encodeURIComponent(industry)}`;
   const actionUrl = `${baseUrl}/api/agent/voice/dial-status?attempt=${attempt + 1}&${ctxQuery}`.replace(/&/g, '&amp;');
 

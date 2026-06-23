@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { FaInstagram } from 'react-icons/fa';
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
 // PROXe-IG app (Tech Provider) — the central Instagram app used across brands.
 const INSTAGRAM_APP_ID = '734209706078170';
@@ -11,9 +12,11 @@ const INSTAGRAM_SCOPES = [
   'instagram_business_manage_comments',
 ].join(',');
 
-const TARGET_ACCOUNT = '@bconclub';
+// Brand-specific — never hardcode another brand's account here.
+const TARGET_ACCOUNT = process.env.NEXT_PUBLIC_IG_ACCOUNT || 'your Instagram account';
 
 export default function InstagramAgentTab() {
+  const brandName = getBrandConfig().name;
   const [authReturned, setAuthReturned] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -35,7 +38,7 @@ export default function InstagramAgentTab() {
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: INSTAGRAM_SCOPES,
-      state: 'bcon-instagram-agent',
+      state: `${getCurrentBrandId()}-instagram-agent`,
     });
 
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
@@ -70,7 +73,7 @@ export default function InstagramAgentTab() {
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              Connect the official BCON Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
+              Connect the official {brandName} Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
               <span className="h-2 w-2 rounded-full bg-[#E1306C]" />
@@ -95,7 +98,7 @@ export default function InstagramAgentTab() {
                 Instagram connection pending
               </div>
               <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                Complete Instagram Business Login to authorize account identity, DMs, and comments for the BCON workspace.
+                Complete Instagram Business Login to authorize account identity, DMs, and comments for the {brandName} workspace.
               </p>
             </div>
 
@@ -119,7 +122,7 @@ export default function InstagramAgentTab() {
             <ol className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
               <li>1. Open Dashboard, then Agents, then Instagram.</li>
               <li>2. Click Connect to Instagram Business.</li>
-              <li>3. Select the BCON Instagram professional account.</li>
+              <li>3. Select the {brandName} Instagram professional account.</li>
               <li>4. Approve the requested basic, messages, and comments permissions.</li>
               <li>5. Return to PROXe and show the authorization success state.</li>
             </ol>
@@ -135,7 +138,7 @@ export default function InstagramAgentTab() {
               {[
                 ['1', 'Connect', `Admin connects ${TARGET_ACCOUNT} through Instagram Business Login.`],
                 ['2', 'Receive', 'Meta webhooks send Instagram DMs and comments to PROXe.'],
-                ['3', 'Respond', 'The BCON team handles enquiries in the dashboard.'],
+                ['3', 'Respond', `The ${brandName} team handles enquiries in the dashboard.`],
               ].map(([step, title, body]) => (
                 <div
                   key={step}

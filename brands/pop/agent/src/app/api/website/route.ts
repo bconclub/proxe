@@ -224,9 +224,10 @@ export async function POST(req: NextRequest) {
             if (!response.ok) {
               console.error('Template send failed:', await response.text());
             }
-          } else if (email) {
-            // Optional: Send email auto-responder via existing /api/send-email
-            await fetch('https://bconclub.com/api/send-email', {
+          } else if (email && process.env.LEAD_EMAIL_ENDPOINT) {
+            // Optional email auto-responder. Endpoint is env-driven and OFF by
+            // default so no brand ever calls another brand's email server.
+            await fetch(process.env.LEAD_EMAIL_ENDPOINT, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

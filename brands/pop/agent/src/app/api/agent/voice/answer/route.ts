@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   // <Dial action> re-invokes /dial-status after the bridge ends; on a busy/failed
   // result it re-dials, VoBiz re-rolls the egress IP, so a retry usually lands on
   // a good one. Context rides in the action URL so retries keep name/business.
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const ctxQuery = `lead_name=${encodeURIComponent(leadName)}&business=${encodeURIComponent(business)}&industry=${encodeURIComponent(industry)}`;
   const actionUrl = `${baseUrl}/api/agent/voice/dial-status?attempt=2&${ctxQuery}`.replace(/&/g, '&amp;');
 

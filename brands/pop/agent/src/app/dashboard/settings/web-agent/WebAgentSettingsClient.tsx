@@ -393,7 +393,7 @@ export default function WebAgentSettingsClient() {
                     fontFamily: 'system-ui, -apple-system, sans-serif',
                   }}
                 >
-                  bconclub.com
+                  your-website.com
                 </span>
               </div>
             </div>
