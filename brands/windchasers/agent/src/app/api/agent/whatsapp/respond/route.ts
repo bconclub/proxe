@@ -24,6 +24,7 @@ import {
   ensureSession,
   addUserInput,
 } from '@/lib/services';
+import { stampProxeActor } from '@/lib/services/leadOwnership';
 
 export const dynamic = 'force-dynamic';
 
@@ -158,6 +159,8 @@ export async function POST(request: NextRequest) {
         await logMessage(leadId, 'whatsapp', 'customer', message, 'text', {}, supabase);
         if (result.response) {
           await logMessage(leadId, 'whatsapp', 'agent', result.response, 'text', responseMetadata, supabase);
+          // PROXe auto-replied → stamp last actor for the "Last Touch" badge.
+          await stampProxeActor(supabase, leadId);
         }
       }
     }

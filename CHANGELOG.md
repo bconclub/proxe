@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · sync: propagate leg-1 fixes master → Windchasers (lockup fix goes live)
+
+- Forward-propagated the 5 leg-1 brand-neutral fixes from master to **Windchasers** (POP already had them from its bcon scaffold, so WC was the only brand behind): `hooks/useRealtimeLeads.ts` (the DB ShareLock lockup fix), `lib/services/leadOwnership.ts`, `lib/agent-core/claudeClient.ts`, `api/dashboard/summarize/route.ts`, `api/agent/whatsapp/respond/route.ts`. All 4 trees now byte-identical on these. Brand-neutral, already running in bcon prod; WC verified via its Vercel build.
+
 ## 2026-06-22 · sync: artifact guardrail + leg-1 reverse-sync (bcon → master)
 
 - **Brand-artifact guardrail** (`scripts/brand-shared.json` + `scripts/reverse-sync.js`): new `brandArtifacts` map declares per-brand, one-directional features built on the PROXe base (POP war-room: `lib/war-room/`, `app/dashboard/war-room/`, `components/dashboard/WarRoom`, `data/`). reverse-sync now hard-errors if any artifact path is in `sharedCore` (guard 1) and refuses an explicit `--only` of an artifact (guard 2) — so brand-only features can never leak up to master or across to other brands.
