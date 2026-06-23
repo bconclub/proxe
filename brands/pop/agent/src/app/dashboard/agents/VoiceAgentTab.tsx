@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
+import { getBrandConfig } from '@/configs';
 
 export default function VoiceAgentTab() {
   // Default "call myself" details — prefilled so one click dials without re-typing.
   // Edit any field to call someone else; "Call myself" resets back to these.
-  const DEFAULT_ME = { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' };
+  // Brand-neutral placeholders — fill in for the active brand before a real call.
+  const DEFAULT_ME = { name: '', business: getBrandConfig().name, industry: '', phone: '' };
 
   const [phone, setPhone] = useState(DEFAULT_ME.phone);
   const [personName, setPersonName] = useState(DEFAULT_ME.name);

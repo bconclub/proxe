@@ -2884,7 +2884,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>BCON AI</span>
+          <span>{config.name}</span>
         </div>
         <div className={styles.headerActions}>
           <button

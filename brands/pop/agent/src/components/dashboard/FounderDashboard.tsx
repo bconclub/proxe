@@ -10,6 +10,7 @@ import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
 import type { Lead } from '@/types'
+import { getBrandConfig } from '@/configs'
 import {
   Sparkline,
   ActivityArea,
@@ -116,6 +117,8 @@ function fmtMs(ms: number): string {
 
 export default function FounderDashboard() {
   const router = useRouter()
+  const brandCfg = getBrandConfig()
+  const brandLogo = brandCfg.chatStructure?.avatar?.source || '/favicon.ico'
   const [metrics, setMetrics] = useState<FounderMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -334,7 +337,7 @@ export default function FounderDashboard() {
           <div className="relative">
             <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
-              <Image src="/bcon-icon.png" alt="BCON" width={80} height={80} className="drop-shadow-lg" priority />
+              <Image src={brandLogo} alt={brandCfg.name} width={80} height={80} className="drop-shadow-lg" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>

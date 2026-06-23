@@ -14,6 +14,7 @@ import {
 } from '@/lib/sound-prefs';
 import { ACCENT_THEMES } from '@/lib/accent-theme';
 import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
+import { getCurrentBrandId } from '@/configs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
   { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
@@ -25,7 +26,7 @@ type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [selectedTheme, setSelectedTheme] = useState('bcon');
+  const [selectedTheme, setSelectedTheme] = useState(getCurrentBrandId());
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
@@ -75,8 +76,8 @@ export default function SettingsPage() {
       setSelectedTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to BCON theme
-      applyTheme('bcon');
+      // Default to the active brand's theme
+      applyTheme(getCurrentBrandId());
     }
   }, [theme]);
 

@@ -386,7 +386,7 @@ export function BookingCalendarWidget({
     const eventTitle = config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit';
     const title = encodeURIComponent(eventTitle);
     const details = encodeURIComponent(`Consultation Booking\n\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\n\nContact: ${formData.email}`);
-    const location = encodeURIComponent(formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)');
+    const location = encodeURIComponent(formData.sessionType === 'offline' ? `${config?.name || 'Our'} Office` : 'Online Session (Video Call)');
 
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
   };
@@ -426,7 +426,7 @@ export function BookingCalendarWidget({
       `DTEND:${endStr}`,
       `SUMMARY:${config?.name ? `${config.name} Consultation` : 'BCON AI Brand Audit'}`,
       `DESCRIPTION:Consultation Booking\\n\\nName: ${formData.name}\\nEmail: ${formData.email}\\nPhone: ${formData.phone}\\n\\nContact: ${formData.email}`,
-      `LOCATION:${formData.sessionType === 'offline' ? 'BCON Club Office' : 'Online Session (Video Call)'}`,
+      `LOCATION:${formData.sessionType === 'offline' ? `${config?.name || 'Our'} Office` : 'Online Session (Video Call)'}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',

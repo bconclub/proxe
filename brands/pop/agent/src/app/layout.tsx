@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
+import { getCurrentBrandId, brandThemeMap } from '@/configs'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -24,8 +25,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const brandId = getCurrentBrandId()
+  const brandTheme = brandThemeMap[brandId] || 'bw-dark'
   return (
-    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="bw-dark">
+    <html lang="en" suppressHydrationWarning data-brand={brandId} data-theme="bw-dark">
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
@@ -41,7 +44,7 @@ export default function RootLayout({
                     el.classList.add('light');
                     el.classList.remove('dark');
                   } else if (t === 'brand') {
-                    el.setAttribute('data-theme', 'bcon-electric');
+                    el.setAttribute('data-theme', '${brandTheme}');
                     el.classList.add('dark');
                     el.classList.remove('light');
                   } else {

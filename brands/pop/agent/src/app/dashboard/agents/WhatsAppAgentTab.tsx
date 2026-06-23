@@ -1,8 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { MdMic, MdSend } from 'react-icons/md';
+import { getBrandConfig } from '@/configs';
 
 export default function WhatsAppAgentTab() {
+  const brandCfg = getBrandConfig();
+  const brandName = brandCfg.name;
+  const waNumber = process.env.NEXT_PUBLIC_WA_NUMBER || 'Number pending';
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('');
@@ -45,7 +49,7 @@ export default function WhatsAppAgentTab() {
           <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
           <div>
             <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>WhatsApp Agent</p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>+918046733388 · BCON Club</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{waNumber} · {brandName}</p>
           </div>
         </div>
 
@@ -166,9 +170,9 @@ export default function WhatsAppAgentTab() {
               fontWeight: 700,
               color: '#fff',
               flexShrink: 0,
-            }}>B</div>
+            }}>{brandName.charAt(0)}</div>
             <div>
-              <p style={{ color: '#e9edef', fontSize: '15px', fontWeight: 600, lineHeight: 1.2 }}>BCON AI</p>
+              <p style={{ color: '#e9edef', fontSize: '15px', fontWeight: 600, lineHeight: 1.2 }}>{brandName}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#25D366' }} />
                 <span style={{ color: '#8696a0', fontSize: '11px' }}>online</span>

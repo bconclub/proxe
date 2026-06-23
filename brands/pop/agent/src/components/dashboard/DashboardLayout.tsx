@@ -70,6 +70,10 @@ const navigation: NavItem[] = [
 const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  // Brand identity comes from the active brand config — never hardcode a brand.
+  const brandCfg = getBrandConfig()
+  const brandName = brandCfg.name
+  const brandLogo = brandCfg.chatStructure?.avatar?.source || '/favicon.ico'
   const pathname = usePathname()
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. Windchasers keeps Voice/Calls off).
@@ -361,8 +365,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/bcon-icon.png"
-                alt="BCON"
+                src={brandLogo}
+                alt={brandName}
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -414,8 +418,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             title={!showExpanded ? 'Click to expand sidebar' : undefined}
           >
             <img
-              src="/bcon-icon.png"
-              alt="BCON"
+              src={brandLogo}
+              alt={brandName}
               className="object-contain"
               style={{ width: '24px', height: '24px' }}
             />
@@ -426,7 +430,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 className="dashboard-layout-sidebar-logo flex-1 truncate"
                 style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
               >
-                BCON
+                {brandName}
               </h1>
               {!isMobile && (
                 <button
@@ -846,7 +850,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <MdMenu size={20} />
           </button>
-          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
         </div>
 
         {/* Page content */}
