@@ -1,0 +1,23 @@
+{
+  "name": "bcon-template-sync-worker",
+  "version": "1.0.0",
+  "description": "Meta WhatsApp Template Sync Worker - Polls Meta API for template status updates",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc",
+    "sync": "ts-node index.ts",
+    "sync:prod": "node dist/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

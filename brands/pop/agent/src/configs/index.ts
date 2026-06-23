@@ -1,0 +1,71 @@
+import { proxeConfig } from './proxe.config';
+import { windchasersConfig } from './brand.config';
+import { bconConfig } from './bcon.config';
+import { popConfig } from './pop.config';
+import type { BrandConfig } from './proxe.config';
+
+export const brandConfigs: Record<string, BrandConfig> = {
+  proxe: proxeConfig,
+  windchasers: windchasersConfig,
+  bcon: bconConfig,
+  pop: popConfig,
+};
+
+/** Brand → data-theme mapping for CSS selectors */
+export const brandThemeMap: Record<string, string> = {
+  windchasers: 'aviation-gold',
+  proxe: 'proxe-purple',
+  bcon: 'bcon-electric',
+  pop: 'pop-tricolor',
+};
+
+/**
+ * Resolve brand ID from env vars.
+ * Supports both NEXT_PUBLIC_BRAND_ID and NEXT_PUBLIC_BRAND for backwards compat.
+ */
+function getBrandFromEnv(): string | undefined {
+  return process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || undefined;
+}
+
+/**
+ * Detect brand from hostname when env var is missing.
+ * Runs client-side only (ThemeProvider, etc.).
+ */
+function detectBrandFromHostname(): string | null {
+  if (typeof window === 'undefined') return null;
+  const host = window.location.hostname.toLowerCase();
+  if (host.includes('pulse') || host.includes('punjab') || host.includes('pop')) return 'pop';
+  if (host.includes('bcon')) return 'bcon';
+  if (host.includes('proxe')) return 'proxe';
+  if (host.includes('windchasers')) return 'windchasers';
+  return null;
+}
+
+/**
+ * Get brand config. Checks explicit brand param first, then env vars,
+ * then hostname detection, falls back to bcon.
+ */
+export function getBrandConfig(brand?: string): BrandConfig {
+  const brandId = brand || getBrandFromEnv() || detectBrandFromHostname() || 'bcon';
+  return brandConfigs[brandId.toLowerCase()] || bconConfig;
+}
+
+/**
+ * Get current brand ID from env vars, hostname detection, or fallback.
+ * Always lowercase — this is the brand IDENTITY written to the DB (all_leads.brand,
+ * voice_sessions.brand, etc.). A stray uppercase env (NEXT_PUBLIC_BRAND="BCON")
+ * must NOT produce mixed-case brand values that split a lead into duplicates.
+ * Callers that need an env-var PREFIX uppercase it themselves (e.g. BRAND_ID.toUpperCase()).
+ */
+export function getCurrentBrandId(): string {
+  return (getBrandFromEnv() || detectBrandFromHostname() || 'bcon').toLowerCase();
+}
+
+/**
+ * Compile/runtime brand id alias. Mirrors the other forks' `BRAND_ID` const so
+ * shared core files synced from WC compile unchanged. Resolves from env at load.
+ */
+export const BRAND_ID = getCurrentBrandId();
+
+export { proxeConfig, windchasersConfig, bconConfig, popConfig };
+export type { BrandConfig };

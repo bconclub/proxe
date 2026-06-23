@@ -1,0 +1,33 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm ci --include=dev",
+  "framework": "nextjs",
+  "version": 2,
+  "functions": {
+    "src/app/api/agent/web/chat/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/agent/whatsapp/respond/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/agent/whatsapp/meta/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/cron/booking-reminders/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/dashboard/founder-metrics/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
