@@ -101,7 +101,20 @@ async function main() {
       await client.query('GRANT ALL ON SCHEMA public TO postgres;');
       await client.query('GRANT ALL ON SCHEMA public TO public;');
       await client.query('GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;');
-      console.log('[apply] public schema reset. Now run: node apply.js apply');
+      // CRITICAL: DROP SCHEMA public wipes Supabase's default privileges, so
+      // tables created afterward have NO grants for the API roles -> PostgREST
+      // returns 42501 "permission denied" for every table. Re-establish default
+      // privileges so all tables created by `apply` are reachable via the API.
+      await client.query(
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;'
+      );
+      await client.query(
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;'
+      );
+      await client.query(
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;'
+      );
+      console.log('[apply] public schema reset (+default privileges). Now run: node apply.js apply');
       return;
     }
 
