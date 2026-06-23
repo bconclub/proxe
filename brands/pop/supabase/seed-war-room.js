@@ -62,6 +62,7 @@ const REGION_ISSUE = {
   const c = new Client({ connectionString: env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   await c.connect();
 
+  await c.query("DELETE FROM conversations WHERE lead_id IN (SELECT id FROM all_leads WHERE brand='pop' AND phone LIKE '+9198765%')");
   await c.query("DELETE FROM all_leads WHERE brand='pop' AND phone LIKE '+9198765%'");
 
   const rows = [];
@@ -93,29 +94,57 @@ const REGION_ISSUE = {
         salience: weighted([[1, 4], [2, 4], [3, 2]]),
         action_intent: weighted(INTENTS), loop_status: weighted(LOOP),
         created: created.toISOString(),
+        // dashboard activity fields
+        score: weighted([[8, 3], [22, 3], [38, 3], [52, 2], [66, 2], [80, 1], [92, 1]]),
+        activeChat: rnd() < 0.3,
+        lastInter: new Date(created.getTime() + Math.floor(rnd() * (Date.now() - created.getTime()))).toISOString(),
       });
+      const rr = rows[rows.length - 1];
+      rr.stage = rr.score >= 86 ? 'Booking Made' : rr.score >= 61 ? 'High Intent' : rr.score >= 31 ? 'Qualified' : rr.activeChat ? 'Engaged' : 'New';
     }
   }
 
+  const NCOL = 18;
   const vals = [];
   const ph = [];
   rows.forEach((r, i) => {
-    const b = i * 14;
-    ph.push(`($${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14})`);
-    vals.push('pop', r.name, r.phone, r.tp, r.tp, r.constituency, r.district, r.language, r.lean, r.magnet, r.grievance_category, r.grievance_text, r.salience, r.created);
+    const b = i * NCOL;
+    ph.push('(' + Array.from({ length: NCOL }, (_, k) => '$' + (b + k + 1)).join(',') + ')');
+    vals.push('pop', r.name, r.phone, r.tp, r.tp, r.constituency, r.district, r.language, r.lean, r.magnet,
+      r.grievance_category, r.grievance_text, r.salience, r.created, r.score, r.stage, r.lastInter, r.activeChat);
   });
-  // columns: brand, customer_name, phone, first_touchpoint, last_touchpoint, constituency, district, language, lean, magnet, grievance_category, grievance_text, salience, created_at
-  // (action_intent + loop_status set in a second pass to keep the tuple width sane)
   await c.query(
-    `INSERT INTO all_leads (brand, customer_name, phone, first_touchpoint, last_touchpoint, constituency, district, language, lean, magnet, grievance_category, grievance_text, salience, created_at) VALUES ${ph.join(',')}`,
+    `INSERT INTO all_leads (brand, customer_name, phone, first_touchpoint, last_touchpoint, constituency, district, language, lean, magnet, grievance_category, grievance_text, salience, created_at, lead_score, lead_stage, last_interaction_at, is_active_chat) VALUES ${ph.join(',')}`,
     vals,
   );
-  // second pass: action_intent + loop_status per seeded row
+  // action_intent + loop_status (kept out of the big tuple)
   for (const r of rows) {
     await c.query("UPDATE all_leads SET action_intent=$1, loop_status=$2 WHERE phone=$3 AND brand='pop'", [r.action_intent || 'none', r.loop_status || 'raised', r.phone]);
   }
 
+  // conversations: 1-2 per lead so the dashboard shows Active Conversations + chat history
+  const idRows = (await c.query("SELECT id, phone FROM all_leads WHERE brand='pop' AND phone LIKE '+9198765%'")).rows;
+  const idByPhone = Object.fromEntries(idRows.map((x) => [x.phone, x.id]));
+  const cvVals = [];
+  const cvPh = [];
+  let ci = 0;
+  for (const r of rows) {
+    const lid = idByPhone[r.phone]; if (!lid) continue;
+    const turns = 1 + (rnd() < 0.5 ? 1 : 0);
+    for (let t = 0; t < turns; t++) {
+      const b = ci * 6; ci++;
+      cvPh.push('(' + Array.from({ length: 6 }, (_, k) => '$' + (b + k + 1)).join(',') + ')');
+      cvVals.push(lid, r.tp, t % 2 === 0 ? 'customer' : 'agent',
+        t % 2 === 0 ? r.grievance_text : 'Tuhadi gall note kar layi hai, asi team naal raise karange.',
+        'text', r.lastInter);
+    }
+  }
+  if (cvPh.length) {
+    await c.query(`INSERT INTO conversations (lead_id, channel, sender, content, message_type, created_at) VALUES ${cvPh.join(',')}`, cvVals);
+  }
+
   const tot = (await c.query("SELECT count(*)::int n FROM all_leads WHERE brand='pop'")).rows[0].n;
+  console.log(`seeded ${ci} conversations`);
   console.log(`seeded ${rows.length} constituents across ${active.length} seats; pop total now ${tot}`);
   await c.end();
 })().catch((e) => { console.error('SEED ERR', e.message); process.exit(1); });
