@@ -473,6 +473,17 @@ export default function FounderDashboard() {
                   {user?.email && <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{user.email}</div>}
                 </div>
                 <div style={{ height: 1, backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
+                {brandCfg.brand === 'pop' && (
+                  <button
+                    onClick={() => { setProfileOpen(false); router.push('/war-room') }}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-bold transition-colors"
+                    style={{ color: '#F06C18' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <span aria-hidden>⚡</span> War Room
+                  </button>
+                )}
                 <button
                   onClick={() => { setProfileOpen(false); router.push('/dashboard/settings') }}
                   className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm transition-colors"
