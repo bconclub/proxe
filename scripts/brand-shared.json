@@ -138,6 +138,7 @@
     "components/dashboard/DashboardBrain.tsx",
     "components/dashboard/EndpointHealthDetail.tsx",
     "components/dashboard/ErrorLogsModal.tsx",
+    "components/dashboard/FlowsAutomation.tsx",
     "components/dashboard/HealthBarButton.tsx",
     "components/dashboard/HealthStrip.tsx",
     "components/dashboard/KnowledgeBase/FileUploader.tsx",
