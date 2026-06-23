@@ -29,5 +29,6 @@
       "path": "/api/cron/booking-reminders",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ."
 }

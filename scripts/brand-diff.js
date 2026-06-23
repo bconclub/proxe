@@ -23,7 +23,7 @@ const { exec } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'brand-shared.json'), 'utf8'));
 const shared = manifest.sharedCore;
-const BRANDS = ['bcon', 'windchasers', 'proxe'];
+const BRANDS = ['bcon', 'windchasers', 'proxe', 'pop'];
 const masterSrc = path.join(ROOT, 'master', 'agent', 'src');
 
 // ── capabilities (grouped) — marker file = "is this wired in this tree" ───────
@@ -59,6 +59,7 @@ const CONFIG = {
   bcon: 'brands/bcon/agent/src/configs/bcon.config.ts',
   windchasers: 'brands/windchasers/agent/src/configs/brand.config.ts',
   proxe: 'brands/proxe/agent/src/configs/proxe.config.ts',
+  pop: 'brands/pop/agent/src/configs/pop.config.ts',
 };
 
 function srcRoot(tree) { return tree === 'master' ? masterSrc : path.join(ROOT, 'brands', tree, 'agent', 'src'); }
@@ -300,7 +301,7 @@ function BrandNode({ data: d }) {
 const nodeTypes = { brand: BrandNode };
 // Generous gaps so the (tall) nodes never overlap: master up top, brands on a
 // row well below it, ~140px horizontal spacing between the 262px-wide cards.
-const NX = { master:{x:470,y:0}, bcon:{x:30,y:520}, windchasers:{x:470,y:520}, proxe:{x:910,y:520} };
+const NX = { master:{x:690,y:0}, bcon:{x:30,y:520}, windchasers:{x:470,y:520}, proxe:{x:910,y:520}, pop:{x:1350,y:520} };
 const nodes = [
   { id:'master', type:'brand', position:NX.master, data:DATA.master, draggable:true },
   ...DATA.brands.map(b => ({ id:b.tree, type:'brand', position:NX[b.tree], data:b, draggable:true })),

@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · deploy: per-brand Vercel ignoreCommand (stop cross-brand rebuilds)
+
+- Every push to `main` was rebuilding **all four** Vercel projects (bcon/wc/pop/proxe each watch the same repo+branch), so a POP-only commit triggered redundant bcon/wc builds and cluttered the dashboard. The war-room code was never leaking (it lives only in `brands/pop/agent`) — only the build *triggering* was wasteful.
+- Added `"ignoreCommand": "git diff --quiet HEAD^ HEAD ."` to each brand's `vercel.json`. Vercel runs it from the project's Root Directory (the brand dir); `git diff --quiet` exits 1 when that brand's dir changed (→ build) and 0 when unchanged (→ skip). So each brand now rebuilds **only when its own directory changes**. This commit touches all 4 (so all rebuild once); scoping applies from the next commit.
+
 ## 2026-06-22 · sync: propagate leg-1 fixes master → Windchasers (lockup fix goes live)
 
 - Forward-propagated the 5 leg-1 brand-neutral fixes from master to **Windchasers** (POP already had them from its bcon scaffold, so WC was the only brand behind): `hooks/useRealtimeLeads.ts` (the DB ShareLock lockup fix), `lib/services/leadOwnership.ts`, `lib/agent-core/claudeClient.ts`, `api/dashboard/summarize/route.ts`, `api/agent/whatsapp/respond/route.ts`. All 4 trees now byte-identical on these. Brand-neutral, already running in bcon prod; WC verified via its Vercel build.

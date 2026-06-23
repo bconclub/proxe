@@ -14,5 +14,6 @@
     "src/app/api/**/*.ts": {
       "maxDuration": 10
     }
-  }
+  },
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ."
 }
