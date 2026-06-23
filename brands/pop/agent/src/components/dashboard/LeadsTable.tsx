@@ -837,10 +837,22 @@ export default function LeadsTable({
                       <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                         {displayName}
                       </div>
-                      {(brandName || city) && !isEmailAsName && (
-                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
-                          {[brandName, city].filter(Boolean).join(' \u00b7 ')}
-                        </div>
+                      {/* POP: show constituent/grievance fields instead of brand/city */}
+                      {brandId === 'pop' ? (
+                        ((lead as any).constituency || (lead as any).grievance_category || (lead as any).lean) && (
+                          <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+                            {[(lead as any).constituency, ((lead as any).grievance_category || '').replace(/_/g, ' ')].filter(Boolean).join(' \u00b7 ')}
+                            {(lead as any).lean && (
+                              <span style={{ color: (lead as any).lean === 'supporter' ? '#4EB457' : (lead as any).lean === 'opposed' ? '#F06C18' : (lead as any).lean === 'undecided' ? '#F0B429' : '#9BD3A4', textTransform: 'capitalize' }}> {' \u00b7 '}{(lead as any).lean}</span>
+                            )}
+                          </div>
+                        )
+                      ) : (
+                        (brandName || city) && !isEmailAsName && (
+                          <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+                            {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                          </div>
+                        )
                       )}
                       {/* Date the lead came in */}
                       {((lead as any).created_at || lead.timestamp) && (
