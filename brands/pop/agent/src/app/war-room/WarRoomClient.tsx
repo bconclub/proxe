@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CONSTITUENCIES, DISTRICTS, TOTAL_SEATS } from '@/lib/war-room/constituencies';
 import PunjabMap, { type ColorMode } from './PunjabMap';
-import { Sparkline, DonutChart, RadialProgress } from '@/components/dashboard/MicroCharts';
-import { LineChart, Line, AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
+import { Sparkline, DonutChart } from '@/components/dashboard/MicroCharts';
+import { LeanDonut, SentimentGauge, TrendLines } from './WarCharts';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import {
   MdWaterDrop, MdBolt, MdWork, MdAddRoad, MdLocalHospital, MdSchool, MdAgriculture, MdWarning, MdMoreHoriz,
 } from 'react-icons/md';
@@ -64,12 +65,11 @@ export default function WarRoomClient() {
   }, [fetchData]);
 
   const d = data;
-  const lineData = useMemo(() => (d ? d.series.days.map((day, i) => { const o: any = { day: day.slice(5) }; d.series.seats.forEach((s) => (o[s] = d.series.bySeat[s]?.[i] || 0)); return o; }) : []), [d]);
   const areaData = useMemo(() => (d ? d.series.days.map((day, i) => { const o: any = { day: day.slice(5) }; d.series.categories.forEach((c) => (o[c] = d.series.byCategory[c]?.[i] || 0)); return o; }) : []), [d]);
   const SEAT_C = [SAFFRON, BLUE, GREEN, AMBER, PURPLE, '#2EC4B6'];
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: BG, color: TXT, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12 }}>
+    <div style={{ height: '100vh', overflow: 'hidden', color: TXT, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, background: `radial-gradient(900px 480px at 12% -6%, rgba(240,108,24,0.12), transparent 60%), radial-gradient(820px 460px at 88% 0%, rgba(34,197,94,0.12), transparent 58%), radial-gradient(820px 520px at 50% 112%, rgba(59,130,246,0.10), transparent 60%), ${BG}` }}>
       {/* MAIN */}
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* HEADER */}
@@ -141,9 +141,9 @@ export default function WarRoomClient() {
               </Panel>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Panel title="Support / Lean / Opposed">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 104, height: 120, flexShrink: 0 }}>
-                      <DonutChart data={LEAN_KEYS.map((k) => ({ name: k, value: d?.leanOverall[k] || 0 }))} colors={LEAN_KEYS.map((k) => LEAN_C[k])} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 132, height: 132, flexShrink: 0 }}>
+                      <LeanDonut data={d?.leanOverall || {}} total={LEAN_KEYS.reduce((s, k) => s + (d?.leanOverall[k] || 0), 0)} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {LEAN_KEYS.map((k) => { const t = LEAN_KEYS.reduce((s, x) => s + (d?.leanOverall[x] || 0), 0) || 1; return <span key={k} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LEAN_C[k] }} /><span style={{ textTransform: 'capitalize', color: MUT, width: 64 }}>{k}</span><b>{d?.leanOverall[k] || 0}</b> <span style={{ color: MUT }}>({Math.round(((d?.leanOverall[k] || 0) / t) * 100)}%)</span></span>; })}
@@ -151,9 +151,14 @@ export default function WarRoomClient() {
                   </div>
                 </Panel>
                 <Panel title="Sentiment">
-                  <div style={{ display: 'grid', placeItems: 'center' }}>
-                    <RadialProgress value={Math.round(((d?.sentiment.net ?? 0) + 1) / 2 * 100)} max={100} size={104} color={(d?.sentiment.net ?? 0) >= 0 ? GREEN : SAFFRON} label="Net Sentiment" valueFormatter={() => `${(d?.sentiment.net ?? 0) >= 0 ? '+' : ''}${d?.sentiment.net ?? 0}`} />
-                    <div style={{ fontSize: 11, color: (d?.sentiment.net ?? 0) >= 0 ? GREEN : SAFFRON }}>{d?.sentiment.label}</div>
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ flex: 1, minHeight: 96 }}>
+                      <SentimentGauge value={d?.sentiment.net ?? 0} />
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 11, marginTop: -6 }}>
+                      <span style={{ color: MUT }}>Net Sentiment · </span>
+                      <span style={{ color: (d?.sentiment.net ?? 0) >= 0 ? GREEN : SAFFRON, fontWeight: 700 }}>{d?.sentiment.label}</span>
+                    </div>
                   </div>
                 </Panel>
               </div>
@@ -163,13 +168,10 @@ export default function WarRoomClient() {
                 </div>
               }>
                 <div style={{ flex: 1, minHeight: 100 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={lineData} margin={{ top: 6, right: 6, bottom: 0, left: -22 }}>
-                      <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
-                      <Tooltip contentStyle={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11, color: TXT }} />
-                      {(d?.series.seats || []).map((s, i) => <Line key={s} type="monotone" dataKey={s} stroke={SEAT_C[i % SEAT_C.length]} strokeWidth={1.8} dot={false} />)}
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <TrendLines
+                    days={(d?.series.days || []).map((day) => day.slice(5))}
+                    series={(d?.series.seats || []).map((s, i) => ({ name: s, color: SEAT_C[i % SEAT_C.length], data: d?.series.bySeat[s] || [] }))}
+                  />
                 </div>
               </Panel>
             </div>
@@ -284,7 +286,16 @@ export default function WarRoomClient() {
 }
 
 // ── primitives ──
-const card: React.CSSProperties = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 12 };
+// Frosted-glass panel: translucent theme bg + blur, soft elevation. color-mix
+// keeps it theme-aware (frosted white on light, frosted slate on dark).
+const card: React.CSSProperties = {
+  background: 'color-mix(in srgb, var(--bg-secondary) 68%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--border-primary) 70%, transparent)',
+  borderRadius: 14,
+  backdropFilter: 'blur(16px) saturate(140%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+  boxShadow: '0 10px 30px rgba(2,6,23,0.10)',
+};
 function Panel({ title, sub, right, children, noPad, grow, h, clip }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; grow?: boolean; h?: number; clip?: boolean }) {
   return (
     <div style={{ ...card, display: 'flex', flexDirection: 'column', minHeight: 0, ...(grow ? { flex: 1 } : {}), ...(h ? { height: h, minHeight: h, flex: 'none' } : {}), ...(clip ? { overflow: 'hidden' } : {}) }}>
