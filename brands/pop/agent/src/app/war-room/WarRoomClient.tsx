@@ -102,7 +102,7 @@ export default function WarRoomClient() {
           </div>
 
           {/* MAIN GRID: map | center | feed */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: 460 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: 620 }}>
             {/* MAP */}
             <Panel title="Constituency Heat Map" sub="Intensity by volume and salience" right={
               <div style={{ display: 'flex', gap: 5 }}>{(['heat', 'lean', 'issue', 'turnout'] as ColorMode[]).map((m) => <Chip key={m} on={mode === m} onClick={() => setMode(m)}>{m === 'heat' ? 'Heat' : m === 'lean' ? 'Lean' : m === 'issue' ? 'Issue' : 'Turnout'}</Chip>)}</div>
@@ -121,8 +121,8 @@ export default function WarRoomClient() {
 
             {/* CENTER COLUMN */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
-              <Panel title="Top Issues by Salience" grow>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, overflowY: 'auto' }}>
+              <Panel title="Top Issues by Salience" h={196}>
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', gap: 4, overflowY: 'auto' }}>
                   {(d?.byCategory || []).map((c, i) => {
                     const max = Math.max(...(d?.byCategory || []).map((x) => x.count), 1); const Icon = CAT_ICON[c.category] || MdMoreHoriz; const pct = Math.round((c.count / (d?.kpis.total || 1)) * 100);
                     return (
@@ -154,18 +154,19 @@ export default function WarRoomClient() {
                   </div>
                 </Panel>
               </div>
-              <Panel title="District Comparison (Top 6)" grow>
-                <div style={{ flex: 1, minHeight: 120 }}>
+              <Panel title="District Comparison (Top 6)" sub="14-day volume" h={212} clip right={
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', justifyContent: 'flex-end', fontSize: 9, color: MUT, maxWidth: 300 }}>
+                  {(d?.series.seats || []).map((s, i) => <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}><span style={{ width: 7, height: 7, borderRadius: 9, background: SEAT_C[i % SEAT_C.length] }} />{s}</span>)}
+                </div>
+              }>
+                <div style={{ flex: 1, minHeight: 100 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={lineData} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>
+                    <LineChart data={lineData} margin={{ top: 6, right: 6, bottom: 0, left: -22 }}>
                       <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
                       <Tooltip contentStyle={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11, color: TXT }} />
                       {(d?.series.seats || []).map((s, i) => <Line key={s} type="monotone" dataKey={s} stroke={SEAT_C[i % SEAT_C.length]} strokeWidth={1.8} dot={false} />)}
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 4 }}>
-                  {(d?.series.seats || []).map((s, i) => <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: SEAT_C[i % SEAT_C.length] }} />{s}</span>)}
                 </div>
               </Panel>
             </div>
@@ -281,9 +282,9 @@ export default function WarRoomClient() {
 
 // ── primitives ──
 const card: React.CSSProperties = { background: CARD, border: `1px solid ${LINE}`, borderRadius: 12 };
-function Panel({ title, sub, right, children, noPad, grow }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; grow?: boolean }) {
+function Panel({ title, sub, right, children, noPad, grow, h, clip }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; grow?: boolean; h?: number; clip?: boolean }) {
   return (
-    <div style={{ ...card, display: 'flex', flexDirection: 'column', minHeight: 0, ...(grow ? { flex: 1 } : {}) }}>
+    <div style={{ ...card, display: 'flex', flexDirection: 'column', minHeight: 0, ...(grow ? { flex: 1 } : {}), ...(h ? { height: h, minHeight: h, flex: 'none' } : {}), ...(clip ? { overflow: 'hidden' } : {}) }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE}` }}>
         <div><div style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</div>{sub && <div style={{ fontSize: 10, color: MUT }}>{sub}</div>}</div>{right}
       </div>
