@@ -110,7 +110,7 @@ export default function WarRoomClient() {
               <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', gap: 8 }}>
                 <div style={{ width: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: MUT }}>
                   <span>High</span>
-                  <div style={{ flex: 1, width: 8, borderRadius: 5, margin: '6px 0', background: `linear-gradient(to top, #0E2238, ${SAFFRON})` }} />
+                  <div style={{ flex: 1, width: 8, borderRadius: 5, margin: '6px 0', background: `linear-gradient(to top, ${TRACK}, ${SAFFRON})` }} />
                   <span>Low</span>
                 </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
