@@ -112,6 +112,10 @@ function featureStates(tree) {
   });
 }
 
+// Compare CONTENT, not bytes — normalize CRLF/LF so a line-ending difference
+// (git autocrlf) doesn't read as drift. Functionally identical = in sync.
+const eqContent = (a, b) => fs.readFileSync(a).toString('utf8').replace(/\r\n/g, '\n') === fs.readFileSync(b).toString('utf8').replace(/\r\n/g, '\n');
+
 function sync(brand) {
   const bs = path.join(ROOT, 'brands', brand, 'agent', 'src');
   let identical = 0, drift = 0, missing = 0;
@@ -119,7 +123,7 @@ function sync(brand) {
     const m = path.join(masterSrc, rel), t = path.join(bs, rel);
     if (!fs.existsSync(m)) continue;
     if (!fs.existsSync(t)) { missing++; continue; }
-    if (fs.readFileSync(m).equals(fs.readFileSync(t))) identical++; else drift++;
+    if (eqContent(m, t)) identical++; else drift++;
   }
   const total = identical + drift + missing;
   return { identical, drift, missing, total, pct: total ? Math.round((identical / total) * 100) : 0 };
@@ -194,7 +198,7 @@ function driftDetail(tree) {
     const m = path.join(masterSrc, f), x = path.join(root, f);
     if (!fs.existsSync(m)) continue;
     if (!fs.existsSync(x)) { missing.push(f); continue; }
-    if (!fs.readFileSync(m).equals(fs.readFileSync(x))) differ.push(f);
+    if (!eqContent(m, x)) differ.push(f);
   }
   const missingFeatures = FEATURE_FILES.filter((ff) => !fs.existsSync(path.join(root, ff.file))).map((ff) => ff.name);
   return { differ, missing, missingFeatures };
