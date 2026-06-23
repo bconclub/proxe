@@ -26,8 +26,25 @@ function cacheable(text: string): any[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
+// Models that have been retired by the API and now 404. If the deploy env still
+// points CLAUDE_MODEL at one of these, silently remap to a current equivalent so
+// chat keeps working without a dashboard env change. Keep this list updated as
+// models retire.
+const RETIRED_MODEL_MAP: Record<string, string> = {
+  'claude-sonnet-4-20250514': 'claude-sonnet-4-5-20250929',
+  'claude-sonnet-4-0': 'claude-sonnet-4-5-20250929',
+  'claude-3-5-sonnet-20240620': 'claude-sonnet-4-5-20250929',
+  'claude-3-5-sonnet-20241022': 'claude-sonnet-4-5-20250929',
+};
+
 function getModel(): string {
-  return process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+  const configured = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+  const remapped = RETIRED_MODEL_MAP[configured];
+  if (remapped) {
+    console.warn(`[ClaudeClient] CLAUDE_MODEL="${configured}" is retired — using "${remapped}". Update the env var.`);
+    return remapped;
+  }
+  return configured;
 }
 
 /**

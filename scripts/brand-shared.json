@@ -4,6 +4,15 @@
     "bcon",
     "windchasers"
   ],
+  "_artifactsComment": "Brand artifacts = features built ON TOP of the PROXe base FOR ONE BRAND (e.g. POP war-room). They live only in that brand and must NEVER reverse-sync up to master or propagate across to other brands — they are one-directional. Keep each artifact in its OWN files under these path prefixes (relative to agent/src/); never inline artifact code into a sharedCore file. reverse-sync.js refuses to pull any path listed here and hard-errors if one is ever added to sharedCore.",
+  "brandArtifacts": {
+    "pop": [
+      "lib/war-room/",
+      "app/dashboard/war-room/",
+      "components/dashboard/WarRoom",
+      "data/"
+    ]
+  },
   "sharedCore": [
     "app/admin/page.tsx",
     "app/api/admin/backfill-calendar/route.ts",

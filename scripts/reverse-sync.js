@@ -83,6 +83,29 @@ const otherBrands = manifest.brands.filter((b) => b && b !== brand);
 const read = (abs) => (fs.existsSync(abs) ? fs.readFileSync(abs) : null);
 const eq = (x, y) => x && y && x.equals(y);
 
+// Brand artifacts: features built on the PROXe base for ONE brand (e.g. POP
+// war-room). One-directional — they never reverse-sync up and never propagate
+// across. Declared in the manifest (brandArtifacts); enforced here so an
+// artifact can't leak into master even by accident or by an explicit --only.
+const ARTIFACTS = manifest.brandArtifacts || {};
+const artifactPrefixes = Object.values(ARTIFACTS).flat();
+const isArtifact = (rel) => artifactPrefixes.some((p) => rel === p || rel.startsWith(p));
+
+// Guard 1 — an artifact must never live in sharedCore. If one crept in, stop
+// hard: promoting it would spread a brand-only feature to every brand.
+const leaked = manifest.sharedCore.filter(isArtifact);
+if (leaked.length) {
+  console.error(`! brand artifact(s) found in sharedCore — eject them, they must stay brand-only:`);
+  leaked.forEach((r) => console.error(`    ✗ ${r}`));
+  process.exit(2);
+}
+
+// Guard 2 — refuse an explicit --only of a declared artifact.
+if (only && isArtifact(only)) {
+  console.error(`! ${only} is a declared brand artifact — it never reverse-syncs (stays brand-only).`);
+  process.exit(2);
+}
+
 const toPull = [];   // brand differs from master, safe (no fork)
 const forked = [];   // brand differs from master AND another brand also differs → fork
 const skipped = [];  // requested --only but file is in sync or brand-absent

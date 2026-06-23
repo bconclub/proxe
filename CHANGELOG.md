@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · sync: artifact guardrail + leg-1 reverse-sync (bcon → master)
+
+- **Brand-artifact guardrail** (`scripts/brand-shared.json` + `scripts/reverse-sync.js`): new `brandArtifacts` map declares per-brand, one-directional features built on the PROXe base (POP war-room: `lib/war-room/`, `app/dashboard/war-room/`, `components/dashboard/WarRoom`, `data/`). reverse-sync now hard-errors if any artifact path is in `sharedCore` (guard 1) and refuses an explicit `--only` of an artifact (guard 2) — so brand-only features can never leak up to master or across to other brands.
+- **Leg-1 reverse-sync bcon → master** (brand-neutral fixes, master only — not a live site): `hooks/useRealtimeLeads.ts` (Realtime→30s polling, fixes the DB ShareLock lockup master+WC still carry), `lib/services/leadOwnership.ts` (AI-vs-human last-actor), `lib/agent-core/claudeClient.ts` (retired-model self-heal), `api/dashboard/summarize/route.ts` (model → live Sonnet 4.5), `api/agent/whatsapp/respond/route.ts` (actor stamp). All verified brand-literal-free; master type-checks clean on these. Tasks board + Flows redesign deliberately NOT pulled (carry bcon copy — need de-branding).
+
 ## 2026-06-22 · bcon: Config page (phase 1 — admin-only visibility of all config)
 
 - New **Config** nav entry → `/dashboard/config`: one admin-only place to SEE the whole setup — every integration's connection status (Connected / Partial / Not set), its non-secret identifiers (URLs, phone/account IDs, from-addresses…), whether each **secret is set** (shown as `•••• set` / `not set` — values are never sent to the client), plus the lead **sources**, connected **channels**, and **lead fields** the agent uses.
