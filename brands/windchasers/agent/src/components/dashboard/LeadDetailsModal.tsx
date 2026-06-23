@@ -422,6 +422,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
+  const logCallInFlight = useRef(false) // ref-guard: blocks double-fire before React state flushes
 
   // Send Message state
   const [showSendMessageForm, setShowSendMessageForm] = useState(false)
@@ -1275,6 +1276,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   const handleLogCall = async () => {
     if (!lead) return
+    if (logCallInFlight.current) return  // block double-fire (Enter + click, rapid taps)
+    logCallInFlight.current = true
     const callNote = logCallNotes.trim()
     setSavingLogCall(true)
     setNoteProgress({
@@ -1284,11 +1287,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       note: callNote || undefined,
     })
     try {
+      const controller = new AbortController()
+      const callTimeout = setTimeout(() => controller.abort(), 30_000) // 30s — orchestrator calls Claude
       const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outcome: logCallOutcome, notes: logCallNotes.trim() || undefined }),
+        signal: controller.signal,
       })
+      clearTimeout(callTimeout)
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to log call')
@@ -1341,6 +1348,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       })
     } finally {
       setSavingLogCall(false)
+      logCallInFlight.current = false
     }
   }
 
@@ -2244,7 +2252,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       value={logCallNotes}
                       onChange={(e) => setLogCallNotes(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleLogCall()
+                        if (e.key === 'Enter' && !savingLogCall) handleLogCall()
                       }}
                       placeholder="Notes (optional)..."
                       className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"

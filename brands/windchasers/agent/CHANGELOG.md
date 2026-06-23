@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/windchasers/agent/` (pre-commit hook). Current line: 0.0.59+.
 
+## 2026-06-23 · Bug fixes: loan figures, duplicate call logs, dashboard error UI
+
+- **Agent loan copy:** removed "up to ₹40 lakh" figure from `brand-facts.ts`; agent now told explicitly "loan amount depends on collateral — never state any loan figure or upper limit". Bank tie-ups + dedicated team copy preserved.
+- **Duplicate call/note logging:** added `logCallInFlight` ref guard in `LeadDetailsModal` — blocks double-fire before React state flushes (covers rapid Enter+click, double-tap). Enter key now also respects `savingLogCall`. Added 30s `AbortController` timeout on the log-call fetch so the orchestrator Claude call can't hang indefinitely.
+- **Dashboard "Failed to load metrics":** server now returns stale in-memory cache (HTTP 200 + `_stale: true`) instead of hard 500 when a DB timeout occurs mid-request. Client error UI replaced with a soft "Dashboard is loading…" message and Retry button instead of the alarming full-screen red panel.
+
 ## 2026-06-19 · Follow-up Health colour follows the reply rate
 
 - The card's colour + label now key off the **reply rate shown** (≥90% = green/Good, below = amber/Fair) instead of the response-TIME status. Previously colour and the % were decoupled, so "Fair/amber" kept jumping independent of the number. 90% now reads green/Good.

@@ -1777,9 +1777,27 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching founder metrics:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : undefined
-    
+
+    // If we have stale cache (any age) serve it rather than a hard error — the
+    // dashboard is far better with last-known data than a full red screen. The
+    // client-side localStorage cache covers the first paint; this covers the case
+    // where the server-side lambda restarts mid-request and the in-memory cache
+    // was just seeded from a prior warm invocation.
+    if (metricsCache) {
+      console.warn('[founder-metrics] returning stale cache after error:', errorMessage)
+      return NextResponse.json(
+        { ...metricsCache.data, _stale: true },
+        {
+          headers: {
+            'X-Cache': 'STALE',
+            'Cache-Control': 'private, max-age=60',
+          },
+        },
+      )
+    }
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to fetch metrics',
         message: errorMessage,
         stack: process.env.NODE_ENV === 'development' ? errorStack : undefined,

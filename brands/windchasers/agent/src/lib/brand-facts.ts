@@ -103,7 +103,8 @@ export const LOCKED_ANSWERS = {
   },
   loanPartners: {
     display: 'HDFC Credila, Avanse, Auxilo',
-    coverage: 'up to ₹40 lakh',
+    // Loan amount depends on the applicant's collateral — never quote a figure.
+    coverage: 'amount depends on collateral — do NOT state any loan figure or upper limit',
   },
   ageCareerPath: {
     display: 'No DGCA age limit on the CPL. Airlines prefer pilots ~18-30 for cockpit jobs.',
@@ -276,7 +277,7 @@ DGCA SEQUENCE: ${LOCKED_ANSWERS.dgcaSequence.display}. ${LOCKED_ANSWERS.dgcaSequ
 DGCA FRAMING: ${LOCKED_ANSWERS.dgcaFraming.display}. ${LOCKED_ANSWERS.dgcaFraming.rule}
 FACULTY: ${LOCKED_ANSWERS.faculty.display}. ${LOCKED_ANSWERS.faculty.rule}
 ELIGIBILITY: ${LOCKED_ANSWERS.eligibility.academic} Age: ${LOCKED_ANSWERS.eligibility.age} Medical: ${LOCKED_ANSWERS.eligibility.medical} ${LOCKED_ANSWERS.eligibility.rule}
-LOAN PARTNERS: ${LOCKED_ANSWERS.loanPartners.display}. Coverage ${LOCKED_ANSWERS.loanPartners.coverage}.
+LOAN PARTNERS: ${LOCKED_ANSWERS.loanPartners.display}. We have a dedicated team to help applicants get a bank loan. ${LOCKED_ANSWERS.loanPartners.coverage}. NEVER mention any loan amount, upper limit, or figure (e.g. "40 lakh") — loan amount is determined by the bank based on the applicant's collateral.
 INTERNATIONAL: ${LOCKED_ANSWERS.internationalPartners.display}. ${LOCKED_ANSWERS.internationalPartners.rule}
 COMMUNITY: ${LOCKED_ANSWERS.community.description} — share the link ${LOCKED_ANSWERS.community.whatsappLink} ${LOCKED_ANSWERS.community.rule}
 FOUNDER: ${BRAND_IDENTITY.founder.name}, ${BRAND_IDENTITY.founder.role}. Founded ${BRAND_IDENTITY.founded}.

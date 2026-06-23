@@ -368,10 +368,19 @@ export default function FounderDashboard() {
 
   if (!metrics) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <p className="text-red-700 dark:text-red-300 font-semibold mb-2">Failed to load metrics</p>
-          <button onClick={loadMetrics} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm">Retry</button>
+      <div className="p-6 flex flex-col gap-4 max-w-md">
+        <div className="rounded-xl border p-5 flex flex-col gap-3" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Dashboard is loading…</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            The first load can take a few seconds. If this persists, tap Retry.
+          </p>
+          <button
+            onClick={loadMetrics}
+            className="self-start px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
