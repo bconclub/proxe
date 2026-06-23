@@ -426,12 +426,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {showExpanded && (
             <>
-              <h1
-                className="dashboard-layout-sidebar-logo flex-1 truncate"
-                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
-              >
-                {brandName}
-              </h1>
+              {brandCfg.brand === 'pop' ? (
+                <a
+                  href="/war-room"
+                  title="Enter the War Room"
+                  className="dashboard-layout-sidebar-logo flex-1 min-w-0 flex items-center gap-1"
+                  style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
+                >
+                  <span className="truncate">{brandName}</span>
+                  <span aria-hidden style={{ flexShrink: 0, fontSize: '11px', opacity: 0.85 }}>⚡</span>
+                </a>
+              ) : (
+                <h1
+                  className="dashboard-layout-sidebar-logo flex-1 truncate"
+                  style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+                >
+                  {brandName}
+                </h1>
+              )}
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
