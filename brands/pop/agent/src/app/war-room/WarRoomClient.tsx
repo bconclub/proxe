@@ -14,7 +14,7 @@ import {
 // Semantic data colors (chart/lean/category encodings) stay concrete; structural
 // colors use the app theme tokens so the war room follows light/dark like the dashboard.
 const SAFFRON = '#F06C18', GREEN = '#22C55E', BLUE = '#3B82F6', AMBER = '#F59E0B', PURPLE = '#A78BFA';
-const BG = 'var(--bg-primary)', CARD = 'var(--bg-secondary)', LINE = 'var(--border-primary)', TXT = 'var(--text-primary)', MUT = 'var(--text-secondary)';
+const BG = 'var(--bg-primary)', CARD = 'var(--bg-secondary)', LINE = 'var(--border-primary)', TXT = 'var(--text-primary)', MUT = 'var(--text-secondary)', TRACK = 'var(--bg-tertiary)';
 const CHANNELS = ['whatsapp', 'voice', 'pulse_app', 'qr', 'missed_call'];
 const LEAN_KEYS = ['supporter', 'leaning', 'undecided', 'opposed'];
 const LEAN_C: Record<string, string> = { supporter: GREEN, leaning: '#86EFAC', undecided: AMBER, opposed: SAFFRON };
@@ -102,7 +102,7 @@ export default function WarRoomClient() {
           </div>
 
           {/* MAIN GRID: map | center | feed */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: 430 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: 460 }}>
             {/* MAP */}
             <Panel title="Constituency Heat Map" sub="Intensity by volume and salience" right={
               <div style={{ display: 'flex', gap: 5 }}>{(['heat', 'lean', 'issue', 'turnout'] as ColorMode[]).map((m) => <Chip key={m} on={mode === m} onClick={() => setMode(m)}>{m === 'heat' ? 'Heat' : m === 'lean' ? 'Lean' : m === 'issue' ? 'Issue' : 'Turnout'}</Chip>)}</div>
@@ -129,7 +129,7 @@ export default function WarRoomClient() {
                       <div key={c.category} style={{ display: 'grid', gridTemplateColumns: '14px 110px 1fr 34px', alignItems: 'center', gap: 8 }}>
                         <span style={{ color: MUT, fontSize: 11 }}>{i + 1}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}><Icon size={13} color={CAT_C[c.category]} />{c.category.replace('_', ' ')}</span>
-                        <div style={{ height: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(c.count / max) * 100}%`, height: '100%', background: SAFFRON, borderRadius: 3 }} /></div>
+                        <div style={{ height: 10, background: TRACK, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(c.count / max) * 100}%`, height: '100%', background: CAT_C[c.category] || SAFFRON, borderRadius: 3 }} /></div>
                         <span style={{ textAlign: 'right', color: MUT }}>{pct}%</span>
                       </div>
                     );
@@ -139,7 +139,7 @@ export default function WarRoomClient() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Panel title="Support / Lean / Opposed">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 96, height: 96, flexShrink: 0 }}>
+                    <div style={{ width: 104, height: 120, flexShrink: 0 }}>
                       <DonutChart data={LEAN_KEYS.map((k) => ({ name: k, value: d?.leanOverall[k] || 0 }))} colors={LEAN_KEYS.map((k) => LEAN_C[k])} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -155,14 +155,16 @@ export default function WarRoomClient() {
                 </Panel>
               </div>
               <Panel title="District Comparison (Top 6)" grow>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={lineData} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>
-                    <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
-                    <Tooltip contentStyle={{ background: 'var(--bg-tertiary)', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
-                    {(d?.series.seats || []).map((s, i) => <Line key={s} type="monotone" dataKey={s} stroke={SEAT_C[i % SEAT_C.length]} strokeWidth={1.6} dot={false} />)}
-                  </LineChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 2 }}>
+                <div style={{ flex: 1, minHeight: 120 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={lineData} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>
+                      <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
+                      <Tooltip contentStyle={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11, color: TXT }} />
+                      {(d?.series.seats || []).map((s, i) => <Line key={s} type="monotone" dataKey={s} stroke={SEAT_C[i % SEAT_C.length]} strokeWidth={1.8} dot={false} />)}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 4 }}>
                   {(d?.series.seats || []).map((s, i) => <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: SEAT_C[i % SEAT_C.length] }} />{s}</span>)}
                 </div>
               </Panel>
@@ -188,34 +190,42 @@ export default function WarRoomClient() {
           </div>
 
           {/* BOTTOM ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.1fr)', gap: 12, minHeight: 200 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.1fr)', gap: 12, minHeight: 232 }}>
             <Panel title="Channel Mix" sub="By volume">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 92, height: 92, flexShrink: 0 }}><DonutChart data={(d?.channelMix || []).map((c) => ({ name: c.magnet, value: c.count }))} colors={[GREEN, BLUE, SAFFRON, AMBER, PURPLE]} /></div>
+                <div style={{ width: 104, height: 120, flexShrink: 0 }}><DonutChart data={(d?.channelMix || []).map((c) => ({ name: c.magnet, value: c.count }))} colors={[GREEN, BLUE, SAFFRON, AMBER, PURPLE]} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {(d?.channelMix || []).map((c, i) => <span key={c.magnet} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: [GREEN, BLUE, SAFFRON, AMBER, PURPLE][i % 5] }} /><span style={{ textTransform: 'capitalize', color: MUT, width: 70 }}>{c.magnet.replace('_', ' ')}</span><b>{c.share}%</b></span>)}
                 </div>
               </div>
             </Panel>
             <Panel title="Mobilization Readiness" sub="Who will act">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
-                {(['vote', 'volunteer', 'rally', 'share'] as const).map((k) => (
-                  <div key={k} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8 }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: GREEN }}>{d?.mobilization[k] || 0}</div>
-                    <div style={{ fontSize: 10, color: MUT, textTransform: 'capitalize', marginBottom: 2 }}>{k === 'vote' ? 'Voters' : k === 'volunteer' ? 'Volunteers' : k === 'rally' ? 'Rallies' : 'Shares'}</div>
-                    <div style={{ height: 22 }}><Sparkline data={sp(d?.series.mobilization[k])} color={GREEN} height={22} /></div>
-                  </div>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gridTemplateRows: '1fr 1fr', gap: 8, flex: 1, minHeight: 0 }}>
+                {(['vote', 'volunteer', 'rally', 'share'] as const).map((k) => {
+                  const c = k === 'vote' ? GREEN : k === 'volunteer' ? BLUE : k === 'rally' ? SAFFRON : PURPLE;
+                  return (
+                    <div key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1.1 }}>{d?.mobilization[k] || 0}</div>
+                      <div style={{ fontSize: 10, color: MUT, textTransform: 'capitalize' }}>{k === 'vote' ? 'Voters' : k === 'volunteer' ? 'Volunteers' : k === 'rally' ? 'Rallies' : 'Shares'}</div>
+                      <div style={{ flex: 1, minHeight: 14, marginTop: 2 }}><Sparkline data={sp(d?.series.mobilization[k])} color={c} height={18} /></div>
+                    </div>
+                  );
+                })}
               </div>
             </Panel>
             <Panel title="Issue Trend (Top 5)" sub="14 days">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={areaData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
-                  <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={3} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-tertiary)', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
-                  {(d?.series.categories || []).map((c) => <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={CAT_C[c]} fill={CAT_C[c]} fillOpacity={0.55} />)}
-                </AreaChart>
-              </ResponsiveContainer>
+              <div style={{ flex: 1, minHeight: 120 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={areaData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                    <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={3} />
+                    <Tooltip contentStyle={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11, color: TXT }} />
+                    {(d?.series.categories || []).map((c) => <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={CAT_C[c]} fill={CAT_C[c]} fillOpacity={0.5} />)}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 4 }}>
+                {(d?.series.categories || []).map((c) => <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 3, textTransform: 'capitalize' }}><span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_C[c] }} />{c.replace('_', ' ')}</span>)}
+              </div>
             </Panel>
             <Panel title="Constituency Snapshot" sub="Top 5 by volume & salience">
               <div style={{ overflowY: 'auto' }}>
@@ -264,7 +274,7 @@ export default function WarRoomClient() {
         </div>
       )}
 
-      <style>{`@keyframes wr-pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.7)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}@keyframes wr-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(234,241,251,0.14);border-radius:9px}`}</style>
+      <style>{`@keyframes wr-pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.7)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}@keyframes wr-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(130,140,160,0.4);border-radius:9px}`}</style>
     </div>
   );
 }
@@ -298,7 +308,7 @@ function Sel({ v, on, opts, fmt }: { v: string; on: (v: string) => void; opts: s
   return <select value={v} onChange={(e) => on(e.target.value)} style={{ background: CARD, color: TXT, border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 9px', fontSize: 11, maxWidth: 150 }}>{opts.map((o) => <option key={o} value={o}>{fmt(o)}</option>)}</select>;
 }
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} style={{ background: on ? SAFFRON : 'rgba(255,255,255,0.05)', color: on ? '#fff' : TXT, border: `1px solid ${on ? SAFFRON : LINE}`, borderRadius: 7, padding: '4px 9px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>;
+  return <button onClick={onClick} style={{ background: on ? SAFFRON : TRACK, color: on ? '#fff' : TXT, border: `1px solid ${on ? SAFFRON : LINE}`, borderRadius: 7, padding: '4px 9px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>;
 }
 function St({ l, v }: { l: string; v: React.ReactNode }) { return <div><div style={{ fontSize: 15, fontWeight: 800, textTransform: 'capitalize' }}>{v}</div><div style={{ fontSize: 10, color: MUT }}>{l}</div></div>; }
 function Empty({ text = 'Awaiting first captures' }: { text?: string }) { return <div style={{ padding: 16, textAlign: 'center', color: MUT, fontSize: 12 }}>{text}</div>; }
