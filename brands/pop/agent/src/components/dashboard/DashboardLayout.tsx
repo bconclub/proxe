@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
@@ -75,6 +75,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const brandName = brandCfg.name
   const brandLogo = brandCfg.chatStructure?.avatar?.source || '/favicon.ico'
   const pathname = usePathname()
+  const router = useRouter()
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. Windchasers keeps Voice/Calls off).
   const brandFeatures = getBrandConfig().features || {}
@@ -408,14 +409,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandCfg.brand === 'pop') ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
+              } else if (showExpanded && brandCfg.brand === 'pop') {
+                router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : brandCfg.brand === 'pop' ? 'Enter the War Room' : undefined}
           >
             <img
               src={brandLogo}
@@ -430,11 +433,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <a
                   href="/war-room"
                   title="Enter the War Room"
-                  className="dashboard-layout-sidebar-logo flex-1 min-w-0 flex items-center gap-1"
-                  style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
+                  className="dashboard-layout-sidebar-logo flex-1 min-w-0"
+                  style={{ fontSize: '13.5px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
                 >
-                  <span className="truncate">{brandName}</span>
-                  <span aria-hidden style={{ flexShrink: 0, fontSize: '11px', opacity: 0.85 }}>⚡</span>
+                  {brandName}
                 </a>
               ) : (
                 <h1

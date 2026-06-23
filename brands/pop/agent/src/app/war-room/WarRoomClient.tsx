@@ -88,6 +88,9 @@ export default function WarRoomClient() {
           <Sel v={filters.channel} on={(v) => setFilters({ ...filters, channel: v })} opts={['', ...CHANNELS]} fmt={(o) => o ? o.replace('_', ' ') : 'All Channels'} />
           <Sel v={filters.language} on={(v) => setFilters({ ...filters, language: v })} opts={['', 'pa', 'hi', 'en']} fmt={(o) => o ? o.toUpperCase() : 'All Languages'} />
           <Sel v={filters.days} on={(v) => setFilters({ ...filters, days: v })} opts={['all', '1', '7', '30']} fmt={(o) => o === 'all' ? 'All Time' : o === '1' ? 'Today' : `${o}d`} />
+          <a href="/dashboard" title="Exit the War Room — back to dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: CARD, color: TXT, border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>✕</span> Exit
+          </a>
         </div>
 
         {/* SCROLL BODY (everything inside one VH) */}
