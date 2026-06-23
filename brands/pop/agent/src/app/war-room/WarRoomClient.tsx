@@ -7,13 +7,14 @@ import PunjabMap, { type ColorMode } from './PunjabMap';
 import { Sparkline, DonutChart, RadialProgress } from '@/components/dashboard/MicroCharts';
 import { LineChart, Line, AreaChart, Area, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import {
-  MdGridView, MdMap, MdReportProblem, MdInsights, MdGroups, MdHub, MdDescription, MdNotificationsActive, MdSettings,
-  MdWaterDrop, MdBolt, MdWork, MdAddRoad, MdLocalHospital, MdSchool, MdAgriculture, MdWarning, MdMoreHoriz, MdOpenInFull,
+  MdWaterDrop, MdBolt, MdWork, MdAddRoad, MdLocalHospital, MdSchool, MdAgriculture, MdWarning, MdMoreHoriz,
 } from 'react-icons/md';
 
 // ── palette ──
+// Semantic data colors (chart/lean/category encodings) stay concrete; structural
+// colors use the app theme tokens so the war room follows light/dark like the dashboard.
 const SAFFRON = '#F06C18', GREEN = '#22C55E', BLUE = '#3B82F6', AMBER = '#F59E0B', PURPLE = '#A78BFA';
-const BG = '#0A1A2F', CARD = '#0E2238', LINE = 'rgba(234,241,251,0.08)', TXT = '#EAF1FB', MUT = 'rgba(234,241,251,0.55)';
+const BG = 'var(--bg-primary)', CARD = 'var(--bg-secondary)', LINE = 'var(--border-primary)', TXT = 'var(--text-primary)', MUT = 'var(--text-secondary)';
 const CHANNELS = ['whatsapp', 'voice', 'pulse_app', 'qr', 'missed_call'];
 const LEAN_KEYS = ['supporter', 'leaning', 'undecided', 'opposed'];
 const LEAN_C: Record<string, string> = { supporter: GREEN, leaning: '#86EFAC', undecided: AMBER, opposed: SAFFRON };
@@ -39,13 +40,6 @@ const EMPTY: Filters = { constituency: '', district: '', channel: '', language: 
 const sp = (a: number[] = []) => a.map((v) => ({ value: v }));
 function mask(name: string | null, c: string | null) { if (name && name.trim().length > 1) { const f = name.trim().split(/\s+/)[0]; return f.length > 2 ? f[0] + '••••' : f; } return `Constituent, ${c || 'Punjab'}`; }
 function ago(iso: string) { const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; }
-const NAV = [
-  { id: 'overview', icon: MdGridView, label: 'Overview' }, { id: 'map', icon: MdMap, label: 'Map' },
-  { id: 'issues', icon: MdReportProblem, label: 'Issues' }, { id: 'signals', icon: MdInsights, label: 'Signals' },
-  { id: 'mobilization', icon: MdGroups, label: 'Mobilization' }, { id: 'channels', icon: MdHub, label: 'Channels' },
-  { id: 'reports', icon: MdDescription, label: 'Reports' }, { id: 'alerts', icon: MdNotificationsActive, label: 'Alerts' },
-  { id: 'settings', icon: MdSettings, label: 'Settings' },
-];
 
 export default function WarRoomClient() {
   const [data, setData] = useState<WarRoomData | null>(null);
@@ -53,7 +47,6 @@ export default function WarRoomClient() {
   const [mode, setMode] = useState<ColorMode>('heat');
   const [selected, setSelected] = useState<string | null>(null);
   const [pulse, setPulse] = useState<string | null>(null);
-  const [nav, setNav] = useState('overview');
   const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -76,27 +69,15 @@ export default function WarRoomClient() {
   const SEAT_C = [SAFFRON, BLUE, GREEN, AMBER, PURPLE, '#2EC4B6'];
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: BG, color: TXT, display: 'flex', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12 }}>
-      {/* NAV RAIL */}
-      <div style={{ width: 76, flexShrink: 0, background: '#081320', borderRight: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 4 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: SAFFRON, display: 'grid', placeItems: 'center', marginBottom: 14 }}>
-          <MdMap size={20} color="#fff" />
-        </div>
-        {NAV.map((n) => {
-          const on = nav === n.id; const Icon = n.icon;
-          return (
-            <button key={n.id} onClick={() => setNav(n.id)} title={n.label}
-              style={{ width: 60, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer', background: on ? 'rgba(240,108,24,0.14)' : 'transparent', color: on ? SAFFRON : MUT, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <Icon size={18} /><span style={{ fontSize: 9 }}>{n.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
+    <div style={{ height: '100vh', overflow: 'hidden', background: BG, color: TXT, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12 }}>
       {/* MAIN */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* HEADER */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', flexWrap: 'wrap', borderBottom: `1px solid ${LINE}` }}>
+          <a href="/dashboard" title="Back to dashboard" style={{ display: 'inline-flex', textDecoration: 'none' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pop-icon.png" alt="Pulse of Punjab" style={{ width: 30, height: 30, borderRadius: 7 }} />
+          </a>
           <div>
             <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>Pulse of Punjab <span style={{ color: MUT, fontWeight: 500, fontSize: 15 }}>War Room</span></div>
             <div style={{ fontSize: 11, color: MUT, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: GREEN, animation: 'wr-pulse 2s infinite' }} />Real-time political intelligence across Punjab</div>
@@ -110,7 +91,7 @@ export default function WarRoomClient() {
         </div>
 
         {/* SCROLL BODY (everything inside one VH) */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* KPI ROW */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
             <Kpi label="Voices Captured" value={d?.kpis.total ?? 0} sub="Total constituents" trend="+14%" up accent={SAFFRON} spark={d?.series.total} />
@@ -177,7 +158,7 @@ export default function WarRoomClient() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={lineData} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>
                     <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
-                    <Tooltip contentStyle={{ background: '#081320', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-tertiary)', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
                     {(d?.series.seats || []).map((s, i) => <Line key={s} type="monotone" dataKey={s} stroke={SEAT_C[i % SEAT_C.length]} strokeWidth={1.6} dot={false} />)}
                   </LineChart>
                 </ResponsiveContainer>
@@ -231,7 +212,7 @@ export default function WarRoomClient() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={areaData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
                   <XAxis dataKey="day" tick={{ fill: MUT, fontSize: 9 }} axisLine={false} tickLine={false} interval={3} />
-                  <Tooltip contentStyle={{ background: '#081320', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-tertiary)', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 11 }} />
                   {(d?.series.categories || []).map((c) => <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={CAT_C[c]} fill={CAT_C[c]} fillOpacity={0.55} />)}
                 </AreaChart>
               </ResponsiveContainer>
