@@ -2893,6 +2893,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       }>).filter(note => note.text?.trim())
 
                       const adminNoteKeys = new Set(adminNotes.map(note => `${note.text}|${note.created_at || ''}`))
+                      // A logged call is persisted TWICE: as an admin_note
+                      // ("Call logged - <outcome>: <text>") and as a call activity
+                      // ("[<outcome>] <text>"). The exact key above misses this dupe
+                      // because the prefixes AND insert timestamps differ. Match on the
+                      // prefix-stripped body so the activity copy is suppressed and only
+                      // the richer admin_note (creator + outcome badge) renders.
+                      const stripCallPrefix = (s?: string) =>
+                        (s || '').replace(/^\s*(?:\[[^\]]*\]|call logged\s*-\s*[^:]*:?)\s*/i, '').trim().toLowerCase()
+                      const adminCallBodies = new Set(
+                        adminNotes.filter(n => n.source === 'log_call').map(n => stripCallPrefix(n.text))
+                      )
                       const timelineItems = [
                         ...adminNotes.map(note => ({
                           id: note.id || `admin-note-${note.created_at || note.text}`,
@@ -2913,7 +2924,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             if (activity.icon === 'automation' || activity.actor === 'PROXe') return false
                             if (!activity.content) return false
                             const key = `${activity.content}|${activity.timestamp || ''}`
-                            return !adminNoteKeys.has(key)
+                            if (adminNoteKeys.has(key)) return false
+                            // Suppress the call-activity twin of a logged call (different
+                            // prefix + timestamp than its admin_note, so the exact key misses it).
+                            if ((activity.icon === 'call' || activity.icon === 'manual_call') &&
+                                adminCallBodies.has(stripCallPrefix(activity.content))) return false
+                            return true
                           })
                           .map(activity => ({
                             id: `activity-${activity.id}`,

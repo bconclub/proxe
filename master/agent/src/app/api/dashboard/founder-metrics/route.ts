@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { cleanDisplayName } from '@/lib/services/utils'
+import { BRAND_ID } from '@/configs'
 
 // Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
 // decorative junk so the dashboard reads as a professional system. Falls back to
@@ -543,10 +544,23 @@ export async function GET(request: NextRequest) {
       .map(({ lead, bookingDate, bookingTime, dt }) => {
         const uc = lead.unified_context || {}
         const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
+        // Structured intent the agent already captured for this lead — the SAME
+        // source the leads table chips read (unified_context[BRAND_ID]). Surfacing
+        // it lets the Upcoming Events card show a real program/intent chip even
+        // when no free-text booking_title was stored.
+        const brand = uc?.[BRAND_ID] || uc?.windchasers || {}
+        const courseInterest = brand.course_interest || (uc?.web?.booking_details?.courseInterest) || null
+        const userType = brand.user_type || brand.business_type || null
+        const painPoint = brand.pain_point || null
+        const timeline = brand.plan_to_fly || brand.timeline || null
         return {
           id: lead.id,
           name: dn(lead.customer_name),
           title,
+          courseInterest,
+          userType,
+          painPoint,
+          timeline,
           date: bookingDate,
           time: bookingTime,
           datetime: dt!.toISOString(),

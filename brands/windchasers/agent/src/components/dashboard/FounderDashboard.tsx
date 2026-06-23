@@ -43,6 +43,10 @@ interface FounderMetrics {
     id: string
     name: string
     title?: string | null
+    courseInterest?: string | null
+    userType?: string | null
+    painPoint?: string | null
+    timeline?: string | null
     date: string
     time: string
     datetime: string
@@ -301,16 +305,20 @@ export default function FounderDashboard() {
   const getInitials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
 
-  // Program category chip derived from an event title (Cabin Crew / Pilot /
-  // Flight Training / CPL / PPL). Returns null when nothing matches.
-  const eventCategory = (title?: string | null): { label: string; color: string; bg: string } | null => {
-    const t = (title || '').toLowerCase()
+  // Program category chip. Prefers the structured course interest the agent
+  // already captured for the lead (unified_context[BRAND_ID].course_interest),
+  // and falls back to keyword-matching the free-text booking title. Accepts
+  // multiple signals so the strongest available wins. Null when nothing matches.
+  const eventCategory = (...signals: Array<string | null | undefined>): { label: string; color: string; bg: string } | null => {
+    const t = signals.filter(Boolean).join(' ').toLowerCase()
     if (!t) return null
-    if (t.includes('cabin crew')) return { label: 'Cabin Crew', color: '#a855f7', bg: 'rgba(168,85,247,0.14)' }
+    if (t.includes('cabin')) return { label: 'Cabin Crew', color: '#a855f7', bg: 'rgba(168,85,247,0.14)' }
+    if (t.includes('helicopter')) return { label: 'Helicopter', color: '#f472b6', bg: 'rgba(244,114,182,0.14)' }
+    if (t.includes('drone')) return { label: 'Drone', color: '#2dd4bf', bg: 'rgba(45,212,191,0.14)' }
     if (t.includes('flight training')) return { label: 'Flight Training', color: '#10b981', bg: 'rgba(16,185,129,0.14)' }
-    if (t.includes('pilot')) return { label: 'Pilot Training', color: '#60a5fa', bg: 'rgba(59,130,246,0.16)' }
     if (t.includes('cpl')) return { label: 'CPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
     if (t.includes('ppl')) return { label: 'PPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
+    if (t.includes('pilot')) return { label: 'Pilot Training', color: '#60a5fa', bg: 'rgba(59,130,246,0.16)' }
     return null
   }
 
@@ -638,7 +646,7 @@ export default function FounderDashboard() {
                         pushed to the right (ml-auto); recency countdown chip last. */}
                     <div className="flex items-center gap-2">
                       <p className="text-[13px] font-semibold truncate min-w-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                      {(() => { const c = eventCategory(booking.title); return c && (
+                      {(() => { const c = eventCategory(booking.courseInterest, booking.title); return c && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0" style={{ background: c.bg, color: c.color }}>
                           {c.label}
                         </span>
@@ -654,10 +662,24 @@ export default function FounderDashboard() {
                         </span>
                       ) })()}
                     </div>
-                    {/* Line 2 — event title (only when present). No third line. */}
-                    {booking.title && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
-                    )}
+                    {/* Line 2 — free-text booking title when present; otherwise a
+                        detail composed from the structured intent we already captured
+                        (program · who · timeline) so the row is never bare. No third line. */}
+                    {(() => {
+                      if (booking.title) return (
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                      )
+                      const cat = eventCategory(booking.courseInterest, booking.title)
+                      const bits = [
+                        cat?.label || booking.courseInterest || null,
+                        booking.userType,
+                        booking.timeline,
+                      ].filter(Boolean)
+                      if (!bits.length) return null
+                      return (
+                        <p className="text-[11px] truncate mt-0.5 capitalize" style={{ color: 'var(--text-secondary)' }}>{bits.join(' · ')}</p>
+                      )
+                    })()}
                   </div>
                 </button>
               ))
