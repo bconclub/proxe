@@ -111,7 +111,38 @@ export async function GET(req: NextRequest) {
     // ── live feed (latest 40, display-safe) ──
     const liveFeed = R.slice(0, 40).map((r) => ({ id: r.id, name: r.name, constituency: r.constituency, category: r.grievance_category, created_at: r.created_at }));
 
-    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, matrix, mobilization, channelMix, liveFeed });
+    // ── daily time-series (last 14d) for sparklines / line / area charts ──
+    const DAYS = 14;
+    const dayKeys = Array.from({ length: DAYS }, (_, i) => new Date(now - (DAYS - 1 - i) * 86400000).toISOString().slice(0, 10));
+    const dayIdx: Record<string, number> = Object.fromEntries(dayKeys.map((k, i) => [k, i]));
+    const totalSeries = new Array(DAYS).fill(0);
+    const resolvedSeries = new Array(DAYS).fill(0);
+    const topCats = byCategory.slice(0, 5).map((c) => c.category);
+    const catSeries: Record<string, number[]> = Object.fromEntries(topCats.map((c) => [c, new Array(DAYS).fill(0)]));
+    const topSeats = [...byConstituency].sort((a, b) => b.count - a.count).slice(0, 6).map((s) => s.constituency);
+    const seatSeries: Record<string, number[]> = Object.fromEntries(topSeats.map((s) => [s, new Array(DAYS).fill(0)]));
+    const mobSeries: Record<string, number[]> = { vote: new Array(DAYS).fill(0), volunteer: new Array(DAYS).fill(0), rally: new Array(DAYS).fill(0), share: new Array(DAYS).fill(0) };
+    R.forEach((r) => {
+      const i = dayIdx[new Date(r.created_at).toISOString().slice(0, 10)];
+      if (i === undefined) return;
+      totalSeries[i]++;
+      if (r.loop_status === 'resolved') resolvedSeries[i]++;
+      const c = r.grievance_category || 'other'; if (catSeries[c]) catSeries[c][i]++;
+      if (r.constituency && seatSeries[r.constituency]) seatSeries[r.constituency][i]++;
+      const a = r.action_intent; if (a && mobSeries[a]) mobSeries[a][i]++;
+    });
+    const series = { days: dayKeys, total: totalSeries, resolved: resolvedSeries, categories: topCats, byCategory: catSeries, seats: topSeats, bySeat: seatSeries, mobilization: mobSeries };
+
+    // ── sentiment (net lean score + 7d shift) ──
+    const LS: Record<string, number> = { supporter: 1, leaning: 0.5, undecided: 0, opposed: -1 };
+    const leaned = R.filter((r) => r.lean);
+    const net = leaned.length ? leaned.reduce((s, r) => s + (LS[r.lean] ?? 0), 0) / leaned.length : 0;
+    const avg = (arr: any[]) => (arr.length ? arr.reduce((s, r) => s + (LS[r.lean] ?? 0), 0) / arr.length : 0);
+    const last7 = R.filter((r) => new Date(r.created_at).getTime() >= d7);
+    const prev7 = R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= d14 && t < d7; });
+    const sentiment = { net: Math.round(net * 100) / 100, shiftPp: Math.round((avg(last7) - avg(prev7)) * 100), label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral' };
+
+    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, matrix, mobilization, channelMix, liveFeed, series, sentiment });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });
