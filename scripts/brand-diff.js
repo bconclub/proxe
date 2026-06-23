@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'brand-shared.json'), 'utf8'));
@@ -125,11 +125,86 @@ function sync(brand) {
   return { identical, drift, missing, total, pct: total ? Math.round((identical / total) * 100) : 0 };
 }
 
+// On-brand display names (the node showed the lowercase tree id before).
+const DISPLAY = { master: 'Master', bcon: 'BCON', windchasers: 'Windchasers', proxe: 'PROXe', pop: 'POP' };
+const ARTIFACTS = manifest.brandArtifacts || {};
+
+function relTime(ms) {
+  if (!ms) return 'unknown';
+  const diff = Date.now() - ms;
+  const m = Math.floor(diff / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  if (d > 0) return d + 'd ' + (h % 24) + 'h ago';
+  if (h > 0) return h + 'h ' + (m % 60) + 'm ago';
+  if (m > 0) return m + 'm ago';
+  return 'just now';
+}
+
+// Last commit that touched this brand's tree ≈ its last deploy (every push to
+// main deploys). Gives "changed N ago" + the commit subject.
+function lastChange(tree) {
+  const dir = tree === 'master' ? 'master/agent' : path.join('brands', tree, 'agent');
+  try {
+    const out = execSync('git log -1 --format=%ct%x1f%s -- "' + dir + '"', { cwd: ROOT }).toString().trim();
+    if (!out) return null;
+    const [ct, subject] = out.split('\x1f');
+    return { rel: relTime(Number(ct) * 1000), subject: subject || '' };
+  } catch { return null; }
+}
+
+// Brand artifacts (e.g. POP War Room): features built ON ONE brand, declared in
+// the manifest's brandArtifacts — one-directional, never reverse-sync/propagate.
+// present = the artifact's files actually exist in that brand's tree.
+function artifacts(tree) {
+  const prefixes = ARTIFACTS[tree] || [];
+  if (!prefixes.length) return [];
+  const root = srcRoot(tree);
+  const groups = new Map();
+  for (const p of prefixes) {
+    const clean = p.replace(/\/+$/, '');
+    const abs = path.join(root, clean);
+    const dir = path.dirname(abs), base = path.basename(clean);
+    let present = false;
+    try {
+      if (fs.existsSync(abs)) present = true;
+      else if (fs.existsSync(dir)) present = fs.readdirSync(dir).some((f) => f.startsWith(base));
+    } catch {}
+    const name = /war.?room/i.test(p) ? 'War Room' : base.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (name.toLowerCase() === 'data') continue; // supporting data, not its own artifact
+    groups.set(name, (groups.get(name) || false) || present);
+  }
+  return [...groups].map(([name, present]) => ({ name, present }));
+}
+
+// New features that exist in some brands but aren't shared-core yet — tracked
+// as "missing feature" gaps so the path to 100% is visible per brand.
+const FEATURE_FILES = [
+  { name: 'Flows: Triggers+Sequences', file: 'components/dashboard/FlowsAutomation.tsx' },
+  { name: 'WhatsApp template builder', file: 'app/dashboard/settings/whatsapp-templates/page.tsx' },
+  { name: 'Config page', file: 'app/dashboard/config/page.tsx' },
+  { name: 'Dashboard Brain', file: 'components/dashboard/DashboardBrain.tsx' },
+  { name: 'Feature flags (runtime)', file: 'lib/useFeatureFlags.ts' },
+];
+
+// The exact drift vs master: which shared files differ / are missing, plus which
+// tracked features this brand lacks. Powers the "what's left to 100%" tooltip.
+function driftDetail(tree) {
+  const root = srcRoot(tree);
+  const differ = [], missing = [];
+  for (const f of shared) {
+    const m = path.join(masterSrc, f), x = path.join(root, f);
+    if (!fs.existsSync(m)) continue;
+    if (!fs.existsSync(x)) { missing.push(f); continue; }
+    if (!fs.readFileSync(m).equals(fs.readFileSync(x))) differ.push(f);
+  }
+  const missingFeatures = FEATURE_FILES.filter((ff) => !fs.existsSync(path.join(root, ff.file))).map((ff) => ff.name);
+  return { differ, missing, missingFeatures };
+}
+
 const DATA = {
   generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC',
   cats: CATS.map((c) => ({ cat: c.cat, keys: c.items.map((i) => i.key) })),
-  master: { tree: 'master', role: 'canonical', features: featureStates('master'), config: brandConfig('master') },
-  brands: BRANDS.map((b) => ({ tree: b, role: 'brand', sync: sync(b), features: featureStates(b), config: brandConfig(b) })),
+  master: { tree: 'master', role: 'canonical', name: DISPLAY.master, lastChange: lastChange('master'), artifacts: artifacts('master'), features: featureStates('master'), config: brandConfig('master') },
+  brands: BRANDS.map((b) => ({ tree: b, role: 'brand', name: DISPLAY[b] || b, lastChange: lastChange(b), artifacts: artifacts(b), sync: sync(b), drift: driftDetail(b), features: featureStates(b), config: brandConfig(b) })),
 };
 
 // ── HTML ──────────────────────────────────────────────────────────────────────
@@ -142,7 +217,7 @@ const HTML = `<!doctype html>
 <link rel="stylesheet" href="https://esm.sh/reactflow@11.11.4/dist/style.css" />
 <style>
   :root { --bg:#0b0e14; --panel:#141925; --line:#263041; --txt:#e6edf3; --mut:#8b97a7;
-          --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --slate:#64748b; --accent:#8b5cf6; }
+          --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --slate:#64748b; --accent:#8b5cf6; --artifact:#fb923c; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--txt);
     font:13px/1.4 ui-sans-serif,system-ui,Segoe UI,Roboto,Arial; }
@@ -157,7 +232,7 @@ const HTML = `<!doctype html>
     box-shadow:0 8px 30px rgba(0,0,0,.35); overflow:hidden; }
   .node.canonical { border-color:var(--accent); }
   .node .hd { padding:10px 12px 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid var(--line); }
-  .node .name { font-weight:700; font-size:15px; text-transform:capitalize; }
+  .node .name { font-weight:700; font-size:15px; }
   .node .role { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); }
   .node .pct { font-size:18px; font-weight:800; }
   .bar { height:5px; background:#0b0e14; border-radius:99px; overflow:hidden; margin:8px 12px 0; }
@@ -170,6 +245,11 @@ const HTML = `<!doctype html>
   .pill.on { background:rgba(34,197,94,.15); color:var(--green); border-color:rgba(34,197,94,.35); }
   .pill.off { background:rgba(100,116,139,.15); color:var(--slate); border-color:rgba(100,116,139,.4); }
   .pill.absent { background:rgba(239,68,68,.13); color:var(--red); border-color:rgba(239,68,68,.3); }
+  .pill.artifact { background:rgba(251,146,60,.16); color:var(--artifact); border-color:rgba(251,146,60,.55); }
+  .pill.artifact.off { opacity:.5; }
+  .catlabel.art { color:var(--artifact); }
+  .deploy { color:var(--mut); font-size:10.5px; margin-top:7px; display:flex; gap:5px; align-items:baseline; }
+  .deploy b { color:var(--txt); font-weight:600; }
   .cfg { display:flex; align-items:center; gap:7px; margin-top:10px; padding-top:9px; border-top:1px dashed var(--line);
     font-size:11px; color:var(--mut); cursor:help; }
   .cfg .sw { width:13px; height:13px; border-radius:4px; border:1px solid rgba(255,255,255,.15); flex:none; }
@@ -195,6 +275,7 @@ const HTML = `<!doctype html>
       <span><b style="background:var(--slate)"></b>present, off</span>
       <span><b style="background:var(--red)"></b>absent</span>
       <span><b style="background:var(--amber)"></b>drift</span>
+      <span><b style="background:var(--artifact)"></b>artifact (brand-only)</span>
     </div>
   </header>
   <div id="flow"></div>
@@ -257,6 +338,18 @@ function configTip(tree, cfg) {
   return rows;
 }
 
+function driftTip(d) {
+  const dr = d.drift || { differ: [], missing: [], missingFeatures: [] };
+  const short = (f) => f.split('/').slice(-2).join('/');
+  let s = '<div><span class="t">' + esc(d.name) + ' → 100%</span></div>';
+  s += '<div class="kv"><b>' + dr.differ.length + '</b> differ · <b>' + dr.missing.length + '</b> missing · <b>' + dr.missingFeatures.length + '</b> features absent</div>';
+  if (dr.missingFeatures.length) s += '<div class="d" style="color:var(--artifact)">features to add: ' + dr.missingFeatures.map(esc).join(', ') + '</div>';
+  if (dr.differ.length) s += '<div class="d">drift: ' + dr.differ.slice(0, 8).map((f) => esc(short(f))).join(', ') + (dr.differ.length > 8 ? ' +' + (dr.differ.length - 8) + ' more' : '') + '</div>';
+  if (dr.missing.length) s += '<div class="d">missing files: ' + dr.missing.slice(0, 6).map((f) => esc(short(f))).join(', ') + (dr.missing.length > 6 ? ' +' + (dr.missing.length - 6) + ' more' : '') + '</div>';
+  if (!dr.differ.length && !dr.missing.length && !dr.missingFeatures.length) s += '<div class="s" style="color:var(--green)">✓ fully in sync with master</div>';
+  return s;
+}
+
 function Pills({ features }) {
   return CATS.map(c => html\`<div class="catrow" key=\${c.cat}>
     <div class="catlabel">\${c.cat}</div>
@@ -278,12 +371,16 @@ function BrandNode({ data: d }) {
     \${!canonical && html\`<\${Handle} type="target" position=\${Position.Top} style=\${{opacity:0}} />\`}
     \${canonical && html\`<\${Handle} type="source" position=\${Position.Bottom} style=\${{opacity:0}} />\`}
     <div class="hd">
-      <div><div class="name">\${d.tree}</div><div class="role">\${d.role}</div></div>
+      <div><div class="name">\${d.name || d.tree}</div><div class="role">\${d.role}</div></div>
       \${!canonical && html\`<div class="pct" style=\${{color:healthColor(pct)}}>\${pct}%</div>\`}
     </div>
     \${!canonical && html\`<div class="bar"><span style=\${{width:pct+'%',background:healthColor(pct)}}></span></div>\`}
     <div class="body">
       <\${Pills} features=\${d.features} />
+      \${d.artifacts && d.artifacts.length ? html\`<div class="catrow">
+        <div class="catlabel art">⬩ Artifacts · brand-only, never syncs</div>
+        <div class="pills">\${d.artifacts.map(a => html\`<span key=\${a.name} class=\${'pill artifact' + (a.present ? '' : ' off')}>\${a.name}</span>\`)}</div>
+      </div>\` : ''}
       <div class="cfg"
         onMouseEnter=\${(e) => showTip(e, configTip(d.tree, cfg))}
         onMouseMove=\${(e) => showTip(e, configTip(d.tree, cfg))}
@@ -292,8 +389,10 @@ function BrandNode({ data: d }) {
         <span>\${canonical ? 'canonical template' : (cfg.brand || d.tree)} · config ⓘ</span>
       </div>
       \${!canonical
-        ? html\`<div class="meta">\${d.sync.identical} identical · \${d.sync.drift} drift · \${d.sync.missing} missing · of \${d.sync.total}</div>\`
+        ? html\`<div class="meta" style=\${{cursor:'help'}}
+            onMouseEnter=\${(e)=>showTip(e,driftTip(d))} onMouseMove=\${(e)=>showTip(e,driftTip(d))} onMouseLeave=\${hideTip}>\${d.sync.identical} identical · \${d.sync.drift} drift · \${d.sync.missing} missing · what's left ⓘ</div>\`
         : html\`<div class="meta">source of truth · \${d.features.filter(f=>f.state!=='absent').length}/\${d.features.length} capabilities</div>\`}
+      \${d.lastChange ? html\`<div class="deploy" title=\${esc(d.lastChange.subject)}>⏱ last change <b>\${d.lastChange.rel}</b></div>\` : ''}
     </div>
   </div>\`;
 }
