@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · fix: bcon production deploys failing — switch install to npm install
+
+- **bcon production had been failing every deploy for ~3h** (stuck on `0249cccf`), so nothing new — incl. the leg-1 lockup fix — reached proxe.bconclub.com. Root cause: bcon's `npm ci --include=dev` died at install with `EUSAGE: npm ci can only install with an existing package-lock.json` (the same lockfile/build-env breakage the parallel session already hit on POP). bcon's lockfile is present + valid at HEAD, but `npm ci` couldn't use it in the Vercel build env.
+- Fix: bcon `vercel.json` install → `npm install --include=dev --no-audit --no-fund` (mirrors the proven POP fix; `npm install` tolerates the lockfile issue, `--include=dev` keeps build-time devDeps). WC left on `npm ci` (it builds fine). My earlier `ignoreCommand` did not cause this.
+
 ## 2026-06-22 · deploy: per-brand Vercel ignoreCommand (stop cross-brand rebuilds)
 
 - Every push to `main` was rebuilding **all four** Vercel projects (bcon/wc/pop/proxe each watch the same repo+branch), so a POP-only commit triggered redundant bcon/wc builds and cluttered the dashboard. The war-room code was never leaking (it lives only in `brands/pop/agent`) — only the build *triggering* was wasteful.
