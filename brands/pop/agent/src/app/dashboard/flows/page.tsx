@@ -42,6 +42,7 @@ import {
   MdRadioButtonUnchecked,
 } from 'react-icons/md'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import FlowsAutomation from '@/components/dashboard/FlowsAutomation'
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -560,7 +561,7 @@ function countdown(dateStr: string | null): string {
 // ── Main Page ─────────────────────────────────────────────────────
 
 export default function FlowsPage() {
-  const [view, setView] = useState<'overview' | 'board' | 'stages'>('stages')
+  const [view, setView] = useState<'overview' | 'board' | 'stages' | 'sequences' | 'triggers'>('stages')
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
   const [selectedFlowName, setSelectedFlowName] = useState('')
   const [flows, setFlows] = useState<FlowSummary[]>([])
@@ -942,6 +943,26 @@ export default function FlowsPage() {
     await reloadFlows()
   }
 
+  // ── Sequences view (default landing) + Triggers view — toggle to either, or Stages ──
+  if (view === 'sequences' || view === 'triggers') {
+    return (
+      <div style={{ minHeight: 'calc(100vh - 48px)', color: 'var(--text-primary)' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Flows</h1>
+            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+              {view === 'sequences'
+                ? 'Sequences — the multi-step chains a lead runs through, and the template each step fires.'
+                : 'Triggers — the one-off automations that fire on an event, and the template each uses.'}
+            </p>
+          </div>
+          <FlowsViewToggle view={view} setView={setView} />
+        </header>
+        <FlowsAutomation section={view === 'sequences' ? 'sequences' : 'triggers'} />
+      </div>
+    )
+  }
+
   // ── Loading state ───────────────────────────────────────────────
 
   if (loading && view === 'stages') {
@@ -988,9 +1009,12 @@ export default function FlowsPage() {
               Pick a funnel to see its stages, templates and coverage.
             </p>
           </div>
-          <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
-            <MdRefresh size={18} /> Refresh
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <FlowsViewToggle view={view} setView={setView} />
+            <button type="button" onClick={() => { fetchFlows(); fetchStageStats() }} style={{ ...flowGhostButtonStyle, minHeight: 38 }} aria-label="Refresh flows">
+              <MdRefresh size={18} /> Refresh
+            </button>
+          </div>
         </header>
 
         {/* Go-Live readiness — kept at top so you always see what's going on */}
@@ -1018,11 +1042,11 @@ export default function FlowsPage() {
                 style={{
                   textAlign: 'left',
                   cursor: 'pointer',
-                  border: active ? `2px solid ${group.color}` : '1px solid var(--border-primary)',
-                  background: active ? `${group.color}12` : 'var(--bg-secondary)',
-                  borderRadius: 14,
+                  border: active ? `1px solid ${group.color}` : '1px solid var(--border-primary)',
+                  background: active ? `color-mix(in srgb, ${group.color} 7%, var(--bg-secondary))` : 'var(--bg-secondary)',
+                  borderRadius: 12,
                   padding: '13px 16px',
-                  boxShadow: active ? `0 10px 24px ${group.color}22` : '0 6px 18px rgba(0,0,0,0.22)',
+                  boxShadow: active ? `0 8px 22px ${group.color}1f` : '0 6px 18px rgba(0,0,0,0.22)',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -1048,7 +1072,7 @@ export default function FlowsPage() {
 
         {/* Drill-in — active funnel's stages (left) + selected stage detail (right) */}
         <section style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12 }}>
-          <div style={{ border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 700, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
               {activeGroup.label} FUNNEL · STAGES
             </div>
@@ -1067,8 +1091,8 @@ export default function FlowsPage() {
                       textAlign: 'left',
                       cursor: 'pointer',
                       width: '100%',
-                      border: sel ? `2px solid ${accent}` : '1px solid var(--border-primary)',
-                      background: sel ? `${accent}12` : 'var(--bg-primary)',
+                      border: sel ? `1px solid ${accent}` : '1px solid var(--border-primary)',
+                      background: sel ? `color-mix(in srgb, ${accent} 7%, var(--bg-secondary))` : 'var(--bg-tertiary)',
                       borderRadius: 10,
                       padding: 11,
                     }}
@@ -1198,7 +1222,7 @@ export default function FlowsPage() {
               {/* Lead cards */}
               <div style={{
                 background: 'var(--bg-secondary)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 8,
                 flex: 1,
                 overflow: 'auto',
@@ -1231,7 +1255,7 @@ export default function FlowsPage() {
                         key={lead.lead_id + '-' + si}
                         style={{
                           background: 'var(--bg-primary)',
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          border: '1px solid var(--border-primary)',
                           borderRadius: 6,
                           padding: '10px 12px',
                           opacity: isLoading ? 0.5 : 1,
@@ -1329,7 +1353,7 @@ export default function FlowsPage() {
           style={{
             padding: '8px 16px',
             background: 'var(--bg-secondary)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid var(--border-primary)',
             borderRadius: 8,
             color: 'var(--text-secondary)',
             fontSize: 13,
@@ -1357,7 +1381,7 @@ export default function FlowsPage() {
               }}
               style={{
                 background: 'var(--bg-secondary)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 10,
                 padding: '20px',
                 cursor: 'pointer',
@@ -1405,7 +1429,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
         maxWidth: 200,
         padding: '20px 24px',
         background: 'var(--bg-secondary)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        border: '1px solid var(--border-primary)',
         borderRadius: 12,
         display: 'flex',
         flexDirection: 'column',
@@ -1424,6 +1448,28 @@ function LegendItem({ color, label }: { color: string; label: string }) {
       <span style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
       {label}
     </span>
+  )
+}
+
+// Segmented toggle: switch the Flows page between Sequences (default),
+// Triggers, and the Stages funnel view.
+function FlowsViewToggle({ view, setView }: { view: string; setView: (v: any) => void }) {
+  const tabs: { v: string; label: string }[] = [
+    { v: 'stages', label: 'Stages' },
+    { v: 'sequences', label: 'Sequences' },
+    { v: 'triggers', label: 'Triggers' },
+  ]
+  return (
+    <div style={{ display: 'flex', gap: 4, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', borderRadius: 10, padding: 4 }}>
+      {tabs.map((t) => (
+        <button key={t.v} type="button" onClick={() => setView(t.v)}
+          style={{ border: 0, borderRadius: 7, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: view === t.v ? 'var(--accent-subtle)' : 'transparent',
+            color: view === t.v ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+          {t.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -1794,7 +1840,7 @@ function FlowDetailPanel({
   const totalSlots = Math.max(1, approved + pending + rejected + emptySlots)
 
   return (
-    <aside style={{ position: 'sticky', top: 16, border: '1px solid var(--border-primary)', borderRadius: 14, background: 'var(--bg-secondary)', boxShadow: '0 18px 40px rgba(0,0,0,0.18)', padding: 16 }}>
+    <aside style={{ position: 'sticky', top: 16, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', boxShadow: '0 18px 40px rgba(0,0,0,0.18)', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1824,7 +1870,7 @@ function FlowDetailPanel({
       {tab === 'Overview' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 148px', gap: 12, marginTop: 14 }}>
-            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14 }}>
+            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, background: 'var(--bg-tertiary)' }}>
               <h3 style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-primary)' }}>Channels</h3>
               {(config?.channels.length ? config.channels : ['whatsapp']).map(channel => (
                 <div key={channel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
@@ -1837,7 +1883,7 @@ function FlowDetailPanel({
               ))}
             </section>
 
-            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, textAlign: 'center' }}>
+            <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, textAlign: 'center', background: 'var(--bg-tertiary)' }}>
               <h3 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text-primary)', textAlign: 'left' }}>Coverage</h3>
               <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : '#f59e0b'} size={92} showLabel />
               <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', color: stage.coverage >= 50 ? '#22c55e' : '#ef4444', fontSize: 12, marginTop: 8 }}>
@@ -1847,13 +1893,13 @@ function FlowDetailPanel({
             </section>
           </div>
 
-          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12 }}>
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12, background: 'var(--bg-tertiary)' }}>
             <h3 style={{ margin: 0, fontSize: 14, color: 'var(--text-primary)' }}>Lead Progress</h3>
             <p style={{ margin: '8px 0 12px', color: 'var(--text-secondary)', fontSize: 12 }}>{stage.leadCount} leads in this stage</p>
             <SegmentedProgress approved={approved} pending={pending} rejected={rejected} empty={emptySlots} total={totalSlots} />
           </section>
 
-          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12 }}>
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, marginTop: 12, background: 'var(--bg-tertiary)' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--text-primary)' }}>Template Schedule</h3>
             <ScheduleMatrix stageId={stage.id} config={config} getSlotStatus={getSlotStatus} />
             <button type="button" onClick={() => setTab('Templates')} style={{ ...flowGhostButtonStyle, width: '100%', marginTop: 14, color: 'var(--accent-primary)', minHeight: 36 }}>
@@ -1882,7 +1928,7 @@ function FlowDetailPanel({
               {stageTemplates.map((t, i) => {
                 const st = STATUS_STYLE[t.status] || STATUS_STYLE.empty
                 return (
-                  <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-primary)' }}>
+                  <div key={t.id || i} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 12, background: 'var(--bg-tertiary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Day {t.day}</span>
@@ -1912,7 +1958,7 @@ function FlowDetailPanel({
 
       {tab === 'Performance' && (
         <div style={{ marginTop: 16 }}>
-          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <section style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 16, background: 'var(--bg-tertiary)' }}>
             <CoverageRing value={stage.coverage} color={stage.coverage >= 80 ? '#22c55e' : stage.coverage >= 50 ? '#f59e0b' : '#ef4444'} size={84} showLabel />
             <div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Template coverage</div>
@@ -1927,7 +1973,7 @@ function FlowDetailPanel({
               { label: 'Rejected', value: rejected, color: '#ef4444' },
               { label: 'Leads in stage', value: stage.leadCount, color: 'var(--accent-primary)' },
             ].map(s => (
-              <div key={s.label} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14 }}>
+              <div key={s.label} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: 14, background: 'var(--bg-tertiary)' }}>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.label}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
               </div>

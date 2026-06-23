@@ -12,6 +12,14 @@ import {
   MdWhatsapp,
   MdPhoneInTalk,
   MdLanguage,
+  MdAccessTime,
+  MdFormatListBulleted,
+  MdCalendarToday,
+  MdExpandMore,
+  MdFilterList,
+  MdWarningAmber,
+  MdCancel,
+  MdPerson,
 } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -386,15 +394,118 @@ const boardBtn = (bg: string, color: string): React.CSSProperties => ({
   border: 'none', cursor: 'pointer', background: bg, color, whiteSpace: 'nowrap',
 })
 
-function KpiCard({ label, value, sub, icon, accent }: { label: string; value: string; sub?: string; icon: React.ReactNode; accent: string }) {
+function KpiCard({ label, value, sub, subColor, icon, accent }: { label: string; value: string; sub?: string; subColor?: string; icon: React.ReactNode; accent: string }) {
   return (
-    <div style={{ flex: '1 1 0', minWidth: 160, background: 'var(--bg-secondary, rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: `${accent}1f`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+    <div style={{ flex: '1 1 0', minWidth: 170, background: 'var(--bg-secondary, rgba(255,255,255,0.02))', border: '1px solid var(--border-primary, rgba(255,255,255,0.08))', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 13, alignItems: 'center' }}>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', background: `${accent}26`, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>{label}</div>
-        <div style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
-        {sub && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>{sub}</div>}
+        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 3, fontWeight: 500 }}>{label}</div>
+        <div style={{ color: 'var(--text-primary)', fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{value}</div>
+        {sub && <div style={{ color: subColor || 'var(--text-muted)', fontSize: 11, marginTop: 4, fontWeight: subColor ? 600 : 400 }}>{sub}</div>}
       </div>
+    </div>
+  )
+}
+
+// --- Header pill control (visual / non-functional) ---
+
+function HeaderPill({ icon, label, caret }: { icon?: React.ReactNode; label: string; caret?: boolean }) {
+  return (
+    <button
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500,
+        padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
+        background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+        border: '1px solid var(--border-primary, rgba(255,255,255,0.08))',
+        color: 'var(--text-secondary)', whiteSpace: 'nowrap',
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+      {caret && <MdExpandMore size={16} style={{ opacity: 0.7 }} />}
+    </button>
+  )
+}
+
+// --- "View all" inline link ---
+
+function ViewAll({ label = 'View all' }: { label?: string }) {
+  return (
+    <span style={{ color: 'var(--accent-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{label}</span>
+  )
+}
+
+// --- Featured "UP NEXT" card ---
+
+function UpNextCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string, a: string, s?: string) => void; onLead: (t: BoardTask) => void }) {
+  const [reSched, setReSched] = useState(false)
+  const [reTime, setReTime] = useState('')
+  const fireTime = t.scheduled_at ? formatTime(t.scheduled_at) : ''
+  const fireMs = t.scheduled_at ? Math.max(0, new Date(t.scheduled_at).getTime() - Date.now()) : null
+  return (
+    <div style={{
+      margin: 14, padding: '14px 16px', borderRadius: 12,
+      border: '1px solid var(--accent-primary)', background: 'var(--accent-subtle, rgba(255,255,255,0.04))',
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--accent-primary)', background: 'var(--accent-subtle, rgba(255,255,255,0.06))', border: '1px solid var(--accent-primary)', padding: '2px 8px', borderRadius: 999 }}>UP NEXT</span>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ color: '#3b82f6', fontSize: 13, fontWeight: 700 }}>Firing in {fmtCountdown(fireMs)}</div>
+          {fireTime && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>at {fireTime}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+        {chanIcon(t.channel)}
+        <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+        {typeBadge(t.task_type)}
+      </div>
+      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: '17px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview}</div>}
+      <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+        <button style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', background: '#3b82f6', color: '#fff' }} onClick={() => onAction(t.id, 'send_now')}>Send now</button>
+        <button style={{ fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 7, cursor: 'pointer', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-primary, rgba(255,255,255,0.15))' }} onClick={() => setReSched(v => !v)}>Reschedule</button>
+        <button style={{ fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 7, cursor: 'pointer', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-primary, rgba(255,255,255,0.15))' }} onClick={() => onAction(t.id, 'skip')}>Skip</button>
+        <button style={{ marginLeft: 'auto', fontSize: 16, fontWeight: 700, padding: '2px 8px', borderRadius: 6, cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', border: 'none', lineHeight: 1 }} title="More">⋮</button>
+      </div>
+      {reSched && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 2 }}>
+          <input type="datetime-local" value={reTime} onChange={e => setReTime(e.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border-primary, rgba(255,255,255,0.15))', background: 'var(--bg-secondary)', color: 'var(--text-primary)', flex: 1 }} />
+          <button style={boardBtn('rgba(59,130,246,0.25)', '#3b82f6')} onClick={() => { if (reTime) { onAction(t.id, 'reschedule', new Date(reTime).toISOString()); setReSched(false) } }}>Confirm</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// --- Compact next-to-fire row (non-featured) ---
+
+function FireRow({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string, a: string, s?: string) => void; onLead: (t: BoardTask) => void }) {
+  const [reSched, setReSched] = useState(false)
+  const [reTime, setReTime] = useState('')
+  const inlineBtn: React.CSSProperties = { fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 5, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border-primary, rgba(255,255,255,0.12))', color: 'var(--text-secondary)' }
+  return (
+    <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 9, alignItems: 'center', minWidth: 0 }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, minWidth: 50, flexShrink: 0 }}>{formatTime(t.scheduled_at)}</span>
+        {chanIcon(t.channel)}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{t.lead_name || 'Unknown'}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 7 }}>{t.task_type.replace(/_/g, ' ')}</span>
+          {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>{t.preview}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', paddingLeft: 59 }}>
+        <button style={{ ...inlineBtn, color: '#22c55e', borderColor: 'rgba(34,197,94,0.4)' }} onClick={() => onAction(t.id, 'send_now')}>Send now</button>
+        <button style={inlineBtn} onClick={() => setReSched(v => !v)}>Reschedule</button>
+        <button style={inlineBtn} onClick={() => onAction(t.id, 'skip')}>Skip</button>
+        <button style={{ ...inlineBtn, border: 'none', fontSize: 14, padding: '2px 6px' }} title="More">⋮</button>
+      </div>
+      {reSched && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 2, paddingLeft: 59 }}>
+          <input type="datetime-local" value={reTime} onChange={e => setReTime(e.target.value)} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border-primary, rgba(255,255,255,0.15))', background: 'var(--bg-secondary)', color: 'var(--text-primary)', flex: 1 }} />
+          <button style={boardBtn('rgba(59,130,246,0.25)', '#3b82f6')} onClick={() => { if (reTime) { onAction(t.id, 'reschedule', new Date(reTime).toISOString()); setReSched(false) } }}>Confirm</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -430,35 +541,44 @@ function FireCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
   )
 }
 
+/** Compact "Nm ago" relative time from an ISO string. */
+function timeAgo(iso?: string | null): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 0) return 'now'
+  const m = Math.round(diff / 60000)
+  if (m < 1) return 'now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
 function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string, a: string, s?: string) => void; onLead: (t: BoardTask) => void }) {
-  const ACTIONS: Record<string, { label: string; bg: string; color: string; act: string }> = {
-    approve: { label: 'Approve', bg: 'rgba(34,197,94,0.15)', color: '#22c55e', act: 'send_now' },
-    retry: { label: 'Retry', bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', act: 'retry' },
-    fix_template: { label: 'Fix template', bg: 'rgba(239,68,68,0.15)', color: '#ef4444', act: 'fix_template' },
-    update_contact: { label: 'Update contact', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', act: 'update_contact' },
+  // action key -> { button label, action verb, status-line text, status icon + color }
+  const ACTIONS: Record<string, { label: string; act: string; statusLine: string; icon: React.ReactNode; iconColor: string }> = {
+    approve: { label: 'Approve', act: 'send_now', statusLine: 'Awaiting approval', icon: <MdNotifications size={16} />, iconColor: '#f59e0b' },
+    retry: { label: 'Retry', act: 'retry', statusLine: 'Delivery failed', icon: <MdCancel size={16} />, iconColor: '#ef4444' },
+    fix_template: { label: 'Fix', act: 'fix_template', statusLine: 'Template missing', icon: <MdWarningAmber size={16} />, iconColor: '#ef4444' },
+    update_contact: { label: 'Update', act: 'update_contact', statusLine: 'Contact not synced', icon: <MdPerson size={16} />, iconColor: '#f59e0b' },
   }
   const a = ACTIONS[t.action || 'approve'] || ACTIONS.approve
-  const isFail = t.status === 'failed' || t.status === 'failed_24h_window'
+  const btnPrimary: React.CSSProperties = {
+    fontSize: 11.5, fontWeight: 600, padding: '5px 14px', borderRadius: 6, cursor: 'pointer',
+    background: 'var(--accent-subtle, rgba(255,255,255,0.06))', color: 'var(--accent-primary)',
+    border: '1px solid var(--accent-primary)', whiteSpace: 'nowrap',
+  }
   return (
-    <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
-          {chanIcon(t.channel)}
+    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+      <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${a.iconColor}26`, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
         </div>
-        {statusPill(t.status)}
-      </div>
-      <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{typeBadge(t.task_type)} <span style={{ marginLeft: 6 }}>{t.reason}</span></div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {a.act === 'fix_template' ? (
-          <span style={{ ...boardBtn(a.bg, a.color), cursor: 'default' }} title="Fix this template in Meta WhatsApp Manager">{a.label} (in Meta)</span>
-        ) : a.act === 'update_contact' ? (
-          <button style={boardBtn(a.bg, a.color)} onClick={() => onLead(t)}>{a.label}</button>
-        ) : (
-          <button style={boardBtn(a.bg, a.color)} onClick={() => onAction(t.id, a.act)}>{a.label}</button>
-        )}
-        {isFail && t.action !== 'retry' && <button style={boardBtn('rgba(59,130,246,0.12)', '#3b82f6')} onClick={() => onAction(t.id, 'retry')}>Retry</button>}
-        <button style={boardBtn('rgba(148,163,184,0.12)', '#94a3b8')} onClick={() => onAction(t.id, 'skip')}>Dismiss</button>
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, margin: '2px 0 3px', textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
+        <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginBottom: 8 }}>{a.statusLine}</div>
+        <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
       </div>
     </div>
   )
@@ -468,13 +588,20 @@ function UpcomingGroup({ title, items, onLead }: { title: string; items: BoardTa
   if (!items.length) return null
   return (
     <div>
-      <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '8px 14px 4px' }}>{title} · {items.length}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '10px 16px 5px' }}>
+        <MdAccessTime size={13} style={{ opacity: 0.7 }} />
+        <span>{title}</span>
+        <span style={{ opacity: 0.6 }}>· {items.length}</span>
+      </div>
       {items.map(t => (
-        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 52, flexShrink: 0 }}>{formatTime(t.scheduled_at)}</span>
+        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.04))' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, minWidth: 50, flexShrink: 0 }}>{formatTime(t.scheduled_at)}</span>
           {chanIcon(t.channel)}
-          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 12, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap' }}>{t.task_type.replace(/_/g, ' ')}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 12.5, cursor: 'pointer', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</span>
+          </div>
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '2px 8px', borderRadius: 999, flexShrink: 0 }}>Scheduled</span>
         </div>
       ))}
     </div>
@@ -483,7 +610,47 @@ function UpcomingGroup({ title, items, onLead }: { title: string; items: BoardTa
 
 const colBox: React.CSSProperties = {
   background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-  border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, flex: 1, overflow: 'auto',
+  border: '1px solid var(--border-primary, rgba(255,255,255,0.08))', borderRadius: 12, flex: 1, overflow: 'auto',
+}
+
+/** Panel header: bold title + count + right-aligned "View all" link. */
+function PanelHead({ title, count, viewAll }: { title: string; count?: number | string; viewAll?: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+      <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>
+        {title}
+        {count != null && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 6 }}>· {count}</span>}
+      </div>
+      {viewAll && <ViewAll label={viewAll} />}
+    </div>
+  )
+}
+
+/** Bottom-of-panel link, e.g. "View full schedule →". */
+function PanelFootLink({ label }: { label: string }) {
+  return (
+    <div style={{ padding: '10px 16px', textAlign: 'center', borderTop: '1px solid var(--border-primary, rgba(255,255,255,0.05))' }}>
+      <span style={{ color: 'var(--accent-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</span>
+    </div>
+  )
+}
+
+/** Activity-table status pill with colored dot/icon. */
+function activityStatusPill(status: string) {
+  const map: Record<string, { color: string; label: string }> = {
+    completed: { color: '#22c55e', label: 'Completed' },
+    sent: { color: '#3b82f6', label: 'Sent' },
+    failed: { color: '#ef4444', label: 'Failed' },
+    failed_24h_window: { color: '#ef4444', label: 'Failed' },
+    recovered: { color: '#f59e0b', label: 'Recovered' },
+  }
+  const s = map[status] || { color: '#9ca3af', label: status }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: s.color, background: `${s.color}1f`, padding: '2px 9px', borderRadius: 999 }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
+      {s.label}
+    </span>
+  )
 }
 
 function Empty({ icon, text }: { icon: React.ReactNode; text: string }) {
@@ -612,84 +779,138 @@ export default function TasksPage() {
     )
   }
 
+  const nextFireTime = b.kpis?.nextFiresInMs != null ? formatTime(new Date(Date.now() + b.kpis.nextFiresInMs).toISOString()) : null
+  const upcomingTotal = (up.soon?.length || 0) + (up.today?.length || 0) + (up.tomorrow?.length || 0) + (up.later?.length || 0)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
       <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
-      <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ color: 'var(--text-primary)', fontSize: 24, fontWeight: 700, margin: 0 }}>Tasks</h1>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Automated follow-ups and queued actions</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <HeaderPill icon={<MdCalendarToday size={14} />} label="Today" />
+          <HeaderPill label="Last 7 days" caret />
+          <HeaderPill icon={<MdFilterList size={15} />} label="Filters" />
+        </div>
+      </div>
 
-      {/* KPI Row */}
+      {/* KPI Row — five cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KpiCard label="Next task fires in" value={b.kpis?.nextFiresInMs != null ? fmtCountdown(b.kpis.nextFiresInMs) : '—'} icon={<MdSchedule size={20} />} accent="#22c55e" />
-        <KpiCard label="Tasks due today" value={String(b.kpis?.dueToday?.total ?? 0)} sub={`${b.kpis?.dueToday?.pending ?? 0} pending · ${b.kpis?.dueToday?.queued ?? 0} queued`} icon={<MdScheduleSend size={20} />} accent="#3b82f6" />
+        <KpiCard label="Next fire" value={b.kpis?.nextFiresInMs != null ? fmtCountdown(b.kpis.nextFiresInMs) : '—'} sub={nextFireTime ? `at ${nextFireTime}` : 'Nothing queued'} icon={<MdAccessTime size={20} />} accent="#3b82f6" />
+        <KpiCard label="Completed today" value={String(b.kpis?.completedToday ?? stats.completedToday ?? 0)} sub="Today" icon={<MdCheckCircle size={20} />} accent="#22c55e" />
+        <KpiCard label="Queued" value={String(b.kpis?.queued ?? stats.queuedCount ?? 0)} sub="Scheduled actions" icon={<MdFormatListBulleted size={20} />} accent="#3b82f6" />
         <KpiCard label="Awaiting approval" value={String(b.kpis?.awaitingApproval ?? 0)} sub="Needs your review" icon={<MdNotifications size={20} />} accent="#f59e0b" />
         <KpiCard label="Automation success" value={`${b.kpis?.successRate7d ?? 100}%`} sub="Last 7 days" icon={<MdBarChart size={20} />} accent="#a855f7" />
       </div>
 
-      {/* Three columns: Next to Fire / Needs Attention / Upcoming Queue */}
+      {/* Main: Left (Next to Fire) + Right (split) */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-        {/* Next to Fire */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Next to Fire <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>· firing soon</span>
-          </div>
-          <div style={colBox}>
+        {/* LEFT zone ~36%: Next to Fire */}
+        <div style={{ flex: '0 0 36%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <PanelHead title="Next to Fire" viewAll="View all" />
+          <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
             {b.nextToFire.length === 0
               ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="Nothing approved to fire" />
-              : b.nextToFire.map((t: BoardTask) => <FireCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
-          </div>
-        </div>
-
-        {/* Needs Attention */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
-            Needs Attention <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>· {b.needsAttention.length}</span>
-          </div>
-          <div style={colBox}>
-            {b.needsAttention.length === 0
-              ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="All clear" />
-              : b.needsAttention.map((t: BoardTask) => <AttnCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
-          </div>
-        </div>
-
-        {/* Upcoming Queue */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Upcoming Queue</div>
-          <div style={colBox}>
-            {((up.soon?.length || 0) + (up.today?.length || 0) + (up.tomorrow?.length || 0) + (up.later?.length || 0)) === 0
-              ? <Empty icon={<MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />} text="No upcoming tasks" />
               : (<>
-                  <UpcomingGroup title="Next 4 hours" items={up.soon || []} onLead={onLead} />
-                  <UpcomingGroup title="Later today" items={up.today || []} onLead={onLead} />
-                  <UpcomingGroup title="Tomorrow" items={up.tomorrow || []} onLead={onLead} />
-                  <UpcomingGroup title="Later" items={up.later || []} onLead={onLead} />
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    {b.nextToFire.map((t: BoardTask, i: number) =>
+                      i === 0
+                        ? <UpNextCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />
+                        : <FireRow key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />
+                    )}
+                  </div>
+                  <PanelFootLink label="View full schedule →" />
                 </>)}
           </div>
         </div>
 
-      </div>
+        {/* RIGHT zone ~64%: vertical split */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Automation Activity feed */}
-      <div>
-        <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Automation Activity</div>
-        <div style={{ ...colBox, maxHeight: 240, flex: 'none' }}>
-          {b.activity.length === 0
-            ? <Empty icon={<MdScheduleSend size={24} style={{ opacity: 0.4 }} />} text="No recent activity" />
-            : b.activity.map((a: any) => (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 52, flexShrink: 0 }}>{formatTime(a.at)}</span>
-                  {chanIcon(a.channel)}
-                  <span onClick={() => onLead(a)} style={{ color: 'var(--text-primary)', fontSize: 12, cursor: 'pointer', flex: '0 0 130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.lead_name || 'Unknown'}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(a.task_type || '').replace(/_/g, ' ')} — {a.outcome}</span>
-                  {statusPill(a.status)}
-                  <span style={{ color: a.actor?.kind === 'human' ? '#f59e0b' : '#8b5cf6', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{a.actor?.label || 'Automation'}</span>
-                </div>
-              ))}
+          {/* Top row: Needs Attention + Upcoming Queue */}
+          <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+
+            {/* Needs Attention */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <PanelHead title="Needs Attention" count={b.needsAttention.length} viewAll="View all" />
+              <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
+                {b.needsAttention.length === 0
+                  ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="All clear" />
+                  : (<>
+                      <div style={{ flex: 1, overflow: 'auto' }}>
+                        {b.needsAttention.map((t: BoardTask) => <AttnCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
+                      </div>
+                      <PanelFootLink label="View all issues →" />
+                    </>)}
+              </div>
+            </div>
+
+            {/* Upcoming Queue */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <PanelHead title="Upcoming Queue" count={upcomingTotal} viewAll="View all" />
+              <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
+                {upcomingTotal === 0
+                  ? <Empty icon={<MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />} text="No upcoming tasks" />
+                  : (<>
+                      <div style={{ flex: 1, overflow: 'auto' }}>
+                        <UpcomingGroup title="Next hour" items={up.soon || []} onLead={onLead} />
+                        <UpcomingGroup title="Later today" items={up.today || []} onLead={onLead} />
+                        <UpcomingGroup title="Tomorrow" items={up.tomorrow || []} onLead={onLead} />
+                        <UpcomingGroup title="Later" items={up.later || []} onLead={onLead} />
+                      </div>
+                      <PanelFootLink label="View full schedule →" />
+                    </>)}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom: Recent Activity table */}
+          <div style={{ flex: 'none', display: 'flex', flexDirection: 'column' }}>
+            <PanelHead title="Recent Activity" viewAll="View all activity logs →" />
+            <div style={{ ...colBox, flex: 'none', maxHeight: 260 }}>
+              {b.activity.length === 0
+                ? <Empty icon={<MdScheduleSend size={24} style={{ opacity: 0.4 }} />} text="No recent activity" />
+                : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ position: 'sticky', top: 0, background: 'var(--bg-secondary, #111)', zIndex: 1 }}>
+                        {['Time', 'Lead', 'Task', 'Channel', 'Status', 'Outcome', 'By'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '9px 14px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.08))' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {b.activity.map((a: any) => (
+                        <tr key={a.id} style={{ borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.04))' }}>
+                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', whiteSpace: 'nowrap' }}>{formatTime(a.at)}</td>
+                          <td style={{ padding: '8px 14px' }}>
+                            <span onClick={() => onLead(a)} style={{ color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 500 }}>{a.lead_name || 'Unknown'}</span>
+                          </td>
+                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{String(a.task_type || '').replace(/_/g, ' ')}</td>
+                          <td style={{ padding: '8px 14px' }}>{chanIcon(a.channel)}</td>
+                          <td style={{ padding: '8px 14px' }}>{activityStatusPill(a.status)}</td>
+                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.outcome}>{a.outcome}</td>
+                          <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
+                            <span style={{ color: a.actor?.kind === 'human' ? '#f59e0b' : '#8b5cf6', fontWeight: 600 }}>{a.actor?.label || 'Automation'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+            </div>
+          </div>
+
         </div>
       </div>
 
-      
       {selectedLead && (
         <LeadDetailsModal
           lead={selectedLead}
