@@ -103,13 +103,6 @@ const POP_INTENT: Record<string, { label: string; color: string }> = {
   share:     { label: 'Share',     color: '#A78BFA' },
   none:      { label: '—',         color: '#6B7280' },
 }
-const POP_MAGNET: Record<string, { label: string; color: string }> = {
-  whatsapp:    { label: 'WhatsApp', color: '#22C55E' },
-  voice:       { label: 'Voice',    color: '#8B5CF6' },
-  pulse_app:   { label: 'Pulse App',color: '#3B82F6' },
-  qr:          { label: 'QR',       color: '#F59E0B' },
-  missed_call: { label: 'Missed Call', color: '#EC4899' },
-}
 const POP_LOOP: Record<string, { label: string; color: string }> = {
   raised:   { label: 'Raised',   color: '#F59E0B' },
   routed:   { label: 'Routed',   color: '#3B82F6' },
@@ -634,13 +627,14 @@ export default function LeadsTable({
           {brandId === 'pop' ? (
             <colgroup>
               {/* POP constituent view — widths sum to 100% */}
-              <col style={{ width: '16%' }} />  {/* Constituent (name + captured) */}
-              <col style={{ width: '12%' }} />  {/* Contact (phone) */}
-              <col style={{ width: '15%' }} />  {/* Constituency (+ district·booth) */}
-              <col style={{ width: '23%' }} />  {/* Grievance (category + salience + text) */}
-              <col style={{ width: '12%' }} />  {/* Lean */}
-              <col style={{ width: '8%' }} />   {/* Intent */}
-              <col style={{ width: '8%' }} />   {/* Channel */}
+              <col style={{ width: '14%' }} />  {/* Constituent (name + captured) */}
+              <col style={{ width: '11%' }} />  {/* Contact (phone) */}
+              <col style={{ width: '12%' }} />  {/* Source (origin + entry point) */}
+              <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
+              <col style={{ width: '12%' }} />  {/* Constituency (+ district·booth) */}
+              <col style={{ width: '18%' }} />  {/* Grievance (category + salience + text) */}
+              <col style={{ width: '9%' }} />   {/* Lean */}
+              <col style={{ width: '7%' }} />   {/* Intent */}
               <col style={{ width: '6%' }} />   {/* Loop */}
             </colgroup>
           ) : (
@@ -667,11 +661,12 @@ export default function LeadsTable({
                 ? [
                     { label: 'Constituent',  align: 'left'   as const },
                     { label: 'Contact',      align: 'left'   as const },
+                    { label: 'Source',       align: 'center' as const },
+                    { label: 'Last Touch',   align: 'center' as const },
                     { label: 'Constituency', align: 'left'   as const },
                     { label: 'Grievance',    align: 'left'   as const },
                     { label: 'Lean',         align: 'center' as const },
                     { label: 'Intent',       align: 'center' as const },
-                    { label: 'Channel',      align: 'center' as const },
                     { label: 'Loop',         align: 'center' as const },
                   ]
                 : [
@@ -700,7 +695,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={brandId === 'pop' ? 8 : 9}
+                  colSpan={9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -899,7 +894,6 @@ export default function LeadsTable({
                   const leanCfg = pl.lean ? POP_LEAN[pl.lean] : null
                   const grvCfg = pl.grievance_category ? POP_GRIEVANCE[pl.grievance_category] : null
                   const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
-                  const magnetCfg = pl.magnet ? POP_MAGNET[pl.magnet] : null
                   const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
                   const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
                   const districtLine = [pl.district, pl.booth].filter(Boolean).join(' · ')
@@ -932,6 +926,65 @@ export default function LeadsTable({
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
+                      </td>
+
+                      {/* SOURCE — origin marketing source + entry point (real attribution) */}
+                      <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                            style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                          >
+                            {srcCfg.label}
+                          </span>
+                          {subSource && (
+                            <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
+                              {subSource}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* LAST TOUCH — last channel + actor (real attribution) */}
+                      <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                        {(() => {
+                          const actor = (lead.unified_context as any)?.last_actor || null
+                          const lastTouchConfig: Record<string, { label: string; color: string }> = {
+                            web: { label: 'Web', color: '#3B82F6' }, form: { label: 'Form', color: '#3B82F6' },
+                            whatsapp: { label: 'WhatsApp', color: '#22C55E' }, voice: { label: 'Voice', color: '#8B5CF6' },
+                            social: { label: 'Social', color: '#EC4899' }, facebook: { label: 'Facebook', color: '#1877F2' },
+                            facebook_lead: { label: 'Facebook', color: '#1877F2' }, meta_forms: { label: 'Meta', color: '#1877F2' },
+                            google: { label: 'Google', color: '#EA4335' }, ads: { label: 'Ads', color: '#F97316' },
+                            pabbly: { label: 'Pabbly', color: '#F59E0B' }, referral: { label: 'Referral', color: '#10B981' },
+                            organic: { label: 'Organic', color: '#84CC16' }, manual: { label: 'Manual', color: '#6B7280' },
+                            landing_page: { label: 'Landing', color: '#3B82F6' }, email: { label: 'Email', color: '#0EA5E9' },
+                          }
+                          const channelCfg = lastTouch
+                            ? (lastTouchConfig[lastTouch] || { label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), color: '#6B7280' })
+                            : null
+                          let actorBadge: { label: string; tooltip: string } | null = null
+                          if (actor?.type === 'user' && (actor.name || actor.email)) {
+                            const aname = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                            actorBadge = { label: aname, tooltip: `Last touched by ${actor.email || aname}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
+                          } else if (actor?.type === 'proxe') {
+                            actorBadge = { label: 'PROXe', tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
+                          }
+                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              {channelCfg && (
+                                <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap" style={{ backgroundColor: `${channelCfg.color}22`, color: channelCfg.color }} title={`Channel: ${channelCfg.label}`}>
+                                  {channelCfg.label}
+                                </span>
+                              )}
+                              {actorBadge && (
+                                <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }} title={actorBadge.tooltip}>
+                                  @{actorBadge.label.toLowerCase().replace(/\s+/g, '')}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
 
                       {/* CONSTITUENCY — seat + district·booth */}
@@ -996,20 +1049,6 @@ export default function LeadsTable({
                             style={{ backgroundColor: `${intentCfg.color}1f`, color: intentCfg.color }}
                           >
                             {intentCfg.label}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* CHANNEL — magnet badge */}
-                      <td className="px-3 py-2 text-center">
-                        {magnetCfg ? (
-                          <span
-                            className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
-                            style={{ backgroundColor: `${magnetCfg.color}22`, color: magnetCfg.color }}
-                          >
-                            {magnetCfg.label}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>—</span>
