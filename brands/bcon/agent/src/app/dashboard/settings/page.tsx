@@ -241,6 +241,30 @@ export default function SettingsPage() {
           </a>
         </div>
 
+        {/* Config — integrations / connections status (moved in from the top nav) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Config
+          </h2>
+          <a
+            href="/dashboard/config"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Integrations &amp; connections
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  See connection status for every integration (Supabase, WhatsApp, Vapi…), which secrets are set, channels and lead sources.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
         {/* Appearance Section */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>

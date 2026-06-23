@@ -32,7 +32,6 @@ import {
   MdTimeline,
   MdChecklist,
   MdViewKanban,
-  MdTune,
 } from 'react-icons/md'
 
 interface DashboardLayoutProps {
@@ -65,7 +64,6 @@ const navigation: NavItem[] = [
   { name: 'Humans', href: '/dashboard/humans', icon: MdPeople },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
-  { name: 'Config', href: '/dashboard/config', icon: MdTune },
 ]
 
 // Divider positions: after Pipeline (index 4), after Flow (index 7)
