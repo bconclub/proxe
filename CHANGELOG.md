@@ -13,6 +13,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-22 · fix: bcon production — remove proxe-platform monorepo dep (the REAL cause)
+
+- The `npm install` switch (prior entry) did NOT fix it — the build log showed the actual error: `EMISSINGTARGET — "../.." is referenced by "node_modules/proxe-platform" but does not exist`. bcon's `package.json` + `package-lock.json` declared `"proxe-platform": "file:../../.."` (the monorepo root), which isn't in Vercel's build context (Root Directory = `brands/bcon/agent`), so install failed regardless of npm ci vs install. **This is the exact issue the parallel session already removed from POP** (WC + POP have zero `proxe-platform` refs and build fine); bcon was simply never cleaned.
+- Fix: surgically removed `proxe-platform` from bcon's `package.json` (deps) and `package-lock.json` (root deps + the `../../..` package + the `node_modules/proxe-platform` link), preserving all cross-platform deps (no full regen — that drops the Linux optional deps). Reverted `installCommand` back to `npm ci --include=dev` (clean lockfile works with it, matching WC/POP). bcon now matches WC/POP: 0 monorepo refs.
+
 ## 2026-06-22 · fix: bcon production deploys failing — switch install to npm install
 
 - **bcon production had been failing every deploy for ~3h** (stuck on `0249cccf`), so nothing new — incl. the leg-1 lockup fix — reached proxe.bconclub.com. Root cause: bcon's `npm ci --include=dev` died at install with `EUSAGE: npm ci can only install with an existing package-lock.json` (the same lockfile/build-env breakage the parallel session already hit on POP). bcon's lockfile is present + valid at HEAD, but `npm ci` couldn't use it in the Vercel build env.
