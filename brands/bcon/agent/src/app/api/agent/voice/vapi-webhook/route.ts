@@ -228,6 +228,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 1b) If phone-based resolution failed (e.g. outbound bridge couldn't recover
+    //     the number), fall back to the lead linked at call INITIATION — the
+    //     test-call route stamps lead_id onto the session up front.
+    if (!leadId && callId) {
+      const { data: s } = await supabase
+        .from('voice_sessions')
+        .select('lead_id')
+        .eq('external_session_id', callId)
+        .maybeSingle();
+      if (s?.lead_id) leadId = s.lead_id;
+    }
+
     // 2) Enrich the session row now that lead + final direction + phone are known.
     if (callId) {
       await upsertSession(supabase, callId, {
@@ -240,12 +252,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3) Log transcript turns into conversations (idempotent per call_id)
-    if (leadId && messages.length) {
+    // 3) Log transcript turns into conversations (idempotent per call_id).
+    //    lead_id may be null (column is nullable); the Calls view joins by call_id,
+    //    so the transcript still surfaces even when no lead could be resolved.
+    if (messages.length) {
       const { data: already } = await supabase
         .from('conversations')
         .select('id')
-        .eq('lead_id', leadId)
+        .eq('channel', 'voice')
         .filter('metadata->>call_id', 'eq', callId)
         .limit(1);
       if (!already || already.length === 0) {
@@ -267,8 +281,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) Store the call summary + recording link as a summary row
-    if (leadId && (summary || recordingUrl)) {
+    // 4) Store the call summary + recording link as a summary row (idempotent per
+    //    call_id; lead_id may be null — the Calls view joins by call_id).
+    if (summary || recordingUrl) {
+      const { data: existingSummary } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('channel', 'voice')
+        .filter('metadata->>call_id', 'eq', callId)
+        .filter('metadata->>summary', 'eq', 'true')
+        .limit(1);
+      if (existingSummary && existingSummary.length) {
+        // already stored — skip to avoid duplicate recording rows on webhook retry
+      } else {
       const { error: smErr } = await supabase.from('conversations').insert({
         lead_id: leadId,
         channel: 'voice',
@@ -285,6 +310,7 @@ export async function POST(req: NextRequest) {
         created_at: endedAt || new Date().toISOString(),
       });
       if (smErr) console.error('[vapi-webhook] summary insert error:', smErr.message);
+      }
     }
 
     // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the

@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServiceClient } from '@/lib/services';
+import { ensureOrUpdateLead } from '@/lib/services/leadManager';
+import { BRAND_ID } from '@/configs';
 
 // Outbound calls are ORIGINATED by Vapi (Vapi -> VoBiz BYO trunk -> PSTN), NOT by
 // the VoBiz Call API. This is the only path that carries lead context: the old
@@ -76,7 +79,54 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       return NextResponse.json({ success: false, error: data?.message || data }, { status: res.status });
     }
-    return NextResponse.json({ success: true, callId: data?.id });
+
+    const callId: string | null = data?.id || null;
+
+    // Persist the call NOW, at initiation — so it shows up in the Calls list with
+    // the real contact (name + number) instead of "Unknown caller", and carries a
+    // lead_id for the transcript/recording join. The Vapi webhook later ENRICHES
+    // this same row (keyed on external_session_id) without clobbering these fields.
+    // Soft-fail: a DB hiccup must never break the call that's already dialing.
+    if (callId) {
+      try {
+        const supabase = getServiceClient();
+        if (supabase) {
+          // Create/link the lead with the name the user entered, so leadName
+          // resolves (the agent already greets by this name on the call).
+          const leadId = await ensureOrUpdateLead(
+            name || business, null, e164, 'voice', undefined, supabase,
+          );
+
+          const sessionFields: Record<string, any> = {
+            lead_id: leadId,
+            customer_phone: e164,
+            customer_phone_normalized: last10,
+            call_direction: 'outbound',
+            call_status: 'queued',
+            brand: BRAND_ID,
+            updated_at: new Date().toISOString(),
+          };
+
+          const { data: existing } = await supabase
+            .from('voice_sessions')
+            .select('id')
+            .eq('external_session_id', callId)
+            .maybeSingle();
+
+          if (existing?.id) {
+            await supabase.from('voice_sessions').update(sessionFields).eq('id', existing.id);
+          } else {
+            await supabase
+              .from('voice_sessions')
+              .insert({ external_session_id: callId, created_at: new Date().toISOString(), ...sessionFields });
+          }
+        }
+      } catch (e: any) {
+        console.error('[test-call] failed to persist lead/session (non-fatal):', e?.message);
+      }
+    }
+
+    return NextResponse.json({ success: true, callId });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

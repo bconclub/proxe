@@ -73,15 +73,18 @@ export async function GET(request: NextRequest) {
       ;(leads || []).forEach((l: any) => leadMap.set(l.id, l))
     }
 
-    // Voice conversation rows for these leads → recording/summary/turn-count by call_id.
+    // Voice conversation rows for these calls → recording/summary/turn-count.
+    // Join on the call_id (conversations.metadata.call_id === external_session_id),
+    // NOT lead_id — recordings/transcripts must surface even when the call has no
+    // lead linkage. The Vapi webhook writes them with metadata.call_id regardless.
     type CallExtra = { recordingUrl: string | null; summary: string | null; endedReason: string | null; turnCount: number }
     const extras = new Map<string, CallExtra>()
-    if (leadIds.length) {
+    if (callIds.length) {
       const { data: convs } = await supabase
         .from('conversations')
-        .select('lead_id, sender, content, metadata, created_at')
+        .select('sender, content, metadata, created_at')
         .eq('channel', 'voice')
-        .in('lead_id', leadIds)
+        .filter('metadata->>call_id', 'in', `(${callIds.join(',')})`)
       ;(convs || []).forEach((c: any) => {
         const cid = c?.metadata?.call_id
         if (!cid) return

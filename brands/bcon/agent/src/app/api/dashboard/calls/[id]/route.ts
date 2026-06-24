@@ -63,15 +63,16 @@ export async function GET(
     let recordingUrl: string | null = session.recording_url || null
     let summary: string | null = session.call_summary || null
     let endedReason: string | null = null
-    if (session.lead_id) {
+    {
+      // Match by call_id (metadata.call_id === external_session_id), not lead_id —
+      // the transcript/recording must load even when the call has no lead linkage.
       const { data: convs } = await supabase
         .from('conversations')
         .select('sender, content, metadata, created_at')
         .eq('channel', 'voice')
-        .eq('lead_id', session.lead_id)
+        .filter('metadata->>call_id', 'eq', callId)
         .order('created_at', { ascending: true })
       ;(convs || []).forEach((c: any) => {
-        if (c?.metadata?.call_id && c.metadata.call_id !== callId) return
         if (c?.metadata?.summary) {
           recordingUrl = c.metadata.recording_url || recordingUrl
           endedReason = c.metadata.ended_reason || endedReason
