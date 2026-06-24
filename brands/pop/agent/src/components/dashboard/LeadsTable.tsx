@@ -501,7 +501,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
+            {(() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -614,10 +614,10 @@ export default function LeadsTable({
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-1.5 pl-2 pr-3 py-1 text-xs font-semibold rounded-md shadow-sm transition-transform hover:scale-[1.04]"
             style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
-            title="Add a new lead"
+            title={brandId === 'pop' ? 'Add a person' : 'Add a new lead'}
           >
             <MdAdd size={16} />
-            Add Lead
+            {brandId === 'pop' ? 'Add Person' : 'Add Lead'}
           </button>
 
           {showViewAll && (

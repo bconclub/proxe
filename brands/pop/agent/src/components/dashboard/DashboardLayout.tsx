@@ -544,7 +544,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name === 'Leads' && brandCfg.brand === 'pop' ? 'People' : navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
@@ -580,7 +580,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           pointerEvents: 'none',
                         }}
                       >
-                        {navItem.name}
+                        {navItem.name === 'Leads' && brandCfg.brand === 'pop' ? 'People' : navItem.name}
                       </span>
                     )}
                   </>
