@@ -708,6 +708,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // Load all data when lead changes
   useEffect(() => {
     if (lead && isOpen) {
+      // Reset inline action forms so they don't bleed across leads
+      setShowLogCallForm(false)
+      setShowAdminNoteInput(false)
+      setShowSendMessageForm(false)
+      setLogCallNotes('')
+      setLogCallOutcome('Connected')
+      setAdminNoteText('')
+      setNoteProgress({ steps: [], visible: false })
       loadFreshLeadData()
       loadUnifiedSummary(true) // Always regenerate fresh summary on open
       loadActivities()
@@ -2901,6 +2909,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       }>).filter(note => note.text?.trim())
 
                       const adminNoteKeys = new Set(adminNotes.map(note => `${note.text}|${note.created_at || ''}`))
+                      // Plain notes are persisted TWICE: as an admin_note (unified_context)
+                      // and as an activities row. The exact key above misses the dupe because
+                      // the two timestamps are set independently (JS clock vs Postgres default).
+                      // Text-only set suppresses the activities-table copy for plain notes.
+                      const adminNoteTexts = new Set(
+                        adminNotes.filter(n => !n.source).map(n => (n.text || '').trim().toLowerCase())
+                      )
                       // A logged call is persisted TWICE: as an admin_note
                       // ("Call logged - <outcome>: <text>") and as a call activity
                       // ("[<outcome>] <text>"). The exact key above misses this dupe
@@ -2933,6 +2948,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             if (!activity.content) return false
                             const key = `${activity.content}|${activity.timestamp || ''}`
                             if (adminNoteKeys.has(key)) return false
+                            // Plain notes: admin-notes API writes to both admin_notes JSON + activities
+                            // table; timestamps differ so exact-key fails — use text-only match.
+                            if (activity.icon !== 'call' && activity.icon !== 'manual_call' &&
+                                adminNoteTexts.has((activity.content || '').trim().toLowerCase())) return false
                             // Suppress the call-activity twin of a logged call (different
                             // prefix + timestamp than its admin_note, so the exact key misses it).
                             if ((activity.icon === 'call' || activity.icon === 'manual_call') &&

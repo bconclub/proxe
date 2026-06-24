@@ -1,6 +1,6 @@
 {
   "name": "proxe-platform",
-  "version": "0.1.11",
+  "version": "0.1.19",
   "private": true,
   "scripts": {
     "dev": "npx concurrently -n \"wc,proxe,bcon\" -c \"cyan,green,magenta\" \"npm run dev:windchasers\" \"npm run dev:proxe\" \"npm run dev:bcon\"",
