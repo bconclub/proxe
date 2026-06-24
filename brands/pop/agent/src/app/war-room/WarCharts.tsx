@@ -88,6 +88,59 @@ export function SentimentGauge({ value }: { value: number }) {
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={base} notMerge lazyUpdate />;
 }
 
+// ── Generic glowing donut ring (Channel Mix etc.) ────────────────────────────
+export function GlowDonut({ segments, centerValue, centerSub }: { segments: { name: string; value: number; top: string; bot: string }[]; centerValue?: number | string; centerSub?: string }) {
+  const c = useThemeColors();
+  const option = {
+    animationDuration: 900, animationEasing: 'cubicOut',
+    tooltip: { trigger: 'item', backgroundColor: c.panel, borderWidth: 0, textStyle: { color: c.text, fontSize: 11 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(2,6,23,0.18);' },
+    title: centerValue != null ? { text: String(centerValue), subtext: centerSub || '', left: 'center', top: '38%', textStyle: { color: c.text, fontSize: 22, fontWeight: 800 }, subtextStyle: { color: c.mut, fontSize: 10 }, itemGap: 2 } : undefined,
+    series: [{
+      type: 'pie', radius: ['60%', '90%'], center: ['50%', '50%'], avoidLabelOverlap: false,
+      label: { show: false }, labelLine: { show: false },
+      itemStyle: { borderRadius: 9, borderColor: 'transparent', borderWidth: 3, shadowBlur: 18, shadowColor: 'rgba(2,6,23,0.18)' },
+      data: segments.map((s) => ({ name: s.name, value: s.value, itemStyle: { color: vGrad(s.top, s.bot) } })),
+    }],
+  };
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={base} notMerge lazyUpdate />;
+}
+
+// ── Tiny glowing area sparkline (Mobilization tiles) ──────────────────────────
+export function GlowSpark({ data, color }: { data: number[]; color: string }) {
+  const option = {
+    animationDuration: 800,
+    grid: { left: 0, right: 0, top: 3, bottom: 0 },
+    xAxis: { type: 'category', show: false, boundaryGap: false, data: data.map((_, i) => i) },
+    yAxis: { type: 'value', show: false, min: 'dataMin', max: 'dataMax' },
+    series: [{
+      type: 'line', smooth: true, symbol: 'none',
+      lineStyle: { width: 2.4, color, shadowBlur: 10, shadowColor: color + 'aa' },
+      areaStyle: { color: vGrad(color + '4d', color + '00') },
+      data,
+    }],
+  };
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={base} notMerge lazyUpdate />;
+}
+
+// ── Stacked glowing area (Issue Trend) ────────────────────────────────────────
+export function GlowArea({ days, series }: { days: string[]; series: { name: string; color: string; data: number[] }[] }) {
+  const c = useThemeColors();
+  const option = {
+    animationDuration: 900,
+    grid: { left: 4, right: 8, top: 10, bottom: 18 },
+    tooltip: { trigger: 'axis', backgroundColor: c.panel, borderWidth: 0, textStyle: { color: c.text, fontSize: 11 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(2,6,23,0.18);' },
+    xAxis: { type: 'category', boundaryGap: false, data: days, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: c.mut, fontSize: 9 }, splitLine: { show: false } },
+    yAxis: { type: 'value', show: false },
+    series: series.map((s) => ({
+      name: s.name, type: 'line', stack: 'all', smooth: true, symbol: 'none',
+      lineStyle: { width: 1.6, color: s.color, shadowBlur: 8, shadowColor: s.color + '88' },
+      areaStyle: { color: vGrad(s.color + 'cc', s.color + '2e'), opacity: 0.9 },
+      emphasis: { focus: 'series' }, data: s.data,
+    })),
+  };
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={base} notMerge lazyUpdate />;
+}
+
 // ── Multi-series smooth glowing trend lines ───────────────────────────────────
 export function TrendLines({ days, series }: { days: string[]; series: { name: string; color: string; data: number[] }[] }) {
   const c = useThemeColors();
