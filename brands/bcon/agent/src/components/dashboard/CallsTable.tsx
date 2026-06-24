@@ -50,9 +50,10 @@ type DirectionFilter = 'all' | 'inbound' | 'outbound'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDuration(secs: number): string {
-  if (!secs || secs <= 0) return '0s'
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
+  const total = Math.round(secs || 0) // round — duration can arrive as a float (e.g. 95.362)
+  if (total <= 0) return '0s'
+  const m = Math.floor(total / 60)
+  const s = total % 60
   if (m <= 0) return `${s}s`
   return `${m}m ${String(s).padStart(2, '0')}s`
 }
@@ -138,14 +139,9 @@ export default function CallsTable() {
     load()
   }, [load])
 
-  // Auto-refresh while the tab is visible so calls (incl. live in-progress ones)
-  // appear without a manual reload. 15s balances freshness vs. request volume.
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') load()
-    }, 15_000)
-    return () => clearInterval(id)
-  }, [load])
+  // No auto-refresh — the page loads on mount and when filters/search change.
+  // (Founder feedback: the constant 15s reload was distracting and unnecessary.)
+  // Use the manual refresh control to pull new calls.
 
   const openDetail = useCallback(async (row: CallRow) => {
     // Seed the drawer with the row we already have, then hydrate with turns.
