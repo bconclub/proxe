@@ -481,6 +481,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
+              // POP: Pipeline page hidden for now (not needed for the campaign).
+              if (item.href === '/dashboard/pipeline' && brandCfg.brand === 'pop') return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when pathname matches the href OR
