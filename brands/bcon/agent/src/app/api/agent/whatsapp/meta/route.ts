@@ -755,11 +755,21 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
           const brandCtx2 = ctx2[brand] || ctx2.bcon || {};
           const mergedBrandCtx = mergeProfile(brandCtx2, profile);
 
-          // Promote profile.full_name → customer_name when the stored name is
-          // garbled / not a real person (e.g. junk Meta form name the customer
-          // later corrected in chat).
+          // Promote the name the user STATED in chat → customer_name. The stored
+          // name is usually the WhatsApp push name (e.g. "SAF"), which looks like
+          // a real name, so the old guard (!isLikelyRealPersonName(stored)) wrongly
+          // blocked the override. Instead: promote when the EXTRACTED name is a
+          // real person's name and genuinely differs from the stored one — but not
+          // when it's just a shorter/longer form (so we never drop a fuller name).
           const storedName = ctxRow2?.customer_name as string | null | undefined;
-          const promote = !!profile.full_name && !isLikelyRealPersonName(storedName || '');
+          const sL = String(storedName || '').trim().toLowerCase();
+          const fL = String(profile.full_name || '').trim().toLowerCase();
+          const promote =
+            !!profile.full_name &&
+            isLikelyRealPersonName(profile.full_name) &&
+            sL !== fL &&
+            !sL.includes(fL) &&
+            !fL.includes(sL);
 
           const update2: Record<string, any> = {
             unified_context: { ...ctx2, [brand]: mergedBrandCtx },
