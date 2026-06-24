@@ -10,6 +10,7 @@ import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId } from '@/configs'
+import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
   MdChat,
@@ -107,6 +108,16 @@ const POP_LOOP: Record<string, { label: string; color: string }> = {
   raised:   { label: 'Raised',   color: '#F59E0B' },
   routed:   { label: 'Routed',   color: '#3B82F6' },
   resolved: { label: 'Resolved', color: '#22C55E' },
+}
+// AC number lookup (numbered constituency chip) + a stable per-district color so
+// every row from the same district reads the same hue. Built from the war-room
+// reference (117 ECI seats). Hash→hue gives a deterministic mid-tone that works
+// on both light and dark.
+const POP_AC_BY_NAME = new Map(CONSTITUENCIES.map((c) => [normSeat(c.name), c]))
+function popDistrictColor(d: string): string {
+  let h = 0
+  for (let i = 0; i < d.length; i++) h = (h * 31 + d.charCodeAt(i)) % 360
+  return `hsl(${h}, 60%, 52%)`
 }
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -896,7 +907,10 @@ export default function LeadsTable({
                   const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
                   const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
                   const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
-                  const districtLine = [pl.district, pl.booth].filter(Boolean).join(' · ')
+                  const seatRef = pl.constituency ? POP_AC_BY_NAME.get(normSeat(pl.constituency)) : undefined
+                  const acNo = seatRef?.no
+                  const districtName = pl.district || seatRef?.district || ''
+                  const distColor = districtName ? popDistrictColor(districtName) : ''
 
                   return (
                     <tr
@@ -917,15 +931,19 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* CONTACT — phone */}
+                      {/* CONTACT — phone + email (when provided) */}
                       <td className="px-3 py-2">
-                        {lead.phone ? (
+                        {lead.phone && (
                           <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
                             {lead.phone}
                           </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
+                        {lead.email && (
+                          <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
+                            {lead.email}
+                          </a>
+                        )}
+                        {!lead.phone && !lead.email && <span style={{ color: 'var(--text-muted)' }}>—</span>}
                       </td>
 
                       {/* SOURCE — origin marketing source + entry point (real attribution) */}
@@ -987,13 +1005,34 @@ export default function LeadsTable({
                         })()}
                       </td>
 
-                      {/* CONSTITUENCY — seat + district·booth */}
+                      {/* CONSTITUENCY — numbered AC chip + seat + district color pill */}
                       <td className="px-3 py-2">
                         {pl.constituency ? (
                           <>
-                            <div className="text-sm" style={{ color: 'var(--text-primary)' }}>{pl.constituency}</div>
-                            {districtLine && (
-                              <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{districtLine}</div>
+                            <div className="flex items-center gap-1.5">
+                              {acNo != null && (
+                                <span
+                                  className="inline-flex items-center justify-center text-[9px] font-bold tabular-nums rounded"
+                                  title={`AC ${acNo}`}
+                                  style={{ minWidth: 18, height: 16, padding: '0 4px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                                >
+                                  {acNo}
+                                </span>
+                              )}
+                              <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{pl.constituency}</span>
+                            </div>
+                            {(districtName || pl.booth) && (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                {districtName && (
+                                  <span
+                                    className="inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap"
+                                    style={{ color: distColor, backgroundColor: `color-mix(in srgb, ${distColor} 16%, transparent)` }}
+                                  >
+                                    {districtName}
+                                  </span>
+                                )}
+                                {pl.booth && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{pl.booth}</span>}
+                              </div>
                             )}
                           </>
                         ) : (
