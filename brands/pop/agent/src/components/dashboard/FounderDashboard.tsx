@@ -115,6 +115,11 @@ function fmtMs(ms: number): string {
   return `${h}h ${m}m`
 }
 
+// Thousands separator for the full KPI numbers (8,832 / 1,284). Indian grouping.
+const fmtComma = (n: number | string): string => (typeof n === 'number' ? n.toLocaleString('en-IN') : String(n))
+// Compact K abbreviation for the tight Engine Overview nodes (10.5K, 2.9K, 760).
+const abbrevK = (n: number): string => (n < 1000 ? String(n) : `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`)
+
 // Deterministic gentle daily climb from `start`→`end` with a small wave — for
 // the mock trend/sparkline series (no Math.random so renders are stable).
 function popDailySeries(n: number, end: number, start: number): Array<{ value: number }> {
@@ -428,6 +433,8 @@ export default function FounderDashboard() {
   const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
   const engBooked = fn ? fn.booked : (flow.booked || 0)
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
+  // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
+  const engK = (n: number): number | string => (brandCfg.brand === 'pop' ? abbrevK(n) : n)
   const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
   // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
@@ -574,7 +581,7 @@ export default function FounderDashboard() {
             </div>
           </div>
           <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
-            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{acValue}</span>
+            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{fmtComma(acValue)}</span>
           </div>
           {(() => {
             // Sparkline tracks the selected window (Today shows the 7-day context).
@@ -593,7 +600,7 @@ export default function FounderDashboard() {
         <KpiCard
           icon={<MdLocalFireDepartment size={15} />} iconColor="#22c55e"
           label="High Intent Leads"
-          value={metrics.hotLeads?.count ?? 0}
+          value={fmtComma(metrics.hotLeads?.count ?? 0)}
           sparkData={metrics.trends?.hotLeads?.data} sparkColor="#22c55e"
           sub="flagged high-intent by PROXe"
           onClick={() => router.push('/dashboard/leads?filter=hot')}
@@ -617,7 +624,7 @@ export default function FounderDashboard() {
         <KpiCard
           icon={<MdEvent size={15} />} iconColor="#a855f7"
           label="Booked Calls / Events"
-          value={bookedVal}
+          value={fmtComma(bookedVal)}
           delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
           sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
           sub="vs last 7 days"
@@ -634,10 +641,10 @@ export default function FounderDashboard() {
         <KpiCard
           icon={<MdCall size={15} />} iconColor="#06b6d4"
           label="Calls"
-          value={metrics.calls?.total ?? 0}
+          value={fmtComma(metrics.calls?.total ?? 0)}
           delta={<KpiDelta change={metrics.calls?.trend?.change} />}
           sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
-          sub={`${metrics.calls?.inbound ?? 0} in · ${metrics.calls?.outbound ?? 0} out`}
+          sub={`${fmtComma(metrics.calls?.inbound ?? 0)} in · ${fmtComma(metrics.calls?.outbound ?? 0)} out`}
           onClick={() => router.push('/dashboard/calls')}
         />
       </div>
@@ -662,11 +669,11 @@ export default function FounderDashboard() {
           </div>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engTotal} label="Total Leads" sub={engTopSub} />
-            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engEngaged} label="Engaged" sub={engPct(engEngaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engWarm} label="Warm" sub={engPct(engWarm)} />
-            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engDue} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engBooked} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
+            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
+            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
+            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engK(engBooked)} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: healthColor }} />
@@ -904,7 +911,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
 function EngineNode({ icon, color, count, label, sub, last }: {
   icon: React.ReactNode
   color: string
-  count: number
+  count: number | string
   label: string
   sub?: string
   last?: boolean
