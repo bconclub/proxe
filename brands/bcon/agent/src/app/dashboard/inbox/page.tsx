@@ -252,12 +252,14 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
     const valueStart = matches[i].index! + matches[i][0].length;
     const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
     const value = content.substring(valueStart, valueEnd).trim();
-    const cleanKey = rawKey
-      .replace(/\?$/, '')
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+    // Preserve the EXACT form question (original casing + "?") so the inbox card
+    // shows the real form verbatim. Only snake_case keys (e.g. Pabbly "full_name")
+    // get title-cased; spaced question text is kept exactly as submitted.
+    const trimmedKey = rawKey.trim();
+    const isSnake = /_/.test(trimmedKey) && !/\s/.test(trimmedKey);
+    const cleanKey = isSnake
+      ? trimmedKey.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      : trimmedKey;
     fields.push({ key: cleanKey, value });
   }
   return { intro, fields };
@@ -1800,23 +1802,23 @@ export default function InboxPage() {
                     // "+" Phone even though the lead record has them — fall back to the
                     // resolved lead, and drop any field that's still blank so the card
                     // never shows empty rows.
-                    const withLabels = formData.fields
+                    // Show the form EXACTLY as submitted: the real question text +
+                    // its answer, in the order the lead filled it in. No relabeling
+                    // to generic tags, no reordering. getFormFieldLabel is used only
+                    // to detect Name/Phone for the blank-value fallback.
+                    const withFields = formData.fields
                       .map(f => {
-                        const label = getFormFieldLabel(f.key);
+                        const kind = getFormFieldLabel(f.key);
                         let value = (f.value || '').trim();
-                        if (label === 'Name' && !value) value = (selectedConversation?.lead_name || '').trim();
-                        if (label === 'Phone' && value.replace(/\D/g, '').length < 7) value = (selectedConversation?.lead_phone || value).trim();
-                        return { value, label };
+                        if (kind === 'Name' && !value) value = (selectedConversation?.lead_name || '').trim();
+                        if (kind === 'Phone' && value.replace(/\D/g, '').length < 7) value = (selectedConversation?.lead_phone || value).trim();
+                        return { label: f.key, value };
                       })
                       .filter(f => f.value && f.value !== '+');
-                    const ORDER = ['Name', 'Email', 'Phone', 'City', 'Brand', 'Business', 'Customers', 'Volume', 'Spend', 'Current System', 'Type', 'Urgency'];
-                    const seen = new Set<typeof withLabels[number]>();
-                    const priorityOrdered = ORDER.flatMap(l => withLabels.filter(f => f.label === l && !seen.has(f) && (seen.add(f), true)));
-                    const otherOrdered = withLabels.filter(f => !seen.has(f));
                     const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[9px] font-semibold uppercase tracking-wide w-[68px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
-                        <span className="text-[12px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                      <div className="flex flex-col gap-0.5 py-1 border-b last:border-b-0" style={{ borderColor: 'rgba(59,130,246,0.12)' }}>
+                        <span className="text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span className="text-[12.5px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
                       </div>
                     );
 
@@ -1841,18 +1843,10 @@ export default function InboxPage() {
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Ordered fields — one per row */}
-                          <div className="space-y-1">
-                            {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
+                          {/* Exact form — question + answer, in submission order */}
+                          <div>
+                            {withFields.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
-                          {otherOrdered.length > 0 && (
-                            <details open className="mt-1.5">
-                              <summary className="text-[10px] cursor-pointer" style={{ color: '#60a5fa' }}>+{otherOrdered.length} more fields</summary>
-                              <div className="space-y-1 mt-1.5">
-                                {otherOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
-                              </div>
-                            </details>
-                          )}
                         </div>
                       </div>
                       </React.Fragment>
