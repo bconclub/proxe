@@ -194,25 +194,33 @@ export async function POST(req: NextRequest) {
     const recordingUrl = msg.recordingUrl || msg.artifact?.recordingUrl || call.recordingUrl || null;
     const messages: any[] = msg.artifact?.messages || msg.messages || [];
 
-    console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length });
+    // The contact name the call was placed with (passed as assistantOverrides at
+    // dial time) — so a lead created/updated from a voice call carries a name
+    // instead of showing "Unknown caller".
+    const vv = call?.assistantOverrides?.variableValues || msg?.assistantOverrides?.variableValues || {};
+    const vapiName = String(vv['vh-contactname'] || vv['vh-greetingname'] || vv['vh-businessname'] || '').trim() || null;
+
+    console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length, name: vapiName });
 
     // 1) Find or create the lead (prefer a match in this brand)
     let leadId: string | null = null;
     if (norm) {
       const { data: leads } = await supabase
         .from('all_leads')
-        .select('id, brand')
+        .select('id, brand, customer_name')
         .eq('customer_phone_normalized', norm);
       const existing = leads?.find((l: any) => l.brand === BRAND_ID) || leads?.[0] || null;
       if (existing) {
         leadId = existing.id;
         const updates: any = { last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() };
         if (existing.brand === 'default') updates.brand = BRAND_ID;
+        if (vapiName && !existing.customer_name) updates.customer_name = vapiName;
         await supabase.from('all_leads').update(updates).eq('id', leadId);
       } else {
         const { data: created, error: cErr } = await supabase
           .from('all_leads')
           .insert({
+            customer_name: vapiName,
             phone,
             customer_phone_normalized: norm,
             brand: BRAND_ID,

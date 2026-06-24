@@ -50,32 +50,30 @@ export async function GET(
     }
 
     const callId = session.external_session_id || id
-    const lead = session.lead_id
-      ? (await supabase
-          .from('all_leads')
-          .select('id, customer_name, email, phone, lead_score, lead_stage')
-          .eq('id', session.lead_id)
-          .maybeSingle()).data
-      : null
 
-    // Transcript turns + summary row for this call (channel='voice', matched by call_id).
+    // Transcript turns + summary row for this call (channel='voice', matched by
+    // call_id, not lead_id — loads even with no lead linkage). Also capture the
+    // lead the transcript is linked to + the real duration, as fallbacks for a
+    // stale/un-enriched session row.
     let turns: Array<{ sender: string; content: string; createdAt: string }> = []
     let recordingUrl: string | null = session.recording_url || null
     let summary: string | null = session.call_summary || null
     let endedReason: string | null = null
+    let convLeadId: string | null = null
+    let convDuration: number | null = null
     {
-      // Match by call_id (metadata.call_id === external_session_id), not lead_id —
-      // the transcript/recording must load even when the call has no lead linkage.
       const { data: convs } = await supabase
         .from('conversations')
-        .select('sender, content, metadata, created_at')
+        .select('lead_id, sender, content, metadata, created_at')
         .eq('channel', 'voice')
         .filter('metadata->>call_id', 'eq', callId)
         .order('created_at', { ascending: true })
       ;(convs || []).forEach((c: any) => {
+        if (c.lead_id && !convLeadId) convLeadId = c.lead_id
         if (c?.metadata?.summary) {
           recordingUrl = c.metadata.recording_url || recordingUrl
           endedReason = c.metadata.ended_reason || endedReason
+          if (typeof c.metadata.duration_seconds === 'number') convDuration = c.metadata.duration_seconds
           if (c.content && c.content !== '(call recording)') summary = summary || c.content
         } else {
           turns.push({ sender: c.sender, content: c.content, createdAt: c.created_at })
@@ -83,19 +81,31 @@ export async function GET(
       })
     }
 
+    const resolvedLeadId: string | null = session.lead_id || convLeadId || null
+    const lead = resolvedLeadId
+      ? (await supabase
+          .from('all_leads')
+          .select('id, customer_name, email, phone, lead_score, lead_stage')
+          .eq('id', resolvedLeadId)
+          .maybeSingle()).data
+      : null
+
+    const ended = !!(endedReason || summary)
+    const status = (ended && session.call_status !== 'completed') ? 'completed' : (session.call_status || null)
+
     return NextResponse.json({
       call: {
         id: callId,
         sessionId: session.id,
         callId,
-        leadId: session.lead_id || null,
+        leadId: resolvedLeadId,
         leadName: lead?.customer_name || null,
         leadScore: lead?.lead_score ?? null,
         leadStage: lead?.lead_stage || null,
-        phone: session.customer_phone || session.customer_phone_normalized || null,
+        phone: session.customer_phone || session.customer_phone_normalized || lead?.phone || null,
         direction: (session.call_direction as string) || 'inbound',
-        status: session.call_status || null,
-        durationSeconds: session.call_duration_seconds ?? 0,
+        status,
+        durationSeconds: session.call_duration_seconds || convDuration || 0,
         recordingUrl,
         summary,
         endedReason,

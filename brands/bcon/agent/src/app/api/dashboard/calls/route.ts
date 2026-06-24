@@ -77,22 +77,28 @@ export async function GET(request: NextRequest) {
     // Join on the call_id (conversations.metadata.call_id === external_session_id),
     // NOT lead_id — recordings/transcripts must surface even when the call has no
     // lead linkage. The Vapi webhook writes them with metadata.call_id regardless.
-    type CallExtra = { recordingUrl: string | null; summary: string | null; endedReason: string | null; turnCount: number }
+    type CallExtra = { recordingUrl: string | null; summary: string | null; endedReason: string | null; turnCount: number; leadId: string | null; durationSeconds: number | null }
     const extras = new Map<string, CallExtra>()
     if (callIds.length) {
       const { data: convs } = await supabase
         .from('conversations')
-        .select('sender, content, metadata, created_at')
+        .select('lead_id, sender, content, metadata, created_at')
         .eq('channel', 'voice')
         .filter('metadata->>call_id', 'in', `(${callIds.join(',')})`)
       ;(convs || []).forEach((c: any) => {
         const cid = c?.metadata?.call_id
         if (!cid) return
-        const e = extras.get(cid) || { recordingUrl: null, summary: null, endedReason: null, turnCount: 0 }
+        const e = extras.get(cid) || { recordingUrl: null, summary: null, endedReason: null, turnCount: 0, leadId: null, durationSeconds: null }
+        // The transcript/summary rows often carry the resolved lead even when the
+        // voice_sessions row never got enriched — capture it so the contact name
+        // resolves from here as a fallback.
+        if (c.lead_id) e.leadId = e.leadId || c.lead_id
         if (c?.metadata?.summary) {
-          // The summary row — carries the recording + ended reason + summary text.
+          // The summary row — carries the recording + ended reason + summary +
+          // duration. Used as a fallback when the session row is stale.
           e.recordingUrl = c.metadata.recording_url || e.recordingUrl
           e.endedReason = c.metadata.ended_reason || e.endedReason
+          if (typeof c.metadata.duration_seconds === 'number') e.durationSeconds = c.metadata.duration_seconds
           if (c.content && c.content !== '(call recording)') e.summary = c.content
         } else {
           e.turnCount += 1
@@ -101,21 +107,43 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Backfill leadMap with any lead found on the conversations but not on the
+    // session row — so "Unknown caller" calls (session.lead_id NULL) still resolve
+    // their name/phone from the lead the transcript is linked to.
+    const convLeadIds = Array.from(new Set(
+      Array.from(extras.values()).map((e) => e.leadId).filter((id): id is string => !!id && !leadMap.has(id)),
+    ))
+    if (convLeadIds.length) {
+      const { data: moreLeads } = await supabase
+        .from('all_leads')
+        .select('id, customer_name, email, phone, lead_score, lead_stage')
+        .in('id', convLeadIds)
+      ;(moreLeads || []).forEach((l: any) => leadMap.set(l.id, l))
+    }
+
     let calls = rows.map((r: any) => {
-      const lead = r.lead_id ? leadMap.get(r.lead_id) : null
       const extra = r.external_session_id ? extras.get(r.external_session_id) : undefined
+      // Resolve the lead from the session, else from the lead the transcript is
+      // linked to — so calls whose voice_sessions row never got enriched still
+      // show the real contact instead of "Unknown caller".
+      const resolvedLeadId = r.lead_id || extra?.leadId || null
+      const lead = resolvedLeadId ? leadMap.get(resolvedLeadId) : null
+      // If the session is stale (never enriched) but the call clearly ended
+      // (summary row present), reflect "completed" + the real duration.
+      const ended = !!(extra?.endedReason || extra?.summary)
+      const status = (ended && r.call_status !== 'completed') ? 'completed' : (r.call_status || null)
       return {
         id: r.external_session_id || r.id,
         sessionId: r.id,
         callId: r.external_session_id || null,
-        leadId: r.lead_id || null,
+        leadId: resolvedLeadId,
         leadName: lead?.customer_name || null,
         leadScore: lead?.lead_score ?? null,
         leadStage: lead?.lead_stage || null,
-        phone: r.customer_phone || r.customer_phone_normalized || null,
+        phone: r.customer_phone || r.customer_phone_normalized || lead?.phone || null,
         direction: (r.call_direction as string) || 'inbound',
-        status: r.call_status || null,
-        durationSeconds: r.call_duration_seconds ?? 0,
+        status,
+        durationSeconds: r.call_duration_seconds || extra?.durationSeconds || 0,
         recordingUrl: r.recording_url || extra?.recordingUrl || null,
         summary: r.call_summary || extra?.summary || null,
         endedReason: extra?.endedReason || null,
