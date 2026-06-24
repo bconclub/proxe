@@ -115,6 +115,54 @@ function fmtMs(ms: number): string {
   return `${h}h ${m}m`
 }
 
+// Deterministic gentle daily climb from `start`→`end` with a small wave — for
+// the mock trend/sparkline series (no Math.random so renders are stable).
+function popDailySeries(n: number, end: number, start: number): Array<{ value: number }> {
+  const out: Array<{ value: number }> = []
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? i / (n - 1) : 1
+    const base = start + (end - start) * t
+    const wave = Math.sin(i * 1.3) * Math.abs(end) * 0.04
+    out.push({ value: Math.max(0, Math.round(base + wave)) })
+  }
+  return out
+}
+
+// POP pitch dashboard: overlay campaign-scale ENGINE/KPI aggregates onto the real
+// metrics so the overview reads like a live statewide operation. Lists (lead
+// queues, bookings) stay real — only the headline numbers are mocked. Pop only.
+function popMockMetrics(real: FounderMetrics): FounderMetrics {
+  const conv7D = popDailySeries(7, 8832, 6100)
+  const conv14D = popDailySeries(14, 8832, 4200)
+  const conv30D = popDailySeries(30, 8832, 2600)
+  return {
+    ...real,
+    totalConversations: { total: 214500, count1D: 8832, count7D: 52400, count14D: 98600, count30D: 196400, trend7D: 18, trend14D: 12, trend30D: 9 },
+    totalLeads: { ...real.totalLeads, count: 10500, count1D: 412, count7D: 2840, count14D: 5460, count30D: 9200, conversionRate: 14, change7D: 11, change14D: 9, change30D: 7 },
+    hotLeads: { ...real.hotLeads, count: 1284 },
+    engagedLeads: { ...real.engagedLeads, count: 2940, count7D: 820, count14D: 1560, count30D: 2410, engagementRate: 28 },
+    warmLeads: { ...real.warmLeads, count: 1880, count7D: 520, count14D: 1010, count30D: 1640 },
+    leadFlow: { new: 10500, engaged: 2940, qualified: 1880, booked: 430 },
+    funnel: {
+      Today: { total: 412, engaged: 120, warm: 78, followUpDue: 44, booked: 22 },
+      '7D': { total: 2840, engaged: 820, warm: 520, followUpDue: 210, booked: 128 },
+      '14D': { total: 5460, engaged: 1560, warm: 1010, followUpDue: 430, booked: 246 },
+      All: { total: 10500, engaged: 2940, warm: 1880, followUpDue: 760, booked: 430 },
+    },
+    responseHealth: { avgMs: 38000, status: 'good' },
+    calls: { total: 1920, inbound: 1108, outbound: 812, today: 214, todayInbound: 124, todayOutbound: 90, count7D: 690, trend7D: 16, trend: { data: popDailySeries(7, 320, 180), change: 16 } },
+    radialMetrics: { avgScore: real.radialMetrics?.avgScore ?? 68, responseRate: 92, bookingRate: 12, avgResponseTime: 38 },
+    trendSeries: { conversations: { All: conv30D, '7D': conv7D, '14D': conv14D, '30D': conv30D } },
+    trends: {
+      leads: { data: popDailySeries(7, 1800, 1200), change: 11 },
+      bookings: { data: popDailySeries(7, 70, 38), change: 14 },
+      conversations: { data: conv7D, change: 18 },
+      hotLeads: { data: popDailySeries(7, 220, 150), change: 9 },
+      responseTime: { data: popDailySeries(7, 36, 48), change: -12 },
+    },
+  }
+}
+
 export default function FounderDashboard() {
   const router = useRouter()
   const brandCfg = getBrandConfig()
@@ -188,7 +236,10 @@ export default function FounderDashboard() {
       const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}`)
       if (response.ok) {
         const data = await response.json()
-        setMetrics(data)
+        // POP pitch dashboard: the People table stays real (125), but the
+        // ENGINE/KPI aggregates show campaign-scale mock numbers so the overview
+        // reads like a live statewide operation. Dashboard-only, pop-only.
+        setMetrics(brandCfg.brand === 'pop' ? popMockMetrics(data) : data)
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Error loading metrics:', response.status, errorData)
