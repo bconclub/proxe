@@ -77,10 +77,12 @@ export async function GET(request: NextRequest) {
       supabase
         .from('web_sessions')
         .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
-      // 3. whatsapp_sessions - conversation counting only (no booking columns on this table)
+      // 3. whatsapp_sessions - bookings + conversation counting. This table DOES
+      //    carry booking columns (the WhatsApp booking flow writes them here); not
+      //    selecting them meant WhatsApp bookings never reached Upcoming Events.
       supabase
         .from('whatsapp_sessions')
-        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name'),
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name, booking_date, booking_time, booking_status, booking_created_at'),
       // 4. voice_sessions - lead linkage + call facts (direction/status/duration)
       //    for the Calls overview tile.
       supabase
