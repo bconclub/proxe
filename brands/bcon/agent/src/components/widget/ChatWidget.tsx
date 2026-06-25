@@ -3379,22 +3379,25 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         )}
         
         
+        {/* Quick-reply chips render INSIDE the scroll flow, right under the last
+            message — so they sit directly below the question (left-aligned) and
+            scroll with the conversation instead of pinning to the widget bottom. */}
+        {(!isMobileViewport) &&
+          isOpen &&
+          hasQuickButtons &&
+          welcomeComplete &&
+          !hasUserMessage &&
+          hasShownWelcomeRef.current &&
+          messages.length >= 1 &&
+          messages[0].type === 'ai' &&
+          !messages[0].isStreaming &&
+          conversationsToRestoreRef.current.length === 0 &&
+          renderWelcomeButtons(styles.welcomeQuickButtons)}
+        {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
+        {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
         <div ref={messagesEndRef} />
       </div>
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
-      {(!isMobileViewport) &&
-        isOpen &&
-        hasQuickButtons &&
-        welcomeComplete &&
-        !hasUserMessage &&
-        hasShownWelcomeRef.current &&
-        messages.length >= 1 &&
-        messages[0].type === 'ai' &&
-        !messages[0].isStreaming &&
-        conversationsToRestoreRef.current.length === 0 &&
-        renderWelcomeButtons(styles.welcomeQuickButtons)}
-      {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
-      {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
 
 
       {/* Welcome video embed temporarily disabled */}

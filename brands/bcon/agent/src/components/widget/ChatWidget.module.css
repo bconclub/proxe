@@ -75,25 +75,22 @@
   height: 0;
 }
 
-/* Welcome quick buttons at bottom near input box */
+/* Quick-reply chips — render inline right under the last message, left-aligned
+   to sit directly below the question (the agent bubble is left-aligned). */
 .welcomeQuickButtons {
-  padding: 16px 20px 8px;
+  padding: 2px 0 6px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: flex-start;
   animation: slideDown 0.3s ease;
   flex-shrink: 0;
-  /* Pin to the bottom of the chat column (just above the input) so the option
-     buttons never float up to the top when the message list is short or the
-     modal height collapses in an embed. */
-  margin-top: auto;
 }
 
 .welcomeQuickButtonsContainer {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -103,7 +100,7 @@
   display: flex;
   flex-direction: row;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
   flex-wrap: wrap;
