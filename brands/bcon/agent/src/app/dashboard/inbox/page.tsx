@@ -169,8 +169,13 @@ interface Message {
 function cleanMessageContent(text: string): string {
   if (!text) return '';
 
-  // Remove [User's name is ...] metadata
-  return text.replace(/\[User's name is [^\]]+\]\s*/g, '').trim();
+  // Strip the system annotations the agent prepends to a button click before
+  // sending it to the LLM ([User's name is X], [Button intent: ...]) so the
+  // inbox shows the clean label the customer actually tapped.
+  return text
+    .replace(/\[User's name is [^\]]+\]\s*/g, '')
+    .replace(/\[Button intent:[^\]]*\]\s*/gi, '')
+    .trim();
 }
 
 function renderMarkdown(text: string) {

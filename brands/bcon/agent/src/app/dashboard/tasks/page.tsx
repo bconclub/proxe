@@ -818,7 +818,7 @@ export default function TasksPage() {
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
         {/* Col 1: Next to Fire — full length (left) */}
-        <div style={{ flex: '0 0 27%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <PanelHead title="Next to Fire" viewAll="View all" />
           <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
             {b.nextToFire.length === 0
@@ -853,7 +853,7 @@ export default function TasksPage() {
 
         {/* Col 3: right — Upcoming Queue (top) over Recent Activity (bottom).
             Each scrolls internally so nothing pushes the page past one viewport. */}
-        <div style={{ flex: '0 0 33%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
           {/* Upcoming Queue — top */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
