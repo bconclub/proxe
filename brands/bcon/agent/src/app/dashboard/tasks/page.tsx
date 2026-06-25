@@ -579,7 +579,18 @@ function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
             <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
           </div>
-          <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
+            {/* Small dismiss control — drop the task without sending (skip). */}
+            <button
+              onClick={() => onAction(t.id, 'skip')}
+              title="Remove this task (dismiss without sending)"
+              aria-label="Remove task"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3, textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
         <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginTop: 2 }}>{a.statusLine}</div>
@@ -682,7 +693,7 @@ export default function TasksPage() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/tasks')
+      const res = await fetch('/api/dashboard/tasks', { cache: 'no-store' })
       const data = await res.json()
       setTasks(data.tasks || [])
       setBoard(data.board || null)
@@ -695,20 +706,33 @@ export default function TasksPage() {
   }, [])
 
   const handleTaskAction = useCallback(async (taskId: string, action: string, scheduledAt?: string) => {
+    // Optimistic UI: react to the click INSTANTLY so it never feels like nothing
+    // happened. Approve → the card leaves "Needs Attention" and shows under "Next
+    // to Fire" (queued to fire on the worker's next run); skip → it just drops.
+    // The refetch below reconciles with the server + the worker's actual result.
+    setBoard((prev: any) => {
+      if (!prev) return prev
+      const card = prev.needsAttention?.find((t: any) => t.id === taskId)
+      if (!card) return prev
+      const needsAttention = prev.needsAttention.filter((t: any) => t.id !== taskId)
+      if (action === 'send_now') {
+        return { ...prev, needsAttention, nextToFire: [{ ...card, status: 'pending' }, ...(prev.nextToFire || [])] }
+      }
+      return { ...prev, needsAttention }
+    })
     try {
       const res = await fetch(`/api/dashboard/tasks/${taskId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, scheduled_at: scheduledAt }),
+        cache: 'no-store',
       })
       const data = await res.json()
-      if (data.success) {
-        fetchTasks()
-      } else {
-        console.error('Task action failed:', data.error)
-      }
+      if (!data.success) console.error('Task action failed:', data.error)
     } catch (err) {
       console.error('Task action error:', err)
+    } finally {
+      fetchTasks() // reconcile with the server (and the worker's result)
     }
   }, [fetchTasks])
 
