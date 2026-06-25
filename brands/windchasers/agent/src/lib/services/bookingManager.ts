@@ -312,26 +312,32 @@ export async function storeBooking(
     updatedSummary = bookingStatusMsg;
   }
 
-  // Update session
+  // Update session — whatsapp_sessions only has booking_date/booking_time/
+  // booking_status/conversation_summary; web_sessions has the full set.
   const bookingUpdate: Record<string, any> = {
     booking_date: booking.date,
     booking_time: toTime24(booking.time),
-    google_event_id: booking.googleEventId ?? null,
     booking_status: booking.status ?? 'Call Booked',
-    booking_created_at: getISTTimestamp(),
-    metadata: mergedMetadata,
     conversation_summary: updatedSummary,
-    ...(booking.meetLink ? { booking_meet_link: booking.meetLink } : {}),
-    ...(booking.title ? { booking_title: booking.title } : {}),
+    ...(tableName === 'web_sessions' ? {
+      google_event_id: booking.googleEventId ?? null,
+      booking_created_at: getISTTimestamp(),
+      metadata: mergedMetadata,
+      ...(booking.meetLink ? { booking_meet_link: booking.meetLink } : {}),
+      ...(booking.title ? { booking_title: booking.title } : {}),
+    } : {}),
   };
 
   let sessionData: any = null;
 
+  const sessionSelect = tableName === 'web_sessions'
+    ? 'lead_id, conversation_summary, user_inputs_summary, metadata'
+    : 'lead_id, conversation_summary, user_inputs_summary';
   const { data, error } = await client
     .from(tableName)
     .update(bookingUpdate)
     .eq('external_session_id', externalSessionId)
-    .select('lead_id, conversation_summary, user_inputs_summary, metadata');
+    .select(sessionSelect);
 
   if (error) {
     console.error('[bookingManager] Failed to store booking in session table', error);
@@ -411,12 +417,11 @@ export async function storeBooking(
 
     const { data: existingLead } = await client
       .from('all_leads')
-      .select('unified_context, metadata')
+      .select('unified_context')
       .eq('id', leadId)
       .maybeSingle();
 
     const existingCtx = existingLead?.unified_context || {};
-    const existingLeadMeta = existingLead?.metadata || {};
 
     const mergedCtx = {
       ...existingCtx,
@@ -426,20 +431,14 @@ export async function storeBooking(
       },
     };
 
-    // all_leads has NO scalar booking_date/booking_time columns — the booking
-    // lives in unified_context.<channel>.booking_date (set in mergedCtx above),
-    // which is exactly what the dashboard/pipeline/score routes read. Previously
-    // this update also set booking_date/booking_time, and because those columns
-    // don't exist Supabase rejected the ENTIRE update — so unified_context never
-    // got written and the booking silently vanished (agent said "Done", nothing
-    // saved). The error wasn't even checked. Persist via unified_context only.
+    // all_leads has NO scalar booking_date/booking_time or metadata columns —
+    // booking data lives in unified_context.<channel> (set in mergedCtx above).
     const { error: leadUpdateError } = await client
       .from('all_leads')
       .update({
         unified_context: mergedCtx,
         last_touchpoint: channel,
         last_interaction_at: getISTTimestamp(),
-        metadata: { ...existingLeadMeta, ...mergedMetadata },
       })
       .eq('id', leadId);
 
