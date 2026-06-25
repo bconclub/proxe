@@ -28,6 +28,15 @@ export interface WarRoomData {
   leanOverall: Record<string, number>;
   swing: { constituency: string; total: number; undecided: number; undecidedPct: number }[];
   byConstituency: { constituency: string; count: number; topCategory: string | null; leanScore: number; voteShare: number }[];
+  seatDetails: Record<string, {
+    total: number; district: string | null;
+    leanSplit: Record<string, number>;
+    topIssues: { category: string; count: number }[];
+    mobilization: Record<string, number>;
+    channels: { magnet: string; count: number }[];
+    resolved: number; loopHealthPct: number; voteShare: number; avgSalience: number;
+    recent: { category: string | null; text: string | null; created_at: string; name: string | null; lean: string | null }[];
+  }>;
   matrix: { districts: string[]; categories: string[]; cells: Record<string, Record<string, number>> };
   mobilization: Record<string, number>;
   channelMix: { magnet: string; count: number; share: number }[];
@@ -274,20 +283,107 @@ export default function WarRoomClient() {
         </div>
       </div>
 
-      {/* DRAWER */}
-      {selected && (
-        <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 340, maxWidth: '92vw', background: CARD, borderLeft: `1px solid ${LINE}`, padding: 18, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><b style={{ fontSize: 17 }}>{selected}</b><Chip on={false} onClick={() => setSelected(null)}>✕</Chip></div>
-            <div style={{ color: MUT, fontSize: 11, marginBottom: 10 }}>{CONSTITUENCIES.find((c) => c.name === selected)?.district} · {CONSTITUENCIES.find((c) => c.name === selected)?.region}</div>
-            {(() => { const seat = d?.byConstituency.find((b) => b.constituency === selected); return seat ? (<>
-              <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}><St l="Voices" v={seat.count} /><St l="Top issue" v={(seat.topCategory || '—').replace('_', ' ')} /><St l="Vote intent" v={`${Math.round(seat.voteShare)}%`} /></div>
-              <div style={{ fontSize: 10, color: MUT, marginBottom: 4 }}>LATEST GRIEVANCES</div>
-              {(d?.liveFeed || []).filter((f) => f.constituency === selected).slice(0, 6).map((f) => <div key={f.id} style={{ padding: '6px 0', borderBottom: `1px solid ${LINE}`, fontSize: 12 }}><span style={{ color: SAFFRON, textTransform: 'capitalize' }}>{(f.category || 'other').replace('_', ' ')}</span> <span style={{ color: MUT }}>· {ago(f.created_at)}</span></div>)}
-            </>) : <Empty text="No captures here yet" />; })()}
+      {/* DRAWER — rich per-constituency detail */}
+      {selected && (() => {
+        const ref = CONSTITUENCIES.find((c) => c.name === selected);
+        const sd = d?.seatDetails?.[selected];
+        const MOB = { vote: { label: 'Voters', color: GREEN }, volunteer: { label: 'Volunteers', color: BLUE }, rally: { label: 'Rallies', color: SAFFRON }, share: { label: 'Shares', color: PURPLE } } as const;
+        const total = sd?.total || 0;
+        return (
+          <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40, backdropFilter: 'blur(2px)' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 384, maxWidth: '94vw', background: CARD, borderLeft: `1px solid ${LINE}`, padding: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              {/* header */}
+              <div style={{ position: 'sticky', top: 0, zIndex: 1, padding: '16px 18px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {ref?.no != null && <span style={{ fontSize: 11, fontWeight: 800, color: TXT, background: TRACK, border: `1px solid ${LINE}`, borderRadius: 6, padding: '2px 7px' }}>AC {ref.no}</span>}
+                    <b style={{ fontSize: 18 }}>{selected}</b>
+                  </div>
+                  <Chip on={false} onClick={() => setSelected(null)}>✕</Chip>
+                </div>
+                <div style={{ color: MUT, fontSize: 11, marginTop: 4 }}>{(sd?.district || ref?.district) || '—'}{ref?.region ? ` · ${ref.region}` : ''}</div>
+              </div>
+
+              {sd && total > 0 ? (
+                <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* stat row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                    <St l="Voices" v={total} /><St l="Vote intent" v={`${sd.voteShare}%`} /><St l="Loop health" v={`${sd.loopHealthPct}%`} /><St l="Salience" v={`${sd.avgSalience}`} />
+                  </div>
+
+                  {/* lean split */}
+                  <div>
+                    <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>LEAN SPLIT</div>
+                    <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: TRACK }}>
+                      {LEAN_KEYS.map((k) => { const v = sd.leanSplit[k] || 0; return v ? <div key={k} title={`${k}: ${v}`} style={{ width: `${(v / total) * 100}%`, background: LEAN_C[k] }} /> : null; })}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 8 }}>
+                      {LEAN_KEYS.map((k) => <span key={k} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: LEAN_C[k] }} /><span style={{ textTransform: 'capitalize', color: MUT }}>{k}</span><b>{sd.leanSplit[k] || 0}</b></span>)}
+                    </div>
+                  </div>
+
+                  {/* top issues */}
+                  <div>
+                    <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>TOP ISSUES</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {sd.topIssues.map((it) => { const Icon = CAT_ICON[it.category] || MdMoreHoriz; const col = CAT_C[it.category] || SAFFRON; return (
+                        <div key={it.category} style={{ display: 'grid', gridTemplateColumns: '105px 1fr 22px', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'capitalize' }}><Icon size={13} color={col} />{it.category.replace('_', ' ')}</span>
+                          <div style={{ height: 8, background: TRACK, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(it.count / total) * 100}%`, height: '100%', background: col, borderRadius: 3 }} /></div>
+                          <span style={{ textAlign: 'right', color: MUT }}>{it.count}</span>
+                        </div>
+                      ); })}
+                    </div>
+                  </div>
+
+                  {/* mobilization */}
+                  <div>
+                    <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>MOBILIZATION</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+                      {(Object.keys(MOB) as (keyof typeof MOB)[]).map((k) => (
+                        <div key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 4px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: MOB[k].color }}>{sd.mobilization[k] || 0}</div>
+                          <div style={{ fontSize: 9, color: MUT }}>{MOB[k].label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* channels */}
+                  {sd.channels.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>CAPTURE CHANNELS</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {sd.channels.map((c) => <span key={c.magnet} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: TRACK, border: `1px solid ${LINE}`, textTransform: 'capitalize' }}>{c.magnet.replace('_', ' ')} <b>{c.count}</b></span>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* recent grievances with text */}
+                  <div>
+                    <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>LATEST GRIEVANCES</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {sd.recent.map((r, i) => { const Icon = CAT_ICON[r.category || 'other'] || MdMoreHoriz; const col = CAT_C[r.category || 'other'] || SAFFRON; return (
+                        <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: 8, borderBottom: i < sd.recent.length - 1 ? `1px solid ${LINE}` : 'none' }}>
+                          <div style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0, display: 'grid', placeItems: 'center', background: `${col}22` }}><Icon size={13} color={col} /></div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: col, textTransform: 'uppercase' }}>{(r.category || 'other').replace('_', ' ')}</span>
+                              <span style={{ fontSize: 10, color: MUT }}>{ago(r.created_at)}</span>
+                            </div>
+                            {r.text && <div style={{ fontSize: 12, color: TXT, marginTop: 2 }}>{r.text}</div>}
+                            <div style={{ fontSize: 10, color: MUT, marginTop: 2 }}>{mask(r.name, selected)}{r.lean ? ` · ${r.lean}` : ''}</div>
+                          </div>
+                        </div>
+                      ); })}
+                    </div>
+                  </div>
+                </div>
+              ) : <div style={{ padding: 18 }}><Empty text="No captures here yet" /></div>}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <style>{`@keyframes wr-pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.7)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}@keyframes wr-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(130,140,160,0.4);border-radius:9px}`}</style>
     </div>

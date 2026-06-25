@@ -91,6 +91,38 @@ export async function GET(req: NextRequest) {
       return { constituency, count: items.length, topCategory, leanScore: Math.round(leanScore * 100) / 100, voteShare: Math.round(voteShare) };
     });
 
+    // ── per-constituency detail (drawer): lean split, top issues, mobilization,
+    //    channels, loop health, recent grievances. Computed from the same rows. ──
+    const seatDetails: Record<string, any> = {};
+    bySeat.forEach((items, constituency) => {
+      const leanSplit: Record<string, number> = { supporter: 0, leaning: 0, undecided: 0, opposed: 0 };
+      const catCount: Record<string, number> = {};
+      const mob: Record<string, number> = { vote: 0, volunteer: 0, rally: 0, share: 0 };
+      const chan: Record<string, number> = {};
+      let resolved = 0;
+      items.forEach((r) => {
+        if (r.lean && leanSplit[r.lean] !== undefined) leanSplit[r.lean]++;
+        const c = r.grievance_category || 'other'; catCount[c] = (catCount[c] || 0) + 1;
+        if (r.action_intent && mob[r.action_intent] !== undefined) mob[r.action_intent]++;
+        const m = r.magnet || 'other'; chan[m] = (chan[m] || 0) + 1;
+        if (r.loop_status === 'resolved') resolved++;
+      });
+      const district = items.find((r) => r.district)?.district || null;
+      seatDetails[constituency] = {
+        total: items.length,
+        district,
+        leanSplit,
+        topIssues: Object.entries(catCount).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([category, count]) => ({ category, count })),
+        mobilization: mob,
+        channels: Object.entries(chan).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([magnet, count]) => ({ magnet, count })),
+        resolved,
+        loopHealthPct: items.length ? Math.round((100 * resolved) / items.length) : 0,
+        voteShare: items.length ? Math.round((100 * mob.vote) / items.length) : 0,
+        avgSalience: items.length ? Math.round((items.reduce((s, r) => s + (r.salience || 1), 0) / items.length) * 10) / 10 : 0,
+        recent: items.slice(0, 6).map((r) => ({ category: r.grievance_category, text: r.grievance_text || null, created_at: r.created_at, name: r.name, lean: r.lean })),
+      };
+    });
+
     // ── district × category matrix ──
     const districts = Array.from(new Set(R.map((r) => r.district).filter(Boolean))).sort() as string[];
     const cells: Record<string, Record<string, number>> = {};
@@ -142,7 +174,7 @@ export async function GET(req: NextRequest) {
     const prev7 = R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= d14 && t < d7; });
     const sentiment = { net: Math.round(net * 100) / 100, shiftPp: Math.round((avg(last7) - avg(prev7)) * 100), label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral' };
 
-    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, matrix, mobilization, channelMix, liveFeed, series, sentiment });
+    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });
