@@ -29,11 +29,19 @@ function dotColor(name: string | null, map: Map<string, string>): string {
   if (!st) return 'var(--text-muted)'
   return st.color
 }
-function worstStepColor(steps: Step[], map: Map<string, string>): string {
-  const colors = steps.map(s => dotColor(s.template, map))
+function worstColor(names: (string | null)[], map: Map<string, string>): string {
+  const colors = names.map(n => dotColor(n, map))
   if (colors.includes('#ef4444')) return '#ef4444'
   if (colors.includes('#f59e0b')) return '#f59e0b'
   return '#22c55e'
+}
+function worstStepColor(steps: Step[], map: Map<string, string>): string {
+  return worstColor(steps.map(s => s.template), map)
+}
+// A trigger's row dot: worst of its per-source templates, else its single one.
+function triggerDot(t: Trigger, map: Map<string, string>): string {
+  if (t.sources) return worstColor(t.sources.map(s => s.template), map)
+  return dotColor(t.template, map)
 }
 
 function TemplateChip({ name, map }: { name: string | null; map: Map<string, string> }) {
@@ -103,8 +111,24 @@ function TriggerDetail({ t, map }: { t: Trigger; map: Map<string, string> }) {
         </div>
       </div>
 
-      <DetailCard title="Template fired">
-        {t.template
+      <DetailCard title={t.sources ? 'Templates by source' : 'Template fired'}>
+        {t.sources ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {t.sources.map((src, i) => (
+              <div key={i}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0' }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--bg-secondary)', border: CARD, color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{src.label}</span>
+                    <TemplateChip name={src.template} map={map} />
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{src.desc}</span>
+                  </div>
+                </div>
+                {i < t.sources!.length - 1 && <div style={{ marginLeft: 12, height: 12, borderLeft: '2px dotted var(--border-primary)' }} />}
+              </div>
+            ))}
+          </div>
+        ) : t.template
           ? <TemplateChip name={t.template} map={map} />
           : <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>No WhatsApp template — this trigger routes internally (kicks off a sequence or schedules a task).</p>}
       </DetailCard>
@@ -192,7 +216,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
           {mode === 'triggers'
             ? TRIGGERS.map(t => (
                 <ListRow key={t.id} icon={t.icon} title={t.event} sub={t.when}
-                  dot={dotColor(t.template, map)} selected={t.id === selTrigger} onClick={() => setSelTrigger(t.id)} />
+                  dot={triggerDot(t, map)} selected={t.id === selTrigger} onClick={() => setSelTrigger(t.id)} />
               ))
             : SEQUENCES.map(s => (
                 <ListRow key={s.id} icon={MdRepeat} title={s.segment} sub={`${s.steps.length} step${s.steps.length === 1 ? '' : 's'}${s.gated ? ' · gated' : ''}`}

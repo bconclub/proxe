@@ -13,6 +13,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-25 00:08 IST · bcon — web-lead welcome fix + per-source "New lead arrives" trigger UI
+
+- **bcon** — Root-caused why "ready" messages weren't sending: the `bcon-tasks` PM2 worker had been dead since 2026-06-23 11:10 UTC (~36h), dropped from PM2 *and* the saved dump. Revived it (`pm2 startOrRestart ecosystem.config.js && pm2 save`) so the whole `agent_tasks` engine processes again. Approval gate left ON (tasks land in "Awaiting Approval"). VPS-side op, no code.
+- **bcon** — `api/integrations/web-agent/route.ts`: added `sendWebWelcome()` — brand-new web (chat-widget) leads now fire the approved `bcon_welcome_web_v1` WhatsApp template. This is the route web leads actually use; previously it created the lead but sent no welcome at all. Sends bare last-10 digits (the format the live worker uses). Awaited so the Vercel lambda can't drop it; soft-fails.
+- **bcon** — `api/website/route.ts`: the form-route welcome was a fire-and-forget IIFE → dropped on lambda freeze. Now awaited. Bumped Graph API v18→v21.
+- **bcon** — `configs/flows-automation.ts` + `components/dashboard/FlowsAutomation.tsx`: "New lead arrives" trigger now breaks down by source in the detail panel — Website → `bcon_welcome_web_v1`, Meta/AI Lead Machine → `bcon_lead_machine_meta_welcome_v1_`, Campaign → (not set) — each with its live Meta approval dot. Replaces the single non-existent `bcon_proxe_first_outreach` reference.
+- User-facing: web leads will now receive a WhatsApp welcome; the Flows → Triggers panel shows the real per-source templates and their approval status.
+
 ## 2026-06-22 · fix: bcon production — remove proxe-platform monorepo dep (the REAL cause)
 
 - The `npm install` switch (prior entry) did NOT fix it — the build log showed the actual error: `EMISSINGTARGET — "../.." is referenced by "node_modules/proxe-platform" but does not exist`. bcon's `package.json` + `package-lock.json` declared `"proxe-platform": "file:../../.."` (the monorepo root), which isn't in Vercel's build context (Root Directory = `brands/bcon/agent`), so install failed regardless of npm ci vs install. **This is the exact issue the parallel session already removed from POP** (WC + POP have zero `proxe-platform` refs and build fine); bcon was simply never cleaned.

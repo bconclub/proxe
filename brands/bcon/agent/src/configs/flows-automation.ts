@@ -4,12 +4,24 @@
 // brand-neutral + shared while each brand defines its own flows here.
 import { MdWavingHand, MdNotificationsActive, MdPhoneMissed, MdCallReceived } from 'react-icons/md'
 
-export type Trigger = { id: string; icon: any; event: string; when: string; template: string | null; desc: string }
+// A trigger fires either a single template, OR — when the same event arrives
+// from several places (a new lead can come from the website, a Meta lead form,
+// or a campaign) — a different welcome per `source`. The detail panel lists each.
+export type Source = { label: string; template: string | null; desc: string }
+export type Trigger = { id: string; icon: any; event: string; when: string; template: string | null; desc: string; sources?: Source[] }
 export type Step = { label: string; delay: string; template: string }
 export type Sequence = { id: string; segment: string; who: string; stop: string; gated?: boolean; steps: Step[] }
 
 export const TRIGGERS: Trigger[] = [
-  { id: 'welcome', icon: MdWavingHand, event: 'New lead arrives', when: 'Immediately', template: 'bcon_proxe_first_outreach', desc: 'The welcome / first outreach a fresh lead receives.' },
+  {
+    id: 'welcome', icon: MdWavingHand, event: 'New lead arrives', when: 'Immediately', template: null,
+    desc: 'The welcome a fresh lead receives — a different template per source.',
+    sources: [
+      { label: 'Website form', template: 'bcon_welcome_web_v1', desc: 'Lead submits a form on the website (api/website → sends instantly).' },
+      { label: 'Meta — AI Lead Machine', template: 'bcon_lead_machine_meta_welcome_v1_', desc: 'Inbound Meta / Facebook lead form (first_outreach task via the worker).' },
+      { label: 'Campaign / other', template: null, desc: 'No dedicated welcome set yet — falls back to default handling.' },
+    ],
+  },
   { id: 'r24', icon: MdNotificationsActive, event: 'Booking — 1 day before', when: '24h before the call', template: 'bcon_proxe_booking_reminder_24h', desc: '“Your call is tomorrow at …”' },
   { id: 'r1', icon: MdNotificationsActive, event: 'Booking — 1 hour before', when: '1h before', template: 'bcon_proxe_booking_reminder_1h', desc: '“Your call starts in 1 hour.”' },
   { id: 'r30', icon: MdNotificationsActive, event: 'Booking — 30 min before', when: '30m before', template: 'bcon_proxe_booking_reminder_30m', desc: '“Your call starts in 30 minutes.”' },

@@ -26,6 +26,55 @@ const normalizePhone = (phone: string): string => {
   return phone.replace(/\D/g, '')
 }
 
+// Fire the WhatsApp welcome (bcon_welcome_web_v1) for a brand-new web lead.
+// Web leads actually arrive through THIS chat-widget route (not /api/website),
+// so without this they never receive the welcome template. Sends the bare
+// last-10 digits — the format the live task-worker uses successfully. Awaited
+// by the caller so the Vercel lambda doesn't drop it on freeze. Soft-fails.
+async function sendWebWelcome(name: string, normalizedPhone: string, brandData?: any): Promise<void> {
+  const to = normalizedPhone.replace(/\D/g, '').slice(-10)
+  if (!to || to.length < 10) return
+  if (!process.env.META_WHATSAPP_PHONE_NUMBER_ID || !process.env.META_WHATSAPP_ACCESS_TOKEN) {
+    console.error('[web-agent] welcome skipped — META_WHATSAPP_* env not set')
+    return
+  }
+  try {
+    const serviceInterest = brandData?.service_interest || 'General Inquiry'
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${process.env.META_WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.META_WHATSAPP_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to,
+          type: 'template',
+          template: {
+            name: 'bcon_welcome_web_v1',
+            language: { code: 'en' },
+            components: [{
+              type: 'body',
+              parameters: [
+                { type: 'text', parameter_name: 'customer_name', text: name },
+                { type: 'text', parameter_name: 'service_interest', text: serviceInterest },
+                { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
+                { type: 'text', parameter_name: 'probe_question', text: "What's the one thing you want to fix first?" },
+              ],
+            }],
+          },
+        }),
+      }
+    )
+    if (!res.ok) console.error('[web-agent] welcome template send failed:', await res.text())
+    else console.log(`[web-agent] welcome (bcon_welcome_web_v1) sent to ${to}`)
+  } catch (e) {
+    console.error('[web-agent] welcome send error:', e)
+  }
+}
+
 // Helper function to update unified_context.web in all_leads (similar to updateWhatsAppContext)
 async function updateWebContext(
   supabase: ReturnType<typeof getServiceClient>,
@@ -354,6 +403,12 @@ export async function POST(request: NextRequest) {
 
         if (insertError) throw insertError
         leadId = newLead.id
+
+        // Brand-new web lead → fire the WhatsApp welcome template once.
+        // Awaited so it isn't dropped when the lambda freezes after the response.
+        if (normalizedPhone) {
+          await sendWebWelcome(name, normalizedPhone, brandData)
+        }
       } else {
         // EXISTING LEAD - Update
         leadId = existingLead.id
