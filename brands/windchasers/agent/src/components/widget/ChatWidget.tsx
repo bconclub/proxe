@@ -811,7 +811,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     }
     console.log('[handleContactPersist] Prepared updates', { updates, updateCount: Object.keys(updates).length });
     if (Object.keys(updates).length > 0) {
-      await persistUserProfile(updates);
+      await persistUserProfile(updates, { sync: false }); // dedup: gate saves locally; server creates the single deduped lead on next chat msg (avoids form+chat race)
     } else {
       console.warn('[handleContactPersist] No valid updates to persist', { data });
     }
