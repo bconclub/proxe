@@ -569,16 +569,20 @@ function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
     border: '1px solid var(--accent-primary)', whiteSpace: 'nowrap',
   }
   return (
-    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${a.iconColor}26`, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</div>
+    <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+      <div style={{ width: 30, height: 30, borderRadius: '50%', background: `${a.iconColor}26`, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
+        {/* Top line: lead + time on the left, action button pinned top-right so
+            the card stays short (no dedicated button row below). */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+            <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
+          </div>
+          <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: 11, margin: '2px 0 3px', textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
-        <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginBottom: 8 }}>{a.statusLine}</div>
-        <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3, textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
+        <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginTop: 2 }}>{a.statusLine}</div>
       </div>
     </div>
   )
