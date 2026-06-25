@@ -83,6 +83,10 @@
   align-items: flex-start;
   animation: slideDown 0.3s ease;
   flex-shrink: 0;
+  /* Pin to the bottom of the chat column (just above the input) so the option
+     buttons never float up to the top when the message list is short or the
+     modal height collapses in an embed. */
+  margin-top: auto;
 }
 
 .welcomeQuickButtonsContainer {
