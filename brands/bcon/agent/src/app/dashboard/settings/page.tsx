@@ -169,6 +169,30 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
+        {/* The Brain — how the task worker thinks (scoring, temperature, sequences) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            The Brain
+          </h2>
+          <a
+            href="/dashboard/settings/brain"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  How the brain works
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  See exactly how the task worker scores leads, reads temperature and intent, handles objections, and times every follow-up. Nothing fires blind.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
         {/* Team & Access — link to user management */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
