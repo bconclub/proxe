@@ -1,7 +1,7 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The Brain — an interactive React Flow map of how the task worker thinks.
+// The Brain - an interactive React Flow map of how the task worker thinks.
 // Pan / zoom / drag / click. Each node is a real step in the live logic
 // (task-worker.js + engine.ts): understand -> score -> temperature -> branch ->
 // personalize -> time -> send -> learn, with the objection and nudge branches.
@@ -39,12 +39,10 @@ function BrainNode({ data }: NodeProps<{ kind: string; title: string; detail?: s
       boxShadow: '0 4px 14px rgba(0,0,0,0.18)', color: 'var(--text-primary)',
     }}>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       {data.tag && <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.5px', color: t.accent, marginBottom: 3 }}>{data.tag}</div>}
       <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.25 }}>{data.title}</div>
       {data.detail && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.35 }}>{data.detail}</div>}
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </div>
   )
 }
@@ -56,35 +54,35 @@ const N = (id: string, kind: string, x: number, y: number, title: string, detail
 })
 
 const NODES: Node[] = [
-  // ── main lifecycle spine (center) ──
-  N('lead', 'entry', 400, 0, 'New lead arrives', 'WhatsApp, web, Meta form, or call', 'TRIGGER'),
-  N('understand', 'stage', 400, 120, 'Understand', 'Name, business, the campaign/ad they came from, their own words', 'STEP 1'),
-  N('score', 'stage', 400, 250, 'Score 0–100', 'AI signals 60% · Activity 25% · Readiness 15% · business boosts', 'STEP 2'),
-  N('temp', 'decision', 400, 380, 'Read temperature', 'From what they say + how fast they reply', 'DECISION'),
-  // temperature outcomes
-  N('hot', 'hot', 70, 530, 'HOT', '"how much", "asap", "sign me up" → Day 1 / 2 / 3, push', 'FAST'),
-  N('warm', 'warm', 300, 530, 'WARM', '"tell me more", detail questions → Day 1 / 3 / 5', 'STANDARD'),
-  N('cool', 'cool', 530, 530, 'COOL', '"maybe later", short replies → Day 2 / 5 / 8, nurture', 'STRETCHED'),
-  N('cold', 'cold', 760, 530, 'COLD', '"not interested", "stop" → sequence stops, monthly re-engage', 'PARK'),
-  // rejoin
-  N('personalize', 'stage', 400, 690, 'Personalize', 'Claude writes the message — real first name + the right "AI …" interest', 'STEP 3'),
-  N('time', 'stage', 400, 820, 'Time it', 'Their active hours · read receipts · quiet hours 9pm–9am', 'STEP 4'),
-  N('send', 'stage', 400, 950, 'Send', 'Approval-gated, no em dashes, logged to the chat', 'STEP 5'),
-  N('learn', 'loop', 400, 1080, 'Learn', 'Read / reply patterns feed the next decision', 'LOOP ↻'),
+  // ── main lifecycle spine (center lane) ──
+  N('lead', 'entry', 520, 0, 'New lead arrives', 'WhatsApp, web, Meta form, or call', 'TRIGGER'),
+  N('understand', 'stage', 520, 110, 'Understand', 'Name, business, the campaign or ad they came from, their own words', 'STEP 1'),
+  N('score', 'stage', 520, 230, 'Score 0 to 100', 'AI signals 60%, activity 25%, readiness 15%, plus business boosts', 'STEP 2'),
+  N('temp', 'decision', 520, 350, 'Read temperature', 'From what they say and how fast they reply', 'DECISION'),
+  // temperature outcomes (horizontal fan)
+  N('hot', 'hot', 180, 490, 'HOT', '"how much", "asap", "sign me up". Day 1 / 2 / 3, push', 'FAST'),
+  N('warm', 'warm', 405, 490, 'WARM', '"tell me more", detail questions. Day 1 / 3 / 5', 'STANDARD'),
+  N('cool', 'cool', 630, 490, 'COOL', '"maybe later", short replies. Day 2 / 5 / 8, nurture', 'STRETCHED'),
+  N('cold', 'cold', 855, 490, 'COLD', '"not interested", "stop". Sequence stops, monthly re-engage', 'PARK'),
+  // rejoin spine
+  N('personalize', 'stage', 520, 630, 'Personalize', 'Claude writes it: real first name and the right "AI ..." interest', 'STEP 3'),
+  N('time', 'stage', 520, 750, 'Time it', 'Their active hours, read receipts, quiet hours 9pm to 9am', 'STEP 4'),
+  N('send', 'stage', 520, 870, 'Send', 'Approval gated, no em dashes, logged to the chat', 'STEP 5'),
+  N('learn', 'loop', 520, 990, 'Learn', 'Read and reply patterns feed the next decision, then it starts over', 'LOOP'),
 
-  // ── objection branch (right) ──
-  N('obj', 'decision', 760, 690, 'They push back?', 'Detect the objection type', 'BRANCH'),
-  N('a_price', 'angle', 760, 800, 'Price', 'Value angle — 3x return in month one'),
-  N('a_time', 'angle', 760, 872, 'Timing', 'Cost of delay — leads slipping every week'),
-  N('a_trust', 'angle', 760, 944, 'Trust', 'Proof — similar business, 2x in 30 days'),
-  N('a_auth', 'angle', 760, 1016, 'Authority', 'Bring the team onto a quick call'),
-  N('a_need', 'angle', 760, 1088, 'Need', 'Free audit — show the leads they’re missing'),
+  // ── nudge branch (left lane, self-contained) ──
+  N('quiet', 'decision', -160, 350, 'When they go quiet', 'Check the last message read receipt', 'BRANCH'),
+  N('q_read', 'outcome', -160, 490, 'Read, no reply', 'Nudge 30 min after they read it'),
+  N('q_deliv', 'outcome', -160, 590, 'Delivered, not read', 'Wait, reschedule to their active hour'),
+  N('q_reply', 'outcome', -160, 690, 'Replied', 'Skip the nudge, the human or agent takes over'),
 
-  // ── nudge branch (left) ──
-  N('quiet', 'decision', 40, 690, 'They go quiet?', 'Check the last message’s read receipt', 'BRANCH'),
-  N('q_read', 'outcome', 40, 800, 'Read, no reply', 'Nudge 30 min after they read it'),
-  N('q_deliv', 'outcome', 40, 880, 'Delivered, not read', 'Wait — reschedule to their active hour'),
-  N('q_reply', 'outcome', 40, 960, 'Replied', 'Skip the nudge — human/agent takes over'),
+  // ── objection branch (right lane, self-contained) ──
+  N('obj', 'decision', 1200, 350, 'When they push back', 'Detect the objection type', 'BRANCH'),
+  N('a_price', 'angle', 1200, 490, 'Price', 'Value angle: 3x return in month one'),
+  N('a_time', 'angle', 1200, 590, 'Timing', 'Cost of delay: leads slipping every week'),
+  N('a_trust', 'angle', 1200, 690, 'Trust', 'Proof: a similar business, 2x in 30 days'),
+  N('a_auth', 'angle', 1200, 790, 'Authority', 'Bring the team onto a quick call'),
+  N('a_need', 'angle', 1200, 890, 'Need', 'Free audit, show the leads they are missing'),
 ]
 
 const E = (s: string, t: string, opts: Partial<Edge> = {}): Edge => ({
@@ -94,21 +92,21 @@ const E = (s: string, t: string, opts: Partial<Edge> = {}): Edge => ({
 })
 
 const EDGES: Edge[] = [
+  // main spine (top to bottom, clean)
   E('lead', 'understand'),
   E('understand', 'score'),
   E('score', 'temp'),
+  // temperature fan out
   E('temp', 'hot'), E('temp', 'warm'), E('temp', 'cool'), E('temp', 'cold'),
+  // rejoin (cold parks, no edge back)
   E('hot', 'personalize'), E('warm', 'personalize'), E('cool', 'personalize'),
   E('personalize', 'time'),
   E('time', 'send'),
   E('send', 'learn'),
-  E('learn', 'understand', { animated: true, style: { stroke: 'var(--accent-primary)', strokeWidth: 1.5, strokeDasharray: '5 5' }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--accent-primary)' } }),
-  // objection branch
-  E('score', 'obj', { style: { stroke: '#f59e0b', strokeWidth: 1.4 } }),
-  E('obj', 'a_price'), E('obj', 'a_time'), E('obj', 'a_trust'), E('obj', 'a_auth'), E('obj', 'a_need'),
-  // nudge branch
-  E('understand', 'quiet', { style: { stroke: '#f59e0b', strokeWidth: 1.4 } }),
-  E('quiet', 'q_read'), E('quiet', 'q_deliv'), E('quiet', 'q_reply'),
+  // nudge branch - chained so no line ever runs behind a node
+  E('quiet', 'q_read'), E('q_read', 'q_deliv'), E('q_deliv', 'q_reply'),
+  // objection branch - chained
+  E('obj', 'a_price'), E('a_price', 'a_time'), E('a_time', 'a_trust'), E('a_trust', 'a_auth'), E('a_auth', 'a_need'),
 ]
 
 export default function BrainPage() {

@@ -169,7 +169,7 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
-        {/* The Brain — how the task worker thinks (scoring, temperature, sequences) */}
+        {/* The Brain - single entry to the interactive flow */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
             The Brain
@@ -182,10 +182,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  How the brain works
+                  Open the flow
                 </h3>
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  See exactly how the task worker scores leads, reads temperature and intent, handles objections, and times every follow-up. Nothing fires blind.
+                  An interactive map of how the worker scores leads, reads temperature and intent, handles objections, and times every follow-up.
                 </p>
               </div>
               <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
