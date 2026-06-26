@@ -598,7 +598,7 @@ async function selectBestChannel(leadId, taskMetadata) {
   if (leadId) {
     const { data: lastMsg } = await supabase
       .from('conversations')
-      .select('read_at, delivered_at, metadata')
+      .select('metadata')
       .eq('lead_id', leadId)
       .eq('channel', 'whatsapp')
       .eq('sender', 'agent')
@@ -2724,7 +2724,7 @@ async function executeNudgeWaiting(task, waPhone) {
   if (task.lead_id) {
     const { data } = await supabase
       .from('conversations')
-      .select('id, read_at, delivered_at, created_at, metadata')
+      .select('id, created_at, metadata')
       .eq('lead_id', task.lead_id)
       .eq('channel', 'whatsapp')
       .eq('sender', 'agent')
@@ -3195,7 +3195,7 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
     // Check if the last agent message was read
     const { data: lastMsg } = await supabase
       .from('conversations')
-      .select('read_at, delivered_at, metadata')
+      .select('metadata')
       .eq('lead_id', task.lead_id)
       .eq('channel', 'whatsapp')
       .eq('sender', 'agent')

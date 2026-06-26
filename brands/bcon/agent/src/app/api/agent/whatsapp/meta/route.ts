@@ -363,13 +363,17 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
         : new Date().toISOString();
 
       if (statusType === 'read') {
-        await supabase
+        // NOTE: read_at/delivered_at live in metadata only — there are no such
+        // TOP-LEVEL columns on `conversations`. Including them made Supabase return
+        // a silent 42703 error (not thrown, not checked) so the receipt NEVER
+        // persisted. A read implies delivered, so stamp both. (read implies delivered)
+        const { error } = await supabase
           .from('conversations')
           .update({
-            read_at: statusTime,
-            metadata: { ...msg.metadata, delivery_status: 'read', read_at: statusTime },
+            metadata: { ...msg.metadata, delivery_status: 'read', read_at: statusTime, delivered_at: msg.metadata?.delivered_at || statusTime },
           })
           .eq('id', msg.id);
+        if (error) console.error('[meta/status] read persist error:', error.message);
 
         // Also update lead's unified_context.last_read_at
         if (msg.lead_id) {
@@ -398,13 +402,14 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
 
         console.log(`[meta/status] READ receipt: msg ${msg.id} read at ${statusTime}`);
       } else if (statusType === 'delivered') {
-        await supabase
+        // delivered_at lives in metadata only (no top-level column — see read branch).
+        const { error } = await supabase
           .from('conversations')
           .update({
-            delivered_at: statusTime,
             metadata: { ...msg.metadata, delivery_status: 'delivered', delivered_at: statusTime },
           })
           .eq('id', msg.id);
+        if (error) console.error('[meta/status] delivered persist error:', error.message);
 
         console.log(`[meta/status] DELIVERED receipt: msg ${msg.id} at ${statusTime}`);
       } else if (statusType === 'sent') {
