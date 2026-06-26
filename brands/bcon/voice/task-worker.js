@@ -3621,13 +3621,11 @@ async function resolveAiInterest(task, lead, deterministicFallback) {
         const label = (data.content?.[0]?.text || '').trim().replace(/^["']+|["'.]+$/g, '').replace(/\s+/g, ' ');
         // Guardrail: must be a clean "AI ..." label, short, single line.
         if (label && /^AI\b/i.test(label) && label.length <= 60 && !label.includes('\n')) {
-          if (leadId) {
-            try {
-              await supabase.from('all_leads').update({
-                unified_context: { ...ctx, ai_interest: { label, at: new Date().toISOString(), by: 'brain' } },
-              }).eq('id', leadId);
-            } catch (e) { /* cache write is best-effort */ }
-          }
+          // NOTE: caching intentionally disabled. A previous version wrote
+          // unified_context: {...ctx, ai_interest}, which overwrote the whole
+          // JSON from a possibly-partial ctx and WIPED rich lead context. The
+          // brain is cheap to recompute per send; safe caching (jsonb_set / a
+          // dedicated column, never a full-object overwrite) can be added later.
           console.log(`[AiInterest] Brain resolved "${label}" for lead ${leadId}`);
           return label;
         }
