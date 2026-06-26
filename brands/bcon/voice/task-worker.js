@@ -3587,7 +3587,19 @@ function buildInterestContext(task, lead) {
 }
 
 async function resolveAiInterest(task, lead, deterministicFallback) {
+  // The brain is only as good as the context it sees (campaign, business, their
+  // words). The caller's lead fetch can be partial or fail transiently, so make
+  // sure we have the full record ourselves before reasoning.
+  if (task.lead_id && (!lead || !lead.unified_context || !lead.id)) {
+    try {
+      const { data } = await supabase.from('all_leads')
+        .select('id, customer_name, response_count, unified_context')
+        .eq('id', task.lead_id).maybeSingle();
+      if (data) lead = data;
+    } catch (e) { /* fall through with whatever we have */ }
+  }
   const ctx = lead?.unified_context || {};
+  const leadId = lead?.id || task.lead_id;
   // 1. Cache — computed once per lead, reused by every send + the dashboard.
   if (ctx.ai_interest && ctx.ai_interest.label && /^AI\b/i.test(ctx.ai_interest.label)) {
     return ctx.ai_interest.label;
@@ -3609,14 +3621,14 @@ async function resolveAiInterest(task, lead, deterministicFallback) {
         const label = (data.content?.[0]?.text || '').trim().replace(/^["']+|["'.]+$/g, '').replace(/\s+/g, ' ');
         // Guardrail: must be a clean "AI ..." label, short, single line.
         if (label && /^AI\b/i.test(label) && label.length <= 60 && !label.includes('\n')) {
-          if (lead?.id) {
+          if (leadId) {
             try {
               await supabase.from('all_leads').update({
                 unified_context: { ...ctx, ai_interest: { label, at: new Date().toISOString(), by: 'brain' } },
-              }).eq('id', lead.id);
+              }).eq('id', leadId);
             } catch (e) { /* cache write is best-effort */ }
           }
-          console.log(`[AiInterest] Brain resolved "${label}" for lead ${lead?.id}`);
+          console.log(`[AiInterest] Brain resolved "${label}" for lead ${leadId}`);
           return label;
         }
         console.warn(`[AiInterest] Brain returned invalid label "${label}" for lead ${lead?.id} — using fallback`);
