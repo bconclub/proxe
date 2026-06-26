@@ -2068,6 +2068,34 @@ export default function InboxPage() {
                             </div>
                           )
                         )}
+                        {!isTemplate && msg.metadata?.quick_reply_buttons && Array.isArray(msg.metadata.quick_reply_buttons) && msg.metadata.quick_reply_buttons.length > 0 && (
+                          // Interactive quick-reply buttons the AI actually sent on WhatsApp
+                          // (stored in metadata.quick_reply_buttons by the meta webhook).
+                          // Render them WhatsApp-style — stacked, reply-arrow, divided by
+                          // hairlines — so the operator sees exactly what the customer was
+                          // offered. These were invisible before (only template_buttons rendered).
+                          <div className="flex flex-col mt-2 -mx-4 -mb-2.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                            {msg.metadata.quick_reply_buttons.map((btn: string, btnIdx: number) => (
+                              <div
+                                key={btnIdx}
+                                className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
+                                style={{
+                                  // Indigo accent (matches the AI bubble tint) — not
+                                  // var(--accent-primary), which is near-white in BCON.
+                                  color: 'rgba(139,142,255,0.95)',
+                                  borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                }}
+                                title={`Quick reply button sent: ${btn}`}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+                                  <polyline points="9 17 4 12 9 7" />
+                                  <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                </svg>
+                                {btn}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {!msg.metadata?.template_name && taskTag && (
                           <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                             <span

@@ -612,7 +612,15 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // above; here we send + log the quick reply and return early.
     if (!isCustomerButtonTap) {
       const quickReply = findQuickReplyFor(messageText);
-      if (quickReply) {
+      // Don't re-fire the canned greeting menu for an established conversation.
+      // A returning customer who says "hello" mid-thread should get a
+      // context-aware LLM reply (using history), NOT the cold "Hey! I'm BCON's
+      // AI…" intro again. Other triggers (pricing/services) may still short-
+      // circuit. userMessageCount includes the message we just logged, so a
+      // brand-new conversation is === 1.
+      const suppressGreetingReplay =
+        quickReply?.triggerKey === 'greeting' && userMessageCount > 1;
+      if (quickReply && !suppressGreetingReplay) {
         console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);
         const waReplyId = await sendReplyMaybeButtons(
           customerPhone,

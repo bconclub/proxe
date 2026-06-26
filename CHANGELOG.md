@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-26 08:07 IST · bcon — inbox renders WA quick-reply buttons + greeting no longer replays mid-chat
+
+- **bcon** — `app/dashboard/inbox/page.tsx`: the inbox now renders `metadata.quick_reply_buttons` (the interactive quick-reply / LLM-emitted buttons the AI actually sends on WhatsApp) as stacked, WhatsApp-style reply buttons under the AI bubble. Previously only `template_buttons` rendered, so these buttons were invisible to operators — the chat looked like the AI sent a bare line with no options. Indigo accent text (not `--accent-primary`, which is near-white in BCON).
+- **bcon** — `app/api/agent/whatsapp/meta/route.ts`: the canned **greeting** quick-reply no longer re-fires for an established conversation. A returning lead who typed "Hello" mid-thread was getting the cold "Hey! I'm BCON's AI…" intro again, wiping context. Now the greeting short-circuit is suppressed when `userMessageCount > 1`, so the message goes to the LLM with full history. Other triggers (pricing/services) still short-circuit on short messages.
+- User-facing: operators can finally see the buttons the AI offered; returning customers get context-aware replies instead of a cold re-intro.
+
 ## 2026-06-25 00:08 IST · bcon — web-lead welcome fix + per-source "New lead arrives" trigger UI
 
 - **bcon** — Root-caused why "ready" messages weren't sending: the `bcon-tasks` PM2 worker had been dead since 2026-06-23 11:10 UTC (~36h), dropped from PM2 *and* the saved dump. Revived it (`pm2 startOrRestart ecosystem.config.js && pm2 save`) so the whole `agent_tasks` engine processes again. Approval gate left ON (tasks land in "Awaiting Approval"). VPS-side op, no code.
