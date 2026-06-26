@@ -2485,7 +2485,7 @@ async function executeTask(task) {
   if (task.lead_id) {
     const { data: freshLead } = await supabase
       .from('all_leads')
-      .select('customer_phone_normalized, customer_name')
+      .select('customer_phone_normalized, customer_name, unified_context')
       .eq('id', task.lead_id)
       .maybeSingle();
 
@@ -2501,11 +2501,24 @@ async function executeTask(task) {
     if (freshLead?.customer_name && freshLead.customer_name !== 'Lead' && freshLead.customer_name !== 'Unknown') {
       leadName = freshLead.customer_name;
     }
+
+    // If the stored name is a generic channel fallback ("WhatsApp User", "Web
+    // User", etc.), recover the real name the lead actually gave us — from the web
+    // form (web.profile.full_name), a name they stated on WhatsApp, and so on. We
+    // must never send "Hi WhatsApp User" when we already know the person is "Uday
+    // Katkar". If we truly have nothing better, the placeholder guard below skips.
+    if (isGenericName(leadName)) {
+      const recovered = recoverRealName(freshLead?.unified_context);
+      if (recovered) {
+        console.log(`[executeTask] Recovered real name "${recovered}" over placeholder "${leadName}" for lead ${task.lead_id}`);
+        leadName = recovered;
+      }
+    }
   }
 
-  // Never send a template with a placeholder or business name ("Hi Lead", "Hi ON A TRIP HOLIDAYS")
-  const PLACEHOLDER_NAMES = ['lead', 'unknown', 'customer', ''];
-  const isPlaceholder = !leadName || PLACEHOLDER_NAMES.includes(leadName.toLowerCase().trim());
+  // Never send a template with a placeholder/channel fallback or business name
+  // ("Hi Lead", "Hi WhatsApp User", "Hi ON A TRIP HOLIDAYS").
+  const isPlaceholder = isGenericName(leadName);
   // Business names: all-caps multi-word names (e.g. "ON A TRIP HOLIDAYS", "WORK PLANET SOLUTIONS")
   const words = leadName ? leadName.trim().split(/\s+/) : [];
   const isBusinessName = words.length >= 3 && words.every(w => w === w.toUpperCase() && /[A-Z]/.test(w));
@@ -3392,6 +3405,84 @@ async function notifyTaskResult(task, success, errorMsg) {
 }
 
 /**
+ * Generic / channel-fallback names that must NEVER be sent as a real name.
+ * Covers WhatsApp/Instagram/web push-name fallbacks ("WhatsApp User"), bare role
+ * words ("there", "customer"), and our own placeholders ("Lead", "Unknown").
+ */
+function isGenericName(name) {
+  if (!name) return true;
+  const n = String(name).toLowerCase().trim();
+  if (!n) return true;
+  const exact = ['lead', 'unknown', 'customer', 'there', 'guest', 'user', 'friend', 'client', 'na', 'n/a', 'test', 'hi', 'hello'];
+  if (exact.includes(n)) return true;
+  // "<channel> user/lead/contact/visitor" fallbacks: "whatsapp user", "web lead", ...
+  if (/^(whats?app|web|website|instagram|insta|ig|facebook|fb|messenger|meta|wa|sms|telegram|tg|voice|call|caller|new|anon|anonymous|unknown)\s+(user|lead|contact|visitor)$/.test(n)) return true;
+  return false;
+}
+
+/** Gently title-case an all-lowercase name ("uday katkar" -> "Uday Katkar"); leave already-capitalised words alone. */
+function titleCaseName(name) {
+  return String(name).trim().split(/\s+/)
+    .map((w) => (w && w === w.toLowerCase() ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+/**
+ * Recover the lead's real, self-stated name from unified_context when the stored
+ * customer_name is a generic channel fallback. Checks every place a real name
+ * lands: web-form full_name, WhatsApp/Instagram stated name, form_data, top-level.
+ * Returns a cleaned, title-cased name, or null if we genuinely have nothing better.
+ */
+function recoverRealName(ctx) {
+  if (!ctx || typeof ctx !== 'object') return null;
+  const cands = [
+    ctx.full_name, ctx.name,
+    ctx.web && ctx.web.profile && (ctx.web.profile.full_name || ctx.web.profile.name),
+    ctx.whatsapp && ctx.whatsapp.profile && (ctx.whatsapp.profile.full_name || ctx.whatsapp.profile.name),
+    ctx.instagram && ctx.instagram.profile && (ctx.instagram.profile.full_name || ctx.instagram.profile.name),
+    ctx.form_data && (ctx.form_data.full_name || ctx.form_data.name),
+  ];
+  for (const c of cands) {
+    if (c && typeof c === 'string') {
+      const cleaned = c.trim();
+      if (cleaned && !isGenericName(cleaned)) return titleCaseName(cleaned);
+    }
+  }
+  return null;
+}
+
+/** "ai-customer-acquisition" -> "AI customer acquisition" (humanise a stated-interest slug). */
+function humaniseInterest(slug) {
+  let s = String(slug).replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  return s.replace(/\bai\b/g, 'AI');
+}
+
+/**
+ * Many leads carry their stated interest as a slug in profile notes or the web
+ * form message, e.g. "interested in ai-customer-acquisition" or a form message
+ * that opens "ai-customer-acquisition - Brand: ...". Pull and humanise it.
+ */
+function extractInterestFromNotes(ctx) {
+  const sources = [
+    ctx.whatsapp && ctx.whatsapp.profile && ctx.whatsapp.profile.notes,
+    ctx.web && ctx.web.profile && ctx.web.profile.notes,
+    ctx.web && ctx.web.form_submission && ctx.web.form_submission.message,
+    ctx.form_data && ctx.form_data.message,
+    ctx.notes,
+  ].filter((s) => typeof s === 'string' && s.trim());
+  for (const s of sources) {
+    const m = s.match(/interested in[:\s]+([a-z0-9][a-z0-9 \-_/&]{2,40})/i);
+    if (m) return humaniseInterest(m[1]);
+    // Web-form message often opens with the slug: "ai-customer-acquisition - Brand: ..."
+    const head = s.split(/[-–|:]/)[0].trim();
+    if (/^[a-z0-9][a-z0-9 _-]{2,40}$/i.test(head) && /acquisition|marketing|lead|automation|growth|sales|brand|social|ads|seo|content/i.test(head)) {
+      return humaniseInterest(head);
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve service_interest and pain_point from lead record / task metadata.
  * Checks form data, task metadata, unified_summary, and admin notes for context.
  */
@@ -3401,9 +3492,14 @@ function resolveLeadContext(task, lead) {
 
   // 1. Try explicit fields first
   let serviceInterest =
-    formData.business_type || formData.service ||
+    formData.business_type || formData.service || formData.service_interest ||
     task.metadata?.service_interest || task.metadata?.business_type ||
     task.metadata?.campaign || null;
+
+  // 1b. Stated-interest slug in notes / web form message ("interested in X").
+  if (!serviceInterest) {
+    serviceInterest = extractInterestFromNotes(ctx);
+  }
 
   // 2. If no explicit field, scan unified_summary and admin notes for topic keywords
   if (!serviceInterest) {
@@ -3439,6 +3535,10 @@ function extractServiceFromContext(ctx) {
   }
   if (ctx.conversation_summary) parts.push(ctx.conversation_summary);
   if (ctx.business_context) parts.push(ctx.business_context);
+  // Also scan the lead's own stated interest in profile notes / web form message.
+  if (ctx.whatsapp && ctx.whatsapp.profile && ctx.whatsapp.profile.notes) parts.push(ctx.whatsapp.profile.notes);
+  if (ctx.web && ctx.web.profile && ctx.web.profile.notes) parts.push(ctx.web.profile.notes);
+  if (ctx.web && ctx.web.form_submission && ctx.web.form_submission.message) parts.push(ctx.web.form_submission.message);
 
   if (parts.length === 0) return null;
 
@@ -3446,6 +3546,7 @@ function extractServiceFromContext(ctx) {
 
   // Match specific service topics (ordered by specificity)
   const topicMap = [
+    { keywords: ['customer acquisition', 'customer-acquisition', 'acquire customers', 'getting customers', 'more customers', 'new customers'], label: 'customer acquisition' },
     { keywords: ['lead gen', 'lead generation', 'lead machine', 'leads', 'getting leads', 'more leads'], label: 'lead generation' },
     { keywords: ['ai agent', 'ai assistant', 'chatbot', 'ai bot', 'whatsapp bot', 'whatsapp automation'], label: 'AI automation' },
     { keywords: ['ai system', 'ai solution', 'artificial intelligence', 'ai for business', 'ai-powered'], label: 'AI systems' },

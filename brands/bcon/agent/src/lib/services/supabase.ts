@@ -66,6 +66,14 @@ export function getServiceClient(): SupabaseClient | null {
 
   serviceClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
+    // CRITICAL: opt every Supabase read out of Next.js's Data Cache. Next patches
+    // global fetch and caches GET requests by default — including PostgREST SELECTs
+    // — so a dashboard read issued moments after a write returns a STALE snapshot
+    // (e.g. Tasks "Approve" flips a task to pending in the DB, but the board re-read
+    // still shows it queued, so the card "comes back to Awaiting Approval"). Writes
+    // are POSTs (never cached) so they persist fine; only reads went stale. Forcing
+    // no-store makes every read fresh — correct for a live dashboard.
+    global: { fetch: (input: any, init?: any) => fetch(input, { ...init, cache: 'no-store' }) },
   });
 
   return serviceClient;
@@ -108,6 +116,9 @@ export function getAnonClient(): SupabaseClient | null {
 
   anonClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
+    // Same no-store rationale as the service client above: never serve stale reads
+    // from Next.js's Data Cache.
+    global: { fetch: (input: any, init?: any) => fetch(input, { ...init, cache: 'no-store' }) },
   });
 
   return anonClient;
