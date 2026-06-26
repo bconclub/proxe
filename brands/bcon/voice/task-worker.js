@@ -40,6 +40,23 @@ if (!WA_TOKEN) {
 }
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
+
+// ── TEST MODE ────────────────────────────────────────────────────────────────
+// When TEST_RECIPIENT is set, EVERY outbound WhatsApp (template + free-form) is
+// redirected to this one number instead of the real lead — so we verify exactly
+// what goes out on a test phone before any real lead is messaged. Unset it to go
+// live. Digits only (e.g. 919731660933).
+const TEST_RECIPIENT = (process.env.TEST_RECIPIENT || '').replace(/\D/g, '') || null;
+if (TEST_RECIPIENT) {
+  console.log(`[TEST MODE] All WhatsApp sends redirected to TEST_RECIPIENT=${TEST_RECIPIENT}. No real lead will be messaged.`);
+}
+function routePhone(phone) {
+  if (TEST_RECIPIENT) {
+    console.log(`[TEST_RECIPIENT] Redirect send: real=${phone} -> test=${TEST_RECIPIENT}`);
+    return TEST_RECIPIENT;
+  }
+  return phone;
+}
 const VOBIZ_AUTH_ID = process.env.VOBIZ_AUTH_ID || null;
 const VOBIZ_AUTH_TOKEN = process.env.VOBIZ_AUTH_TOKEN || null;
 const VOBIZ_FROM_NUMBER = process.env.VOBIZ_FROM_NUMBER || '918046733388';
@@ -3486,37 +3503,132 @@ function extractInterestFromNotes(ctx) {
  * Resolve service_interest and pain_point from lead record / task metadata.
  * Checks form data, task metadata, unified_summary, and admin notes for context.
  */
+// Everything reads "AI ..." for consistency ("AI lead generation", "AI marketing").
+function ensureAiPrefix(s) {
+  s = String(s).trim();
+  return /^ai\b/i.test(s) ? s.replace(/^ai\b/i, 'AI') : `AI ${s}`;
+}
+
+// Brand from STRUCTURED fields only — never parsed from free-text summaries (that
+// produced garbage like "New Lead With No Discussion"). No clean brand -> null.
+function resolveBrandName(ctx) {
+  const direct = ctx.company
+    || (ctx.form_data && (ctx.form_data.brand_name || ctx.form_data.brand || ctx.form_data.business_name || ctx.form_data.company))
+    || (ctx.web && ctx.web.profile && (ctx.web.profile.company || ctx.web.profile.brand_name || ctx.web.profile.business_name))
+    || (ctx.whatsapp && ctx.whatsapp.profile && (ctx.whatsapp.profile.company || ctx.whatsapp.profile.brand_name));
+  if (direct && String(direct).trim() && !isGenericName(String(direct))) return titleCaseName(String(direct).trim());
+  return null;
+}
+
+// Deterministic fallback resolver (used only when the brain — resolveAiInterest —
+// is unavailable). NOTE: business_type (their INDUSTRY) is deliberately NOT used:
+// "you reached out about ERP Consultant" reads broken. Only a genuine stated
+// interest, else "AI marketing for <brand>".
 function resolveLeadContext(task, lead) {
   const ctx = lead?.unified_context || {};
   const formData = ctx.form_data || ctx.whatsapp?.profile || ctx.web?.profile || {};
 
-  // 1. Try explicit fields first
   let serviceInterest =
-    formData.business_type || formData.service || formData.service_interest ||
-    task.metadata?.service_interest || task.metadata?.business_type ||
-    task.metadata?.campaign || null;
+    formData.service || formData.service_interest ||
+    task.metadata?.service_interest || null;
 
-  // 1b. Stated-interest slug in notes / web form message ("interested in X").
-  if (!serviceInterest) {
-    serviceInterest = extractInterestFromNotes(ctx);
-  }
+  if (!serviceInterest) serviceInterest = extractInterestFromNotes(ctx);
+  if (!serviceInterest) serviceInterest = extractServiceFromContext(ctx);
 
-  // 2. If no explicit field, scan unified_summary and admin notes for topic keywords
-  if (!serviceInterest) {
-    serviceInterest = extractServiceFromContext(ctx);
-  }
-
-  // 3. Final fallback
-  if (!serviceInterest) {
-    serviceInterest = 'Human X AI solutions';
+  if (serviceInterest) {
+    serviceInterest = ensureAiPrefix(serviceInterest);
+  } else {
+    serviceInterest = `AI marketing for ${resolveBrandName(ctx) || 'your brand'}`;
   }
 
   const painPoint =
     ctx.pain_point ||
     task.metadata?.pain_point ||
     serviceInterest ||
-    'Human X AI solutions';
+    'AI marketing';
   return { serviceInterest, painPoint };
+}
+
+// ── THE BRAIN: intelligent service-interest resolution ───────────────────────
+// Instead of dumb keyword matching, Claude reads the lead's REAL context — their
+// own words, their business, and the campaign/ad that brought them in — and
+// returns ONE consistent "AI ..." interest label. It knows our products and
+// reasons about niches (an insurance agent sells insurance -> "AI marketing for
+// insurance"). The result is cached on the lead (unified_context.ai_interest) so
+// it is computed once and reused by every send + the dashboard. Falls back to the
+// deterministic resolver (which itself ends at "AI marketing for <brand>") when
+// the brain is unavailable or returns junk.
+const AI_INTEREST_SYS = `You fill ONE blank in a WhatsApp follow-up from BCON, an AI-native marketing company: "you reached out to us recently about ___."
+Output a short label, 2 to 7 words. Follow exactly:
+- ALWAYS start with "AI".
+- Our named products (use when they fit): "AI Lead Machine" (done-for-you AI lead-generation system) and "PROXe" (our AI lead platform).
+- The campaign/ad is intent. If they came from a campaign named after a product (e.g. "AI Lead Machine"), they want THAT product -> "AI Lead Machine for your brand", or "AI Lead Machine for <their niche>" when the niche is clear. If the ad copy is about lead generation -> "AI lead generation"; about marketing -> "AI marketing".
+- Otherwise pick by best fit: "AI lead generation" (wants more leads/customers/sales), "AI customer acquisition" (acquisition focus), "AI marketing" (general marketing/brand/growth). Specialise to their niche when it reads naturally (an insurance agent sells insurance -> "AI marketing for insurance").
+- Priority: their own stated words > campaign/ad intent > inference from their business > if truly nothing is known, exactly "AI marketing for your brand".
+- Output ONLY the label. No quotes, no full stop, no extra words.`;
+
+function buildInterestContext(task, lead) {
+  const ctx = lead?.unified_context || {};
+  const f = ctx.form_data || {}, wp = (ctx.whatsapp || {}).profile || {}, web = ctx.web || {}, wf = web.form_submission || {};
+  const attr = ctx.attribution || {}, utm = web.utm || attr.utm || {};
+  const campaign = attr.campaign || utm.campaign || wf.campaign;
+  const adCopy = utm.content;
+  return [
+    `Name: ${task.lead_name || lead?.customer_name || 'there'}`,
+    (f.business_type || wp.business_type) ? `Business/industry: ${f.business_type || wp.business_type}` : '',
+    (ctx.company || f.company) ? `Company: ${ctx.company || f.company}` : '',
+    wp.notes ? `What they told us: ${wp.notes}` : '',
+    wf.message ? `Form message: ${wf.message}` : '',
+    ctx.unified_summary ? `Summary: ${ctx.unified_summary}` : '',
+    campaign ? `Campaign they came from: ${campaign}` : '',
+    adCopy ? `Ad they responded to: ${String(adCopy).replace(/\s+/g, ' ').slice(0, 320)}` : '',
+    (attr.source || attr.first_touch) ? `Source: ${attr.source || ''} / ${attr.first_touch || ''}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+async function resolveAiInterest(task, lead, deterministicFallback) {
+  const ctx = lead?.unified_context || {};
+  // 1. Cache — computed once per lead, reused by every send + the dashboard.
+  if (ctx.ai_interest && ctx.ai_interest.label && /^AI\b/i.test(ctx.ai_interest.label)) {
+    return ctx.ai_interest.label;
+  }
+  // 2. The brain.
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 30,
+          system: AI_INTEREST_SYS,
+          messages: [{ role: 'user', content: buildInterestContext(task, lead) }],
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const label = (data.content?.[0]?.text || '').trim().replace(/^["']+|["'.]+$/g, '').replace(/\s+/g, ' ');
+        // Guardrail: must be a clean "AI ..." label, short, single line.
+        if (label && /^AI\b/i.test(label) && label.length <= 60 && !label.includes('\n')) {
+          if (lead?.id) {
+            try {
+              await supabase.from('all_leads').update({
+                unified_context: { ...ctx, ai_interest: { label, at: new Date().toISOString(), by: 'brain' } },
+              }).eq('id', lead.id);
+            } catch (e) { /* cache write is best-effort */ }
+          }
+          console.log(`[AiInterest] Brain resolved "${label}" for lead ${lead?.id}`);
+          return label;
+        }
+        console.warn(`[AiInterest] Brain returned invalid label "${label}" for lead ${lead?.id} — using fallback`);
+      } else {
+        console.warn(`[AiInterest] Brain API ${res.status} for lead ${lead?.id} — using fallback`);
+      }
+    } catch (e) {
+      console.warn(`[AiInterest] Brain error for lead ${lead?.id}: ${e.message} — using fallback`);
+    }
+  }
+  // 3. Deterministic fallback (already "AI marketing for <brand>" at worst).
+  return deterministicFallback || 'AI marketing for your brand';
 }
 
 /**
@@ -3550,8 +3662,7 @@ function extractServiceFromContext(ctx) {
     { keywords: ['lead gen', 'lead generation', 'lead machine', 'leads', 'getting leads', 'more leads'], label: 'lead generation' },
     { keywords: ['ai agent', 'ai assistant', 'chatbot', 'ai bot', 'whatsapp bot', 'whatsapp automation'], label: 'AI automation' },
     { keywords: ['ai system', 'ai solution', 'artificial intelligence', 'ai for business', 'ai-powered'], label: 'AI systems' },
-    { keywords: ['brand audit', 'ai brand audit', 'ai audit'], label: 'an AI Brand Audit' },
-    { keywords: ['marketing', 'digital marketing', 'social media', 'content', 'branding'], label: 'marketing' },
+    { keywords: ['marketing', 'digital marketing', 'social media', 'content', 'branding', 'brand audit', 'ai brand audit'], label: 'marketing' },
     { keywords: ['website', 'web app', 'mobile app', 'app development', 'saas'], label: 'app development' },
     { keywords: ['automation', 'automate', 'workflow', 'process automation'], label: 'automation' },
     { keywords: ['crm', 'customer management', 'pipeline'], label: 'CRM and pipeline management' },
@@ -3639,7 +3750,11 @@ function renderTemplateText(templateName, params) {
 async function getTemplatePreview(task, lead) {
   const leadName = (task.lead_name && task.lead_name.trim()) || 'there';
   const taskType = task.task_type || '';
-  const { serviceInterest, painPoint } = resolveLeadContext(task, lead);
+  const det = resolveLeadContext(task, lead);
+  // The brain decides the interest (campaign/business/their words); the
+  // deterministic resolver is the seed it falls back to.
+  const serviceInterest = await resolveAiInterest(task, lead, det.serviceInterest);
+  const painPoint = det.painPoint;
   const bookingTime = task.metadata?.booking_time || 'your scheduled time';
   const engaged = isEngaged(lead);
   
@@ -3916,6 +4031,7 @@ async function isWithin24hWindow(leadId) {
 // WHATSAPP SEND - Free-form (Meta Cloud API v21.0)
 // ============================================
 async function sendWhatsApp(phone, message) {
+  phone = routePhone(phone); // TEST MODE: redirect to test number if set
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 
   const res = await fetch(url, {
@@ -3954,6 +4070,7 @@ async function sendWhatsApp(phone, message) {
 // Routes to the correct template per task type.
 // ============================================
 async function sendWhatsAppTemplate(phone, task) {
+  phone = routePhone(phone); // TEST MODE: redirect to test number if set
   // Fetch lead record for context-aware template selection
   let lead = null;
   if (task.lead_id) {
