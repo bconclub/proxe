@@ -57,6 +57,21 @@ function routePhone(phone) {
   }
   return phone;
 }
+
+// ── HARD BAN on em/en dashes in any outbound copy ────────────────────────────
+// Prompt instructions alone don't hold — the model still emits "—" sometimes.
+// Strip it at the send layer so a dash can NEVER reach a customer. Em dash ->
+// comma, en dash -> hyphen. Applied to every free-form message and template param.
+function noEmDash(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/\s*—\s*/g, ', ')
+    .replace(/\s*–\s*/g, '-')
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 const VOBIZ_AUTH_ID = process.env.VOBIZ_AUTH_ID || null;
 const VOBIZ_AUTH_TOKEN = process.env.VOBIZ_AUTH_TOKEN || null;
 const VOBIZ_FROM_NUMBER = process.env.VOBIZ_FROM_NUMBER || '918046733388';
@@ -4025,6 +4040,7 @@ async function isWithin24hWindow(leadId) {
 // ============================================
 async function sendWhatsApp(phone, message) {
   phone = routePhone(phone); // TEST MODE: redirect to test number if set
+  message = noEmDash(message); // HARD BAN: no em dashes ever
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 
   const res = await fetch(url, {
@@ -4094,7 +4110,7 @@ async function sendWhatsAppTemplate(phone, task) {
         const text = (!val || (typeof val === 'string' && val.trim() === ''))
           ? (() => { console.warn(`[WhatsApp] Template "${templateName}" param "${p.label}" is empty for lead ${task.lead_id}, using fallback "there"`); return 'there'; })()
           : val;
-        return { type: 'text', parameter_name: p.parameter_name, text };
+        return { type: 'text', parameter_name: p.parameter_name, text: noEmDash(text) };
       }),
     }
   ];
