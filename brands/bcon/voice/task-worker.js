@@ -2544,8 +2544,10 @@ async function executeTask(task) {
     return { skipped: true, reason: `Bad customer name "${leadName}" — placeholder or business name` };
   }
 
-  // Propagate resolved name to all downstream functions that use task.lead_name
-  task.lead_name = leadName;
+  // Greet by FIRST name only — "Hi Saravanan", not "Hi Saravanan Real-estate"
+  // (the name field often has an industry/extra word appended). The full name was
+  // already used above for the placeholder/business-name guard.
+  task.lead_name = leadName.trim().split(/\s+/)[0];
 
   if (!phone) throw new Error('No phone number');
 
@@ -2771,33 +2773,14 @@ async function executeNudgeWaiting(task, waPhone) {
     console.log(`[SmartNudge] ${timingReason}`);
     return { skipped: true, reason: timingReason };
   } else {
-    // ── NOT DELIVERED → phone might be off, flag for voice call ──
-    const timingReason = 'Not delivered, flagged for voice call';
-    await supabase.from('agent_tasks').update({
-      metadata: { ...task.metadata, timing_reason: timingReason },
-    }).eq('id', task.id);
-
-    // Create a try_voice_call task
-    const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-    await supabase.from('agent_tasks').insert({
-      task_type: 'try_voice_call',
-      task_description: `Voice call attempt: WhatsApp not delivered to ${task.lead_name}`,
-      lead_id: task.lead_id || null,
-      lead_phone: phone10,
-      lead_name: task.lead_name,
-      status: 'queued',
-      scheduled_at: new Date().toISOString(),
-      metadata: {
-        source: 'smart_nudge',
-        reason: 'whatsapp_not_delivered',
-        prev_task_id: task.id,
-        timing_reason: timingReason,
-      },
-      created_at: new Date().toISOString(),
-    });
-
-    console.log(`[SmartNudge] ${timingReason} for ${task.lead_name}`);
-    return { skipped: true, reason: timingReason };
+    // ── No read/delivery receipt at all ──
+    // WhatsApp delivery/read webhooks aren't wired, so delivered_at/read_at are
+    // null even when the message WAS delivered. The old behaviour treated this as
+    // "not delivered" and spawned a voice-call task — which meant this nudge NEVER
+    // actually fired in practice. Unknown status -> assume delivered and send the
+    // nudge. (Reinstate the voice-call branch once real delivery receipts exist.)
+    console.log(`[SmartNudge] No delivery receipt for ${task.lead_name} — assuming delivered, sending nudge`);
+    return await executeSendNudgeMessage(task, waPhone);
   }
 }
 
