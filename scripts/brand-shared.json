@@ -136,6 +136,7 @@
     "components/dashboard/CalendarView.tsx",
     "components/dashboard/CallsTable.tsx",
     "components/dashboard/DashboardBrain.tsx",
+    "components/dashboard/DashboardLayout.tsx",
     "components/dashboard/EndpointHealthDetail.tsx",
     "components/dashboard/ErrorLogsModal.tsx",
     "components/dashboard/FlowsAutomation.tsx",

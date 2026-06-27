@@ -7,6 +7,7 @@ import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
+import { getBrandConfig } from '@/configs'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
@@ -73,8 +74,12 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  // Brand logo + name come from the brand config so this layout shell stays
+  // byte-identical across brands — only the resolved values differ per brand.
+  const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
+  const brandLogo = brandChat?.avatar?.source || '/logo.png'
   // Per-brand feature toggles — hides nav entries for features this brand has
-  // switched off (e.g. Windchasers keeps Voice/Calls off).
+  // switched off (e.g. a brand keeps Voice/Calls off).
   const brandFeatures = useFeatureFlags()
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -166,7 +171,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     let cancelled = false
     try {
-      const cachedAccent = localStorage.getItem('windchasers-accent-theme')
+      const cachedAccent = localStorage.getItem(`${brandId}-accent-theme`)
       if (cachedAccent) {
         const mode = (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(cachedAccent, mode)
@@ -180,7 +185,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (mode) setTheme(mode)
       const accent = prefs.theme?.accent
       if (accent) {
-        try { localStorage.setItem('windchasers-accent-theme', accent) } catch { /* ignore */ }
+        try { localStorage.setItem(`${brandId}-accent-theme`, accent) } catch { /* ignore */ }
         const effMode = mode || (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(accent, effMode)
       }
@@ -371,8 +376,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/logo.png"
-                alt="Windchasers"
+                src={brandLogo}
+                alt={brandName}
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -424,8 +429,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             title={!showExpanded ? 'Click to expand sidebar' : undefined}
           >
             <img
-              src="/logo.png"
-              alt="Windchasers"
+              src={brandLogo}
+              alt={brandName}
               className="object-contain"
               style={{ width: '24px', height: '24px' }}
             />
@@ -436,7 +441,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 className="dashboard-layout-sidebar-logo flex-1 truncate"
                 style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
               >
-                Windchasers
+                {brandName}
               </h1>
               {!isMobile && (
                 <button
@@ -883,7 +888,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <MdMenu size={20} />
           </button>
-          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
+          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
         </div>
 
         {/* Page content */}

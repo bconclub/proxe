@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
+import { getBrandConfig } from '@/configs'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
-import { getBrandConfig } from '@/configs'
 import {
   MdInbox,
   MdDashboard,
@@ -25,14 +25,14 @@ import {
   MdLightMode,
   MdDarkMode,
   MdChatBubbleOutline,
-  MdCall,
   MdMonitorHeart,
-  MdFavorite,
-  MdMoreHoriz,
   MdTimeline,
   MdChecklist,
   MdViewKanban,
+  MdCall,
+  MdLogout,
 } from 'react-icons/md'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -66,19 +66,21 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 4), after Flow (index 7)
+// Divider positions: after Pipeline (index 4), after Flow (index 7).
+// Calls sits at index 3 (gated off for brands without voice); its array slot is
+// counted here so the dividers land in the same rendered position whether or not
+// Calls is shown.
 const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  // Brand identity comes from the active brand config — never hardcode a brand.
-  const brandCfg = getBrandConfig()
-  const brandName = brandCfg.name
-  const brandLogo = brandCfg.chatStructure?.avatar?.source || '/favicon.ico'
   const pathname = usePathname()
-  const router = useRouter()
+  // Brand logo + name come from the brand config so this layout shell stays
+  // byte-identical across brands — only the resolved values differ per brand.
+  const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
+  const brandLogo = brandChat?.avatar?.source || '/logo.png'
   // Per-brand feature toggles — hides nav entries for features this brand has
-  // switched off (e.g. Windchasers keeps Voice/Calls off).
-  const brandFeatures = getBrandConfig().features || {}
+  // switched off (e.g. a brand keeps Voice/Calls off).
+  const brandFeatures = useFeatureFlags()
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
@@ -161,15 +163,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [])
 
   // Global preferences hydration. Sounds + theme are stored server-side so one
-  // user's setting applies to every user (global config). On load we paint the
-  // locally-cached accent instantly (no bare flash), then fetch the global
-  // config and reconcile: sounds → localStorage, dashboard mode →
-  // ThemeProvider, accent → CSS vars. When nothing is saved globally yet, this
-  // is a no-op and per-user/local wins.
+  // founder's setting applies to every user (founder request — "whatever setting
+  // I make should be for all users"). On load we paint the locally-cached accent
+  // instantly (no bare flash), then fetch the global config and reconcile:
+  // sounds → localStorage, dashboard mode → ThemeProvider, accent → CSS vars.
+  // When nothing is saved globally yet, this is a no-op and per-user/local wins.
   useEffect(() => {
     let cancelled = false
     try {
-      const cachedAccent = localStorage.getItem('bcon-accent-theme')
+      const cachedAccent = localStorage.getItem(`${brandId}-accent-theme`)
       if (cachedAccent) {
         const mode = (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(cachedAccent, mode)
@@ -183,7 +185,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (mode) setTheme(mode)
       const accent = prefs.theme?.accent
       if (accent) {
-        try { localStorage.setItem('bcon-accent-theme', accent) } catch { /* ignore */ }
+        try { localStorage.setItem(`${brandId}-accent-theme`, accent) } catch { /* ignore */ }
         const effMode = mode || (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(accent, effMode)
       }
@@ -332,12 +334,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }
 
-  // AUTHENTICATION DISABLED - Logout function disabled
+  // Signs the user out of Supabase and bounces them back to the login screen.
+  // Uses a full reload (not router.push) so the SSR layout re-runs its auth
+  // check with no session and renders the login page cleanly without any
+  // stale dashboard state lingering in memory.
   const handleLogout = async () => {
-    // const supabase = createClient()
-    // await supabase.auth.signOut()
-    // window.location.href = '/auth/login'
-    console.log('Logout disabled - authentication is not enabled')
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('[layout] signOut failed:', err)
+      // Continue with redirect anyway — better to land on /auth/login than
+      // stay stuck in a broken authed state.
+    }
+    window.location.href = '/auth/login'
   }
 
   // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
@@ -409,16 +419,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandCfg.brand === 'pop') ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
-              } else if (showExpanded && brandCfg.brand === 'pop') {
-                router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : brandCfg.brand === 'pop' ? 'Enter the War Room' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : undefined}
           >
             <img
               src={brandLogo}
@@ -429,23 +437,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {showExpanded && (
             <>
-              {brandCfg.brand === 'pop' ? (
-                <a
-                  href="/war-room"
-                  title="Enter the War Room"
-                  className="dashboard-layout-sidebar-logo flex-1 min-w-0"
-                  style={{ fontSize: '13.5px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
-                >
-                  {brandName}
-                </a>
-              ) : (
-                <h1
-                  className="dashboard-layout-sidebar-logo flex-1 truncate"
-                  style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
-                >
-                  {brandName}
-                </h1>
-              )}
+              <h1
+                className="dashboard-layout-sidebar-logo flex-1 truncate"
+                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+              >
+                {brandName}
+              </h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -481,14 +478,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
-              // POP: Pipeline page hidden for now (not needed for the campaign).
-              if (item.href === '/dashboard/pipeline' && brandCfg.brand === 'pop') return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
-              // Match the nav item active when pathname matches the href OR
-              // starts with `${href}/` (sub-page case — e.g. /settings/users
-              // should highlight "Configure"). Exclude bare /dashboard to
-              // avoid Overview lighting up on every page.
+              // Match the nav item active when:
+              //   • pathname exactly matches its href, OR
+              //   • pathname starts with `${href}/` (i.e. user is on a
+              //     sub-page like /dashboard/settings/users — highlight the
+              //     parent "Configure" item)
+              // We exclude bare '/dashboard' from the prefix match, otherwise
+              // Overview would light up on every page.
               const matchesSubPath = (href?: string) =>
                 !!href && href !== '/dashboard' && pathname.startsWith(href + '/')
               const isActive = pathname === item.href
@@ -502,14 +500,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
                 const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 
-                // Modern sidebar item styling — no hard borders, accent-tinted
-                // active pill, soft hover. Mirrors windchasers DashboardLayout
-                // so the visual language stays in lockstep across brands.
+                // Modern sidebar item styling — no hard borders, no filled
+                // bg-hover for active. Active is an accent-tinted pill with
+                // accent-coloured text+icon (picks up the brand colour).
+                // Hover on inactive items gets a soft neutral tint via the
+                // existing onMouseEnter handlers.
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
                   fontWeight: itemIsActive ? 600 : 500,
                   color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
                   backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
+                  // Pin the icon: constant vertical margin + a left padding of 0
+                  // in both states (the icon sits in a fixed 40px leading box,
+                  // below). Only the label reveals on expand — the icon's X never
+                  // moves. Child items indent via left padding (expanded only).
                   margin: '2px 0',
                   borderRadius: '8px',
                   padding: isChild && showExpanded ? '7px 10px 7px 28px' : '7px 10px 7px 0',
@@ -530,9 +534,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
-                        // Fixed-width AND fixed-height leading box, icon centered,
-                        // so rows are the same height collapsed or expanded and the
-                        // icons never drift downward on hover-expand.
+                        // Fixed-width AND fixed-height leading box, icon centered.
+                        // The fixed 20px height matches the label's line-height so
+                        // the row is the SAME height whether collapsed (icon only)
+                        // or expanded (icon + label) — otherwise the taller label
+                        // line grows every row and the icons drift downward.
                         width: '40px',
                         minWidth: '40px',
                         height: '20px',
@@ -546,7 +552,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name === 'Leads' && brandCfg.brand === 'pop' ? 'People' : navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
@@ -582,7 +588,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           pointerEvents: 'none',
                         }}
                       >
-                        {navItem.name === 'Leads' && brandCfg.brand === 'pop' ? 'People' : navItem.name}
+                        {navItem.name}
                       </span>
                     )}
                   </>
@@ -601,7 +607,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
+                          // Soft neutral tint on hover — sits below the active
+                          // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                          e.currentTarget.style.color = 'var(--text-primary)'
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -610,6 +619,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
                         }
                       }}
                     >
@@ -669,7 +679,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
+                          // Soft neutral tint on hover — sits below the active
+                          // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                          e.currentTarget.style.color = 'var(--text-primary)'
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -678,6 +691,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                         if (!itemIsActive) {
                           e.currentTarget.style.backgroundColor = 'transparent'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
                         }
                       }}
                     >
@@ -735,7 +749,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   color: 'var(--text-secondary)',
                   backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                 }}
-                title="More Options"
+                title="System"
                 aria-expanded={moreOptionsOpen}
                 aria-haspopup="menu"
                 onMouseEnter={(e) => {
@@ -749,7 +763,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   }
                 }}
               >
-                <MdMoreHoriz size={16} />
+                <MdMonitorHeart size={16} />
               </button>
 
               {moreOptionsOpen && (
@@ -758,9 +772,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   style={{
                     backgroundColor: 'var(--bg-secondary)',
                     border: '1px solid var(--border-primary)',
-                    minWidth: '180px',
+                    minWidth: '200px',
                   }}
                 >
+                  {/* "Endpoint Health" used to live here as a popover modal,
+                     but System Status (/dashboard/status) already renders
+                     HealthStrip + EndpointHealthDetail on a single page —
+                     one source of truth, no menu duplication. */}
                   <Link
                     href="/status"
                     onClick={() => {
@@ -783,28 +801,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                     System Status
                   </Link>
+
+                  {/* Divider before destructive action */}
+                  <div
+                    style={{
+                      height: '1px',
+                      backgroundColor: 'var(--border-primary)',
+                      margin: '4px 0',
+                    }}
+                  />
+
                   <button
                     type="button"
                     onClick={() => {
                       setMoreOptionsOpen(false)
-                      setHealthOpen(true)
                       if (isMobile) {
                         setMobileSidebarOpen(false)
                       }
+                      handleLogout()
                     }}
                     className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--text-primary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
+                    style={{ color: 'var(--text-primary)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    <MdFavorite size={18} style={{ marginRight: '12px' }} />
-                    Endpoint Health
+                    <MdLogout size={18} style={{ marginRight: '12px' }} />
+                    Sign out
                   </button>
                 </div>
               )}
@@ -869,10 +891,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
         </div>
 
-        {/* Page content. The inbox and the dashboard home lock to exactly one
-            viewport (founder: "one VH completely") — they handle their own padding
-            + internal scroll, so the page itself never scrolls. min-h-0 lets this
-            flex child shrink below its content so the inner overflow can contain it. */}
+        {/* Page content */}
+        {/* Home (/dashboard) + inbox render in a NON-scrolling full-height main
+            so the home page fits exactly one viewport (founder: "one VH completely").
+            FounderDashboard handles its own padding + internal scroll. */}
         {pathname === '/dashboard/inbox' || pathname === '/dashboard' ? (
           <main className="dashboard-layout-main-content-wrapper flex-1 min-h-0" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
             {children}
