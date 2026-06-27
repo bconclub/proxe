@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
@@ -74,6 +74,7 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands — only the resolved values differ per brand.
   const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
@@ -419,14 +420,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandId === 'pop') ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
+              } else if (showExpanded && brandId === 'pop') {
+                router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : brandId === 'pop' ? 'Enter the War Room' : undefined}
           >
             <img
               src={brandLogo}
@@ -437,12 +440,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {showExpanded && (
             <>
-              <h1
-                className="dashboard-layout-sidebar-logo flex-1 truncate"
-                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
-              >
-                {brandName}
-              </h1>
+              {brandId === 'pop' ? (
+                <a
+                  href="/war-room"
+                  title="Enter the War Room"
+                  className="dashboard-layout-sidebar-logo flex-1 min-w-0"
+                  style={{ fontSize: '13.5px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
+                >
+                  {brandName}
+                </a>
+              ) : (
+                <h1
+                  className="dashboard-layout-sidebar-logo flex-1 truncate"
+                  style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+                >
+                  {brandName}
+                </h1>
+              )}
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -478,6 +492,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
+              // POP: Pipeline page hidden for now (not needed for the campaign).
+              if (item.href === '/dashboard/pipeline' && brandId === 'pop') return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
@@ -552,7 +568,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
@@ -588,7 +604,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           pointerEvents: 'none',
                         }}
                       >
-                        {navItem.name}
+                        {navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}
                       </span>
                     )}
                   </>
