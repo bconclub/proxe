@@ -489,7 +489,7 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
+      <div className={`wc-bento grid grid-cols-2 md:grid-cols-3 ${features.voice ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-3 sm:gap-4 shrink-0`}>
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 4%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 14%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
@@ -566,16 +566,19 @@ export default function FounderDashboard() {
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
         />
-        {/* Calls — inbound + outbound voice volume (links to the Calls view). */}
-        <KpiCard
-          icon={<MdCall size={15} />} iconColor="#06b6d4"
-          label="Calls"
-          value={metrics.calls?.total ?? 0}
-          delta={<KpiDelta change={metrics.calls?.trend?.change} />}
-          sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
-          sub={`${metrics.calls?.inbound ?? 0} in · ${metrics.calls?.outbound ?? 0} out`}
-          onClick={() => router.push('/dashboard/calls')}
-        />
+        {/* Calls — inbound + outbound voice volume (links to the Calls view).
+            Only shown when the Voice/Calls feature is enabled for this brand. */}
+        {features.voice && (
+          <KpiCard
+            icon={<MdCall size={15} />} iconColor="#06b6d4"
+            label="Calls"
+            value={metrics.calls?.total ?? 0}
+            delta={<KpiDelta change={metrics.calls?.trend?.change} />}
+            sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
+            sub={`${metrics.calls?.inbound ?? 0} in · ${metrics.calls?.outbound ?? 0} out`}
+            onClick={() => router.push('/dashboard/calls')}
+          />
+        )}
       </div>
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
