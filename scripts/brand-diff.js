@@ -204,11 +204,50 @@ function driftDetail(tree) {
   return { differ, missing, missingFeatures };
 }
 
+// ── DRIFT RADAR ───────────────────────────────────────────────────────────────
+// The manifest only tracks 179 files for byte-identical sync. Plenty of files
+// (dashboard components, metrics routes) exist in several brands and SHOULD stay
+// roughly in step, but aren't manifest-shareable because they carry per-brand
+// content — so when a tweak lands on one brand and not the others, the drift is
+// invisible. The radar makes it visible: every file present in BOTH this brand
+// and master that DIFFERS, but is neither manifest-tracked nor legitimately
+// brand-private. These are review candidates, not auto-sync targets.
+function walkSrc(root) {
+  const out = [];
+  (function rec(dir) {
+    let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name === 'node_modules' || e.name === '.next') continue; rec(p); }
+      else if (/\.(ts|tsx)$/.test(e.name)) out.push(path.relative(root, p).replace(/\\/g, '/'));
+    }
+  })(root);
+  return out;
+}
+// Legitimately per-brand (intended to differ) — kept off the radar so it isn't noise.
+const RADAR_IGNORE = [/^configs\//, /promptBuilder/, /promptConfig/, /\/prompt\//, /accent-theme/, /ChatWidget/, /\.json$/, /brand\.ts$/, /generated-version/];
+const sharedSet = new Set(shared);
+function untrackedDrift(tree) {
+  const root = srcRoot(tree);
+  const arts = ARTIFACTS[tree] || [];
+  const isArt = (f) => arts.some((a) => f.startsWith(String(a).replace(/\\/g, '/')));
+  const hits = [];
+  for (const f of walkSrc(root)) {
+    if (sharedSet.has(f)) continue;                       // already tracked by the manifest
+    if (RADAR_IGNORE.some((re) => re.test(f))) continue;  // intended brand-private
+    if (isArt(f)) continue;                               // brand artifact (one-directional)
+    const m = path.join(masterSrc, f);
+    if (!fs.existsSync(m)) continue;                      // brand-only file — not drift, a new thing
+    if (!eqContent(m, path.join(root, f))) hits.push(f);
+  }
+  return hits;
+}
+
 const DATA = {
   generatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC',
   cats: CATS.map((c) => ({ cat: c.cat, keys: c.items.map((i) => i.key) })),
   master: { tree: 'master', role: 'canonical', name: DISPLAY.master, lastChange: lastChange('master'), artifacts: artifacts('master'), features: featureStates('master'), config: brandConfig('master') },
-  brands: BRANDS.map((b) => ({ tree: b, role: 'brand', name: DISPLAY[b] || b, lastChange: lastChange(b), artifacts: artifacts(b), sync: sync(b), drift: driftDetail(b), features: featureStates(b), config: brandConfig(b) })),
+  brands: BRANDS.map((b) => ({ tree: b, role: 'brand', name: DISPLAY[b] || b, lastChange: lastChange(b), artifacts: artifacts(b), sync: sync(b), drift: driftDetail(b), untracked: untrackedDrift(b), features: featureStates(b), config: brandConfig(b) })),
 };
 
 // ── HTML ──────────────────────────────────────────────────────────────────────
@@ -350,7 +389,9 @@ function driftTip(d) {
   if (dr.missingFeatures.length) s += '<div class="d" style="color:var(--artifact)">features to add: ' + dr.missingFeatures.map(esc).join(', ') + '</div>';
   if (dr.differ.length) s += '<div class="d">drift: ' + dr.differ.slice(0, 8).map((f) => esc(short(f))).join(', ') + (dr.differ.length > 8 ? ' +' + (dr.differ.length - 8) + ' more' : '') + '</div>';
   if (dr.missing.length) s += '<div class="d">missing files: ' + dr.missing.slice(0, 6).map((f) => esc(short(f))).join(', ') + (dr.missing.length > 6 ? ' +' + (dr.missing.length - 6) + ' more' : '') + '</div>';
-  if (!dr.differ.length && !dr.missing.length && !dr.missingFeatures.length) s += '<div class="s" style="color:var(--green)">✓ fully in sync with master</div>';
+  const ut = d.untracked || [];
+  if (ut.length) s += '<div class="d" style="color:var(--amber)">⚠ radar — untracked drift (' + ut.length + ', not manifest-tracked): ' + ut.slice(0, 10).map((f) => esc(short(f))).join(', ') + (ut.length > 10 ? ' +' + (ut.length - 10) + ' more' : '') + '</div>';
+  if (!dr.differ.length && !dr.missing.length && !dr.missingFeatures.length && !ut.length) s += '<div class="s" style="color:var(--green)">✓ fully in sync with master</div>';
   return s;
 }
 
@@ -394,7 +435,7 @@ function BrandNode({ data: d }) {
       </div>
       \${!canonical
         ? html\`<div class="meta" style=\${{cursor:'help'}}
-            onMouseEnter=\${(e)=>showTip(e,driftTip(d))} onMouseMove=\${(e)=>showTip(e,driftTip(d))} onMouseLeave=\${hideTip}>\${d.sync.identical} identical · \${d.sync.drift} drift · \${d.sync.missing} missing · what's left ⓘ</div>\`
+            onMouseEnter=\${(e)=>showTip(e,driftTip(d))} onMouseMove=\${(e)=>showTip(e,driftTip(d))} onMouseLeave=\${hideTip}>\${d.sync.identical} identical · \${d.sync.drift} drift · \${d.sync.missing} missing\${d.untracked && d.untracked.length ? html\` · <b style=\${{color:'var(--amber)'}}>⚠ \${d.untracked.length} radar</b>\` : ''} · what's left ⓘ</div>\`
         : html\`<div class="meta">source of truth · \${d.features.filter(f=>f.state!=='absent').length}/\${d.features.length} capabilities</div>\`}
       \${d.lastChange ? html\`<div class="deploy" title=\${esc(d.lastChange.subject)}>⏱ last change <b>\${d.lastChange.rel}</b></div>\` : ''}
     </div>
@@ -436,7 +477,19 @@ createRoot(document.getElementById('flow')).render(html\`<\${App} />\`);
 fs.writeFileSync(path.join(ROOT, 'scripts', 'brand-diff.html'), HTML);
 console.log('Wrote scripts/brand-diff.html  (' + ALL.length + ' capabilities in ' + CATS.length + ' groups)');
 for (const b of DATA.brands) {
-  console.log(`${b.tree.padEnd(12)} sync ${b.sync.pct}%  on:${b.features.filter(f=>f.state==='on').length} off:${b.features.filter(f=>f.state==='off').length} absent:${b.features.filter(f=>f.state==='absent').length}`);
+  const ut = (b.untracked || []).length;
+  console.log(`${b.tree.padEnd(12)} sync ${b.sync.pct}%  on:${b.features.filter(f=>f.state==='on').length} off:${b.features.filter(f=>f.state==='off').length} absent:${b.features.filter(f=>f.state==='absent').length}${ut ? `  ⚠ radar:${ut}` : ''}`);
+}
+// --radar prints the full untracked-drift list per brand (files that differ vs
+// master but aren't manifest-tracked — the invisible drift the radar surfaces).
+if (process.argv.includes('--radar')) {
+  console.log('\nDRIFT RADAR — untracked files differing vs master (review candidates):');
+  for (const b of DATA.brands) {
+    const ut = b.untracked || [];
+    if (!ut.length) continue;
+    console.log(`\n  ${DISPLAY[b.tree] || b.tree} (${ut.length}):`);
+    for (const f of ut) console.log('    ~ ' + f);
+  }
 }
 
 if (process.argv.includes('--serve')) {
