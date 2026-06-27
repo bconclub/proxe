@@ -2,7 +2,8 @@
   "_comment": "Files identical across master+bcon+wc = the shared core. propagate-from-master.js overwrites these in every brand from master/agent. Brand-specific files (configs, prompts, brand-facts, brand-divergent components/routes) are NOT listed and never touched. Move a file OUT the moment a brand must diverge it; move one IN once it is brand-neutral.",
   "brands": [
     "bcon",
-    "windchasers"
+    "windchasers",
+    "pop"
   ],
   "_artifactsComment": "Brand artifacts = features built ON TOP of the PROXe base FOR ONE BRAND (e.g. POP war-room). They live only in that brand and must NEVER reverse-sync up to master or propagate across to other brands — they are one-directional. Keep each artifact in its OWN files under these path prefixes (relative to agent/src/); never inline artifact code into a sharedCore file. reverse-sync.js refuses to pull any path listed here and hard-errors if one is ever added to sharedCore.",
   "brandArtifacts": {
@@ -61,7 +62,6 @@
     "app/api/dashboard/settings/features/route.ts",
     "app/api/dashboard/settings/lead-modal/route.ts",
     "app/api/dashboard/settings/preferences/route.ts",
-    "app/api/dashboard/settings/prompt/route.ts",
     "app/api/dashboard/settings/widget-style/route.ts",
     "app/api/dashboard/summarize/route.ts",
     "app/api/dashboard/tasks/[id]/action/route.ts",
@@ -115,7 +115,6 @@
     "app/dashboard/settings/knowledge-base/KnowledgeBaseClient.tsx",
     "app/dashboard/settings/knowledge-base/page.tsx",
     "app/dashboard/settings/lead-modal/page.tsx",
-    "app/dashboard/settings/prompt/page.tsx",
     "app/dashboard/settings/sequences/page.tsx",
     "app/dashboard/settings/web-agent/page.tsx",
     "app/dashboard/settings/whatsapp-templates/page.tsx",
@@ -179,7 +178,6 @@
     "lib/knowledgeProcessor.ts",
     "lib/leadModalConfig.ts",
     "lib/leadScoreCalculator.ts",
-    "lib/promptConfig.ts",
     "lib/services/businessCrawler.ts",
     "lib/services/conversationLogger.ts",
     "lib/services/instagramSender.ts",
