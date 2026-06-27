@@ -14,6 +14,7 @@ import {
 } from '@/lib/sound-prefs';
 import { ACCENT_THEMES } from '@/lib/accent-theme';
 import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
+import { BRAND_ID } from '@/configs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
   { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
@@ -25,7 +26,7 @@ type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [selectedTheme, setSelectedTheme] = useState('bcon');
+  const [selectedTheme, setSelectedTheme] = useState(ACCENT_THEMES[0].id);
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
@@ -70,13 +71,13 @@ export default function SettingsPage() {
   // accent CSS vars are re-applied after a dark/light switch — otherwise the
   // ThemeProvider re-sets the base vars on toggle and the chosen accent is lost.
   useEffect(() => {
-    const savedTheme = localStorage.getItem('bcon-accent-theme');
+    const savedTheme = localStorage.getItem(`${BRAND_ID}-accent-theme`);
     if (savedTheme) {
       setSelectedTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to BCON theme
-      applyTheme('bcon');
+      // Default to the brand's first accent theme
+      applyTheme(ACCENT_THEMES[0].id);
     }
   }, [theme]);
 
@@ -114,7 +115,7 @@ export default function SettingsPage() {
   function handleThemeSelect(themeId: string) {
     setSelectedTheme(themeId);
     applyTheme(themeId);
-    localStorage.setItem('bcon-accent-theme', themeId);
+    localStorage.setItem(`${BRAND_ID}-accent-theme`, themeId);
     // Global: every user picks up this accent on their next load.
     saveGlobalPrefs({ theme: { accent: themeId } });
     setSaved(true);
