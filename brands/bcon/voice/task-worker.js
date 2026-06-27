@@ -2573,9 +2573,10 @@ async function executeTask(task) {
   // ── Duplicate-send guard: skip if same template was already sent to this lead via conversations log ──
   // Covers cross-task-type duplicates (follow_up_day1, follow_up_day3, follow_up_day5 all use the same template)
   const TEMPLATE_TASK_TYPES = ['follow_up_24h', 'nudge_waiting', 'push_to_book', 'follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage', 'first_outreach'];
-  // In TEST mode every send goes to our own number, so the no-spam guard does not
-  // apply - let us re-fire freely while testing. Real (non-test) sends are guarded.
-  if (TEMPLATE_TASK_TYPES.includes(task.task_type) && task.lead_id && !TEST_RECIPIENT) {
+  // ALWAYS runs - no test-mode bypass. A second follow-up template must never go
+  // to the same lead inside the window, period. (For testing, clear the lead's
+  // recent marker or use a fresh lead - never disable this guard.)
+  if (TEMPLATE_TASK_TYPES.includes(task.task_type) && task.lead_id) {
     // 1. Check agent_tasks: any of these task types completed in last 6h
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     const { data: recentTask } = await supabase
