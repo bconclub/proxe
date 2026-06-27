@@ -2009,9 +2009,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* FORM DETAILS — everything the lead submitted on the intake form
-                    (the BCON qualifiers), shown as chips like the WC profile fields
-                    above. Data lives in unified_context.form_data / raw_form_fields. */}
+                {/* TOP-LEVEL BUSINESS — only the brand and the industry. The full form
+                    submission belongs in the chat, not crammed into the contact card. */}
                 {(() => {
                   const ctx: any = currentLead.unified_context || {};
                   const fd: any = ctx.form_data || {};
@@ -2021,12 +2020,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   const rows: { label: string; value: string }[] = [];
                   const push = (label: string, v: any) => { const f = fmt(v); if (f && !rows.some(r => r.label === label)) rows.push({ label, value: f }); };
                   push('Brand', prof.company || raw['Company Name'] || raw.company);
-                  push('Business', fd.business_type || prof.business_type || ctx.bcon?.business_type);
-                  push('Customers', fd.customer_type);
-                  push('Volume', fd.lead_volume);
-                  push('Spend', fd.marketing_spend);
-                  push('System', fd.current_system);
-                  push('Urgency', fd.urgency || ctx.urgency);
+                  push('Industry', fd.business_type || prof.business_type || ctx.bcon?.business_type);
                   if (!rows.length) return null;
                   return (
                     <div className="lead-form-details flex flex-wrap gap-1.5 pt-2 mt-1.5 border-t border-[var(--border-primary)]">
