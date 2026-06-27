@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, getClient } from '@/lib/services';
+import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +56,7 @@ async function upsertSession(
       const { error } = await supabase.from('voice_sessions').update(row).eq('id', sess.id);
       if (error) console.error('[vapi-webhook] session UPDATE failed:', error.message, error.details, error.hint);
     } else {
-      const insertRow: Record<string, any> = { external_session_id: callId, brand: 'bcon', ...row };
+      const insertRow: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
       insertRow.created_at = createdAtIfNew || new Date().toISOString();
       const { error } = await supabase.from('voice_sessions').insert(insertRow);
       if (error) console.error('[vapi-webhook] session INSERT failed:', error.message, error.details, error.hint);
@@ -164,19 +165,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve the real party. customer.number is reliable for INBOUND. For OUTBOUND
-    // it is the BCON number itself (bridge artifact) — detect that and recover the
+    // it is OUR own VoBiz number (bridge artifact) — detect that and recover the
     // actual destination from the VoBiz CDR so the call files under the lead, not us.
     const rawCustomer = msg.customer?.number || call.customer?.number || null;
     let { full: phone, norm } = normalizePhone(rawCustomer);
-    const bconNorm = normalizePhone(process.env.VOBIZ_FROM_NUMBER || '918046733388').norm;
+    // Our own VoBiz sender number, env-driven (per brand). No hardcoded fallback so
+    // this file is brand-neutral shared core; if unset the bridge-detection simply
+    // doesn't trigger and the inbound path is used.
+    const ownNorm = normalizePhone(process.env.VOBIZ_FROM_NUMBER || null).norm;
     let direction: 'inbound' | 'outbound';
-    if (norm && bconNorm && norm === bconNorm) {
+    if (norm && ownNorm && norm === ownNorm) {
       direction = 'outbound';
       const rec = await recoverOutboundDestination(startedAt);
       if (rec.norm) {
         phone = rec.full; norm = rec.norm;
       } else {
-        console.warn('[vapi-webhook] outbound bridge but could not recover lead number; not filing under BCON number');
+        console.warn('[vapi-webhook] outbound bridge but could not recover lead number; not filing under our own number');
         phone = null; norm = null;
       }
     } else if (/outbound/i.test(callType)) {
@@ -190,28 +194,36 @@ export async function POST(req: NextRequest) {
     const recordingUrl = msg.recordingUrl || msg.artifact?.recordingUrl || call.recordingUrl || null;
     const messages: any[] = msg.artifact?.messages || msg.messages || [];
 
-    console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length });
+    // The contact name the call was placed with (passed as assistantOverrides at
+    // dial time) — so a lead created/updated from a voice call carries a name
+    // instead of showing "Unknown caller".
+    const vv = call?.assistantOverrides?.variableValues || msg?.assistantOverrides?.variableValues || {};
+    const vapiName = String(vv['vh-contactname'] || vv['vh-greetingname'] || vv['vh-businessname'] || '').trim() || null;
 
-    // 1) Find or create the lead (prefer a bcon-branded match)
+    console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length, name: vapiName });
+
+    // 1) Find or create the lead (prefer a match in this brand)
     let leadId: string | null = null;
     if (norm) {
       const { data: leads } = await supabase
         .from('all_leads')
-        .select('id, brand')
+        .select('id, brand, customer_name')
         .eq('customer_phone_normalized', norm);
-      const existing = leads?.find((l: any) => l.brand === 'bcon') || leads?.[0] || null;
+      const existing = leads?.find((l: any) => l.brand === BRAND_ID) || leads?.[0] || null;
       if (existing) {
         leadId = existing.id;
         const updates: any = { last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() };
-        if (existing.brand === 'default') updates.brand = 'bcon';
+        if (existing.brand === 'default') updates.brand = BRAND_ID;
+        if (vapiName && !existing.customer_name) updates.customer_name = vapiName;
         await supabase.from('all_leads').update(updates).eq('id', leadId);
       } else {
         const { data: created, error: cErr } = await supabase
           .from('all_leads')
           .insert({
+            customer_name: vapiName,
             phone,
             customer_phone_normalized: norm,
-            brand: 'bcon',
+            brand: BRAND_ID,
             first_touchpoint: 'voice',
             last_touchpoint: 'voice',
             last_interaction_at: new Date().toISOString(),
@@ -222,6 +234,18 @@ export async function POST(req: NextRequest) {
         if (cErr) console.error('[vapi-webhook] lead insert error:', cErr.message);
         leadId = created?.id || null;
       }
+    }
+
+    // 1b) If phone-based resolution failed (e.g. outbound bridge couldn't recover
+    //     the number), fall back to the lead linked at call INITIATION — the
+    //     test-call route stamps lead_id onto the session up front.
+    if (!leadId && callId) {
+      const { data: s } = await supabase
+        .from('voice_sessions')
+        .select('lead_id')
+        .eq('external_session_id', callId)
+        .maybeSingle();
+      if (s?.lead_id) leadId = s.lead_id;
     }
 
     // 2) Enrich the session row now that lead + final direction + phone are known.
@@ -236,12 +260,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3) Log transcript turns into conversations (idempotent per call_id)
-    if (leadId && messages.length) {
+    // 3) Log transcript turns into conversations (idempotent per call_id).
+    //    lead_id may be null (column is nullable); the Calls view joins by call_id,
+    //    so the transcript still surfaces even when no lead could be resolved.
+    if (messages.length) {
       const { data: already } = await supabase
         .from('conversations')
         .select('id')
-        .eq('lead_id', leadId)
+        .eq('channel', 'voice')
         .filter('metadata->>call_id', 'eq', callId)
         .limit(1);
       if (!already || already.length === 0) {
@@ -263,8 +289,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) Store the call summary + recording link as a summary row
-    if (leadId && (summary || recordingUrl)) {
+    // 4) Store the call summary + recording link as a summary row (idempotent per
+    //    call_id; lead_id may be null — the Calls view joins by call_id).
+    if (summary || recordingUrl) {
+      const { data: existingSummary } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('channel', 'voice')
+        .filter('metadata->>call_id', 'eq', callId)
+        .filter('metadata->>summary', 'eq', 'true')
+        .limit(1);
+      if (existingSummary && existingSummary.length) {
+        // already stored — skip to avoid duplicate recording rows on webhook retry
+      } else {
       const { error: smErr } = await supabase.from('conversations').insert({
         lead_id: leadId,
         channel: 'voice',
@@ -281,6 +318,7 @@ export async function POST(req: NextRequest) {
         created_at: endedAt || new Date().toISOString(),
       });
       if (smErr) console.error('[vapi-webhook] summary insert error:', smErr.message);
+      }
     }
 
     // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the

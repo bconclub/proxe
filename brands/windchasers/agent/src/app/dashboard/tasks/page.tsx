@@ -569,16 +569,31 @@ function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
     border: '1px solid var(--accent-primary)', whiteSpace: 'nowrap',
   }
   return (
-    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${a.iconColor}26`, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</div>
+    <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+      <div style={{ width: 30, height: 30, borderRadius: '50%', background: `${a.iconColor}26`, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{a.icon}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
+        {/* Top line: lead + time on the left, action button pinned top-right so
+            the card stays short (no dedicated button row below). */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+            <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>{timeAgo(t.scheduled_at)}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
+            {/* Small dismiss control — drop the task without sending (skip). */}
+            <button
+              onClick={() => onAction(t.id, 'skip')}
+              title="Remove this task (dismiss without sending)"
+              aria-label="Remove task"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
+            >
+              ×
+            </button>
+          </div>
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: 11, margin: '2px 0 3px', textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
-        <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginBottom: 8 }}>{a.statusLine}</div>
-        <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3, textTransform: 'capitalize' }}>{t.task_type.replace(/_/g, ' ')}</div>
+        <div style={{ color: a.iconColor, fontSize: 11.5, fontWeight: 500, marginTop: 2 }}>{a.statusLine}</div>
       </div>
     </div>
   )
@@ -678,7 +693,7 @@ export default function TasksPage() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/tasks')
+      const res = await fetch('/api/dashboard/tasks', { cache: 'no-store' })
       const data = await res.json()
       setTasks(data.tasks || [])
       setBoard(data.board || null)
@@ -691,20 +706,33 @@ export default function TasksPage() {
   }, [])
 
   const handleTaskAction = useCallback(async (taskId: string, action: string, scheduledAt?: string) => {
+    // Optimistic UI: react to the click INSTANTLY so it never feels like nothing
+    // happened. Approve → the card leaves "Needs Attention" and shows under "Next
+    // to Fire" (queued to fire on the worker's next run); skip → it just drops.
+    // The refetch below reconciles with the server + the worker's actual result.
+    setBoard((prev: any) => {
+      if (!prev) return prev
+      const card = prev.needsAttention?.find((t: any) => t.id === taskId)
+      if (!card) return prev
+      const needsAttention = prev.needsAttention.filter((t: any) => t.id !== taskId)
+      if (action === 'send_now') {
+        return { ...prev, needsAttention, nextToFire: [{ ...card, status: 'pending' }, ...(prev.nextToFire || [])] }
+      }
+      return { ...prev, needsAttention }
+    })
     try {
       const res = await fetch(`/api/dashboard/tasks/${taskId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, scheduled_at: scheduledAt }),
+        cache: 'no-store',
       })
       const data = await res.json()
-      if (data.success) {
-        fetchTasks()
-      } else {
-        console.error('Task action failed:', data.error)
-      }
+      if (!data.success) console.error('Task action failed:', data.error)
     } catch (err) {
       console.error('Task action error:', err)
+    } finally {
+      fetchTasks() // reconcile with the server (and the worker's result)
     }
   }, [fetchTasks])
 
@@ -783,7 +811,9 @@ export default function TasksPage() {
   const upcomingTotal = (up.soon?.length || 0) + (up.today?.length || 0) + (up.tomorrow?.length || 0) + (up.later?.length || 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
+    // Lock the page to one viewport (the dashboard <main> is scrollable + has
+    // py-6, so subtract 3rem). Each panel below scrolls internally — no page scroll.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: 'calc(100vh - 3rem)', overflow: 'hidden' }}>
       <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
       {/* Header */}
@@ -811,8 +841,8 @@ export default function TasksPage() {
       {/* Main: Left (Next to Fire) + Right (split) */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-        {/* LEFT zone ~36%: Next to Fire */}
-        <div style={{ flex: '0 0 36%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Col 1: Next to Fire — full length (left) */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <PanelHead title="Next to Fire" viewAll="View all" />
           <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
             {b.nextToFire.length === 0
@@ -830,80 +860,68 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* RIGHT zone ~64%: vertical split */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Col 2: Needs Attention — full length, internal scroll */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <PanelHead title="Needs Attention" count={b.needsAttention.length} viewAll="View all" />
+          <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
+            {b.needsAttention.length === 0
+              ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="All clear" />
+              : (<>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    {b.needsAttention.map((t: BoardTask) => <AttnCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
+                  </div>
+                  <PanelFootLink label="View all issues →" />
+                </>)}
+          </div>
+        </div>
 
-          {/* Top row: Needs Attention + Upcoming Queue */}
-          <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+        {/* Col 3: right — Upcoming Queue (top) over Recent Activity (bottom).
+            Each scrolls internally so nothing pushes the page past one viewport. */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
-            {/* Needs Attention */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <PanelHead title="Needs Attention" count={b.needsAttention.length} viewAll="View all" />
-              <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
-                {b.needsAttention.length === 0
-                  ? <Empty icon={<MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />} text="All clear" />
-                  : (<>
-                      <div style={{ flex: 1, overflow: 'auto' }}>
-                        {b.needsAttention.map((t: BoardTask) => <AttnCard key={t.id} t={t} onAction={handleTaskAction} onLead={onLead} />)}
-                      </div>
-                      <PanelFootLink label="View all issues →" />
-                    </>)}
-              </div>
+          {/* Upcoming Queue — top */}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <PanelHead title="Upcoming Queue" count={upcomingTotal} viewAll="View all" />
+            <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
+              {upcomingTotal === 0
+                ? <Empty icon={<MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />} text="No upcoming tasks" />
+                : (<>
+                    <div style={{ flex: 1, overflow: 'auto' }}>
+                      <UpcomingGroup title="Next hour" items={up.soon || []} onLead={onLead} />
+                      <UpcomingGroup title="Later today" items={up.today || []} onLead={onLead} />
+                      <UpcomingGroup title="Tomorrow" items={up.tomorrow || []} onLead={onLead} />
+                      <UpcomingGroup title="Later" items={up.later || []} onLead={onLead} />
+                    </div>
+                    <PanelFootLink label="View full schedule →" />
+                  </>)}
             </div>
-
-            {/* Upcoming Queue */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <PanelHead title="Upcoming Queue" count={upcomingTotal} viewAll="View all" />
-              <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
-                {upcomingTotal === 0
-                  ? <Empty icon={<MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />} text="No upcoming tasks" />
-                  : (<>
-                      <div style={{ flex: 1, overflow: 'auto' }}>
-                        <UpcomingGroup title="Next hour" items={up.soon || []} onLead={onLead} />
-                        <UpcomingGroup title="Later today" items={up.today || []} onLead={onLead} />
-                        <UpcomingGroup title="Tomorrow" items={up.tomorrow || []} onLead={onLead} />
-                        <UpcomingGroup title="Later" items={up.later || []} onLead={onLead} />
-                      </div>
-                      <PanelFootLink label="View full schedule →" />
-                    </>)}
-              </div>
-            </div>
-
           </div>
 
-          {/* Bottom: Recent Activity table */}
-          <div style={{ flex: 'none', display: 'flex', flexDirection: 'column' }}>
-            <PanelHead title="Recent Activity" viewAll="View all activity logs →" />
-            <div style={{ ...colBox, flex: 'none', maxHeight: 260 }}>
+          {/* Recent Activity — bottom (compact feed; fits the narrow column) */}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <PanelHead title="Recent Activity" viewAll="View all logs →" />
+            <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
               {b.activity.length === 0
                 ? <Empty icon={<MdScheduleSend size={24} style={{ opacity: 0.4 }} />} text="No recent activity" />
                 : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ position: 'sticky', top: 0, background: 'var(--bg-secondary, #111)', zIndex: 1 }}>
-                        {['Time', 'Lead', 'Task', 'Channel', 'Status', 'Outcome', 'By'].map(h => (
-                          <th key={h} style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '9px 14px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.08))' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {b.activity.map((a: any) => (
-                        <tr key={a.id} style={{ borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.04))' }}>
-                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', whiteSpace: 'nowrap' }}>{formatTime(a.at)}</td>
-                          <td style={{ padding: '8px 14px' }}>
-                            <span onClick={() => onLead(a)} style={{ color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 500 }}>{a.lead_name || 'Unknown'}</span>
-                          </td>
-                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{String(a.task_type || '').replace(/_/g, ' ')}</td>
-                          <td style={{ padding: '8px 14px' }}>{chanIcon(a.channel)}</td>
-                          <td style={{ padding: '8px 14px' }}>{activityStatusPill(a.status)}</td>
-                          <td style={{ color: 'var(--text-secondary)', padding: '8px 14px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.outcome}>{a.outcome}</td>
-                          <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
-                            <span style={{ color: a.actor?.kind === 'human' ? '#f59e0b' : '#8b5cf6', fontWeight: 600 }}>{a.actor?.label || 'Automation'}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    {b.activity.map((a: any) => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--border-primary, rgba(255,255,255,0.05))' }}>
+                        {chanIcon(a.channel)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                            <span onClick={() => onLead(a)} style={{ color: 'var(--text-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.lead_name || 'Unknown'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 10.5, flexShrink: 0, whiteSpace: 'nowrap' }}>{formatTime(a.at)}</span>
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }} title={a.outcome}>{a.outcome}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            {activityStatusPill(a.status)}
+                            <span style={{ fontSize: 10, color: a.actor?.kind === 'human' ? '#f59e0b' : '#8b5cf6', fontWeight: 600 }}>{a.actor?.label || 'Automation'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
             </div>
           </div>

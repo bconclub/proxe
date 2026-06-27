@@ -252,9 +252,12 @@ export async function GET(request: NextRequest) {
       .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
       .map(slim)
 
-    // Needs attention: awaiting approval (queued) + recent failures/blocked
+    // Needs attention: awaiting approval (queued) + recent failures/blocked.
+    // Sort the queued ones NEWEST-FIRST (created_at desc) so the tasks the worker
+    // just created surface at the top instead of being buried under stale ones.
     const needsAttention = [
-      ...pend.filter((t: any) => t.status === 'queued'),
+      ...pend.filter((t: any) => t.status === 'queued')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
       ...(historyResult.data || []).filter((t: any) =>
         (t.status === 'failed' || t.status === 'failed_24h_window') &&
         t.completed_at && new Date(t.completed_at) >= todayStart),

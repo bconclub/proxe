@@ -5,7 +5,7 @@ import {
   getClient,
   getServiceClient,
   logMessage,
-  updateLeadProfile,
+  normalizePhone,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -61,17 +61,24 @@ export async function POST(request: NextRequest) {
       leadId = session?.lead_id || null;
     }
 
-    if (!leadId && (user.phone || user.email)) {
-      leadId = await updateLeadProfile(
-        sessionId,
-        {
-          userName: user.name,
-          email: user.email,
-          phone: user.phone,
-        },
-        'web',
-        supabase,
-      );
+    // Events are telemetry — they must NOT create a lead. The conversation route
+    // (/api/agent/web/chat) is the single, attribution-aware lead creator. If a
+    // lead already exists for this phone+brand, link to it; otherwise leave the
+    // events anonymous and let the next chat message mint the lead. (Both routes
+    // formerly ran find-or-create concurrently -> duplicate leads for the same
+    // phone ~0-2s apart: an un-attributed events row + the attributed chat row.)
+    if (!leadId && user.phone) {
+      const normalizedPhone = normalizePhone(user.phone);
+      const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+      if (normalizedPhone) {
+        const { data: existing } = await supabase
+          .from('all_leads')
+          .select('id')
+          .eq('customer_phone_normalized', normalizedPhone)
+          .eq('brand', brand)
+          .maybeSingle();
+        leadId = existing?.id || null;
+      }
     }
 
     if (leadId) {
