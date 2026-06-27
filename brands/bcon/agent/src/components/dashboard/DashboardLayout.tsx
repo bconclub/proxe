@@ -850,9 +850,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
         </div>
 
-        {/* Page content */}
-        {pathname === '/dashboard/inbox' ? (
-          <main className="dashboard-layout-main-content-wrapper flex-1" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+        {/* Page content. The inbox and the dashboard home lock to exactly one
+            viewport (founder: "one VH completely") — they handle their own padding
+            + internal scroll, so the page itself never scrolls. min-h-0 lets this
+            flex child shrink below its content so the inner overflow can contain it. */}
+        {pathname === '/dashboard/inbox' || pathname === '/dashboard' ? (
+          <main className="dashboard-layout-main-content-wrapper flex-1 min-h-0" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
             {children}
           </main>
         ) : (
