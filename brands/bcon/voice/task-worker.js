@@ -2432,10 +2432,12 @@ async function processPendingTasks() {
         continue;
       }
 
-      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning
+      // Quiet hours: 9 PM to 9 AM IST - reschedule to 9 AM IST next morning.
+      // In TEST mode (TEST_RECIPIENT set) we are only ever messaging our own test
+      // number, so quiet hours do not apply - fire anytime so we can test.
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hourIST = nowIST.getHours();
-      if (hourIST >= 21 || hourIST < 9) {
+      if ((hourIST >= 21 || hourIST < 9) && !TEST_RECIPIENT) {
         const nextMorning = new Date(nowIST);
         if (hourIST >= 21) nextMorning.setDate(nextMorning.getDate() + 1);
         nextMorning.setHours(9, 0, 0, 0);
