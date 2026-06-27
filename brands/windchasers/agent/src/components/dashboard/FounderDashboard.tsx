@@ -119,9 +119,9 @@ export default function FounderDashboard() {
   const [showLeadModal, setShowLeadModal] = useState(false)
 
   // Per-card date ranges (founder: "put the toggle inside the cards, as we used
-  // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
+  // to have"). Active Conversations defaults to Today (24h); the trend to 7D.
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
-  const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
   // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
   const [engineRange, setEngineRange] = useState<'Today' | '7D' | '14D' | 'All'>('All')
   // Top-bar user profile menu.
