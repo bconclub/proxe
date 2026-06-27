@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -58,6 +58,17 @@ interface FounderMetrics {
     web: { total: number; booked: number }
     whatsapp: { total: number; booked: number }
     voice: { total: number; booked: number }
+  }
+  calls?: {
+    total: number
+    inbound: number
+    outbound: number
+    today: number
+    todayInbound: number
+    todayOutbound: number
+    count7D: number
+    trend7D: number
+    trend: { data: Array<{ value: number }>; change: number }
   }
   scoreDistribution: { hot: number; warm: number; cold: number }
   recentActivity: Array<{ id: string; channel: string; type: string; timestamp: string; content: string; metadata?: any }>
@@ -434,10 +445,10 @@ export default function FounderDashboard() {
   // (≥90% = green/Good, below = amber/Fair) so the colour can't drift away from
   // the number — previously it keyed off response-time status and "jumped".
   const replyRate = Math.round(rm?.responseRate ?? 0)
-  const healthIsGood = replyRate >= 90
-  const healthColor = healthIsGood ? '#22c55e' : '#f59e0b'
-  const healthLabel = healthIsGood ? 'Good' : 'Fair'
-  const healthNote = healthIsGood ? 'on track' : 'needs attention'
+  const healthLevel: 'good' | 'warning' | 'critical' = replyRate >= 90 ? 'good' : replyRate >= 70 ? 'warning' : 'critical'
+  const healthColor = healthLevel === 'good' ? '#22c55e' : healthLevel === 'warning' ? '#f59e0b' : '#ef4444'
+  const healthLabel = healthLevel === 'good' ? 'Good' : healthLevel === 'warning' ? 'Fair' : 'Needs work'
+  const healthNote = healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention'
   // Booked calls + what share of total leads that represents (founder conversion view).
   const bookedVal = Math.max(flow.booked || 0, metrics.upcomingBookings.length)
   const bookedPctOfLeads = total > 0 ? `${Math.round((bookedVal / total) * 100)}% of total leads` : 'no leads yet'
@@ -518,7 +529,7 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 shrink-0">
+      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 4%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 14%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
@@ -566,7 +577,7 @@ export default function FounderDashboard() {
         {/* Follow-up Health — status + ring; whole card follows the status colour. */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthIsGood ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthLevel === 'good' ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
           </div>
           <div className="flex items-center justify-between mt-1">
@@ -594,6 +605,16 @@ export default function FounderDashboard() {
           value={fmtMs(metrics.responseHealth.avgMs)}
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
+        />
+        {/* Calls — inbound + outbound voice volume (links to the Calls view). */}
+        <KpiCard
+          icon={<MdCall size={15} />} iconColor="#06b6d4"
+          label="Calls"
+          value={metrics.calls?.total ?? 0}
+          delta={<KpiDelta change={metrics.calls?.trend?.change} />}
+          sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
+          sub={`${metrics.calls?.inbound ?? 0} in · ${metrics.calls?.outbound ?? 0} out`}
+          onClick={() => router.push('/dashboard/calls')}
         />
       </div>
 
@@ -624,8 +645,8 @@ export default function FounderDashboard() {
             <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engBooked} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
-            <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
-            {healthIsGood ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: healthColor }} />
+            {healthLevel === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
           </div>
         </section>
 

@@ -1640,8 +1640,48 @@ export async function GET(request: NextRequest) {
       All: funnelFor(null),
     }
 
+    // ============================================================================
+    // CALLS OVERVIEW — inbound/outbound counts + today/7d windows + 7-day trend
+    // ============================================================================
+    const allCalls = voiceSessions || []
+    const isOutbound = (c: any) => String(c.call_direction || '').toLowerCase() === 'outbound'
+    const callsInWindow = (from: Date) => allCalls.filter((c: any) => c.created_at && new Date(c.created_at) >= from)
+    const callsToday = callsInWindow(oneDayAgo)
+    const calls7D = callsInWindow(sevenDaysAgo)
+    const callsPrev7D = allCalls.filter((c: any) => {
+      if (!c.created_at) return false
+      const d = new Date(c.created_at)
+      return d >= previous7DaysStart && d < sevenDaysAgo
+    })
+    const callsTrend = (() => {
+      const prev = callsPrev7D.length
+      return prev > 0 ? Math.round(((calls7D.length - prev) / prev) * 100) : (calls7D.length > 0 ? 100 : 0)
+    })()
+    // 7-day per-day call volume for the sparkline.
+    const callsTrendSeries: Array<{ value: number }> = []
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(now)
+      day.setDate(day.getDate() - i)
+      const dayStr = day.toISOString().split('T')[0]
+      callsTrendSeries.push({
+        value: allCalls.filter((c: any) => c.created_at && new Date(c.created_at).toISOString().split('T')[0] === dayStr).length,
+      })
+    }
+    const calls = {
+      total: allCalls.length,
+      inbound: allCalls.filter((c: any) => !isOutbound(c)).length,
+      outbound: allCalls.filter(isOutbound).length,
+      today: callsToday.length,
+      todayInbound: callsToday.filter((c: any) => !isOutbound(c)).length,
+      todayOutbound: callsToday.filter(isOutbound).length,
+      count7D: calls7D.length,
+      trend7D: callsTrend,
+      trend: { data: callsTrendSeries, change: callsTrend },
+    }
+
     // Prepare response data
     const responseData = {
+      calls,
       hotLeads: {
         count: hotLeads.length,
         leads: hotLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
