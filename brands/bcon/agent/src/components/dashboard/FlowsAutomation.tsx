@@ -180,8 +180,8 @@ function SequenceDetail({ s, map }: { s: Sequence; map: Map<string, string> }) {
 export default function FlowsAutomation({ section }: { section?: 'triggers' | 'sequences' }) {
   const [map, setMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
-  const [selTrigger, setSelTrigger] = useState<string>(TRIGGERS[0].id)
-  const [selSequence, setSelSequence] = useState<string>(SEQUENCES[0].id)
+  const [selTrigger, setSelTrigger] = useState<string>(TRIGGERS[0]?.id ?? '')
+  const [selSequence, setSelSequence] = useState<string>(SEQUENCES[0]?.id ?? '')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -199,6 +199,18 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
 
   const trigger = TRIGGERS.find(t => t.id === selTrigger) || TRIGGERS[0]
   const sequence = SEQUENCES.find(s => s.id === selSequence) || SEQUENCES[0]
+
+  // A brand may have no triggers/sequences configured yet (empty brand config) —
+  // render a friendly empty state instead of crashing on TRIGGERS[0]/SEQUENCES[0].
+  if ((mode === 'triggers' ? TRIGGERS.length : SEQUENCES.length) === 0) {
+    return (
+      <div style={{ border: CARD, borderRadius: 12, background: 'var(--bg-secondary)', boxShadow: SHADOW, padding: 40, minHeight: 'calc(100vh - 220px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        {mode === 'triggers' ? <MdBolt size={28} style={{ color: 'var(--text-muted)' }} /> : <MdRepeat size={28} style={{ color: 'var(--text-muted)' }} />}
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>No {mode} configured yet</div>
+        <div style={{ fontSize: 12, maxWidth: 360 }}>This brand has no {mode === 'triggers' ? 'event triggers' : 'multi-step sequences'} set up. Add them in the brand’s flows config to see them here.</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 12, alignItems: 'start', minHeight: 'calc(100vh - 170px)', color: 'var(--text-primary)' }}>
