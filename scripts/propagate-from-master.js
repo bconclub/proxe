@@ -33,6 +33,21 @@ const brands = (onlyBrand ? [onlyBrand] : manifest.brands).filter(Boolean);
 
 const masterSrc = path.join(ROOT, 'master', 'agent', 'src');
 
+// ── BRAND-IDENTITY FIREWALL ───────────────────────────────────────────────────
+// Defense in depth: even if a brand-identity file is ever (mis)added to
+// sharedCore, propagate REFUSES to copy it. These define each brand's voice,
+// look, and config — the brands are LIVE, so overwriting a prompt / colour /
+// config from master would corrupt their customer responses and identity.
+const NEVER_SYNC = [
+  /(^|\/)configs\//,                                     // brand config (name, colour, logo, fields, flow + template DATA)
+  /accent-theme/,                                        // colour theme
+  /promptBuilder|promptConfig|\/prompt\/|system-prompt/, // ANY prompt
+  /brand-facts|persona/,                                 // brand voice / facts
+  /ChatWidget/,                                          // the live chat widget
+  /\.(png|jpe?g|svg|webp|ico|gif)$/i,                    // images
+];
+const isBrandIdentity = (rel) => NEVER_SYNC.some((re) => re.test(String(rel).replace(/\\/g, '/')));
+
 let totalChanged = 0;
 const report = {};
 
@@ -44,8 +59,10 @@ for (const brand of brands) {
   }
   const changed = [];
   const missingInMaster = [];
+  const blocked = [];
 
   for (const rel of manifest.sharedCore) {
+    if (isBrandIdentity(rel)) { blocked.push(rel); continue; } // firewall — never overwrite brand identity
     const from = path.join(masterSrc, rel);
     const to = path.join(brandSrc, rel);
     if (!fs.existsSync(from)) { missingInMaster.push(rel); continue; }
@@ -59,7 +76,7 @@ for (const brand of brands) {
     }
   }
 
-  report[brand] = { changed, missingInMaster };
+  report[brand] = { changed, missingInMaster, blocked };
   totalChanged += changed.length;
 }
 
@@ -80,6 +97,10 @@ for (const brand of brands) {
   if (r.missingInMaster.length) {
     console.log(`  ! ${r.missingInMaster.length} manifest file(s) missing in master (stale manifest?):`);
     r.missingInMaster.forEach((f) => console.log(`    ? ${f}`));
+  }
+  if (r.blocked && r.blocked.length) {
+    console.log(`  🛡 firewall blocked ${r.blocked.length} brand-identity file(s) (never synced — eject from sharedCore):`);
+    r.blocked.forEach((f) => console.log(`    ⛔ ${f}`));
   }
   console.log('');
 }

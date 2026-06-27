@@ -75,7 +75,6 @@
     "app/api/health/route.ts",
     "app/api/integrations/voice/route.ts",
     "app/api/integrations/whatsapp/route.ts",
-    "app/api/integrations/whatsapp/system-prompt/route.ts",
     "app/api/knowledge-base/[id]/reprocess/route.ts",
     "app/api/knowledge-base/[id]/route.ts",
     "app/api/knowledge-base/route.ts",

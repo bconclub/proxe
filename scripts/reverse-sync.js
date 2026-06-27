@@ -106,12 +106,34 @@ if (only && isArtifact(only)) {
   process.exit(2);
 }
 
+// Guard 3 — BRAND-IDENTITY FIREWALL. Prompts, colours, brand config, persona and
+// the chat widget define each brand's voice + look. Promoting one brand's
+// identity up to master would then propagate it to every brand and corrupt their
+// live responses. Refuse to pull them, and hard-error if one is in sharedCore.
+// (Mirrors the firewall in propagate-from-master.js.)
+const NEVER_SYNC = [
+  /(^|\/)configs\//, /accent-theme/, /promptBuilder|promptConfig|\/prompt\/|system-prompt/,
+  /brand-facts|persona/, /ChatWidget/, /\.(png|jpe?g|svg|webp|ico|gif)$/i,
+];
+const isBrandIdentity = (rel) => NEVER_SYNC.some((re) => re.test(String(rel).replace(/\\/g, '/')));
+const identityLeak = manifest.sharedCore.filter(isBrandIdentity);
+if (identityLeak.length) {
+  console.error(`! brand-identity file(s) found in sharedCore — eject them, they must stay brand-only:`);
+  identityLeak.forEach((r) => console.error(`    ✗ ${r}`));
+  process.exit(2);
+}
+if (only && isBrandIdentity(only)) {
+  console.error(`! ${only} is brand identity (prompt/colour/config) — it never reverse-syncs.`);
+  process.exit(2);
+}
+
 const toPull = [];   // brand differs from master, safe (no fork)
 const forked = [];   // brand differs from master AND another brand also differs → fork
 const skipped = [];  // requested --only but file is in sync or brand-absent
 
 for (const rel of manifest.sharedCore) {
   if (only && rel !== only) continue;
+  if (isArtifact(rel) || isBrandIdentity(rel)) continue; // firewall — never promote brand-only/identity files
   const m = read(path.join(masterSrc, rel));
   const b = read(path.join(brandSrc, rel));
   if (!b) { skipped.push(`${rel} (absent in ${brand})`); continue; }
