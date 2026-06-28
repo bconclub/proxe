@@ -2045,33 +2045,6 @@ export default function InboxPage() {
                             </div>
                           )
                         })()}
-                        {/* Free-form agent WhatsApp messages (not templates) also carry
-                            a delivery receipt now — show the same Sent/Delivered/Read/
-                            Failed label so EVERY outbound message's fate is visible. */}
-                        {!isCustomer && !isTemplate && msg.channel === 'whatsapp' && (
-                          <div className="flex items-center justify-end gap-1.5 mt-1.5 pt-1 border-t flex-wrap" style={{ borderColor: 'var(--border-primary)' }}>
-                            {msg.metadata?.test_mode === true && (
-                              <span
-                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
-                                style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
-                                title={typeof msg.metadata?.test_recipient === 'string' ? `Test send — went to ${msg.metadata.test_recipient}, NOT this lead` : 'Test send — did not go to this lead'}
-                              >
-                                {typeof msg.metadata?.test_recipient === 'string' ? `TEST → ${msg.metadata.test_recipient}` : 'TEST'}
-                              </span>
-                            )}
-                            {msg.metadata?.send_succeeded === false ? (
-                              <span
-                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
-                                style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
-                                title={typeof msg.metadata?.send_error === 'string' ? msg.metadata.send_error : 'Send failed'}
-                              >
-                                Send failed
-                              </span>
-                            ) : (
-                              <DeliveryStatusIcon deliveredAt={msg.metadata?.delivered_at} readAt={msg.metadata?.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} error={msg.metadata?.delivery_error} />
-                            )}
-                          </div>
-                        )}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
                           isTemplate ? (
                             // WhatsApp-style Quick Reply buttons — stacked, flush, divided by hairlines (theme-aware).
@@ -2151,35 +2124,16 @@ export default function InboxPage() {
                           </div>
                         )}
                         {!isTemplate && !isCustomer && msg.channel === 'whatsapp' && (
+                          // ONE delivery receipt per message — the latest state only
+                          // (Sent → Delivered → Read, or Failed). Reason shows on hover.
+                          // send_succeeded === false means the send API call itself
+                          // failed (no wa_message_id, no webhook) — surface it as Failed.
                           <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
-                            {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
-                              <div className="relative group flex items-center">
-                                <span
-                                  className="text-[8px] font-mono px-1 py-0.5 rounded cursor-default truncate max-w-[120px]"
-                                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
-                                >
-                                  {msg.metadata.delivery_error}
-                                </span>
-                                <div
-                                  className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block z-50 pointer-events-none"
-                                  style={{ minWidth: '200px', maxWidth: '280px' }}
-                                >
-                                  <div
-                                    className="text-[10px] leading-relaxed px-2.5 py-2 rounded-lg shadow-lg"
-                                    style={{ background: '#1a1a2e', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
-                                  >
-                                    <div className="font-semibold mb-0.5" style={{ color: '#EF4444' }}>Delivery Failed</div>
-                                    {msg.metadata.delivery_error}
-                                  </div>
-                                  <div className="flex justify-end pr-2">
-                                    <div className="w-2 h-2 rotate-45 -mt-1" style={{ background: '#1a1a2e', borderRight: '1px solid rgba(239,68,68,0.4)', borderBottom: '1px solid rgba(239,68,68,0.4)' }} />
-                                  </div>
-                                </div>
-                              </div>
+                            {msg.metadata?.send_succeeded === false ? (
+                              <DeliveryStatusIcon createdAt={msg.created_at} deliveryStatus="failed" error={typeof msg.metadata?.send_error === 'string' ? msg.metadata.send_error : 'Send failed'} />
+                            ) : (
+                              <DeliveryStatusIcon deliveredAt={msg.metadata?.delivered_at} readAt={msg.metadata?.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} error={msg.metadata?.delivery_error} />
                             )}
-                            <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
-                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} />
-                            </span>
                           </div>
                         )}
                       </div>

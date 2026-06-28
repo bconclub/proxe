@@ -13,6 +13,16 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-28 13:30 IST · bcon — one delivery receipt per message (no more SENT/SENT, FAILED/FAILED)
+
+- **bcon** — `app/dashboard/inbox/page.tsx`: each outbound WhatsApp message now shows **exactly one** delivery receipt = the latest state only (Sent → Delivered → Read, or Failed). The previous commit added a delivery-status block that **duplicated** a pre-existing one with the identical `!isTemplate && !isCustomer && whatsapp` condition, so every bubble rendered the status twice ("SENT SENT" / "FAILED FAILED"). Removed the duplicate; the surviving block is now the single source — corrected to read `metadata.delivered_at/read_at` (the top-level columns do not exist) and to show one labelled chip (grey Sent · green Delivered · blue Read · red Failed) with the Meta reason on hover. send_succeeded === false (send API itself failed) also surfaces as Failed.
+- User-facing: clean single status per message instead of a stacked pair.
+
+## 2026-06-28 ~13:10 IST · bcon — clear delivery labels + duplicate call-log card fix (`9fe25c43`)
+
+- **bcon** — `app/dashboard/inbox/page.tsx`: `DeliveryStatusIcon` was reading top-level `msg.delivered_at/read_at` (columns that don't exist; status lives in `metadata.*`), so every send fell to one bare amber tick. Now driven off `metadata.delivery_status` with an always-visible Sent/Delivered/Read/Failed label.
+- **bcon** — `components/dashboard/LeadDetailsModal.tsx`: the Notes tab rendered a logged call twice (the `log_call` admin_note **and** the `manual_call` activity, whose differing text formats dodged the dedup). Excluded `manual_call` from the Notes tab (still in Activity) and added a re-entrancy guard to `handleLogCall` so a double-click can't write two logs.
+
 ## 2026-06-26 08:07 IST · bcon — inbox renders WA quick-reply buttons + greeting no longer replays mid-chat
 
 - **bcon** — `app/dashboard/inbox/page.tsx`: the inbox now renders `metadata.quick_reply_buttons` (the interactive quick-reply / LLM-emitted buttons the AI actually sends on WhatsApp) as stacked, WhatsApp-style reply buttons under the AI bubble. Previously only `template_buttons` rendered, so these buttons were invisible to operators — the chat looked like the AI sent a bare line with no options. Indigo accent text (not `--accent-primary`, which is near-white in BCON).
