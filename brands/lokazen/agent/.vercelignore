@@ -1,0 +1,24 @@
+# Exclude Supabase node_modules to reduce function size
+node_modules/@supabase/**
+
+# Exclude documentation
+*.md
+docs/
+README.md
+**/docs/**
+
+# Exclude test files
+**/*.test.*
+**/*.spec.*
+**/__tests__/**
+
+# Exclude development files
+.env.local
+.env.development
+.env.test
+
+# Exclude build artifacts that aren't needed
+.next/cache/**
+
+# Exclude root-level supabase (migrations) only - do NOT match src/lib/supabase
+/supabase/

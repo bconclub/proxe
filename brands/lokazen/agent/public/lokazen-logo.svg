@@ -1,0 +1,41 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="orbOrange" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FF7A40"/>
+      <stop offset="100%" stop-color="#FF5200"/>
+    </radialGradient>
+    <radialGradient id="orbRed" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FF3366"/>
+      <stop offset="100%" stop-color="#E4002B"/>
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Transparent background — works on any light bg -->
+  <rect width="200" height="200" fill="transparent"/>
+
+  <!-- Outer ring -->
+  <circle cx="100" cy="108" r="78" fill="none" stroke="#FF5200" stroke-width="1.5" opacity="0.25"/>
+
+  <!-- Connection lines -->
+  <line x1="75" y1="90" x2="108" y2="130" stroke="#FF5200" stroke-width="1.5" opacity="0.5"/>
+  <line x1="118" y1="62" x2="108" y2="130" stroke="#FF5200" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Large top-right orange orb -->
+  <circle cx="118" cy="62" r="34" fill="url(#orbOrange)" filter="url(#softGlow)" opacity="0.95"/>
+  <circle cx="108" cy="52" r="14" fill="#FFFFFF" opacity="0.18"/>
+
+  <!-- Medium left orange orb -->
+  <circle cx="72" cy="88" r="26" fill="url(#orbOrange)" filter="url(#softGlow)" opacity="0.92"/>
+  <circle cx="63" cy="80" r="10" fill="#FFFFFF" opacity="0.18"/>
+
+  <!-- Small bottom-right red orb -->
+  <circle cx="122" cy="142" r="20" fill="url(#orbRed)" filter="url(#softGlow)" opacity="0.95"/>
+  <circle cx="114" cy="134" r="8" fill="#FFFFFF" opacity="0.2"/>
+</svg>
