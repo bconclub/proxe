@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
@@ -74,11 +74,10 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
-  const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands — only the resolved values differ per brand.
   const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
-  const brandLogo = brandChat?.avatar?.source || '/logo.png'
+  const brandLogo = brandChat?.avatar?.source || '' // never fall back to another brand's asset
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. a brand keeps Voice/Calls off).
   const brandFeatures = useFeatureFlags()
@@ -376,11 +375,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               }}
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
-              <img
-                src={brandLogo}
-                alt={brandName}
-                className="w-full h-full object-contain drop-shadow-lg"
-              />
+              {brandLogo && (
+                <img
+                  src={brandLogo}
+                  alt={brandName}
+                  className="w-full h-full object-contain drop-shadow-lg"
+                />
+              )}
             </div>
           </div>
           <p className="dashboard-layout-auth-loader-text mt-4 text-gray-600 dark:text-gray-400">Checking authentication...</p>
@@ -420,43 +421,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandId === 'pop') ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
-              } else if (showExpanded && brandId === 'pop') {
-                router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : brandId === 'pop' ? 'Enter the War Room' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : undefined}
           >
-            <img
-              src={brandLogo}
-              alt={brandName}
-              className="object-contain"
-              style={{ width: '24px', height: '24px' }}
-            />
+            {brandLogo && (
+              <img
+                src={brandLogo}
+                alt={brandName}
+                className="object-contain"
+                style={{ width: '24px', height: '24px' }}
+              />
+            )}
           </div>
           {showExpanded && (
             <>
-              {brandId === 'pop' ? (
-                <a
-                  href="/war-room"
-                  title="Enter the War Room"
-                  className="dashboard-layout-sidebar-logo flex-1 min-w-0"
-                  style={{ fontSize: '13.5px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.01em', color: 'var(--accent-primary)', textDecoration: 'none' }}
-                >
-                  {brandName}
-                </a>
-              ) : (
-                <h1
-                  className="dashboard-layout-sidebar-logo flex-1 truncate"
-                  style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
-                >
-                  {brandName}
-                </h1>
-              )}
+              <h1
+                className="dashboard-layout-sidebar-logo flex-1 truncate"
+                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+              >
+                {brandName}
+              </h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -492,8 +482,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
-              // POP: Pipeline page hidden for now (not needed for the campaign).
-              if (item.href === '/dashboard/pipeline' && brandId === 'pop') return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
@@ -568,7 +556,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
@@ -604,7 +592,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           pointerEvents: 'none',
                         }}
                       >
-                        {navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}
+                        {navItem.name}
                       </span>
                     )}
                   </>

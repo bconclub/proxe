@@ -1,11 +1,10 @@
 /**
- * BCON accent themes — shared between the Configure page (interactive picker)
- * and the global-prefs hydration in DashboardLayout, so both apply the exact
- * same accent colours and never diverge.
+ * Pulse of Punjab accent palette. RULE: a brand's UI uses ONLY its own brand colour or a
+ * neutral — never another brand's colours. Three accent options (brand /
+ * monochrome / grey); dark vs light is the separate Dashboard Mode. Standard
+ * semantic colours (success green / error red / info blue) are unaffected.
  *
- * Ported from Windchasers. DEFAULT is BCON's brand accent (electric purple
- * #8B5CF6). The remaining accent OPTIONS are carried over from WC so the
- * picker offers the same selectable palette across brands.
+ * This file is brand-PRIVATE (never synced) so each brand owns its palette.
  */
 
 export type ThemeMode = 'brand' | 'bw-dark' | 'bw-light'
@@ -25,10 +24,9 @@ export interface AccentTheme {
 }
 
 export const ACCENT_THEMES: AccentTheme[] = [
-  { id: 'bcon', name: 'BCON Purple', color: '#8B5CF6' },
-  { id: 'gold', name: 'Electric Lime', color: '#afd510' },
-  { id: 'orange', name: 'Sunset Orange', color: '#fc7301' },
-  { id: 'grey', name: 'Neutral Grey', color: '#6B7280' },
+  { id: 'brand', name: 'Pulse of Punjab', color: '#F06C18' },
+  { id: 'mono',  name: 'Black & White', color: '#FAFAFA' },
+  { id: 'grey',  name: 'Black & Grey',  color: '#6B7280' },
 ]
 
 export const DEFAULT_ACCENT_ID = ACCENT_THEMES[0].id

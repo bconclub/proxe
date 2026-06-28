@@ -1,7 +1,10 @@
 /**
- * Windchasers accent themes — shared between the Configure page (interactive
- * picker) and the global-prefs hydration in DashboardLayout, so both apply the
- * exact same accent colours and never diverge.
+ * Windchasers accent palette. RULE: a brand's UI uses ONLY its own brand colour or a
+ * neutral — never another brand's colours. Three accent options (brand /
+ * monochrome / grey); dark vs light is the separate Dashboard Mode. Standard
+ * semantic colours (success green / error red / info blue) are unaffected.
+ *
+ * This file is brand-PRIVATE (never synced) so each brand owns its palette.
  */
 
 export type ThemeMode = 'brand' | 'bw-dark' | 'bw-light'
@@ -21,22 +24,9 @@ export interface AccentTheme {
 }
 
 export const ACCENT_THEMES: AccentTheme[] = [
-  {
-    id: 'aviation-gold',
-    name: 'Aviation Gold',
-    color: '#C9A961',
-    bgSecondary: '#1A0F0A',
-    bgTertiary: 'rgba(201, 169, 97, 0.12)',
-    bgHover: 'rgba(201, 169, 97, 0.16)',
-    borderPrimary: 'rgba(201, 169, 97, 0.32)',
-    textPrimary: '#E8D5B7',
-    textSecondary: 'rgba(232, 213, 183, 0.75)',
-    buttonBg: '#C9A961',
-    textButton: '#1A0F0A',
-  },
-  { id: 'gold', name: 'Electric Lime', color: '#afd510' },
-  { id: 'orange', name: 'Sunset Orange', color: '#fc7301' },
-  { id: 'grey', name: 'Neutral Grey', color: '#6B7280' },
+  { id: 'brand', name: 'Windchasers', color: '#C5A572' },
+  { id: 'mono',  name: 'Black & White', color: '#FAFAFA' },
+  { id: 'grey',  name: 'Black & Grey',  color: '#6B7280' },
 ]
 
 export const DEFAULT_ACCENT_ID = ACCENT_THEMES[0].id
@@ -54,21 +44,10 @@ export function applyAccentColor(themeId: string, mode: ThemeMode) {
   if (!accent) return
   const root = document.documentElement
 
+  // Accent-only: the brand colour ACCENTS the UI (highlights, active states).
+  // It never takes over bg/text — those come from the Dashboard Mode
+  // (brand / bw-dark / bw-light) so the brand colour can't hurt readability.
   root.style.setProperty('--accent-primary', accent.color)
   root.style.setProperty('--accent-light', accent.color)
   root.style.setProperty('--accent-subtle', `${accent.color}20`)
-
-  // Aviation Gold takes over bg/text only when NOT in light mode (otherwise it
-  // stomps light-mode readability). Other accents leave the mode's base bg/text
-  // exactly as ThemeProvider set them.
-  if (accent.id === 'aviation-gold' && mode !== 'bw-light') {
-    root.style.setProperty('--bg-secondary', accent.bgSecondary!)
-    root.style.setProperty('--bg-tertiary', accent.bgTertiary!)
-    root.style.setProperty('--bg-hover', accent.bgHover!)
-    root.style.setProperty('--border-primary', accent.borderPrimary!)
-    root.style.setProperty('--text-primary', accent.textPrimary!)
-    root.style.setProperty('--text-secondary', accent.textSecondary!)
-    root.style.setProperty('--button-bg', accent.buttonBg!)
-    root.style.setProperty('--text-button', accent.textButton!)
-  }
 }

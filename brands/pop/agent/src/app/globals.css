@@ -18,9 +18,9 @@
   --text-secondary: #595959;
   --text-muted: #888888;
   /* Accent colors set by ThemeProvider from brand config */
-  --accent-primary: #8B5CF6;
-  --accent-light: #8B5CF6;
-  --accent-subtle: rgba(139, 92, 246, 0.12);
+  --accent-primary: #F06C18;
+  --accent-light: #F06C18;
+  --accent-subtle: rgba(240, 108, 24, 0.12);
   /* Z-index scale */
   --z-dropdown: 100;
   --z-sticky: 200;
@@ -36,9 +36,9 @@
   --bg-tertiary: rgba(255, 255, 255, 0.02);
   --bg-hover: #1A1A1A;
   --border-primary: #262626;
-  --accent-primary: #8B5CF6;
-  --accent-light: #8B5CF6;
-  --accent-subtle: rgba(139, 92, 246, 0.12);
+  --accent-primary: #F06C18;
+  --accent-light: #F06C18;
+  --accent-subtle: rgba(240, 108, 24, 0.12);
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
   --text-muted: #666666;
