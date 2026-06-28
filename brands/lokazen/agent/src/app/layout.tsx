@@ -19,9 +19,9 @@ export const metadata: Metadata = {
   title: `PROXe ${brandConfig.name}`,
   description: `${brandConfig.name} Dashboard`,
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: '/lokazen-favicon.svg',
+    shortcut: '/lokazen-favicon.svg',
+    apple: '/lokazen-mark.svg',
   },
 }
 
