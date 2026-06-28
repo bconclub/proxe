@@ -345,31 +345,45 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
 }
 
 
-function DeliveryStatusIcon({ deliveredAt, readAt, createdAt, deliveryStatus, waMessageId }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string; deliveryStatus?: string | null; waMessageId?: string | null }) {
-  // Confirmed sent = Meta accepted the message (has a wa_message_id or explicit 'sent' status)
+// WhatsApp-style delivery receipt: icon + an always-visible label so the state
+// is unmistakable (the old version drew a bare amber tick that read identically
+// for sent / delivered / read). Driven PRIMARILY off `deliveryStatus`, the field
+// the status webhook actually writes — the top-level delivered_at/read_at columns
+// do NOT exist on the conversations table, so timestamps come from metadata.
+function DeliveryStatusIcon({ deliveredAt, readAt, createdAt, deliveryStatus, waMessageId, error }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string; deliveryStatus?: string | null; waMessageId?: string | null; error?: string | null }) {
   const confirmedSent = deliveryStatus === 'sent' || !!waMessageId;
-  // Only show ! when not confirmed sent AND no delivery receipt after 10 min
-  const isFailed = !confirmedSent && !deliveredAt && !readAt && createdAt &&
-    (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
+  // Resolve to a single state. Explicit webhook status wins; timestamps and
+  // wa_message_id are fallbacks; only treat as failed after a 10-min silence.
+  let state: 'failed' | 'read' | 'delivered' | 'sent' | 'pending';
+  if (deliveryStatus === 'failed') state = 'failed';
+  else if (deliveryStatus === 'read' || readAt) state = 'read';
+  else if (deliveryStatus === 'delivered' || deliveredAt) state = 'delivered';
+  else if (confirmedSent) state = 'sent';
+  else if (createdAt && (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000) state = 'failed';
+  else state = 'pending';
 
-  if (isFailed || deliveryStatus === 'failed') {
-    // Warning icon
-    return (
-      <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-        <path d="M8 1v10M8 13v2" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
-      </svg>
-    );
-  }
-  if (readAt) {
-    // Double green tick = read by recipient
-    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-  }
-  if (deliveredAt) {
-    // Double amber tick = delivered
-    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-  }
-  // Single amber tick = sent (no delivery confirmation)
-  return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  const tickSingle = (c: string) => <svg width="11" height="9" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  const tickDouble = (c: string) => <svg width="14" height="9" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  const cross = <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/></svg>;
+  const clock = <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#9CA3AF" strokeWidth="1.6"/><path d="M8 5v3.2l2 1.3" stroke="#9CA3AF" strokeWidth="1.6" strokeLinecap="round"/></svg>;
+
+  const map = {
+    failed:    { icon: cross,                label: 'Failed',    color: '#EF4444' },
+    read:      { icon: tickDouble('#3B82F6'), label: 'Read',      color: '#3B82F6' },
+    delivered: { icon: tickDouble('#22C55E'), label: 'Delivered', color: '#22C55E' },
+    sent:      { icon: tickSingle('#9CA3AF'), label: 'Sent',      color: '#9CA3AF' },
+    pending:   { icon: clock,                 label: 'Sending',   color: '#9CA3AF' },
+  } as const;
+  const v = map[state];
+  const tip = state === 'failed'
+    ? (error ? `Not delivered: ${error}` : 'Not delivered by WhatsApp')
+    : `${v.label}${readAt ? ' · ' + new Date(readAt).toLocaleString() : deliveredAt ? ' · ' + new Date(deliveredAt).toLocaleString() : ''}`;
+  return (
+    <span className="inline-flex items-center gap-1" title={tip}>
+      {v.icon}
+      <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: v.color }}>{v.label}</span>
+    </span>
+  );
 }
 
 export default function InboxPage() {
@@ -2024,13 +2038,40 @@ export default function InboxPage() {
                                 </span>
                               )}
                               {!sendFailed && (
-                                <span className="flex items-center" title={ds || 'pending'}>
-                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} />
+                                <span className="flex items-center">
+                                  <DeliveryStatusIcon deliveredAt={msg.metadata?.delivered_at} readAt={msg.metadata?.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} error={msg.metadata?.delivery_error} />
                                 </span>
                               )}
                             </div>
                           )
                         })()}
+                        {/* Free-form agent WhatsApp messages (not templates) also carry
+                            a delivery receipt now — show the same Sent/Delivered/Read/
+                            Failed label so EVERY outbound message's fate is visible. */}
+                        {!isCustomer && !isTemplate && msg.channel === 'whatsapp' && (
+                          <div className="flex items-center justify-end gap-1.5 mt-1.5 pt-1 border-t flex-wrap" style={{ borderColor: 'var(--border-primary)' }}>
+                            {msg.metadata?.test_mode === true && (
+                              <span
+                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
+                                title={typeof msg.metadata?.test_recipient === 'string' ? `Test send — went to ${msg.metadata.test_recipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                              >
+                                {typeof msg.metadata?.test_recipient === 'string' ? `TEST → ${msg.metadata.test_recipient}` : 'TEST'}
+                              </span>
+                            )}
+                            {msg.metadata?.send_succeeded === false ? (
+                              <span
+                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
+                                title={typeof msg.metadata?.send_error === 'string' ? msg.metadata.send_error : 'Send failed'}
+                              >
+                                Send failed
+                              </span>
+                            ) : (
+                              <DeliveryStatusIcon deliveredAt={msg.metadata?.delivered_at} readAt={msg.metadata?.read_at} createdAt={msg.created_at} deliveryStatus={msg.metadata?.delivery_status} waMessageId={msg.metadata?.wa_message_id} error={msg.metadata?.delivery_error} />
+                            )}
+                          </div>
+                        )}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
                           isTemplate ? (
                             // WhatsApp-style Quick Reply buttons — stacked, flush, divided by hairlines (theme-aware).

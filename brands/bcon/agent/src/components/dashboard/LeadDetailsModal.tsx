@@ -1273,6 +1273,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   const handleLogCall = async () => {
     if (!lead) return
+    // Re-entrancy guard: savingLogCall toggles the disabled state, but React
+    // applies it async — a fast double-click / double-Enter could fire two
+    // POSTs (two call logs) before the re-render. Bail if one is in flight.
+    if (savingLogCall) return
     setSavingLogCall(true)
     try {
       const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
@@ -2705,6 +2709,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             const who = (activity.actor || '').toLowerCase()
                             if (who === 'proxe' || who === 'proxe ai' || who === 'system') return false
                             if (activity.icon === 'automation') return false
+                            // A logged call writes BOTH a manual_call activity AND a
+                            // source:'log_call' admin_note. The admin_note already
+                            // renders here as the "Call log" card, so the activity is
+                            // a duplicate in the Notes tab (it still shows in Activity).
+                            // The text formats differ ("[Connected] …" vs "Call logged
+                            // - Connected: …") so the content-key dedup below can't
+                            // catch it — exclude manual_call outright.
+                            if (activity.icon === 'manual_call') return false
                             if (!activity.content) return false
                             const key = `${activity.content}|${activity.timestamp || ''}`
                             return !adminNoteKeys.has(key)
