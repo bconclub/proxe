@@ -193,7 +193,41 @@ export async function POST(req: NextRequest) {
               probeQuestion = 'What\'s the one thing you want to fix first?';
             }
 
-            // Send WhatsApp Template for new web leads
+            // Route the welcome by source page. A lead from the AI Lead Machine
+            // landing page came in FOR the AI Lead Machine, so it gets the Lead
+            // Machine welcome (not the generic "got your inquiry about General
+            // Inquiry" one). Everything else keeps the general web welcome.
+            const isLeadMachine = /lead.?machine/i.test(
+              String(page_url || body.form_source || body.form_name || form_type || '')
+            );
+            const brandName = body.company || body.brand_name || body.business_name || 'your brand';
+            const welcomeTemplate = isLeadMachine
+              ? {
+                  name: 'bcon_lead_machine_meta_welcome_v1_',
+                  language: { code: 'en' },
+                  components: [{
+                    type: 'body',
+                    parameters: [
+                      { type: 'text', parameter_name: 'customer_name', text: name },
+                      { type: 'text', parameter_name: 'brand_name', text: brandName },
+                    ],
+                  }],
+                }
+              : {
+                  name: 'bcon_welcome_web_v1',
+                  language: { code: 'en' },
+                  components: [{
+                    type: 'body',
+                    parameters: [
+                      { type: 'text', parameter_name: 'customer_name', text: name },
+                      { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
+                      { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
+                      { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
+                    ],
+                  }],
+                };
+
+            // Send WhatsApp Template for new web leads (routed by source above)
             const response = await fetch(
               `https://graph.facebook.com/v21.0/${process.env.META_WHATSAPP_PHONE_NUMBER_ID}/messages`,
               {
@@ -206,22 +240,11 @@ export async function POST(req: NextRequest) {
                   messaging_product: 'whatsapp',
                   to: normalizedPhone.replace(/^\+/, ''),
                   type: 'template',
-                  template: {
-                    name: 'bcon_welcome_web_v1',
-                    language: { code: 'en' },
-                    components: [{
-                      type: 'body',
-                      parameters: [
-                        { type: 'text', parameter_name: 'customer_name', text: name },
-                        { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
-                        { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
-                        { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
-                      ]
-                    }]
-                  }
+                  template: welcomeTemplate,
                 })
               }
             );
+            console.log(`[website] Welcome sent to ${normalizedPhone}: ${welcomeTemplate.name} (leadMachine=${isLeadMachine})`);
 
             if (!response.ok) {
               console.error('Template send failed:', await response.text());
