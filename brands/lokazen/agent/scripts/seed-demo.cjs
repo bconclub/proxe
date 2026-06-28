@@ -94,6 +94,7 @@ function thread(person, type, tier, biz, area, sqft, company) {
       lead_score: tier === 'hot' ? 78 + (i % 18) : tier === 'warm' ? 45 + (i % 22) : 12 + (i % 24),
       lead_stage: hasBooking ? 'Booking Made' : pick(STAGE[tier], i), status: tier, last_scored_at: isoH(interHrs),
       booking_date: hasBooking ? new Date(Date.now() + (bookingFuture ? ((i % 10) + 1) : -((i % 8) + 1)) * 86400000).toISOString().slice(0,10) : null,
+      booking_time: hasBooking ? pick(['10:30:00','11:00:00','15:00:00','16:30:00','17:00:00'], i) : null,
     })
   }
   const clean = leadRows.map(({ _i,_type,_tier,_biz,_area,_sqft,_src,_person,_company, ...r }) => r)
@@ -108,7 +109,9 @@ function thread(person, type, tier, biz, area, sqft, company) {
     if (l._tier === 'cold' && i % 2 === 0) return
     const msgs = thread(l._person, l._type, l._tier, l._biz, l._area, l._sqft, l._company)
     const baseHrs = l._tier === 'hot' ? (1 + (i % 20)) : l._tier === 'warm' ? (30 + (i % 60)) : (100 + (i % 200))
-    msgs.forEach((m, k) => convRows.push({ lead_id: ids[i], channel: l._src === 'social' ? 'social' : l._src, sender: m[0], content: m[1], message_type: 'text', metadata: { is_demo: true }, created_at: isoH(baseHrs - k * 0.3) }))
+    msgs.forEach((m, k) => convRows.push({ lead_id: ids[i], channel: l._src === 'social' ? 'social' : l._src, sender: m[0], content: m[1], message_type: 'text',
+      metadata: m[0] === 'agent' ? { is_demo: true, input_to_output_gap_ms: 1500 + ((i * 37 + k * 13) % 6500) } : { is_demo: true },
+      created_at: isoH(baseHrs - k * 0.05) }))
   })
   let conv = 0
   for (let c = 0; c < convRows.length; c += 100) {
@@ -116,5 +119,12 @@ function thread(person, type, tier, biz, area, sqft, company) {
     if (error) { console.error('Conversation insert error:', error); process.exit(1) }
     conv += data.length
   }
-  console.log(`Seeded ${ids.length} demo leads (person-first) + ${conv} messages. Bookings: ${leadRows.filter(l => l.booking_date).length}.`)
+  // Re-assert intended scores/stages: inserting conversations fires
+  // trigger_conversations_update_score which recomputes lead_score via the DB
+  // function (low for demo data). A plain UPDATE does NOT re-trigger scoring, so
+  // this sticks — metrics (High Intent = score>=70) then reflect our demo spread.
+  for (let i = 0; i < leadRows.length; i++) {
+    await supabase.from('all_leads').update({ lead_score: leadRows[i].lead_score, lead_stage: leadRows[i].lead_stage }).eq('id', ids[i])
+  }
+  console.log(`Seeded ${ids.length} demo leads (person-first) + ${conv} messages, scores re-asserted. Bookings: ${leadRows.filter(l => l.booking_date).length}.`)
 })()

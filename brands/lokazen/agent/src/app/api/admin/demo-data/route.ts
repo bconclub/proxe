@@ -68,9 +68,28 @@ function buildLeadRows() {
       lead_score: tier === 'hot' ? 78 + (i % 18) : tier === 'warm' ? 45 + (i % 22) : 12 + (i % 24),
       lead_stage: hasBooking ? 'Booking Made' : pick(STAGE[tier], i), status: tier, last_scored_at: isoH(interHrs),
       booking_date: hasBooking ? new Date(Date.now() + (bookingFuture ? ((i % 10) + 1) : -((i % 8) + 1)) * 86400000).toISOString().slice(0, 10) : null,
+      booking_time: hasBooking ? pick(['10:30:00', '11:00:00', '15:00:00', '16:30:00', '17:00:00'], i) : null,
+      _i: i, _type: type, _tier: tier, _biz: biz, _area: area, _sqft: sqft, _src: src, _person: person, _company: company,
     })
   }
   return rows
+}
+
+function thread(person: string, type: string, tier: string, biz: string, area: string, sqft: number, company: string) {
+  const fn = person.split(' ')[0]; const rent = `₹${Math.max(1, Math.round(sqft * 0.09))}K`; const T: [string, string][] = []
+  if (type === 'brand') {
+    T.push(['customer', `Hi, this is ${fn} from ${company}. Looking for a ${sqft} sqft ${biz.toLowerCase()} space in ${area}.`])
+    T.push(['agent', `Hi ${fn}! Happy to help. What's your budget and how soon do you want to move in?`])
+    if (tier !== 'cold') { T.push(['customer', tier === 'hot' ? `Around ${rent}/month, move-in 4-6 weeks.` : `Maybe ${rent}/month, next month.`]); T.push(['agent', `Got it. I'll shortlist ${area} options and set up a site visit.`]) }
+    if (tier === 'hot') { T.push(['customer', `Yes, this week works.`]); T.push(['agent', `Done. Confirming 2-3 spaces and a slot.`]) }
+  } else {
+    const owns = company === 'Independent Owner' ? 'my' : `our (${company})`
+    T.push(['customer', `Hi, ${fn} here. I want to list ${owns} ${sqft} sqft ${biz.toLowerCase()} in ${area}.`])
+    T.push(['agent', `Great ${fn}! Expected rent, and is it ready to occupy?`])
+    if (tier !== 'cold') { T.push(['customer', tier === 'hot' ? `${rent}/month, ready now. Want tenants ASAP.` : `Around ${rent}/month, available next month.`]); T.push(['agent', `Perfect. I'll match it to active brands in ${area} and line up viewings.`]) }
+    if (tier === 'hot') { T.push(['customer', `Please proceed.`]); T.push(['agent', `On it — matched brand profiles this week.`]) }
+  }
+  return T
 }
 
 export async function GET() {
@@ -87,13 +106,35 @@ export async function POST() {
   if (!supabase) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   await supabase.from('all_leads').delete().eq('brand', BRAND).eq('metadata->>is_demo', 'true')
   const rows = buildLeadRows()
-  let seeded = 0
-  for (let c = 0; c < rows.length; c += 50) {
-    const { data, error } = await supabase.from('all_leads').insert(rows.slice(c, c + 50)).select('id')
+  const clean = rows.map(({ _i, _type, _tier, _biz, _area, _sqft, _src, _person, _company, ...r }: any) => r)
+  const ids: string[] = []
+  for (let c = 0; c < clean.length; c += 50) {
+    const { data, error } = await supabase.from('all_leads').insert(clean.slice(c, c + 50)).select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    seeded += data?.length || 0
+    ;(data || []).forEach((d: any) => ids.push(d.id))
   }
-  return NextResponse.json({ seeded })
+  // Conversation threads (skip half the cold leads for natural variety)
+  const convRows: any[] = []
+  rows.forEach((l: any, i: number) => {
+    if (l._tier === 'cold' && i % 2 === 0) return
+    const msgs = thread(l._person, l._type, l._tier, l._biz, l._area, l._sqft, l._company)
+    const baseHrs = l._tier === 'hot' ? (1 + (i % 20)) : l._tier === 'warm' ? (30 + (i % 60)) : (100 + (i % 200))
+    msgs.forEach((m, k) => convRows.push({
+      lead_id: ids[i], channel: l._src === 'social' ? 'social' : l._src, sender: m[0], content: m[1], message_type: 'text',
+      metadata: m[0] === 'agent' ? { is_demo: true, input_to_output_gap_ms: 1500 + ((i * 37 + k * 13) % 6500) } : { is_demo: true },
+      created_at: isoH(baseHrs - k * 0.05),
+    }))
+  })
+  for (let c = 0; c < convRows.length; c += 100) {
+    const { error } = await supabase.from('conversations').insert(convRows.slice(c, c + 100))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  // Re-assert scores — inserting conversations fires the DB scoring trigger which
+  // overwrites lead_score; a plain UPDATE doesn't re-trigger, so this sticks.
+  for (let i = 0; i < rows.length; i++) {
+    await supabase.from('all_leads').update({ lead_score: rows[i].lead_score, lead_stage: rows[i].lead_stage }).eq('id', ids[i])
+  }
+  return NextResponse.json({ seeded: ids.length, messages: convRows.length })
 }
 
 export async function DELETE() {
