@@ -13,8 +13,9 @@ import ReactFlow, {
   type Node, type Edge, type NodeProps,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
-import { MdPsychology, MdArrowBack } from 'react-icons/md'
+import { MdPsychology, MdArrowBack, MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp } from 'react-icons/md'
 
 // ── tone palette (maps to the dashboard's CSS variables + temperature colors) ──
 const TONES: Record<string, { bg: string; border: string; accent: string }> = {
@@ -109,6 +110,94 @@ const EDGES: Edge[] = [
   E('obj', 'a_price'), E('a_price', 'a_time'), E('a_time', 'a_trust'), E('a_trust', 'a_auth'), E('a_auth', 'a_need'),
 ]
 
+// ── Stage Test Bench ─────────────────────────────────────────────────────────
+// Read each engaged-journey stage exactly as it lands, and fire it to the test
+// phone (your own chat) on demand. Copy lives server-side in the test-stage route
+// (single source); this just renders + sends. Never touches a real lead.
+type TestStage = { id: string; label: string; when: string; body: string; buttons: string[] }
+
+function StageTestBench() {
+  const [stages, setStages] = useState<TestStage[]>([])
+  const [testNumber, setTestNumber] = useState('')
+  const [status, setStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({})
+  const [errorMsg, setErrorMsg] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetch('/api/dashboard/brain/test-stage')
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d?.stages)) setStages(d.stages)
+        if (d?.testNumber) setTestNumber(d.testNumber)
+      })
+      .catch(() => {})
+  }, [])
+
+  const send = async (id: string) => {
+    setStatus((s) => ({ ...s, [id]: 'sending' }))
+    try {
+      const r = await fetch('/api/dashboard/brain/test-stage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: id }),
+      })
+      const d = await r.json()
+      if (d?.success) setStatus((s) => ({ ...s, [id]: 'sent' }))
+      else { setStatus((s) => ({ ...s, [id]: 'error' })); setErrorMsg((m) => ({ ...m, [id]: d?.error || 'Send failed' })) }
+    } catch (e: any) {
+      setStatus((s) => ({ ...s, [id]: 'error' })); setErrorMsg((m) => ({ ...m, [id]: e?.message || 'Send failed' }))
+    }
+  }
+
+  if (!stages.length) return null
+  return (
+    <div style={{ flexShrink: 0, borderTop: '1px solid var(--border-primary)', background: 'var(--bg-secondary)', padding: '10px 16px 14px', maxHeight: '40vh', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
+        <MdWhatsapp size={16} style={{ color: '#22c55e' }} />
+        <span style={{ fontSize: 13, fontWeight: 800 }}>Test the engaged journey</span>
+        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+          Fires the real message to your test number {testNumber || '…'} — your chat only, never a real lead.
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 10 }}>
+        {stages.map((s) => {
+          const st = status[s.id] || 'idle'
+          return (
+            <div key={s.id} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: '10px 11px', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{s.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.when}</span>
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{s.body}</div>
+              {s.buttons?.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {s.buttons.map((b, i) => (
+                    <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(99,102,241,.3)', color: 'rgba(139,142,255,.95)', background: 'rgba(99,102,241,.08)' }}>{b}</span>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => send(s.id)} disabled={st === 'sending'}
+                style={{
+                  marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 700,
+                  padding: '7px 10px', borderRadius: 8, border: 'none', cursor: st === 'sending' ? 'default' : 'pointer',
+                  background: st === 'sent' ? 'rgba(34,197,94,.15)' : st === 'error' ? 'rgba(239,68,68,.15)' : '#22c55e',
+                  color: st === 'sent' ? '#22c55e' : st === 'error' ? '#ef4444' : '#fff', opacity: st === 'sending' ? 0.6 : 1,
+                }}
+              >
+                {st === 'sent' ? (<><MdCheckCircle size={14} /> Sent to your WhatsApp</>)
+                  : st === 'error' ? (<><MdErrorOutline size={14} /> Failed — retry</>)
+                  : st === 'sending' ? ('Sending…')
+                  : (<><MdSend size={13} /> Send to my WhatsApp</>)}
+              </button>
+              {st === 'error' && errorMsg[s.id] && (
+                <div style={{ fontSize: 10, color: '#ef4444' }} title={errorMsg[s.id]}>{String(errorMsg[s.id]).slice(0, 90)}</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function BrainPage() {
   const [nodes, , onNodesChange] = useNodesState(NODES)
   const [edges, , onEdgesChange] = useEdgesState(EDGES)
@@ -158,6 +247,9 @@ export default function BrainPage() {
             />
           </ReactFlow>
         </div>
+
+        {/* Stage test bench — fire each engaged-journey message to the test phone */}
+        <StageTestBench />
       </div>
     </DashboardLayout>
   )

@@ -13,6 +13,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-29 15:00 IST · bcon — Stage Test Bench on the Brain page (engaged journey)
+
+- **bcon** — new `app/api/dashboard/brain/test-stage/route.ts`: GET lists the engaged-journey stages + rendered previews (single source of the copy); POST { stage } fires that stage's real message to the test phone (919731660933) as a free-form interactive message (body + quick-reply buttons, 24h window, no Meta-template approval needed), threaded into the test number's own chat and stamped test_mode. Auth-gated. Never touches a real lead.
+- **bcon** — `app/dashboard/settings/brain/page.tsx`: added a "Test the engaged journey" strip below the Brain flow — each stage shows its rendered message + buttons + a "Send to my WhatsApp" button (WhatsApp-green, not accent-on-white which is invisible in BCON). Lets us read + iterate each engaged follow-up live.
+- Engaged-journey copy reworked to be context-aware (leans on their words/business/pain) vs the old generic "Let's continue where we left off?": Nudge / Push-to-book / Re-engage. Worker template copy can follow once we like these.
+
 ## 2026-06-29 14:25 IST · bcon — first greeting: warmer, one "BCON", explore-first buttons
 
 - **bcon** — `lib/services/quickReplyMap.ts` greeting: body → "Hey, lovely to have you here. I'm PROXe, BCON's AI. What brings you here today?" (drops the duplicate "BCON", opens with curiosity not "how can I help"). Buttons → "What you do · How it works · Book a call" (explore-first; the booking CTA is soft and last, no "Book AI Brand Audit" on message one). First touch should feel welcoming, not pushy.
