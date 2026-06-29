@@ -50,6 +50,10 @@ const TEST_RECIPIENT = (process.env.TEST_RECIPIENT || '').replace(/\D/g, '') || 
 if (TEST_RECIPIENT) {
   console.log(`[TEST MODE] All WhatsApp sends redirected to TEST_RECIPIENT=${TEST_RECIPIENT}. No real lead will be messaged.`);
 }
+// Stamp every send-log row in test mode so the inbox can clearly mark it as a
+// test send (went to the test phone, NOT the real lead). Without this the row
+// looks identical to a real send and reads as if the lead received it.
+const TEST_META = TEST_RECIPIENT ? { test_mode: true, test_recipient: TEST_RECIPIENT } : {};
 function routePhone(phone) {
   if (TEST_RECIPIENT) {
     console.log(`[TEST_RECIPIENT] Redirect send: real=${phone} -> test=${TEST_RECIPIENT}`);
@@ -2929,7 +2933,7 @@ async function executeFirstOutreach(task, waPhone) {
       sender: 'agent',
       content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
       message_type: 'text',
-      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, template_buttons: TEMPLATE_BUTTONS[templateName] || undefined, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}) }
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, template_buttons: TEMPLATE_BUTTONS[templateName] || undefined, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}), ...TEST_META }
     }).then(({ error }) => {
       if (error) console.error('[FirstOutreach] Conversation log error:', error.message);
     });
@@ -4002,6 +4006,7 @@ async function executeSendMessage(task, waPhone, fallbackMessage) {
         ...(templateUsed ? { template_name: templateUsed, template_buttons: TEMPLATE_BUTTONS[templateUsed] || undefined } : {}),
         wa_message_id: waMessageId || undefined,
         ...(waMessageId ? { whatsapp_message_id: waMessageId } : {}),
+        ...TEST_META,
       }
     }).then(({ error }) => {
       if (error) console.error('[executeTask] Conversation log error:', error.message);

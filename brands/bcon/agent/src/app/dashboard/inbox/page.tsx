@@ -2128,7 +2128,16 @@ export default function InboxPage() {
                           // (Sent → Delivered → Read, or Failed). Reason shows on hover.
                           // send_succeeded === false means the send API call itself
                           // failed (no wa_message_id, no webhook) — surface it as Failed.
-                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
+                          <div className="flex justify-end items-center gap-1.5 mt-1 -mb-0.5">
+                            {msg.metadata?.test_mode === true && (
+                              <span
+                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
+                                style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
+                                title={typeof msg.metadata?.test_recipient === 'string' ? `Test send — went to ${msg.metadata.test_recipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                              >
+                                {typeof msg.metadata?.test_recipient === 'string' ? `TEST → ${msg.metadata.test_recipient}` : 'TEST'}
+                              </span>
+                            )}
                             {msg.metadata?.send_succeeded === false ? (
                               <DeliveryStatusIcon createdAt={msg.created_at} deliveryStatus="failed" error={typeof msg.metadata?.send_error === 'string' ? msg.metadata.send_error : 'Send failed'} />
                             ) : (

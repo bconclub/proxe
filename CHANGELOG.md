@@ -13,6 +13,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-29 13:48 IST · bcon — test sends clearly marked in the inbox (no more "did it go to a real lead?")
+
+- **bcon** — `brands/bcon/voice/task-worker.js`: in TEST mode the worker redirects every send to the test phone but was NOT stamping the conversation row, so a test send looked identical to a real one and read as if the lead received it. Added a `TEST_META` fragment (`test_mode:true`, `test_recipient`) spread into both send-log inserts (first_outreach + executeTask). 
+- **bcon** — `app/dashboard/inbox/page.tsx`: non-template outbound messages now also show the amber **TEST → <number>** badge (the template footer already had it). So any test-redirected send is unmistakable.
+- **bcon** — data backfill: stamped `test_mode` on 6 historical sends whose wamid decodes to the test number `919731660933` (authoritative recipient proof), so past test sends show the badge too. Real sends untouched.
+- User-facing: in test mode, every redirected message is labelled TEST → 919731660933 — it is provably NOT reaching real leads.
+
 ## 2026-06-28 13:30 IST · bcon — one delivery receipt per message (no more SENT/SENT, FAILED/FAILED)
 
 - **bcon** — `app/dashboard/inbox/page.tsx`: each outbound WhatsApp message now shows **exactly one** delivery receipt = the latest state only (Sent → Delivered → Read, or Failed). The previous commit added a delivery-status block that **duplicated** a pre-existing one with the identical `!isTemplate && !isCustomer && whatsapp` condition, so every bubble rendered the status twice ("SENT SENT" / "FAILED FAILED"). Removed the duplicate; the surviving block is now the single source — corrected to read `metadata.delivered_at/read_at` (the top-level columns do not exist) and to show one labelled chip (grey Sent · green Delivered · blue Read · red Failed) with the Meta reason on hover. send_succeeded === false (send API itself failed) also surfaces as Failed.
