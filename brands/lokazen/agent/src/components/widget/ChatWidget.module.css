@@ -2000,12 +2000,7 @@
 
 .bubbleButton[data-theme="lokazen-orange"]::after,
 .bubbleButton[data-brand="lokazen"]::after {
-  background: linear-gradient(90deg,
-    #FF5200 0%,
-    #E4002B 50%,
-    #FF5200 100%
-  );
-  background-size: 200% 100%;
+  display: none;
 }
 
 .bubbleButton:hover::after {
