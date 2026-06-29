@@ -687,13 +687,14 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  overflow: hidden;
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-vibrant) 100%);
   color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   border: 0.5px solid var(--border-accent);
-  box-shadow: 
+  box-shadow:
     0 0 7px var(--primary-color),
     0 2px 8px rgba(0, 0, 0, 0.055);
 }
@@ -706,6 +707,14 @@
 
 .avatar svg path {
   fill: #ffffff;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .headerActions {
@@ -2013,8 +2022,10 @@
 }
 
 .bubbleIcon {
-  width: 39px;
-  height: 39px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2024,6 +2035,14 @@
 .bubbleIcon svg {
   width: 100%;
   height: 100%;
+}
+
+.bubbleIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 /* Chatbox container for bubble style - matches agent.windchasers.in */

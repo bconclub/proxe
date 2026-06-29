@@ -136,7 +136,7 @@ const ICONS = {
         return <PROXELogo />;
       }
       if (avatarType === 'image' && config.chatStructure.avatar.source) {
-        return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
+        return <img src={config.chatStructure.avatar.source} alt={config.name} />;
       }
     }
     // Fallback: Use image logo for Windchasers, infinity symbol for others
