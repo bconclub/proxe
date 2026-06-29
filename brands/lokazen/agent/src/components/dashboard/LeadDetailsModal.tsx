@@ -45,27 +45,55 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
   const fields = (isBrand ? brandFields : ownerFields).filter(([, v]) => v != null && String(v).trim() !== '')
   if (!fields.length) return null
   return (
-    <div className="mt-1 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-3 py-2">
+    <>
+      {/* Trigger row — opens a clean popup, never expands inline. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-1 w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors hover:brightness-110"
+        style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+      >
         <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide truncate" style={{ color: 'var(--accent-primary)' }}>
           {title}
           {summaryLoc && (
             <span className="font-medium normal-case tracking-normal truncate" style={{ color: 'var(--text-secondary)' }}>· {summaryLoc}</span>
           )}
         </span>
-        <MdExpandMore size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        <span className="flex items-center gap-1 text-[10px] font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+          View <MdOpenInNew size={13} />
+        </span>
       </button>
+
+      {/* Popup overlay */}
       {open && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-3 pb-3">
-          {fields.map(([label, value]) => (
-            <div key={label} className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</span>
-              <span className="text-sm capitalize" style={{ color: 'var(--text-primary)' }}>{String(value)}</span>
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border shadow-2xl"
+            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--accent-primary)' }}>{title}</span>
+              <button type="button" onClick={() => setOpen(false)} className="rounded p-1 hover:opacity-70" style={{ color: 'var(--text-secondary)' }} aria-label="Close">
+                <MdClose size={18} />
+              </button>
             </div>
-          ))}
+            <div className="grid grid-cols-2 gap-x-5 gap-y-3.5 px-5 py-4">
+              {fields.map(([label, value]) => (
+                <div key={label} className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                  <span className="text-sm capitalize" style={{ color: 'var(--text-primary)' }}>{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
