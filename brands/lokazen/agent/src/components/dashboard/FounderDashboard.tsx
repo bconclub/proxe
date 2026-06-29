@@ -120,7 +120,7 @@ export default function FounderDashboard() {
   // Per-card date ranges (founder: "put the toggle inside the cards, as we used
   // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
-  const [range, setRange] = useState<'7D' | '14D' | '30D'>('30D')
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
   // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
   const [engineRange, setEngineRange] = useState<'All' | '7D' | '14D'>('All')
   // Top-bar user profile menu.

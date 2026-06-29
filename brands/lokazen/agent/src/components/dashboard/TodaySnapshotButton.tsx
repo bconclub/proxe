@@ -126,7 +126,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
               className="flex items-center gap-2 px-3 py-2.5 border-b"
               style={{ borderColor: 'var(--border-primary)' }}
             >
-              <MdVisibility size={16} style={{ color: '#C9A961' }} />
+              <MdVisibility size={16} style={{ color: 'var(--accent-primary)' }} />
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-semibold leading-tight truncate">
                   {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
@@ -159,7 +159,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                       className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
                       style={{
                         color: active ? '#1a1a1a' : 'var(--text-secondary)',
-                        background: active ? '#C9A961' : 'transparent',
+                        background: active ? 'var(--accent-primary)' : 'transparent',
                       }}
                       disabled={loading && active}
                     >
@@ -206,7 +206,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                 <>
                   {/* Top KPI strip — 4 hero numbers across */}
                   <div className="grid grid-cols-4 gap-2 mb-1">
-                    <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
+                    <KpiCell label="New leads" value={data.leads.total} accent="var(--accent-primary)" />
                     <KpiCell label="PAT done" value={data.events.pat_submitted} accent="#a5b4fc" />
                     <KpiCell label="Demos booked" value={data.events.demo_booked} accent="#22c55e" />
                     <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
@@ -331,7 +331,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                                 </div>
                                 <span
                                   className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                                  style={{ background: 'rgba(201,169,97,0.18)', color: '#C9A961' }}
+                                  style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
                                 >
                                   {l.messageCount} msg
                                 </span>
@@ -510,7 +510,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
       <div className="flex items-center justify-center gap-2 pt-3 pb-1" aria-live="polite">
         <span
           className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
-          style={{ background: '#C9A961' }}
+          style={{ background: 'var(--accent-primary)' }}
           aria-hidden="true"
         />
         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
