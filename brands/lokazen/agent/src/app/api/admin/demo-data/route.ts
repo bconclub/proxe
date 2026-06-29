@@ -73,7 +73,8 @@ function buildLeadRows() {
     const s = summary(tier, type, biz, area, sqft, company)
     const lang = pick(LANGS, i * 3)
     const outlets = 1 + (i % 8)
-    const zone2 = pick(AREAS, i * 7)
+    let zone2 = pick(AREAS, i * 7)
+    if (zone2 === area) zone2 = pick(AREAS, i * 7 + 1)  // never repeat the primary zone
     const rk = rentK(sqft)
     const fmt = pick(FORMATS, i)
     const tl = tier === 'hot' ? 'immediate' : tier === 'warm' ? '1-3 mo' : 'exploring'

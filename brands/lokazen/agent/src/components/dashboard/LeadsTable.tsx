@@ -815,11 +815,13 @@ export default function LeadsTable({
                 // and size get their own columns (set below).
                 const lkz = uc?.[brandId] || {}
                 const lkzType = lkz.user_type === 'brand' ? 'Brand' : lkz.user_type === 'owner' ? 'Owner' : ''
-                const lkzLocation = lkz.user_type === 'brand'
+                const rawLocation = lkz.user_type === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
                   : lkz.user_type === 'owner'
                   ? (lkz.property_zone || lkz.area || '')
                   : ''
+                // Dedupe repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
+                const lkzLocation = Array.from(new Set(String(rawLocation).split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
                 // Property Type is common to both sides: what the brand wants (format)
                 // or what the owner has (property_type).
                 const propTypeCol = lkz.user_type === 'brand'
@@ -1129,13 +1131,13 @@ export default function LeadsTable({
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold truncate min-w-0" style={{ color: 'var(--text-primary)' }} title={displayName}>
                           {displayName}
                         </span>
                         {lkzType && (
                           <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
                             style={lkzType === 'Brand'
                               ? { backgroundColor: '#FF5200', color: '#fff' }
                               : { backgroundColor: '#2563eb', color: '#fff' }}
