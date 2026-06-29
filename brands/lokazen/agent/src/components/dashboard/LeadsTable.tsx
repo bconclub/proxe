@@ -86,17 +86,19 @@ const lkzPropTypeStyle = (value: string): CSSProperties => {
   return { backgroundColor: bg, color }
 }
 
-// Lokazen size-bracket chip colors. Parses the leading number from a size
-// string like "800-1200" or "27000": small=amber, medium=green, large=blue,
-// very large=purple.
+// First number in a size string ("800-1200" -> 800, "27000" -> 27000).
+// (Stripping all non-digits would concatenate ranges into a huge number.)
+const lkzSizeNum = (raw: string): number => {
+  const m = String(raw).match(/\d+/)
+  return m ? parseInt(m[0], 10) : 0
+}
+
+// Lokazen size-bracket chip colors: green up to 10,000 sqft, purple above.
 const lkzSizeStyle = (raw: string): CSSProperties => {
-  const n = parseInt(String(raw).replace(/[^0-9]/g, '').slice(0, 6) || '0', 10)
-  let bg = 'rgba(107,114,128,0.15)', color = '#9ca3af'
-  if (n > 0 && n < 1000) { bg = 'rgba(245,158,11,0.15)'; color = '#f59e0b' }        // small
-  else if (n < 5000) { bg = 'rgba(34,197,94,0.15)'; color = '#22c55e' }              // medium
-  else if (n < 15000) { bg = 'rgba(59,130,246,0.15)'; color = '#60a5fa' }            // large
-  else if (n >= 15000) { bg = 'rgba(168,85,247,0.15)'; color = '#a855f7' }           // very large
-  return { backgroundColor: bg, color }
+  const n = lkzSizeNum(raw)
+  if (n >= 10000) return { backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7' }  // big
+  if (n > 0) return { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' }          // up to 10k
+  return { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' }
 }
 
 const getScoreColor = (score: number | null | undefined): string => {
@@ -287,7 +289,7 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => {
         const lkz = lead.unified_context?.[brandId] || {}
         const raw = lkz.required_size_sqft || lkz.property_size_sqft || ''
-        const n = parseInt(String(raw).replace(/[^0-9]/g, '').slice(0, 6) || '0', 10)
+        const n = lkzSizeNum(raw)
         if (!n) return false
         if (sizeFilter === 'lt1000') return n < 1000
         if (sizeFilter === '1000to3000') return n >= 1000 && n < 3000
