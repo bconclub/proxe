@@ -29,7 +29,6 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
   if (!isBrand && !isOwner) return null
   const LANG: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada' }
   const title = isBrand ? 'Brand Requirement' : 'Property Listing'
-  const summaryLoc = isBrand ? (lkz.target_zones || lkz.area || '') : (lkz.property_zone || lkz.area || '')
   const brandFields: [string, any][] = [
     ['Brand', lkz.brand_name], ['Category', lkz.brand_category], ['Current outlets', lkz.current_outlets],
     ['Expansion', lkz.expansion_intent], ['Target zones', lkz.target_zones], ['Size (sqft)', lkz.required_size_sqft],
@@ -46,22 +45,18 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
   if (!fields.length) return null
   return (
     <>
-      {/* Trigger row — opens a clean popup, never expands inline. */}
+      {/* Trigger row — just the title; opens a clean popup. Fixed height, no
+          location text crammed in, never widens the contact card. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors hover:brightness-110"
+        className="mt-1 w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border transition-colors hover:brightness-110"
         style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
       >
-        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide truncate" style={{ color: 'var(--accent-primary)' }}>
+        <span className="text-xs font-bold uppercase tracking-wide truncate" style={{ color: 'var(--accent-primary)' }}>
           {title}
-          {summaryLoc && (
-            <span className="font-medium normal-case tracking-normal truncate" style={{ color: 'var(--text-secondary)' }}>· {summaryLoc}</span>
-          )}
         </span>
-        <span className="flex items-center gap-1 text-[10px] font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
-          View <MdOpenInNew size={13} />
-        </span>
+        <MdOpenInNew size={14} className="flex-shrink-0" style={{ color: 'var(--text-secondary)' }} />
       </button>
 
       {/* Popup overlay */}
