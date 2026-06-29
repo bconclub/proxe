@@ -185,24 +185,35 @@ export default function LogCallDecisionHub({ leadId, leadName, outcome, notes, o
         </div>
 
         {(action === 'book' || action === 'task') && (
-          <div className="flex gap-1.5 mb-2">
-            <input value={date} onChange={(e) => setDate(e.target.value)} placeholder="date (e.g. jul 15, tomorrow)" className="flex-1 text-xs px-2 py-1.5 rounded border bg-transparent outline-none" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }} />
-            <input value={time} onChange={(e) => setTime(e.target.value)} placeholder="time (e.g. 3 pm)" className="w-24 text-xs px-2 py-1.5 rounded border bg-transparent outline-none" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }} />
+          <div className="mb-2">
+            <div className="flex gap-1.5">
+              <label className="flex-1 flex flex-col gap-0.5">
+                <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>date</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="text-xs px-2 py-1.5 rounded border outline-none" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-primary)', colorScheme: 'dark' }} />
+              </label>
+              <label className="w-32 flex flex-col gap-0.5">
+                <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>time</span>
+                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="text-xs px-2 py-1.5 rounded border outline-none" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', background: 'var(--bg-primary)', colorScheme: 'dark' }} />
+              </label>
+            </div>
           </div>
         )}
         {action === 'task' && (
           <input value={taskNote} onChange={(e) => setTaskNote(e.target.value)} placeholder="what to do (e.g. send pricing for NICU)" className="w-full text-xs px-2 py-1.5 rounded border bg-transparent outline-none mb-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }} />
         )}
         {needsStage && (
-          <select value={stage} onChange={(e) => setStage(e.target.value)} className="w-full text-xs px-2 py-1.5 rounded border bg-transparent outline-none mb-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}>
-            <option value="">pick a stage…</option>
-            {stageList.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {stageList.map((s) => (
+              <button key={s} onClick={() => setStage(s)} className="text-xs px-2.5 py-1.5 rounded border" style={{ borderColor: stage === s ? '#22c55e' : 'var(--border-primary)', background: stage === s ? 'rgba(34,197,94,0.12)' : 'transparent', color: 'var(--text-primary)' }}>{s}</button>
+            ))}
+          </div>
         )}
         {action === 'sequence' && (
-          <select value={sequence} onChange={(e) => setSequence(e.target.value as any)} className="w-full text-xs px-2 py-1.5 rounded border bg-transparent outline-none mb-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}>
-            {SEQUENCES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+          <div className="flex flex-col gap-1.5 mb-2">
+            {SEQUENCES.map((s) => (
+              <button key={s.key} onClick={() => setSequence(s.key)} className="text-left text-xs px-3 py-2 rounded border" style={{ borderColor: sequence === s.key ? '#22c55e' : 'var(--border-primary)', background: sequence === s.key ? 'rgba(34,197,94,0.12)' : 'transparent', color: 'var(--text-primary)' }}>{s.label}</button>
+            ))}
+          </div>
         )}
 
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="why this decision? (teaches the brain)" rows={2} className="w-full text-xs px-2 py-1.5 rounded border bg-transparent outline-none mb-2 resize-none" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }} />
