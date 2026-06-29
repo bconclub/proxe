@@ -743,6 +743,8 @@ export default function LeadsTable({
                   uc?.web?.profile?.full_name ||
                   lead.name || ''
                 const brandName =
+                  uc?.[brandId]?.brand_name ||
+                  uc?.[brandId]?.company ||
                   uc?.web?.what_is_your_brand_name ||
                   uc?.whatsapp?.what_is_your_brand_name ||
                   uc?.whatsapp?.profile?.company ||
@@ -766,6 +768,14 @@ export default function LeadsTable({
                 // If no name, use email as primary identifier
                 const displayName = resolvedName || lead.email || lead.phone || '-'
                 const isEmailAsName = !resolvedName && !!lead.email
+
+                // Lokazen CRE one-line requirement/listing summary for the table.
+                const lkz = uc?.[brandId] || {}
+                const creLine = lkz.user_type === 'brand'
+                  ? [lkz.brand_category, lkz.target_zones || lkz.area, lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null].filter(Boolean).join(' · ')
+                  : lkz.user_type === 'owner'
+                  ? [lkz.property_type, lkz.property_zone || lkz.area, lkz.asking_rent_monthly || null].filter(Boolean).join(' · ')
+                  : ''
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -1073,6 +1083,11 @@ export default function LeadsTable({
                       {(brandName || city) && !isEmailAsName && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
                           {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                        </div>
+                      )}
+                      {creLine && (
+                        <div className="text-[11px] mt-0.5 truncate capitalize" style={{ color: 'var(--accent-primary)' }} title={creLine}>
+                          {creLine}
                         </div>
                       )}
                       {/* Date the lead came in */}

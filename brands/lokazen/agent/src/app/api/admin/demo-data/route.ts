@@ -21,6 +21,23 @@ const PROP = ['Office Tower', 'Retail Unit', 'Warehouse', 'Standalone Building',
 const SOURCES = ['web', 'whatsapp', 'social', 'web', 'whatsapp', 'web']
 const STAGE: Record<string, string[]> = { hot: ['High Intent', 'Booking Made'], warm: ['Qualified', 'Engaged'], cold: ['New', 'Cold'] }
 const pick = (a: string[], i: number) => a[i % a.length]
+
+// ── Brief variable derivations (Configuration Brief v1.0) ──────────────────
+const CATEGORY_BY_BIZ: Record<string, string> = {
+  'Cafe': 'Café/Bakery', 'Restaurant': 'F&B', 'Retail Store': 'Retail', 'Gym': 'Fitness',
+  'Salon': 'Wellness', 'Clinic': 'Wellness', 'Cloud Kitchen': 'Cloud Kitchen',
+  'Showroom': 'Retail', 'Pharmacy': 'Services', 'Quick-service Restaurant': 'QSR',
+}
+const PROPTYPE_BY_BIZ: Record<string, string> = {
+  'Office Tower': 'office', 'Retail Unit': 'retail', 'Warehouse': 'standalone',
+  'Standalone Building': 'standalone', 'Mall Unit': 'retail', 'Commercial Floor': 'office',
+  'High-street Shop': 'retail', 'Co-working Floor': 'office',
+}
+const FORMATS = ['high-street', 'mall', 'standalone', 'food-court', 'kiosk']
+const LANGS = ['en', 'en', 'en', 'hi', 'kn', 'en']
+const FLOORS = ['ground', 'upper', 'basement']
+const AMEN = ['parking, storage', 'parking, kitchen setup', 'storage', 'parking', 'kitchen setup, parking, storage']
+const rentK = (sqft: number) => Math.max(20, Math.round(sqft * 0.09))
 const isoH = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString()
 const isoD = (d: number) => new Date(Date.now() - d * 86400 * 1000).toISOString()
 const tierFor = (i: number) => { const r = i % 10; return r < 2 ? 'hot' : r < 5 ? 'warm' : 'cold' }
@@ -52,6 +69,42 @@ function buildLeadRows() {
     const hasBooking = i % Math.floor(TOTAL / BOOKINGS) === 0
     const bookingFuture = hasBooking && (i % 2 === 0)
     const s = summary(tier, type, biz, area, sqft, company)
+    const lang = pick(LANGS, i * 3)
+    const outlets = 1 + (i % 8)
+    const zone2 = pick(AREAS, i * 7)
+    const rk = rentK(sqft)
+    const fmt = pick(FORMATS, i)
+    const tl = tier === 'hot' ? 'immediate' : tier === 'warm' ? '1-3 mo' : 'exploring'
+    // Full brief variable set per audience side, stored structured under [BRAND].
+    const creCtx = type === 'brand'
+      ? {
+          user_type: 'brand', company, business_type: biz, area, city: 'Bangalore', carpet_area_sqft: sqft,
+          requirement: `${company} needs ${sqft} sqft ${biz.toLowerCase()} in ${area}`,
+          brand_name: company,
+          brand_category: CATEGORY_BY_BIZ[biz] || 'Retail',
+          current_outlets: String(outlets),
+          expansion_intent: outlets === 1 ? 'first outlet' : outlets <= 5 ? '2-5' : '5+',
+          target_zones: `${area}, ${zone2}`,
+          required_size_sqft: `${sqft}-${sqft + 400}`,
+          budget_monthly_rent: `₹${rk}K-${rk + 20}K`,
+          preferred_format: fmt,
+          timeline: tl,
+          preferred_language: lang,
+        }
+      : {
+          user_type: 'owner', company, business_type: biz, area, city: 'Bangalore', carpet_area_sqft: sqft,
+          requirement: `Lists ${sqft} sqft ${biz.toLowerCase()} in ${area}`,
+          property_zone: area,
+          property_address: `${biz}, ${area} Main Road, Bengaluru`,
+          property_size_sqft: String(sqft),
+          asking_rent_monthly: `₹${rk}K`,
+          property_type: PROPTYPE_BY_BIZ[biz] || 'other',
+          floor: pick(FLOORS, i),
+          frontage_ft: String(15 + (i % 6) * 5),
+          availability_date: new Date(Date.now() + ((i % 30) + 5) * 86400000).toISOString().slice(0, 10),
+          amenities: pick(AMEN, i),
+          preferred_language: lang,
+        }
     rows.push({
       customer_name: person,
       email: `${person.toLowerCase().replace(/[^a-z0-9]+/g, '.')}.${i}@example.com`,
@@ -61,8 +114,7 @@ function buildLeadRows() {
       unified_context: {
         unified_summary: s, form_data: formData(tier),
         web: { user_type: type, conversation_summary: s, profile: { full_name: person, company, city: 'Bangalore' } },
-        [BRAND]: { user_type: type, company, business_type: biz, area, city: 'Bangalore', carpet_area_sqft: sqft,
-          requirement: type === 'brand' ? `${company} needs ${sqft} sqft ${biz.toLowerCase()} in ${area}` : `Lists ${sqft} sqft ${biz.toLowerCase()} in ${area}` },
+        [BRAND]: creCtx,
       },
       metadata: { is_demo: true, lead_type_label: type === 'brand' ? 'Brand Owner' : 'Property Owner', heat: tier, company },
       lead_score: tier === 'hot' ? 78 + (i % 18) : tier === 'warm' ? 45 + (i % 22) : 12 + (i % 24),
