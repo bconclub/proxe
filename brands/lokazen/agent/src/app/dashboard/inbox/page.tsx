@@ -1936,7 +1936,7 @@ export default function InboxPage() {
                               // Subtle enough that templates still dominate
                               // visually, distinct enough that the eye knows
                               // "this isn't a customer message".
-                              : 'rgba(201, 169, 97, 0.08)',
+                              : 'rgba(255, 82, 0, 0.08)',
                           backdropFilter: 'blur(8px)',
                           WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
@@ -1945,7 +1945,7 @@ export default function InboxPage() {
                               ? 'rgba(37, 211, 102, 0.45)'
                               // Matching subtle gold edge so the AI bubble
                               // has a hint of brand framing.
-                              : 'rgba(201, 169, 97, 0.25)',
+                              : 'rgba(255, 82, 0, 0.25)',
                           borderWidth: '1px',
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }

@@ -205,7 +205,7 @@ export default function UserManagementPage() {
             <button
               onClick={() => { setShowInviteModal(true); setInviteResult(null); setError(null) }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: '#C9A961', color: '#1A1A1A' }}
+              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff' }}
             >
               <MdPersonAdd size={16} />
               Invite User
@@ -406,7 +406,7 @@ export default function UserManagementPage() {
                     <button
                       onClick={() => handleCopy(inviteResult.url)}
                       className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-                      style={{ background: '#C9A961', color: '#1A1A1A' }}
+                      style={{ background: 'var(--accent-primary)', color: '#fff' }}
                     >
                       {copied ? <><MdCheck size={16} /> Copied</> : <><MdContentCopy size={16} /> Copy link</>}
                     </button>
@@ -448,7 +448,7 @@ export default function UserManagementPage() {
                       type="submit"
                       disabled={inviting || !inviteEmail.trim()}
                       className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity"
-                      style={{ background: '#C9A961', color: '#1A1A1A' }}
+                      style={{ background: 'var(--accent-primary)', color: '#fff' }}
                     >
                       {inviting ? 'Creating…' : 'Create invitation'}
                     </button>
