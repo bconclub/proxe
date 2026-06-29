@@ -17,6 +17,23 @@ const USER_TYPE_OPTIONS = [
   { value: 'owner', label: 'Property Owner' },
 ]
 
+// ── Lokazen CRE option lists (Configuration Brief v1.0) ─────────────────────
+const LKZ_TYPE_OPTIONS = [
+  { value: 'brand', label: 'Brand looking for space' },
+  { value: 'owner', label: 'Property owner listing space' },
+]
+const LKZ_BRAND_CATEGORY = ['F&B', 'QSR', 'Cloud Kitchen', 'Café/Bakery', 'Retail', 'Wellness', 'Fitness', 'D2C', 'Services']
+const LKZ_EXPANSION = ['first outlet', '2-5', '5+']
+const LKZ_FORMAT = ['high-street', 'mall', 'standalone', 'food-court', 'kiosk']
+const LKZ_TIMELINE = ['immediate', '1-3 mo', '3-6 mo', 'exploring']
+const LKZ_PROPERTY_TYPE = ['retail', 'restaurant', 'office', 'bungalow', 'standalone', 'other']
+const LKZ_FLOOR = ['ground', 'upper', 'basement']
+const LKZ_LANGUAGE = [
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'kn', label: 'Kannada' },
+]
+
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50'
 const labelClass = 'block text-sm font-medium mb-1.5'
@@ -24,6 +41,7 @@ const labelClass = 'block text-sm font-medium mb-1.5'
 export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModalProps) {
   const brandId = getCurrentBrandId()
   const showAviationFields = brandId === 'windchasers'
+  const isLokazen = brandId === 'lokazen'
 
   const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
@@ -35,6 +53,29 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
   const [education, setEducation] = useState('')
   const [note, setNote] = useState('')
   const [sendWelcome, setSendWelcome] = useState(false)
+
+  // ── Lokazen CRE fields ────────────────────────────────────────────────────
+  const [preferredLanguage, setPreferredLanguage] = useState('')
+  // Brand side (demand)
+  const [brandName, setBrandName] = useState('')
+  const [brandCategory, setBrandCategory] = useState('')
+  const [currentOutlets, setCurrentOutlets] = useState('')
+  const [expansionIntent, setExpansionIntent] = useState('')
+  const [targetZones, setTargetZones] = useState('')
+  const [requiredSize, setRequiredSize] = useState('')
+  const [budgetRent, setBudgetRent] = useState('')
+  const [preferredFormat, setPreferredFormat] = useState('')
+  const [timeline, setTimeline] = useState('')
+  // Owner side (supply)
+  const [propertyZone, setPropertyZone] = useState('')
+  const [propertyAddress, setPropertyAddress] = useState('')
+  const [propertySize, setPropertySize] = useState('')
+  const [askingRent, setAskingRent] = useState('')
+  const [propertyType, setPropertyType] = useState('')
+  const [floor, setFloor] = useState('')
+  const [frontageFt, setFrontageFt] = useState('')
+  const [availabilityDate, setAvailabilityDate] = useState('')
+  const [amenities, setAmenities] = useState('')
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -50,6 +91,11 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     setName(''); setPhone(''); setEmail(''); setCity('')
     setCourseInterest(''); setUserType(''); setEducation(''); setNote('')
     setSendWelcome(false)
+    setPreferredLanguage('')
+    setBrandName(''); setBrandCategory(''); setCurrentOutlets(''); setExpansionIntent('')
+    setTargetZones(''); setRequiredSize(''); setBudgetRent(''); setPreferredFormat(''); setTimeline('')
+    setPropertyZone(''); setPropertyAddress(''); setPropertySize(''); setAskingRent('')
+    setPropertyType(''); setFloor(''); setFrontageFt(''); setAvailabilityDate(''); setAmenities('')
     setImagePreview(null); setExtractMsg(null); setError(null)
   }, [])
 
@@ -151,6 +197,26 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           education: education.trim(),
           note: note.trim(),
           send_welcome: sendWelcome,
+          // Lokazen CRE variables
+          preferred_language: preferredLanguage.trim(),
+          brand_name: brandName.trim(),
+          brand_category: brandCategory.trim(),
+          current_outlets: currentOutlets.trim(),
+          expansion_intent: expansionIntent.trim(),
+          target_zones: targetZones.trim(),
+          required_size_sqft: requiredSize.trim(),
+          budget_monthly_rent: budgetRent.trim(),
+          preferred_format: preferredFormat.trim(),
+          timeline: timeline.trim(),
+          property_zone: propertyZone.trim(),
+          property_address: propertyAddress.trim(),
+          property_size_sqft: propertySize.trim(),
+          asking_rent_monthly: askingRent.trim(),
+          property_type: propertyType.trim(),
+          floor: floor.trim(),
+          frontage_ft: frontageFt.trim(),
+          availability_date: availabilityDate.trim(),
+          amenities: amenities.trim(),
         }),
       })
       const data = await res.json()
@@ -170,7 +236,11 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     } finally {
       setSaving(false)
     }
-  }, [name, phone, email, city, courseInterest, userType, education, note, sendWelcome, resetForm, onCreated, onClose])
+  }, [name, phone, email, city, courseInterest, userType, education, note, sendWelcome,
+      preferredLanguage, brandName, brandCategory, currentOutlets, expansionIntent, targetZones,
+      requiredSize, budgetRent, preferredFormat, timeline, propertyZone, propertyAddress,
+      propertySize, askingRent, propertyType, floor, frontageFt, availabilityDate, amenities,
+      resetForm, onCreated, onClose])
 
   if (!isOpen) return null
 
@@ -285,12 +355,162 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                   <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Email</label>
                   <input className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" disabled={saving} />
                 </div>
+
+                {/* Lokazen: which side is this lead on? Drives the next step. */}
+                {isLokazen && (
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>This lead is a</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {LKZ_TYPE_OPTIONS.map((t) => (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setUserType(t.value)}
+                          disabled={saving}
+                          className="px-3 py-2.5 rounded-md text-sm font-medium border text-left transition-colors"
+                          style={
+                            userType === t.value
+                              ? { borderColor: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }
+                              : { borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }
+                          }
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
             {/* ───────── STEP 2 — More ───────── */}
             {step === 2 && (
               <>
+                {/* Lokazen BRAND-side requirement fields */}
+                {isLokazen && userType === 'brand' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Brand name</label>
+                      <input className={inputClass} value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Third Wave Coffee" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Category</label>
+                      <select className={inputClass} value={brandCategory} onChange={(e) => setBrandCategory(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_BRAND_CATEGORY.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Current outlets</label>
+                      <input className={inputClass} value={currentOutlets} onChange={(e) => setCurrentOutlets(e.target.value)} placeholder="e.g. 3" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Expansion intent</label>
+                      <select className={inputClass} value={expansionIntent} onChange={(e) => setExpansionIntent(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_EXPANSION.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Preferred format</label>
+                      <select className={inputClass} value={preferredFormat} onChange={(e) => setPreferredFormat(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_FORMAT.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Target zones</label>
+                      <input className={inputClass} value={targetZones} onChange={(e) => setTargetZones(e.target.value)} placeholder="e.g. Indiranagar, Koramangala, HSR" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Required size (sqft)</label>
+                      <input className={inputClass} value={requiredSize} onChange={(e) => setRequiredSize(e.target.value)} placeholder="e.g. 800-1200" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Budget (monthly rent ₹)</label>
+                      <input className={inputClass} value={budgetRent} onChange={(e) => setBudgetRent(e.target.value)} placeholder="e.g. 1.5-2.5L" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Timeline</label>
+                      <select className={inputClass} value={timeline} onChange={(e) => setTimeline(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_TIMELINE.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Language</label>
+                      <select className={inputClass} value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_LANGUAGE.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lokazen OWNER-side property fields */}
+                {isLokazen && userType === 'owner' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Property zone</label>
+                      <input className={inputClass} value={propertyZone} onChange={(e) => setPropertyZone(e.target.value)} placeholder="e.g. Jayanagar" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Property type</label>
+                      <select className={inputClass} value={propertyType} onChange={(e) => setPropertyType(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_PROPERTY_TYPE.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Address</label>
+                      <input className={inputClass} value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} placeholder="Street / landmark" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Size (sqft)</label>
+                      <input className={inputClass} value={propertySize} onChange={(e) => setPropertySize(e.target.value)} placeholder="e.g. 1500" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Asking rent (monthly ₹)</label>
+                      <input className={inputClass} value={askingRent} onChange={(e) => setAskingRent(e.target.value)} placeholder="e.g. 2L" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Floor</label>
+                      <select className={inputClass} value={floor} onChange={(e) => setFloor(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_FLOOR.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Frontage (ft)</label>
+                      <input className={inputClass} value={frontageFt} onChange={(e) => setFrontageFt(e.target.value)} placeholder="e.g. 20" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Availability date</label>
+                      <input type="date" className={inputClass} value={availabilityDate} onChange={(e) => setAvailabilityDate(e.target.value)} disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Language</label>
+                      <select className={inputClass} value={preferredLanguage} onChange={(e) => setPreferredLanguage(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_LANGUAGE.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Amenities</label>
+                      <input className={inputClass} value={amenities} onChange={(e) => setAmenities(e.target.value)} placeholder="parking, kitchen setup, storage…" disabled={saving} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Lokazen with no type chosen yet — nudge back */}
+                {isLokazen && !userType && (
+                  <div className="p-3 rounded-md text-sm" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
+                    Pick Brand or Property owner on the previous step to capture the right details.
+                  </div>
+                )}
+
+                {/* Non-Lokazen brands keep the original fields */}
+                {!isLokazen && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass} style={{ color: 'var(--text-primary)' }}>City</label>
@@ -319,6 +539,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                     <input className={inputClass} value={education} onChange={(e) => setEducation(e.target.value)} placeholder="e.g. 12th with PCM" disabled={saving} />
                   </div>
                 </div>
+                )}
 
                 <div>
                   <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Note</label>

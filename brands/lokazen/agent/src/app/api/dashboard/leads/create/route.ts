@@ -56,6 +56,30 @@ export async function POST(request: NextRequest) {
     const note = clean(body.note)
     const sendWelcome = body.send_welcome === true
 
+    // ── Lokazen CRE lead variables (Configuration Brief v1.0) ─────────────────
+    // Stored structured in unified_context[brand]; no DB migration needed.
+    const preferredLanguage = clean(body.preferred_language)
+    // Brand side (demand)
+    const brandName = clean(body.brand_name)
+    const brandCategory = clean(body.brand_category)
+    const currentOutlets = clean(body.current_outlets)
+    const expansionIntent = clean(body.expansion_intent)
+    const targetZones = clean(body.target_zones)
+    const requiredSizeSqft = clean(body.required_size_sqft)
+    const budgetMonthlyRent = clean(body.budget_monthly_rent)
+    const preferredFormat = clean(body.preferred_format)
+    const timeline = clean(body.timeline)
+    // Owner side (supply)
+    const propertyZone = clean(body.property_zone)
+    const propertyAddress = clean(body.property_address)
+    const propertySizeSqft = clean(body.property_size_sqft)
+    const askingRentMonthly = clean(body.asking_rent_monthly)
+    const propertyType = clean(body.property_type)
+    const floor = clean(body.floor)
+    const frontageFt = clean(body.frontage_ft)
+    const availabilityDate = clean(body.availability_date)
+    const amenities = clean(body.amenities)
+
     if (!phoneRaw) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
     }
@@ -94,9 +118,30 @@ export async function POST(request: NextRequest) {
     if (city) brandCtx.city = city
     if (courseInterest) brandCtx.course_interest = courseInterest
     if (education) brandCtx.education = education
-    if (['student', 'parent', 'professional', 'early_stage'].includes(userType)) {
+    if (['student', 'parent', 'professional', 'early_stage', 'brand', 'owner'].includes(userType)) {
       brandCtx.user_type = userType
     }
+    if (preferredLanguage) brandCtx.preferred_language = preferredLanguage
+    // Lokazen brand-side (demand) variables
+    if (brandName) brandCtx.brand_name = brandName
+    if (brandCategory) brandCtx.brand_category = brandCategory
+    if (currentOutlets) brandCtx.current_outlets = currentOutlets
+    if (expansionIntent) brandCtx.expansion_intent = expansionIntent
+    if (targetZones) brandCtx.target_zones = targetZones
+    if (requiredSizeSqft) brandCtx.required_size_sqft = requiredSizeSqft
+    if (budgetMonthlyRent) brandCtx.budget_monthly_rent = budgetMonthlyRent
+    if (preferredFormat) brandCtx.preferred_format = preferredFormat
+    if (timeline) brandCtx.timeline = timeline
+    // Lokazen owner-side (supply) variables
+    if (propertyZone) brandCtx.property_zone = propertyZone
+    if (propertyAddress) brandCtx.property_address = propertyAddress
+    if (propertySizeSqft) brandCtx.property_size_sqft = propertySizeSqft
+    if (askingRentMonthly) brandCtx.asking_rent_monthly = askingRentMonthly
+    if (propertyType) brandCtx.property_type = propertyType
+    if (floor) brandCtx.floor = floor
+    if (frontageFt) brandCtx.frontage_ft = frontageFt
+    if (availabilityDate) brandCtx.availability_date = availabilityDate
+    if (amenities) brandCtx.amenities = amenities
 
     // ── Dedup by (phone, brand) ───────────────────────────────────────────────
     const { data: existing } = await supabase
