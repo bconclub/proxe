@@ -55,6 +55,22 @@ export interface OrchestratorResult {
   summary_refreshed: boolean;
 }
 
+/**
+ * A read-only proposal: what the orchestrator WOULD do for a given
+ * classification, expressed for a human to confirm or override. Writes nothing.
+ * This is the `ai_proposed_plan` half of the decision-learning record — we save
+ * it next to the human's actual choice so the brain can learn the gap.
+ */
+export interface PlanProposal {
+  category: string;
+  /** Short machine action key, maps to a hub button: book | post_call | sequence | close | nurture | message | none */
+  action: 'book' | 'post_call' | 'sequence' | 'close' | 'nurture' | 'message' | 'none';
+  /** One-line plain-English recommendation. */
+  reason: string;
+  /** The concrete steps the worker would schedule if left to run. */
+  next_steps: string[];
+}
+
 // ─── Classifier prompt ──────────────────────────────────────────────────────
 
 const CLASSIFY_SYSTEM_PROMPT = `You are a sales admin assistant. Given an admin note about a lead, extract:
@@ -265,6 +281,99 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
 
   targetIST.setUTCHours(hour, minutes, 0, 0);
   return new Date(targetIST.getTime() - istOffsetMs);
+}
+
+// ─── Proposal (read-only) ─────────────────────────────────────────────────────
+
+/**
+ * Mirror of the category branches in `classifyAndAct`, but writes NOTHING.
+ * Given a classification, return the plan the worker would run, in words a
+ * human can confirm or override at the log-call hub. Keep this in sync with the
+ * branches below — it is the single source for "what the brain would do".
+ */
+export function proposePlan(c: NoteClassification): PlanProposal {
+  const when = c.booking_date ? `${c.booking_date}${c.booking_time ? ' ' + c.booking_time : ''}` : 'the booked slot';
+  switch (c.category) {
+    case 'BOOKING_MADE':
+      return {
+        category: c.category, action: 'book',
+        reason: `Looks like a demo was booked for ${when}. I'd lock it in and stop chasing.`,
+        next_steps: ['Cancel pending follow-ups', `Create 24h + 30m reminders for ${when}`, 'Stage → Booking Made, score 80'],
+      };
+    case 'POST_CALL':
+      return {
+        category: c.category, action: 'post_call',
+        reason: 'A call happened or a callback is planned. I\'d keep it warm with one light touch.',
+        next_steps: ['Mark last touchpoint as voice', 'Post-call follow-up in 1 hour'],
+      };
+    case 'DEMO_TAKEN':
+      return {
+        category: c.category, action: 'sequence',
+        reason: 'Demo is done. I\'d run the post-demo nudge sequence.',
+        next_steps: ['Stage → Demo Taken, score 72', 'Sequence: day 1, voice day 2, day 3, day 5'],
+      };
+    case 'PROPOSAL_SENT':
+      return {
+        category: c.category, action: 'sequence',
+        reason: 'Proposal is out. I\'d chase it lightly over a week.',
+        next_steps: ['Stage → Proposal Sent, score 80', 'Sequence: day 1 + voice, day 3, day 5'],
+      };
+    case 'RNR':
+      return {
+        category: c.category, action: 'sequence',
+        reason: 'Couldn\'t reach them. I\'d try again shortly, then run the re-try sequence.',
+        next_steps: ['Cancel booking reminders', 'Missed-call follow-up in 30 min', 'Sequence: day 1, 3, 5, 7', 'Stage → In Sequence'],
+      };
+    case 'HOT_LEAD':
+      return {
+        category: c.category, action: 'sequence',
+        reason: 'High intent. I\'d push toward a booking fast.',
+        next_steps: ['Temperature → hot', 'Stage → High Intent, score 85', 'Push-to-book in 1 hour (or prep task if already booked)'],
+      };
+    case 'WARM_LATER':
+      return {
+        category: c.category, action: 'nurture',
+        reason: 'Warm but not now. I\'d park it and check back later.',
+        next_steps: ['Stage → Nurture', '90-day check-in'],
+      };
+    case 'NOT_INTERESTED':
+    case 'NOT_POTENTIAL':
+      return {
+        category: c.category, action: 'close',
+        reason: 'Reads as a dead lead. I\'d close it and cancel everything pending.',
+        next_steps: ['Cancel pending tasks', 'Stage → Closed Lost', ...(c.category === 'NOT_POTENTIAL' ? ['90-day re-engagement check-in'] : [])],
+      };
+    case 'CONVERTED':
+      return {
+        category: c.category, action: 'close',
+        reason: 'Deal closed. I\'d mark it won and clear pending tasks.',
+        next_steps: ['Cancel pending tasks', 'Stage → Converted'],
+      };
+    case 'MEETING_REQUEST':
+      return {
+        category: c.category, action: 'message',
+        reason: 'They want to meet. I\'d ask for a time and nudge if no reply.',
+        next_steps: ['Send meeting-time message (if inside 24h window)', 'Nudge in 2 hours'],
+      };
+    case 'SEND_MESSAGE':
+      return {
+        category: c.category, action: 'message',
+        reason: 'A direct message to send.',
+        next_steps: ['Send the message (if inside 24h window)'],
+      };
+    case 'NAME_UPDATE':
+      return {
+        category: c.category, action: 'none',
+        reason: 'Just a name correction.',
+        next_steps: [c.name ? `Update name to ${c.name}` : 'Update name'],
+      };
+    default:
+      return {
+        category: 'INFO_ONLY', action: 'none',
+        reason: 'Nothing to automate from this. I\'d just save the note.',
+        next_steps: ['Save note, no action'],
+      };
+  }
 }
 
 // ─── Main orchestrator ──────────────────────────────────────────────────────

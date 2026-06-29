@@ -2035,7 +2035,7 @@ async function createFollowUpTasks() {
   // 4. Fix SQL Query Filters
   let query = supabase
     .from('all_leads')
-    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, response_count, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup')
+    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, response_count, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup, unified_context')
     .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
@@ -2067,6 +2067,15 @@ async function createFollowUpTasks() {
       const leadId = lead.id;
 
       console.log(`[FollowUp] Evaluating lead ${leadId} (${leadName}): stage=${leadStage}, responses=${responseCount}, hoursSinceInteraction=${hoursSinceInteraction.toFixed(1)}`);
+
+      // --- HUMAN-OWNED GUARD: a human took this lead at the log-call hub. ---
+      // The AI must not chase them with the generic cadence. They get human
+      // follow-up only (reminders), until handed back via "put in a sequence".
+      if (lead.unified_context && lead.unified_context.owned_by_human === true) {
+        console.log(`[FollowUp] Skipping lead ${leadId}: human-owned (decision hub)`);
+        skippedCount++;
+        continue;
+      }
 
       // --- DEDUPLICATION GUARD 1: Skip if in cooldown ---
       if (await isInCooldown(lead)) {
@@ -2299,7 +2308,7 @@ async function createColdLeadTasks() {
 
   const { data: leads } = await supabase
     .from('all_leads')
-    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
+    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, unified_context')
     .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
@@ -2310,6 +2319,8 @@ async function createColdLeadTasks() {
 
   for (const lead of leads) {
     try {
+      // Human-owned leads (taken at the log-call hub) are off the AI cadence.
+      if (lead.unified_context && lead.unified_context.owned_by_human === true) continue;
       // Schedule 7 days from their last interaction, not NOW
       const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await createTaskIfNotExists({
@@ -2706,6 +2717,22 @@ async function executeTask(task) {
     case 'follow_up_day5':
       return await executeSequenceStep(task, waPhone,
         `${task.lead_name}, haven't heard back. Still interested in growing your business faster? Last chance to grab that free Brand Audit.`);
+    // day7/30/90 previously had no case and fell through to the unsubmitted
+    // rnr template (silent failure outside the 24h window). Give them real,
+    // spaced re-engagement copy via the sequence-step path (template-routed).
+    case 'follow_up_day7':
+      return await executeSequenceStep(task, waPhone,
+        `Hi ${task.lead_name}, still keen to explore this for your business? Happy to pick it up whenever the time is right.`);
+    case 'follow_up_day30':
+      return await executeSequenceStep(task, waPhone,
+        `Hi ${task.lead_name}, checking back in. We've shipped a lot since we last spoke. Worth a quick look at what AI could do for you now?`);
+    case 'follow_up_day90':
+      return await executeSequenceStep(task, waPhone,
+        `Hi ${task.lead_name}, it's been a while. If growing your business with AI is back on your radar, just say the word and we'll pick it up.`);
+
+    // Human-owned reminder: ping the owner on Telegram, never message the lead.
+    case 'human_followup':
+      return await executeHumanFollowup(task);
     case 're_engage':
       if (task.metadata?.sequence) {
         return await executeSequenceStep(task, waPhone,
@@ -2921,6 +2948,26 @@ async function executeHumanCallback(task, waPhone) {
 
   return await executeSendMessage(task, waPhone,
     `Hey ${task.lead_name}, following up as promised. Got a few minutes to chat?`);
+}
+
+/**
+ * Human follow-up reminder. Created by the log-call decision hub when the human
+ * takes ownership of a lead ("add a task for me"). This NEVER messages the
+ * lead — it pings the owner on Telegram so they do the outreach themselves.
+ */
+async function executeHumanFollowup(task) {
+  const note = task.metadata?.note || task.task_description || 'Follow up';
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
+    return { skipped: true, reason: 'Reminder due but Telegram not configured' };
+  }
+  const owner = task.metadata?.owner_email ? ` (${escapeHtml(task.metadata.owner_email)})` : '';
+  const body =
+    `⏰ <b>Follow-up due</b>${owner}\n` +
+    `Lead: <b>${escapeHtml(task.lead_name || 'Lead')}</b>\n` +
+    `${escapeHtml(note)}\n\n` +
+    `This is your task — reach out yourself, the bot won't.`;
+  await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+  return { sent: true, channel: 'telegram' };
 }
 
 /**

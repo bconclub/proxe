@@ -198,6 +198,96 @@ function StageTestBench() {
   )
 }
 
+// ── Learning panel — what the brain is learning from human decisions ──────────
+type LearnData = {
+  total: number
+  matchRate: number
+  byAction: Record<string, number>
+  byStageAction: Array<{ stage: string; count: number; top_action: string; top_count: number }>
+  recent: Array<{ lead_id: string; lead_name: string; at: string; ai_action: string; human_action: string; matched: boolean; reason: string | null; stage: string | null; intent: string | null }>
+}
+
+function LearningPanel() {
+  const [data, setData] = useState<LearnData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/dashboard/brain/decisions')
+      .then((r) => r.json())
+      .then((d) => { if (alive) setData(d?.error ? null : d) })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  return (
+    <div style={{ marginTop: 24, padding: 16, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <MdPsychology size={18} style={{ color: 'var(--accent-primary)' }} />
+        <h3 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>What the brain is learning</h3>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+        Every logged-call decision teaches it. When match rate climbs, the brain is ready to act on its own.
+      </p>
+
+      {loading ? (
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</div>
+      ) : !data || data.total === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No decisions logged yet. Log a call and pick an action to start teaching it.</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <Stat label="decisions" value={String(data.total)} />
+            <Stat label="ai matched human" value={`${data.matchRate}%`} accent={data.matchRate >= 70 ? '#22c55e' : data.matchRate >= 40 ? '#f59e0b' : '#ef4444'} />
+            <Stat label="actions used" value={String(Object.keys(data.byAction).length)} />
+          </div>
+
+          {data.byStageAction.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>patterns by stage</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {data.byStageAction.map((p) => (
+                  <div key={p.stage} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Leads at <span style={{ color: 'var(--text-primary)' }}>{p.stage}</span> → humans mostly chose <span style={{ color: 'var(--accent-primary)' }}>{p.top_action}</span> ({p.top_count}/{p.count})
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>recent decisions</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.recent.map((e, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0, background: e.matched ? '#22c55e' : '#f59e0b' }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: 'var(--text-primary)' }}>
+                    {e.lead_name} · <span style={{ color: 'var(--text-secondary)' }}>{e.stage || 'unknown'}{e.intent ? ` · ${e.intent}` : ''}</span>
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>
+                    ai proposed <span style={{ color: 'var(--text-primary)' }}>{e.ai_action}</span>, human chose <span style={{ color: e.matched ? '#22c55e' : '#f59e0b' }}>{e.human_action}</span>
+                    {e.reason ? ` — "${e.reason}"` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', minWidth: 90 }}>
+      <div style={{ fontSize: 20, fontWeight: 500, color: accent || 'var(--text-primary)' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</div>
+    </div>
+  )
+}
+
 export default function BrainPage() {
   const [nodes, , onNodesChange] = useNodesState(NODES)
   const [edges, , onEdgesChange] = useEdgesState(EDGES)
@@ -250,6 +340,9 @@ export default function BrainPage() {
 
         {/* Stage test bench — fire each engaged-journey message to the test phone */}
         <StageTestBench />
+
+        {/* Learning panel — what the brain is learning from human decisions */}
+        <LearningPanel />
       </div>
     </DashboardLayout>
   )

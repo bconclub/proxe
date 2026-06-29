@@ -10,6 +10,7 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } fro
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
+import LogCallDecisionHub from './LogCallDecisionHub'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
@@ -421,6 +422,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
+  // The decision hub opens after the draft (outcome + notes) is entered. It
+  // shows the AI's proposed plan and lets the human confirm or override.
+  const [showLogCallHub, setShowLogCallHub] = useState(false)
 
   // Send Message state
   const [showSendMessageForm, setShowSendMessageForm] = useState(false)
@@ -1271,35 +1275,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
-  const handleLogCall = async () => {
-    if (!lead) return
-    // Re-entrancy guard: savingLogCall toggles the disabled state, but React
-    // applies it async — a fast double-click / double-Enter could fire two
-    // POSTs (two call logs) before the re-render. Bail if one is in flight.
-    if (savingLogCall) return
-    setSavingLogCall(true)
-    try {
-      const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome: logCallOutcome, notes: logCallNotes.trim() || undefined }),
-      })
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to log call')
-      }
-      setShowLogCallForm(false)
-      setLogCallOutcome('Connected')
-      setLogCallNotes('')
-      setActiveTab('notes') // surface the logged call in the Notes tab
-      loadActivities()
-      loadLeadTasks()
-      loadFreshLeadData()
-    } catch (err) {
-      console.error('Error logging call:', err)
-    } finally {
-      setSavingLogCall(false)
-    }
+  // Step 1: draft saved → open the decision hub (it runs propose + commit).
+  const handleLogCall = () => {
+    if (!lead || savingLogCall) return
+    setShowLogCallHub(true)
+  }
+
+  // Step 2: the hub committed the decision → reset + refresh the lead.
+  const finishLogCall = () => {
+    setShowLogCallHub(false)
+    setShowLogCallForm(false)
+    setLogCallOutcome('Connected')
+    setLogCallNotes('')
+    setActiveTab('notes') // surface the logged call in the Notes tab
+    loadActivities()
+    loadLeadTasks()
+    loadFreshLeadData()
   }
 
   const handleSendMessage = async () => {
@@ -1333,6 +1324,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   const closeAllActionForms = () => {
     setShowLogCallForm(false)
+    setShowLogCallHub(false)
     setShowAdminNoteInput(false)
     setShowSendMessageForm(false)
   }
@@ -2117,8 +2109,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* Log a Call form */}
-                {showLogCallForm && (
+                {/* Log a Call form — draft row (hidden once the hub opens) */}
+                {showLogCallForm && !showLogCallHub && (
                   <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
                     <select
                       value={logCallOutcome}
@@ -2151,6 +2143,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       <MdCheck size={12} />
                     </button>
                   </div>
+                )}
+
+                {/* Decision hub — opens after the draft is saved */}
+                {showLogCallForm && showLogCallHub && lead && (
+                  <LogCallDecisionHub
+                    leadId={lead.id}
+                    leadName={lead.name || 'this lead'}
+                    outcome={logCallOutcome}
+                    notes={logCallNotes}
+                    onCancel={() => setShowLogCallHub(false)}
+                    onDone={finishLogCall}
+                  />
                 )}
 
                 {/* Send Message form */}

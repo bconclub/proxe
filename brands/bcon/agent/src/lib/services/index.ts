@@ -128,7 +128,9 @@ export {
   type NoteClassification,
   type ClassifyAndActInput,
   type OrchestratorResult,
+  type PlanProposal,
   classifyNote,
+  proposePlan,
   resolveBookingDate,
   classifyAndAct,
 } from './noteOrchestrator';
