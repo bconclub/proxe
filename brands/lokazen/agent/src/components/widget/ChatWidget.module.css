@@ -2447,6 +2447,58 @@
     overflow-y: hidden !important;
     overscroll-behavior: none !important;
   }
-  
+
 }
+
+/* Typing indicator */
+.typingBubble {
+  min-width: 60px !important;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+}
+
+.typingIndicator span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-primary, #FF5200);
+  opacity: 0.6;
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typingIndicator span:nth-child(1) { animation-delay: 0s; }
+.typingIndicator span:nth-child(2) { animation-delay: 0.2s; }
+.typingIndicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+.typingIndicatorFallback {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typingIndicatorFallback span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-primary, #FF5200);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typingIndicatorFallback span:nth-child(1) { animation-delay: 0s; }
+.typingIndicatorFallback span:nth-child(2) { animation-delay: 0.2s; }
+.typingIndicatorFallback span:nth-child(3) { animation-delay: 0.4s; }
 
