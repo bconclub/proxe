@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-29 14:25 IST · bcon — first greeting: warmer, one "BCON", explore-first buttons
+
+- **bcon** — `lib/services/quickReplyMap.ts` greeting: body → "Hey, lovely to have you here. I'm PROXe, BCON's AI. What brings you here today?" (drops the duplicate "BCON", opens with curiosity not "how can I help"). Buttons → "What you do · How it works · Book a call" (explore-first; the booking CTA is soft and last, no "Book AI Brand Audit" on message one). First touch should feel welcoming, not pushy.
+
 ## 2026-06-29 14:05 IST · bcon — warmer first-message greeting (welcome, not a pitch)
 
 - **bcon** — `lib/services/quickReplyMap.ts`: the greeting short-circuit (fires on the first "hi/hello") replied with a pitch — "Hey! I'm BCON's AI. Want to see how AI can grow your business?". Changed to a direct, welcoming open: "Hey, welcome to BCON. I'm PROXe, BCON's AI. How can I help you today?". Option buttons (Book AI Brand Audit / How it works / What I get) kept. Brand-private copy.

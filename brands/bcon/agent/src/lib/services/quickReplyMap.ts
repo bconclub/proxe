@@ -42,8 +42,10 @@ const TRIGGERS: QuickReplyTrigger[] = [
     match: /\b(hi|hello|hey|hi there|hello there)\b/i,
     config: {
       triggerKey: 'greeting',
-      body: "Hey, welcome to BCON. I'm PROXe, BCON's AI. How can I help you today?",
-      buttons: ['Book AI Brand Audit', 'How it works', 'What I get'],
+      // First message = warm + welcoming, NOT a pitch. Explore-first buttons;
+      // the booking CTA stays soft ("Book a call") and comes after curiosity.
+      body: "Hey, lovely to have you here. I'm PROXe, BCON's AI. What brings you here today?",
+      buttons: ['What you do', 'How it works', 'Book a call'],
     },
   },
   // ── Pricing ───────────────────────────────────────────────────────────────
