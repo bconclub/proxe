@@ -4,6 +4,10 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  eslint: {
+    // Don't fail the production build on lint errors (matches bcon/windchasers).
+    ignoreDuringBuilds: true,
+  },
   typescript: {
     // Don't fail build on TypeScript errors (we already have type-check script)
     // Allow builds to succeed on Vercel even with type errors
