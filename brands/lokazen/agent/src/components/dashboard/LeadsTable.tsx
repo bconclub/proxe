@@ -769,12 +769,19 @@ export default function LeadsTable({
                 const displayName = resolvedName || lead.email || lead.phone || '-'
                 const isEmailAsName = !resolvedName && !!lead.email
 
-                // Lokazen CRE one-line requirement/listing summary for the table.
+                // Lokazen CRE: lead type, location, and a one-line detail — all packed
+                // into the LEAD cell (no new columns).
                 const lkz = uc?.[brandId] || {}
-                const creLine = lkz.user_type === 'brand'
-                  ? [lkz.brand_category, lkz.target_zones || lkz.area, lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null].filter(Boolean).join(' · ')
+                const lkzType = lkz.user_type === 'brand' ? 'Brand' : lkz.user_type === 'owner' ? 'Owner' : ''
+                const lkzLocation = lkz.user_type === 'brand'
+                  ? (lkz.target_zones || lkz.area || '')
                   : lkz.user_type === 'owner'
-                  ? [lkz.property_type, lkz.property_zone || lkz.area, lkz.asking_rent_monthly || null].filter(Boolean).join(' · ')
+                  ? (lkz.property_zone || lkz.area || '')
+                  : ''
+                const creLine = lkz.user_type === 'brand'
+                  ? [lkz.brand_category, lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null, lkz.budget_monthly_rent].filter(Boolean).join(' · ')
+                  : lkz.user_type === 'owner'
+                  ? [lkz.property_type, lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null, lkz.asking_rent_monthly].filter(Boolean).join(' · ')
                   : ''
 
                 const bookingDate = lead.booking_date ||
@@ -1077,12 +1084,24 @@ export default function LeadsTable({
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                        {displayName}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {displayName}
+                        </span>
+                        {lkzType && (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                            style={lkzType === 'Brand'
+                              ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
+                              : { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}
+                          >
+                            {lkzType === 'Brand' ? 'Brand' : 'Property Owner'}
+                          </span>
+                        )}
                       </div>
-                      {(brandName || city) && !isEmailAsName && (
-                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
-                          {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                      {(brandName || lkzLocation || city) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}>
+                          {[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}
                         </div>
                       )}
                       {creLine && (
