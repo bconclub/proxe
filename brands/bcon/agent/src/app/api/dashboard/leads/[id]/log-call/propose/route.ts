@@ -35,27 +35,28 @@ export async function POST(
       return NextResponse.json({ error: `Invalid outcome` }, { status: 400 })
     }
 
-    const { data: lead, error } = await supabase
+    // Fetch context, but NEVER let a fetch hiccup kill the suggestion — degrade
+    // to an empty snapshot so the hub always gets a plan back.
+    const { data: lead } = await supabase
       .from('all_leads')
       .select('customer_name, lead_stage, lead_score, response_count, last_touchpoint, last_interaction_at, created_at, unified_context')
       .eq('id', leadId)
-      .single()
-    if (error || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+      .maybeSingle()
 
-    const ctx = lead.unified_context || {}
+    const ctx = lead?.unified_context || {}
     const profile = ctx.web?.profile || ctx.profile || {}
-    const daysSinceFirstTouch = lead.created_at
+    const daysSinceFirstTouch = lead?.created_at
       ? Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000)
       : null
 
     // Snapshot of WHO this lead is right now — the half of the learning record
     // that explains "this kind of person came in".
     const context_snapshot = {
-      stage: lead.lead_stage || null,
-      score: lead.lead_score ?? null,
+      stage: lead?.lead_stage || null,
+      score: lead?.lead_score ?? null,
       temperature: ctx.lead_temperature || null,
-      response_count: lead.response_count ?? 0,
-      last_touchpoint: lead.last_touchpoint || null,
+      response_count: lead?.response_count ?? 0,
+      last_touchpoint: lead?.last_touchpoint || null,
       days_since_first_touch: daysSinceFirstTouch,
       service_interest: profile.service_interest || ctx.service_interest || null,
       business: profile.company || profile.business || ctx.business || null,
