@@ -525,10 +525,10 @@ export default function FounderDashboard() {
         </div>
         {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
         <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor="#ef4444"
+          icon={<MdLocalFireDepartment size={15} />} iconColor="var(--accent-primary)"
           label="High Intent Leads"
           value={metrics.hotLeads?.count ?? 0}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#ef4444"
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor="var(--accent-primary)"
           sub="flagged high-intent by PROXe"
           onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
