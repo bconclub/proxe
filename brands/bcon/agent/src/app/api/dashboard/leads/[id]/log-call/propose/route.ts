@@ -37,9 +37,11 @@ export async function POST(
 
     // Fetch context, but NEVER let a fetch hiccup kill the suggestion — degrade
     // to an empty snapshot so the hub always gets a plan back.
+    // NOTE: all_leads has NO response_count column — selecting it 400s the whole
+    // query and empties the snapshot. Reply count comes from unified_context.
     const { data: lead } = await supabase
       .from('all_leads')
-      .select('customer_name, lead_stage, lead_score, response_count, last_touchpoint, last_interaction_at, created_at, unified_context')
+      .select('customer_name, lead_stage, lead_score, last_touchpoint, last_interaction_at, created_at, unified_context')
       .eq('id', leadId)
       .maybeSingle()
 
@@ -55,7 +57,7 @@ export async function POST(
       stage: lead?.lead_stage || null,
       score: lead?.lead_score ?? null,
       temperature: ctx.lead_temperature || null,
-      response_count: lead?.response_count ?? 0,
+      response_count: ctx.response_count ?? ctx.message_count ?? null,
       last_touchpoint: lead?.last_touchpoint || null,
       days_since_first_touch: daysSinceFirstTouch,
       service_interest: profile.service_interest || ctx.service_interest || null,

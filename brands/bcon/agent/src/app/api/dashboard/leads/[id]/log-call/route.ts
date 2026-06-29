@@ -151,7 +151,9 @@ export async function POST(
         at: now.toISOString(), decided_by: createdBy, outcome,
         call_note: trimmedNotes || null, context_snapshot: contextSnapshot,
         ai_proposed_plan: aiProposedPlan,
-        human_decision: { action: 'none', detail: {}, reason: decision.reason || null },
+        // Accepting = the human endorsed the AI's action, so record THAT action
+        // (not "none") with accepted=true, so the Learning readout is meaningful.
+        human_decision: { action: aiProposedPlan?.action || 'none', accepted: true, detail: {}, reason: decision.reason || null },
         agreement: { matched: true, delta: `accepted ai:${aiProposedPlan?.action || 'none'}` },
       }
       // Re-fetch AFTER classifyAndAct (it rewrites unified_context) then append.
