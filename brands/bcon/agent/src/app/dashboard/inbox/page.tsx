@@ -2032,11 +2032,19 @@ export default function InboxPage() {
                             </div>
                           )
                         })()}
-                        {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
-                          isTemplate ? (
+                        {(() => {
+                          // Render buttons from EITHER key: template sends use
+                          // template_buttons; LLM-extracted / quick-reply sends
+                          // use quick_reply_buttons. The inbox only checked the
+                          // first, so AI-reply buttons silently never showed.
+                          const btns = (Array.isArray(msg.metadata?.template_buttons) && msg.metadata.template_buttons.length > 0)
+                            ? msg.metadata.template_buttons
+                            : (Array.isArray(msg.metadata?.quick_reply_buttons) ? msg.metadata.quick_reply_buttons : [])
+                          if (!btns.length) return null
+                          return isTemplate ? (
                             // WhatsApp-style Quick Reply buttons — stacked, flush, divided by hairlines (theme-aware).
                             <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                              {btns.map((btn: string, btnIdx: number) => (
                                 <div
                                   key={btnIdx}
                                   className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
@@ -2057,7 +2065,7 @@ export default function InboxPage() {
                             </div>
                           ) : (
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                              {btns.map((btn: string, btnIdx: number) => (
                                 <span
                                   key={btnIdx}
                                   className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
@@ -2068,7 +2076,7 @@ export default function InboxPage() {
                               ))}
                             </div>
                           )
-                        )}
+                        })()}
                         {!msg.metadata?.template_name && taskTag && (
                           <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                             <span
