@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import InitialsAvatar from '@/components/dashboard/InitialsAvatar'
 import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -2349,12 +2350,7 @@ export default function InboxPage() {
               <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
                 {/* Avatar row */}
                 <div className="flex items-start gap-3 mb-3">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                    style={{ background: avatarBg, color: '#fff' }}
-                  >
-                    {initials}
-                  </div>
+                  <InitialsAvatar name={leadDetails.customer_name || leadDetails.phone} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>

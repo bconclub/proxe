@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
@@ -631,9 +632,7 @@ export default function FounderDashboard() {
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
-                    {getInitials(booking.name)}
-                  </span>
+                  <InitialsAvatar name={booking.name} size={24} />
                   <div className="flex-1 min-w-0">
                     {/* Line 1 — name · date · owner, with the recency-coloured
                         countdown chip on the right (only thing that's coloured). */}
@@ -702,7 +701,7 @@ export default function FounderDashboard() {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3 min-w-[150px]">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{getInitials(lead.name)}</span>
+                            <InitialsAvatar name={lead.name} size={32} />
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
                               <p className="text-[11px] truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} · score {lead.score}</p>

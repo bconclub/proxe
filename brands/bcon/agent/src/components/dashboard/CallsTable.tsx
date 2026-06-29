@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import InitialsAvatar from './InitialsAvatar'
 import {
   MdCallReceived,
   MdCallMade,
@@ -258,7 +259,7 @@ export default function CallsTable() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3 min-w-[150px]">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>{initials(c.leadName)}</span>
+                          <InitialsAvatar name={c.leadName} size={32} />
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
                             <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</p>
