@@ -15,6 +15,7 @@ import {
   MdGraphicEq,
   MdPersonOutline,
   MdSmartToy,
+  MdLanguage,
 } from 'react-icons/md'
 
 // ── Types (mirror /api/dashboard/calls) ─────────────────────────────────────
@@ -262,7 +263,14 @@ export default function CallsTable() {
                         <div className="flex items-center gap-3 min-w-[150px]">
                           <ScoreRing score={c.leadScore} size={32} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
+                              {!c.phone && !c.leadName && (
+                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                                  <MdLanguage size={10} /> Website
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</p>
                           </div>
                         </div>
@@ -337,7 +345,14 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
           <div className="flex items-center gap-3 min-w-0">
             <DirectionBadge direction={call.direction} />
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{call.leadName || 'Unknown caller'}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{call.leadName || 'Unknown caller'}</p>
+                {!call.phone && !call.leadName && (
+                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                    <MdLanguage size={10} /> Website
+                  </span>
+                )}
+              </div>
               <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{call.phone || '—'} · {out ? 'Outbound' : 'Inbound'}</p>
             </div>
           </div>
