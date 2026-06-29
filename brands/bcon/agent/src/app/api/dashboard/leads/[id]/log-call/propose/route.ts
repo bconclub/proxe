@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { classifyNote, proposePlan, getServiceClient, type CallOutcome } from '@/lib/services'
 
+// Re-deploy nudge: prior build hung on a stale restored cache (local build clean).
 export const dynamic = 'force-dynamic'
 
 const VALID_OUTCOMES: CallOutcome[] = ['Connected', 'No Answer', 'Busy', 'Voicemail']
