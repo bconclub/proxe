@@ -8,6 +8,7 @@ import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-pr
 import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
 import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
 import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
+import { getLokazenSystemPrompt } from '../../configs/prompts/lokazen-prompt';
 import { isLikelyRealPersonName } from '../services/utils';
 
 interface PromptOptions {
@@ -45,6 +46,8 @@ function getBrandSystemPrompt(brand: string, context: string, messageCount?: num
       return channel === 'web'
         ? getBconWebSystemPrompt(context, messageCount)
         : getBconSystemPrompt(context, messageCount);
+    case 'lokazen':
+      return getLokazenSystemPrompt(context, messageCount);
     case 'windchasers':
     default:
       return channel === 'web'
