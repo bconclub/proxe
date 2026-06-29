@@ -19,6 +19,56 @@ import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } fr
 // resend import was added to the barrel.
 import { cleanDisplayName } from '@/lib/services/utils'
 
+// Lokazen CRE details — collapsed by default, click the header to expand.
+// Keeps the contact card clean instead of cramming every field inline.
+function LokazenCreCard({ ctx }: { ctx: any }) {
+  const [open, setOpen] = useState(false)
+  const lkz = ctx || {}
+  const isBrand = lkz.user_type === 'brand'
+  const isOwner = lkz.user_type === 'owner'
+  if (!isBrand && !isOwner) return null
+  const LANG: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada' }
+  const title = isBrand ? 'Brand Requirement' : 'Property Listing'
+  const summaryLoc = isBrand ? (lkz.target_zones || lkz.area || '') : (lkz.property_zone || lkz.area || '')
+  const brandFields: [string, any][] = [
+    ['Brand', lkz.brand_name], ['Category', lkz.brand_category], ['Current outlets', lkz.current_outlets],
+    ['Expansion', lkz.expansion_intent], ['Target zones', lkz.target_zones], ['Size (sqft)', lkz.required_size_sqft],
+    ['Budget/mo', lkz.budget_monthly_rent], ['Format', lkz.preferred_format], ['Timeline', lkz.timeline],
+    ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
+  ]
+  const ownerFields: [string, any][] = [
+    ['Zone', lkz.property_zone], ['Type', lkz.property_type], ['Address', lkz.property_address],
+    ['Size (sqft)', lkz.property_size_sqft], ['Asking rent/mo', lkz.asking_rent_monthly], ['Floor', lkz.floor],
+    ['Frontage (ft)', lkz.frontage_ft], ['Available', lkz.availability_date], ['Amenities', lkz.amenities],
+    ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
+  ]
+  const fields = (isBrand ? brandFields : ownerFields).filter(([, v]) => v != null && String(v).trim() !== '')
+  if (!fields.length) return null
+  return (
+    <div className="mt-1 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-3 py-2">
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide truncate" style={{ color: 'var(--accent-primary)' }}>
+          {title}
+          {summaryLoc && (
+            <span className="font-medium normal-case tracking-normal truncate" style={{ color: 'var(--text-secondary)' }}>· {summaryLoc}</span>
+          )}
+        </span>
+        <MdExpandMore size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-3 pb-3">
+          {fields.map(([label, value]) => (
+            <div key={label} className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</span>
+              <span className="text-sm capitalize" style={{ color: 'var(--text-primary)' }}>{String(value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
   if (!dateString) return '-';
@@ -2029,55 +2079,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* LOKAZEN CRE DETAILS — brand/owner variables from the Configuration Brief */}
-                {(() => {
-                  const lkz = currentLead.unified_context?.lokazen || {};
-                  const isBrand = lkz.user_type === 'brand';
-                  const isOwner = lkz.user_type === 'owner';
-                  if (!isBrand && !isOwner) return null;
-                  const LANG: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada' };
-                  const brandFields: [string, any][] = [
-                    ['Brand', lkz.brand_name],
-                    ['Category', lkz.brand_category],
-                    ['Current outlets', lkz.current_outlets],
-                    ['Expansion', lkz.expansion_intent],
-                    ['Target zones', lkz.target_zones],
-                    ['Size (sqft)', lkz.required_size_sqft],
-                    ['Budget/mo', lkz.budget_monthly_rent],
-                    ['Format', lkz.preferred_format],
-                    ['Timeline', lkz.timeline],
-                    ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
-                  ];
-                  const ownerFields: [string, any][] = [
-                    ['Zone', lkz.property_zone],
-                    ['Type', lkz.property_type],
-                    ['Address', lkz.property_address],
-                    ['Size (sqft)', lkz.property_size_sqft],
-                    ['Asking rent/mo', lkz.asking_rent_monthly],
-                    ['Floor', lkz.floor],
-                    ['Frontage (ft)', lkz.frontage_ft],
-                    ['Available', lkz.availability_date],
-                    ['Amenities', lkz.amenities],
-                    ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
-                  ];
-                  const fields = (isBrand ? brandFields : ownerFields).filter(([, v]) => v != null && String(v).trim() !== '');
-                  if (!fields.length) return null;
-                  return (
-                    <div className="mt-1 rounded-lg border p-3" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
-                      <div className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--accent-primary)' }}>
-                        {isBrand ? 'Brand requirement' : 'Property listing'}
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                        {fields.map(([label, value]) => (
-                          <div key={label} className="flex flex-col">
-                            <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</span>
-                            <span className="text-sm capitalize" style={{ color: 'var(--text-primary)' }}>{String(value)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* LOKAZEN CRE DETAILS — collapsible; click to expand the full brief variables */}
+                <LokazenCreCard ctx={currentLead.unified_context?.lokazen} />
 
                 {/* ATTRIBUTION moved to the Interaction tab (with expanded
                     UTM / ad set / ad name / fbclid details). Used to live here
