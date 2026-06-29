@@ -25,10 +25,10 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
 }
 
 // Per-event playback gain (0..1). Page-ready mp3 is loud — turn it down hard
-// (founder: "the homepage reload sound is too loud"). Halved from 0.35 → 0.18.
+// Founder: "every ping is too loud" — new/update cut ~60% (1.0 -> 0.4).
 const SOUND_VOLUME: Record<SoundEvent, number> = {
-  new: 1.0,
-  update: 1.0,
+  new: 0.4,
+  update: 0.4,
   ready: 0.18,
 }
 

@@ -28,8 +28,8 @@ export const SOUND_LABELS: Record<SoundEvent, string> = {
 // near full so they're clearly audible. Lower `ready` if the page-load cue feels
 // too loud.
 const SOUND_VOLUME: Record<SoundEvent, number> = {
-  new: 1.0,
-  update: 1.0,
+  new: 0.4,
+  update: 0.4,
   ready: 0.25,
 }
 
