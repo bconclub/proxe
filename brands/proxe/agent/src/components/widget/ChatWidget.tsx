@@ -3266,12 +3266,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
-          <div className={styles.privacyNotice}>
+          <a
+            href="https://goproxe.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.privacyNotice}
+            style={{ textDecoration: 'none', cursor: 'pointer' }}
+          >
             <span className={styles.privacyPoweredIcon}>
               <PROXELogo />
             </span>
             <span>Powered by PROXe</span>
-          </div>
+          </a>
         )}
         <div className={styles.chatInputRow}>
           <div className={styles.chatInputWrapper}>
