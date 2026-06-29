@@ -68,6 +68,37 @@ const getStageColor = (stage: string | null) => {
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
+// Lokazen property-type chip colors — high-street/retail (prime) lean green,
+// then distinct hues per type. Falls back to grey for unknowns.
+const lkzPropTypeStyle = (value: string): CSSProperties => {
+  const map: Record<string, [string, string]> = {
+    'high-street': ['rgba(34,197,94,0.15)', '#22c55e'],
+    'retail':      ['rgba(34,197,94,0.15)', '#22c55e'],
+    'mall':        ['rgba(59,130,246,0.15)', '#60a5fa'],
+    'office':      ['rgba(59,130,246,0.15)', '#60a5fa'],
+    'standalone':  ['rgba(168,85,247,0.15)', '#a855f7'],
+    'restaurant':  ['rgba(249,115,22,0.15)', '#f97316'],
+    'food-court':  ['rgba(245,158,11,0.15)', '#f59e0b'],
+    'bungalow':    ['rgba(20,184,166,0.15)', '#14b8a6'],
+    'kiosk':       ['rgba(236,72,153,0.15)', '#ec4899'],
+  }
+  const [bg, color] = map[value.toLowerCase()] || ['rgba(107,114,128,0.15)', '#9ca3af']
+  return { backgroundColor: bg, color }
+}
+
+// Lokazen size-bracket chip colors. Parses the leading number from a size
+// string like "800-1200" or "27000": small=amber, medium=green, large=blue,
+// very large=purple.
+const lkzSizeStyle = (raw: string): CSSProperties => {
+  const n = parseInt(String(raw).replace(/[^0-9]/g, '').slice(0, 6) || '0', 10)
+  let bg = 'rgba(107,114,128,0.15)', color = '#9ca3af'
+  if (n > 0 && n < 1000) { bg = 'rgba(245,158,11,0.15)'; color = '#f59e0b' }        // small
+  else if (n < 5000) { bg = 'rgba(34,197,94,0.15)'; color = '#22c55e' }              // medium
+  else if (n < 15000) { bg = 'rgba(59,130,246,0.15)'; color = '#60a5fa' }            // large
+  else if (n >= 15000) { bg = 'rgba(168,85,247,0.15)'; color = '#a855f7' }           // very large
+  return { backgroundColor: bg, color }
+}
+
 const getScoreColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined) return 'var(--text-secondary)'
   if (score >= 70) return '#22C55E'
@@ -822,6 +853,12 @@ export default function LeadsTable({
                   : ''
                 // Dedupe repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
                 const lkzLocation = Array.from(new Set(String(rawLocation).split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
+                // Brands scout many areas, so a single location next to the brand name
+                // is misleading + cramped — show location only for property owners.
+                // Non-lokazen brands keep their city as before.
+                const secondaryLoc = showLokazenColumns
+                  ? (lkz.user_type === 'owner' ? lkzLocation : '')
+                  : city
                 // Property Type is common to both sides: what the brand wants (format)
                 // or what the owner has (property_type).
                 const propTypeCol = lkz.user_type === 'brand'
@@ -1146,9 +1183,9 @@ export default function LeadsTable({
                           </span>
                         )}
                       </div>
-                      {(brandName || lkzLocation || city) && !isEmailAsName && (
-                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}>
-                          {[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}
+                      {(brandName || secondaryLoc) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[brandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}>
+                          {[brandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}
                         </div>
                       )}
                       {/* Date the lead came in */}
@@ -1451,15 +1488,27 @@ export default function LeadsTable({
                       )
                     })()}
 
-                    {/* LOKAZEN: Property Type + Size columns */}
+                    {/* LOKAZEN: Property Type + Size columns (colored chips) */}
                     {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center text-xs capitalize" style={{ color: propTypeCol ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                        {propTypeCol || '—'}
+                      <td className="px-3 py-2 text-center">
+                        {propTypeCol ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={lkzPropTypeStyle(propTypeCol)}>
+                            {propTypeCol}
+                          </span>
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
                       </td>
                     )}
                     {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center text-xs tabular-nums" style={{ color: sizeCol ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                        {sizeCol ? `${sizeCol} sqft` : '—'}
+                      <td className="px-3 py-2 text-center">
+                        {sizeCol ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
+                            {sizeCol} sqft
+                          </span>
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
                       </td>
                     )}
 
