@@ -13,6 +13,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-29 13:58 IST · bcon — test sends no longer pollute real leads (route to test thread)
+
+- **bcon** — `brands/bcon/voice/task-worker.js`: in TEST mode the send was redirected to the test phone but the conversation row was still logged against the REAL lead — corrupting that lead's history AND tripping the duplicate-send guard (a test send then blocked a real future send). Now `resolveTestLead()` resolves the test number's own lead once per run and `convLeadId()` routes every send-log row to it; in live mode it's the real lead, unchanged. Both send-log inserts (first_outreach + executeTask) use it; if no test lead resolves, the row is skipped rather than written to the real lead.
+- **bcon** — data cleanup: moved 5 historical test sends off real leads (Farhan, Uday, Manav, Sandip, Saravanan) onto the test thread, with `original_lead_id` recorded in metadata. Real leads' threads + dedup guards are clean again.
+- Verified end-to-end: Manav follow-up fired → test number, logged to test thread `3d3fd709`, Manav's real lead untouched.
+- User-facing: in test mode every message lands in YOUR number's thread, never a real customer's.
+
 ## 2026-06-29 13:48 IST · bcon — test sends clearly marked in the inbox (no more "did it go to a real lead?")
 
 - **bcon** — `brands/bcon/voice/task-worker.js`: in TEST mode the worker redirects every send to the test phone but was NOT stamping the conversation row, so a test send looked identical to a real one and read as if the lead received it. Added a `TEST_META` fragment (`test_mode:true`, `test_recipient`) spread into both send-log inserts (first_outreach + executeTask). 

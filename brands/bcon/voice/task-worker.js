@@ -54,6 +54,34 @@ if (TEST_RECIPIENT) {
 // test send (went to the test phone, NOT the real lead). Without this the row
 // looks identical to a real send and reads as if the lead received it.
 const TEST_META = TEST_RECIPIENT ? { test_mode: true, test_recipient: TEST_RECIPIENT } : {};
+
+// In TEST mode the send is redirected to the test phone, so its conversation log
+// must ALSO go to the test number's own lead thread — NEVER the real lead. Logging
+// a redirected send against the real lead corrupts that lead's history AND trips
+// the duplicate-send guard (a test send then blocks a real future send). Resolve
+// the test number's lead once per run; convLeadId() routes every send-log row.
+let TEST_LEAD_ID = null;
+async function resolveTestLead() {
+  if (!TEST_RECIPIENT || TEST_LEAD_ID) return TEST_LEAD_ID;
+  try {
+    const last10 = TEST_RECIPIENT.slice(-10);
+    const { data } = await supabase
+      .from('all_leads')
+      .select('id')
+      .or(`phone.eq.${TEST_RECIPIENT},customer_phone_normalized.eq.${last10}`)
+      .limit(1);
+    TEST_LEAD_ID = data && data[0] ? data[0].id : null;
+    console.log(`[TEST MODE] Conversation logs routed to test lead ${TEST_LEAD_ID || '(none found — sends will not pollute real leads)'}`);
+  } catch (e) {
+    TEST_LEAD_ID = null;
+  }
+  return TEST_LEAD_ID;
+}
+// The lead_id a send-log row is written against: the test lead in test mode
+// (so real leads are never touched), the real lead otherwise.
+function convLeadId(realLeadId) {
+  return TEST_RECIPIENT ? TEST_LEAD_ID : realLeadId;
+}
 function routePhone(phone) {
   if (TEST_RECIPIENT) {
     console.log(`[TEST_RECIPIENT] Redirect send: real=${phone} -> test=${TEST_RECIPIENT}`);
@@ -1760,6 +1788,7 @@ async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
 
   try {
+    await resolveTestLead();
     await pollTelegramCommands();
     await morningBriefing();
     await sendDailyReport();
@@ -2925,10 +2954,10 @@ async function executeFirstOutreach(task, waPhone) {
     task_type: 'first_outreach',
   });
 
-  // Log to conversations
-  if (task.lead_id) {
+  // Log to conversations (test mode → test lead thread, never the real lead)
+  if (task.lead_id && convLeadId(task.lead_id)) {
     await supabase.from('conversations').insert({
-      lead_id: task.lead_id,
+      lead_id: convLeadId(task.lead_id),
       channel: 'whatsapp',
       sender: 'agent',
       content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
@@ -3991,10 +4020,11 @@ async function executeSendMessage(task, waPhone, fallbackMessage) {
     waMessageId = wamid;
   }
 
-  // Log to conversations (include wa_message_id for read receipt tracking)
-  if (task.lead_id) {
+  // Log to conversations (include wa_message_id for read receipt tracking).
+  // Test mode → test lead thread, never the real lead.
+  if (task.lead_id && convLeadId(task.lead_id)) {
     await supabase.from('conversations').insert({
-      lead_id: task.lead_id,
+      lead_id: convLeadId(task.lead_id),
       channel: 'whatsapp',
       sender: 'agent',
       content: message,
