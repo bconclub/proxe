@@ -43,7 +43,7 @@ const TRIGGERS: QuickReplyTrigger[] = [
     config: {
       triggerKey: 'greeting',
       // First message = warm + welcoming, NOT a pitch. Explore-first buttons;
-      // the booking CTA stays soft ("Book a call") and comes after curiosity.
+      // the booking CTA stays soft ("Book a call"), pushed only after curiosity.
       body: "Hey, lovely to have you here. I'm PROXe, BCON's AI. What brings you here today?",
       buttons: ['What you do', 'How it works', 'Book a call'],
     },
