@@ -1908,15 +1908,15 @@
   width: 69px;
   height: 69px;
   border-radius: 50%;
-  background: #1A0F0A;
-  border: 2px solid #C9A961;
+  background: #000000;
+  border: 2px solid var(--accent-primary, #FF5200);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
-    0 0 10px rgba(201, 169, 97, 0.25);
+    0 0 12px var(--border-glow, rgba(255, 82, 0, 0.35));
   z-index: 2147482999;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -1934,7 +1934,7 @@
   transform: scale(1.05);
   box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.4),
-    0 0 15px rgba(201, 169, 97, 0.4);
+    0 0 18px var(--border-glow, rgba(255, 82, 0, 0.5));
 }
 
 .bubbleButton:active {
@@ -1979,12 +1979,22 @@
 
 .bubbleButton[data-theme="warm-frost"]::after,
 .bubbleButton[data-brand="windchasers"]::after {
-  background: linear-gradient(90deg, 
-    #C9A961 0%, 
+  background: linear-gradient(90deg,
+    #C9A961 0%,
     #D4AF37 25%,
     #E8D5B7 50%,
     #D4AF37 75%,
     #C9A961 100%
+  );
+  background-size: 200% 100%;
+}
+
+.bubbleButton[data-theme="lokazen-orange"]::after,
+.bubbleButton[data-brand="lokazen"]::after {
+  background: linear-gradient(90deg,
+    #FF5200 0%,
+    #E4002B 50%,
+    #FF5200 100%
   );
   background-size: 200% 100%;
 }
