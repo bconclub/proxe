@@ -3,7 +3,7 @@ import type { BrandConfig } from './proxe.config';
 export const lokazenConfig: BrandConfig = {
   name: 'Lokazen',
   brand: 'lokazen',
-  tagline: 'Lokazen Commercial Real Estate',
+  tagline: 'Bangalore',
   website: 'https://lokazen.in',
   // Sensible defaults for a fresh brand — flip on as Lokazen adopts each feature.
   features: {
