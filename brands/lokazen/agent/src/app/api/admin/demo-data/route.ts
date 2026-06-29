@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+// Seeding 117 leads + ~350 messages + score re-asserts is heavy; give it room.
+export const maxDuration = 300
 
 function svc() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -156,6 +158,14 @@ export async function GET() {
 export async function POST() {
   const supabase = svc()
   if (!supabase) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  // Clear prior demo data — conversations first (FK on lead_id) so reseeds don't
+  // leave orphaned demo messages behind, then the demo leads themselves.
+  const { data: oldLeads } = await supabase.from('all_leads').select('id')
+    .eq('brand', BRAND).eq('metadata->>is_demo', 'true')
+  const oldIds = (oldLeads || []).map((l: any) => l.id)
+  for (let c = 0; c < oldIds.length; c += 100) {
+    await supabase.from('conversations').delete().in('lead_id', oldIds.slice(c, c + 100))
+  }
   await supabase.from('all_leads').delete().eq('brand', BRAND).eq('metadata->>is_demo', 'true')
   const rows = buildLeadRows()
   const clean = rows.map(({ _i, _type, _tier, _biz, _area, _sqft, _src, _person, _company, ...r }: any) => r)
