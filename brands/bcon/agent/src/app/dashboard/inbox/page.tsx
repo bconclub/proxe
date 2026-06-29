@@ -2349,7 +2349,7 @@ export default function InboxPage() {
               <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
                 {/* Avatar row */}
                 <div className="flex items-start gap-3 mb-3">
-                  <InitialsAvatar name={leadDetails.customer_name || leadDetails.phone} size={44} />
+                  <ScoreRing score={score} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>

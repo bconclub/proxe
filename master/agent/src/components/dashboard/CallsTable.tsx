@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import {
   MdCallReceived,
@@ -259,7 +260,7 @@ export default function CallsTable() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3 min-w-[150px]">
-                          <InitialsAvatar name={c.leadName} size={32} />
+                          <ScoreRing score={c.leadScore} size={32} />
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
                             <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</p>

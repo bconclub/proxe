@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
@@ -769,7 +770,7 @@ export default function FounderDashboard() {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3 min-w-[150px]">
-                            <InitialsAvatar name={lead.name} size={32} />
+                            <ScoreRing score={lead.score} size={32} />
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{lead.name}</p>
                               <p className="text-[11px] truncate capitalize" style={{ color: 'var(--text-secondary)' }}>{lead.channel || 'unknown'} · score {lead.score}</p>
