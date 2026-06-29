@@ -13,9 +13,9 @@
 export type SoundEvent = 'new' | 'update' | 'ready'
 
 export const SOUND_FILES: Record<SoundEvent, string> = {
-  new: '/sounds/pop.wav', // custom POP cue supplied by the team
-  update: '/sounds/pop.wav', // custom POP cue (same as new-lead)
-  ready: '/sounds/long-pop.wav', // custom "long pop" cue supplied by the team
+  new: '/sounds/new-lead.mp3',
+  update: '/sounds/update.mp3',
+  ready: '/sounds/page-load.mp3',
 }
 
 export const SOUND_LABELS: Record<SoundEvent, string> = {
