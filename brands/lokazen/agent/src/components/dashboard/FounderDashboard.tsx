@@ -523,15 +523,23 @@ export default function FounderDashboard() {
           })()}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
-        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
-        <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor="var(--accent-primary)"
-          label="High Intent Leads"
-          value={metrics.hotLeads?.count ?? 0}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor="var(--accent-primary)"
-          sub="flagged high-intent by PROXe"
-          onClick={() => router.push('/dashboard/leads?filter=hot')}
-        />
+        {/* Card 2 — High Intent Leads: green when stable/rising, amber when dropping. */}
+        {(() => {
+          const hiData = metrics.trends?.hotLeads?.data ?? []
+          const isDropping = hiData.length >= 4 &&
+            (hiData[hiData.length - 1]?.value ?? 0) < (hiData[Math.floor(hiData.length / 2)]?.value ?? 0)
+          const hiColor = isDropping ? '#f59e0b' : '#22c55e'
+          return (
+            <KpiCard
+              icon={<MdLocalFireDepartment size={15} />} iconColor={hiColor}
+              label="High Intent Leads"
+              value={metrics.hotLeads?.count ?? 0}
+              sparkData={hiData} sparkColor={hiColor}
+              sub="flagged high-intent by PROXe"
+              onClick={() => router.push('/dashboard/leads?filter=hot')}
+            />
+          )
+        })()}
         {/* Follow-up Health — status + ring; whole card follows the status colour. */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 7%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 22%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
