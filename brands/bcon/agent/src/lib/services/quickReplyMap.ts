@@ -42,7 +42,7 @@ const TRIGGERS: QuickReplyTrigger[] = [
     match: /\b(hi|hello|hey|hi there|hello there)\b/i,
     config: {
       triggerKey: 'greeting',
-      body: "Hey! I'm BCON's AI. Want to see how AI can grow your business?",
+      body: "Hey, welcome to BCON. I'm PROXe, BCON's AI. How can I help you today?",
       buttons: ['Book AI Brand Audit', 'How it works', 'What I get'],
     },
   },

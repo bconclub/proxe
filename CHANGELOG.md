@@ -13,6 +13,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-06-29 14:05 IST · bcon — warmer first-message greeting (welcome, not a pitch)
+
+- **bcon** — `lib/services/quickReplyMap.ts`: the greeting short-circuit (fires on the first "hi/hello") replied with a pitch — "Hey! I'm BCON's AI. Want to see how AI can grow your business?". Changed to a direct, welcoming open: "Hey, welcome to BCON. I'm PROXe, BCON's AI. How can I help you today?". Option buttons (Book AI Brand Audit / How it works / What I get) kept. Brand-private copy.
+
 ## 2026-06-29 13:58 IST · bcon — test sends no longer pollute real leads (route to test thread)
 
 - **bcon** — `brands/bcon/voice/task-worker.js`: in TEST mode the send was redirected to the test phone but the conversation row was still logged against the REAL lead — corrupting that lead's history AND tripping the duplicate-send guard (a test send then blocked a real future send). Now `resolveTestLead()` resolves the test number's own lead once per run and `convLeadId()` routes every send-log row to it; in live mode it's the real lead, unchanged. Both send-log inserts (first_outreach + executeTask) use it; if no test lead resolves, the row is skipped rather than written to the real lead.
