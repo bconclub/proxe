@@ -151,6 +151,7 @@ export default function LeadsTable({
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
   const showAviationColumns = brandId === 'windchasers'
+  const showLokazenColumns = brandId === 'lokazen'
   const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
@@ -167,6 +168,7 @@ export default function LeadsTable({
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
+  const [sizeFilter, setSizeFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -249,6 +251,21 @@ export default function LeadsTable({
       })
     }
 
+    // Lokazen size filter — parse the leading number from brand/owner size field.
+    if (sizeFilter !== 'all') {
+      filtered = filtered.filter((lead) => {
+        const lkz = lead.unified_context?.[brandId] || {}
+        const raw = lkz.required_size_sqft || lkz.property_size_sqft || ''
+        const n = parseInt(String(raw).replace(/[^0-9]/g, '').slice(0, 6) || '0', 10)
+        if (!n) return false
+        if (sizeFilter === 'lt1000') return n < 1000
+        if (sizeFilter === '1000to3000') return n >= 1000 && n < 3000
+        if (sizeFilter === '3000to10000') return n >= 3000 && n < 10000
+        if (sizeFilter === 'gt10000') return n >= 10000
+        return true
+      })
+    }
+
     // Score filter (use calculated scores when available, fallback to DB score)
     if (scoreFilter !== 'all') {
       const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
@@ -285,7 +302,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, sizeFilter, searchQuery, limit, presetFilter, calculatedScores])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -567,6 +584,15 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
+              {/* Lokazen: Brand vs Property Owner is the primary filter — show it first. */}
+              {showLokazenColumns && (
+                <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All leads</option>
+                  <option value="brand">Brands</option>
+                  <option value="owner">Property owners</option>
+                </select>
+              )}
+
               <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All time</option>
                 <option value="today">Today</option>
@@ -608,6 +634,16 @@ export default function LeadsTable({
                   <option value="Heli">Heli</option>
                   <option value="Cabin">Cabin</option>
                   <option value="Drone">Drone</option>
+                </select>
+              )}
+
+              {showLokazenColumns && (
+                <select value={sizeFilter} onChange={(e) => setSizeFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All sizes</option>
+                  <option value="lt1000">Under 1,000 sqft</option>
+                  <option value="1000to3000">1,000 - 3,000 sqft</option>
+                  <option value="3000to10000">3,000 - 10,000 sqft</option>
+                  <option value="gt10000">10,000+ sqft</option>
                 </select>
               )}
             </>
@@ -682,6 +718,8 @@ export default function LeadsTable({
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
+            {showLokazenColumns && <col style={{ width: '9%' }} />}  {/* Property Type */}
+            {showLokazenColumns && <col style={{ width: '8%' }} />}  {/* Size */}
             <col style={{ width: '9%' }} />   {/* Owner */}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
@@ -700,6 +738,10 @@ export default function LeadsTable({
                   { label: 'Course', align: 'center' as const },
                   { label: 'PAT',    align: 'center' as const },
                 ] : []),
+                ...(showLokazenColumns ? [
+                  { label: 'Property Type', align: 'center' as const },
+                  { label: 'Size',          align: 'center' as const },
+                ] : []),
                 { label: 'Owner',  align: 'left' as const },
               ].map(({ label, align }) => (
                 <th
@@ -716,7 +758,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 12 : 9}
+                  colSpan={showAviationColumns ? 12 : showLokazenColumns ? 11 : 9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -769,8 +811,8 @@ export default function LeadsTable({
                 const displayName = resolvedName || lead.email || lead.phone || '-'
                 const isEmailAsName = !resolvedName && !!lead.email
 
-                // Lokazen CRE: lead type, location, and a one-line detail — all packed
-                // into the LEAD cell (no new columns).
+                // Lokazen CRE: lead type + location in the LEAD cell; property-type
+                // and size get their own columns (set below).
                 const lkz = uc?.[brandId] || {}
                 const lkzType = lkz.user_type === 'brand' ? 'Brand' : lkz.user_type === 'owner' ? 'Owner' : ''
                 const lkzLocation = lkz.user_type === 'brand'
@@ -778,11 +820,14 @@ export default function LeadsTable({
                   : lkz.user_type === 'owner'
                   ? (lkz.property_zone || lkz.area || '')
                   : ''
-                const creLine = lkz.user_type === 'brand'
-                  ? [lkz.brand_category, lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null, lkz.budget_monthly_rent].filter(Boolean).join(' · ')
+                // Property Type is common to both sides: what the brand wants (format)
+                // or what the owner has (property_type).
+                const propTypeCol = lkz.user_type === 'brand'
+                  ? (lkz.preferred_format || lkz.brand_category || '')
                   : lkz.user_type === 'owner'
-                  ? [lkz.property_type, lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null, lkz.asking_rent_monthly].filter(Boolean).join(' · ')
+                  ? (lkz.property_type || '')
                   : ''
+                const sizeCol = lkz.required_size_sqft || lkz.property_size_sqft || ''
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -1090,10 +1135,10 @@ export default function LeadsTable({
                         </span>
                         {lkzType && (
                           <span
-                            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                             style={lkzType === 'Brand'
-                              ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
-                              : { backgroundColor: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}
+                              ? { backgroundColor: '#FF5200', color: '#fff' }
+                              : { backgroundColor: '#2563eb', color: '#fff' }}
                           >
                             {lkzType === 'Brand' ? 'Brand' : 'Property Owner'}
                           </span>
@@ -1102,11 +1147,6 @@ export default function LeadsTable({
                       {(brandName || lkzLocation || city) && !isEmailAsName && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}>
                           {[brandName, lkzLocation || city].filter(Boolean).join(' \u00b7 ')}
-                        </div>
-                      )}
-                      {creLine && (
-                        <div className="text-[11px] mt-0.5 truncate capitalize" style={{ color: 'var(--accent-primary)' }} title={creLine}>
-                          {creLine}
                         </div>
                       )}
                       {/* Date the lead came in */}
@@ -1408,6 +1448,18 @@ export default function LeadsTable({
                         </td>
                       )
                     })()}
+
+                    {/* LOKAZEN: Property Type + Size columns */}
+                    {showLokazenColumns && (
+                      <td className="px-3 py-2 text-center text-xs capitalize" style={{ color: propTypeCol ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {propTypeCol || '—'}
+                      </td>
+                    )}
+                    {showLokazenColumns && (
+                      <td className="px-3 py-2 text-center text-xs tabular-nums" style={{ color: sizeCol ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {sizeCol ? `${sizeCol} sqft` : '—'}
+                      </td>
+                    )}
 
                     {/* OWNER */}
                     <td className="px-3 py-2 text-xs">
