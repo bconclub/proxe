@@ -44,13 +44,13 @@ export default function PageTransitionLoader() {
               margin: '-10px',
             }}
           />
-          <div className="page-transition-loader-icon-wrapper relative animate-pulse">
+          <div className="page-transition-loader-icon-wrapper relative animate-pulse rounded-full overflow-hidden">
             <Image
               src="/lokazen-mark.svg"
               alt="Lokazen"
               width={80}
               height={80}
-              className="page-transition-loader-icon drop-shadow-lg"
+              className="page-transition-loader-icon drop-shadow-lg rounded-full"
               priority
             />
           </div>

@@ -346,8 +346,8 @@ export default function FounderDashboard() {
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
-            <div className="relative animate-pulse">
-              <Image src="/lokazen-mark.svg" alt="Lokazen" width={80} height={80} className="drop-shadow-lg" priority />
+            <div className="relative animate-pulse rounded-full overflow-hidden">
+              <Image src="/lokazen-mark.svg" alt="Lokazen" width={80} height={80} className="drop-shadow-lg rounded-full" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
