@@ -136,8 +136,33 @@ export async function POST(
     const now = new Date()
     const actionsTaken: string[] = []
     let newStage: string | null = null
+    let bookingVoice: Record<string, any> | null = null
 
     const detail = decision.detail || {}
+
+    // ── "Accept the plan" → actually EXECUTE what the brain proposed ──────────
+    // The classifier reads the note (e.g. "demo on 2nd July 4pm") and runs the
+    // full orchestration: parse + store the booking, create reminders, set the
+    // stage. Accepting must DO the plan, not just log it.
+    if (decision.action === 'none') {
+      const result = await classifyAndAct({ leadId, text: trimmedNotes, outcome, createdBy, supabase: supabase as any })
+      const acceptRecord = {
+        id: `dec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        at: now.toISOString(), decided_by: createdBy, outcome,
+        call_note: trimmedNotes || null, context_snapshot: contextSnapshot,
+        ai_proposed_plan: aiProposedPlan,
+        human_decision: { action: 'none', detail: {}, reason: decision.reason || null },
+        agreement: { matched: true, delta: `accepted ai:${aiProposedPlan?.action || 'none'}` },
+      }
+      // Re-fetch AFTER classifyAndAct (it rewrites unified_context) then append.
+      const { data: cr } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
+      const c = cr?.unified_context || {}
+      const dl = Array.isArray(c.decision_log) ? c.decision_log : []
+      await supabase.from('all_leads').update({
+        unified_context: { ...c, decision_log: [...dl, acceptRecord] },
+      }).eq('id', leadId)
+      return NextResponse.json({ success: true, outcome, mode: 'accept', ...result })
+    }
 
     // "task" and "book" keep the lead human-owned (you handle it).
     // "sequence" hands it back to the AI. Others just set state.
@@ -163,6 +188,14 @@ export async function POST(
       if (r24 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_24h', task_description: `24h reminder: ${leadName} at ${timeDisp}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r24.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
       if (r30 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_30m', task_description: `30min reminder: ${leadName}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r30.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
       newStage = 'Booking Made'
+      // Store the booking so the Key Event / Upcoming widgets update (mirrors
+      // the orchestrator's BOOKING_MADE behaviour).
+      bookingVoice = {
+        booking_date: bookingAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+        booking_time: bookingAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }),
+        booking_status: 'Call Booked',
+        booking_created_at: now.toISOString(),
+      }
       actionsTaken.push(`Booking reminders set for ${detail.date || 'tomorrow'} ${timeDisp}`)
     } else if (decision.action === 'move' && detail.stage) {
       newStage = detail.stage
@@ -213,7 +246,13 @@ export async function POST(
     const decisionLog: any[] = Array.isArray(ctx2.decision_log) ? ctx2.decision_log : []
     await supabase.from('all_leads').update({
       ...(newStage ? { lead_stage: newStage, stage_override: true } : {}),
-      unified_context: { ...ctx2, owned_by_human: !handBackToAi, unified_summary: null, decision_log: [...decisionLog, decisionRecord] },
+      unified_context: {
+        ...ctx2,
+        owned_by_human: !handBackToAi,
+        unified_summary: null,
+        decision_log: [...decisionLog, decisionRecord],
+        ...(bookingVoice ? { voice: { ...(ctx2.voice || {}), ...bookingVoice } } : {}),
+      },
     }).eq('id', leadId)
 
     // 4. Plain (metadata-free) activity row so the decision shows in the timeline.
