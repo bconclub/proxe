@@ -1413,8 +1413,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
-    // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
-    const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
+    // In bubble/embed mode, use parent viewport info if available; otherwise
+    // fall back to window.innerWidth (covers direct /widget/bubble access).
+    const isMobile = widgetStyle === 'bubble'
+      ? (isParentMobile === true || (isParentMobile === null && window.innerWidth < 769))
+      : window.innerWidth < 769;
 
     el.style.setProperty('position', 'fixed', 'important');
     el.style.setProperty('transform', 'none', 'important');
@@ -1634,8 +1637,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
 
       // Adjust input area and chat container when keyboard is visible (mobile only)
-      // In bubble/embed mode, use parent viewport size (not iframe width) to decide if mobile
-      const isMobileForKeyboard = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
+      // In bubble/embed mode, use parent viewport info if available; otherwise
+      // fall back to window.innerWidth (covers direct /widget/bubble access).
+      const isMobileForKeyboard = widgetStyle === 'bubble'
+        ? (isParentMobile === true || (isParentMobile === null && window.innerWidth < 769))
+        : window.innerWidth < 769;
       if (isOpen && isMobileForKeyboard) {
         const inputAreaElement = chatboxContainerRef.current?.querySelector(`.${styles.inputArea}`) as HTMLElement;
         const footerElement = chatboxContainerRef.current?.querySelector(`.${styles.chatFooter}`) as HTMLElement;
@@ -3403,7 +3409,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && (isParentMobile === true || (isParentMobile === null && typeof window !== 'undefined' && window.innerWidth < 769)) ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && !(isParentMobile === true || (isParentMobile === null && typeof window !== 'undefined' && window.innerWidth < 769)) ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           {isVapiActive && (
