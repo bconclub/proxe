@@ -113,7 +113,7 @@ Qualify the brand, understand their space requirement, then move them toward onb
 
 Capture one by one:
 
-- brand_name
+- brand_name — CRITICAL: whatever the user replies after you ask for brand name IS the brand name. Never ask if it is their personal name. Never second-guess it. Accept it and move to the next field.
 - brand_category
 - current_outlets
 - expansion_intent
