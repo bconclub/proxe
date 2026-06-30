@@ -1111,7 +1111,7 @@ export default function LeadsTable({
                   guide: 'Guide',
                   contact: 'Contact Form',
                   newsletter: 'Newsletter',
-                  page: 'Web Form',
+                  page: showLokazenColumns ? 'Chat Widget' : 'Web Form',
                   event: 'Event',
                 }
                 const utmMediumLabels: Record<string, string> = {
@@ -1136,7 +1136,9 @@ export default function LeadsTable({
                 if (attrFirstTouchKey && subSourceLabels[attrFirstTouchKey]) {
                   subSource = subSourceLabels[attrFirstTouchKey]
                 } else if (attrFirstTouchLabel) {
-                  subSource = attrFirstTouchLabel
+                  subSource = showLokazenColumns && attrFirstTouchLabel === 'Web Form'
+                    ? 'Chat Widget'
+                    : attrFirstTouchLabel
                 } else if (formType) {
                   subSource =
                     subSourceLabels[formType] ||
@@ -1160,7 +1162,7 @@ export default function LeadsTable({
                 } else if (source === 'voice') {
                   subSource = 'Call'
                 } else if (source === 'web' || source === 'form') {
-                  subSource = 'Web Form'
+                  subSource = showLokazenColumns ? 'Chat Widget' : 'Web Form'
                 }
 
                 // Score pill colors
