@@ -94,7 +94,7 @@ export const lokazenConfig: BrandConfig = {
   quickButtons: [
     'Find Commercial Space',
     'List My Property',
-    'Talk to Loka',
+    'Talk to Lokazen team',
   ],
   // Shown when exploring — commercial property types
   exploreButtons: [
@@ -103,7 +103,7 @@ export const lokazenConfig: BrandConfig = {
     'Warehouse',
     'Restaurant Space',
   ],
-  followUpButtons: ['Get Matched', 'Book a Site Visit', 'Talk to Loka', 'Request a Callback'],
+  followUpButtons: ['Get Matched', 'Book a Site Visit', 'Talk to Lokazen team', 'Request a Callback'],
   firstMessageButtons: ['I need space', 'I have a property'],
   support: {
     whatsapp: '+916366826978',

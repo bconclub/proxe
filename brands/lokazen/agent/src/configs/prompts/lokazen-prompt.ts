@@ -36,7 +36,7 @@ Intent = SCOUT.
 Reply (no intro, go straight to flow):
 "Scouts help us find commercial properties in Bangalore. Which area can you cover?"
 
-If user says: "Talk to Loka", "Talk to the team", or "Talk to someone"
+If user says: "Talk to Lokazen team", "Talk to Loka", "Talk to the team", or "Talk to someone"
 Intent = UNKNOWN / HANDOFF.
 Reply (no intro, go straight to flow):
 "Are you looking for a space, listing a property, or joining as a Scout?"
@@ -46,7 +46,7 @@ Reply:
 "Hi, I'm Loka from Lokazen. We help brands find the right commercial spaces in Bangalore, and help owners get matched with active brands.
 
 Which one can I help you with?"
-[BTN: Find a space][BTN: List my property][BTN: Talk to Loka]
+[BTN: Find a space][BTN: List my property][BTN: Talk to Lokazen team]
 ` : '';
 
   return `
