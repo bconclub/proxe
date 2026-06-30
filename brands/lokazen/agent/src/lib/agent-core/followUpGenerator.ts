@@ -80,14 +80,14 @@ function detectLokazenStepButtons(assistantMessage: string): string[] {
   ) {
     return ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999'];
   }
-  if (r.includes('ready to get started') || r.includes('start this plan') || (r.includes('talk to loka') && r.includes('plan'))) {
+  if (r.includes('ready to get started') || r.includes('start this plan') || ((r.includes('talk to loka') || r.includes('talk to lokazen team')) && r.includes('plan'))) {
     return ['Start this plan', 'Talk to the team'];
   }
   if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
     return ['Immediately', '1-3 months', 'Just exploring'];
   }
   if (r.includes('find a space') || (r.includes('list') && r.includes('property')) || (r.includes('help you with') && r.includes('lokazen'))) {
-    return ['Find a space', 'List my property', 'Talk to Loka'];
+    return ['Find a space', 'List my property', 'Talk to Lokazen team'];
   }
   return [];
 }
