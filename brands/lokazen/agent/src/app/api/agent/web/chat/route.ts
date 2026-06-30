@@ -344,9 +344,15 @@ function buildLokazenContextPatch(
     previousAssistant.includes('which area is the property') ||
     previousAssistant.includes('what type of property') ||
     previousAssistant.includes('what size is the space') ||
+    previousAssistant.includes('how big is the space') ||
     previousAssistant.includes('monthly rent') ||
+    previousAssistant.includes('asking rent') ||
     previousAssistant.includes('which floor') ||
+    previousAssistant.includes('frontage') ||
     previousAssistant.includes('when is it available') ||
+    previousAssistant.includes('amenities') ||
+    previousAssistant.includes('parking') ||
+    previousAssistant.includes('photos') ||
     previousAssistant.includes('google maps link') ||
     previousAssistant.includes('full address');
 
@@ -354,9 +360,16 @@ function buildLokazenContextPatch(
     previousAssistant.includes("what's your brand name") ||
     previousAssistant.includes('what is your brand name') ||
     previousAssistant.includes('what kind of brand') ||
+    previousAssistant.includes('how many outlets') ||
+    previousAssistant.includes('first outlet') ||
+    previousAssistant.includes('expansion') ||
     previousAssistant.includes('which part of bangalore') ||
+    previousAssistant.includes('which areas') ||
+    previousAssistant.includes('preferred format') ||
+    previousAssistant.includes('high-street') ||
     previousAssistant.includes('what size range') ||
     previousAssistant.includes('rent budget') ||
+    previousAssistant.includes('budget range') ||
     previousAssistant.includes('when do you need the space');
 
   if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
@@ -377,7 +390,19 @@ function buildLokazenContextPatch(
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'brand_category', answer);
+  } else if (previousAssistant.includes('how many outlets')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'current_outlets', answer);
+  } else if (previousAssistant.includes('first outlet') || previousAssistant.includes('expansion')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'expansion_intent', answer);
   } else if (previousAssistant.includes('which part of bangalore')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'target_zones', answer);
+  } else if (previousAssistant.includes('which areas')) {
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'target_zones', answer);
@@ -385,10 +410,14 @@ function buildLokazenContextPatch(
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'required_size_sqft', answer);
-  } else if (previousAssistant.includes('rent budget')) {
+  } else if (previousAssistant.includes('rent budget') || previousAssistant.includes('budget range')) {
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'budget_monthly_rent', answer);
+  } else if (previousAssistant.includes('preferred format') || previousAssistant.includes('high-street') || previousAssistant.includes('mall') || previousAssistant.includes('standalone') || previousAssistant.includes('food-court') || previousAssistant.includes('kiosk')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'preferred_format', answer);
   } else if (previousAssistant.includes('when do you need the space')) {
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
@@ -405,7 +434,11 @@ function buildLokazenContextPatch(
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
     setIfUseful(patch, 'property_size_sqft', answer);
-  } else if (previousAssistant.includes('monthly rent')) {
+  } else if (previousAssistant.includes('how big is the space')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'property_size_sqft', answer);
+  } else if (previousAssistant.includes('monthly rent') || previousAssistant.includes('asking rent')) {
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
     setIfUseful(patch, 'asking_rent_monthly', answer);
@@ -417,6 +450,18 @@ function buildLokazenContextPatch(
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
     setIfUseful(patch, 'availability_date', answer);
+  } else if (previousAssistant.includes('frontage')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'frontage_ft', answer);
+  } else if (previousAssistant.includes('amenities') || previousAssistant.includes('parking')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'amenities', answer);
+  } else if (previousAssistant.includes('photos')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'photos_received', answer);
   } else if (previousAssistant.includes('google maps link') || previousAssistant.includes('full address')) {
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
