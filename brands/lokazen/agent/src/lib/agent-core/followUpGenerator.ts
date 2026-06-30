@@ -66,11 +66,12 @@ function detectLokazenStepButtons(response: string): string[] {
   if (r.includes('ready to get started') || r.includes('start this plan') || r.includes('talk to someone') && r.includes('plan')) {
     return ['Start this plan', 'Talk to someone'];
   }
-  if (r.includes('find a space') || r.includes('list') && r.includes('property') || r.includes('help you with') && r.includes('lokazen')) {
+  if (r.includes('find a space') || (r.includes('list') && r.includes('property')) || (r.includes('help you with') && r.includes('lokazen'))) {
     return ['Find a space', 'List my property', 'Talk to team'];
   }
 
-  return [];
+  // Fallback: always show something for Lokazen so buttons never disappear
+  return ['Find a space', 'List my property', 'Talk to team'];
 }
 
 const BANNED_BUTTONS = [

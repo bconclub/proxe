@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       messageCount = 0,
       usedButtons = [],
       metadata = {},
+      brand: bodyBrand,
     } = body;
 
     if (!message) {
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
       conversationHistory,
       summary: memory.summary || '',
       usedButtons,
+      brand: bodyBrand || BRAND_ID || undefined,
     };
 
     // Create SSE stream

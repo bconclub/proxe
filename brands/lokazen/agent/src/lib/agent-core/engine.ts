@@ -288,7 +288,7 @@ export async function* processStream(
   }
 
   try {
-    const brandId = getCurrentBrandId();
+    const brandId = input.brand || getCurrentBrandId();
     const brandConfig = getBrandConfig(brandId);
 
     // 1. Extract intent — determines which DB calls to make

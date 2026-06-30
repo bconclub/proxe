@@ -19,6 +19,7 @@ export interface AgentInput {
   conversationHistory: HistoryEntry[];
   summary: string;
   usedButtons?: string[];
+  brand?: string;
   metadata?: Record<string, any>;
   adminNotes?: Array<{ text: string; created_by: string; created_at: string }>;
 }
