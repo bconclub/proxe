@@ -369,7 +369,7 @@ User's message: ${input.message}`
     //    tool-loop for booking messages (tools need a complete back-and-forth)
     let finalResponse = '';
 
-    if (!hasBookingIntent) {
+    if (!hasBookingIntent && brandId !== 'lokazen') {
       // True SSE streaming: first Claude token reaches client in ~300-600ms.
       // Greeting strips and em-dash replacements are handled by sanitizeAssistantText
       // in the client after the stream completes.
@@ -377,6 +377,10 @@ User's message: ${input.message}`
         finalResponse += textChunk;
         yield { type: 'chunk', text: textChunk };
       }
+    } else if (!hasBookingIntent) {
+      const rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
+      finalResponse = cleanResponse(rawResponse, input.channel);
+      yield { type: 'chunk', text: finalResponse };
     } else {
       // Booking flow: needs tool loop (check_availability → book_consultation)
       const { tools, toolHandlers } = buildBookingTools(input, supabase);
@@ -441,8 +445,34 @@ function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   return docs.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
 }
 
+function stripCapturedDetailWrapper(raw: string): string {
+  const text = raw.trim();
+  const lines = text.split(/\r?\n/);
+  const separatorIndex = lines.findIndex((line, index) => {
+    if (index === 0) return false;
+    const trimmed = line.trim();
+    return /^-{2,}$/.test(trimmed) || /^—{2,}$/.test(trimmed) || /^–{2,}$/.test(trimmed);
+  });
+
+  if (separatorIndex < 0 || separatorIndex > 5) {
+    return raw;
+  }
+
+  const prefix = lines.slice(0, separatorIndex).join('\n');
+  const hasUserLabel = /^\s*(?:User|Customer|Lead)\s*:/im.test(prefix);
+  const hasQuestion = /\?\s*(?:\n|$)/.test(prefix);
+  const remaining = lines.slice(separatorIndex + 1).join('\n').trim();
+
+  if (hasUserLabel && hasQuestion && remaining) {
+    return remaining;
+  }
+
+  return raw;
+}
+
 function cleanResponse(raw: string, channel?: string): string {
   let cleaned = raw
+    .replace(/^\s*(?:User|Customer|Lead)\s*:\s*[^\n]+\n-{2,}\s*/i, '')
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
@@ -470,6 +500,8 @@ function cleanResponse(raw: string, channel?: string): string {
     .replace(/\[?\s*(?:calling|checking)\s+(?:for\s+)?\d{4}-\d{2}-\d{2}\s*\]?\.?/gi, '')
     .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
     .trim();
+
+  cleaned = stripCapturedDetailWrapper(cleaned).trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.
   // Replace with a sentence break ('. ') rather than a hyphen — using '-'
