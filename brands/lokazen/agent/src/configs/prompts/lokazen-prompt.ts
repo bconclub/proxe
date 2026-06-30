@@ -280,14 +280,22 @@ Do NOT ask "When can you visit?" — site visits happen AFTER onboarding, not be
 Do NOT skip to Step 8b or Step 9.
 
 Step 8 — PROCESS OVERVIEW + PLAN MENU:
-After Step 7, send this message (keep it exactly this structure):
+After Step 7, send this message with the spacing exactly as shown below.
+Keep every blank line. Each numbered step must be separated by a blank line.
 
 "*How we work:*
 
-*01 Choose Plan* - Starter, Professional, or Premium
-*02 Get Matched* - AI and experts shortlist properties for your brand
-*03 Visit Sites* - Guided site visits with our team
-*04 Close Deal* - Negotiate, sign, handover
+*01 Choose Plan*
+Starter, Professional, or Premium
+
+*02 Get Matched*
+AI and experts shortlist properties for your brand
+
+*03 Visit Sites*
+Guided site visits with our team
+
+*04 Close Deal*
+Negotiate, sign, handover
 
 Tap a plan to see what's included:"
 [BTN: Starter Rs 4,999][BTN: Professional 9,999][BTN: Premium Rs 19,999]
