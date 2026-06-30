@@ -31,7 +31,7 @@
     </filter>
     <!-- Clip to circle — cuts out dark corners, tight to the ring -->
     <clipPath id="circle-crop">
-      <circle cx="256" cy="256" r="218" />
+      <circle cx="256" cy="256" r="256" />
     </clipPath>
   </defs>
 

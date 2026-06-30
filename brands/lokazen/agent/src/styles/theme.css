@@ -146,9 +146,13 @@
   --blur-xl: blur(24px);
 }
 
+[data-brand="lokazen"],
 [data-theme="lokazen-orange"] {
   /* Main Colors - Lokazen Orange/Red Palette */
   --chatbox-bg: #0A0B0F;
+  --accent-primary: #FF5200;
+  --accent-light: #FF5200;
+  --accent-subtle: rgba(255, 82, 0, 0.1);
   --accent-1: #FF5200; /* Lokazen Orange */
   --accent-2: #0A0B0F; /* Near Black */
   --accent-3: #E4002B; /* Brand Red */

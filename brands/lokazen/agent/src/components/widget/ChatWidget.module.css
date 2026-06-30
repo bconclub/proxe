@@ -2003,6 +2003,18 @@
   display: none;
 }
 
+.bubbleButton[data-brand="lokazen"] {
+  border: 2px solid #FF5200;
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(255, 82, 0, 0.45);
+}
+
+.bubbleButton[data-brand="lokazen"] .bubbleIcon {
+  width: 65px;
+  height: 65px;
+}
+
 .bubbleButton:hover::after {
   opacity: 1;
 }
