@@ -17,26 +17,26 @@ interface UseChatStreamOptions {
 }
 
 const BCON_INTRO_LINE_REGEXES = [
-  /^hi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
-  /^hi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
   /^how can i help with your marketing today\??$/i,
-  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
-  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
 ];
 
 const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
-  if (!rawText) return ‘’;
+  if (!rawText) return '';
 
   const withoutGenericGreeting = rawText
-    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, ‘’)
-    .replace(/^(Hi|Hello|Hey),?\s*/gi, ‘’)
-    .replace(/\[BUTTONS:[^\]]*\]/gi, ‘’)
-    .replace(/[—–]/g, ‘-’)
+    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
+    .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    .replace(/[—–]/g, '-')
     .trim();
 
   const normalized = withoutGenericGreeting
-    .replace(/\r\n/g, ‘\n’)
-    .replace(/\n{3,}/g, ‘\n\n’)
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 
   if (!hasPriorAssistantMessage) {
@@ -44,17 +44,17 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   }
 
   const strippedRepeatedIntro = normalized
-    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
-    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’)
-    .replace(/\b[a-z0-9 _.’-]{1,40}\s*,?\s*i\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
-    .replace(/\b[a-z0-9 _.’-]{1,40}\s*,?\s*i\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’)
-    .replace(/\bi\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\bi\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
     // Lokazen: strip re-introduction of Loka after first message
-    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, ‘’)
-    .replace(/\bi\s*(?:am|[‘’]m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, ‘’)
-    .replace(/\bwelcome\s+to\s+lokazen[,.]?\s*/gi, ‘’);
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, '')
+    .replace(/\bi\s*(?:am|['']m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, '')
+    .replace(/\bwelcome\s+to\s+lokazen[,.]?\s*/gi, '');
   const strippedRepeatedIdentity = strippedRepeatedIntro
-    .replace(/\bi\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’);
+    .replace(/\bi\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
 
   const lines = strippedRepeatedIdentity
     .split('\n')
