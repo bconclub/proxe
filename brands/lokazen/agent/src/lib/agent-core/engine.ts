@@ -407,10 +407,8 @@ User's message: ${input.message}`
       yield { type: 'chunk', text: finalResponse };
     }
 
-    // 5. Signal completion immediately so the client can show buttons right away.
-    //    Follow-ups are generated after and arrive as a late SSE event.
-    yield { type: 'done' };
-
+    // 5. Generate follow-ups BEFORE signalling done so the client's
+    //    checkAndComplete timer always fires after msg.followUps is populated.
     const followUps = await generateFollowUps({
       channel: input.channel,
       userMessage: input.message,
@@ -422,7 +420,11 @@ User's message: ${input.message}`
       brand: brandId,
     });
 
-    yield { type: 'followUps', followUps };
+    if (followUps.length > 0) {
+      yield { type: 'followUps', followUps };
+    }
+
+    yield { type: 'done' };
 
     // Schedule flow tasks (non-blocking — fires after response is sent)
     scheduleFlowTasks(supabase, input, finalResponse).catch(err => {
