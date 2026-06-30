@@ -770,6 +770,34 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
+    // 7-loka. LOKAZEN FIRST-MESSAGE — deterministic greeting with buttons.
+    // Fires on the very first message from a new contact (any text/greeting).
+    // Skips if the message already clearly signals seeker or owner intent.
+    if (
+      !isCustomerButtonTap &&
+      userMessageCount <= 1 &&
+      BRAND_ID === 'lokazen'
+    ) {
+      const lowerMsg = messageText.toLowerCase();
+      const isClearSeeker =
+        /\b(find|need|looking for|want|search|space|office|retail|warehouse|restaurant|shop)\b/.test(lowerMsg);
+      const isClearOwner =
+        /\b(list|have (a )?property|own|landlord|lease out|rent out|owner)\b/.test(lowerMsg);
+
+      if (!isClearSeeker && !isClearOwner) {
+        const firstName = (customerName || '').split(' ')[0] || '';
+        const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+        const body = `${greeting} I'm Loka from Lokazen. We match brands with commercial space in Bangalore using AI.`;
+        console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
+        await sendAndLogReply(supabase, leadId, customerPhone, body, {
+          sessionId,
+          buttons: ['Find a space', 'List my property', 'Talk to someone'],
+          quickReplyTrigger: 'lokazen_welcome',
+        });
+        return;
+      }
+    }
+
     if (!isCustomerButtonTap) {
       const quickReply = findQuickReplyFor(messageText);
       if (quickReply) {
