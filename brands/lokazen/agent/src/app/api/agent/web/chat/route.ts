@@ -320,6 +320,11 @@ function setIfUseful(patch: LokazenContextPatch, key: string, answer: string) {
   patch[key] = cleaned;
 }
 
+function extractEmailAddress(value: string): string | null {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0].toLowerCase() : null;
+}
+
 function latestAssistantPrompt(history: AgentInput['conversationHistory']): string {
   for (let i = history.length - 1; i >= 0; i -= 1) {
     if (history[i]?.role === 'assistant') return history[i].content || '';
@@ -622,6 +627,29 @@ async function postProcess(
         },
         supabase,
       );
+    }
+
+    const messageEmail = extractEmailAddress(userMessage);
+    if (messageEmail) {
+      await supabase
+        .from('web_sessions')
+        .update({ customer_email: messageEmail })
+        .eq('external_session_id', externalSessionId);
+
+      if (leadId) {
+        const { data: leadEmailRow } = await supabase
+          .from('all_leads')
+          .select('email')
+          .eq('id', leadId)
+          .maybeSingle();
+
+        if (!leadEmailRow?.email) {
+          await supabase
+            .from('all_leads')
+            .update({ email: messageEmail })
+            .eq('id', leadId);
+        }
+      }
     }
 
     if (leadId && BRAND_ID === 'lokazen') {
