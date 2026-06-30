@@ -226,6 +226,45 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
   });
 }
 
+function splitButtonMarkers(text: string): { body: string; buttons: string[] } {
+  const buttons: string[] = [];
+  const body = (text || '').replace(/\[BTN:\s*([^\]]+)\]/g, (_, label) => {
+    const cleaned = String(label || '').trim();
+    if (cleaned) buttons.push(cleaned);
+    return '';
+  }).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { body, buttons };
+}
+
+function renderMessageWithButtons(
+  text: string,
+  formatter: (value: string) => React.ReactNode,
+): React.ReactNode {
+  const { body, buttons } = splitButtonMarkers(text);
+  return (
+    <>
+      {body && <div className="whitespace-pre-wrap">{formatter(body)}</div>}
+      {buttons.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {buttons.map((button, index) => (
+            <span
+              key={`${button}-${index}`}
+              className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none"
+              style={{
+                borderColor: 'rgba(255,82,0,0.65)',
+                backgroundColor: 'rgba(255,82,0,0.12)',
+                color: 'var(--accent-primary)',
+              }}
+            >
+              {button}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Parse form submission data from a message into structured fields */
 function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
   if (!content) return null;
@@ -2022,9 +2061,12 @@ export default function InboxPage() {
                              solely on isTemplate left WA agent replies showing literal
                              asterisks ("All set, Punith. Your demo is locked in for
                              *Tuesday, May 26*."). */}
-                          {(isTemplate || msg.channel === 'whatsapp')
-                            ? renderWhatsAppMarkdown(msg.content)
-                            : renderMarkdown(msg.content)}
+                          {renderMessageWithButtons(
+                            msg.content,
+                            (value) => (isTemplate || msg.channel === 'whatsapp')
+                              ? renderWhatsAppMarkdown(value)
+                              : renderMarkdown(value),
+                          )}
                         </div>
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status

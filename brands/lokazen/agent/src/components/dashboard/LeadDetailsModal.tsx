@@ -268,6 +268,45 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
   });
 }
 
+function splitButtonMarkers(text: string): { body: string; buttons: string[] } {
+  const buttons: string[] = [];
+  const body = (text || '').replace(/\[BTN:\s*([^\]]+)\]/g, (_, label) => {
+    const cleaned = String(label || '').trim();
+    if (cleaned) buttons.push(cleaned);
+    return '';
+  }).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { body, buttons };
+}
+
+function renderMessageWithButtons(
+  text: string,
+  formatter: (value: string) => React.ReactNode,
+): React.ReactNode {
+  const { body, buttons } = splitButtonMarkers(text);
+  return (
+    <>
+      {body && <div className="whitespace-pre-wrap">{formatter(body)}</div>}
+      {buttons.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {buttons.map((button, index) => (
+            <span
+              key={`${button}-${index}`}
+              className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none"
+              style={{
+                borderColor: 'rgba(255,82,0,0.65)',
+                backgroundColor: 'rgba(255,82,0,0.12)',
+                color: 'var(--accent-primary)',
+              }}
+            >
+              {button}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Render summary as plain text - just sentences, no formatting */
 function renderSummary(text: string) {
   if (!text) return null;
@@ -2885,11 +2924,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   marginRight: isCustomer ? '0' : 'auto'
                                 }}
                               >
-                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isCustomer ? 'text-emerald-950 dark:text-emerald-50' : 'text-blue-950 dark:text-blue-50'}`}>
-                                  {activity.channel === 'whatsapp'
-                                    ? renderWhatsAppMarkdown(activity.content)
-                                    : renderMarkdown(activity.content)}
-                                </p>
+                                <div className={`text-sm leading-relaxed ${isCustomer ? 'text-emerald-950 dark:text-emerald-50' : 'text-blue-950 dark:text-blue-50'}`}>
+                                  {renderMessageWithButtons(
+                                    activity.content,
+                                    (value) => activity.channel === 'whatsapp'
+                                      ? renderWhatsAppMarkdown(value)
+                                      : renderMarkdown(value),
+                                  )}
+                                </div>
                               </div>
                             ) : isTeam && (displayContent || outcomeBadge) ? (
                               <div
@@ -2916,11 +2958,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 )}
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-                                {activity.channel === 'whatsapp'
-                                  ? renderWhatsAppMarkdown(activity.content)
-                                  : renderMarkdown(activity.content)}
-                              </p>
+                              <div className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
+                                {renderMessageWithButtons(
+                                  activity.content,
+                                  (value) => activity.channel === 'whatsapp'
+                                    ? renderWhatsAppMarkdown(value)
+                                    : renderMarkdown(value),
+                                )}
+                              </div>
                             ) : null}
 
                             <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
