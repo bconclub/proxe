@@ -16,7 +16,7 @@ const brandConfig = getBrandConfig(brandId)
 const brandTheme = brandThemeMap[brandId] || 'aviation-gold'
 
 export const metadata: Metadata = {
-  title: brandConfig.name,
+  title: `PROXe ${brandConfig.name}`,
   description: `${brandConfig.name} Dashboard`,
   icons: {
     icon: '/lokazen-favicon.svg',
