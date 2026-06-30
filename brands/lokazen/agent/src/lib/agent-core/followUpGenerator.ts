@@ -43,6 +43,23 @@ function getBrandPool(_brand?: string) {
 function detectLokazenStepButtons(response: string): string[] {
   const r = response.toLowerCase();
 
+  const asksForFreeText = [
+    "what's the brand name",
+    "what's your brand name",
+    "what is your brand name",
+    'who am i speaking with',
+    'which area is it in',
+    'which area is the property in',
+    'which area in bangalore can you cover',
+    'best number to reach you',
+    'name and phone',
+    'google maps location',
+    'full address',
+  ].some((phrase) => r.includes(phrase));
+
+  if (asksForFreeText) {
+    return [];
+  }
   if (r.includes('type of brand') || r.includes('what type') && r.includes('brand') ||
       r.includes('qsr') || r.includes('f&b') || r.includes('cafe') || r.includes('restaurant') && r.includes('wellness')) {
     return ['QSR / F&B', 'Cafe / Restaurant', 'Retail'];
@@ -57,23 +74,20 @@ function detectLokazenStepButtons(response: string): string[] {
   if (r.includes('budget') || r.includes('monthly rent')) {
     return ['Under 50k', '50k-1.5L', 'Above 1.5L'];
   }
-  if (r.includes('when do you need') || r.includes('timeline') && r.includes('space')) {
+  if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
     return ['Immediately', '1-3 months', 'Just exploring'];
   }
   if (r.includes('which plan') || (r.includes('starter') && r.includes('professional') && r.includes('premium'))) {
     return ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999'];
   }
-  if (r.includes('ready to get started') || r.includes('start this plan') || r.includes('talk to someone') && r.includes('plan')) {
-    return ['Start this plan', 'Talk to someone'];
+  if (r.includes('ready to get started') || r.includes('start this plan') || (r.includes('talk to loka') && r.includes('plan')) || (r.includes('talk to someone') && r.includes('plan'))) {
+    return ['Start this plan', 'Talk to Loka'];
   }
   if (r.includes('find a space') || (r.includes('list') && r.includes('property')) || (r.includes('help you with') && r.includes('lokazen'))) {
-    return ['Find a space', 'List my property', 'Talk to team'];
+    return ['Find a space', 'List my property', 'Talk to Loka'];
   }
-
-  // Fallback: always show something for Lokazen so buttons never disappear
-  return ['Find a space', 'List my property', 'Talk to team'];
+  return [];
 }
-
 const BANNED_BUTTONS = [
   'tell me my business',
   'learn more',
@@ -114,14 +128,15 @@ export async function generateFollowUps(params: {
   const isFirstMessage = messageCount === 1 || messageCount === 0;
   const usedButtonsLower = usedButtons.map(b => b.toLowerCase());
 
+  // Lokazen: use step-detection for deterministic flow buttons; skip WC pool entirely.
+  // Do not show home buttons while Loka is collecting free-text answers.
+  if (brand === 'lokazen') {
+    return detectLokazenStepButtons(assistantMessage);
+  }
+
   // First message: always show hardcoded quickButtons from config, no AI generation
   if (isFirstMessage) {
     return quickButtons;
-  }
-
-  // Lokazen: use step-detection for deterministic flow buttons; skip WC pool entirely
-  if (brand === 'lokazen') {
-    return detectLokazenStepButtons(assistantMessage);
   }
 
   // Check for explore click → show explore buttons from brand config

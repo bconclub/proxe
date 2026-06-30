@@ -791,7 +791,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
         await sendAndLogReply(supabase, leadId, customerPhone, body, {
           sessionId,
-          buttons: ['Find a space', 'List my property', 'Talk to the team'],
+          buttons: ['Find a space', 'List my property', 'Talk to Loka'],
           quickReplyTrigger: 'lokazen_welcome',
         });
         return;
@@ -799,7 +799,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     if (!isCustomerButtonTap) {
-      const quickReply = findQuickReplyFor(messageText);
+      const quickReply = findQuickReplyFor(messageText, BRAND_ID);
       if (quickReply) {
         console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);
         await sendAndLogReply(

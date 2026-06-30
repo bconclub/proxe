@@ -120,7 +120,8 @@ const TRIGGERS: QuickReplyTrigger[] = [
  * Returns null if no trigger fires OR if the message is too long (we treat
  * long messages as nuanced enough to need the LLM).
  */
-export function findQuickReplyFor(message: string): QuickReplyConfig | null {
+export function findQuickReplyFor(message: string, brand?: string): QuickReplyConfig | null {
+  if (brand?.toLowerCase() === 'lokazen') return null;
   if (!message) return null;
   const trimmed = message.trim();
   // Only short messages should short-circuit Claude. A long sentence like
