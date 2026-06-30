@@ -3303,6 +3303,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     }, 200);
   };
 
+  const spaceLokazenProcessSteps = (text: string): string => {
+    if (!/How we work|01\s+Choose Plan|02\s+Get Matched/i.test(text)) {
+      return text;
+    }
+
+    return text
+      .replace(/(\*?How we work:\*?)\n(?=\*?01\s+)/i, '$1\n\n')
+      .replace(/\n(?=\*?0[2-4]\s+)/g, '\n\n')
+      .replace(/\n(?=Tap a plan\b)/i, '\n\n')
+      .replace(/\n{3,}/g, '\n\n');
+  };
+
   const formatText = (text: string): string => {
     if (!text) return '';
     // Remove button instruction patterns (e.g., "→ BUTTON: Schedule a Demo") before formatting
@@ -3312,6 +3324,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
       .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
       .trim();
+    cleanedText = spaceLokazenProcessSteps(cleanedText);
     
     // Basic markdown to HTML conversion
     // Convert double newlines to breaks
