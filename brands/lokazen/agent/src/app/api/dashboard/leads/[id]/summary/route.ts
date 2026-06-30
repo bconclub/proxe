@@ -20,6 +20,205 @@ function formatTimeAgo(dateString: string): string {
   return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`
 }
 
+function hasValue(value: any): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== ''
+}
+
+function fieldLine(label: string, value: any): string | null {
+  if (!hasValue(value)) return null
+  return `${label}: ${String(value).trim()}`
+}
+
+function normalizeLokazenUserType(value: any): 'brand' | 'owner' | 'scout' | '' {
+  const raw = String(value || '').toLowerCase()
+  if (raw === 'property_owner') return 'owner'
+  if (raw === 'owner' || raw === 'brand' || raw === 'scout') return raw as any
+  return ''
+}
+
+async function buildLokazenSummaryResponse(
+  supabase: any,
+  lead: any,
+  leadId: string,
+  bookingDate: string | null,
+  bookingTime: string | null,
+) {
+  const ctx = lead.unified_context || {}
+  const lkz = ctx.lokazen || {}
+  const userType = normalizeLokazenUserType(lkz.user_type || lkz.lead_type)
+
+  const brandFields = [
+    fieldLine('Brand', lkz.brand_name),
+    fieldLine('Category', lkz.brand_category),
+    fieldLine('Current outlets', lkz.current_outlets),
+    fieldLine('Expansion', lkz.expansion_intent),
+    fieldLine('Target zones', lkz.target_zones),
+    fieldLine('Size', lkz.required_size_sqft),
+    fieldLine('Budget', lkz.budget_monthly_rent),
+    fieldLine('Format', lkz.preferred_format),
+    fieldLine('Timeline', lkz.timeline),
+    fieldLine('Selected plan', lkz.selected_plan),
+  ].filter(Boolean) as string[]
+
+  const ownerFields = [
+    fieldLine('Zone', lkz.property_zone),
+    fieldLine('Type', lkz.property_type),
+    fieldLine('Address', lkz.property_address || lkz.google_maps_url),
+    fieldLine('Size', lkz.property_size_sqft),
+    fieldLine('Asking rent', lkz.asking_rent_monthly),
+    fieldLine('Floor', lkz.floor),
+    fieldLine('Frontage', lkz.frontage_ft),
+    fieldLine('Available', lkz.availability_date),
+    fieldLine('Amenities', lkz.amenities),
+    fieldLine('Photos', lkz.photos_received),
+  ].filter(Boolean) as string[]
+
+  const scoutFields = [
+    fieldLine('Scout area', lkz.scout_area || lkz.area),
+    fieldLine('Coverage', lkz.coverage),
+  ].filter(Boolean) as string[]
+
+  const contactFields = [
+    fieldLine('Name', lead.customer_name),
+    fieldLine('Phone', lead.phone),
+    fieldLine('Email', lead.email),
+  ].filter(Boolean) as string[]
+
+  const hasLokazenSignal =
+    userType ||
+    brandFields.length > 0 ||
+    ownerFields.length > 0 ||
+    scoutFields.length > 0 ||
+    contactFields.length > 0 ||
+    bookingDate ||
+    bookingTime
+
+  if (!hasLokazenSignal) return null
+
+  const { data: messages } = await supabase
+    .from('conversations')
+    .select('sender, content, channel, created_at')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: true })
+    .limit(80)
+
+  const allMessages = Array.isArray(messages) ? messages : []
+  const customerMessages = allMessages.filter((m: any) => m.sender === 'customer')
+  const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null
+
+  const leadKind =
+    userType === 'brand' ? 'brand looking for commercial space'
+    : userType === 'owner' ? 'property owner listing a commercial space'
+    : userType === 'scout' ? 'scout lead'
+    : 'Lokazen lead'
+
+  const fieldGroup =
+    userType === 'owner' ? ownerFields
+    : userType === 'scout' ? scoutFields
+    : brandFields.length > 0 ? brandFields
+    : ownerFields.length > 0 ? ownerFields
+    : scoutFields
+
+  const detailSentence = fieldGroup.length > 0
+    ? `Captured CRE details: ${fieldGroup.slice(0, 8).join('; ')}.`
+    : 'No CRE requirement details have been captured yet.'
+
+  const bookingSentence = bookingDate || bookingTime
+    ? `Call booking is recorded for ${[bookingDate, bookingTime].filter(Boolean).join(' at ')}.`
+    : lkz.selected_plan || /talk to (the |lokazen )?team/i.test(allMessages.map((m: any) => m.content).join(' '))
+      ? 'The lead has shown intent to speak with the Lokazen team; a call is not booked until a date and time are selected.'
+      : 'No call booking is recorded yet.'
+
+  const contactSentence = contactFields.length > 0
+    ? `Contact captured: ${contactFields.join('; ')}.`
+    : 'Contact details are not captured yet.'
+
+  const summary = [
+    `${lead.customer_name || 'This lead'} is a ${leadKind} from the Lokazen ${lastMessage?.channel || 'web'} conversation.`,
+    detailSentence,
+    `${contactSentence} ${bookingSentence}`,
+    `Current stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`,
+  ].join(' ')
+
+  const lastInteraction = lead.last_interaction_at || lead.created_at
+  const daysInactive = lastInteraction
+    ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / 86400000))
+    : 0
+
+  const responseRate = allMessages.length > 0
+    ? Math.round((customerMessages.length / allMessages.length) * 100)
+    : 0
+
+  const hoursSinceLastMessage = lastMessage
+    ? Math.floor((new Date().getTime() - new Date(lastMessage.created_at).getTime()) / 3600000)
+    : daysInactive * 24
+  const conversationStatus = !lastMessage
+    ? 'No recent activity'
+    : hoursSinceLastMessage < 1
+      ? 'Actively chatting'
+      : lastMessage.sender === 'agent'
+        ? `Waiting on customer (${hoursSinceLastMessage}h ago)`
+        : `No response (${hoursSinceLastMessage}h ago)`
+
+  let attribution = ''
+  const { data: lastStageChangeData } = await supabase
+    .from('lead_stage_changes')
+    .select('changed_by, created_at, new_stage')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
+  if (lastStageChange) {
+    attribution = `Last updated by PROXe AI ${formatTimeAgo(lastStageChange.created_at)} - changed stage to ${lastStageChange.new_stage}`
+  } else if (lastMessage) {
+    const sender = lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'
+    attribution = `Last updated by ${sender} ${formatTimeAgo(lastMessage.created_at)} - message sent`
+  }
+
+  try {
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...ctx,
+          unified_summary: summary,
+          unified_summary_generated_at: new Date().toISOString(),
+        },
+      })
+      .eq('id', leadId)
+  } catch (error) {
+    console.error('Error saving Lokazen summary:', error)
+  }
+
+  return NextResponse.json({
+    summary,
+    attribution,
+    data: {
+      leadName: lead.customer_name || 'Customer',
+      lastMessage: lastMessage ? {
+        content: lastMessage.content,
+        sender: lastMessage.sender,
+        timestamp: lastMessage.created_at,
+        channel: lastMessage.channel,
+      } : null,
+      conversationStatus,
+      responseRate,
+      daysInactive,
+      nextTouchpoint: ctx.next_touchpoint || ctx.sequence?.next_step,
+      keyInfo: {
+        budget: lkz.budget_monthly_rent || lkz.asking_rent_monthly || null,
+        serviceInterest: userType || null,
+        painPoints: lkz.target_zones || lkz.property_zone || null,
+      },
+      leadStage: lead.lead_stage,
+      subStage: lead.sub_stage,
+      bookingDate,
+      bookingTime,
+      lokazenContext: lkz,
+    },
+  })
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -57,6 +256,11 @@ export async function GET(
     // Extract booking_date and booking_time from unified_context
     const bookingDate = lead.unified_context?.web?.booking_date || lead.unified_context?.web?.booking?.date || null
     const bookingTime = lead.unified_context?.web?.booking_time || lead.unified_context?.web?.booking?.time || null
+
+    const lokazenSummaryResponse = await buildLokazenSummaryResponse(supabase, lead, leadId, bookingDate, bookingTime)
+    if (lokazenSummaryResponse) {
+      return lokazenSummaryResponse
+    }
 
     // ============================================
     // STEP 0: Hallucination guard — refuse to summarize with no real signal
