@@ -2464,6 +2464,8 @@
 
 /* Typing indicator */
 .typingBubble {
+  width: fit-content !important;
+  max-width: fit-content !important;
   min-width: 60px !important;
   min-height: 36px;
   display: flex;
