@@ -270,13 +270,11 @@ async function postProcess(
       leadId = sessionData.lead_id;
     }
 
-    // 2. Create/update lead: immediately if phone/email provided, otherwise after
-    // messageCount >= 3 (brand name + person name captured in Lokazen flow).
-    // This ensures web chat conversations always appear in the leads dashboard,
-    // even before the contact step at the end of the qualification flow.
-    const hasContact = !!(userProfile.email || userProfile.phone);
-    const hasEnoughContext = messageCount >= 3;
-    if (!leadId && (hasContact || hasEnoughContext)) {
+    // 2. Create lead on every web chat. Lokazen's conversations table has lead_id NOT NULL
+    // so any insert with null lead_id fails → nothing appears in the inbox.
+    // Creating an anonymous lead immediately on turn 1 fixes this; the lead gets
+    // enriched with name/phone as the qualification flow progresses.
+    if (!leadId) {
       leadId = await updateLeadProfile(
         externalSessionId,
         {
