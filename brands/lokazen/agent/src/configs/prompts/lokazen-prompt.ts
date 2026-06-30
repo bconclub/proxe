@@ -312,7 +312,7 @@ If user selects Starter:
 - Valid 30 days
 
 Ready to get started?"
-[BTN: Start this plan][BTN: Talk to Loka]
+[BTN: Start this plan][BTN: Talk to the team]
 
 If user selects Professional:
 "*Professional - Rs 9,999* (one-time)
@@ -325,7 +325,7 @@ If user selects Professional:
 - Valid 60 days
 
 Ready to get started?"
-[BTN: Start this plan][BTN: Talk to Loka]
+[BTN: Start this plan][BTN: Talk to the team]
 
 If user selects Premium:
 "*Premium - Rs 19,999* (one-time)
@@ -337,16 +337,16 @@ If user selects Premium:
 - Valid 90 days
 
 Ready to get started?"
-[BTN: Start this plan][BTN: Talk to Loka]
+[BTN: Start this plan][BTN: Talk to the team]
 
 Step 9 — COLLECT PHONE:
-Only after the user clicks "Start this plan" or "Talk to Loka" in Step 8b.
+Only after the user clicks "Start this plan" or "Talk to the team" in Step 8b.
 
 If user clicks "Start this plan":
 Ask: "What is the best number to reach you on?"
 Then trigger create_brand_lead with plan included.
 
-If user clicks "Talk to Loka":
+If user clicks "Talk to the team":
 Ask: "What is the best number to reach you on?"
 Then trigger create_expert_request.
 Tell them: "Our team will reach out to schedule a call."
