@@ -31,6 +31,7 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    .replace(/\[BTN:[^\]]*\]/gi, '')
     .replace(/[—–]/g, '-')
     .trim();
 
@@ -397,23 +398,24 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                               existing.type === 'ai' &&
                               Boolean(existing.text?.trim())
                           );
-                          const sanitized = sanitizeAssistantText(
-                            msg.text || '',
-                            hasPriorAssistantMessage
-                          );
-
-                          // Extract [BTN: X] markers emitted by the LLM and
-                          // put them in followUps so ChatWidget renders them
-                          // as quick-reply buttons rather than literal text.
+                          // Extract [BTN: X] markers from raw text BEFORE
+                          // sanitization — sanitizeAssistantText strips them
+                          // so they must be harvested first.
                           const extractedBtns: string[] = [];
-                          const finalText = sanitized.replace(
+                          const rawWithoutBtns = (msg.text || '').replace(
                             /\[BTN:\s*([^\]]+)\]/gi,
                             (_m, label) => {
                               const t = String(label).trim().slice(0, 20);
                               if (t && extractedBtns.length < 3) extractedBtns.push(t);
                               return '';
                             }
-                          ).trim();
+                          );
+
+                          const sanitized = sanitizeAssistantText(
+                            rawWithoutBtns,
+                            hasPriorAssistantMessage
+                          );
+                          const finalText = sanitized.trim();
 
                           const mergedFollowUps =
                             extractedBtns.length > 0
