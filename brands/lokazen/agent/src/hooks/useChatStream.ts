@@ -30,6 +30,7 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   const withoutGenericGreeting = rawText
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
+    .replace(/\[BTN:\s*[^\]]+\]/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
     .replace(/[—–]/g, '-')
     .trim();
@@ -70,6 +71,46 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   return cleaned || normalized;
 };
 
+const splitButtonMarkersFromChunk = (
+  incomingText: string,
+  pendingMarker: string,
+): { visibleText: string; buttons: string[]; pendingMarker: string } => {
+  if (!incomingText && !pendingMarker) {
+    return { visibleText: '', buttons: [], pendingMarker: '' };
+  }
+
+  let text = `${pendingMarker || ''}${incomingText || ''}`;
+  const buttons: string[] = [];
+
+  text = text.replace(/\[BTN:\s*([^\]]+)\]/gi, (_match, label) => {
+    const cleanLabel = String(label).trim();
+    if (cleanLabel) buttons.push(cleanLabel);
+    return '';
+  });
+
+  const lastBracketIndex = text.lastIndexOf('[');
+  let nextPendingMarker = '';
+  if (lastBracketIndex >= 0) {
+    const suffix = text.slice(lastBracketIndex);
+    const upperSuffix = suffix.toUpperCase();
+    if ('[BTN:'.startsWith(upperSuffix) || (upperSuffix.startsWith('[BTN:') && !suffix.includes(']'))) {
+      nextPendingMarker = suffix;
+      text = text.slice(0, lastBracketIndex);
+    }
+  }
+
+  return { visibleText: text, buttons, pendingMarker: nextPendingMarker };
+};
+
+const mergeButtonLabels = (existing: string[] = [], incoming: string[] = []): string[] => {
+  const merged = [...existing];
+  for (const label of incoming) {
+    if (!merged.some((item) => item.trim().toLowerCase() === label.trim().toLowerCase())) {
+      merged.push(label);
+    }
+  }
+  return merged.slice(0, 3);
+};
 export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStreamOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,6 +119,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
   const streamingMessageRef = useRef<Message | null>(null);
   const streamingQueueRef = useRef<string[]>([]);
   const isStreamingCharsRef = useRef<boolean>(false);
+  const pendingButtonMarkerRef = useRef<string>('');
 
   const addUserMessage = useCallback((message: string) => {
     const userMessage: Message = {
@@ -201,6 +243,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
       // Reset streaming queue for new message
       streamingQueueRef.current = [];
       isStreamingCharsRef.current = false;
+      pendingButtonMarkerRef.current = '';
 
       // Create streaming message
       const streamingMessage: Message = {
@@ -267,8 +310,25 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                 const newText = (typeof data.text === 'string') ? data.text : '';
 
                 if (newText && typeof newText === 'string') {
+                  const parsedChunk = splitButtonMarkersFromChunk(newText, pendingButtonMarkerRef.current);
+                  pendingButtonMarkerRef.current = parsedChunk.pendingMarker;
+
+                  if (parsedChunk.buttons.length > 0) {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === streamingMessage.id
+                          ? { ...msg, followUps: mergeButtonLabels(msg.followUps, parsedChunk.buttons) }
+                          : msg
+                      )
+                    );
+                  }
+
+                  if (!parsedChunk.visibleText) {
+                    continue;
+                  }
+
                   // Add to queue for sequential character streaming
-                  streamingQueueRef.current.push(newText);
+                  streamingQueueRef.current.push(parsedChunk.visibleText);
 
                   // Start processing queue if not already processing
                   if (!isStreamingCharsRef.current) {
@@ -348,7 +408,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                 const followUps = Array.isArray(data.followUps) ? data.followUps : [];
                 setMessages((prev) =>
                   prev.map((msg) =>
-                    msg.id === streamingMessage.id ? { ...msg, followUps: followUps } : msg
+                    msg.id === streamingMessage.id ? { ...msg, followUps: mergeButtonLabels(msg.followUps, followUps) } : msg
                   )
                 );
               } else if (data.type === 'error') {
@@ -427,6 +487,8 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                   }
                 };
 
+                pendingButtonMarkerRef.current = '';
+
                 // Start checking after a short delay to allow current chunk to process
                 setTimeout(checkAndComplete, 100);
               }
@@ -474,6 +536,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
     streamingMessageRef.current = null;
     streamingQueueRef.current = [];
     isStreamingCharsRef.current = false;
+    pendingButtonMarkerRef.current = '';
   }, []);
 
   return {
