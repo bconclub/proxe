@@ -136,8 +136,9 @@ User's message: ${input.message}`
     .reverse()
     .find((m) => m.role === 'assistant');
   const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-  const needsBookingTools = input.channel === 'whatsapp' &&
-    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow);
+  const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
+  const needsBookingTools = (input.channel === 'whatsapp' || lokazenBookingAction) &&
+    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
   // check below can read it. The set is populated by the book_consultation
@@ -246,6 +247,7 @@ User's message: ${input.message}`
 
   let cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
   cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
+  cleanedResponse = advanceLokazenBookingAfterEmail(cleanedResponse, input, brandId);
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
@@ -306,7 +308,8 @@ export async function* processStream(
       .reverse()
       .find((m) => m.role === 'assistant');
     const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow;
+    const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
+    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction;
 
     // 2. Parallelize DB calls: KB search always runs; booking check only when needed
     const [relevantDocs, existingBookingMessage] = await Promise.all([
@@ -381,6 +384,7 @@ User's message: ${input.message}`
     } else if (!hasBookingIntent) {
       const rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
       finalResponse = suppressKnownContactReask(cleanResponse(rawResponse, input.channel), input, brandId);
+      finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
       yield { type: 'chunk', text: finalResponse };
     } else {
       // Booking flow: needs tool loop (check_availability → book_consultation)
@@ -409,6 +413,7 @@ User's message: ${input.message}`
       }
 
       finalResponse = suppressKnownContactReask(cleanResponse(rawResponse), input, brandId);
+      finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
       yield { type: 'chunk', text: finalResponse };
     }
 
@@ -481,6 +486,48 @@ function suppressKnownContactReask(response: string, input: AgentInput, brandId:
   }
 
   return 'What would you like to do next?\n[BTN: Submit Property][BTN: Talk to Team]';
+}
+
+function isLokazenBookingAction(input: AgentInput): boolean {
+  const current = (input.message || '').toLowerCase();
+  const buttons = (input.usedButtons || []).map((b) => String(b).toLowerCase());
+  const text = [current, ...buttons].join(' ');
+  const lastAssistant = (input.conversationHistory || [])
+    .slice(-4)
+    .reverse()
+    .find((m) => m.role === 'assistant')?.content || '';
+
+  return (
+    /\b(start this plan|talk to (?:the |lokazen )?team|book a call|schedule a call|site visit)\b/i.test(text) ||
+    isBookingFlowStep(lastAssistant)
+  );
+}
+
+function advanceLokazenBookingAfterEmail(response: string, input: AgentInput, brandId: string): string {
+  if (brandId !== 'lokazen') return response;
+
+  const userMessage = input.message || '';
+  const emailProvided = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userMessage.trim());
+  if (!emailProvided) return response;
+
+  const lastAssistant = (input.conversationHistory || [])
+    .slice(-4)
+    .reverse()
+    .find((m) => m.role === 'assistant')?.content || '';
+  const askedForEmail = /\b(best|your|what'?s the best)\s+email\b/i.test(lastAssistant) ||
+    /\bemail\b[^.?!]*\b(reach|send|invite|calendar)\b/i.test(lastAssistant) ||
+    /\b(reach|send|invite|calendar)\b[^.?!]*\bemail\b/i.test(lastAssistant);
+  if (!askedForEmail) return response;
+
+  const puntsToTeam = /\b(team|we|lokazen)\b[^.?!]*(reach out|call you|schedule|confirm)/i.test(response) ||
+    /\bwill reach out\b/i.test(response);
+  const asksForSlot = /\b(date|day|time|slot|when works|what works)\b/i.test(response);
+
+  if (!puntsToTeam || asksForSlot) return response;
+
+  const name = input.userProfile.name?.trim();
+  const greeting = name ? `Got it, ${name.split(/\s+/)[0]}.` : 'Got it.';
+  return `${greeting} What day and time works best for a quick Lokazen call?`;
 }
 
 function stripCapturedDetailWrapper(raw: string): string {
