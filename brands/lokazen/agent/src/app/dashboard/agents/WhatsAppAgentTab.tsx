@@ -45,7 +45,7 @@ export default function WhatsAppAgentTab() {
           <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
           <div>
             <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>WhatsApp Agent</p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>+918046733388 · BCON Club</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>+916366826978 · Lokazen</p>
           </div>
         </div>
 
