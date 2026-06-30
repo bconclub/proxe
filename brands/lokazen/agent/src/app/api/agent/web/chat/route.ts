@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const session = metadata.session || {};
     const memory = metadata.memory || {};
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const userProfile = session.user || {};
+    const requestUserProfile = session.user || {};
 
     // Skip all DB writes for deploy health-check sessions (deploy_ready_*)
     // These are synthetic pings that create noise in sessions + conversations tables.
@@ -89,6 +89,15 @@ export async function POST(request: NextRequest) {
     if (!isHealthCheck) {
       await ensureSession(externalSessionId, 'web', supabase);
     }
+
+    const storedUserProfile = isHealthCheck
+      ? {}
+      : await fetchStoredWebProfile(externalSessionId, supabase);
+    const userProfile = {
+      name: requestUserProfile.name || storedUserProfile.name,
+      email: requestUserProfile.email || storedUserProfile.email,
+      phone: requestUserProfile.phone || storedUserProfile.phone,
+    };
 
     // Server-authoritative history — mirror the WhatsApp pipeline. Web previously
     // trusted a browser-side ref capped at 6 turns (memory.recentHistory), which
@@ -243,6 +252,43 @@ async function fetchWebHistory(
 }
 
 // ─── Post-Processing (non-blocking) ─────────────────────────────────────────
+
+async function fetchStoredWebProfile(
+  sessionId: string,
+  supabase: any,
+): Promise<{ name?: string | null; email?: string | null; phone?: string | null }> {
+  try {
+    const { data: sessionData } = await supabase
+      .from('web_sessions')
+      .select('customer_name, customer_email, customer_phone, lead_id')
+      .eq('external_session_id', sessionId)
+      .maybeSingle();
+
+    let leadProfile: { name?: string | null; email?: string | null; phone?: string | null } = {};
+    if (sessionData?.lead_id) {
+      const { data: leadData } = await supabase
+        .from('all_leads')
+        .select('customer_name, email, phone')
+        .eq('id', sessionData.lead_id)
+        .maybeSingle();
+
+      leadProfile = {
+        name: leadData?.customer_name ?? null,
+        email: leadData?.email ?? null,
+        phone: leadData?.phone ?? null,
+      };
+    }
+
+    return {
+      name: sessionData?.customer_name || leadProfile.name || null,
+      email: sessionData?.customer_email || leadProfile.email || null,
+      phone: sessionData?.customer_phone || leadProfile.phone || null,
+    };
+  } catch (err) {
+    console.error('[agent/web/chat] fetchStoredWebProfile failed:', err);
+    return {};
+  }
+}
 
 async function postProcess(
   externalSessionId: string,
