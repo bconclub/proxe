@@ -1,4 +1,4 @@
-export type StorageBrandKey = 'proxe' | 'windchasers' | 'bcon';
+export type StorageBrandKey = 'proxe' | 'windchasers' | 'bcon' | 'lokazen';
 
 const getKeys = (brand: StorageBrandKey) => ({
   sessionKey: `${brand}.chat.sessionId`,
@@ -33,6 +33,12 @@ export function clearSessionId(brand: StorageBrandKey = 'proxe') {
   if (typeof window === 'undefined') return;
   const { sessionKey } = getKeys(brand);
   localStorage.removeItem(sessionKey);
+}
+
+export function clearStoredUser(brand: StorageBrandKey = 'proxe') {
+  if (typeof window === 'undefined') return;
+  const { userKey } = getKeys(brand);
+  localStorage.removeItem(userKey);
 }
 
 export function getStoredUser(brand: StorageBrandKey = 'proxe'): LocalUserProfile | null {

@@ -29,8 +29,10 @@ import {
 import {
   getStoredSessionId,
   storeSessionId,
+  clearSessionId,
   getStoredUser,
   storeUserProfile,
+  clearStoredUser,
   type LocalUserProfile,
   type StorageBrandKey,
 } from '@/lib/chatLocalStorage';
@@ -40,6 +42,7 @@ import Vapi from '@vapi-ai/web';
 interface ChatWidgetProps {
   apiUrl?: string;
   widgetStyle?: 'searchbar' | 'bubble';
+  resetOnLoad?: boolean;
 }
 
 interface FlowOverrideRule {
@@ -193,7 +196,7 @@ const cleanSummary = (summary: string | null | undefined): string => {
     .trim();
 };
 
-export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProps) {
+export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = false }: ChatWidgetProps) {
   const brand = getCurrentBrandId();
   const config = getBrandConfig(brand);
   const { openModal: openDeployModal, setOnFormSubmit } = useDeployModal();
@@ -299,6 +302,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
+  const hasResetOnLoadRef = useRef<boolean>(false);
   const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
   const prevIsLoadingRef = useRef(false);
   const bookingConfirmedRef = useRef(false);
@@ -373,6 +377,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       try {
         if (process.env.NODE_ENV !== 'production') {
           console.log(`[ChatWidget ${brandKey}] Initialising session`, { brandKey });
+        }
+
+        if (resetOnLoad && !hasResetOnLoadRef.current) {
+          clearSessionId(brandKey);
+          clearStoredUser(brandKey);
+          conversationsToRestoreRef.current = [];
+          hasRestoredMessagesRef.current = false;
+          hasResetOnLoadRef.current = true;
         }
 
         let storedId = getStoredSessionId(brandKey);
