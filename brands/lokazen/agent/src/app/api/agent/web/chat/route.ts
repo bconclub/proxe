@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
                 responseTimeMs,
                 requestOrigin,
                 messageCount,
+                usedButtons,
               );
             } catch (err) {
               console.error('[agent/web/chat] Post-processing error:', err);
@@ -288,6 +289,191 @@ async function fetchStoredWebProfile(
   }
 }
 
+type LokazenContextPatch = Record<string, string | boolean | number>;
+
+function compactAnswer(value: unknown): string {
+  return String(value || '')
+    .replace(/\[BTN\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lowerText(value: unknown): string {
+  return compactAnswer(value).toLowerCase();
+}
+
+function isActionButtonAnswer(answer: string): boolean {
+  const normalized = lowerText(answer);
+  return [
+    'find commercial space',
+    'list my property',
+    'talk to loka',
+    'talk to the team',
+    'talk to an expert',
+    'start this plan',
+  ].includes(normalized);
+}
+
+function setIfUseful(patch: LokazenContextPatch, key: string, answer: string) {
+  const cleaned = compactAnswer(answer);
+  if (!cleaned || isActionButtonAnswer(cleaned)) return;
+  patch[key] = cleaned;
+}
+
+function latestAssistantPrompt(history: AgentInput['conversationHistory']): string {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i]?.role === 'assistant') return history[i].content || '';
+  }
+  return '';
+}
+
+function buildLokazenContextPatch(
+  userMessage: string,
+  agentInput: AgentInput,
+  usedButtons: string[],
+): LokazenContextPatch {
+  const answer = compactAnswer(userMessage);
+  const answerLower = answer.toLowerCase();
+  const previousAssistant = lowerText(latestAssistantPrompt(agentInput.conversationHistory));
+  const buttons = usedButtons.map(lowerText);
+  const patch: LokazenContextPatch = {};
+
+  const ownerQuestion =
+    previousAssistant.includes('which area is the property') ||
+    previousAssistant.includes('what type of property') ||
+    previousAssistant.includes('what size is the space') ||
+    previousAssistant.includes('monthly rent') ||
+    previousAssistant.includes('which floor') ||
+    previousAssistant.includes('when is it available') ||
+    previousAssistant.includes('google maps link') ||
+    previousAssistant.includes('full address');
+
+  const brandQuestion =
+    previousAssistant.includes("what's your brand name") ||
+    previousAssistant.includes('what is your brand name') ||
+    previousAssistant.includes('what kind of brand') ||
+    previousAssistant.includes('which part of bangalore') ||
+    previousAssistant.includes('what size range') ||
+    previousAssistant.includes('rent budget') ||
+    previousAssistant.includes('when do you need the space');
+
+  if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+  } else if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+  }
+
+  if (previousAssistant.includes("what's your brand name") || previousAssistant.includes('what is your brand name')) {
+    if (patch.user_type !== 'owner') {
+      patch.user_type = 'brand';
+      patch.lead_type = 'brand';
+      setIfUseful(patch, 'brand_name', answer);
+    }
+  } else if (previousAssistant.includes('what kind of brand')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'brand_category', answer);
+  } else if (previousAssistant.includes('which part of bangalore')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'target_zones', answer);
+  } else if (previousAssistant.includes('what size range')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'required_size_sqft', answer);
+  } else if (previousAssistant.includes('rent budget')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'budget_monthly_rent', answer);
+  } else if (previousAssistant.includes('when do you need the space')) {
+    patch.user_type = 'brand';
+    patch.lead_type = 'brand';
+    setIfUseful(patch, 'timeline', answer);
+  } else if (previousAssistant.includes('which area is the property')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'property_zone', answer);
+  } else if (previousAssistant.includes('what type of property')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'property_type', answer);
+  } else if (previousAssistant.includes('what size is the space')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'property_size_sqft', answer);
+  } else if (previousAssistant.includes('monthly rent')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'asking_rent_monthly', answer);
+  } else if (previousAssistant.includes('which floor')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'floor', answer);
+  } else if (previousAssistant.includes('when is it available')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    setIfUseful(patch, 'availability_date', answer);
+  } else if (previousAssistant.includes('google maps link') || previousAssistant.includes('full address')) {
+    patch.user_type = 'owner';
+    patch.lead_type = 'property_owner';
+    if (/https?:\/\/\S+/i.test(answer)) {
+      setIfUseful(patch, 'google_maps_url', answer);
+    } else {
+      setIfUseful(patch, 'property_address', answer);
+    }
+  }
+
+  if (buttons.some((b) => b.includes('starter'))) patch.selected_plan = 'Starter';
+  if (buttons.some((b) => b.includes('professional'))) patch.selected_plan = 'Professional';
+  if (buttons.some((b) => b.includes('premium'))) patch.selected_plan = 'Premium';
+
+  if (Object.keys(patch).length > 0) {
+    patch.last_profile_capture_at = new Date().toISOString();
+  }
+
+  return patch;
+}
+
+async function updateLokazenLeadContext(
+  leadId: string,
+  userMessage: string,
+  agentInput: AgentInput,
+  usedButtons: string[],
+  supabase: any,
+) {
+  const patch = buildLokazenContextPatch(userMessage, agentInput, usedButtons);
+  if (Object.keys(patch).length === 0) return;
+
+  const { data: ctxRow, error } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[agent/web/chat/lokazen-context] read failed:', error);
+    return;
+  }
+
+  const ctx = ctxRow?.unified_context || {};
+  const existingLokazen = ctx.lokazen || {};
+  const nextLokazen = { ...existingLokazen, ...patch };
+
+  const { error: updateError } = await supabase
+    .from('all_leads')
+    .update({ unified_context: { ...ctx, lokazen: nextLokazen } })
+    .eq('id', leadId);
+
+  if (updateError) {
+    console.error('[agent/web/chat/lokazen-context] update failed:', updateError);
+    return;
+  }
+
+  console.log(`[agent/web/chat/lokazen-context] lead=${leadId} captured=${JSON.stringify(patch)}`);
+}
+
 async function postProcess(
   externalSessionId: string,
   userMessage: string,
@@ -298,6 +484,7 @@ async function postProcess(
   responseTimeMs?: number,
   requestOrigin?: string,
   messageCount: number = 0,
+  usedButtons: string[] = [],
 ): Promise<void> {
   try {
     // 1. Check for existing lead from session first
@@ -392,6 +579,16 @@ async function postProcess(
       );
     }
 
+    if (leadId && BRAND_ID === 'lokazen') {
+      await updateLokazenLeadContext(
+        leadId,
+        userMessage,
+        agentInput,
+        usedButtons,
+        supabase,
+      );
+    }
+
     // 4. Generate and save conversation summary (every 3rd message to save tokens)
     const shouldSummarize = messageCount % 3 === 0 || messageCount <= 1;
     if (assistantResponse && shouldSummarize) {
@@ -424,7 +621,9 @@ async function postProcess(
     // 5. AI profile extraction — picks up user_type, course_interest, timeline,
     //    education, city from the conversation (catches phrasing the keyword
     //    extractor misses). Runs every 2nd message, fire-and-forget.
-    if (leadId && messageCount >= 2 && messageCount % 2 === 0) {
+    // Lokazen uses deterministic CRE capture above; this generic extractor is
+    // aviation-shaped and can overwrite owner/brand with unrelated values.
+    if (leadId && BRAND_ID !== 'lokazen' && messageCount >= 2 && messageCount % 2 === 0) {
       (async () => {
         try {
           const history = [

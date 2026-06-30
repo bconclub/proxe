@@ -273,7 +273,10 @@ export default function LeadsTable({
     if (userTypeFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
-        return (brandData.user_type || brandData.business_type) === userTypeFilter
+        const normalizedUserType = brandData.user_type === 'property_owner'
+          ? 'owner'
+          : (brandData.user_type || brandData.business_type)
+        return normalizedUserType === userTypeFilter
       })
     }
 
@@ -847,10 +850,11 @@ export default function LeadsTable({
                 // Lokazen CRE: lead type + location in the LEAD cell; property-type
                 // and size get their own columns (set below).
                 const lkz = uc?.[brandId] || {}
-                const lkzType = lkz.user_type === 'brand' ? 'Brand' : lkz.user_type === 'owner' ? 'Owner' : ''
-                const rawLocation = lkz.user_type === 'brand'
+                const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
+                const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : ''
+                const rawLocation = lkzUserType === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
-                  : lkz.user_type === 'owner'
+                  : lkzUserType === 'owner'
                   ? (lkz.property_zone || lkz.area || '')
                   : ''
                 // Dedupe repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
@@ -859,16 +863,20 @@ export default function LeadsTable({
                 // is misleading + cramped — show location only for property owners.
                 // Non-lokazen brands keep their city as before.
                 const secondaryLoc = showLokazenColumns
-                  ? (lkz.user_type === 'owner' ? lkzLocation : '')
+                  ? (lkzUserType === 'owner' ? lkzLocation : '')
                   : city
+                const secondaryBrandName = lkzUserType === 'owner' ? '' : brandName
                 // Property Type is common to both sides: what the brand wants (format)
                 // or what the owner has (property_type).
-                const propTypeCol = lkz.user_type === 'brand'
+                const propTypeCol = lkzUserType === 'brand'
                   ? (lkz.preferred_format || lkz.brand_category || '')
-                  : lkz.user_type === 'owner'
+                  : lkzUserType === 'owner'
                   ? (lkz.property_type || '')
                   : ''
                 const sizeCol = lkz.required_size_sqft || lkz.property_size_sqft || ''
+                const sizeLabel = sizeCol && /\b(sq\.?\s*ft|sqft|square\s*feet)\b/i.test(String(sizeCol))
+                  ? String(sizeCol)
+                  : sizeCol ? `${sizeCol} sqft` : ''
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -1185,9 +1193,9 @@ export default function LeadsTable({
                           </span>
                         )}
                       </div>
-                      {(brandName || secondaryLoc) && !isEmailAsName && (
-                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[brandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}>
-                          {[brandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}
+                      {(secondaryBrandName || secondaryLoc) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }} title={[secondaryBrandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}>
+                          {[secondaryBrandName, secondaryLoc].filter(Boolean).join(' \u00b7 ')}
                         </div>
                       )}
                       {/* Date the lead came in */}
@@ -1504,9 +1512,9 @@ export default function LeadsTable({
                     )}
                     {showLokazenColumns && (
                       <td className="px-3 py-2 text-center">
-                        {sizeCol ? (
+                        {sizeLabel ? (
                           <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
-                            {sizeCol} sqft
+                            {sizeLabel}
                           </span>
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
