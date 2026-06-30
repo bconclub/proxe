@@ -25,7 +25,7 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
   const [open, setOpen] = useState(false)
   const lkz = ctx || {}
   const isBrand = lkz.user_type === 'brand'
-  const isOwner = lkz.user_type === 'owner'
+  const isOwner = lkz.user_type === 'owner' || lkz.user_type === 'property_owner'
   if (!isBrand && !isOwner) return null
   const LANG: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada' }
   const title = isBrand ? 'Brand Requirement' : 'Property Listing'
@@ -36,9 +36,10 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
     ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
   ]
   const ownerFields: [string, any][] = [
-    ['Zone', lkz.property_zone], ['Type', lkz.property_type], ['Address', lkz.property_address],
+    ['Zone', lkz.property_zone], ['Type', lkz.property_type], ['Address', lkz.property_address], ['Maps URL', lkz.google_maps_url],
     ['Size (sqft)', lkz.property_size_sqft], ['Asking rent/mo', lkz.asking_rent_monthly], ['Floor', lkz.floor],
     ['Frontage (ft)', lkz.frontage_ft], ['Available', lkz.availability_date], ['Amenities', lkz.amenities],
+    ['Photos received', lkz.photos_received],
     ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
   ]
   const fields = (isBrand ? brandFields : ownerFields).filter(([, v]) => v != null && String(v).trim() !== '')
