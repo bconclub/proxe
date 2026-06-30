@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
+import { getBrandConfig } from '@/configs'
 import {
   MdCode,
   MdRefresh,
@@ -11,6 +12,8 @@ import {
   MdCheckCircle,
   MdInfoOutline
 } from 'react-icons/md'
+
+const BRAND_WEBSITE = getBrandConfig().website || 'https://lokazen.in'
 
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
@@ -441,7 +444,7 @@ export default function WebAgentSettingsClient() {
                     const raw =
                       process.env.NEXT_PUBLIC_SITE_URL ||
                       process.env.NEXT_PUBLIC_APP_URL ||
-                      'https://windchasers.in'
+                      BRAND_WEBSITE
                     try {
                       return new URL(raw).hostname.replace(/^www\./, '')
                     } catch {
