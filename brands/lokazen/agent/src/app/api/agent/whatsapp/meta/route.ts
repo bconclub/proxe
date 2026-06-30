@@ -771,7 +771,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     if (!isCustomerButtonTap) {
-      const quickReply = findQuickReplyFor(messageText);
+      const quickReply = findQuickReplyFor(messageText, BRAND_ID);
       if (quickReply) {
         console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);
         await sendAndLogReply(

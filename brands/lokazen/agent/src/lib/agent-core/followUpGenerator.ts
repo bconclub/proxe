@@ -36,6 +36,52 @@ function getBrandPool(_brand?: string) {
   return windchasersPool;
 }
 
+function detectLokazenStepButtons(assistantMessage: string): string[] {
+  const r = assistantMessage.toLowerCase();
+
+  const asksForFreeText = [
+    "what's the brand name",
+    "what's your brand name",
+    "what is your brand name",
+    'who am i speaking with',
+    'which area is it in',
+    'which area is the property in',
+    'which area in bangalore can you cover',
+    'best number to reach you',
+    'name and phone',
+    'google maps location',
+    'full address',
+  ].some((phrase) => r.includes(phrase));
+
+  if (asksForFreeText) {
+    return [];
+  }
+  if (r.includes('what type of space') || r.includes('what kind of brand') || r.includes('brand category')) {
+    return ['QSR / F&B', 'Cafe / Restaurant', 'Retail'];
+  }
+  if (r.includes('preferred area') || r.includes('where are you looking')) {
+    return ['North Bangalore', 'South Bangalore', 'East Bangalore'];
+  }
+  if (r.includes('space size') || r.includes('how much space') || r.includes('sqft')) {
+    return ['Under 500 sqft', '500-1500 sqft', '1500+ sqft'];
+  }
+  if (r.includes('budget') || r.includes('monthly rent')) {
+    return ['Under 50k', '50k-1.5L', 'Above 1.5L'];
+  }
+  if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
+    return ['Immediately', '1-3 months', 'Just exploring'];
+  }
+  if (r.includes('which plan') || (r.includes('starter') && r.includes('professional') && r.includes('premium'))) {
+    return ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999'];
+  }
+  if (r.includes('ready to get started') || r.includes('start this plan') || (r.includes('talk to loka') && r.includes('plan'))) {
+    return ['Start this plan', 'Talk to Loka'];
+  }
+  if (r.includes('find a space') || (r.includes('list') && r.includes('property')) || (r.includes('help you with') && r.includes('lokazen'))) {
+    return ['Find a space', 'List my property', 'Talk to Loka'];
+  }
+  return [];
+}
 const BANNED_BUTTONS = [
   'tell me my business',
   'learn more',
@@ -75,6 +121,11 @@ export async function generateFollowUps(params: {
   const lowerMessage = userMessage.toLowerCase();
   const isFirstMessage = messageCount === 1 || messageCount === 0;
   const usedButtonsLower = usedButtons.map(b => b.toLowerCase());
+
+  // Lokazen has a strict step flow. Do not show home buttons while collecting free text.
+  if (brand === 'lokazen') {
+    return detectLokazenStepButtons(assistantMessage);
+  }
 
   // First message: always show hardcoded quickButtons from config, no AI generation
   if (isFirstMessage) {
