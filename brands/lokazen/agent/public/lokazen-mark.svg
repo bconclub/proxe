@@ -1,6 +1,5 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Sphere gradients with directional highlight (light from top-left) -->
     <radialGradient id="orb-orange-lg" cx="38%" cy="32%" r="68%">
       <stop offset="0%"  stop-color="#FFC59B" />
       <stop offset="22%" stop-color="#FF8E47" />
@@ -19,60 +18,63 @@
       <stop offset="60%" stop-color="#E11D48" />
       <stop offset="100%" stop-color="#8B0E2C" />
     </radialGradient>
-
-    <!-- Ambient glow behind the whole composition -->
     <radialGradient id="bg-glow" cx="50%" cy="50%" r="50%">
       <stop offset="0%"  stop-color="#3A1505" stop-opacity="0.55" />
       <stop offset="55%" stop-color="#1A0904" stop-opacity="0.20" />
       <stop offset="100%" stop-color="#000000" stop-opacity="0" />
     </radialGradient>
-
     <filter id="orb-glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="9" />
     </filter>
     <filter id="ring-glow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="5" />
     </filter>
+    <!-- Clip to circle — cuts out dark corners, tight to the ring -->
+    <clipPath id="circle-crop">
+      <circle cx="256" cy="256" r="218" />
+    </clipPath>
   </defs>
 
-  <!-- Dark canvas -->
-  <rect width="512" height="512" fill="#080306" />
+  <g clip-path="url(#circle-crop)">
+    <!-- Dark canvas -->
+    <rect width="512" height="512" fill="#080306" />
 
-  <!-- Soft ambient glow centred behind the mark -->
-  <rect width="512" height="512" fill="url(#bg-glow)" />
+    <!-- Soft ambient glow -->
+    <rect width="512" height="512" fill="url(#bg-glow)" />
 
-  <!-- Glowing outer ring -->
-  <circle cx="256" cy="256" r="208" fill="none" stroke="#FF5200" stroke-width="6" opacity="0.35" filter="url(#ring-glow)" />
-  <circle cx="256" cy="256" r="208" fill="none" stroke="#FF6B2B" stroke-width="2.5" opacity="0.95" />
+    <!-- Glowing outer ring -->
+    <circle cx="256" cy="256" r="208" fill="none" stroke="#FF5200" stroke-width="6" opacity="0.35" filter="url(#ring-glow)" />
+    <circle cx="256" cy="256" r="208" fill="none" stroke="#FF6B2B" stroke-width="2.5" opacity="0.95" />
 
-  <!-- Connecting lines between the three nodes (drawn under the spheres) -->
-  <g stroke="#FF5200" stroke-width="2.5" opacity="0.62" stroke-linecap="round">
-    <line x1="240" y1="192" x2="178" y2="292" />
-    <line x1="240" y1="192" x2="336" y2="340" />
-    <line x1="178" y1="292" x2="336" y2="340" />
-  </g>
+    <!-- Connecting lines -->
+    <g stroke="#FF5200" stroke-width="2.5" opacity="0.62" stroke-linecap="round">
+      <line x1="240" y1="192" x2="178" y2="292" />
+      <line x1="240" y1="192" x2="336" y2="340" />
+      <line x1="178" y1="292" x2="336" y2="340" />
+    </g>
 
-  <!-- LARGE orange sphere (upper) -->
-  <g>
-    <circle cx="240" cy="192" r="76" fill="url(#orb-orange-lg)" filter="url(#orb-glow)" opacity="0.55" />
-    <circle cx="240" cy="192" r="68" fill="url(#orb-orange-lg)" />
-    <circle cx="220" cy="174" r="16" fill="#FFE4CC" opacity="0.55" />
-    <circle cx="216" cy="170" r="6"  fill="#FFFFFF" opacity="0.7" />
-  </g>
+    <!-- Large orange sphere (upper) -->
+    <g>
+      <circle cx="240" cy="192" r="76" fill="url(#orb-orange-lg)" filter="url(#orb-glow)" opacity="0.55" />
+      <circle cx="240" cy="192" r="68" fill="url(#orb-orange-lg)" />
+      <circle cx="220" cy="174" r="16" fill="#FFE4CC" opacity="0.55" />
+      <circle cx="216" cy="170" r="6"  fill="#FFFFFF" opacity="0.7" />
+    </g>
 
-  <!-- MEDIUM orange sphere (lower-left) -->
-  <g>
-    <circle cx="178" cy="292" r="52" fill="url(#orb-orange-md)" filter="url(#orb-glow)" opacity="0.55" />
-    <circle cx="178" cy="292" r="46" fill="url(#orb-orange-md)" />
-    <circle cx="165" cy="280" r="11" fill="#FFE4CC" opacity="0.55" />
-    <circle cx="162" cy="277" r="4"  fill="#FFFFFF" opacity="0.7" />
-  </g>
+    <!-- Medium orange sphere (lower-left) -->
+    <g>
+      <circle cx="178" cy="292" r="52" fill="url(#orb-orange-md)" filter="url(#orb-glow)" opacity="0.55" />
+      <circle cx="178" cy="292" r="46" fill="url(#orb-orange-md)" />
+      <circle cx="165" cy="280" r="11" fill="#FFE4CC" opacity="0.55" />
+      <circle cx="162" cy="277" r="4"  fill="#FFFFFF" opacity="0.7" />
+    </g>
 
-  <!-- SMALL red/crimson sphere (lower-right) -->
-  <g>
-    <circle cx="336" cy="340" r="42" fill="url(#orb-red)" filter="url(#orb-glow)" opacity="0.55" />
-    <circle cx="336" cy="340" r="36" fill="url(#orb-red)" />
-    <circle cx="325" cy="330" r="9"  fill="#FFD6DE" opacity="0.55" />
-    <circle cx="322" cy="328" r="3.5" fill="#FFFFFF" opacity="0.75" />
+    <!-- Small red sphere (lower-right) -->
+    <g>
+      <circle cx="336" cy="340" r="42" fill="url(#orb-red)" filter="url(#orb-glow)" opacity="0.55" />
+      <circle cx="336" cy="340" r="36" fill="url(#orb-red)" />
+      <circle cx="325" cy="330" r="9"  fill="#FFD6DE" opacity="0.55" />
+      <circle cx="322" cy="328" r="3.5" fill="#FFFFFF" opacity="0.75" />
+    </g>
   </g>
 </svg>
