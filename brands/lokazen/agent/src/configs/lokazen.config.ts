@@ -105,4 +105,8 @@ export const lokazenConfig: BrandConfig = {
   ],
   followUpButtons: ['Get Matched', 'Book a Site Visit', 'Talk to an Expert', 'Request a Callback'],
   firstMessageButtons: ['I need space', 'I have a property'],
+  support: {
+    whatsapp: '+916366826978',
+    email: 'support@lokazen.in',
+  },
 };
