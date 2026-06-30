@@ -785,13 +785,11 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         /\b(list|have (a )?property|own|landlord|lease out|rent out|owner)\b/.test(lowerMsg);
 
       if (!isClearSeeker && !isClearOwner) {
-        const firstName = (customerName || '').split(' ')[0] || '';
-        const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
-        const body = `${greeting} I'm Loka from Lokazen. We match brands with commercial space in Bangalore using AI.`;
+        const body = `Hi, Welcome to Lokazen\nI'm Loka, helping brands find the right spaces in Bangalore - and help property owners get matched with active brands.\n\nWhat would you like to do today?`;
         console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
         await sendAndLogReply(supabase, leadId, customerPhone, body, {
           sessionId,
-          buttons: ['Find a space', 'List my property', 'Talk to someone'],
+          buttons: ['Find a space', 'List my property', 'Talk to Loka'],
           quickReplyTrigger: 'lokazen_welcome',
         });
         return;
