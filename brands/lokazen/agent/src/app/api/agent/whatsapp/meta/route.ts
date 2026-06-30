@@ -783,13 +783,15 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         /\b(find|need|looking for|want|search|space|office|retail|warehouse|restaurant|shop)\b/.test(lowerMsg);
       const isClearOwner =
         /\b(list|have (a )?property|own|landlord|lease out|rent out|owner)\b/.test(lowerMsg);
+      const isClearScout =
+        /\b(scout|field agent|find properties|submit (property|lead))\b/.test(lowerMsg);
 
-      if (!isClearSeeker && !isClearOwner) {
-        const body = `Hi, Welcome to Lokazen\nI'm Loka, helping brands find the right spaces in Bangalore - and help property owners get matched with active brands.\n\nWhat would you like to do today?`;
+      if (!isClearSeeker && !isClearOwner && !isClearScout) {
+        const body = `Hi, Welcome to Lokazen\nI'm Loka, helping brands find the right commercial spaces in Bangalore and helping owners get matched with active brands.\n\nWhat would you like to do?\n\n1. Find a space\n2. List my property\n3. Become a Scout\n4. Talk to the team`;
         console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
         await sendAndLogReply(supabase, leadId, customerPhone, body, {
           sessionId,
-          buttons: ['Find a space', 'List my property', 'Talk to Loka'],
+          buttons: ['Find a space', 'List my property', 'Talk to the team'],
           quickReplyTrigger: 'lokazen_welcome',
         });
         return;
