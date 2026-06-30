@@ -1023,7 +1023,7 @@
   color: var(--text-primary);
   border: 2px solid var(--bubble-user-border);
   box-shadow: var(--bubble-user-shadow);
-  width: 70%;
+  width: fit-content;
   max-width: 70%;
   margin-left: auto; /* Align to the right */
 }

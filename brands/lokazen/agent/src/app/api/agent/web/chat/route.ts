@@ -268,12 +268,17 @@ async function postProcess(
       leadId = sessionData.lead_id;
     }
 
-    // 2. Only create/update lead if phone OR email is provided (name alone is not enough)
-    if (!leadId && (userProfile.email || userProfile.phone)) {
+    // 2. Create/update lead: immediately if phone/email provided, otherwise after
+    // messageCount >= 3 (brand name + person name captured in Lokazen flow).
+    // This ensures web chat conversations always appear in the leads dashboard,
+    // even before the contact step at the end of the qualification flow.
+    const hasContact = !!(userProfile.email || userProfile.phone);
+    const hasEnoughContext = messageCount >= 3;
+    if (!leadId && (hasContact || hasEnoughContext)) {
       leadId = await updateLeadProfile(
         externalSessionId,
         {
-          userName: userProfile.name,
+          userName: userProfile.name || undefined,
           email: userProfile.email,
           phone: userProfile.phone,
         },
