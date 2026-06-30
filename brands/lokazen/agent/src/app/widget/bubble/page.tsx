@@ -19,5 +19,5 @@ export default function BubblePage() {
 
   if (!mounted) return null
 
-  return <ChatWidget widgetStyle="bubble" />
+  return <ChatWidget widgetStyle="bubble" resetOnLoad />
 }
