@@ -1322,6 +1322,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setFlowOverrideButtons(activeFlowOverride.followUpButtons);
       setDynamicQuickButtons(null);
       setPendingFlowOverrideState(null);
+    } else if (message.followUps && message.followUps.length > 0) {
+      // LLM emitted [BTN: X] markers → useChatStream extracted them into
+      // message.followUps. Surface them as quick-reply buttons.
+      setFlowOverrideButtons(message.followUps);
+      setDynamicQuickButtons(null);
     }
 
     if (message.text) {
@@ -4012,18 +4017,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
-          <a
-            href="https://goproxe.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.privacyNotice}
-            style={{ textDecoration: 'none', cursor: 'pointer' }}
-          >
+          <div className={styles.privacyNotice}>
             <span className={styles.privacyPoweredIcon}>
               <PROXELogo />
             </span>
             <span>Powered by PROXe</span>
-          </a>
+          </div>
         )}
         <div className={styles.chatInputRow}>
           <button

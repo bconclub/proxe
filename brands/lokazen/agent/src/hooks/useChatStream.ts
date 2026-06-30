@@ -25,18 +25,18 @@ const BCON_INTRO_LINE_REGEXES = [
 ];
 
 const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
-  if (!rawText) return '';
+  if (!rawText) return ‘’;
 
   const withoutGenericGreeting = rawText
-    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
-    .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
-    .replace(/\[BUTTONS:[^\]]*\]/gi, '')
-    .replace(/[—–]/g, '-')
+    .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, ‘’)
+    .replace(/^(Hi|Hello|Hey),?\s*/gi, ‘’)
+    .replace(/\[BUTTONS:[^\]]*\]/gi, ‘’)
+    .replace(/[—–]/g, ‘-’)
     .trim();
 
   const normalized = withoutGenericGreeting
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\r\n/g, ‘\n’)
+    .replace(/\n{3,}/g, ‘\n\n’)
     .trim();
 
   if (!hasPriorAssistantMessage) {
@@ -44,13 +44,17 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   }
 
   const strippedRepeatedIntro = normalized
-    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
-    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
-    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
-    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
-    .replace(/\bi\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '');
+    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
+    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’)
+    .replace(/\b[a-z0-9 _.’-]{1,40}\s*,?\s*i\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
+    .replace(/\b[a-z0-9 _.’-]{1,40}\s*,?\s*i\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’)
+    .replace(/\bi\s*(?:am|[‘’]m)\s*bcon’?s\s*ai strategist\.?/gi, ‘’)
+    // Lokazen: strip re-introduction of Loka after first message
+    .replace(/\bhi,?\s*i\s*(?:am|[‘’]m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, ‘’)
+    .replace(/\bi\s*(?:am|[‘’]m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, ‘’)
+    .replace(/\bwelcome\s+to\s+lokazen[,.]?\s*/gi, ‘’);
   const strippedRepeatedIdentity = strippedRepeatedIntro
-    .replace(/\bi\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
+    .replace(/\bi\s*(?:am|[‘’]m)\s*proxe,\s*bcon’?s\s*ai marketing strategist\.?/gi, ‘’);
 
   const lines = strippedRepeatedIdentity
     .split('\n')
@@ -393,16 +397,35 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                               existing.type === 'ai' &&
                               Boolean(existing.text?.trim())
                           );
-                          const finalText = sanitizeAssistantText(
+                          const sanitized = sanitizeAssistantText(
                             msg.text || '',
                             hasPriorAssistantMessage
                           );
+
+                          // Extract [BTN: X] markers emitted by the LLM and
+                          // put them in followUps so ChatWidget renders them
+                          // as quick-reply buttons rather than literal text.
+                          const extractedBtns: string[] = [];
+                          const finalText = sanitized.replace(
+                            /\[BTN:\s*([^\]]+)\]/gi,
+                            (_m, label) => {
+                              const t = String(label).trim().slice(0, 20);
+                              if (t && extractedBtns.length < 3) extractedBtns.push(t);
+                              return '';
+                            }
+                          ).trim();
+
+                          const mergedFollowUps =
+                            extractedBtns.length > 0
+                              ? extractedBtns
+                              : (msg.followUps || []);
 
                           const completedMessage: Message = {
                             ...msg,
                             isStreaming: false,
                             hasStreamed: true,
                             text: finalText,
+                            followUps: mergedFollowUps,
                           };
 
                           completedMessageForCallback = completedMessage;
