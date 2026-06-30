@@ -68,14 +68,19 @@ function detectLokazenStepButtons(assistantMessage: string): string[] {
   if (r.includes('budget') || r.includes('monthly rent')) {
     return ['Under 50k', '50k-1.5L', 'Above 1.5L'];
   }
-  if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
-    return ['Immediately', '1-3 months', 'Just exploring'];
-  }
-  if (r.includes('which plan') || (r.includes('starter') && r.includes('professional') && r.includes('premium'))) {
+  if (
+    r.includes('tap a plan') ||
+    r.includes('how we work') ||
+    r.includes('which plan') ||
+    (r.includes('starter') && r.includes('professional') && r.includes('premium'))
+  ) {
     return ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999'];
   }
   if (r.includes('ready to get started') || r.includes('start this plan') || (r.includes('talk to loka') && r.includes('plan'))) {
     return ['Start this plan', 'Talk to the team'];
+  }
+  if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
+    return ['Immediately', '1-3 months', 'Just exploring'];
   }
   if (r.includes('find a space') || (r.includes('list') && r.includes('property')) || (r.includes('help you with') && r.includes('lokazen'))) {
     return ['Find a space', 'List my property', 'Talk to Loka'];

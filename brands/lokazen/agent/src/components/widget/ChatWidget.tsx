@@ -2001,6 +2001,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const hasUserMessage = messages.some((m) => m.type === 'user');
   const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
   const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
+  const lastAiText = lastAiMessage?.text || '';
+  const isLokazenPlanMenuMessage = /how we work|tap a plan|01\s+choose plan/i.test(lastAiText);
+  const isTimelineButtonRail = (buttons: string[] | null | undefined) =>
+    Boolean(buttons?.some((button) => /^(Immediately|1-3 months|Just exploring)$/i.test(button.trim())));
+  const visibleFlowOverrideButtons =
+    isLokazenPlanMenuMessage && isTimelineButtonRail(flowOverrideButtons)
+      ? ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999']
+      : flowOverrideButtons;
   const desktopWelcomeEligible =
     !isMobileViewport &&
     isOpen &&
@@ -3161,7 +3169,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       <div className={wrapperClassName}>
         <div className={styles.welcomeQuickButtonsContainer}>
           <div className={styles.welcomeQuickButtonRow}>
-            {flowOverrideButtons?.map((buttonText, index) => (
+            {visibleFlowOverrideButtons?.map((buttonText, index) => (
               <button
                 key={buttonText}
                 className={`${styles.quickBtn} ${styles.flowOverrideBtn} ${styles[`accent-${index % 7}`]}`}
@@ -3175,7 +3183,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         </div>
       </div>
     ),
-    [flowOverrideButtons, handleQuickButtonClick]
+    [visibleFlowOverrideButtons, handleQuickButtonClick]
   );
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -4057,8 +4065,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         )}
         {isOpen &&
           !isLoading &&
-          flowOverrideButtons &&
-          flowOverrideButtons.length > 0 &&
+          visibleFlowOverrideButtons &&
+          visibleFlowOverrideButtons.length > 0 &&
           !lastAiMessage?.isStreaming &&
           renderFlowOverrideButtons(styles.welcomeQuickButtons)}
         <div ref={messagesEndRef} />
