@@ -84,17 +84,6 @@ async function buildLokazenSummaryResponse(
     fieldLine('Email', lead.email),
   ].filter(Boolean) as string[]
 
-  const hasLokazenSignal =
-    userType ||
-    brandFields.length > 0 ||
-    ownerFields.length > 0 ||
-    scoutFields.length > 0 ||
-    contactFields.length > 0 ||
-    bookingDate ||
-    bookingTime
-
-  if (!hasLokazenSignal) return null
-
   const { data: messages } = await supabase
     .from('conversations')
     .select('sender, content, channel, created_at')
@@ -121,7 +110,7 @@ async function buildLokazenSummaryResponse(
 
   const detailSentence = fieldGroup.length > 0
     ? `Captured CRE details: ${fieldGroup.slice(0, 8).join('; ')}.`
-    : 'No CRE requirement details have been captured yet.'
+    : 'CRE requirement details are not captured yet.'
 
   const bookingSentence = bookingDate || bookingTime
     ? `Call booking is recorded for ${[bookingDate, bookingTime].filter(Boolean).join(' at ')}.`
