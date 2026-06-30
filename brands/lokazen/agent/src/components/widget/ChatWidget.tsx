@@ -626,8 +626,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   useEffect(() => {
     if (showNamePrompt) {
       setNameInput(userProfile.name || '');
+      const cleanPhone = userProfile.phone ? userProfile.phone.replace(/^\+1\s*/, '').trim() : '';
+      setPhoneInput(cleanPhone);
     }
-  }, [showNamePrompt, userProfile.name]);
+  }, [showNamePrompt, userProfile.name, userProfile.phone]);
 
   // Removed auto-focus to prevent keyboard from automatically opening
   // User will click on input to open keyboard, keeping full screen experience
@@ -992,9 +994,29 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setShowQuickButtons(false);
   };
 
-  // Upfront contact gates disabled: name/email/phone are collected on the
-  // booking form (BookingDetails) or the callback form, not mid-conversation.
-  const requestNameBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestNameBeforeProceed = (message: string, buttons: string[]) => {
+    // Lokazen web chats must become reachable dashboard leads before the AI flow starts.
+    // Collect name + WhatsApp number once, then let /api/agent/web/chat create the lead server-side.
+    const needContact = (!userProfile.name || !userProfile.phone) && messageCount === 0;
+    if (!needContact) return false;
+
+    if (!showNamePrompt) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[ChatWidget] Requesting Lokazen name + phone before first AI response');
+      }
+      setHasAskedName(true);
+      setHasAskedPhone(true);
+      addUserMessage(message);
+      queuePendingMessage(message, buttons, 'name');
+      setSkipAddingUserMessage(true);
+      setIsOpen(true);
+      setIsInputActive(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setShowNamePrompt(true);
+    }
+    return true;
+  };
   const requestEmailBeforeProceed = (_message: string, _buttons: string[]) => false;
   const requestPhoneBeforeProceed = (_message: string, _buttons: string[]) => false;
 
@@ -1189,21 +1211,26 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   const handleNameSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!nameInput.trim()) return;
+    const cleanPhone = phoneInput.replace(/[^\d+]/g, '');
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+    if (!nameInput.trim() || phoneDigits.length < 8) return;
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[ChatWidget] Name submitted', { name: nameInput.trim() });
+      console.log('[ChatWidget] Lokazen name + phone submitted', { name: nameInput.trim() });
     }
-    // Set flag immediately to prevent re-asking
     setHasAskedName(true);
+    setHasAskedPhone(true);
     setNamePromptDismissed(false);
+    setPhonePromptDismissed(false);
     setShowNamePrompt(false);
     
     await persistUserProfile({
       name: nameInput.trim(),
-      phoneSkipped: userProfile.phoneSkipped,
+      phone: cleanPhone,
       promptedName: true,
-    });
+      promptedPhone: true,
+    }, { sync: false });
     setNameInput('');
+    setPhoneInput('');
   };
 
   const handleNameDismiss = () => {
@@ -3884,17 +3911,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
-                    <button
-                      type="button"
-                      className={styles.inlinePromptClose}
-                      onClick={handleNameDismiss}
-                      aria-label="Close name prompt"
-                    >
-                      {ICONS.close}
-                    </button>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
                   </div>
-                  <p className={styles.inlinePromptText}>What should we call you?</p>
+                  <p className={styles.inlinePromptText}>A quick intro before we dive in.</p>
                   <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
                     <div className={styles.inlinePromptInputWrapper}>
                       <input
@@ -3904,7 +3929,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                         value={nameInput}
                         onChange={(event) => setNameInput(event.target.value)}
                       />
-                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!nameInput.trim()}>
+                    </div>
+                    <div className={styles.inlinePromptInputWrapper} style={{ marginTop: '8px' }}>
+                      <input
+                        className={styles.inlinePromptInput}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="WhatsApp number"
+                        value={phoneInput}
+                        onChange={(event) => setPhoneInput(event.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className={styles.inlinePromptSendBtn}
+                        disabled={!nameInput.trim() || phoneInput.replace(/\D/g, '').length < 8}
+                      >
                         {ICONS.send}
                       </button>
                     </div>
