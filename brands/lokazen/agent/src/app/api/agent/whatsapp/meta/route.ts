@@ -787,7 +787,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         /\b(scout|field agent|find properties|submit (property|lead))\b/.test(lowerMsg);
 
       if (!isClearSeeker && !isClearOwner && !isClearScout) {
-        const body = `Hi, Welcome to Lokazen\nI'm Loka, helping brands find the right commercial spaces in Bangalore and helping owners get matched with active brands.\n\nWhat would you like to do?`;
+        const body = `Hi, Welcome to Lokazen\n\nI'm Loka, helping brands find the right commercial spaces and helping owners get matched with active brands.\n\nWhat would you like to do?`;
         console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
         await sendAndLogReply(supabase, leadId, customerPhone, body, {
           sessionId,
