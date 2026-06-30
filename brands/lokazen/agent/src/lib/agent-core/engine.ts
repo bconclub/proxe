@@ -244,7 +244,8 @@ User's message: ${input.message}`
     rawResponse = stripBookedTimeSlots(rawResponse, availabilityRef.current.availableTimes);
   }
 
-  const cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
+  let cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
+  cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
@@ -379,7 +380,7 @@ User's message: ${input.message}`
       }
     } else if (!hasBookingIntent) {
       const rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
-      finalResponse = cleanResponse(rawResponse, input.channel);
+      finalResponse = suppressKnownContactReask(cleanResponse(rawResponse, input.channel), input, brandId);
       yield { type: 'chunk', text: finalResponse };
     } else {
       // Booking flow: needs tool loop (check_availability → book_consultation)
@@ -407,7 +408,7 @@ User's message: ${input.message}`
         }
       }
 
-      finalResponse = cleanResponse(rawResponse);
+      finalResponse = suppressKnownContactReask(cleanResponse(rawResponse), input, brandId);
       yield { type: 'chunk', text: finalResponse };
     }
 
@@ -445,6 +446,25 @@ User's message: ${input.message}`
 function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   if (docs.length === 0) return 'No relevant snippets found.';
   return docs.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
+}
+
+function suppressKnownContactReask(response: string, input: AgentInput, brandId: string): string {
+  if (brandId !== 'lokazen') return response;
+
+  const hasKnownContact = Boolean(
+    input.userProfile.name?.trim() &&
+    input.userProfile.phone?.trim()
+  );
+  if (!hasKnownContact) return response;
+
+  const asksForKnownContact =
+    /\bwho should (?:the |our |lokazen )*team contact\b/i.test(response) ||
+    /\bshare your name and phone\b/i.test(response) ||
+    /\bshare (?:the )?(?:owner )?name and phone\b/i.test(response);
+
+  if (!asksForKnownContact) return response;
+
+  return 'What would you like to do next?\n[BTN: Submit Property][BTN: Talk to Team]';
 }
 
 function stripCapturedDetailWrapper(raw: string): string {

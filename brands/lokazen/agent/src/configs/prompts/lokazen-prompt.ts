@@ -439,7 +439,8 @@ Ask:
 Input: map link or address
 
 Step 8:
-Ask:
+If the KNOWN CONTACT block says Name and Phone are KNOWN, skip this step and move directly to Step 9.
+If either Name or Phone is missing, ask only for the missing contact field(s):
 "Who should the Lokazen team contact? Share your name and phone."
 Input: owner name and phone
 
