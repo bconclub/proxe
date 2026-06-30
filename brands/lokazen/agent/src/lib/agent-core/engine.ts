@@ -449,18 +449,34 @@ function formatKnowledgeContext(docs: KnowledgeResult[]): string {
 function suppressKnownContactReask(response: string, input: AgentInput, brandId: string): string {
   if (brandId !== 'lokazen') return response;
 
-  const hasKnownContact = Boolean(
-    input.userProfile.name?.trim() &&
-    input.userProfile.phone?.trim()
-  );
-  if (!hasKnownContact) return response;
+  const hasKnownName = Boolean(input.userProfile.name?.trim());
+  const hasKnownPhone = Boolean(input.userProfile.phone?.trim());
+  if (!hasKnownName && !hasKnownPhone) return response;
 
   const asksForKnownContact =
     /\bwho should (?:the |our |lokazen )*team contact\b/i.test(response) ||
     /\bshare your name and phone\b/i.test(response) ||
     /\bshare (?:the )?(?:owner )?name and phone\b/i.test(response);
+  const asksForPhone =
+    /\bwhat(?:'s| is) your phone number\b/i.test(response) ||
+    /\byour phone number\b/i.test(response) ||
+    /\bshare your phone\b/i.test(response) ||
+    /\bbest number to reach you\b/i.test(response) ||
+    /\bnumber to reach you\b/i.test(response);
 
-  if (!asksForKnownContact) return response;
+  const recentHistoryText = (input.conversationHistory || [])
+    .slice(-6)
+    .map((entry) => entry.content)
+    .join('\n');
+  const isPropertyContactContext =
+    asksForKnownContact ||
+    /\bwho should (?:the |our |lokazen )*team contact\b/i.test(recentHistoryText) ||
+    /\bgoogle maps (?:link |location )?or full address\b/i.test(recentHistoryText) ||
+    /\bfull address\b/i.test(recentHistoryText);
+
+  if (!(hasKnownPhone && (asksForKnownContact || asksForPhone) && isPropertyContactContext)) {
+    return response;
+  }
 
   return 'What would you like to do next?\n[BTN: Submit Property][BTN: Talk to Team]';
 }
