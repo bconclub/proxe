@@ -300,6 +300,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasRestoredMessagesRef = useRef<boolean>(false);
   const hasShownWelcomeRef = useRef<boolean>(false);
   const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
+  const prevIsLoadingRef = useRef(false);
   const bookingConfirmedRef = useRef(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
@@ -1839,6 +1840,27 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setFlowOverrideButtons(pendingOverride.followUpButtons);
     setDynamicQuickButtons(null);
   }, [isLoading, messages, updateMessageText]);
+
+  // Safety net: when isLoading transitions true→false, read followUps directly
+  // from the last AI message and apply them as flow override buttons.
+  // This catches the case where onMessageComplete fires before React commits
+  // the setMessages update (making completedMessageForCallback null), which
+  // prevents handleAssistantMessageComplete from seeing the followUps.
+  useEffect(() => {
+    const justFinished = prevIsLoadingRef.current && !isLoading;
+    prevIsLoadingRef.current = isLoading;
+    if (!justFinished) return;
+
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    if (!lastMsg.followUps || lastMsg.followUps.length === 0) return;
+    if (pendingFlowOverrideRef.current) return;
+
+    setFlowOverrideButtons(current => {
+      if (current && current.length > 0) return current;
+      return lastMsg.followUps!;
+    });
+  }, [isLoading, messages]);
 
   const resetChatState = useCallback(() => {
     closeCalendarWidget();
