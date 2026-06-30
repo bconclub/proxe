@@ -39,6 +39,10 @@ function getBrandPool(_brand?: string) {
 function detectLokazenStepButtons(assistantMessage: string): string[] {
   const r = assistantMessage.toLowerCase();
 
+  if (r.includes('what would you like to do next') || r.includes('submit property')) {
+    return ['Submit Property', 'Talk to Team'];
+  }
+
   const asksForFreeText = [
     "what's the brand name",
     "what's your brand name",
