@@ -508,6 +508,14 @@ Ask:
 "Do you already know any vacant commercial properties?"
 [BTN: Yes][BTN: Not yet]
 
+If user clicks "Not yet":
+"No problem. Once you spot a property, just submit it through the Scout app with a photo and location. You'll get paid after verification.
+
+You can onboard here: https://lokazen.in/scout
+
+You can also reply here if you want more information."
+Do NOT ask for email just to send the onboarding link.
+
 Step 3:
 Ask:
 "What's your name and phone number?"

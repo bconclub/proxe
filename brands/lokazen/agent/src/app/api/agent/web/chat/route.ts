@@ -37,6 +37,31 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+const LOKAZEN_SCOUT_ONBOARDING_URL =
+  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://lokazen.in/scout';
+
+function isLokazenScoutNotYetCloseout(params: {
+  brand?: string;
+  audience: 'brand' | 'owner' | 'scout' | null;
+  message: string;
+  usedButtons: string[];
+  history: AgentInput['conversationHistory'];
+}): boolean {
+  if (params.brand !== 'lokazen' || params.audience !== 'scout') return false;
+  const answer = params.message.toLowerCase().trim();
+  const buttons = params.usedButtons.map((button) => button.toLowerCase().trim());
+  const lastAssistant = [...params.history]
+    .reverse()
+    .find((item) => item.role === 'assistant')?.content?.toLowerCase() || '';
+
+  return (answer.includes('not yet') || buttons.some((button) => button.includes('not yet'))) &&
+    lastAssistant.includes('do you already know any vacant commercial properties');
+}
+
+function buildScoutNotYetCloseout(): string {
+  return `No problem. Once you spot a property, just submit it through the Scout app with a photo and location. You'll get paid after verification.\n\nYou can onboard here: ${LOKAZEN_SCOUT_ONBOARDING_URL}\n\nYou can also reply here if you want more information.`;
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
@@ -145,6 +170,16 @@ export async function POST(request: NextRequest) {
       lokazenAudience,
     };
 
+    const deterministicResponse = isLokazenScoutNotYetCloseout({
+      brand: resolvedBrand,
+      audience: lokazenAudience,
+      message,
+      usedButtons,
+      history: conversationHistory,
+    })
+      ? buildScoutNotYetCloseout()
+      : null;
+
     // Create SSE stream
     const encoder = new TextEncoder();
     const requestStartTime = Date.now();
@@ -153,14 +188,20 @@ export async function POST(request: NextRequest) {
         let fullResponse = '';
 
         try {
-          // Stream AI response
-          for await (const chunk of processStream(agentInput, supabase)) {
-            const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
-            controller.enqueue(encoder.encode(sseData));
+          if (deterministicResponse) {
+            fullResponse = deterministicResponse;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: deterministicResponse })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+          } else {
+            // Stream AI response
+            for await (const chunk of processStream(agentInput, supabase)) {
+              const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
+              controller.enqueue(encoder.encode(sseData));
 
-            // Accumulate full response text
-            if (chunk.type === 'chunk' && chunk.text) {
-              fullResponse += chunk.text;
+              // Accumulate full response text
+              if (chunk.type === 'chunk' && chunk.text) {
+                fullResponse += chunk.text;
+              }
             }
           }
 
