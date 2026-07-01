@@ -2005,6 +2005,8 @@
 
 .bubbleButton[data-brand="lokazen"] {
   bottom: 84px;
+  width: 56px;
+  height: 56px;
   border: 2px solid #FF5200;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
@@ -2012,8 +2014,8 @@
 }
 
 .bubbleButton[data-brand="lokazen"] .bubbleIcon {
-  width: 65px;
-  height: 65px;
+  width: 52px;
+  height: 52px;
 }
 
 .bubbleButton:hover::after {
