@@ -21,6 +21,11 @@ const USER_TYPE_OPTIONS = [
 const LKZ_TYPE_OPTIONS = [
   { value: 'brand', label: 'Brand looking for space' },
   { value: 'owner', label: 'Property owner listing space' },
+  { value: 'scout', label: 'Scout (recruitment interest)' },
+]
+const LKZ_SCOUT_KNOWS_PROPERTIES = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'not_yet', label: 'Not yet' },
 ]
 const LKZ_BRAND_CATEGORY = ['F&B', 'QSR', 'Cloud Kitchen', 'Café/Bakery', 'Retail', 'Wellness', 'Fitness', 'D2C', 'Services']
 const LKZ_EXPANSION = ['first outlet', '2-5', '5+']
@@ -76,6 +81,9 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
   const [frontageFt, setFrontageFt] = useState('')
   const [availabilityDate, setAvailabilityDate] = useState('')
   const [amenities, setAmenities] = useState('')
+  // Scout side (recruitment interest)
+  const [scoutAreaCovered, setScoutAreaCovered] = useState('')
+  const [scoutKnowsProperties, setScoutKnowsProperties] = useState('')
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -96,6 +104,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     setTargetZones(''); setRequiredSize(''); setBudgetRent(''); setPreferredFormat(''); setTimeline('')
     setPropertyZone(''); setPropertyAddress(''); setPropertySize(''); setAskingRent('')
     setPropertyType(''); setFloor(''); setFrontageFt(''); setAvailabilityDate(''); setAmenities('')
+    setScoutAreaCovered(''); setScoutKnowsProperties('')
     setImagePreview(null); setExtractMsg(null); setError(null)
   }, [])
 
@@ -217,6 +226,8 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           frontage_ft: frontageFt.trim(),
           availability_date: availabilityDate.trim(),
           amenities: amenities.trim(),
+          scout_area_covered: scoutAreaCovered.trim(),
+          scout_knows_properties: scoutKnowsProperties.trim(),
         }),
       })
       const data = await res.json()
@@ -240,6 +251,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
       preferredLanguage, brandName, brandCategory, currentOutlets, expansionIntent, targetZones,
       requiredSize, budgetRent, preferredFormat, timeline, propertyZone, propertyAddress,
       propertySize, askingRent, propertyType, floor, frontageFt, availabilityDate, amenities,
+      scoutAreaCovered, scoutKnowsProperties,
       resetForm, onCreated, onClose])
 
   if (!isOpen) return null
@@ -502,10 +514,27 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                   </div>
                 )}
 
+                {/* Lokazen SCOUT-side fields (recruitment interest only — KYC/UPI/tier live in the separate Scout app) */}
+                {isLokazen && userType === 'scout' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Area covered</label>
+                      <input className={inputClass} value={scoutAreaCovered} onChange={(e) => setScoutAreaCovered(e.target.value)} placeholder="e.g. Koramangala" disabled={saving} />
+                    </div>
+                    <div>
+                      <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Knows vacant properties?</label>
+                      <select className={inputClass} value={scoutKnowsProperties} onChange={(e) => setScoutKnowsProperties(e.target.value)} disabled={saving}>
+                        <option value="">—</option>
+                        {LKZ_SCOUT_KNOWS_PROPERTIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 {/* Lokazen with no type chosen yet — nudge back */}
                 {isLokazen && !userType && (
                   <div className="p-3 rounded-md text-sm" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--text-primary)' }}>
-                    Pick Brand or Property owner on the previous step to capture the right details.
+                    Pick Brand, Property owner, or Scout on the previous step to capture the right details.
                   </div>
                 )}
 

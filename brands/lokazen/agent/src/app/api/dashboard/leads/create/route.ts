@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     if (city) brandCtx.city = city
     if (courseInterest) brandCtx.course_interest = courseInterest
     if (education) brandCtx.education = education
-    if (['student', 'parent', 'professional', 'early_stage', 'brand', 'owner'].includes(userType)) {
+    if (['student', 'parent', 'professional', 'early_stage', 'brand', 'owner', 'scout'].includes(userType)) {
       brandCtx.user_type = userType
     }
     if (preferredLanguage) brandCtx.preferred_language = preferredLanguage
@@ -142,6 +142,11 @@ export async function POST(request: NextRequest) {
     if (frontageFt) brandCtx.frontage_ft = frontageFt
     if (availabilityDate) brandCtx.availability_date = availabilityDate
     if (amenities) brandCtx.amenities = amenities
+    // Scout side (recruitment interest — KYC/UPI/tier live in the separate Scout app, not this CRM)
+    const scoutAreaCovered = clean(body.scout_area_covered)
+    const scoutKnowsProperties = clean(body.scout_knows_properties)
+    if (scoutAreaCovered) brandCtx.scout_area_covered = scoutAreaCovered
+    if (scoutKnowsProperties) brandCtx.scout_knows_properties = scoutKnowsProperties
 
     // ── Dedup by (phone, brand) ───────────────────────────────────────────────
     const { data: existing } = await supabase
