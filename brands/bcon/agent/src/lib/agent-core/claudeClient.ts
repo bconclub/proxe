@@ -26,6 +26,12 @@ function cacheable(text: string): any[] {
   return [{ type: 'text', text, cache_control: { type: 'ephemeral' } }];
 }
 
+// Sonnet 5 (and Sonnet 4.6) turn adaptive thinking ON when `thinking` is omitted,
+// which adds seconds of latency and 3-10x output tokens per reply. For a snappy
+// WhatsApp/web chat bot we always disable it. Accepted by every model we run
+// (Haiku 4.5, Sonnet 4.5/4.6/5); harmless on models where it's already the default.
+const NO_THINKING = { type: 'disabled' as const };
+
 // Models that have been retired by the API and now 404. If the deploy env still
 // points CLAUDE_MODEL at one of these, silently remap to a current equivalent so
 // chat keeps working without a dashboard env change. Keep this list updated as
@@ -75,6 +81,7 @@ export async function* streamResponse(
       stream = await (anthropic.messages.stream as any)({
         model,
         max_tokens: maxTokens,
+        thinking: NO_THINKING,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -149,6 +156,7 @@ export async function generateResponse(
       const response = await (anthropic.messages.create as any)({
         model,
         max_tokens: maxTokens,
+        thinking: NO_THINKING,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -229,6 +237,7 @@ export async function generateResponseWithTools(
         response = await (anthropic.messages.create as any)({
           model,
           max_tokens: maxTokens,
+          thinking: NO_THINKING,
           system: cacheable(systemPrompt),
           messages,
           tools: tools as any,
@@ -357,6 +366,7 @@ export async function generateFromImage(
       const response = await (anthropic.messages.create as any)({
         model,
         max_tokens: maxTokens,
+        thinking: NO_THINKING,
         system: cacheable(systemPrompt),
         messages: [
           {

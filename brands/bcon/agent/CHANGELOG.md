@@ -11,6 +11,12 @@
 - User-facing: editing a team member's name in User Management now reflects in the dashboard greeting.
 - (pending commit)
 
+## 2026-07-01 · Disable adaptive thinking on all chat calls (prep for Sonnet 5)
+
+- Sonnet 5 (and Sonnet 4.6) turn adaptive thinking ON by default when the `thinking` param is omitted, which our client did. That would add seconds of latency and 3-10x output tokens per WhatsApp/web reply. Added a shared `NO_THINKING = {type:'disabled'}` and applied it to all 4 API call sites in claudeClient.ts (streamResponse, generateResponse, generateResponseWithTools, generateFromImage). Accepted by every model we run (Haiku 4.5, Sonnet 4.5/4.6/5); harmless where thinking is already off.
+- Unblocks setting `CLAUDE_MODEL=claude-sonnet-5` on Vercel without a latency/cost surprise. Note: live model was actually Sonnet 4.5 (env `CLAUDE_MODEL=claude-sonnet-4-20250514`, a retired ID auto-remapped by RETIRED_MODEL_MAP), not Haiku.
+- (pending commit)
+
 ## 2026-07-01 · WhatsApp prompt v3 - flow-tree rewrite
 
 - Replaced the WhatsApp system prompt (`bcon-prompt.ts`) with the new v3 supplied by the user: "smart friend" tone, HARD RULES block, a branching FLOW TREE (How it works / Get more leads -> AI in Marketing / Content with AI / AI Lead Machine), UNDERSTAND-before-push (max 2 probes), a BOOKING OVERRIDE priority block, and KB-RULES that pull named blocks (PRICING/LEAD_MACHINE/CASES/AUDIT) only when triggered.
