@@ -90,6 +90,21 @@ function routePhone(phone) {
   return phone;
 }
 
+// all_leads has NO response_count column (selecting it 400s the WHOLE query —
+// PostgREST rejects the entire select list on one bad column). Reply count is
+// computed live from conversations instead. Used to bucket ONE_TOUCH vs
+// ENGAGED leads in the follow-up scanner, and to pick the engaged/noengage
+// template variant when sending.
+async function getResponseCount(leadId) {
+  if (!leadId) return 0;
+  const { count } = await supabase
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .eq('lead_id', leadId)
+    .eq('sender', 'customer');
+  return count || 0;
+}
+
 // ── HARD BAN on em/en dashes in any outbound copy ────────────────────────────
 // Prompt instructions alone don't hold — the model still emits "—" sometimes.
 // Strip it at the send layer so a dash can NEVER reach a customer. Em dash ->
@@ -2035,7 +2050,7 @@ async function createFollowUpTasks() {
   // 4. Fix SQL Query Filters
   let query = supabase
     .from('all_leads')
-    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, response_count, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup, unified_context')
+    .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score, last_follow_up_sent_at, follow_up_cooldown_until, needs_human_followup, unified_context')
     .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
@@ -2060,7 +2075,7 @@ async function createFollowUpTasks() {
   for (const lead of leads) {
     try {
       const hoursSinceInteraction = (Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60);
-      const responseCount = lead.response_count || 0;
+      const responseCount = await getResponseCount(lead.id);
       const leadStage = lead.lead_stage || 'New';
       const leadName = lead.customer_name || 'Lead';
       const leadPhone = lead.customer_phone_normalized;
@@ -3676,7 +3691,7 @@ async function resolveAiInterest(task, lead, deterministicFallback) {
   if (task.lead_id && (!lead || !lead.unified_context || !lead.id)) {
     try {
       const { data } = await supabase.from('all_leads')
-        .select('id, customer_name, response_count, unified_context')
+        .select('id, customer_name, unified_context')
         .eq('id', task.lead_id).maybeSingle();
       if (data) lead = data;
     } catch (e) { /* fall through with whatever we have */ }
@@ -4171,9 +4186,9 @@ async function sendWhatsAppTemplate(phone, task) {
   let lead = null;
   if (task.lead_id) {
     const { data } = await supabase.from('all_leads')
-      .select('id, response_count, unified_context, last_follow_up_template')
+      .select('id, unified_context, last_follow_up_template')
       .eq('id', task.lead_id).maybeSingle();
-    lead = data;
+    lead = data ? { ...data, response_count: await getResponseCount(task.lead_id) } : null;
   }
 
   const tplInfo = await getTemplatePreview(task, lead);

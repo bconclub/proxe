@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone } from '@/lib/services';
+import { getServiceClient, normalizePhone, ensureOrUpdateLead } from '@/lib/services';
 
 // Auth check
 function isAuthorized(req: NextRequest): boolean {
@@ -87,9 +87,10 @@ export async function POST(req: NextRequest) {
       admin_notes: []
     };
 
-    // Check for existing lead (phone优先, then email)
-    let existingLead = null;
-    
+    // Check for an existing lead BEFORE writing, so we know created vs updated
+    // and (email-only path) so we can merge unified_context manually.
+    let existingLead: { id: string; lead_stage?: string | null; unified_context?: any } | null = null;
+
     if (normalizedPhone) {
       const { data: phoneMatch } = await supabase
         .from('all_leads')
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (phoneMatch) existingLead = phoneMatch;
     }
-    
+
     if (!existingLead && email) {
       const { data: emailMatch } = await supabase
         .from('all_leads')
@@ -113,18 +114,50 @@ export async function POST(req: NextRequest) {
     let leadId: string;
     let action: 'created' | 'updated';
 
-    if (existingLead) {
-      // Update existing lead
+    if (normalizedPhone) {
+      // Phone present: route through the SAME dedup path WhatsApp + web chat
+      // use (ensureOrUpdateLead — phone-first match, race-safe on concurrent
+      // inserts). This is the fix for the bug where a person who messaged on
+      // WhatsApp and later filled the web form (or vice versa) got a SECOND
+      // lead row instead of converging onto the one they already have.
+      const sharedLeadId = await ensureOrUpdateLead(name, email || null, phone, 'web', undefined, supabase, {
+        formType: form_type || null,
+        utm: { source: utm_source || null, medium: utm_medium || null, campaign: utm_campaign || null },
+        pageUrl: page_url || null,
+      });
+      if (!sharedLeadId) {
+        return NextResponse.json({ success: false, error: 'Failed to create/update lead' }, { status: 500 });
+      }
+      leadId = sharedLeadId;
+      action = existingLead ? 'updated' : 'created';
+
+      // ensureOrUpdateLead doesn't know about this route's form-submission
+      // history tracking — merge it on top of whatever it just wrote.
+      const { data: fresh } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle();
+      const ctx = fresh?.unified_context || {};
+      const existingSubs = Array.isArray(ctx.web?.form_submission)
+        ? ctx.web.form_submission
+        : (ctx.web?.form_submission ? [ctx.web.form_submission] : []);
+      const mergedWeb = {
+        ...(ctx.web || {}),
+        profile: unifiedContext.web.profile,
+        utm: unifiedContext.web.utm,
+        form_submission: [...existingSubs, unifiedContext.web.form_submission].slice(-5),
+      };
+      await supabase.from('all_leads').update({ unified_context: { ...ctx, web: mergedWeb } }).eq('id', leadId);
+    } else if (existingLead) {
+      // No phone on this submission, but matched by email — keep the
+      // original manual update path (ensureOrUpdateLead hard-requires phone).
       const updatedContext = {
         ...existingLead.unified_context,
         web: {
           ...existingLead.unified_context?.web,
           ...unifiedContext.web,
           form_submission: [
-            ...(Array.isArray(existingLead.unified_context?.web?.form_submission) 
-              ? existingLead.unified_context.web.form_submission 
-              : existingLead.unified_context?.web?.form_submission 
-                ? [existingLead.unified_context.web.form_submission] 
+            ...(Array.isArray(existingLead.unified_context?.web?.form_submission)
+              ? existingLead.unified_context.web.form_submission
+              : existingLead.unified_context?.web?.form_submission
+                ? [existingLead.unified_context.web.form_submission]
                 : []),
             unifiedContext.web.form_submission
           ].slice(-5) // Keep last 5 submissions
@@ -149,7 +182,9 @@ export async function POST(req: NextRequest) {
       leadId = data.id;
       action = 'updated';
     } else {
-      // Create new lead
+      // No phone, no existing email match — create (email-only lead, e.g.
+      // newsletter signup). ensureOrUpdateLead can't be used here since it
+      // hard-requires a phone number.
       const { data, error } = await supabase
         .from('all_leads')
         .insert({

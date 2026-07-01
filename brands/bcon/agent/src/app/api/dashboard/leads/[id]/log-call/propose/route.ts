@@ -51,13 +51,21 @@ export async function POST(
       ? Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000)
       : null
 
+    // Reply count isn't a stored column or context field — compute it live
+    // from conversations (same approach as the worker's getResponseCount).
+    const { count: responseCount } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_id', leadId)
+      .eq('sender', 'customer')
+
     // Snapshot of WHO this lead is right now — the half of the learning record
     // that explains "this kind of person came in".
     const context_snapshot = {
       stage: lead?.lead_stage || null,
       score: lead?.lead_score ?? null,
       temperature: ctx.lead_temperature || null,
-      response_count: ctx.response_count ?? ctx.message_count ?? null,
+      response_count: responseCount ?? 0,
       last_touchpoint: lead?.last_touchpoint || null,
       days_since_first_touch: daysSinceFirstTouch,
       service_interest: profile.service_interest || ctx.service_interest || null,
