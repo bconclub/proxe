@@ -1453,10 +1453,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
-    // In bubble/embed mode, use parent viewport info if available; otherwise
-    // fall back to window.innerWidth (covers direct /widget/bubble access).
+    // Bubble embeds can be narrow desktop iframes. Only switch to fullscreen
+    // mobile layout when the parent explicitly reports a mobile viewport.
     const isMobile = widgetStyle === 'bubble'
-      ? (isParentMobile === true || (isParentMobile === null && window.innerWidth < 769))
+      ? isParentMobile === true
       : window.innerWidth < 769;
 
     el.style.setProperty('position', 'fixed', 'important');
@@ -1677,10 +1677,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       }
 
       // Adjust input area and chat container when keyboard is visible (mobile only)
-      // In bubble/embed mode, use parent viewport info if available; otherwise
-      // fall back to window.innerWidth (covers direct /widget/bubble access).
+      // Bubble embeds can be narrow desktop iframes. Only use mobile keyboard
+      // handling when the parent explicitly reports a mobile viewport.
       const isMobileForKeyboard = widgetStyle === 'bubble'
-        ? (isParentMobile === true || (isParentMobile === null && window.innerWidth < 769))
+        ? isParentMobile === true
         : window.innerWidth < 769;
       if (isOpen && isMobileForKeyboard) {
         const inputAreaElement = chatboxContainerRef.current?.querySelector(`.${styles.inputArea}`) as HTMLElement;
@@ -2106,6 +2106,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       ),
     [isLoading, messages]
   );
+  const isBubbleWidget = widgetStyle === 'bubble';
+  const isBubbleMobileLayout = isBubbleWidget && isParentMobile === true;
+  const isBubbleDesktopLayout = isBubbleWidget && !isBubbleMobileLayout;
 
   // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
   const hasStreamingText = useMemo(
@@ -3491,7 +3494,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && (isParentMobile === true || (isParentMobile === null && typeof window !== 'undefined' && window.innerWidth < 769)) ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && !(isParentMobile === true || (isParentMobile === null && typeof window !== 'undefined' && window.innerWidth < 769)) ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${isBubbleWidget ? styles.chatboxBubble : ''} ${isBubbleMobileLayout ? styles.chatboxBubbleMobile : ''} ${isBubbleDesktopLayout ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           {isVapiActive && (
@@ -4210,7 +4213,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       </div>
       </div>
     </div>
-    {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
+    {(isDesktop || isBubbleDesktopLayout) && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
