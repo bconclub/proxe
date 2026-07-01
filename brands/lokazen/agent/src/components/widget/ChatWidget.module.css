@@ -2004,6 +2004,7 @@
 }
 
 .bubbleButton[data-brand="lokazen"] {
+  bottom: 84px;
   border: 2px solid #FF5200;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
@@ -2063,8 +2064,8 @@
   -webkit-transform: none !important;
   width: 360px !important;
   max-width: calc(100vw - 48px) !important;
-  height: 580px !important;
-  max-height: calc(100vh - 130px) !important;
+  height: 520px !important;
+  max-height: calc(100vh - 200px) !important;
   z-index: 2147483000 !important;
   pointer-events: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2114,13 +2115,13 @@
 /* Desktop bubble - keep positioned above bubble button */
 .chatboxBubbleDesktop {
   position: fixed !important;
-  bottom: 104px !important;
+  bottom: 172px !important;
   right: 24px !important;
   top: auto !important;
   left: auto !important;
-  width: 400px !important;
-  height: 580px !important;
-  max-height: calc(100vh - 130px) !important;
+  width: 360px !important;
+  height: 520px !important;
+  max-height: calc(100vh - 200px) !important;
   border-radius: 24px !important;
 }
 
@@ -2521,15 +2522,15 @@
 @media (max-width: 768px) {
   .chatboxBubbleDesktop {
     position: fixed !important;
-    inset: auto 24px 104px auto !important;
+    inset: auto 24px 172px auto !important;
     top: auto !important;
     left: auto !important;
     right: 24px !important;
-    bottom: 104px !important;
+    bottom: 172px !important;
     width: min(360px, calc(100vw - 48px)) !important;
     max-width: calc(100vw - 48px) !important;
-    height: min(580px, calc(100vh - 130px)) !important;
-    max-height: calc(100vh - 130px) !important;
+    height: min(520px, calc(100vh - 200px)) !important;
+    max-height: calc(100vh - 200px) !important;
     border-radius: 24px !important;
     box-shadow: 0 14px 50px rgba(0, 0, 0, 0.35) !important;
   }
