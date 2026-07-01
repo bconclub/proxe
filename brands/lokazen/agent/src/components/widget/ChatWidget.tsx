@@ -50,6 +50,8 @@ interface FlowOverrideRule {
   followUpButtons: string[];
 }
 
+type LokazenPageContext = 'default' | 'scout';
+
 const FLOW_COUNTRIES = ['USA', 'Canada', 'Hungary', 'New Zealand', 'Thailand', 'Australia'] as const;
 
 // PROXE Logo component (white icon version)
@@ -180,10 +182,23 @@ const ICONS = {
 };
 
 // Lokazen welcome bubble — three-part intro sequence.
-const windchasersWelcomeSequence = [
+const lokazenDefaultWelcomeSequence = [
   { text: "Hi, I'm Loka,", delay: 0 },
   { text: "Lokazen's commercial real estate assistant.", delay: 800 },
   { text: "Looking for space, or have a property to list? Tell me what you need.", delay: 1600 },
+];
+
+const lokazenScoutWelcomeSequence = [
+  { text: "Hi, I'm Loka,", delay: 0 },
+  { text: "Lokazen's commercial real estate assistant.", delay: 800 },
+  { text: "Are you looking to join us as a Scout?", delay: 1600 },
+];
+
+const lokazenScoutQuickButtons = [
+  'I want to become a Scout',
+  'How does it work?',
+  'Join as a Scout',
+  'Verify KYC',
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -256,6 +271,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
+  const [pageContext, setPageContext] = useState<LokazenPageContext>('default');
   const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
@@ -308,6 +324,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const bookingConfirmedRef = useRef(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+  const isLokazenScoutPage = brandKey === 'lokazen' && pageContext === 'scout';
 
   const setPendingFlowOverrideState = useCallback((rule: FlowOverrideRule | null) => {
     pendingFlowOverrideRef.current = rule;
@@ -319,6 +336,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setWidgetTheme(savedTheme);
+    }
+
+    const initialPageContext = new URLSearchParams(window.location.search).get('page_context');
+    if (initialPageContext === 'lokazen_scout' || initialPageContext === 'scout') {
+      setPageContext('scout');
     }
   }, []);
 
@@ -359,6 +381,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
+      }
+      if (e.data && e.data.type === 'proxe_page_context') {
+        const nextContext = e.data.pageContext === 'lokazen_scout' || e.data.pageContext === 'scout'
+          ? 'scout'
+          : 'default';
+        setPageContext(nextContext);
       }
       if (e.data && e.data.type === 'proxe_lead_context') {
         console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
@@ -839,10 +867,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
 
 
   const buildRequestPayload = () => ({
+    pageContext,
+    lokazenAudience: isLokazenScoutPage ? 'scout' : undefined,
     session: {
       externalId: externalSessionId,
       supabaseId: sessionRecord?.id ?? null,
       brand: brandKey,
+      pageContext,
       user: {
         name: userProfile.name ?? null,
         email: userProfile.email ?? null,
@@ -1993,16 +2024,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     }
 
     // Instant bubbles — CSS messageIn handles the fade-up animation
-    for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
+    const welcomeSequence = isLokazenScoutPage
+      ? lokazenScoutWelcomeSequence
+      : lokazenDefaultWelcomeSequence;
+
+    for (let i = 0; i < welcomeSequence.length; i++) {
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 120));
       }
-      addAIMessage(windchasersWelcomeSequence[i].text);
+      addAIMessage(welcomeSequence[i].text);
       window.dispatchEvent(new Event('message-updated'));
     }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage, isLokazenScoutPage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -2027,8 +2062,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     [isMobileViewport, messages.length]
   );
 
-  const mobileQuickActions = config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"];
-  const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
+  const configuredQuickButtons = isLokazenScoutPage
+    ? lokazenScoutQuickButtons
+    : (config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"]);
+  const mobileQuickActions = configuredQuickButtons;
+  const defaultQuickButtons = dynamicQuickButtons ?? configuredQuickButtons;
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
   const hasUserMessage = messages.some((m) => m.type === 'user');

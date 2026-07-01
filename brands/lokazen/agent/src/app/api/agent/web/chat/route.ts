@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
+    const pageContext = metadata.pageContext || session.pageContext || '';
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const requestUserProfile = session.user || {};
 
@@ -119,8 +120,11 @@ export async function POST(request: NextRequest) {
     // Scopes KB retrieval to the active Lokazen flow (brand/owner/scout) so,
     // e.g., a brand's pricing question never surfaces Scout payout content.
     const resolvedBrand = bodyBrand || BRAND_ID || undefined;
+    const pageAudience = String(pageContext).toLowerCase().includes('scout') || metadata.lokazenAudience === 'scout'
+      ? 'scout'
+      : null;
     const lokazenAudience = resolvedBrand === 'lokazen'
-      ? detectLokazenAudience(message, conversationHistory, usedButtons)
+      ? (pageAudience || detectLokazenAudience(message, conversationHistory, usedButtons))
       : null;
 
     // Build AgentInput

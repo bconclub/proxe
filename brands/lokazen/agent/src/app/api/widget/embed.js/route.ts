@@ -24,7 +24,9 @@ export async function GET() {
   var scriptEl = document.currentScript || document.querySelector('script[src*="embed.js"]');
   var scriptSrc = scriptEl ? scriptEl.src : '';
   var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
-  iframe.src = baseUrl + '/widget/bubble';
+  var pagePath = (window.location && window.location.pathname ? window.location.pathname : '').toLowerCase();
+  var pageContext = pagePath.indexOf('scout') !== -1 ? 'lokazen_scout' : 'lokazen_default';
+  iframe.src = baseUrl + '/widget/bubble?page_context=' + encodeURIComponent(pageContext);
   iframe.setAttribute('allowtransparency', 'true');
   iframe.setAttribute('allow', 'microphone; camera; autoplay; clipboard-write');
   iframe.setAttribute('allowusermedia', '');
@@ -84,6 +86,19 @@ export async function GET() {
   });
 
   document.body.appendChild(iframe);
+
+  var sendPageContext = function() {
+    if (iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: 'proxe_page_context',
+        pageContext: pageContext,
+        pageUrl: window.location.href
+      }, '*');
+    }
+  };
+
+  iframe.addEventListener('load', sendPageContext);
+  sendPageContext();
 
   // Pass lead context to widget when it's ready
   if (leadContext) {
