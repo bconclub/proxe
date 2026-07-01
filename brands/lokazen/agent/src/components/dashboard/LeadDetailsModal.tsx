@@ -3332,6 +3332,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                     {/* Compact Intelligence Insights - Only render when data exists */}
                     {(() => {
+                      // Scouts aren't buyers — Buying Signals (budget/interest/pain)
+                      // is meaningless for them (it was surfacing "Interest: scout"). Hide it.
+                      const isScoutLead = currentLead.unified_context?.lokazen?.user_type === 'scout'
+                      if (isScoutLead) return null
                       const hasKeyInfo = summaryData?.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints)
                       const brandProfileCheck = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {}
                       const hasProfile = Object.keys(brandProfileCheck).length > 0

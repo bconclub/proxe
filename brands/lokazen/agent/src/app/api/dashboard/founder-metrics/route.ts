@@ -484,8 +484,14 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Leads Needing Attention (top leads with recent interaction, sorted by score)
+    // Scouts are a separate audience with their own dedicated dashboard page —
+    // they never belong in the founder overview's lead-attention/booking cards.
+    const isScoutLead = (lead: any) =>
+      (lead.unified_context?.[BRAND_ID]?.user_type || lead.unified_context?.lokazen?.user_type) === 'scout'
+
     const leadsNeedingAttention = safeLeads
       .filter(lead => {
+        if (isScoutLead(lead)) return false
         const score = lead.lead_score || 0
         const lastInteraction = lead.last_interaction_at ? new Date(lead.last_interaction_at) : null
         const daysSinceInteraction = lastInteraction
@@ -534,6 +540,7 @@ export async function GET(request: NextRequest) {
     }
 
     const upcomingBookings = safeLeads
+      .filter(lead => !isScoutLead(lead))
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
         return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }

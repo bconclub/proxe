@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-01 16:05 IST · lokazen — exclude Scouts from founder overview + hide Buying Signals for Scouts
+
+- **lokazen** — `app/api/dashboard/founder-metrics/route.ts`: added `isScoutLead()` (checks `unified_context[BRAND_ID].user_type === 'scout'`) and filtered it out of BOTH `leadsNeedingAttention` (Priority Lead Queue) and `upcomingBookings` (Upcoming Events). Scouts have their own dashboard page; they were wrongly appearing in the founder overview with buyer-style "Push to book a call" next steps.
+- **lokazen** — `components/dashboard/LeadDetailsModal.tsx`: the "Buying Signals" intelligence block (Budget / Interest / Pain Point) is hidden for scout leads — it was surfacing a meaningless "Interest: scout" chip. Scouts aren't buyers.
+
 ## 2026-07-01 15:52 IST · lokazen — Scouts table "Area Covered" chip wraps to 2 lines
 
 - **lokazen** — `components/dashboard/LeadsTable.tsx`: the Scouts table "Area Covered" chip had `whitespace-nowrap`, so long free-text values (e.g. "Darbhanga, Bihar (Outside Current Bangalore Zone)") overflowed the cell on one line. Changed to `whitespace-normal break-words leading-snug max-w-[180px]` (and `rounded-full` → `rounded-2xl` so a wrapped multi-line chip still looks right) so it wraps to a second line inside the cell instead of breaking out. Property-type/size chips keep nowrap (short fixed values).
