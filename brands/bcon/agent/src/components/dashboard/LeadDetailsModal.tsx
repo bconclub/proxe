@@ -105,13 +105,27 @@ function formatCountdown(scheduledAt: string): string {
   return `In ${minutes}m`
 }
 
+// Task types encode their day offset in the name (follow_up_day3, follow_up_24h,
+// booking_reminder_30m, ...) — surface that instead of a generic "Follow-up"
+// label so the timeline reads like an actual cadence, not repeated placeholders.
+function getDayLabel(taskType: string): string | null {
+  const t = (taskType || '').toLowerCase()
+  const dayMatch = t.match(/day\s*(\d+)/)
+  if (dayMatch) return `Day ${dayMatch[1]}`
+  if (t.includes('24h')) return 'Day 1'
+  if (t.includes('30m')) return '30 min'
+  if (t.includes('try_voice_call')) return 'Voice call'
+  return null
+}
+
 function getTaskTypeConfig(taskType: string): { color: string; bg: string; label: string } {
   const t = (taskType || '').toLowerCase()
-  if (t.includes('nudge')) return { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'Nudge' }
-  if (t.includes('reminder')) return { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'Reminder' }
-  if (t.includes('re_engage') || t.includes('reengage')) return { color: '#EF4444', bg: 'rgba(239,68,68,0.12)', label: 'Re-engage' }
-  if (t.includes('follow')) return { color: '#22C55E', bg: 'rgba(34,197,94,0.12)', label: 'Follow-up' }
-  return { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', label: taskType?.replace(/_/g, ' ') || 'Task' }
+  const dayLabel = getDayLabel(taskType)
+  if (t.includes('nudge')) return { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: dayLabel || 'Nudge' }
+  if (t.includes('reminder')) return { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: dayLabel || 'Reminder' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { color: '#EF4444', bg: 'rgba(239,68,68,0.12)', label: dayLabel || 'Re-engage' }
+  if (t.includes('follow')) return { color: '#22C55E', bg: 'rgba(34,197,94,0.12)', label: dayLabel || 'Follow-up' }
+  return { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', label: dayLabel || taskType?.replace(/_/g, ' ') || 'Task' }
 }
 
 function getTaskActionLabel(task: any): string {
@@ -2844,7 +2858,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             {(() => {
                               const task = pendingTasks.find(t => t.id === expandedTaskId)
                               if (!task) return null
+                              const dayLabel = getDayLabel(task.task_type)
                               const actionLabel = getTaskActionLabel(task)
+                              const fullLabel = dayLabel ? `${dayLabel} · ${actionLabel}` : actionLabel
                               const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
                               const preview = task.preview || task.metadata?.preview || task.metadata?.message_preview || ''
                               const sequenceLabel = task.sequence_label || (task.metadata?.sequence && task.metadata?.step != null
@@ -2854,7 +2870,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 <div className="mt-1 p-2.5 rounded-lg border group" style={{ borderColor: 'var(--accent-primary)', background: 'var(--bg-primary)' }}>
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{actionLabel}</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{fullLabel}</p>
                                       {sequenceLabel && (
                                         <p className="text-[10px] font-medium mt-0.5" style={{ color: 'var(--accent-primary)' }}>{sequenceLabel}</p>
                                       )}
@@ -2872,7 +2888,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       &ldquo;{preview}&rdquo;
                                     </p>
                                   ) : (
-                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">Message is generated at send time (AI-dynamic step).</p>
+                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">No fixed template — the AI writes this live at send time using the angle below.</p>
                                   )}
                                   {reason && (
                                     <p className="text-[10px] text-[var(--text-muted)] mt-1">{reason}</p>

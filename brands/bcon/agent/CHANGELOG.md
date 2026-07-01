@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Next Actions: real day labels instead of generic "Follow-up"
+
+- Timeline steps were all labelled "Follow-up" regardless of which day of the cadence they were — now derives "Day 1", "Day 3", "Day 7", "30 min", "Voice call" etc. straight from the task_type (follow_up_day3, booking_reminder_30m, ...).
+- AI-dynamic steps (no fixed Meta template — message is LLM-authored at send time) now say so explicitly instead of a vague "generated at send time" placeholder, and point at the reason/angle line right below it.
+- User-facing: the lead panel Next Actions timeline now reads as an actual day-by-day cadence.
+- (pending commit)
+
 ## 2026-07-01 · Fixed double-sequence enrolment on RNR (busy/call-back) notes
 
 - `noteOrchestrator`'s RNR branch (logged when a call connects but the lead says "call back later") only cancelled pending booking reminders before starting its own 4-step follow-up sequence — it never cancelled a lead's pre-existing follow-up ladder (e.g. the worker's ONE_TOUCH scanner). A lead already mid-ladder got double-enrolled, stacking both sequences' tasks in Next Actions (this is what showed up as 5+ near-duplicate "WhatsApp Follow-Up" cards on Jai).
