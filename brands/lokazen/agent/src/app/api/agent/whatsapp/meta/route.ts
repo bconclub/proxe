@@ -69,6 +69,21 @@ function isMessageAlreadyProcessed(messageId: string): boolean {
 
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
 
+function isAutomatedBusinessReply(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+
+  const automatedPatterns = [
+    /thank(s| you)? for (contacting|reaching out to|messaging)\b/,
+    /please let us know how we can help/,
+    /\bwe (have )?(received|got) your (enquiry|inquiry|query|message)\b/,
+    /\b(property specialist|team member|representative) will (contact|get back to|reach out to) you shortly\b/,
+    /\breply to this message\b/,
+  ];
+
+  return automatedPatterns.some((pattern) => pattern.test(normalized));
+}
+
 /** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
 async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
@@ -757,6 +772,15 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       || triggerKind === 'interactive_button'
       || triggerKind === 'interactive_list';
 
+    if (
+      BRAND_ID === 'lokazen' &&
+      !isCustomerButtonTap &&
+      isAutomatedBusinessReply(messageText)
+    ) {
+      console.log(`[meta/webhook] LOKAZEN automated business reply ignored lead=${leadId}`);
+      return;
+    }
+
     // 7-pre. FORM / AD LEAD FIRST RESPONSE — DETERMINISTIC, never the LLM.
     // These leads came from a pilot-training ad, so we must NOT describe the
     // academy or list programs (helicopter / cabin crew / type rating). The LLM
@@ -801,7 +825,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
         await sendAndLogReply(supabase, leadId, customerPhone, body, {
           sessionId,
-          buttons: ['Find a space', 'List my property', 'Talk to Loka'],
+          buttons: ['Find a space', 'List my property', 'Talk to Lokazen team'],
           quickReplyTrigger: 'lokazen_welcome',
         });
         return;
