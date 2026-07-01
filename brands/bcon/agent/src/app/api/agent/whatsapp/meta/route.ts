@@ -32,6 +32,7 @@ import {
   fetchSummary,
   normalizePhone,
   sendWhatsAppInteractiveButtons,
+  sendWhatsAppText,
   findQuickReplyFor,
   extractButtonsFromLLMResponse,
   type AttributionSignal,
@@ -240,6 +241,16 @@ export async function POST(request: NextRequest) {
 
       if (!messageText) continue;
 
+      // ── STOP / opt-out (Meta compliance) ──────────────────────────────────
+      // Several cadence templates now carry a STOP button (Meta-required
+      // opt-out). Intercept it BEFORE the quick-reply/LLM pipeline so a
+      // opted-out lead never gets a marketing-flavored AI reply instead of an
+      // opt-out confirmation, and so every pending auto-send is cancelled.
+      if (messageText.trim().toLowerCase() === 'stop') {
+        await handleOptOut(customerPhone, brand);
+        continue;
+      }
+
       // ── Deduplication: skip if this exact message was already processed ──
       if (isMessageAlreadyProcessed(whatsappMessageId)) {
         console.log(`[meta/webhook] DUPLICATE skipped: ${whatsappMessageId} from ${customerPhone}`);
@@ -435,6 +446,62 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
     } catch (err) {
       console.error(`[meta/status] Error processing ${statusType} for ${waMessageId}:`, err);
     }
+  }
+}
+
+// ─── Opt-out (STOP) ────────────────────────────────────────────────────────────
+
+/**
+ * A lead replied STOP. Mark them opted-out, cancel every pending auto-send
+ * (nothing already queued may slip through), and send ONE fixed confirmation
+ * — never LLM-generated, so it can't accidentally carry marketing framing.
+ * The worker's scanners also check unified_context.opted_out before creating
+ * any new follow-up task, so this lead is fully off the cadence going forward.
+ */
+async function handleOptOut(customerPhone: string, brand: string): Promise<void> {
+  const supabase = getServiceClient() || getClient();
+  const normalizedPhone = normalizePhone(customerPhone);
+  if (!supabase) {
+    console.error('[meta/webhook] Opt-out: no Supabase client available');
+  } else try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('id, unified_context')
+      .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', brand)
+      .maybeSingle();
+
+    if (lead) {
+      const ctx = lead.unified_context || {};
+      await supabase.from('all_leads').update({
+        unified_context: { ...ctx, opted_out: true, opted_out_at: new Date().toISOString() },
+      }).eq('id', lead.id);
+
+      const { data: cancelled } = await supabase.from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: new Date().toISOString(), error_message: 'Cancelled: lead opted out (STOP)' })
+        .eq('lead_id', lead.id)
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id');
+
+      await supabase.from('activities').insert({
+        lead_id: lead.id,
+        activity_type: 'automation',
+        note: `Lead replied STOP — opted out, ${cancelled?.length || 0} pending follow-up(s) cancelled`,
+        created_by: 'PROXe AI',
+      });
+      console.log(`[meta/webhook] Opt-out processed for lead ${lead.id} (${cancelled?.length || 0} tasks cancelled)`);
+    } else {
+      console.log(`[meta/webhook] STOP received from ${customerPhone} but no matching lead found`);
+    }
+  } catch (e) {
+    console.error('[meta/webhook] Opt-out handling failed', e);
+  }
+
+  // Fixed confirmation, not routed through the LLM.
+  try {
+    await sendWhatsAppText(customerPhone, "You've been unsubscribed and won't receive further messages from us. Reply anytime if you'd like to pick this back up.");
+  } catch (e) {
+    console.error('[meta/webhook] Opt-out confirmation send failed', e);
   }
 }
 

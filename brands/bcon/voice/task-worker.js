@@ -2092,6 +2092,13 @@ async function createFollowUpTasks() {
         continue;
       }
 
+      // --- OPT-OUT GUARD: lead replied STOP. Never create another auto-send. ---
+      if (lead.unified_context && lead.unified_context.opted_out === true) {
+        console.log(`[FollowUp] Skipping lead ${leadId}: opted out (STOP)`);
+        skippedCount++;
+        continue;
+      }
+
       // --- DEDUPLICATION GUARD 1: Skip if in cooldown ---
       if (await isInCooldown(lead)) {
         console.log(`[FollowUp] Skipping lead ${leadId}: in cooldown`);
@@ -2336,6 +2343,8 @@ async function createColdLeadTasks() {
     try {
       // Human-owned leads (taken at the log-call hub) are off the AI cadence.
       if (lead.unified_context && lead.unified_context.owned_by_human === true) continue;
+      // Opted-out leads (replied STOP) are never auto-messaged again.
+      if (lead.unified_context && lead.unified_context.opted_out === true) continue;
       // Schedule 7 days from their last interaction, not NOW
       const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await createTaskIfNotExists({
@@ -2588,6 +2597,12 @@ async function executeTask(task) {
         console.warn(`[executeTask] Phone mismatch for ${task.lead_name}: task=${phone} lead=${freshPhone} - using lead phone`);
         phone = freshPhone;
       }
+    }
+
+    // Final safety net: a task can already be queued from BEFORE the lead
+    // opted out (STOP). Never let an already-scheduled send slip through.
+    if (freshLead?.unified_context?.opted_out === true) {
+      return { skipped: true, reason: 'Lead opted out (STOP) — auto-send blocked' };
     }
 
     // Re-resolve name from lead record — task.lead_name may be stale or a placeholder
