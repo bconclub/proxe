@@ -44,6 +44,9 @@ const RETIRED_MODEL_MAP: Record<string, string> = {
 };
 
 function getModel(): string {
+  // Production CLAUDE_MODEL is set to `claude-sonnet-5` on Vercel (chat runs with
+  // thinking disabled — see NO_THINKING — so it stays fast + cheap). Falls back to
+  // Haiku 4.5 only if the env var is unset.
   const configured = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
   const remapped = RETIRED_MODEL_MAP[configured];
   if (remapped) {
