@@ -3644,7 +3644,8 @@ function resolveLeadContext(task, lead) {
     task.metadata?.pain_point ||
     serviceInterest ||
     'AI marketing';
-  return { serviceInterest, painPoint };
+  const businessName = resolveBrandName(ctx) || 'your business';
+  return { serviceInterest, painPoint, businessName };
 }
 
 // ── THE BRAIN: intelligent service-interest resolution ───────────────────────
@@ -3811,6 +3812,15 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_followup_noengage': 2,     // name, service
   'bcon_proxe_rnr': 1,                   // name
   'bcon_lead_machine_meta_welcome_v1_': 2,     // customer_name, brand_name
+  // Purpose-built cadence templates (approved on Meta 2026, previously unwired).
+  // one_touch = ghost flow (never replied); low_touch = engaged/demo/proposal flow.
+  'bcon_onetouch_d1_v1': 3,   // customer_name, business_name, service_interest
+  'bcon_onetouch_d3_v1': 3,   // customer_name, business_name, service_interest
+  'bcon_onetouch_d7_v1': 3,   // customer_name, service_interest, pain_point
+  'bcon_onetouch_d30_v1': 2,  // customer_name, service_interest
+  'bcon_lowtouch_d1_v1': 3,   // customer_name, service_interest, pain_point
+  'bcon_lowtouch_d3_v1': 3,   // customer_name, service_interest, business_name
+  'bcon_lowtouch_d7_v1': 4,   // customer_name, service_interest, business_name, pain_point
 };
 
 // Template quick reply button labels matching Meta-approved templates
@@ -3822,6 +3832,13 @@ const TEMPLATE_BUTTONS = {
   'bcon_proxe_reengagement_engaged': ['Yes, let\'s talk'],
   'bcon_proxe_reengagement_noengage': ['Yes Lets Talk'],
   'bcon_lead_machine_meta_welcome_v1_': ['Yes, Book a Demo', 'Tell me more in chat'],
+  'bcon_onetouch_d1_v1': ['Getting more leads', 'Managing follow-ups', 'Creating content', 'Ads not working', 'Website not converting', 'No time for marketing', 'Something else'],
+  'bcon_onetouch_d3_v1': ['Book a Call', 'Not Needed Now', 'STOP'],
+  'bcon_onetouch_d7_v1': ['Lets Talk', 'Not Needed Now', 'STOP'],
+  'bcon_onetouch_d30_v1': ['Book a call', 'Call back in 1 month', 'Not needed', 'STOP'],
+  'bcon_lowtouch_d1_v1': ['Yes, Book a Call', 'Follow Up Later'],
+  'bcon_lowtouch_d3_v1': ['Yes, Book a Call', 'Not a Priority now', 'STOP'],
+  'bcon_lowtouch_d7_v1': ['Yes, Book a Call', 'Not a Priority now', 'STOP'],
 };
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
@@ -3836,6 +3853,13 @@ const TEMPLATE_BODIES = {
   'bcon_proxe_followup_noengage': `Hi {{customer_name}}, you reached out to us recently about {{service_interest}}. Would you like to know how we can help?`,
   'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`, // NOT YET SUBMITTED TO META — placeholder text
   'bcon_lead_machine_meta_welcome_v1_': `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}.\n\nWe help businesses like yours capture, qualify and convert more leads on autopilot, fully done for you.\n\nWant to see it in action?`,
+  'bcon_onetouch_d1_v1': `Hi {{customer_name}}, saw {{business_name}} looking into {{service_interest}}.\n\nQuick question - what's the daily headache you're trying to fix?\n\nGetting more leads, managing follow-ups, creating content? or something else entirely?`,
+  'bcon_onetouch_d3_v1': `Hi {{customer_name}}, saw {{business_name}} checked out our {{service_interest}} a couple days back.\n\nStill trying to figure or did you find what you needed?`,
+  'bcon_onetouch_d7_v1': `Hi {{customer_name}}, it's been a week since you enquired about {{service_interest}}\n\nAre you still dealing with {{pain_point}} or did you sort it out?`,
+  'bcon_onetouch_d30_v1': `Hi {{customer_name}}, it's been a month. Seems like {{service_interest}} isn't a priority for you now.\n\nI'll stop messaging for now. You can reach back here anytime.`,
+  'bcon_lowtouch_d1_v1': `Hi {{customer_name}}, we spoke yesterday about {{service_interest}}. Wanted to follow up on what you mentioned about {{pain_point}}.\n\nAre you still looking to start fixing these this week?`,
+  'bcon_lowtouch_d3_v1': `Hi {{customer_name}}, checking in since we spoke about {{service_interest}}.\n\nYou mentioned setting this up for {{business_name}}. Is this still a priority,\n\nI'll like to take you on a demo to show how this can work for your business`,
+  'bcon_lowtouch_d7_v1': `Hi {{customer_name}}, last week you were looking at {{service_interest}} for {{business_name}}.\n\nWe helped a similar business fix {{pain_point}} in 48 hours, I'd like  to show you how we can do this to your business too`,
 };
 
 /**
@@ -3919,6 +3943,99 @@ async function getTemplatePreview(task, lead) {
   } else if (taskType === 'post_call_followup') {
     return { name: 'bcon_proxe_post_call_followup', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {
+    const bucket = task.metadata?.bucket || '';
+    const businessName = det.businessName;
+
+    // ONE_TOUCH (ghost, never replied) flow -> purpose-built day-N templates
+    // with real personalization + STOP buttons, instead of the generic pair
+    // that made every ghost lead's follow-up read identically.
+    if (bucket === 'ONE_TOUCH') {
+      if (taskType === 'follow_up_24h') {
+        return {
+          name: 'bcon_onetouch_d1_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Business', parameter_name: 'business_name', value: businessName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          ],
+        };
+      }
+      if (taskType === 'follow_up_day3') {
+        return {
+          name: 'bcon_onetouch_d3_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Business', parameter_name: 'business_name', value: businessName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          ],
+        };
+      }
+      if (taskType === 'follow_up_day7') {
+        return {
+          name: 'bcon_onetouch_d7_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+          ],
+        };
+      }
+      if (taskType === 'follow_up_day30') {
+        return {
+          name: 'bcon_onetouch_d30_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          ],
+        };
+      }
+      // day90 has no dedicated onetouch template — closest approved fit.
+      if (taskType === 'follow_up_day90') {
+        return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
+      }
+    }
+
+    // Post-demo / post-proposal ladders (already-engaged leads) -> low-touch
+    // day-N templates. No dedicated day5 template exists, so day5 borrows the
+    // day7 body (both are the same "haven't heard back, proof point" escalation)
+    // rather than repeat day3's exact copy twice in one sequence.
+    if (bucket === 'DEMO_TAKEN' || bucket === 'PROPOSAL_SENT') {
+      if (taskType === 'follow_up_day1') {
+        return {
+          name: 'bcon_lowtouch_d1_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+          ],
+        };
+      }
+      if (taskType === 'follow_up_day3') {
+        return {
+          name: 'bcon_lowtouch_d3_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Business', parameter_name: 'business_name', value: businessName },
+          ],
+        };
+      }
+      if (taskType === 'follow_up_day5') {
+        return {
+          name: 'bcon_lowtouch_d7_v1',
+          params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Business', parameter_name: 'business_name', value: businessName },
+            { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+          ],
+        };
+      }
+    }
+
+    // Everything else — singleton nudges (ENGAGED/HIGH_INTENT follow_up_24h,
+    // nudge_waiting, push_to_book, missed_call_followup, human_callback) —
+    // keeps the existing generic engaged/noengage rotation; no day-N ladder fits.
     // Template rotation: alternate between engaged/noengage variants
     // If last was noengage, send engaged this time (and vice versa)
     const lastWasNoEngage = lastTemplate === 'bcon_proxe_followup_noengage';

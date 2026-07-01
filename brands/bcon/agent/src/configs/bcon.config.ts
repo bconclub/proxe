@@ -90,7 +90,7 @@ export const bconConfig: BrandConfig = {
   quickButtons: [
     'Explore AI Marketing Solutions',
     'Book AI Brand Audit',
-    'View Use Cases',
+    'AI Lead Machine',
     'See Work Portfolio',
   ],
   exploreButtons: [
