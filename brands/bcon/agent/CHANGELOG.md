@@ -4,6 +4,15 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · One universal enrolment GATE — leads can never double-stack sequences
+
+- Root cause of the stacked Day-1/Day-3 duplicates: each note-handler branch (RNR, DEMO_TAKEN, PROPOSAL_SENT, POST_CALL) had its own hand-maintained list of task types to cancel before enrolling a lead in a new sequence, and those lists had drifted out of sync — most were missing `follow_up_day7/day30/day90`, so a worker ONE_TOUCH ladder's long tail survived and stacked under the new note-created ladder.
+- Replaced all four ad-hoc cancel lists with a single `cancelPendingFollowUps()` gate backed by one canonical `ALL_FOLLOWUP_TASK_TYPES` superset. Every branch that starts a sequence now clears the lead's entire existing follow-up ladder first. A lead is only ever in ONE ladder.
+- Added the gate to POST_CALL too (it previously stacked a post-call nudge on top of a live ghost ladder).
+- The worker scanner was already guarded (pending-task exclusion + 72h cooldown + createTaskIfNotExists) — the leak was entirely in the note path.
+- User-facing: logging any call outcome or stage-change note no longer leaves duplicate follow-up tracks; note: this prevents NEW dupes, it does not retro-clean leads already stacked before this shipped.
+- (pending commit)
+
 ## 2026-07-01 · Next Actions: real day labels instead of generic "Follow-up"
 
 - Timeline steps were all labelled "Follow-up" regardless of which day of the cadence they were — now derives "Day 1", "Day 3", "Day 7", "30 min", "Voice call" etc. straight from the task_type (follow_up_day3, booking_reminder_30m, ...).

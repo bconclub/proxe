@@ -24,6 +24,48 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendWhatsAppText } from './whatsappSender';
 
+// ─── Sequence-enrolment gate ─────────────────────────────────────────────────
+
+/**
+ * Every follow-up-family task type the worker or note orchestrator can create.
+ * A lead should only ever be in ONE follow-up ladder at a time — before a note
+ * enrols a lead in a NEW sequence, we cancel any pending task in this whole
+ * family so ladders never stack (the "double-enrolment" bug: a worker ONE_TOUCH
+ * ladder + a note-created RNR/demo ladder both live at once). Keep this list a
+ * superset of every follow-up type in task-worker.js + this file.
+ */
+const ALL_FOLLOWUP_TASK_TYPES = [
+  'follow_up_24h',
+  'follow_up_day1', 'follow_up_day3', 'follow_up_day5',
+  'follow_up_day7', 'follow_up_day30', 'follow_up_day90',
+  'nudge_waiting', 'push_to_book', 're_engage',
+  'missed_call_followup', 'human_callback', 'post_call_followup', 'try_voice_call',
+];
+
+/**
+ * THE GATE. Cancel every pending follow-up-family task for a lead before
+ * enrolling it in a new sequence. Returns how many were cancelled so the branch
+ * can report it. Call this at the top of ANY branch that creates a sequence —
+ * it is the single source of truth for "clear the old ladder first", replacing
+ * the per-branch ad-hoc `.in('task_type', [...])` lists that drifted out of sync
+ * and let long-tail steps (day7/day30/day90) survive and stack.
+ */
+async function cancelPendingFollowUps(
+  supabase: SupabaseClient,
+  leadId: string,
+  now: Date,
+  reason: string,
+): Promise<number> {
+  const { data } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: ${reason}` })
+    .eq('lead_id', leadId)
+    .in('task_type', ALL_FOLLOWUP_TASK_TYPES)
+    .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+    .select('id');
+  return data?.length || 0;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type CallOutcome = 'Connected' | 'No Answer' | 'Busy' | 'Voicemail';
@@ -531,6 +573,13 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .update({ last_touchpoint: 'voice', last_interaction_at: now.toISOString() })
       .eq('id', leadId);
     actionsTaken.push(`Marked last touchpoint as voice call`);
+    // GATE: a human just spoke to this lead — clear any pending ghost/auto
+    // follow-up ladder before scheduling the single post-call nudge.
+    const postCallCancelCount = await cancelPendingFollowUps(supabase, leadId, now, 'post-call handled by human');
+    if (postCallCancelCount > 0) {
+      actions.push(`cancelled_${postCallCancelCount}_followup_tasks`);
+      actionsTaken.push(`Cancelled ${postCallCancelCount} pending follow-up tasks`);
+    }
     await supabase.from('agent_tasks').insert({
       task_type: 'post_call_followup',
       task_description: `Post-call follow-up: ${trimmedNote}`,
@@ -693,18 +742,10 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
       .in('status', ['pending', 'queued']);
 
-    // Cancel any pre-existing follow-up ladder (e.g. the worker's ONE_TOUCH
-    // scanner) before starting the RNR sequence below — otherwise the lead
-    // ends up double-enrolled, with both ladders' tasks stacking in Next
-    // Actions. Mirrors the same guard in the DEMO_TAKEN/PROPOSAL_SENT branches.
-    const { data: rnrCancelledTasks } = await supabase
-      .from('agent_tasks')
-      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Cancelled: replaced by RNR sequence via note' })
-      .eq('lead_id', leadId)
-      .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'follow_up_day7', 'follow_up_day30', 'follow_up_24h', 'nudge_waiting', 'push_to_book', 're_engage'])
-      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
-      .select('id');
-    const rnrCancelCount = rnrCancelledTasks?.length || 0;
+    // GATE: clear any pre-existing follow-up ladder (e.g. the worker's
+    // ONE_TOUCH scanner) before starting the RNR sequence, so the lead is never
+    // double-enrolled with two ladders stacking in Next Actions.
+    const rnrCancelCount = await cancelPendingFollowUps(supabase, leadId, now, 'replaced by RNR sequence via note');
     if (rnrCancelCount > 0) {
       actions.push(`cancelled_${rnrCancelCount}_followup_tasks`);
       actionsTaken.push(`Cancelled ${rnrCancelCount} pending follow-up tasks`);
@@ -808,14 +849,8 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── DEMO_TAKEN ───────────────────────────────────────────────────────────
   if (classification.category === 'DEMO_TAKEN') {
-    const { data: cancelledTasks } = await supabase
-      .from('agent_tasks')
-      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Cancelled: demo taken via note' })
-      .eq('lead_id', leadId)
-      .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'nudge_waiting', 'push_to_book', 'follow_up_24h'])
-      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
-      .select('id');
-    const cancelCount = cancelledTasks?.length || 0;
+    // GATE: clear the whole existing follow-up ladder before the post-demo one.
+    const cancelCount = await cancelPendingFollowUps(supabase, leadId, now, 'demo taken via note');
     if (cancelCount > 0) {
       actions.push(`cancelled_${cancelCount}_followup_tasks`);
       actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`);
@@ -855,14 +890,8 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── PROPOSAL_SENT ────────────────────────────────────────────────────────
   if (classification.category === 'PROPOSAL_SENT') {
-    const { data: cancelledTasks } = await supabase
-      .from('agent_tasks')
-      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Cancelled: proposal sent via note' })
-      .eq('lead_id', leadId)
-      .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'nudge_waiting', 'push_to_book', 'follow_up_24h'])
-      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
-      .select('id');
-    const cancelCount = cancelledTasks?.length || 0;
+    // GATE: clear the whole existing follow-up ladder before the post-proposal one.
+    const cancelCount = await cancelPendingFollowUps(supabase, leadId, now, 'proposal sent via note');
     if (cancelCount > 0) {
       actions.push(`cancelled_${cancelCount}_followup_tasks`);
       actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`);
