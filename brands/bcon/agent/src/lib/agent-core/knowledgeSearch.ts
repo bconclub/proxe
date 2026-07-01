@@ -21,7 +21,14 @@ export async function searchKnowledgeBase(
   try {
     const allResults: KnowledgeResult[] = [];
 
-    // 1. Chunk-level full-text search via RPC
+    // 1. Chunk-level full-text search via RPC (needs the embedding/chunk pipeline).
+    //    CRITICAL: supabase.rpc() RETURNS { data, error } — it does NOT throw on
+    //    a SQL error. So a broken RPC surfaces as `kbError`, never as an
+    //    exception. The ILIKE fallback below must therefore be gated on
+    //    "did the RPC actually yield hits", NOT wrapped in a catch (a catch only
+    //    fires on a thrown error, so the fallback used to be dead code whenever
+    //    the RPC failed the normal way — which is every call in prod today).
+    let rpcHits = 0;
     try {
       const { data: kbResults, error: kbError } = await supabase
         .rpc('search_knowledge_base', {
@@ -31,7 +38,9 @@ export async function searchKnowledgeBase(
           filter_subcategory: null
         });
 
-      if (!kbError && kbResults && Array.isArray(kbResults)) {
+      if (kbError) {
+        console.error('[KnowledgeSearch] RPC error, using ILIKE fallback:', kbError.message);
+      } else if (kbResults && Array.isArray(kbResults)) {
         kbResults.forEach((item: any) => {
           const content = item.content || item.answer || item.question || '';
           if (content.trim()) {
@@ -48,23 +57,25 @@ export async function searchKnowledgeBase(
             });
           }
         });
+        rpcHits = allResults.length;
       }
-    } catch (kbError) {
-      console.error('[KnowledgeSearch] RPC search failed, falling back to ILIKE:', kbError);
-      // 2. Fallback to ILIKE search on parent table.
-      // NOTE: does NOT filter on embeddings_status — that column tracks the
-      // embedding/chunk pipeline's progress, not content visibility. ILIKE is
-      // plain text matching and doesn't need embeddings at all; filtering to
-      // 'ready' here meant real, good content sitting at 'pending' (the
-      // pipeline that flips it to 'ready' never ran) was invisible to search
-      // even though the RPC path (which DOES need embeddings) was failing on
-      // every call — the KB was 100% unreachable in production either way.
+    } catch (kbErr) {
+      console.error('[KnowledgeSearch] RPC threw, using ILIKE fallback:', kbErr);
+    }
+
+    // 2. ILIKE keyword fallback on the parent knowledge_base table. Runs whenever
+    //    the RPC produced nothing — a RETURNED error, a throw, or zero rows. This
+    //    is the path that actually works today (the RPC + embedding pipeline are
+    //    broken in prod): plain-text keyword match, no embeddings required.
+    //    Does NOT filter on embeddings_status — that tracks pipeline progress,
+    //    not content visibility, and real content sits at 'pending'.
+    if (rpcHits === 0) {
       try {
         const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
         // Whole-phrase ILIKE is nearly useless for real chat questions ("who
-        // owns bcon" won't appear verbatim in any row) — match on individual
-        // significant keywords instead (any keyword hit counts), same idea as
-        // a basic full-text search without needing the broken RPC.
+        // owns bcon" won't appear verbatim) — match individual significant
+        // keywords instead (any keyword hit counts), like a basic full-text
+        // search without needing the broken RPC.
         const stopwords = new Set(['what', 'who', 'when', 'where', 'why', 'how', 'does', 'do', 'is', 'are', 'the', 'a', 'an', 'you', 'your', 'about', 'with', 'for', 'and', 'this', 'that']);
         const keywords = query
           .toLowerCase()
@@ -93,7 +104,7 @@ export async function searchKnowledgeBase(
           });
         }
       } catch (fallbackError) {
-        console.error('[KnowledgeSearch] ILIKE fallback also failed:', fallbackError);
+        console.error('[KnowledgeSearch] ILIKE fallback failed:', fallbackError);
       }
     }
 

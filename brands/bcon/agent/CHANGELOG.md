@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · KB reachable again - fix dead-code fallback (rpc returns, not throws)
+
+- Root cause the KB returned nothing in prod: the ILIKE keyword fallback lived inside a `catch` block, but supabase `.rpc()` RETURNS `{data, error}` and does not THROW on a SQL error. So when `search_knowledge_base` failed (`missing FROM-clause entry for table "c"`), `kbError` was set, results were skipped, nothing threw, and the catch never fired — the fallback was dead code and the KB was 100% unreachable.
+- Restructured: RPC error detected via `kbError` (not a catch); the ILIKE keyword fallback now runs whenever the RPC yields nothing (returned error, throw, or zero rows). KB is now reachable via plain-text keyword match on the real `knowledge_base` rows, with no dependency on the broken RPC or the empty embeddings pipeline.
+- Still open (needs Supabase SQL access): fix the `search_knowledge_base` function + run the embedding pipeline for semantic search. This is the interim that makes KB work now.
+- (pending commit)
+
 ## 2026-07-01 · Dashboard greeting uses the edited name, not the email prefix
 
 - The dashboard greeting ("Good morning, X") read `full_name` from Supabase auth `user_metadata`, but the name edited in User Management is stored in the `dashboard_users` table - two different stores. So renaming a user to "Thanzeel" still greeted them "...Connect" (the `connect@bconclub.com` email prefix). Greeting now reads `dashboard_users.full_name` first, then falls back to auth metadata, then the email prefix.
