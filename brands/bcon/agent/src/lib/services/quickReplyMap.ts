@@ -44,8 +44,8 @@ const TRIGGERS: QuickReplyTrigger[] = [
       triggerKey: 'greeting',
       // First message = warm + welcoming, NOT a pitch. Explore-first buttons;
       // the booking CTA stays soft ("Book a call"), pushed only after curiosity.
-      body: "Hey, lovely to have you here. I'm PROXe, BCON's AI. What brings you here today?",
-      buttons: ['What you do', 'How it works', 'Book a call'],
+      body: "Hey! I'm PROXe, BCON's marketing AI. We help businesses get more customers using AI. What brings you here?",
+      buttons: ['Get more leads', 'How it works', 'Book a call'],
     },
   },
   // ── Pricing ───────────────────────────────────────────────────────────────

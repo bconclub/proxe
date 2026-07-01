@@ -4,6 +4,14 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · New WhatsApp first-message greeting + buttons
+
+- Updated the WhatsApp opening line and its 3 routing buttons per direct request. Body: "Hey! I'm PROXe, BCON's marketing AI. We help businesses get more customers using AI. What brings you here?" Buttons: Get more leads / How it works / Book a call.
+- Changed in BOTH first-message paths that must stay in lockstep (same voice whether the LLM path or the keyword quick-reply shortcut fires): `bcon-prompt.ts` CORE LINE and `quickReplyMap.ts`'s `greeting` trigger.
+- Website prompt greeting is unchanged — this was scoped to WhatsApp only.
+- User-facing: every new WhatsApp conversation opens with the new line + buttons.
+- (pending commit)
+
 ## 2026-07-01 · Team Members: inline name editing, incl. your own
 
 - Team Members table had no way to edit a name/username at all — only role dropdown + deactivate. Added inline edit (pencil icon on hover → input → save/cancel) wired to the existing (already-built) `PATCH /api/dashboard/users/[id]` full_name field.
