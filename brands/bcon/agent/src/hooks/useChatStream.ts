@@ -319,13 +319,18 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                                           Boolean(existing.text?.trim())
                                       );
 
-                                      // Re-sanitize the FULL raw buffer (not just append) on
-                                      // every chunk so a repeated intro is stripped as soon as
-                                      // it's recognizable, never shown then yanked at the end.
-                                      const nextDisplayText = sanitizeAssistantText(
-                                        rawStreamTextRef.current,
-                                        hasPriorAssistantMessage
-                                      );
+                                      // A repeated greeting, if the model emits one, is always
+                                      // in the opening ~200 chars. Only pay for the multi-regex
+                                      // sanitize pass while inside that window — re-running it
+                                      // on the FULL accumulator every 2-4 chars for the rest of
+                                      // a long message is O(n^2) work and was the actual cause
+                                      // of the jittery/bursty streaming feel. Past the window,
+                                      // fall back to a plain cheap append.
+                                      const GREETING_CHECK_CHARS = 220;
+                                      const nextDisplayText =
+                                        rawStreamTextRef.current.length <= GREETING_CHECK_CHARS
+                                          ? sanitizeAssistantText(rawStreamTextRef.current, hasPriorAssistantMessage)
+                                          : (msg.text || '') + charsToAdd;
                                       return { ...msg, text: nextDisplayText };
                                     })()
                                   : msg

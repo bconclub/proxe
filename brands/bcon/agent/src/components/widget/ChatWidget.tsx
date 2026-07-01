@@ -1009,7 +1009,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // Keep quick-button instructions hidden from the visible user bubble.
     if (/^explore ai marketing solutions$/i.test(trimmed)) {
-      contextualMessage = `[Button intent: Ask user for business and industry context before suggesting solutions.] ${trimmed}`;
+      contextualMessage = `[Button intent: Show 2-3 solution areas first, then ask ONE short question inviting them to pick a lane. Do not jump to a discovery question.] ${trimmed}`;
     } else if (/^view use cases$/i.test(trimmed)) {
       contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
     }
@@ -2155,17 +2155,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // Wait for AI message to be fully streamed and not currently streaming
       // Also check that message has text content (more reliable than just hasStreamed)
       if (lastMessage && lastMessage.type === 'ai' && !lastMessage.isStreaming && lastMessage.text && lastMessage.text.length > 0) {
-        const normalizedLastText = lastMessage.text.toLowerCase();
-        const hasInlineTimeSlots =
-          (lastMessage.text.match(/\b\d{1,2}:\d{2}\s?(am|pm)\b/gi)?.length ?? 0) >= 2;
-        const isAskingForTimeChoice =
-          /which time works|what time works|pick a time|choose a time/.test(normalizedLastText);
-
-        // If the AI already showed concrete time slots in text, don't open calendar too.
-        if (hasInlineTimeSlots && isAskingForTimeChoice) {
-          setPendingCalendar(false);
-          return;
-        }
+        // The prompt deliberately lists slots as plain text AND expects the
+        // visitor to pick from the visual calendar widget alongside it (see
+        // bcon-web-prompt.ts "Present as plain text; the visitor sees a
+        // calendar widget to pick"). This used to bail out here whenever the
+        // AI's text contained time slots, which suppressed the widget on
+        // EVERY booking reply (the prompt always lists slots as text) — the
+        // widget effectively never showed. Always continue to open it.
 
         // Use setTimeout to ensure state updates properly
         const timer = setTimeout(async () => {

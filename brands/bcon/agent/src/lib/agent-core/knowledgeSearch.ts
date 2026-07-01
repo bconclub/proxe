@@ -51,14 +51,31 @@ export async function searchKnowledgeBase(
       }
     } catch (kbError) {
       console.error('[KnowledgeSearch] RPC search failed, falling back to ILIKE:', kbError);
-      // 2. Fallback to ILIKE search on parent table
+      // 2. Fallback to ILIKE search on parent table.
+      // NOTE: does NOT filter on embeddings_status — that column tracks the
+      // embedding/chunk pipeline's progress, not content visibility. ILIKE is
+      // plain text matching and doesn't need embeddings at all; filtering to
+      // 'ready' here meant real, good content sitting at 'pending' (the
+      // pipeline that flips it to 'ready' never ran) was invisible to search
+      // even though the RPC path (which DOES need embeddings) was failing on
+      // every call — the KB was 100% unreachable in production either way.
       try {
-        const { data: fallbackResults } = await supabase
-          .from('knowledge_base')
-          .select('*')
-          .eq('embeddings_status', 'ready')
-          .ilike('content', `%${query}%`)
-          .limit(limit * 2);
+        const brand = process.env.NEXT_PUBLIC_BRAND || 'bcon';
+        // Whole-phrase ILIKE is nearly useless for real chat questions ("who
+        // owns bcon" won't appear verbatim in any row) — match on individual
+        // significant keywords instead (any keyword hit counts), same idea as
+        // a basic full-text search without needing the broken RPC.
+        const stopwords = new Set(['what', 'who', 'when', 'where', 'why', 'how', 'does', 'do', 'is', 'are', 'the', 'a', 'an', 'you', 'your', 'about', 'with', 'for', 'and', 'this', 'that']);
+        const keywords = query
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter((w) => w.length >= 3 && !stopwords.has(w));
+
+        let fbQuery = supabase.from('knowledge_base').select('*').eq('brand', brand);
+        fbQuery = keywords.length > 0
+          ? fbQuery.or(keywords.map((kw) => `content.ilike.%${kw}%,title.ilike.%${kw}%`).join(','))
+          : fbQuery.ilike('content', `%${query}%`);
+        const { data: fallbackResults } = await fbQuery.limit(limit * 2);
 
         if (fallbackResults && Array.isArray(fallbackResults)) {
           fallbackResults.forEach((item: any) => {

@@ -148,9 +148,9 @@
     scrollbar-width: none;
   }
 
-  /* Slightly reduce quick action text size on mobile (10% smaller) */
+  /* Compact quick action pills on mobile — was 15.3px, made buttons feel roomy */
   .mobileQuickActions .quickBtn {
-    font-size: 15.3px;
+    font-size: 13px;
   }
 
   .mobileQuickActionsInner::-webkit-scrollbar {
@@ -272,7 +272,7 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.9);
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
