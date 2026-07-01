@@ -4,6 +4,14 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Config hub reorder + sequence-aware Next Actions timeline
+
+- Settings page (`/dashboard/settings`): Appearance/Theme/Widget Appearance/Preview now lead the page; The Brain, Team & Access, Features, WhatsApp Templates, and Config link-cards moved below.
+- Lead modal Next Actions rebuilt as a horizontal step timeline — click a step to expand the exact filled outgoing template message plus which sequence/step it belongs to, instead of a flat "WhatsApp Follow-Up" list with no content.
+- Lead owner assignment moved out of the modal header into the footer, next to the lead ID.
+- User-facing: clicking a Next Action now shows what will actually be sent, not just a generic label.
+- (`f54e9380`)
+
 ## 2026-07-01 · STOP opt-out compliance (5 of the newly-wired cadence templates require it)
 
 - WhatsApp webhook now intercepts a literal "stop" reply BEFORE the quick-reply/LLM pipeline, marks the lead `opted_out`, cancels every pending `agent_task`, and sends one fixed (non-LLM) confirmation. Worker's two follow-up scanners and `executeTask`'s final send-time check all honor the flag, so an opted-out lead is never auto-messaged again — including a task already queued before the opt-out.
