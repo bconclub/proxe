@@ -835,7 +835,7 @@ function buildBookingTools(
           },
           phone: {
             type: 'string',
-            description: 'Phone number of the person booking',
+            description: 'Phone number of the person booking. Optional: web users usually book with an email instead — provide whichever contact you have (phone OR email), not necessarily both.',
           },
           title: {
             type: 'string',
@@ -852,7 +852,7 @@ function buildBookingTools(
             description: 'Use online unless the user explicitly asks for offline, in-person, campus, or facility visit.',
           },
         },
-        required: ['date', 'time', 'name', 'phone', 'title'],
+        required: ['date', 'time', 'name', 'title'],
       },
     },
     {

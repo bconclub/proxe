@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · agent-core — web bookings no longer stall when only an email is given (phone optional)
+
+- **agent-core (all brands)** — `lib/agent-core/engine.ts`: the `book_consultation` tool schema listed `phone` in `required`, but the handler only needs phone OR email (`if (!bookingPhone && !bookingEmail)`). A web lead that gave only an email (e.g. Lokazen "g@lokazen.in") could never satisfy the schema, so the model collected date/time/name/email and then silently stopped — booking never fired, no calendar invite. Removed `phone` from `required` (now `['date','time','name','title']`) and documented on the field that phone is optional when an email is provided. WhatsApp brands are unaffected (phone is always present there). This unblocks Lokazen/BCON web email-only bookings.
+
 ## 2026-07-01 16:05 IST · lokazen — exclude Scouts from founder overview + hide Buying Signals for Scouts
 
 - **lokazen** — `app/api/dashboard/founder-metrics/route.ts`: added `isScoutLead()` (checks `unified_context[BRAND_ID].user_type === 'scout'`) and filtered it out of BOTH `leadsNeedingAttention` (Priority Lead Queue) and `upcomingBookings` (Upcoming Events). Scouts have their own dashboard page; they were wrongly appearing in the founder overview with buyer-style "Push to book a call" next steps.
