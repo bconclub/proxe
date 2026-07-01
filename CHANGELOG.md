@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-01 15:40 IST · lokazen — chat bubble docked above footer, Scout call/link/copy fixes
+
+- **lokazen** — `components/widget/ChatWidget.module.css`: the floating chat bubble (`.bubbleButton[data-brand="lokazen"]`) sat at `bottom: 128px`, floating well above the site's mobile footer nav. Lowered to `bottom: 96px` so it docks just above the footer with a little padding (data-open state 84px → 96px to match). This is the bubble injected onto www.lokazen.in via the `proxe.lokazen.in/api/widget/embed.js` iframe. User-facing: bubble no longer floats high above the bottom nav.
+- **lokazen** — `configs/prompts/lokazen-prompt.ts`: BOOKING CALL FLOW is now scoped BRAND/OWNER-only with an explicit guardrail — Loka must never offer or book a call for a Scout (Scouts convert via Join + KYC, not a call). This fixes the live case where an out-of-area Scout (Darbhanga) was pushed to "what day works best for a quick call".
+- **lokazen** — Scout onboarding link corrected everywhere to `https://www.lokazen.in/scout#scout-form` (was `lokazen.in/scout#join`): prompt SCOUT FLOW + the `LOKAZEN_SCOUT_ONBOARDING_URL` fallback constant in `app/api/agent/web/chat/route.ts`. Also tightened the "Not yet" closeout line breaks (submit + paid on adjacent lines, link separate) and fixed the Step-1 phrasing drift ("Which area in Bangalore can you cover?" → "Which area can you cover?").
+
 ## 2026-07-01 15:10 IST · lokazen — Scout misclassification fix + sync accumulated dev-tree work
 
 - **lokazen** — Fixed Scouts being misclassified as Brand leads: the widget button label (`"Join as a Scout"`) and the live prompt wording (`"Which area can you cover?"`) had drifted from the hardcoded detection strings (`"become a scout"`, `"which area in bangalore can you cover"`) in three places — `lib/agent-core/lokazenAudience.ts` (shared detector for web + WhatsApp), `app/api/agent/web/chat/route.ts` (duplicate check), `lib/agent-core/followUpGenerator.ts` (quick-reply suppression). All three now match the actual copy.

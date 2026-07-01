@@ -2006,7 +2006,9 @@
 .bubbleButton[data-brand="lokazen"] {
   width: 56px;
   height: 56px;
-  bottom: 128px;
+  /* Sit just above the site's mobile footer nav (~89px tall at screen bottom)
+     with a little padding, instead of floating high above it. */
+  bottom: 96px;
   border: 2px solid #FF5200;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
@@ -2014,7 +2016,7 @@
 }
 
 .bubbleButton[data-brand="lokazen"][data-open="true"] {
-  bottom: 84px;
+  bottom: 96px;
 }
 
 .bubbleButton[data-brand="lokazen"] .bubbleIcon {
