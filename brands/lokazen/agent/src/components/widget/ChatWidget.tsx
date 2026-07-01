@@ -189,16 +189,14 @@ const lokazenDefaultWelcomeSequence = [
 ];
 
 const lokazenScoutWelcomeSequence = [
-  { text: "Hi, I'm Loka,", delay: 0 },
-  { text: "Lokazen's commercial real estate assistant.", delay: 800 },
-  { text: "Are you looking to join us as a Scout?", delay: 1600 },
+  { text: "Hi, I'm Loka, Lokazen's commercial real estate assistant.", delay: 0 },
+  { text: "Are you looking to join us as a Scout? How can I help you today?", delay: 800 },
 ];
 
 const lokazenScoutQuickButtons = [
   'I want to become a Scout',
   'How does it work?',
   'Join as a Scout',
-  'Verify KYC',
 ];
 
 // Helper function to clean metadata strings from conversation summary

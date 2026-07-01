@@ -70,7 +70,7 @@ export async function GET() {
       } else {
         // Desktop: chat modal size
         iframe.style.width = '450px';
-        iframe.style.height = '760px';
+        iframe.style.height = '660px';
       }
       // Tell widget whether parent is mobile
       iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');
