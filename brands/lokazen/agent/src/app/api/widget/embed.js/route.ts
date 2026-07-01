@@ -32,7 +32,7 @@ export async function GET() {
   iframe.setAttribute('allowusermedia', '');
 
   // Widget shows immediately on page load
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:112px;height:112px;border:none;background:transparent;z-index:2147483647;';
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:112px;height:172px;border:none;background:transparent;z-index:2147483647;';
 
   // Check for pre-loaded lead context from host page
   var leadContext = window.__proxe_lead || null;
@@ -81,7 +81,7 @@ export async function GET() {
       iframe.style.right = '0';
       iframe.style.bottom = '0';
       iframe.style.width = '112px';
-      iframe.style.height = '112px';
+      iframe.style.height = '172px';
     }
   });
 
