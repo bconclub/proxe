@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import LeadsTable from '@/components/dashboard/LeadsTable'
 
 function ScoutsPageContent() {
-  return <LeadsTable showLimitSelector initialUserTypeFilter="scout" hideUserTypeFilter />
+  return <LeadsTable showLimitSelector initialUserTypeFilter="scout" hideUserTypeFilter title="Scouts" />
 }
 
 export default function ScoutsPage() {

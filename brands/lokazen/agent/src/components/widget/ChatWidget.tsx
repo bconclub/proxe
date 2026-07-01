@@ -3970,7 +3970,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         inputMode="tel"
                         placeholder="WhatsApp number"
                         value={phoneInput}
-                        onChange={(event) => setPhoneInput(event.target.value)}
+                        onChange={(event) => setPhoneInput(event.target.value.replace(/[^\d+\-\s]/g, ''))}
                       />
                       <button
                         type="submit"
@@ -3980,6 +3980,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         {ICONS.send}
                       </button>
                     </div>
+                    {phoneInput.trim().length > 0 && phoneInput.replace(/\D/g, '').length < 8 && (
+                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Enter a valid WhatsApp number to continue
+                      </p>
+                    )}
                   </form>
                 </div>
               </div>

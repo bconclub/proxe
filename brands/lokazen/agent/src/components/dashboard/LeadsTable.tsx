@@ -175,6 +175,8 @@ interface LeadsTableProps {
   /** Lokazen only: lock the user-type filter (e.g. 'scout') and hide the dropdown that would otherwise let it be changed. */
   initialUserTypeFilter?: string
   hideUserTypeFilter?: boolean
+  /** Overrides the header label (defaults to "Leads" / "Engaged Leads" / "Warm Leads"). */
+  title?: string
 }
 
 export default function LeadsTable({
@@ -185,6 +187,7 @@ export default function LeadsTable({
   showViewAll = false,
   initialUserTypeFilter,
   hideUserTypeFilter = false,
+  title,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
@@ -566,7 +569,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
+            {title || (presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads')}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
