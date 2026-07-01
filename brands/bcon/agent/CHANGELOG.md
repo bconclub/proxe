@@ -4,6 +4,26 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · STOP opt-out compliance (5 of the newly-wired cadence templates require it)
+
+- WhatsApp webhook now intercepts a literal "stop" reply BEFORE the quick-reply/LLM pipeline, marks the lead `opted_out`, cancels every pending `agent_task`, and sends one fixed (non-LLM) confirmation. Worker's two follow-up scanners and `executeTask`'s final send-time check all honor the flag, so an opted-out lead is never auto-messaged again — including a task already queued before the opt-out.
+- User-facing: a lead tapping STOP on any cadence template now gets a clean, quiet opt-out instead of continuing to receive follow-ups.
+- (`400707a8`)
+
+## 2026-07-01 · Unified WhatsApp greeting voice + wired 7 unused approved cadence templates
+
+- WhatsApp's LLM-path first-message copy ("Real human energy, AI speed...") didn't match the approved quick-reply greeting ("Hey, lovely to have you here...") — now identical wording/buttons regardless of which path fires on message #1.
+- Web widget's third quick button: "View Use Cases" → "AI Lead Machine".
+- Found 7 Meta-**approved** templates (`bcon_onetouch_d1/d3/d7/d30_v1`, `bcon_lowtouch_d1/d3/d7_v1`) that were never referenced anywhere in the worker — purpose-built day-1/3/7/30 cadence with `pain_point`/`business_name` personalization and Meta-required STOP buttons, verified live against the Meta Graph API. `getTemplatePreview()` now routes by `task.metadata.bucket` (ONE_TOUCH → onetouch_dN, DEMO_TAKEN/PROPOSAL_SENT → lowtouch_dN) instead of defaulting every send to the same generic `bcon_proxe_followup_noengage` body — the actual root cause of "same message every day."
+- User-facing: ghost and engaged leads now get real, varied, personalized follow-ups instead of one repeated generic line.
+- (`90571446`)
+
+## 2026-07-01 · Web-form lead dedup + response_count column didn't exist
+
+- `app/api/website/route.ts` (the web-form endpoint) hand-rolled its own duplicate-check instead of the shared `ensureOrUpdateLead()` used by WhatsApp/web-chat — no race-safe retry, so a person contacting through two channels got two lead rows. Phone-present submissions now route through the shared dedup path.
+- `all_leads` has **no `response_count` column** at all — any query selecting it 400s the whole request in PostgREST. This silently broke template rotation (always fell to the same default), the day-1/3/5/7 eligibility scanner, and the log-call decision hub's context snapshot. Reply count is now computed live from `conversations` via a shared helper everywhere it's needed.
+- (`95dd89c8`)
+
 ## 2026-06-22 · Config page (phase 1 — admin-only visibility)
 
 - New **Config** nav entry + `/dashboard/config`: admin-only view of every integration's status + non-secret identifiers + whether each secret is set (never the value), plus lead sources, connected channels, and lead fields. New admin-gated `GET /api/dashboard/config` reads status from env. Phase 2 = write-only token editing (next).
