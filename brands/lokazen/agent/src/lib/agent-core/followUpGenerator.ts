@@ -43,6 +43,13 @@ function getBrandPool(_brand?: string) {
 function detectLokazenStepButtons(response: string): string[] {
   const r = response.toLowerCase();
 
+  if (
+    r.includes('okay, what do you want to do next') ||
+    (r.includes('scout') && (r.includes('kyc') || r.includes('join now') || r.includes('onboard')))
+  ) {
+    return ['Join now', 'Do KYC', 'Chat with team'];
+  }
+
   if (r.includes('what would you like to do next') || r.includes('submit property')) {
     return ['Submit Property', 'Talk to Team'];
   }
