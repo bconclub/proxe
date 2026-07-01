@@ -693,8 +693,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 2–6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
-    const [, , conversationHistory, summaryResult] = await Promise.all([
+    // 2–5. Parallelize: log inputs + fetch summary (session now guaranteed to exist)
+    const [, , summaryResult] = await Promise.all([
       addUserInput(
         sessionId,
         messageText,
@@ -718,9 +718,18 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         },
         supabase,
       ),
-      fetchRecentHistory(leadId, supabase),
       fetchSummary(sessionId, 'whatsapp', supabase),
     ]);
+
+    // 6. Fetch history strictly AFTER the current message's writes above have
+    //    committed — previously this ran inside the same Promise.all with no
+    //    ordering guarantee against them, so a fast SELECT could race ahead of
+    //    the customer-message INSERT and read a stale history missing the
+    //    message just sent. That undercounted userMessageCount below, which
+    //    made mid-flow answers (e.g. "Koramangala" mid-Scout-flow) look like
+    //    message #0/#1 and reset the conversation to the first-time welcome
+    //    menu instead of advancing to the next step.
+    const conversationHistory = await fetchRecentHistory(leadId, supabase);
 
     // Track channel performance (fire and forget)
     updateChannelPerformance(supabase, leadId, 'whatsapp', 'response').catch(() => {});

@@ -30,7 +30,7 @@ import {
   MdViewKanban,
   MdCall,
   MdLogout,
-  MdCameraAlt,
+  MdTwoWheeler,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import { getBrandConfig } from '@/configs'
@@ -58,7 +58,7 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
-  { name: 'Scouts', href: '/dashboard/scouts', icon: MdCameraAlt },
+  { name: 'Scouts', href: '/dashboard/scouts', icon: MdTwoWheeler },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },

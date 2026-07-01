@@ -6,12 +6,20 @@
 > - [`brands/bcon/agent/CHANGELOG.md`](brands/bcon/agent/CHANGELOG.md)
 > - [`brands/windchasers/agent/CHANGELOG.md`](brands/windchasers/agent/CHANGELOG.md)
 > - [`master/agent/CHANGELOG.md`](master/agent/CHANGELOG.md)
+> - [`brands/lokazen/agent/CHANGELOG.md`](brands/lokazen/agent/CHANGELOG.md) — currently stale (inherited from `master` at scaffold time); Lokazen entries logged here until it's cleaned up.
 >
 > **Versioning** (two levels, both auto-bumped per commit by `scripts/git-hooks/pre-commit`; install with `sh scripts/install-git-hooks.sh`):
 > - **Company-wide** — root `package.json` (`proxe-platform`) bumps on *every* commit, any brand.
 > - **Per-brand** — each `<brand>/agent` bumps its own version when a commit touches it.
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
+
+## 2026-07-01 11:26 IST · lokazen — WhatsApp Scout-flow reset bug, dashboard columns, rider icon
+
+- **lokazen** — `app/api/agent/whatsapp/meta/route.ts`: fixed a real race condition — `fetchRecentHistory` ran inside the same `Promise.all` as the writes persisting the *current* message, with no ordering guarantee against them. A fast SELECT could read history missing the just-sent message, undercounting `userMessageCount` and making a mid-flow answer (e.g. "Koramangala" mid-Scout-flow) look like message #0/#1 — resetting the conversation to the first-time welcome menu instead of advancing to the next step. This is what broke the live WhatsApp Scout test (`HI I want to be a scout` → area answered → bot reset to "Hi, Welcome to Lokazen..."). History fetch now runs strictly after the writes commit.
+- **lokazen** — `components/dashboard/LeadsTable.tsx`: the Scouts tab was showing "Property Type" / "Size" columns (brand/owner-only fields, always blank for scouts) per the user's "details in this scout are completely off" report. Now swaps to "Area Covered" / "Knows Properties" (from `scout_area_covered` / `scout_knows_properties`) whenever `userTypeFilter === 'scout'`; brand/owner views unchanged.
+- **lokazen** — `components/dashboard/DashboardLayout.tsx`: Scouts nav icon changed from a camera to `MdTwoWheeler` (rider/vehicle), matching the gig-worker identity.
+- User-facing: WhatsApp Scout flow no longer resets mid-conversation; Scouts dashboard tab shows relevant fields; nav icon updated.
 
 ## 2026-06-29 15:00 IST · bcon — Stage Test Bench on the Brain page (engaged journey)
 

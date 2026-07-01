@@ -783,10 +783,17 @@ export default function LeadsTable({
                   { label: 'Course', align: 'center' as const },
                   { label: 'PAT',    align: 'center' as const },
                 ] : []),
-                ...(showLokazenColumns ? [
-                  { label: 'Property Type', align: 'center' as const },
-                  { label: 'Size',          align: 'center' as const },
-                ] : []),
+                ...(showLokazenColumns ? (
+                  userTypeFilter === 'scout'
+                    ? [
+                        { label: 'Area Covered',     align: 'center' as const },
+                        { label: 'Knows Properties', align: 'center' as const },
+                      ]
+                    : [
+                        { label: 'Property Type', align: 'center' as const },
+                        { label: 'Size',          align: 'center' as const },
+                      ]
+                ) : []),
                 { label: 'Owner',  align: 'left' as const },
               ].map(({ label, align }) => (
                 <th
@@ -1514,29 +1521,50 @@ export default function LeadsTable({
                       )
                     })()}
 
-                    {/* LOKAZEN: Property Type + Size columns (colored chips) */}
-                    {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center">
-                        {propTypeCol ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={lkzPropTypeStyle(propTypeCol)}>
-                            {propTypeCol}
-                          </span>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
-                    {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center">
-                        {sizeLabel ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
-                            {sizeLabel}
-                          </span>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
+                    {/* LOKAZEN: Property Type + Size (brand/owner) OR Area Covered + Knows Properties (scout) */}
+                    {showLokazenColumns && userTypeFilter === 'scout' ? (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_area_covered ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
+                              {lkz.scout_area_covered}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_knows_properties ? (
+                            <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>
+                              {lkz.scout_knows_properties === 'yes' ? 'Yes' : lkz.scout_knows_properties === 'not_yet' ? 'Not yet' : lkz.scout_knows_properties}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </>
+                    ) : showLokazenColumns ? (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {propTypeCol ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={lkzPropTypeStyle(propTypeCol)}>
+                              {propTypeCol}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {sizeLabel ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
+                              {sizeLabel}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </>
+                    ) : null}
 
                     {/* OWNER */}
                     <td className="px-3 py-2 text-xs">
