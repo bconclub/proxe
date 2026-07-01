@@ -2148,6 +2148,36 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }, 300);
     }
     
+    // AI-DRIVEN calendar trigger: the calendar otherwise only opens when the
+    // USER's message contains a booking keyword (call/book/schedule). But the
+    // visitor often just replies "tomorrow" or picks a time in prose, and the AI
+    // responds by offering slots — with no calendar widget shown (the bug: "still
+    // throwing text, not giving the booking model"). So when the AI's COMPLETED
+    // reply is clearly offering booking slots, flip pendingCalendar so the block
+    // below opens the visual picker.
+    if (!pendingCalendar && !showCalendly && !bookingCompleted && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last && last.type === 'ai' && !last.isStreaming && last.text) {
+        const t = last.text.toLowerCase();
+        const aiOffersBooking =
+          t.includes('open slots') ||
+          t.includes('here are the slots') ||
+          t.includes('here are the open') ||
+          t.includes('take your pick') ||
+          t.includes('pick a time') ||
+          t.includes('grab a time') ||
+          t.includes('lock in the calendar') ||
+          t.includes('lock it in') ||
+          t.includes('calendar invite') ||
+          t.includes('which one works') ||
+          t.includes('what time works') ||
+          ((t.includes('slot') || t.includes('open ')) && (t.includes('tomorrow') || t.includes('today') || t.includes('pick')));
+        if (aiOffersBooking) {
+          setPendingCalendar(true);
+        }
+      }
+    }
+
     // Check if we should show calendar widget after AI response completes
     if (pendingCalendar && messages.length > 0 && !bookingCompleted) {
       const lastMessage = messages[messages.length - 1];

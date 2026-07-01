@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Web calendar widget now opens when the AI offers slots
+
+- The booking calendar widget only opened when the USER's message had a booking keyword (call/book/schedule). But visitors reply "tomorrow" or pick a time in prose, so the AI offered slots as TEXT with no visual picker ("still throwing text, not the booking model").
+- Added an AI-driven trigger: when the assistant's completed reply is clearly offering booking slots ("open slots", "take your pick", "lock in the calendar invite", "pick a time", etc.), flip pendingCalendar so the existing open-logic renders the calendar widget (with its existing-booking check).
+
 ## 2026-07-02 · Lead dedup: pre-insert race re-check (stops form+chat double leads)
 
 - One person became two leads (Web Form + Web Chat) because the web form (/api/website) and the first web-chat message both call ensureOrUpdateLead near-simultaneously; the initial phone+brand SELECT at the top of the fn missed the row the other path had just inserted, and with no DB unique constraint both inserts succeeded.
