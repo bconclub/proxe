@@ -170,126 +170,6 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
-        {/* The Brain - single entry to the interactive flow */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            The Brain
-          </h2>
-          <a
-            href="/dashboard/settings/brain"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Open the flow
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  An interactive map of how the worker scores leads, reads temperature and intent, handles objections, and times every follow-up.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
-
-        {/* Team & Access — link to user management */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Team & Access
-          </h2>
-          <a
-            href="/dashboard/settings/users"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Manage users
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Invite teammates, set roles, and revoke access. Every lead-related action is logged with the user&rsquo;s name.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
-
-        {/* Features — runtime on/off toggles for promoted features */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Features
-          </h2>
-          <a
-            href="/dashboard/settings/features"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Feature toggles
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Switch Voice/Calls, Dashboard Brain and other features on or off for this brand — no redeploy needed.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
-
-        {/* WhatsApp Templates — create + submit Meta message templates */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            WhatsApp Templates
-          </h2>
-          <a
-            href="/dashboard/settings/whatsapp-templates"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Message templates
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Create and submit WhatsApp message templates to Meta for approval, and see their status.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
-
-        {/* Config — integrations / connections status (moved in from the top nav) */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Config
-          </h2>
-          <a
-            href="/dashboard/config"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Integrations &amp; connections
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  See connection status for every integration (Supabase, WhatsApp, Vapi…), which secrets are set, channels and lead sources.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
-
         {/* Appearance Section */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
@@ -694,6 +574,126 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* The Brain - single entry to the interactive flow */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            The Brain
+          </h2>
+          <a
+            href="/dashboard/settings/brain"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Open the flow
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  An interactive map of how the worker scores leads, reads temperature and intent, handles objections, and times every follow-up.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
+        {/* Team & Access — link to user management */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Team & Access
+          </h2>
+          <a
+            href="/dashboard/settings/users"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Manage users
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Invite teammates, set roles, and revoke access. Every lead-related action is logged with the user&rsquo;s name.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
+        {/* Features — runtime on/off toggles for promoted features */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Features
+          </h2>
+          <a
+            href="/dashboard/settings/features"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Feature toggles
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Switch Voice/Calls, Dashboard Brain and other features on or off for this brand — no redeploy needed.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
+        {/* WhatsApp Templates — create + submit Meta message templates */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            WhatsApp Templates
+          </h2>
+          <a
+            href="/dashboard/settings/whatsapp-templates"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Message templates
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Create and submit WhatsApp message templates to Meta for approval, and see their status.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
+        </div>
+
+        {/* Config — integrations / connections status (moved in from the top nav) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Config
+          </h2>
+          <a
+            href="/dashboard/config"
+            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Integrations &amp; connections
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  See connection status for every integration (Supabase, WhatsApp, Vapi…), which secrets are set, channels and lead sources.
+                </p>
+              </div>
+              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+            </div>
+          </a>
         </div>
 
         {/* Notifications & Sounds Section */}

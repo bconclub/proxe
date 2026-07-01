@@ -438,6 +438,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [leadTasks, setLeadTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [, setTick] = useState(0)
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
 
   // Lead owner (assignment) state
   const [owner, setOwner] = useState<{ id: string; name: string; email: string | null } | null>(null)
@@ -1803,75 +1804,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </button>
                 </div>
 
-                {/* Owner (assignment) */}
-                <div className="lead-owner-container flex items-center gap-1.5 relative mt-1.5">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                    Owner
-                  </span>
-                  {owner ? (
-                    <span
-                      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[140px]"
-                      style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-                      title={owner.name}
-                    >
-                      {owner.name}
-                    </span>
-                  ) : (
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Unassigned</span>
-                  )}
-                  <button
-                    onClick={() => {
-                      const next = !showOwnerDropdown
-                      setShowOwnerDropdown(next)
-                      if (next) loadTeamMembers()
-                    }}
-                    disabled={savingOwner}
-                    className="p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
-                    title="Assign owner"
-                    aria-label="Assign lead owner"
-                    aria-expanded={showOwnerDropdown}
-                    aria-haspopup="true"
-                  >
-                    <MdEdit size={12} className="text-[var(--text-muted)]" />
-                  </button>
-
-                  {showOwnerDropdown && (
-                    <div
-                      className="absolute left-0 top-full mt-1 z-50 min-w-[180px] max-h-[240px] overflow-y-auto rounded-md shadow-lg py-1"
-                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
-                    >
-                      {loadingTeamMembers ? (
-                        <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => assignOwner(null)}
-                            className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors"
-                            style={{ color: 'var(--text-secondary)' }}
-                          >
-                            Unassigned
-                          </button>
-                          {teamMembers.length === 0 ? (
-                            <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>No team members</div>
-                          ) : (
-                            teamMembers.map((m) => (
-                              <button
-                                key={m.id}
-                                onClick={() => assignOwner(m)}
-                                className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors truncate"
-                                style={{ color: owner?.id === m.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
-                                title={m.email || m.name}
-                              >
-                                {m.name}
-                              </button>
-                            ))
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
                 {/* Service Interest & Pain Point pills - only for engaged leads (score 50+) */}
                 {score >= 50 && (() => {
                   const ctx = currentLead.unified_context || {}
@@ -2867,41 +2799,87 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           )
                         }
                         return (
-                          <div className="space-y-2">
-                            {pendingTasks.map((task: any) => {
-                              const typeConfig = getTaskTypeConfig(task.task_type)
-                              const actionLabel = getTaskActionLabel(task)
-                              const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
-                              return (
-                                <div key={task.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] group">
-                                  <span
-                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 mt-0.5"
-                                    style={{ color: typeConfig.color, backgroundColor: typeConfig.bg }}
+                          <div>
+                            {/* Horizontal timeline — click a step to reveal the exact outgoing message */}
+                            <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory">
+                              {pendingTasks.map((task: any, i: number) => {
+                                const typeConfig = getTaskTypeConfig(task.task_type)
+                                const isExpanded = expandedTaskId === task.id
+                                const hasPreview = !!(task.preview || task.metadata?.preview || task.metadata?.message_preview)
+                                return (
+                                  <button
+                                    key={task.id}
+                                    onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                                    className="snap-start flex-shrink-0 w-[140px] text-left p-2 rounded-lg border transition-colors"
+                                    style={{
+                                      borderColor: isExpanded ? 'var(--accent-primary)' : 'var(--border-primary)',
+                                      background: isExpanded ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                                    }}
                                   >
-                                    {typeConfig.label}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{actionLabel}</p>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span
+                                        className="text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wider"
+                                        style={{ color: typeConfig.color, backgroundColor: typeConfig.bg }}
+                                      >
+                                        {i + 1}
+                                      </span>
+                                      {hasPreview && (
+                                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                          {isExpanded ? '▲' : '▼'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate">{typeConfig.label}</p>
                                     {task.scheduled_at && (
-                                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                                        <MdSchedule size={11} className="inline mr-0.5 -mt-0.5" />
+                                      <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
                                         {formatCountdown(task.scheduled_at)}
                                       </p>
                                     )}
-                                    {reason && (
-                                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{reason}</p>
-                                    )}
-                                  </div>
-                                  <button
-                                    onClick={() => handleCancelTask(task.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
-                                    title="Cancel task"
-                                  >
-                                    <MdClose size={14} />
                                   </button>
+                                )
+                              })}
+                            </div>
+
+                            {/* Expanded detail strip for the selected step */}
+                            {(() => {
+                              const task = pendingTasks.find(t => t.id === expandedTaskId)
+                              if (!task) return null
+                              const actionLabel = getTaskActionLabel(task)
+                              const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
+                              const preview = task.preview || task.metadata?.preview || task.metadata?.message_preview || ''
+                              const sequenceLabel = task.sequence_label || (task.metadata?.sequence && task.metadata?.step != null
+                                ? `Step ${task.metadata.step} of ${task.metadata.total_steps || 4} - ${task.metadata.sequence}`
+                                : '')
+                              return (
+                                <div className="mt-1 p-2.5 rounded-lg border group" style={{ borderColor: 'var(--accent-primary)', background: 'var(--bg-primary)' }}>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{actionLabel}</p>
+                                      {sequenceLabel && (
+                                        <p className="text-[10px] font-medium mt-0.5" style={{ color: 'var(--accent-primary)' }}>{sequenceLabel}</p>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => handleCancelTask(task.id)}
+                                      className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
+                                      title="Cancel task"
+                                    >
+                                      <MdClose size={14} />
+                                    </button>
+                                  </div>
+                                  {preview ? (
+                                    <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 p-2 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] whitespace-pre-wrap">
+                                      &ldquo;{preview}&rdquo;
+                                    </p>
+                                  ) : (
+                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">Message is generated at send time (AI-dynamic step).</p>
+                                  )}
+                                  {reason && (
+                                    <p className="text-[10px] text-[var(--text-muted)] mt-1">{reason}</p>
+                                  )}
                                 </div>
                               )
-                            })}
+                            })()}
                           </div>
                         )
                       })()}
@@ -3423,8 +3401,78 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             >
               Delete Lead
             </button>
-            <div className="text-[10px] text-[var(--text-muted)]">
-              ID: {lead?.id?.slice(0, 8)}...
+            <div className="flex items-center gap-3">
+              {/* Owner (assignment) */}
+              <div className="lead-owner-container flex items-center gap-1.5 relative">
+                <span className="text-[10px] uppercase tracking-wider font-semibold flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  Owner
+                </span>
+                {owner ? (
+                  <span
+                    className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[140px]"
+                    style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                    title={owner.name}
+                  >
+                    {owner.name}
+                  </span>
+                ) : (
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Unassigned</span>
+                )}
+                <button
+                  onClick={() => {
+                    const next = !showOwnerDropdown
+                    setShowOwnerDropdown(next)
+                    if (next) loadTeamMembers()
+                  }}
+                  disabled={savingOwner}
+                  className="p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
+                  title="Assign owner"
+                  aria-label="Assign lead owner"
+                  aria-expanded={showOwnerDropdown}
+                  aria-haspopup="true"
+                >
+                  <MdEdit size={12} className="text-[var(--text-muted)]" />
+                </button>
+
+                {showOwnerDropdown && (
+                  <div
+                    className="absolute right-0 bottom-full mb-1 z-50 min-w-[180px] max-h-[240px] overflow-y-auto rounded-md shadow-lg py-1"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
+                  >
+                    {loadingTeamMembers ? (
+                      <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => assignOwner(null)}
+                          className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          Unassigned
+                        </button>
+                        {teamMembers.length === 0 ? (
+                          <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>No team members</div>
+                        ) : (
+                          teamMembers.map((m) => (
+                            <button
+                              key={m.id}
+                              onClick={() => assignOwner(m)}
+                              className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors truncate"
+                              style={{ color: owner?.id === m.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                              title={m.email || m.name}
+                            >
+                              {m.name}
+                            </button>
+                          ))
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)]">
+                ID: {lead?.id?.slice(0, 8)}...
+              </div>
             </div>
           </footer>
         </dialog>
