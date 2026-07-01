@@ -58,8 +58,12 @@ function isLokazenScoutNotYetCloseout(params: {
     lastAssistant.includes('do you already know any vacant commercial properties');
 }
 
-function buildScoutNotYetCloseout(): string {
-  return `No problem. Once you spot a property, just submit it through the Scout app with a photo and location. You'll get paid after verification.\n\nYou can onboard here: ${LOKAZEN_SCOUT_ONBOARDING_URL}\n\nYou can also reply here if you want more information.`;
+function buildScoutNotYetCloseout(): string[] {
+  return [
+    "No problem. Once you spot a property, submit it through the Scout app with a photo and location.",
+    "You'll get paid after verification.",
+    `You can onboard here: ${LOKAZEN_SCOUT_ONBOARDING_URL}`,
+  ];
 }
 
 export async function OPTIONS() {
@@ -170,7 +174,7 @@ export async function POST(request: NextRequest) {
       lokazenAudience,
     };
 
-    const deterministicResponse = isLokazenScoutNotYetCloseout({
+    const deterministicResponseParts = isLokazenScoutNotYetCloseout({
       brand: resolvedBrand,
       audience: lokazenAudience,
       message,
@@ -188,9 +192,11 @@ export async function POST(request: NextRequest) {
         let fullResponse = '';
 
         try {
-          if (deterministicResponse) {
-            fullResponse = deterministicResponse;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: deterministicResponse })}\n\n`));
+          if (deterministicResponseParts) {
+            fullResponse = deterministicResponseParts.join('\n\n');
+            for (const part of deterministicResponseParts) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: `${part}\n\n` })}\n\n`));
+            }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
           } else {
             // Stream AI response
