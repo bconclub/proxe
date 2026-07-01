@@ -693,6 +693,23 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
       .in('status', ['pending', 'queued']);
 
+    // Cancel any pre-existing follow-up ladder (e.g. the worker's ONE_TOUCH
+    // scanner) before starting the RNR sequence below — otherwise the lead
+    // ends up double-enrolled, with both ladders' tasks stacking in Next
+    // Actions. Mirrors the same guard in the DEMO_TAKEN/PROPOSAL_SENT branches.
+    const { data: rnrCancelledTasks } = await supabase
+      .from('agent_tasks')
+      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Cancelled: replaced by RNR sequence via note' })
+      .eq('lead_id', leadId)
+      .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'follow_up_day7', 'follow_up_day30', 'follow_up_24h', 'nudge_waiting', 'push_to_book', 're_engage'])
+      .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+      .select('id');
+    const rnrCancelCount = rnrCancelledTasks?.length || 0;
+    if (rnrCancelCount > 0) {
+      actions.push(`cancelled_${rnrCancelCount}_followup_tasks`);
+      actionsTaken.push(`Cancelled ${rnrCancelCount} pending follow-up tasks`);
+    }
+
     // If the team already sent the chaser/WhatsApp, don't stack PROXe's own
     // missed-call follow-up + 4-step sequence on top. Just log the call.
     if (alreadyActioned) {

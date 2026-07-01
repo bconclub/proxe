@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Fixed double-sequence enrolment on RNR (busy/call-back) notes
+
+- `noteOrchestrator`'s RNR branch (logged when a call connects but the lead says "call back later") only cancelled pending booking reminders before starting its own 4-step follow-up sequence — it never cancelled a lead's pre-existing follow-up ladder (e.g. the worker's ONE_TOUCH scanner). A lead already mid-ladder got double-enrolled, stacking both sequences' tasks in Next Actions (this is what showed up as 5+ near-duplicate "WhatsApp Follow-Up" cards on Jai).
+- Now cancels `follow_up_day1/3/5/7/30`, `follow_up_24h`, `nudge_waiting`, `push_to_book`, `re_engage` before creating the RNR sequence — mirrors the existing guard already in the DEMO_TAKEN/PROPOSAL_SENT branches.
+- User-facing: logging a "connected, will call back" note no longer creates a duplicate follow-up track for leads already in a cadence.
+- (pending commit)
+
 ## 2026-07-01 · Config hub reorder + sequence-aware Next Actions timeline
 
 - Settings page (`/dashboard/settings`): Appearance/Theme/Widget Appearance/Preview now lead the page; The Brain, Team & Access, Features, WhatsApp Templates, and Config link-cards moved below.
