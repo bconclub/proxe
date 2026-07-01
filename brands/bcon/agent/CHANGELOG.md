@@ -4,6 +4,15 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · WhatsApp prompt v3 - flow-tree rewrite
+
+- Replaced the WhatsApp system prompt (`bcon-prompt.ts`) with the new v3 supplied by the user: "smart friend" tone, HARD RULES block, a branching FLOW TREE (How it works / Get more leads -> AI in Marketing / Content with AI / AI Lead Machine), UNDERSTAND-before-push (max 2 probes), a BOOKING OVERRIDE priority block, and KB-RULES that pull named blocks (PRICING/LEAD_MACHINE/CASES/AUDIT) only when triggered.
+- Kept the `getBconSystemPrompt(context, messageCount)` signature; wired the KB `{{context}}` placeholder to the existing `${context}` var and kept the messageCount first-message signal.
+- Stripped em-dashes from the supplied section headers (the prompt's own HARD RULE bans them).
+- Welcome line + buttons unchanged from the version already shipped in `7fe95915`, so the LLM path and the keyword quick-reply stay in lockstep.
+- Note: KB-block pulls depend on the knowledge base, which is still broken in prod (empty chunks / RPC error, separate open item).
+- (pending commit)
+
 ## 2026-07-01 · New WhatsApp first-message greeting + buttons
 
 - Updated the WhatsApp opening line and its 3 routing buttons per direct request. Body: "Hey! I'm PROXe, BCON's marketing AI. We help businesses get more customers using AI. What brings you here?" Buttons: Get more leads / How it works / Book a call.
