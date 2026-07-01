@@ -38,7 +38,7 @@ const CORS_HEADERS = {
 };
 
 const LOKAZEN_SCOUT_ONBOARDING_URL =
-  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://lokazen.in/scout';
+  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://lokazen.in/scout#join';
 
 function isLokazenScoutNotYetCloseout(params: {
   brand?: string;
@@ -60,9 +60,10 @@ function isLokazenScoutNotYetCloseout(params: {
 
 function buildScoutNotYetCloseout(): string[] {
   return [
-    "No problem. Once you spot a property, submit it through the Scout app with a photo and location.",
+    "No problem.",
+    "Once you spot a property, submit it through the Scout app with a photo and location.",
     "You'll get paid after verification.",
-    `You can onboard here: ${LOKAZEN_SCOUT_ONBOARDING_URL}`,
+    `Join here:\n${LOKAZEN_SCOUT_ONBOARDING_URL}`,
   ];
 }
 

@@ -509,11 +509,14 @@ Ask:
 [BTN: Yes][BTN: Not yet]
 
 If user clicks "Not yet":
-"No problem. Once you spot a property, submit it through the Scout app with a photo and location.
+"No problem.
+
+Once you spot a property, submit it through the Scout app with a photo and location.
 
 You'll get paid after verification.
 
-You can onboard here: https://lokazen.in/scout"
+Join here:
+https://lokazen.in/scout#join"
 Do NOT ask for email just to send the onboarding link.
 
 Step 3:
