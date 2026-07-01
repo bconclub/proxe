@@ -193,7 +193,15 @@ export async function* processStream(
 
     // 1. Extract intent — determines which DB calls to make
     const intent = extractIntent(input.message, input.usedButtons);
-    const hasBookingIntent = isBookingIntent(input.message);
+    // Booking flow must be STICKY. isBookingIntent only looks at the current
+    // message, but mid-booking the user's replies are "Yes", "4pm", their
+    // email — none contain booking keywords. Those turns used to route to the
+    // no-tools streaming path, where the model (told to use the booking tools)
+    // could only WRITE "book_consultation(...)" as text — leaking tool syntax
+    // into chat AND never actually booking (hence "no upcoming events"). If the
+    // last assistant turn was steering a booking, treat this turn as booking
+    // too so the real tools stay available.
+    const hasBookingIntent = isInBookingFlow(input);
 
     // 2. Parallelize DB calls: KB search always runs; booking check only when needed
     const [relevantDocs, existingBookingMessage] = await Promise.all([
@@ -322,11 +330,48 @@ function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   return docs.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
 }
 
+/**
+ * Booking flow is sticky: true if the current message reads as booking intent,
+ * OR the last assistant turn was clearly steering a booking (asked for a time,
+ * listed slots, asked for the email for the invite, etc.) — in which case the
+ * user's short reply ("yes", "4pm", their email) is a continuation and must
+ * keep the real booking tools active.
+ */
+function isInBookingFlow(input: AgentInput): boolean {
+  if (isBookingIntent(input.message)) return true;
+  const history = input.conversationHistory || [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role !== 'assistant') continue;
+    const t = (history[i].content || '').toLowerCase();
+    return (
+      t.includes('check_availability') ||
+      t.includes('book_consultation') ||
+      t.includes('slot') ||
+      t.includes('what time') ||
+      t.includes('which time') ||
+      t.includes('pick a time') ||
+      t.includes('lock it in') ||
+      t.includes('lock you in') ||
+      t.includes('calendar invite') ||
+      t.includes('email so i can') ||
+      t.includes('what\'s your email') ||
+      t.includes('here are the slots') ||
+      t.includes('time works')
+    );
+  }
+  return false;
+}
+
 function cleanResponse(raw: string, channel?: string): string {
   let cleaned = raw
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    // Defensive: never let leaked tool-call syntax reach the user. If the model
+    // ever writes the tool name as text (e.g. detection missed a mid-flow
+    // turn), strip the call rather than showing "book_consultation(...)".
+    .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)/gi, '')
+    .replace(/\b(check_availability|book_consultation)\b\s*:?\s*[^\n.]*/gi, '')
     .trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.

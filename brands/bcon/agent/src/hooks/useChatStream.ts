@@ -31,6 +31,10 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    // Never render leaked booking tool-call syntax. The streaming path yields
+    // raw chunks (bypassing the server's cleanResponse), so strip it here too.
+    .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)/gi, '')
+    .replace(/\b(check_availability|book_consultation)\b\s*:?\s*[^\n.]*/gi, '')
     .replace(/[—–]/g, '-')
     .trim();
 
