@@ -78,6 +78,12 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
   const streamingMessageRef = useRef<Message | null>(null);
   const streamingQueueRef = useRef<string[]>([]);
   const isStreamingCharsRef = useRef<boolean>(false);
+  // Raw (unsanitized) accumulator for the message currently streaming. Kept
+  // separate from the displayed text so sanitizeAssistantText (which strips a
+  // repeated greeting/intro) can be re-applied on every chunk instead of only
+  // once at stream-end — otherwise the raw greeting flashes on screen for the
+  // whole stream, then visibly vanishes the instant it completes.
+  const rawStreamTextRef = useRef<string>('');
 
   const addUserMessage = useCallback((message: string) => {
     const userMessage: Message = {
@@ -201,6 +207,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
       // Reset streaming queue for new message
       streamingQueueRef.current = [];
       isStreamingCharsRef.current = false;
+      rawStreamTextRef.current = '';
 
       // Create streaming message
       const streamingMessage: Message = {
@@ -299,6 +306,8 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                           charIndex += charsToAdd.length;
 
                           requestAnimationFrame(() => {
+                            rawStreamTextRef.current += charsToAdd;
+
                             setMessages((prev) =>
                               prev.map((msg) =>
                                 msg.id === streamingMessage.id
@@ -310,8 +319,14 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                                           Boolean(existing.text?.trim())
                                       );
 
-                                      const nextRawText = (msg.text || '') + charsToAdd;
-                                      return { ...msg, text: nextRawText };
+                                      // Re-sanitize the FULL raw buffer (not just append) on
+                                      // every chunk so a repeated intro is stripped as soon as
+                                      // it's recognizable, never shown then yanked at the end.
+                                      const nextDisplayText = sanitizeAssistantText(
+                                        rawStreamTextRef.current,
+                                        hasPriorAssistantMessage
+                                      );
+                                      return { ...msg, text: nextDisplayText };
                                     })()
                                   : msg
                               )
@@ -393,8 +408,11 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                               existing.type === 'ai' &&
                               Boolean(existing.text?.trim())
                           );
+                          // Source from the raw accumulator, not msg.text — msg.text is
+                          // already progressively sanitized (see chunk handler above), so
+                          // re-deriving from raw here is the single source of truth.
                           const finalText = sanitizeAssistantText(
-                            msg.text || '',
+                            rawStreamTextRef.current || msg.text || '',
                             hasPriorAssistantMessage
                           );
 
