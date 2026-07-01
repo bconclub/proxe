@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Dedup: chat is the sole lead creator (profile-sync can't race it)
+
+- The web dupe (Web Form + Web Chat, same phone, ~1s apart) was a TRUE concurrent race: two server paths — the chat route AND the profile-sync path (persistUserProfile sync -> updateLeadProfile) — both called ensureOrUpdateLead and both inserted. The pre-insert re-check narrows the window but can't win a genuinely simultaneous race without a DB unique constraint.
+- Fix: added a `createIfMissing` option to ensureOrUpdateLead. The profile-sync path now passes `createIfMissing: false` — it only ENRICHES an existing lead, never creates one. The chat route (/api/agent/web/chat) is the single, attribution-aware creator. Removes the two-creators race that produced the duplicate.
+- Definitive backstop still recommended: UNIQUE(customer_phone_normalized, brand) index (needs existing dupes merged first + DB DDL access); the 23505 handler already converges once it exists.
+
 ## 2026-07-02 · Fix "Failed to create calendar event" - drop unsupported Meet conference
 
 - Every booking 500'd with "Invalid conference type value": the event insert requested a Google Meet conference (`conferenceSolutionKey: hangoutsMeet` + `conferenceDataVersion: 1`), but the calendar (bconclubx@gmail.com) is a personal Gmail and the service account has no Domain-Wide Delegation — Meet creation via a service account requires Google Workspace + DWD, so Google rejected the whole insert.

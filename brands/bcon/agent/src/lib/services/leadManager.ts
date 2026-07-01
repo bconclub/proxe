@@ -97,6 +97,11 @@ export async function ensureOrUpdateLead(
   externalSessionId?: string,
   supabase?: SupabaseClient | null,
   attributionSignal?: AttributionSignal | null,
+  // createIfMissing=false → only UPDATE an existing lead, never INSERT a new one.
+  // The profile-sync path (updateLeadProfile) passes false so it can't create a
+  // second lead concurrently with the chat route — the chat is the SOLE creator,
+  // which removes the form/contact-sync + chat race that produced duplicate leads.
+  opts?: { createIfMissing?: boolean },
 ): Promise<string | null> {
   // Prefer service role client for lead operations (bypasses RLS)
   const client = supabase || getServiceClient() || getClient();
@@ -278,6 +283,14 @@ export async function ensureOrUpdateLead(
       }
     }
 
+    // Update-only callers (profile-sync) stop here: no existing lead was found,
+    // and they must NOT create a competing one — the chat route is the sole
+    // creator. This removes the concurrent form/contact-sync + chat lead race.
+    if (opts?.createIfMissing === false) {
+      console.log('[leadManager] update-only: no existing lead for this phone+brand, skipping create (chat route will mint it)');
+      return null;
+    }
+
     // 7. Only INSERT if nothing matches
     const insertData: any = {
       customer_name: customerName,
@@ -446,6 +459,10 @@ export async function updateLeadProfile(
     externalSessionId,
     client,
     attributionSignal,
+    // Profile-sync only enriches an EXISTING lead. It must not create a second
+    // lead concurrently with the chat route (that was the Web Form + Web Chat
+    // duplicate). If no lead exists yet, the next chat message mints the one lead.
+    { createIfMissing: false },
   );
 
   // Link lead_id to session
