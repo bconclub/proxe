@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · KB portal: click a knowledge item to view its full content
+
+- KB list only showed a truncated preview with no way to open an item. Added click-to-view: the title and a new eye icon open a modal (portaled to body so it escapes the table) showing the item's full content, type, status, source, and created date.
+- Lets you actually inspect what the agent can retrieve from each KB entry.
+
 ## 2026-07-01 · KB reachable again - fix dead-code fallback (rpc returns, not throws)
 
 - Root cause the KB returned nothing in prod: the ILIKE keyword fallback lived inside a `catch` block, but supabase `.rpc()` RETURNS `{data, error}` and does not THROW on a SQL error. So when `search_knowledge_base` failed (`missing FROM-clause entry for table "c"`), `kbError` was set, results were skipped, nothing threw, and the catch never fired — the fallback was dead code and the KB was 100% unreachable.
