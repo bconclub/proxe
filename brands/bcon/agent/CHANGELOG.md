@@ -11,6 +11,13 @@
 - User-facing: editing a team member's name in User Management now reflects in the dashboard greeting.
 - (pending commit)
 
+## 2026-07-01 · WhatsApp prompt v4 - Explore/More-about-BCON welcome + CAPTURE
+
+- New welcome body + buttons (Explore Services / More about BCON / Book a call), synced across the LLM prompt CORE and the keyword quick-reply so both fire identically. Two-line welcome with a line break.
+- Added a CAPTURE section (business name, what they do, current lead source, what's breaking) that the agent fills one question at a time before pushing a call, plus a "More about BCON" branch and an outcomes-first "AI in Marketing" branch.
+- Em-dashes stripped per the hard rule.
+- (pending commit)
+
 ## 2026-07-01 · Disable adaptive thinking on all chat calls (prep for Sonnet 5)
 
 - Sonnet 5 (and Sonnet 4.6) turn adaptive thinking ON by default when the `thinking` param is omitted, which our client did. That would add seconds of latency and 3-10x output tokens per WhatsApp/web reply. Added a shared `NO_THINKING = {type:'disabled'}` and applied it to all 4 API call sites in claudeClient.ts (streamResponse, generateResponse, generateResponseWithTools, generateFromImage). Accepted by every model we run (Haiku 4.5, Sonnet 4.5/4.6/5); harmless where thinking is already off.
