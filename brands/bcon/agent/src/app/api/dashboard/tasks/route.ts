@@ -156,6 +156,11 @@ export async function GET(request: NextRequest) {
       const totalSteps = t.metadata?.total_steps || 4
       const enriched: any = { ...t }
 
+      // Outgoing-message preview: the actual template (filled with lead details)
+      // this task will send. The inbox lead-panel timeline shows this when you
+      // click a step, so you can see exactly what's going out per follow-up.
+      enriched.preview = renderPreview(t)
+
       // Sequence label
       if (seq && step != null) {
         enriched.sequence_label = `Step ${step} of ${totalSteps} - ${SEQUENCE_LABELS[seq] || seq}`

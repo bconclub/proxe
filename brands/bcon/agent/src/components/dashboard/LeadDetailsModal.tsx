@@ -2814,8 +2814,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         }
                         return (
                           <div>
-                            {/* Horizontal timeline — click a step to reveal the exact outgoing message */}
-                            <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory">
+                            {/* Horizontal timeline — click a step to reveal the exact outgoing message.
+                                Wheel scroll is translated to horizontal so a normal scroll moves the
+                                strip sideways; native trackpad/scrollbar drag still works too. */}
+                            <div
+                              className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth cursor-grab"
+                              onWheel={(e) => {
+                                const el = e.currentTarget
+                                if (el.scrollWidth > el.clientWidth && e.deltaY !== 0) {
+                                  el.scrollLeft += e.deltaY
+                                }
+                              }}
+                            >
                               {pendingTasks.map((task: any, i: number) => {
                                 const typeConfig = getTaskTypeConfig(task.task_type)
                                 const isExpanded = expandedTaskId === task.id

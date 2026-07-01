@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Next Actions timeline: show the real template on click + horizontal scroll
+
+- Clicking a step showed no outgoing message because the per-lead `/api/dashboard/tasks?lead_id=` response never attached `preview` (only the board KPI sections did). Now every per-lead task carries `preview = renderPreview(t)` — the actual template filled with the lead's details — so clicking a step reveals exactly what's going out.
+- The timeline is a horizontal strip but a normal mouse wheel didn't move it. Added a wheel-to-horizontal handler (deltaY → scrollLeft) plus smooth scroll and a grab cursor, so scrolling moves it sideways; trackpad/scrollbar drag still works.
+
 ## 2026-07-01 · Booking: stop offering past slots + roll to next working day
 
 - `getAvailableSlots` mapped over the raw AVAILABLE_SLOTS in every path (no-calendar fallback AND the Google Calendar path), so the past-time filter (`getBookableSlotStartsForDate`) was never applied — at 9 PM the bot offered today's 11 AM / 1 / 3 PM slots that are long gone. Now every path filters to slots still bookable for TODAY.
