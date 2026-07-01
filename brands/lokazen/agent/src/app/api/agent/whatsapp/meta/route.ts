@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { process as processMessage } from '@/lib/agent-core/engine';
 import { AgentInput } from '@/lib/agent-core/types';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
+import { detectLokazenAudience } from '@/lib/agent-core/lokazenAudience';
 import {
   getServiceClient,
   getClient,
@@ -818,6 +819,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 7. Build AgentInput and generate AI response
+    const lokazenAudience = BRAND_ID === 'lokazen'
+      ? detectLokazenAudience(messageText, conversationHistory, [])
+      : null;
+
     const agentInput: AgentInput = {
       channel: 'whatsapp',
       message: messageText,
@@ -830,6 +835,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       conversationHistory,
       summary: existingSummary,
       usedButtons: [],
+      lokazenAudience,
     };
 
     // FINAL DEDUP CHECK — race protection.

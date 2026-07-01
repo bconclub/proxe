@@ -172,6 +172,9 @@ interface LeadsTableProps {
   hideFilters?: boolean
   showLimitSelector?: boolean
   showViewAll?: boolean
+  /** Lokazen only: lock the user-type filter (e.g. 'scout') and hide the dropdown that would otherwise let it be changed. */
+  initialUserTypeFilter?: string
+  hideUserTypeFilter?: boolean
 }
 
 export default function LeadsTable({
@@ -180,6 +183,8 @@ export default function LeadsTable({
   hideFilters = false,
   showLimitSelector = false,
   showViewAll = false,
+  initialUserTypeFilter,
+  hideUserTypeFilter = false,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
@@ -197,7 +202,7 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(initialUserTypeFilter || 'all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
@@ -620,12 +625,13 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
-              {/* Lokazen: Brand vs Property Owner is the primary filter — show it first. */}
-              {showLokazenColumns && (
+              {/* Lokazen: Brand vs Property Owner vs Scout is the primary filter — show it first. */}
+              {showLokazenColumns && !hideUserTypeFilter && (
                 <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
                   <option value="all">All leads</option>
                   <option value="brand">Brands</option>
                   <option value="owner">Property owners</option>
+                  <option value="scout">Scouts</option>
                 </select>
               )}
 
@@ -851,21 +857,24 @@ export default function LeadsTable({
                 // and size get their own columns (set below).
                 const lkz = uc?.[brandId] || {}
                 const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
-                const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : ''
+                const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : ''
                 const rawLocation = lkzUserType === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
                   : lkzUserType === 'owner'
                   ? (lkz.property_zone || lkz.area || '')
+                  : lkzUserType === 'scout'
+                  ? (lkz.scout_area_covered || '')
                   : ''
                 // Dedupe repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
                 const lkzLocation = Array.from(new Set(String(rawLocation).split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
                 // Brands scout many areas, so a single location next to the brand name
-                // is misleading + cramped — show location only for property owners.
+                // is misleading + cramped — show location only for property owners
+                // and scouts (whose "area covered" is their single most useful field).
                 // Non-lokazen brands keep their city as before.
                 const secondaryLoc = showLokazenColumns
-                  ? (lkzUserType === 'owner' ? lkzLocation : '')
+                  ? (lkzUserType === 'owner' || lkzUserType === 'scout' ? lkzLocation : '')
                   : city
-                const secondaryBrandName = lkzUserType === 'owner' ? '' : brandName
+                const secondaryBrandName = lkzUserType === 'owner' || lkzUserType === 'scout' ? '' : brandName
                 // Property Type is common to both sides: what the brand wants (format)
                 // or what the owner has (property_type).
                 const propTypeCol = lkzUserType === 'brand'
@@ -1189,9 +1198,11 @@ export default function LeadsTable({
                             className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
                             style={lkzType === 'Brand'
                               ? { backgroundColor: '#FF5200', color: '#fff' }
+                              : lkzType === 'Scout'
+                              ? { backgroundColor: '#7c3aed', color: '#fff' }
                               : { backgroundColor: '#2563eb', color: '#fff' }}
                           >
-                            {lkzType === 'Brand' ? 'Brand' : 'Property Owner'}
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Property Owner'}
                           </span>
                         )}
                       </div>

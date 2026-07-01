@@ -20,6 +20,8 @@ export interface AgentInput {
   summary: string;
   usedButtons?: string[];
   brand?: string;
+  /** Lokazen only: which conversation flow (brand/owner/scout) is active this turn — scopes KB retrieval so audiences never cross-contaminate. */
+  lokazenAudience?: 'brand' | 'owner' | 'scout' | null;
   metadata?: Record<string, any>;
   adminNotes?: Array<{ text: string; created_by: string; created_at: string }>;
 }
