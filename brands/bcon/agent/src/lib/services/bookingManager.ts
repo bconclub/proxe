@@ -650,13 +650,13 @@ export async function createCalendarEvent(booking: {
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
-      conferenceData: {
-        createRequest: {
-          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          conferenceSolutionKey: { type: 'hangoutsMeet' },
-        },
-      },
-      // No attendees - service account lacks Domain-Wide Delegation; customers get details via WhatsApp
+      // NO Google Meet conference: the calendar (bconclubx@gmail.com) is a
+      // personal Gmail and the service account has no Domain-Wide Delegation, so
+      // requesting a hangoutsMeet conference makes Google reject the whole insert
+      // with "Invalid conference type value" — failing every booking. Meet
+      // creation via a service account requires Google Workspace + DWD. Without
+      // it we create a plain calendar event; customers get details via WhatsApp.
+      // No attendees for the same DWD reason.
       reminders: {
         useDefault: false,
         overrides: [
@@ -675,7 +675,6 @@ export async function createCalendarEvent(booking: {
     const createdEvent = await calendar.events.insert({
       calendarId: CALENDAR_ID,
       requestBody: event,
-      conferenceDataVersion: 1,
     });
 
     if (!createdEvent?.data?.id) return null;

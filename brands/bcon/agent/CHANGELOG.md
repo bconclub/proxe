@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Fix "Failed to create calendar event" - drop unsupported Meet conference
+
+- Every booking 500'd with "Invalid conference type value": the event insert requested a Google Meet conference (`conferenceSolutionKey: hangoutsMeet` + `conferenceDataVersion: 1`), but the calendar (bconclubx@gmail.com) is a personal Gmail and the service account has no Domain-Wide Delegation — Meet creation via a service account requires Google Workspace + DWD, so Google rejected the whole insert.
+- Removed the conferenceData block + conferenceDataVersion. Bookings now create a plain calendar event successfully; customers get the details via WhatsApp (no attendees, same DWD reason). Add Workspace + DWD later if an auto Meet link is wanted.
+
 ## 2026-07-02 · Web calendar widget now opens when the AI offers slots
 
 - The booking calendar widget only opened when the USER's message had a booking keyword (call/book/schedule). But visitors reply "tomorrow" or pick a time in prose, so the AI offered slots as TEXT with no visual picker ("still throwing text, not the booking model").
