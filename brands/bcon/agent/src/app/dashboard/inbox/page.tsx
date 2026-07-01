@@ -290,6 +290,28 @@ function getFormFieldLabel(key: string): string {
   return key.length > 48 ? key.substring(0, 48) + '…' : key;
 }
 
+/** Date + time for a planned follow-up, IST, e.g. "Fri 27 Jun, 9:00 AM". */
+function fmtPlannedWhen(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  return `${date}, ${time}`
+}
+
+/** Short human label for a task type shown on the planned-follow-up timeline. */
+function humanizeTaskType(t: string): string {
+  const map: Record<string, string> = {
+    follow_up_24h: 'Follow-up', follow_up_day1: 'Day 1', follow_up_day3: 'Day 3',
+    follow_up_day5: 'Day 5', follow_up_day7: 'Day 7', follow_up_day30: 'Day 30', follow_up_day90: 'Day 90',
+    re_engage: 'Re-engage', nudge_waiting: 'Nudge', push_to_book: 'Push to book',
+    booking_reminder_24h: 'Reminder 24h', booking_reminder_30m: 'Reminder 30m',
+    try_voice_call: 'Voice call', human_callback: 'Callback', human_followup: 'Your task',
+    missed_call_followup: 'Missed-call', first_outreach: 'Welcome',
+  }
+  return map[t] || (t || 'task').replace(/_/g, ' ')
+}
+
 /** Format a time gap in ms to a human-readable short string */
 function formatGap(ms: number): string {
   const secs = Math.floor(ms / 1000);
@@ -404,6 +426,9 @@ export default function InboxPage() {
   // Meta-form card: expand to reveal every submitted field (the full form as
   // it came in), not just the primary ones. Reset when the lead changes.
   const [formCardExpanded, setFormCardExpanded] = useState(false)
+  // Planned follow-ups (the sequence this lead is in) for the right-panel timeline.
+  const [plannedActions, setPlannedActions] = useState<any[]>([])
+  const [loadingPlanned, setLoadingPlanned] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -440,6 +465,37 @@ export default function InboxPage() {
   // Set default channel when conversation is selected
   // Collapse the form card again whenever a different lead is opened.
   useEffect(() => { setFormCardExpanded(false) }, [selectedLeadId])
+
+  // Load this lead's planned follow-ups (the sequence they're in) for the
+  // right-panel timeline — every upcoming agent_task with its message preview,
+  // date-wise. Reuses the tasks board API (already resolves the template body).
+  useEffect(() => {
+    if (!selectedLeadId) { setPlannedActions([]); return }
+    let alive = true
+    setLoadingPlanned(true)
+    fetch(`/api/dashboard/tasks?lead_id=${selectedLeadId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!alive) return
+        const b = d?.board
+        if (!b) { setPlannedActions([]); return }
+        const flat = [
+          ...(b.nextToFire || []),
+          ...(b.upcoming?.soon || []),
+          ...(b.upcoming?.today || []),
+          ...(b.upcoming?.tomorrow || []),
+          ...(b.upcoming?.later || []),
+          ...((b.needsAttention || []).filter((t: any) => t.action === 'approve')),
+        ]
+        const seen = new Set<string>()
+        const dedup = flat.filter((t: any) => t?.scheduled_at && !seen.has(t.id) && seen.add(t.id))
+        dedup.sort((a: any, x: any) => new Date(a.scheduled_at).getTime() - new Date(x.scheduled_at).getTime())
+        setPlannedActions(dedup)
+      })
+      .catch(() => { if (alive) setPlannedActions([]) })
+      .finally(() => { if (alive) setLoadingPlanned(false) })
+    return () => { alive = false }
+  }, [selectedLeadId])
 
   useEffect(() => {
     if (selectedLeadId && !selectedChannel) {
@@ -2600,6 +2656,40 @@ export default function InboxPage() {
                   </div>
                 ) : (
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
+                )}
+              </div>
+
+              {/* ── PLANNED FOLLOW-UPS (the sequence this lead is in) ── */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Planned follow-ups</p>
+                  {plannedActions.length > 0 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{plannedActions.length}</span>
+                  )}
+                </div>
+                {loadingPlanned ? (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+                ) : plannedActions.length === 0 ? (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No follow-ups scheduled</p>
+                ) : (
+                  <div className="flex flex-col">
+                    {plannedActions.map((t, i) => (
+                      <div key={t.id} className="relative pl-4 pb-3 last:pb-0">
+                        {i < plannedActions.length - 1 && (
+                          <span className="absolute top-3 bottom-0 w-px" style={{ left: '3px', background: 'var(--border-primary)' }} />
+                        )}
+                        <span className="absolute w-[7px] h-[7px] rounded-full" style={{ left: 0, top: '5px', background: 'var(--accent-primary)' }} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtPlannedWhen(t.scheduled_at)}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wide" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{humanizeTaskType(t.task_type)}</span>
+                          {t.sequence_label && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t.sequence_label}</span>}
+                        </div>
+                        {t.preview && (
+                          <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{t.preview}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 

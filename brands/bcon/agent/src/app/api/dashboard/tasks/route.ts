@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
 // Brand-private template-body map (the board's outgoing-message preview).
-import { TEMPLATE_BODIES } from '@/configs/template-bodies'
+import { TEMPLATE_BODIES, resolveTaskTemplate } from '@/configs/template-bodies'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,11 +9,15 @@ export const dynamic = 'force-dynamic'
 function renderPreview(t: any): string {
   const name = (t.lead_name || 'there').split(' ')[0]
   const md = t.metadata || {}
-  const tmpl = md.template_name || md.template
+  // Prefer an explicit template on the task; otherwise resolve the template the
+  // worker WILL send for this task_type + bucket, so the timeline shows the
+  // actual outgoing message per planned step (not a generic description).
+  const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket)
   if (tmpl && TEMPLATE_BODIES[tmpl]) {
     return TEMPLATE_BODIES[tmpl]
       .replace(/\{\{\s*customer_name\s*\}\}/g, name)
       .replace(/\{\{\s*brand_name\s*\}\}/g, md.brand_name || 'your brand')
+      .replace(/\{\{\s*business_name\s*\}\}/g, md.business_name || md.brand_name || 'your business')
       .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || 'your goals')
       .replace(/\{\{\s*booking_time\s*\}\}/g, md.booking_time || 'your slot')
       .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
