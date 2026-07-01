@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-01 15:52 IST · lokazen — Scouts table "Area Covered" chip wraps to 2 lines
+
+- **lokazen** — `components/dashboard/LeadsTable.tsx`: the Scouts table "Area Covered" chip had `whitespace-nowrap`, so long free-text values (e.g. "Darbhanga, Bihar (Outside Current Bangalore Zone)") overflowed the cell on one line. Changed to `whitespace-normal break-words leading-snug max-w-[180px]` (and `rounded-full` → `rounded-2xl` so a wrapped multi-line chip still looks right) so it wraps to a second line inside the cell instead of breaking out. Property-type/size chips keep nowrap (short fixed values).
+
 ## 2026-07-01 15:40 IST · lokazen — chat bubble docked above footer, Scout call/link/copy fixes
 
 - **lokazen** — `components/widget/ChatWidget.module.css`: the floating chat bubble (`.bubbleButton[data-brand="lokazen"]`) sat at `bottom: 128px`, floating well above the site's mobile footer nav. Lowered to `bottom: 96px` so it docks just above the footer with a little padding (data-open state 84px → 96px to match). This is the bubble injected onto www.lokazen.in via the `proxe.lokazen.in/api/widget/embed.js` iframe. User-facing: bubble no longer floats high above the bottom nav.

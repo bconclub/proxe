@@ -1533,7 +1533,7 @@ export default function LeadsTable({
                       <>
                         <td className="px-3 py-2 text-center">
                           {lkz.scout_area_covered ? (
-                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
+                            <span className="inline-block px-2 py-0.5 rounded-2xl text-[10px] font-semibold capitalize whitespace-normal break-words leading-snug max-w-[180px] align-middle" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
                               {lkz.scout_area_covered}
                             </span>
                           ) : (
