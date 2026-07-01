@@ -413,13 +413,19 @@ export async function storeBooking(
  * Returns array of time slots with availability status
  */
 export async function getAvailableSlots(date: string, _sessionType?: string | null): Promise<TimeSlot[]> {
+  // Past-time guard: for TODAY (IST), drop slots whose start already passed, so
+  // a customer messaging at 9 PM is never offered an 11 AM / 3 PM slot that is
+  // long gone. For any future date this is the full window. Every path below
+  // maps over this filtered list instead of the raw AVAILABLE_SLOTS.
+  const bookableSlots = getBookableSlotStartsForDate(date, _sessionType);
+
   const hasCredentials =
     !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!hasCredentials) {
-    // Return all slots as available when credentials are not configured
-    return AVAILABLE_SLOTS.map(slot => ({
+    // Return remaining slots as available when credentials are not configured
+    return bookableSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
       available: true,
@@ -447,7 +453,7 @@ export async function getAvailableSlots(date: string, _sessionType?: string | nu
 
     const events = response.data.items || [];
 
-    return AVAILABLE_SLOTS.map(slot => {
+    return bookableSlots.map(slot => {
       const [hour, minute] = slot.split(':').map(Number);
       const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);
       const slotEnd = new Date(`${dateStr}T${(hour + 1).toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`);

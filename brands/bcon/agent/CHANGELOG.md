@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Booking: stop offering past slots + roll to next working day
+
+- `getAvailableSlots` mapped over the raw AVAILABLE_SLOTS in every path (no-calendar fallback AND the Google Calendar path), so the past-time filter (`getBookableSlotStartsForDate`) was never applied — at 9 PM the bot offered today's 11 AM / 1 / 3 PM slots that are long gone. Now every path filters to slots still bookable for TODAY.
+- `check_availability` handler: when today has no remaining slots (messaged late), it now rolls forward to the next working day (skips Sunday) and returns those times, instead of dead-ending. So a 9 PM "book a call" offers tomorrow's slots.
+- (pending commit)
+
 ## 2026-07-01 · Fix lead scoring 500 on every message (phantom response_count column)
 
 - `/api/leads/score` wrote `response_count` and `total_touchpoints` into `all_leads`, but neither is a column there — so every message threw PGRST204 ("Could not find the 'response_count' column") and returned 500. Lead scores/stages silently never updated (webhook logged "Failed to update lead").

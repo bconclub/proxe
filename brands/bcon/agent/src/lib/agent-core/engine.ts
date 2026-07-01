@@ -613,6 +613,28 @@ function buildBookingTools(
       const availableSlots = slots.filter(s => s.available);
 
       if (availableSlots.length === 0) {
+        // If TODAY has no remaining slots (customer messaged late in the day),
+        // roll forward to the next working day and offer those, instead of
+        // dead-ending. At 9 PM this offers tomorrow's times, not today's gone ones.
+        if (date === todayIST) {
+          let cursor = new Date(`${date}T12:00:00+05:30`);
+          for (let i = 0; i < 7; i++) {
+            cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+            const nextStr = cursor.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const [ny, nm, nd] = nextStr.split('-').map(Number);
+            if (new Date(Date.UTC(ny, nm - 1, nd)).getUTCDay() === 0) continue; // skip Sunday
+            const nextSlots = (await getAvailableSlots(nextStr)).filter(s => s.available);
+            if (nextSlots.length > 0) {
+              return JSON.stringify({
+                date: nextStr,
+                rolled_from_today: true,
+                available_slots: nextSlots.map(s => ({ time: s.time, time24: s.time24 })),
+                total_available: nextSlots.length,
+                message: `Today (${date}) has no slots left. Tell the user today is done and offer these ${nextStr} times instead.`,
+              });
+            }
+          }
+        }
         return JSON.stringify({
           available_slots: [],
           message: `No slots available on ${date}. Suggest the user try a different date.`,
