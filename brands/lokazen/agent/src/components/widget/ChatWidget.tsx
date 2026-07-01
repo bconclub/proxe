@@ -194,9 +194,8 @@ const lokazenScoutWelcomeSequence = [
 ];
 
 const lokazenScoutQuickButtons = [
-  'I want to become a Scout',
-  'How does it work?',
   'Join as a Scout',
+  'How it works',
 ];
 
 // Helper function to clean metadata strings from conversation summary
