@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-01 12:16 IST · lokazen — activate Scout Priority Zone Bonus (confirmed by user)
+
+- **lokazen** — Scout KB: the Priority Zone Bonus (extra ₹100 → ₹350 total for a verified listing in a priority zone) was ingested earlier as `category=scout_internal` (proposed/hidden, never retrievable) pending confirmation. User confirmed it as real, so it's been rewritten as a customer-facing entry and moved to `category=scout` — Loka can now cite it. Zero `scout_internal` rows remain; 18 `category=scout` rows total. (Supabase change, not in repo.)
+- **lokazen** — `configs/prompts/lokazen-prompt.ts`: added the Priority Zone Bonus to SCOUT APPROVED FACTS, and flipped the two guardrails that previously said "never mention a priority-zone bonus unless the KB confirms it's active" — now they state the bonus IS confirmed and safe to quote (₹350 total in a priority zone), while still holding the line on any *other* unlisted bonus.
+- User-facing: scouts asking about earnings/zones will now hear about the ₹350 priority-zone rate; stacks with brand-match bonus; eligibility auto-determined from the photo's captured location.
+
 ## 2026-07-01 11:26 IST · lokazen — WhatsApp Scout-flow reset bug, dashboard columns, rider icon
 
 - **lokazen** — `app/api/agent/whatsapp/meta/route.ts`: fixed a real race condition — `fetchRecentHistory` ran inside the same `Promise.all` as the writes persisting the *current* message, with no ordering guarantee against them. A fast SELECT could read history missing the just-sent message, undercounting `userMessageCount` and making a mid-flow answer (e.g. "Koramangala" mid-Scout-flow) look like message #0/#1 — resetting the conversation to the first-time welcome menu instead of advancing to the next step. This is what broke the live WhatsApp Scout test (`HI I want to be a scout` → area answered → bot reset to "Hi, Welcome to Lokazen..."). History fetch now runs strictly after the writes commit.
