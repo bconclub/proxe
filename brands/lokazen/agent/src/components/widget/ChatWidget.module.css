@@ -2061,7 +2061,7 @@
   left: auto !important;
   transform: none !important;
   -webkit-transform: none !important;
-  width: 400px !important;
+  width: 360px !important;
   max-width: calc(100vw - 48px) !important;
   height: 580px !important;
   max-height: calc(100vh - 130px) !important;
@@ -2526,7 +2526,7 @@
     left: auto !important;
     right: 24px !important;
     bottom: 104px !important;
-    width: min(400px, calc(100vw - 48px)) !important;
+    width: min(360px, calc(100vw - 48px)) !important;
     max-width: calc(100vw - 48px) !important;
     height: min(580px, calc(100vh - 130px)) !important;
     max-height: calc(100vh - 130px) !important;
