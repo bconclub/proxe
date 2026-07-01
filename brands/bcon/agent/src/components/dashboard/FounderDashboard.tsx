@@ -146,8 +146,22 @@ export default function FounderDashboard() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (cancelled) return
-        const meta = (user?.user_metadata || {}) as Record<string, unknown>
-        const name = (meta.full_name as string) || (meta.name as string) || ''
+        // Prefer the name set in User Management (dashboard_users.full_name) —
+        // that's the field the admin edits. Fall back to auth metadata, then to
+        // the email prefix. Editing the name in User Management must reflect here.
+        let name = ''
+        if (user?.id) {
+          const { data: du } = await supabase
+            .from('dashboard_users')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (du?.full_name) name = du.full_name as string
+        }
+        if (!name) {
+          const meta = (user?.user_metadata || {}) as Record<string, unknown>
+          name = (meta.full_name as string) || (meta.name as string) || ''
+        }
         setUser({ name, email: user?.email || '' })
       } catch { /* soft-fail — greeting falls back to "Founder" */ }
     })()

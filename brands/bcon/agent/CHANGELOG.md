@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Dashboard greeting uses the edited name, not the email prefix
+
+- The dashboard greeting ("Good morning, X") read `full_name` from Supabase auth `user_metadata`, but the name edited in User Management is stored in the `dashboard_users` table - two different stores. So renaming a user to "Thanzeel" still greeted them "...Connect" (the `connect@bconclub.com` email prefix). Greeting now reads `dashboard_users.full_name` first, then falls back to auth metadata, then the email prefix.
+- Owner display + last-touch actor badge already prefer `full_name` (via the team-members endpoint), so re-assigning an owner now stores the real name. Note: owner/actor values snapshotted BEFORE a name edit keep their old label until the next action.
+- User-facing: editing a team member's name in User Management now reflects in the dashboard greeting.
+- (pending commit)
+
 ## 2026-07-01 · WhatsApp prompt v3 - flow-tree rewrite
 
 - Replaced the WhatsApp system prompt (`bcon-prompt.ts`) with the new v3 supplied by the user: "smart friend" tone, HARD RULES block, a branching FLOW TREE (How it works / Get more leads -> AI in Marketing / Content with AI / AI Lead Machine), UNDERSTAND-before-push (max 2 probes), a BOOKING OVERRIDE priority block, and KB-RULES that pull named blocks (PRICING/LEAD_MACHINE/CASES/AUDIT) only when triggered.
