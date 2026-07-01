@@ -276,6 +276,11 @@ Respond with ONLY a JSON object in this exact format:
     const oldStage = lead.lead_stage
 
     // Update lead
+    // NOTE: response_count and total_touchpoints are NOT columns on all_leads —
+    // writing them threw PGRST204 ("Could not find the 'response_count' column")
+    // on EVERY message, 500-ing /api/leads/score so scores never updated. They're
+    // computed in-function above (for stage logic) and nothing reads them back
+    // from a column, so they're simply not persisted here.
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({
@@ -283,8 +288,6 @@ Respond with ONLY a JSON object in this exact format:
         lead_stage: newStage,
         last_scored_at: new Date().toISOString(),
         last_interaction_at: new Date().toISOString(),
-        response_count: responseCount,
-        total_touchpoints: touchpoints,
       })
       .eq('id', lead_id)
 

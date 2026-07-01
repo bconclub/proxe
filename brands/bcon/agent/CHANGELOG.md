@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Fix lead scoring 500 on every message (phantom response_count column)
+
+- `/api/leads/score` wrote `response_count` and `total_touchpoints` into `all_leads`, but neither is a column there — so every message threw PGRST204 ("Could not find the 'response_count' column") and returned 500. Lead scores/stages silently never updated (webhook logged "Failed to update lead").
+- Both are computed in-function for stage logic and nothing reads them back from a column, so they're no longer written. Kept lead_score/lead_stage/last_scored_at/last_interaction_at.
+- Found while verifying the KB fix in live logs (scoring 500'd on a real conversation).
+
 ## 2026-07-01 · KB portal: click a knowledge item to view its full content
 
 - KB list only showed a truncated preview with no way to open an item. Added click-to-view: the title and a new eye icon open a modal (portaled to body so it escapes the table) showing the item's full content, type, status, source, and created date.
