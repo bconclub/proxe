@@ -401,6 +401,9 @@ export default function InboxPage() {
   // lead_score is often null/0; this lets the list reflect real engagement.
   const [calculatedConvScores, setCalculatedConvScores] = useState<Record<string, number>>({})
   const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
+  // Meta-form card: expand to reveal every submitted field (the full form as
+  // it came in), not just the primary ones. Reset when the lead changes.
+  const [formCardExpanded, setFormCardExpanded] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -435,6 +438,9 @@ export default function InboxPage() {
   }, [conversations, selectedLeadId, searchParams])
 
   // Set default channel when conversation is selected
+  // Collapse the form card again whenever a different lead is opened.
+  useEffect(() => { setFormCardExpanded(false) }, [selectedLeadId])
+
   useEffect(() => {
     if (selectedLeadId && !selectedChannel) {
       const conversation = conversations.find(c => c.lead_id === selectedLeadId)
@@ -1821,6 +1827,32 @@ export default function InboxPage() {
                         return { label: f.key, value };
                       })
                       .filter(f => f.value && f.value !== '+');
+
+                    // The message text only carries the fields that got formatted
+                    // into it — the FULL Meta submission (every question) is kept
+                    // in unified_context.raw_form_fields. Merge in any of those not
+                    // already shown so the card is the complete form, not half of it.
+                    const rawFF = (selectedConversation?.unified_context?.raw_form_fields || {}) as Record<string, any>;
+                    const shownValues = new Set(withFields.map(f => f.value.toLowerCase().trim()));
+                    const shownKinds = new Set(withFields.map(f => getFormFieldLabel(f.label).toLowerCase()));
+                    const humanizeKey = (k: string) =>
+                      k.replace(/[_?]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\w/, c => c.toUpperCase());
+                    const extraFields = Object.entries(rawFF)
+                      .filter(([k, v]) => {
+                        if (v == null) return false;
+                        const val = String(v).trim();
+                        if (!val || val === '+') return false;
+                        if (shownValues.has(val.toLowerCase())) return false;      // same answer already shown
+                        if (shownKinds.has(getFormFieldLabel(k).toLowerCase())) return false; // same field kind already shown
+                        return true;
+                      })
+                      .map(([k, v]) => ({ label: humanizeKey(k), value: String(v).trim() }));
+
+                    const allFields = [...withFields, ...extraFields];
+                    const PRIMARY = 6;
+                    const hasMore = allFields.length > PRIMARY;
+                    const visibleFields = (hasMore && !formCardExpanded) ? allFields.slice(0, PRIMARY) : allFields;
+
                     const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
                       <div className="flex flex-col gap-0.5 py-1 border-b last:border-b-0" style={{ borderColor: 'rgba(59,130,246,0.12)' }}>
                         <span className="text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
@@ -1849,10 +1881,20 @@ export default function InboxPage() {
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Exact form — question + answer, in submission order */}
+                          {/* The complete form — every submitted field, collapsible */}
                           <div>
-                            {withFields.map((f, i) => <FieldRow key={i} f={f} />)}
+                            {visibleFields.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
+                          {hasMore && (
+                            <button
+                              type="button"
+                              onClick={() => setFormCardExpanded(v => !v)}
+                              className="mt-1.5 text-[10.5px] font-semibold"
+                              style={{ color: '#60a5fa' }}
+                            >
+                              {formCardExpanded ? 'Show less' : `Show all ${allFields.length} fields`}
+                            </button>
+                          )}
                         </div>
                       </div>
                       </React.Fragment>
