@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
-import { MdPersonAdd, MdContentCopy, MdDelete, MdCheck, MdRefresh } from 'react-icons/md'
+import { MdPersonAdd, MdContentCopy, MdDelete, MdCheck, MdRefresh, MdEdit } from 'react-icons/md'
 
 interface DashboardUser {
   id: string
@@ -37,6 +37,11 @@ export default function UserManagementPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
   const [copied, setCopied] = useState(false)
+
+  // Inline name edit
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -136,6 +141,39 @@ export default function UserManagementPage() {
       load()
     } catch (e: any) {
       setError(e.message)
+    }
+  }
+
+  const startEditName = (u: DashboardUser) => {
+    setEditingId(u.id)
+    setEditingName(u.full_name || '')
+  }
+
+  const cancelEditName = () => {
+    setEditingId(null)
+    setEditingName('')
+  }
+
+  const saveEditName = async (userId: string) => {
+    setSavingName(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/dashboard/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: editingName.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update name')
+      }
+      setEditingId(null)
+      setEditingName('')
+      load()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setSavingName(false)
     }
   }
 
@@ -293,8 +331,51 @@ export default function UserManagementPage() {
                   users.map((u) => (
                     <tr key={u.id} className="border-t border-[var(--border-primary)]">
                       <td className="px-4 py-3">
-                        <div className="text-sm font-semibold text-[var(--text-primary)]">{u.full_name || u.email.split('@')[0]}</div>
-                        <div className="text-xs text-[var(--text-secondary)]">{u.email}</div>
+                        {editingId === u.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEditName(u.id)
+                                if (e.key === 'Escape') cancelEditName()
+                              }}
+                              placeholder={u.email.split('@')[0]}
+                              className="text-sm px-2 py-1 rounded border border-[var(--border-primary)] outline-none focus:border-[var(--accent-primary)]"
+                              style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                            />
+                            <button
+                              onClick={() => saveEditName(u.id)}
+                              disabled={savingName}
+                              className="p-1 rounded hover:bg-[var(--bg-hover)] text-green-400 disabled:opacity-50"
+                              title="Save"
+                            >
+                              <MdCheck size={16} />
+                            </button>
+                            <button
+                              onClick={cancelEditName}
+                              className="text-xs text-[var(--text-secondary)] hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="group flex items-center gap-1.5">
+                            <div>
+                              <div className="text-sm font-semibold text-[var(--text-primary)]">{u.full_name || u.email.split('@')[0]}</div>
+                              <div className="text-xs text-[var(--text-secondary)]">{u.email}</div>
+                            </div>
+                            <button
+                              onClick={() => startEditName(u)}
+                              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] transition-opacity flex-shrink-0"
+                              title="Edit name"
+                              aria-label="Edit name"
+                            >
+                              <MdEdit size={12} className="text-[var(--text-muted)]" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <select

@@ -4,6 +4,13 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-01 · Team Members: inline name editing, incl. your own
+
+- Team Members table had no way to edit a name/username at all — only role dropdown + deactivate. Added inline edit (pencil icon on hover → input → save/cancel) wired to the existing (already-built) `PATCH /api/dashboard/users/[id]` full_name field.
+- The API blanket-blocked ANY self-edit (role, status, AND name) to prevent admin lockout — that's why the single admin in a fresh team couldn't touch their own row at all. Narrowed the self-block to role/is_active only; editing your own display name is safe and now allowed.
+- Known gap (not fixed here): only admins can hit this endpoint at all, so a viewer still can't edit their own name — email editing also isn't exposed (it's the Supabase auth identity, not just a display field, so needs a separate auth.updateUser flow).
+- (pending commit)
+
 ## 2026-07-01 · One universal enrolment GATE — leads can never double-stack sequences
 
 - Root cause of the stacked Day-1/Day-3 duplicates: each note-handler branch (RNR, DEMO_TAKEN, PROPOSAL_SENT, POST_CALL) had its own hand-maintained list of task types to cancel before enrolling a lead in a new sequence, and those lists had drifted out of sync — most were missing `follow_up_day7/day30/day90`, so a worker ONE_TOUCH ladder's long tail survived and stacked under the new note-created ladder.
