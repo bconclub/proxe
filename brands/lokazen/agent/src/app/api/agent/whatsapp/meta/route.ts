@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { process as processMessage } from '@/lib/agent-core/engine';
 import { AgentInput } from '@/lib/agent-core/types';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
+import { detectLokazenAudience } from '@/lib/agent-core/lokazenAudience';
 import {
   getServiceClient,
   getClient,
@@ -67,6 +68,28 @@ function isMessageAlreadyProcessed(messageId: string): boolean {
 }
 
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
+
+function isAutomatedBusinessReply(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+
+  const automatedPatterns = [
+    /thank(s| you)? for (contacting|reaching out to|messaging)\b/,
+    /please let us know how we can help/,
+    /\bwe (have )?(received|got) your (enquiry|inquiry|query|message)\b/,
+    /\b(property specialist|team member|representative) will (contact|get back to|reach out to) you shortly\b/,
+    /\breply to this message\b/,
+  ];
+
+  return automatedPatterns.some((pattern) => pattern.test(normalized));
+}
+
+function isLokazenPlanAction(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  return normalized === 'start this plan' ||
+    normalized === 'talk to the team' ||
+    normalized === 'talk to lokazen team';
+}
 
 /** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
 async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
@@ -692,8 +715,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 2–6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
-    const [, , conversationHistory, summaryResult] = await Promise.all([
+    // 2–5. Parallelize: log inputs + fetch summary (session now guaranteed to exist)
+    const [, , summaryResult] = await Promise.all([
       addUserInput(
         sessionId,
         messageText,
@@ -717,9 +740,18 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         },
         supabase,
       ),
-      fetchRecentHistory(leadId, supabase),
       fetchSummary(sessionId, 'whatsapp', supabase),
     ]);
+
+    // 6. Fetch history strictly AFTER the current message's writes above have
+    //    committed — previously this ran inside the same Promise.all with no
+    //    ordering guarantee against them, so a fast SELECT could race ahead of
+    //    the customer-message INSERT and read a stale history missing the
+    //    message just sent. That undercounted userMessageCount below, which
+    //    made mid-flow answers (e.g. "Koramangala" mid-Scout-flow) look like
+    //    message #0/#1 and reset the conversation to the first-time welcome
+    //    menu instead of advancing to the next step.
+    const conversationHistory = await fetchRecentHistory(leadId, supabase);
 
     // Track channel performance (fire and forget)
     updateChannelPerformance(supabase, leadId, 'whatsapp', 'response').catch(() => {});
@@ -747,6 +779,38 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       || triggerKind === 'interactive_button'
       || triggerKind === 'interactive_list';
 
+    if (
+      BRAND_ID === 'lokazen' &&
+      !isCustomerButtonTap &&
+      isAutomatedBusinessReply(messageText)
+    ) {
+      console.log(`[meta/webhook] LOKAZEN automated business reply ignored lead=${leadId}`);
+      return;
+    }
+
+    if (
+      BRAND_ID === 'lokazen' &&
+      isCustomerButtonTap &&
+      isLokazenPlanAction(messageText)
+    ) {
+      const { data: leadContact } = await supabase
+        .from('all_leads')
+        .select('email')
+        .eq('id', leadId)
+        .maybeSingle();
+      const hasEmail = Boolean(leadContact?.email && String(leadContact.email).trim());
+      const body = hasEmail
+        ? 'I have your WhatsApp number and email. What day and time works best for a quick Lokazen call?'
+        : "I have your WhatsApp number. What's the best email to send the details to?";
+
+      console.log(`[meta/webhook] LOKAZEN deterministic plan action lead=${leadId} action="${messageText}" hasEmail=${hasEmail}`);
+      await sendAndLogReply(supabase, leadId, customerPhone, body, {
+        sessionId,
+        quickReplyTrigger: 'lokazen_plan_action',
+      });
+      return;
+    }
+
     // 7-pre. FORM / AD LEAD FIRST RESPONSE — DETERMINISTIC, never the LLM.
     // These leads came from a pilot-training ad, so we must NOT describe the
     // academy or list programs (helicopter / cabin crew / type rating). The LLM
@@ -770,6 +834,34 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
+    // 7-loka. LOKAZEN FIRST-MESSAGE — deterministic greeting with buttons.
+    // Fires on the very first message from a new contact (any text/greeting).
+    // Skips if the message already clearly signals seeker or owner intent.
+    if (
+      !isCustomerButtonTap &&
+      userMessageCount <= 1 &&
+      BRAND_ID === 'lokazen'
+    ) {
+      const lowerMsg = messageText.toLowerCase();
+      const isClearSeeker =
+        /\b(find|need|looking for|want|search|space|office|retail|warehouse|restaurant|shop)\b/.test(lowerMsg);
+      const isClearOwner =
+        /\b(list|have (a )?property|own|landlord|lease out|rent out|owner)\b/.test(lowerMsg);
+      const isClearScout =
+        /\b(scout|field agent|find properties|submit (property|lead))\b/.test(lowerMsg);
+
+      if (!isClearSeeker && !isClearOwner && !isClearScout) {
+        const body = `Hi, Welcome to Lokazen\n\nI'm Loka, helping brands find the right commercial spaces and helping owners get matched with active brands.\n\nWhat would you like to do?`;
+        console.log(`[meta/webhook] LOKAZEN first-message greeting lead=${leadId}`);
+        await sendAndLogReply(supabase, leadId, customerPhone, body, {
+          sessionId,
+          buttons: ['Find a space', 'List my property', 'Talk to Lokazen team'],
+          quickReplyTrigger: 'lokazen_welcome',
+        });
+        return;
+      }
+    }
+
     if (!isCustomerButtonTap) {
       const quickReply = findQuickReplyFor(messageText, BRAND_ID);
       if (quickReply) {
@@ -790,6 +882,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 7. Build AgentInput and generate AI response
+    const lokazenAudience = BRAND_ID === 'lokazen'
+      ? detectLokazenAudience(messageText, conversationHistory, [])
+      : null;
+
     const agentInput: AgentInput = {
       channel: 'whatsapp',
       message: messageText,
@@ -802,6 +898,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       conversationHistory,
       summary: existingSummary,
       usedButtons: [],
+      lokazenAudience,
     };
 
     // FINAL DEDUP CHECK — race protection.

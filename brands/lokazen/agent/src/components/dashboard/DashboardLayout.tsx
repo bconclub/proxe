@@ -30,6 +30,7 @@ import {
   MdViewKanban,
   MdCall,
   MdLogout,
+  MdTwoWheeler,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import { getBrandConfig } from '@/configs'
@@ -57,6 +58,7 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Scouts', href: '/dashboard/scouts', icon: MdTwoWheeler },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
@@ -71,11 +73,11 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 4), after Flow (index 7).
-// Calls sits at index 3 (gated off for brands without voice); its array slot is
+// Divider positions: after Pipeline (index 5), after Flow (index 8).
+// Calls sits at index 4 (gated off for brands without voice); its array slot is
 // counted here so the dividers land in the same rendered position whether or not
 // Calls is shown.
-const DIVIDER_AFTER_INDICES = [4, 7]
+const DIVIDER_AFTER_INDICES = [5, 8]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()

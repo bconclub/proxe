@@ -172,6 +172,11 @@ interface LeadsTableProps {
   hideFilters?: boolean
   showLimitSelector?: boolean
   showViewAll?: boolean
+  /** Lokazen only: lock the user-type filter (e.g. 'scout') and hide the dropdown that would otherwise let it be changed. */
+  initialUserTypeFilter?: string
+  hideUserTypeFilter?: boolean
+  /** Overrides the header label (defaults to "Leads" / "Engaged Leads" / "Warm Leads"). */
+  title?: string
 }
 
 export default function LeadsTable({
@@ -180,6 +185,9 @@ export default function LeadsTable({
   hideFilters = false,
   showLimitSelector = false,
   showViewAll = false,
+  initialUserTypeFilter,
+  hideUserTypeFilter = false,
+  title,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
@@ -197,7 +205,7 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(initialUserTypeFilter || 'all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
@@ -277,6 +285,13 @@ export default function LeadsTable({
           ? 'owner'
           : (brandData.user_type || brandData.business_type)
         return normalizedUserType === userTypeFilter
+      })
+    } else if (showLokazenColumns) {
+      // Lokazen: Scouts have their own dedicated page — keep them out of the
+      // general Leads view, which is brand + property-owner only.
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        return brandData.user_type !== 'scout'
       })
     }
 
@@ -561,7 +576,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
+            {title || (presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads')}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -620,12 +635,13 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
-              {/* Lokazen: Brand vs Property Owner is the primary filter — show it first. */}
-              {showLokazenColumns && (
+              {/* Lokazen: Brand vs Property Owner vs Scout is the primary filter — show it first. */}
+              {showLokazenColumns && !hideUserTypeFilter && (
                 <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
                   <option value="all">All leads</option>
                   <option value="brand">Brands</option>
                   <option value="owner">Property owners</option>
+                  <option value="scout">Scouts</option>
                 </select>
               )}
 
@@ -774,10 +790,17 @@ export default function LeadsTable({
                   { label: 'Course', align: 'center' as const },
                   { label: 'PAT',    align: 'center' as const },
                 ] : []),
-                ...(showLokazenColumns ? [
-                  { label: 'Property Type', align: 'center' as const },
-                  { label: 'Size',          align: 'center' as const },
-                ] : []),
+                ...(showLokazenColumns ? (
+                  userTypeFilter === 'scout'
+                    ? [
+                        { label: 'Area Covered',     align: 'center' as const },
+                        { label: 'Knows Properties', align: 'center' as const },
+                      ]
+                    : [
+                        { label: 'Property Type', align: 'center' as const },
+                        { label: 'Size',          align: 'center' as const },
+                      ]
+                ) : []),
                 { label: 'Owner',  align: 'left' as const },
               ].map(({ label, align }) => (
                 <th
@@ -851,21 +874,24 @@ export default function LeadsTable({
                 // and size get their own columns (set below).
                 const lkz = uc?.[brandId] || {}
                 const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
-                const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : ''
+                const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : ''
                 const rawLocation = lkzUserType === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
                   : lkzUserType === 'owner'
                   ? (lkz.property_zone || lkz.area || '')
+                  : lkzUserType === 'scout'
+                  ? (lkz.scout_area_covered || '')
                   : ''
                 // Dedupe repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
                 const lkzLocation = Array.from(new Set(String(rawLocation).split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
                 // Brands scout many areas, so a single location next to the brand name
-                // is misleading + cramped — show location only for property owners.
+                // is misleading + cramped — show location only for property owners
+                // and scouts (whose "area covered" is their single most useful field).
                 // Non-lokazen brands keep their city as before.
                 const secondaryLoc = showLokazenColumns
-                  ? (lkzUserType === 'owner' ? lkzLocation : '')
+                  ? (lkzUserType === 'owner' || lkzUserType === 'scout' ? lkzLocation : '')
                   : city
-                const secondaryBrandName = lkzUserType === 'owner' ? '' : brandName
+                const secondaryBrandName = lkzUserType === 'owner' || lkzUserType === 'scout' ? '' : brandName
                 // Property Type is common to both sides: what the brand wants (format)
                 // or what the owner has (property_type).
                 const propTypeCol = lkzUserType === 'brand'
@@ -1189,9 +1215,11 @@ export default function LeadsTable({
                             className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
                             style={lkzType === 'Brand'
                               ? { backgroundColor: '#FF5200', color: '#fff' }
+                              : lkzType === 'Scout'
+                              ? { backgroundColor: '#7c3aed', color: '#fff' }
                               : { backgroundColor: '#2563eb', color: '#fff' }}
                           >
-                            {lkzType === 'Brand' ? 'Brand' : 'Property Owner'}
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Property Owner'}
                           </span>
                         )}
                       </div>
@@ -1500,29 +1528,50 @@ export default function LeadsTable({
                       )
                     })()}
 
-                    {/* LOKAZEN: Property Type + Size columns (colored chips) */}
-                    {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center">
-                        {propTypeCol ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={lkzPropTypeStyle(propTypeCol)}>
-                            {propTypeCol}
-                          </span>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
-                    {showLokazenColumns && (
-                      <td className="px-3 py-2 text-center">
-                        {sizeLabel ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
-                            {sizeLabel}
-                          </span>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                    )}
+                    {/* LOKAZEN: Property Type + Size (brand/owner) OR Area Covered + Knows Properties (scout) */}
+                    {showLokazenColumns && userTypeFilter === 'scout' ? (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_area_covered ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
+                              {lkz.scout_area_covered}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_knows_properties ? (
+                            <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>
+                              {lkz.scout_knows_properties === 'yes' ? 'Yes' : lkz.scout_knows_properties === 'not_yet' ? 'Not yet' : lkz.scout_knows_properties}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </>
+                    ) : showLokazenColumns ? (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {propTypeCol ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap" style={lkzPropTypeStyle(propTypeCol)}>
+                              {propTypeCol}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {sizeLabel ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums whitespace-nowrap" style={lkzSizeStyle(sizeCol)}>
+                              {sizeLabel}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </>
+                    ) : null}
 
                     {/* OWNER */}
                     <td className="px-3 py-2 text-xs">

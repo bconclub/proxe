@@ -15,11 +15,18 @@ import { KnowledgeResult } from './types';
 export async function searchKnowledgeBase(
   supabase: SupabaseClient,
   query: string,
-  limit: number = 3
+  limit: number = 3,
+  filterCategory: string | null = null
 ): Promise<KnowledgeResult[]> {
-  console.log('[kb-search] query:', query);
+  console.log('[kb-search] query:', query, filterCategory ? `(category=${filterCategory})` : '');
   try {
     const allResults: KnowledgeResult[] = [];
+    // supabase.rpc() resolves { data, error } for a Postgres-level error — it
+    // does NOT throw. A prior version of this function only handled the
+    // thrown-exception case, so a returned RPC error silently produced zero
+    // results and never reached the ILIKE fallback below. Track success
+    // explicitly so both failure modes (thrown or returned) fall through.
+    let rpcSucceeded = false;
 
     // 1. Chunk-level full-text search via RPC
     try {
@@ -27,11 +34,14 @@ export async function searchKnowledgeBase(
         .rpc('search_knowledge_base', {
           query_text: query,
           match_limit: limit * 2,
-          filter_category: null,
+          filter_category: filterCategory,
           filter_subcategory: null
         });
 
-      if (!kbError && kbResults && Array.isArray(kbResults)) {
+      if (kbError) {
+        console.error('[KnowledgeSearch] RPC returned error, falling back to ILIKE:', kbError.message);
+      } else if (kbResults && Array.isArray(kbResults)) {
+        rpcSucceeded = true;
         kbResults.forEach((item: any) => {
           const content = item.content || item.answer || item.question || '';
           if (content.trim()) {
@@ -50,15 +60,24 @@ export async function searchKnowledgeBase(
         });
       }
     } catch (kbError) {
-      console.error('[KnowledgeSearch] RPC search failed, falling back to ILIKE:', kbError);
-      // 2. Fallback to ILIKE search on parent table
+      console.error('[KnowledgeSearch] RPC threw, falling back to ILIKE:', kbError);
+    }
+
+    if (!rpcSucceeded) {
+      // 2. Fallback to ILIKE search on parent table — still respects the
+      //    audience category filter so a broken RPC never leaks Scout
+      //    content into a brand/owner reply or vice versa.
       try {
-        const { data: fallbackResults } = await supabase
+        let fallbackQuery = supabase
           .from('knowledge_base')
           .select('*')
           .eq('embeddings_status', 'ready')
           .ilike('content', `%${query}%`)
           .limit(limit * 2);
+        if (filterCategory) {
+          fallbackQuery = fallbackQuery.eq('category', filterCategory);
+        }
+        const { data: fallbackResults } = await fallbackQuery;
 
         if (fallbackResults && Array.isArray(fallbackResults)) {
           fallbackResults.forEach((item: any) => {

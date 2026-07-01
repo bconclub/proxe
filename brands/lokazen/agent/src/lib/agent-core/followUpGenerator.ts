@@ -36,8 +36,19 @@ function getBrandPool(_brand?: string) {
   return windchasersPool;
 }
 
-function detectLokazenStepButtons(assistantMessage: string): string[] {
-  const r = assistantMessage.toLowerCase();
+/**
+ * Detect which Lokazen flow step was just completed and return the
+ * appropriate quick-reply buttons. Returns [] if no match.
+ */
+function detectLokazenStepButtons(response: string): string[] {
+  const r = response.toLowerCase();
+
+  if (
+    r.includes('okay, what do you want to do next') ||
+    (r.includes('scout') && (r.includes('kyc') || r.includes('join now') || r.includes('onboard')))
+  ) {
+    return ['Join now', 'Do KYC', 'Chat with team'];
+  }
 
   if (r.includes('what would you like to do next') || r.includes('submit property')) {
     return ['Submit Property', 'Talk to Team'];
@@ -50,7 +61,7 @@ function detectLokazenStepButtons(assistantMessage: string): string[] {
     'who am i speaking with',
     'which area is it in',
     'which area is the property in',
-    'which area in bangalore can you cover',
+    'which area can you cover',
     'best number to reach you',
     'name and phone',
     'google maps location',
@@ -60,13 +71,15 @@ function detectLokazenStepButtons(assistantMessage: string): string[] {
   if (asksForFreeText) {
     return [];
   }
-  if (r.includes('what type of space') || r.includes('what kind of brand') || r.includes('brand category')) {
+  if (r.includes('type of brand') || r.includes('what type') && r.includes('brand') ||
+      r.includes('qsr') || r.includes('f&b') || r.includes('cafe') || r.includes('restaurant') && r.includes('wellness')) {
     return ['QSR / F&B', 'Cafe / Restaurant', 'Retail'];
   }
-  if (r.includes('preferred area') || r.includes('where are you looking')) {
+  if ((r.includes('part of bangalore') || r.includes('area') && r.includes('considering')) &&
+      !r.includes('which plan')) {
     return ['North Bangalore', 'South Bangalore', 'East Bangalore'];
   }
-  if (r.includes('space size') || r.includes('how much space') || r.includes('sqft')) {
+  if (r.includes('size') && (r.includes('sqft') || r.includes('looking for') || r.includes('space'))) {
     return ['Under 500 sqft', '500-1500 sqft', '1500+ sqft'];
   }
   if (r.includes('budget') || r.includes('monthly rent')) {
@@ -80,7 +93,7 @@ function detectLokazenStepButtons(assistantMessage: string): string[] {
   ) {
     return ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999'];
   }
-  if (r.includes('ready to get started') || r.includes('start this plan') || ((r.includes('talk to loka') || r.includes('talk to lokazen team')) && r.includes('plan'))) {
+  if (r.includes('ready to get started') || r.includes('start this plan') || ((r.includes('talk to loka') || r.includes('talk to lokazen team') || r.includes('talk to someone') || r.includes('talk to the team')) && r.includes('plan'))) {
     return ['Start this plan', 'Talk to the team'];
   }
   if (r.includes('when do you need') || (r.includes('timeline') && r.includes('space'))) {
@@ -131,7 +144,8 @@ export async function generateFollowUps(params: {
   const isFirstMessage = messageCount === 1 || messageCount === 0;
   const usedButtonsLower = usedButtons.map(b => b.toLowerCase());
 
-  // Lokazen has a strict step flow. Do not show home buttons while collecting free text.
+  // Lokazen: use step-detection for deterministic flow buttons; skip WC pool entirely.
+  // Do not show home buttons while Loka is collecting free-text answers.
   if (brand === 'lokazen') {
     return detectLokazenStepButtons(assistantMessage);
   }

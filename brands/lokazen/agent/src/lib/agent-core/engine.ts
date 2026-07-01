@@ -27,6 +27,20 @@ import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
 
 /**
+ * Lokazen has three separate audiences (brand/owner/scout) that must never
+ * cross-contaminate — a brand's pricing question should never surface Scout
+ * payout content, and vice versa. Only Scout currently has KB content, so
+ * for any other (or undetermined) audience we skip the KB search entirely
+ * rather than risk a leak; extend the 'scout' branch pattern here if
+ * brand/owner KB content is added later.
+ */
+function resolveKbScope(brandId: string, audience: AgentInput['lokazenAudience']): { skip: boolean; category: string | null } {
+  if (brandId !== 'lokazen') return { skip: false, category: null };
+  if (audience === 'scout') return { skip: false, category: 'scout' };
+  return { skip: true, category: null };
+}
+
+/**
  * Process a message and return a complete response (for WhatsApp, voice, etc.)
  */
 export async function process(
@@ -43,8 +57,9 @@ export async function process(
   // 1. Extract intent from message
   const intent = extractIntent(input.message, input.usedButtons);
 
-  // 2. Search knowledge base
-  const relevantDocs = await searchKnowledgeBase(supabase, input.message, 3);
+  // 2. Search knowledge base (audience-scoped for Lokazen — see resolveKbScope)
+  const kbScope = resolveKbScope(brandId, input.lokazenAudience);
+  const relevantDocs = kbScope.skip ? [] : await searchKnowledgeBase(supabase, input.message, 3, kbScope.category);
   const knowledgeContext = formatKnowledgeContext(relevantDocs);
 
   // 3. Check for existing booking
@@ -291,7 +306,7 @@ export async function* processStream(
   }
 
   try {
-    const brandId = getCurrentBrandId();
+    const brandId = input.brand || getCurrentBrandId();
     const brandConfig = getBrandConfig(brandId);
 
     // 1. Extract intent — determines which DB calls to make
@@ -311,9 +326,11 @@ export async function* processStream(
     const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
     const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction;
 
-    // 2. Parallelize DB calls: KB search always runs; booking check only when needed
+    // 2. Parallelize DB calls: KB search always runs (audience-scoped for
+    //    Lokazen — see resolveKbScope); booking check only when needed
+    const kbScope = resolveKbScope(brandId, input.lokazenAudience);
     const [relevantDocs, existingBookingMessage] = await Promise.all([
-      searchKnowledgeBase(supabase, input.message, 3),
+      kbScope.skip ? Promise.resolve([]) : searchKnowledgeBase(supabase, input.message, 3, kbScope.category),
       hasBookingIntent ? checkBooking(supabase, input) : Promise.resolve(null),
     ]);
     const knowledgeContext = formatKnowledgeContext(relevantDocs);
@@ -417,10 +434,8 @@ User's message: ${input.message}`
       yield { type: 'chunk', text: finalResponse };
     }
 
-    // 5. Signal completion immediately so the client can show buttons right away.
-    //    Follow-ups are generated after and arrive as a late SSE event.
-    yield { type: 'done' };
-
+    // 5. Generate follow-ups BEFORE signalling done so the client's
+    //    checkAndComplete timer always fires after msg.followUps is populated.
     const followUps = await generateFollowUps({
       channel: input.channel,
       userMessage: input.message,
@@ -432,7 +447,11 @@ User's message: ${input.message}`
       brand: brandId,
     });
 
-    yield { type: 'followUps', followUps };
+    if (followUps.length > 0) {
+      yield { type: 'followUps', followUps };
+    }
+
+    yield { type: 'done' };
 
     // Schedule flow tasks (non-blocking — fires after response is sent)
     scheduleFlowTasks(supabase, input, finalResponse).catch(err => {

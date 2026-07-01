@@ -14,6 +14,7 @@ import { processStream } from '@/lib/agent-core/engine';
 import { generateSummary } from '@/lib/agent-core/summarizer';
 import { AgentInput } from '@/lib/agent-core/types';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
+import { detectLokazenAudience } from '@/lib/agent-core/lokazenAudience';
 import {
   getServiceClient,
   getClient,
@@ -36,6 +37,36 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+const LOKAZEN_SCOUT_ONBOARDING_URL =
+  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://lokazen.in/scout#join';
+
+function isLokazenScoutNotYetCloseout(params: {
+  brand?: string;
+  audience: 'brand' | 'owner' | 'scout' | null;
+  message: string;
+  usedButtons: string[];
+  history: AgentInput['conversationHistory'];
+}): boolean {
+  if (params.brand !== 'lokazen' || params.audience !== 'scout') return false;
+  const answer = params.message.toLowerCase().trim();
+  const buttons = params.usedButtons.map((button) => button.toLowerCase().trim());
+  const lastAssistant = [...params.history]
+    .reverse()
+    .find((item) => item.role === 'assistant')?.content?.toLowerCase() || '';
+
+  return (answer.includes('not yet') || buttons.some((button) => button.includes('not yet'))) &&
+    lastAssistant.includes('do you already know any vacant commercial properties');
+}
+
+function buildScoutNotYetCloseout(): string[] {
+  return [
+    "No problem.",
+    "Once you spot a property, submit it through the Scout app with a photo and location.",
+    "You'll get paid after verification.",
+    `Join here:\n${LOKAZEN_SCOUT_ONBOARDING_URL}`,
+  ];
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
@@ -51,6 +82,7 @@ export async function POST(request: NextRequest) {
       messageCount = 0,
       usedButtons = [],
       metadata = {},
+      brand: bodyBrand,
     } = body;
 
     if (!message) {
@@ -68,6 +100,7 @@ export async function POST(request: NextRequest) {
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
+    const pageContext = metadata.pageContext || session.pageContext || '';
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const requestUserProfile = session.user || {};
 
@@ -114,6 +147,16 @@ export async function POST(request: NextRequest) {
       ? dbHistory
       : (memory.recentHistory || []);
 
+    // Scopes KB retrieval to the active Lokazen flow (brand/owner/scout) so,
+    // e.g., a brand's pricing question never surfaces Scout payout content.
+    const resolvedBrand = bodyBrand || BRAND_ID || undefined;
+    const pageAudience = String(pageContext).toLowerCase().includes('scout') || metadata.lokazenAudience === 'scout'
+      ? 'scout'
+      : null;
+    const lokazenAudience = resolvedBrand === 'lokazen'
+      ? (pageAudience || detectLokazenAudience(message, conversationHistory, usedButtons))
+      : null;
+
     // Build AgentInput
     const agentInput: AgentInput = {
       channel: 'web',
@@ -128,7 +171,19 @@ export async function POST(request: NextRequest) {
       conversationHistory,
       summary: memory.summary || '',
       usedButtons,
+      brand: resolvedBrand,
+      lokazenAudience,
     };
+
+    const deterministicResponseParts = isLokazenScoutNotYetCloseout({
+      brand: resolvedBrand,
+      audience: lokazenAudience,
+      message,
+      usedButtons,
+      history: conversationHistory,
+    })
+      ? buildScoutNotYetCloseout()
+      : null;
 
     // Create SSE stream
     const encoder = new TextEncoder();
@@ -138,14 +193,22 @@ export async function POST(request: NextRequest) {
         let fullResponse = '';
 
         try {
-          // Stream AI response
-          for await (const chunk of processStream(agentInput, supabase)) {
-            const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
-            controller.enqueue(encoder.encode(sseData));
+          if (deterministicResponseParts) {
+            fullResponse = deterministicResponseParts.join('\n\n');
+            for (const part of deterministicResponseParts) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: `${part}\n\n` })}\n\n`));
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+          } else {
+            // Stream AI response
+            for await (const chunk of processStream(agentInput, supabase)) {
+              const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
+              controller.enqueue(encoder.encode(sseData));
 
-            // Accumulate full response text
-            if (chunk.type === 'chunk' && chunk.text) {
-              fullResponse += chunk.text;
+              // Accumulate full response text
+              if (chunk.type === 'chunk' && chunk.text) {
+                fullResponse += chunk.text;
+              }
             }
           }
 
@@ -325,6 +388,14 @@ function extractEmailAddress(value: string): string | null {
   return match ? match[0].toLowerCase() : null;
 }
 
+/** Splits a free-text "name and phone" answer into its two parts. */
+function parseNameAndPhone(answer: string): { name: string | null; phone: string | null } {
+  const phoneMatch = answer.match(/(?:\+?91[\s-]?)?[6-9]\d{9}/);
+  const phone = phoneMatch ? phoneMatch[0].replace(/\D/g, '').slice(-10) : null;
+  const name = compactAnswer(answer.replace(phoneMatch ? phoneMatch[0] : '', '').replace(/[,-]/g, ' ')) || null;
+  return { name, phone };
+}
+
 function latestAssistantPrompt(history: AgentInput['conversationHistory']): string {
   for (let i = history.length - 1; i >= 0; i -= 1) {
     if (history[i]?.role === 'assistant') return history[i].content || '';
@@ -343,44 +414,16 @@ function buildLokazenContextPatch(
   const buttons = usedButtons.map(lowerText);
   const patch: LokazenContextPatch = {};
 
-  const ownerQuestion =
-    previousAssistant.includes('which area is the property') ||
-    previousAssistant.includes('what type of property') ||
-    previousAssistant.includes('what size is the space') ||
-    previousAssistant.includes('how big is the space') ||
-    previousAssistant.includes('monthly rent') ||
-    previousAssistant.includes('asking rent') ||
-    previousAssistant.includes('which floor') ||
-    previousAssistant.includes('frontage') ||
-    previousAssistant.includes('when is it available') ||
-    previousAssistant.includes('amenities') ||
-    previousAssistant.includes('parking') ||
-    previousAssistant.includes('photos') ||
-    previousAssistant.includes('google maps link') ||
-    previousAssistant.includes('full address');
-
-  const brandQuestion =
-    previousAssistant.includes("what's your brand name") ||
-    previousAssistant.includes('what is your brand name') ||
-    previousAssistant.includes('what kind of brand') ||
-    previousAssistant.includes('how many outlets') ||
-    previousAssistant.includes('first outlet') ||
-    previousAssistant.includes('expansion') ||
-    previousAssistant.includes('which part of bangalore') ||
-    previousAssistant.includes('which areas') ||
-    previousAssistant.includes('preferred format') ||
-    previousAssistant.includes('high-street') ||
-    previousAssistant.includes('what size range') ||
-    previousAssistant.includes('rent budget') ||
-    previousAssistant.includes('budget range') ||
-    previousAssistant.includes('when do you need the space');
-
-  if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
+  const audience = detectLokazenAudience(userMessage, agentInput.conversationHistory, usedButtons);
+  if (audience === 'owner') {
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
-  } else if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
+  } else if (audience === 'brand') {
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
+  } else if (audience === 'scout') {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
   }
 
   if (previousAssistant.includes("what's your brand name") || previousAssistant.includes('what is your brand name')) {
@@ -473,6 +516,34 @@ function buildLokazenContextPatch(
     } else {
       setIfUseful(patch, 'property_address', answer);
     }
+  } else if (previousAssistant.includes('which area can you cover')) {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
+    setIfUseful(patch, 'scout_area_covered', answer);
+  } else if (previousAssistant.includes('do you already know any vacant commercial properties')) {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
+    if (buttons.some((b) => b.includes('yes')) || answerLower === 'yes') {
+      patch.scout_knows_properties = 'yes';
+    } else if (buttons.some((b) => b.includes('not yet')) || answerLower.includes('not yet')) {
+      patch.scout_knows_properties = 'not_yet';
+    } else {
+      setIfUseful(patch, 'scout_knows_properties', answer);
+    }
+  } else if (previousAssistant.includes("what's your name and phone number")) {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
+    const { name, phone } = parseNameAndPhone(answer);
+    if (name) setIfUseful(patch, 'scout_name', name);
+    if (phone) setIfUseful(patch, 'scout_phone', phone);
+  } else if (previousAssistant.includes('would you like the team to help you get started')) {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
+    if (buttons.some((b) => b.includes('talk to team'))) {
+      patch.scout_next_action = 'talk_to_team';
+    } else {
+      setIfUseful(patch, 'scout_next_action', answer);
+    }
   }
 
   if (buttons.some((b) => b.includes('starter'))) patch.selected_plan = 'Starter';
@@ -551,12 +622,15 @@ async function postProcess(
       leadId = sessionData.lead_id;
     }
 
-    // 2. Only create/update lead if phone OR email is provided (name alone is not enough)
-    if (!leadId && (userProfile.email || userProfile.phone)) {
+    // 2. Create lead on every web chat. Lokazen's conversations table has lead_id NOT NULL
+    // so any insert with null lead_id fails → nothing appears in the inbox.
+    // Creating an anonymous lead immediately on turn 1 fixes this; the lead gets
+    // enriched with name/phone as the qualification flow progresses.
+    if (!leadId) {
       leadId = await updateLeadProfile(
         externalSessionId,
         {
-          userName: userProfile.name,
+          userName: userProfile.name || undefined,
           email: userProfile.email,
           phone: userProfile.phone,
         },

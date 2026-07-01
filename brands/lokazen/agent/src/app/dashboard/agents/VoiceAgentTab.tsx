@@ -1,38 +1,16 @@
 'use client';
 import { useState } from 'react';
-import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
+import { MdPhone, MdToggleOff, MdToggleOn } from 'react-icons/md';
 
 export default function VoiceAgentTab() {
-  const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState('');
-  const [calling, setCalling] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [number, setNumber] = useState('');
+  const [saved, setSaved] = useState(false);
 
-  const voiceNumber = '+918046733388';
-
-  async function triggerCall() {
-    if (!phone.trim()) return;
-    setCalling(true);
-    setStatus('');
-    try {
-      const res = await fetch('/api/agent/voice/test-call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), direction: 'cold_intro' }),
-      });
-      const data = await res.json();
-      setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
-    } catch {
-      setStatus('Error — check server logs');
-    } finally {
-      setCalling(false);
-    }
-  }
-
-  function copyNumber() {
-    navigator.clipboard.writeText(voiceNumber);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  function handleSave() {
+    if (!number.trim()) return;
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -44,111 +22,119 @@ export default function VoiceAgentTab() {
       overflowY: 'auto',
       height: '100%',
     }}>
-      {/* Status */}
-      <div className="flex items-center gap-3 p-4 rounded-xl" style={{
+      {/* Status bar */}
+      <div className="flex items-center justify-between p-4 rounded-xl" style={{
         backgroundColor: 'var(--bg-secondary)',
         border: '1px solid var(--border-primary)',
       }}>
-        <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#22c55e' }} />
-        <div>
-          <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Voice Agent</p>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{voiceNumber} · voiceproxe.bconclub.com</p>
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full" style={{
+            backgroundColor: enabled ? '#22c55e' : 'var(--text-muted)',
+          }} />
+          <div>
+            <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Voice Agent</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {enabled ? 'Active' : 'Not enabled'}
+            </p>
+          </div>
         </div>
+        <button
+          onClick={() => setEnabled(v => !v)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 0 }}
+        >
+          {enabled
+            ? <MdToggleOn size={40} style={{ color: 'var(--accent-primary)' }} />
+            : <MdToggleOff size={40} style={{ color: 'var(--text-muted)' }} />}
+        </button>
       </div>
 
-      {/* Two-column sections */}
-      <div style={{ display: 'flex', gap: '24px' }}>
-        {/* Section 1 — Inbound (Call Us) */}
+      {/* Not enabled state */}
+      {!enabled && (
         <div style={{
           flex: 1,
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-primary)',
-          borderRadius: '16px',
-          padding: '32px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          textAlign: 'center',
+          justifyContent: 'center',
           gap: '16px',
+          padding: '48px 32px',
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: '16px',
+          textAlign: 'center',
         }}>
-          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call to Test</h2>
-          <p style={{
-            color: 'var(--text-primary)',
-            fontSize: '28px',
-            fontWeight: 700,
-            letterSpacing: '1px',
-          }}>{voiceNumber}</p>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Call this number to speak with the AI agent
+          <MdPhone size={40} style={{ color: 'var(--text-muted)' }} />
+          <p className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+            Voice Agent is not enabled
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)', maxWidth: '360px' }}>
+            Toggle on above to set up a voice number. You will need a phone number from a provider like Vapi or VoBiz.
           </p>
           <button
-            onClick={copyNumber}
-            className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-all"
+            onClick={() => setEnabled(true)}
+            className="rounded-lg px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
             style={{
-              backgroundColor: copied ? 'var(--button-bg)' : 'var(--bg-tertiary)',
-              color: copied ? 'var(--text-button)' : 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
+              backgroundColor: 'var(--button-bg)',
+              color: 'var(--text-button)',
               cursor: 'pointer',
+              border: 'none',
             }}
           >
-            {copied ? <MdCheckCircle size={16} /> : <MdContentCopy size={16} />}
-            {copied ? 'Copied!' : 'Copy Number'}
+            Enable Voice
           </button>
         </div>
+      )}
 
-        {/* Section 2 — Outbound call */}
+      {/* Enabled state — enter number */}
+      {enabled && (
         <div style={{
-          flex: 1,
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border-primary)',
           borderRadius: '16px',
           padding: '32px',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '16px',
+          gap: '20px',
         }}>
-          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            PROXE will call this number and introduce itself
-          </p>
+          <div>
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Voice Phone Number</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Enter the number you have obtained from your voice provider (Vapi, VoBiz, etc.)
+            </p>
+          </div>
           <input
             type="text"
-            placeholder="Enter phone number"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && triggerCall()}
-            className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
+            placeholder="+91 XXXXX XXXXX"
+            value={number}
+            onChange={e => setNumber(e.target.value)}
+            className="rounded-lg px-4 py-2.5 text-sm outline-none"
             style={{
               backgroundColor: 'var(--bg-primary)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border-primary)',
-              maxWidth: '300px',
-              textAlign: 'center',
+              maxWidth: '320px',
             }}
           />
-          <button
-            onClick={triggerCall}
-            disabled={calling || !phone.trim()}
-            className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{
-              backgroundColor: 'var(--button-bg)',
-              color: 'var(--text-button)',
-              cursor: (calling || !phone.trim()) ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {calling ? 'Calling...' : 'Call'}
-          </button>
-          {status && (
-            <p className="text-sm" style={{ color: status.startsWith('✓') ? '#22c55e' : '#ef4444' }}>
-              {status}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSave}
+              disabled={!number.trim()}
+              className="rounded-lg px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+              style={{
+                backgroundColor: 'var(--button-bg)',
+                color: 'var(--text-button)',
+                cursor: number.trim() ? 'pointer' : 'not-allowed',
+                border: 'none',
+              }}
+            >
+              {saved ? 'Saved!' : 'Save Number'}
+            </button>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Full voice setup requires Vapi credentials in Vercel env vars.
             </p>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

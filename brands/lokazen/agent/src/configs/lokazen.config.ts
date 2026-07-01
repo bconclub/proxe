@@ -26,7 +26,7 @@ export const lokazenConfig: BrandConfig = {
     maxFollowUps: 3,
     avatar: {
       type: 'image',
-      source: '/lokazen-mark.svg',
+      source: '/lokazen-icon.jpg',
     },
   },
   colors: {

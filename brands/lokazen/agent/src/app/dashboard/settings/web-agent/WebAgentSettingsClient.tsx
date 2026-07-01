@@ -443,8 +443,9 @@ export default function WebAgentSettingsClient() {
                   {(() => {
                     const raw =
                       process.env.NEXT_PUBLIC_SITE_URL ||
+                      BRAND_WEBSITE ||
                       process.env.NEXT_PUBLIC_APP_URL ||
-                      BRAND_WEBSITE
+                      ''
                     try {
                       return new URL(raw).hostname.replace(/^www\./, '')
                     } catch {

@@ -17,11 +17,11 @@ interface UseChatStreamOptions {
 }
 
 const BCON_INTRO_LINE_REGEXES = [
-  /^hi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
-  /^hi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^hi,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
   /^how can i help with your marketing today\??$/i,
-  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?$/i,
-  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?$/i,
+  /^[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?$/i,
 ];
 
 const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolean): string => {
@@ -32,6 +32,7 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BTN:\s*[^\]]+\]/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
+    .replace(/\[BTN:[^\]]*\]/gi, '')
     .replace(/[—–]/g, '-')
     .trim();
 
@@ -45,13 +46,17 @@ const sanitizeAssistantText = (rawText: string, hasPriorAssistantMessage: boolea
   }
 
   const strippedRepeatedIntro = normalized
-    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
-    .replace(/\bhi,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
-    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '')
-    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
-    .replace(/\bi\s*(?:am|['’]m)\s*bcon'?s\s*ai strategist\.?/gi, '');
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    .replace(/\b[a-z0-9 _.'-]{1,40}\s*,?\s*i\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '')
+    .replace(/\bi\s*(?:am|['']m)\s*bcon'?s\s*ai strategist\.?/gi, '')
+    // Lokazen: strip re-introduction of Loka after first message
+    .replace(/\bhi,?\s*i\s*(?:am|['']m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, '')
+    .replace(/\bi\s*(?:am|['']m)\s*loka(?:\s+from\s+lokazen)?[,.]?\s*/gi, '')
+    .replace(/\bwelcome\s+to\s+lokazen[,.]?\s*/gi, '');
   const strippedRepeatedIdentity = strippedRepeatedIntro
-    .replace(/\bi\s*(?:am|['’]m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
+    .replace(/\bi\s*(?:am|['']m)\s*proxe,\s*bcon'?s\s*ai marketing strategist\.?/gi, '');
 
   const lines = strippedRepeatedIdentity
     .split('\n')
@@ -453,16 +458,36 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                               existing.type === 'ai' &&
                               Boolean(existing.text?.trim())
                           );
-                          const finalText = sanitizeAssistantText(
-                            msg.text || '',
+                          // Extract [BTN: X] markers from raw text BEFORE
+                          // sanitization — sanitizeAssistantText strips them
+                          // so they must be harvested first.
+                          const extractedBtns: string[] = [];
+                          const rawWithoutBtns = (msg.text || '').replace(
+                            /\[BTN:\s*([^\]]+)\]/gi,
+                            (_m, label) => {
+                              const t = String(label).trim().slice(0, 20);
+                              if (t && extractedBtns.length < 3) extractedBtns.push(t);
+                              return '';
+                            }
+                          );
+
+                          const sanitized = sanitizeAssistantText(
+                            rawWithoutBtns,
                             hasPriorAssistantMessage
                           );
+                          const finalText = sanitized.trim();
+
+                          const mergedFollowUps =
+                            extractedBtns.length > 0
+                              ? extractedBtns
+                              : (msg.followUps || []);
 
                           const completedMessage: Message = {
                             ...msg,
                             isStreaming: false,
                             hasStreamed: true,
                             text: finalText,
+                            followUps: mergedFollowUps,
                           };
 
                           completedMessageForCallback = completedMessage;

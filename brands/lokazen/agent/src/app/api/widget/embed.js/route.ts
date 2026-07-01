@@ -24,13 +24,15 @@ export async function GET() {
   var scriptEl = document.currentScript || document.querySelector('script[src*="embed.js"]');
   var scriptSrc = scriptEl ? scriptEl.src : '';
   var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
-  iframe.src = baseUrl + '/widget/bubble';
+  var pagePath = (window.location && window.location.pathname ? window.location.pathname : '').toLowerCase();
+  var pageContext = pagePath.indexOf('scout') !== -1 ? 'lokazen_scout' : 'lokazen_default';
+  iframe.src = baseUrl + '/widget/bubble?page_context=' + encodeURIComponent(pageContext);
   iframe.setAttribute('allowtransparency', 'true');
   iframe.setAttribute('allow', 'microphone; camera; autoplay; clipboard-write');
   iframe.setAttribute('allowusermedia', '');
 
   // Widget shows immediately on page load
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:112px;height:208px;border:none;background:transparent;z-index:2147483647;';
 
   // Check for pre-loaded lead context from host page
   var leadContext = window.__proxe_lead || null;
@@ -68,7 +70,7 @@ export async function GET() {
       } else {
         // Desktop: chat modal size
         iframe.style.width = '450px';
-        iframe.style.height = '760px';
+        iframe.style.height = '660px';
       }
       // Tell widget whether parent is mobile
       iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');
@@ -78,12 +80,25 @@ export async function GET() {
       iframe.style.left = 'auto';
       iframe.style.right = '0';
       iframe.style.bottom = '0';
-      iframe.style.width = '125px';
-      iframe.style.height = '125px';
+      iframe.style.width = '112px';
+      iframe.style.height = '208px';
     }
   });
 
   document.body.appendChild(iframe);
+
+  var sendPageContext = function() {
+    if (iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: 'proxe_page_context',
+        pageContext: pageContext,
+        pageUrl: window.location.href
+      }, '*');
+    }
+  };
+
+  iframe.addEventListener('load', sendPageContext);
+  sendPageContext();
 
   // Pass lead context to widget when it's ready
   if (leadContext) {

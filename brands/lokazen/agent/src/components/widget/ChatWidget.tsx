@@ -50,6 +50,8 @@ interface FlowOverrideRule {
   followUpButtons: string[];
 }
 
+type LokazenPageContext = 'default' | 'scout';
+
 const FLOW_COUNTRIES = ['USA', 'Canada', 'Hungary', 'New Zealand', 'Thailand', 'Australia'] as const;
 
 // PROXE Logo component (white icon version)
@@ -180,10 +182,20 @@ const ICONS = {
 };
 
 // Lokazen welcome bubble — three-part intro sequence.
-const windchasersWelcomeSequence = [
+const lokazenDefaultWelcomeSequence = [
   { text: "Hi, I'm Loka,", delay: 0 },
   { text: "Lokazen's commercial real estate assistant.", delay: 800 },
   { text: "Looking for space, or have a property to list? Tell me what you need.", delay: 1600 },
+];
+
+const lokazenScoutWelcomeSequence = [
+  { text: "Hi, I'm Loka, Lokazen's commercial real estate assistant.", delay: 0 },
+  { text: "Are you looking to join us as a Scout? How can I help you today?", delay: 800 },
+];
+
+const lokazenScoutQuickButtons = [
+  'Join as a Scout',
+  'How it works',
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -256,6 +268,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
+  const [pageContext, setPageContext] = useState<LokazenPageContext>('default');
   const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
   const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
   const SEARCHBAR_BASE_OFFSET = 60;
@@ -304,9 +317,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const hasShownWelcomeRef = useRef<boolean>(false);
   const hasResetOnLoadRef = useRef<boolean>(false);
   const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
+  const prevIsLoadingRef = useRef(false);
   const bookingConfirmedRef = useRef(false);
   const brandKey = brand as StorageBrandKey;
   const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+  const isLokazenScoutPage = brandKey === 'lokazen' && pageContext === 'scout';
 
   const setPendingFlowOverrideState = useCallback((rule: FlowOverrideRule | null) => {
     pendingFlowOverrideRef.current = rule;
@@ -318,6 +333,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setWidgetTheme(savedTheme);
+    }
+
+    const initialPageContext = new URLSearchParams(window.location.search).get('page_context');
+    if (initialPageContext === 'lokazen_scout' || initialPageContext === 'scout') {
+      setPageContext('scout');
     }
   }, []);
 
@@ -358,6 +378,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     const handleMessage = (e: MessageEvent) => {
       if (e.data && e.data.type === 'wc-viewport') {
         setIsParentMobile(e.data.isMobile);
+      }
+      if (e.data && e.data.type === 'proxe_page_context') {
+        const nextContext = e.data.pageContext === 'lokazen_scout' || e.data.pageContext === 'scout'
+          ? 'scout'
+          : 'default';
+        setPageContext(nextContext);
       }
       if (e.data && e.data.type === 'proxe_lead_context') {
         console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
@@ -838,10 +864,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
 
 
   const buildRequestPayload = () => ({
+    pageContext,
+    lokazenAudience: isLokazenScoutPage ? 'scout' : undefined,
     session: {
       externalId: externalSessionId,
       supabaseId: sessionRecord?.id ?? null,
       brand: brandKey,
+      pageContext,
       user: {
         name: userProfile.name ?? null,
         email: userProfile.email ?? null,
@@ -1361,6 +1390,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       setFlowOverrideButtons(activeFlowOverride.followUpButtons);
       setDynamicQuickButtons(null);
       setPendingFlowOverrideState(null);
+    } else if (message.followUps && message.followUps.length > 0) {
+      // LLM emitted [BTN: X] markers → useChatStream extracted them into
+      // message.followUps. Surface them as quick-reply buttons.
+      setFlowOverrideButtons(message.followUps);
+      setDynamicQuickButtons(null);
     }
 
     if (message.text) {
@@ -1447,8 +1481,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   useEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
-    // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
-    const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
+    // Bubble embeds can be narrow desktop iframes. Only switch to fullscreen
+    // mobile layout when the parent explicitly reports a mobile viewport.
+    const isMobile = widgetStyle === 'bubble'
+      ? isParentMobile === true
+      : window.innerWidth < 769;
 
     el.style.setProperty('position', 'fixed', 'important');
     el.style.setProperty('transform', 'none', 'important');
@@ -1668,8 +1705,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       }
 
       // Adjust input area and chat container when keyboard is visible (mobile only)
-      // In bubble/embed mode, use parent viewport size (not iframe width) to decide if mobile
-      const isMobileForKeyboard = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
+      // Bubble embeds can be narrow desktop iframes. Only use mobile keyboard
+      // handling when the parent explicitly reports a mobile viewport.
+      const isMobileForKeyboard = widgetStyle === 'bubble'
+        ? isParentMobile === true
+        : window.innerWidth < 769;
       if (isOpen && isMobileForKeyboard) {
         const inputAreaElement = chatboxContainerRef.current?.querySelector(`.${styles.inputArea}`) as HTMLElement;
         const footerElement = chatboxContainerRef.current?.querySelector(`.${styles.chatFooter}`) as HTMLElement;
@@ -1868,6 +1908,27 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     setDynamicQuickButtons(null);
   }, [isLoading, messages, updateMessageText]);
 
+  // Safety net: when isLoading transitions true→false, read followUps directly
+  // from the last AI message and apply them as flow override buttons.
+  // This catches the case where onMessageComplete fires before React commits
+  // the setMessages update (making completedMessageForCallback null), which
+  // prevents handleAssistantMessageComplete from seeing the followUps.
+  useEffect(() => {
+    const justFinished = prevIsLoadingRef.current && !isLoading;
+    prevIsLoadingRef.current = isLoading;
+    if (!justFinished) return;
+
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    if (!lastMsg.followUps || lastMsg.followUps.length === 0) return;
+    if (pendingFlowOverrideRef.current) return;
+
+    setFlowOverrideButtons(current => {
+      if (current && current.length > 0) return current;
+      return lastMsg.followUps!;
+    });
+  }, [isLoading, messages]);
+
   const resetChatState = useCallback(() => {
     closeCalendarWidget();
     closeVideoWidget();
@@ -1960,16 +2021,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     }
 
     // Instant bubbles — CSS messageIn handles the fade-up animation
-    for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
+    const welcomeSequence = isLokazenScoutPage
+      ? lokazenScoutWelcomeSequence
+      : lokazenDefaultWelcomeSequence;
+
+    for (let i = 0; i < welcomeSequence.length; i++) {
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 120));
       }
-      addAIMessage(windchasersWelcomeSequence[i].text);
+      addAIMessage(welcomeSequence[i].text);
       window.dispatchEvent(new Event('message-updated'));
     }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     setWelcomeComplete(true);
-  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage]);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage, isLokazenScoutPage]);
 
   const handleRequestResetChat = useCallback(() => {
     if (messages.length > 0) {
@@ -1994,8 +2059,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     [isMobileViewport, messages.length]
   );
 
-  const mobileQuickActions = config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"];
-  const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
+  const configuredQuickButtons = isLokazenScoutPage
+    ? lokazenScoutQuickButtons
+    : (config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"]);
+  const mobileQuickActions = configuredQuickButtons;
+  const defaultQuickButtons = dynamicQuickButtons ?? configuredQuickButtons;
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
   const hasUserMessage = messages.some((m) => m.type === 'user');
@@ -2073,6 +2141,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       ),
     [isLoading, messages]
   );
+  const isBubbleWidget = widgetStyle === 'bubble';
+  const isBubbleMobileLayout = isBubbleWidget && isParentMobile === true;
+  const isBubbleDesktopLayout = isBubbleWidget && !isBubbleMobileLayout;
 
   // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
   const hasStreamingText = useMemo(
@@ -3458,7 +3529,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     {widgetStyle !== 'bubble' && searchbar}
     <div 
       ref={chatboxContainerRef}
-      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${widgetStyle === 'bubble' ? styles.chatboxBubble : ''} ${widgetStyle === 'bubble' && isParentMobile === true ? styles.chatboxBubbleMobile : ''} ${widgetStyle === 'bubble' && isParentMobile !== true ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${isBubbleWidget ? styles.chatboxBubble : ''} ${isBubbleMobileLayout ? styles.chatboxBubbleMobile : ''} ${isBubbleDesktopLayout ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
       data-brand={brand}
     >
           {isVapiActive && (
@@ -3937,7 +4008,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         inputMode="tel"
                         placeholder="WhatsApp number"
                         value={phoneInput}
-                        onChange={(event) => setPhoneInput(event.target.value)}
+                        onChange={(event) => setPhoneInput(event.target.value.replace(/[^\d+\-\s]/g, ''))}
                       />
                       <button
                         type="submit"
@@ -3947,6 +4018,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         {ICONS.send}
                       </button>
                     </div>
+                    {phoneInput.trim().length > 0 && phoneInput.replace(/\D/g, '').length < 8 && (
+                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Enter a valid WhatsApp number to continue
+                      </p>
+                    )}
                   </form>
                 </div>
               </div>
@@ -4084,18 +4160,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
 
       <div className={styles.inputArea}>
         {isOpen && showPrivacyNotice && (
-          <a
-            href="https://goproxe.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.privacyNotice}
-            style={{ textDecoration: 'none', cursor: 'pointer' }}
-          >
+          <div className={styles.privacyNotice}>
             <span className={styles.privacyPoweredIcon}>
               <PROXELogo />
             </span>
             <span>Powered by PROXe</span>
-          </a>
+          </div>
         )}
         <div className={styles.chatInputRow}>
           <button
@@ -4178,7 +4248,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       </div>
       </div>
     </div>
-    {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
+    {(isDesktop || isBubbleDesktopLayout) && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
