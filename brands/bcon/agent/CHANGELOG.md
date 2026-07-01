@@ -4,6 +4,12 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Lead dedup: pre-insert race re-check (stops form+chat double leads)
+
+- One person became two leads (Web Form + Web Chat) because the web form (/api/website) and the first web-chat message both call ensureOrUpdateLead near-simultaneously; the initial phone+brand SELECT at the top of the fn missed the row the other path had just inserted, and with no DB unique constraint both inserts succeeded.
+- Added a pre-insert re-check: right before inserting a new lead, re-SELECT by (customer_phone_normalized, brand); if a row now exists, converge onto it (update, return its id) instead of creating a duplicate. Logs `[leadManager] dedup: converged onto existing lead ... duplicate creation avoided` so it's visible/testable in runtime logs.
+- Note: this closes the common near-simultaneous case. A TRUE concurrent race is only fully closed by a UNIQUE(customer_phone_normalized, brand) index (needs DB DDL access); the existing 23505 catch already handles convergence once that index exists.
+
 ## 2026-07-02 · Fix web booking leaking a bare date ("2026-07-03") instead of slots
 
 - Regression from the v4 prompt: its booking push asks "what DAY works for you?" / "quick call", but `isInBookingFlow` only matched "what TIME", "time works", "slot", etc. So the reply "tomorrow" wasn't detected as booking, routed to the no-tools streaming path, and Sonnet 5 (reaches for tools more) leaked `check_availability(2026-07-03)` as text, rendering as a bare date with no calendar/slots.

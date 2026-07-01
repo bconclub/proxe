@@ -254,7 +254,31 @@ export async function ensureOrUpdateLead(
       return existingLead.id;
     }
 
-    // 6. Only INSERT if nothing matches
+    // 6. Race guard: re-check for an existing lead by phone+brand RIGHT BEFORE
+    //    insert. The web form (/api/website) and the first web-chat message both
+    //    call this fn near-simultaneously; the initial SELECT at the top can miss
+    //    a row the other path just inserted (that's how one person became two
+    //    leads — Web Form + Web Chat). Re-checking here converges the common case
+    //    onto the one lead instead of creating a duplicate, and logs it so it's
+    //    visible/testable. A TRUE concurrent race is only fully closed by a
+    //    UNIQUE(customer_phone_normalized, brand) index — add that when DB access
+    //    is available; the 23505 catch below already handles it once it exists.
+    {
+      const { data: raceHit } = await client
+        .from('all_leads')
+        .select('id, unified_context')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .eq('brand', brand)
+        .maybeSingle();
+      if (raceHit?.id) {
+        console.log(`[leadManager] dedup: converged onto existing lead ${raceHit.id} on pre-insert re-check (phone+brand match) — duplicate creation avoided`);
+        const raceUpdates = buildUpdates(raceHit.unified_context || {});
+        await client.from('all_leads').update(raceUpdates).eq('id', raceHit.id);
+        return raceHit.id;
+      }
+    }
+
+    // 7. Only INSERT if nothing matches
     const insertData: any = {
       customer_name: customerName,
       email: email,
