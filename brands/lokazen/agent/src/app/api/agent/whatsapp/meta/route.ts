@@ -84,6 +84,13 @@ function isAutomatedBusinessReply(text: string): boolean {
   return automatedPatterns.some((pattern) => pattern.test(normalized));
 }
 
+function isLokazenPlanAction(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  return normalized === 'start this plan' ||
+    normalized === 'talk to the team' ||
+    normalized === 'talk to lokazen team';
+}
+
 /** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
 async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
@@ -778,6 +785,29 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       isAutomatedBusinessReply(messageText)
     ) {
       console.log(`[meta/webhook] LOKAZEN automated business reply ignored lead=${leadId}`);
+      return;
+    }
+
+    if (
+      BRAND_ID === 'lokazen' &&
+      isCustomerButtonTap &&
+      isLokazenPlanAction(messageText)
+    ) {
+      const { data: leadContact } = await supabase
+        .from('all_leads')
+        .select('email')
+        .eq('id', leadId)
+        .maybeSingle();
+      const hasEmail = Boolean(leadContact?.email && String(leadContact.email).trim());
+      const body = hasEmail
+        ? 'I have your WhatsApp number and email. What day and time works best for a quick Lokazen call?'
+        : "I have your WhatsApp number. What's the best email to send the details to?";
+
+      console.log(`[meta/webhook] LOKAZEN deterministic plan action lead=${leadId} action="${messageText}" hasEmail=${hasEmail}`);
+      await sendAndLogReply(supabase, leadId, customerPhone, body, {
+        sessionId,
+        quickReplyTrigger: 'lokazen_plan_action',
+      });
       return;
     }
 
