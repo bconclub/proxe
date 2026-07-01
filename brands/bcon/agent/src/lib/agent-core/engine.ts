@@ -356,7 +356,23 @@ function isInBookingFlow(input: AgentInput): boolean {
       t.includes('email so i can') ||
       t.includes('what\'s your email') ||
       t.includes('here are the slots') ||
-      t.includes('time works')
+      t.includes('time works') ||
+      // v4 prompt booking-push phrasing asks for a DAY, not a time ("what day
+      // works for you?", "quick call to map out..."). Without these, the reply
+      // ("tomorrow") missed the booking flow, hit the no-tools streaming path,
+      // and the model leaked check_availability(...) as text (the bare date bug).
+      t.includes('what day') ||
+      t.includes('which day') ||
+      t.includes('day works') ||
+      t.includes('day suits') ||
+      t.includes('day would work') ||
+      t.includes('quick call') ||
+      t.includes('book a call') ||
+      t.includes('set up a call') ||
+      t.includes('hop on a call') ||
+      t.includes('get on a call') ||
+      t.includes('schedule a call') ||
+      t.includes('get our experts')
     );
   }
   return false;

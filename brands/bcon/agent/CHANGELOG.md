@@ -4,6 +4,11 @@
 >
 > Version auto-bumps per commit that touches `brands/bcon/agent/` (pre-commit hook). Current line: 0.0.21+.
 
+## 2026-07-02 · Fix web booking leaking a bare date ("2026-07-03") instead of slots
+
+- Regression from the v4 prompt: its booking push asks "what DAY works for you?" / "quick call", but `isInBookingFlow` only matched "what TIME", "time works", "slot", etc. So the reply "tomorrow" wasn't detected as booking, routed to the no-tools streaming path, and Sonnet 5 (reaches for tools more) leaked `check_availability(2026-07-03)` as text, rendering as a bare date with no calendar/slots.
+- Broadened `isInBookingFlow` to also match the v4 push phrasing: what day / which day / day works / quick call / book a call / set up a call / get our experts, etc. Booking replies now route to the real tool loop (check_availability -> slots), no leak.
+
 ## 2026-07-02 · Next Actions timeline: show the real template on click + horizontal scroll
 
 - Clicking a step showed no outgoing message because the per-lead `/api/dashboard/tasks?lead_id=` response never attached `preview` (only the board KPI sections did). Now every per-lead task carries `preview = renderPreview(t)` — the actual template filled with the lead's details — so clicking a step reveals exactly what's going out.
