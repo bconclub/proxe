@@ -61,7 +61,7 @@ function detectLokazenStepButtons(response: string): string[] {
     'who am i speaking with',
     'which area is it in',
     'which area is the property in',
-    'which area in bangalore can you cover',
+    'which area can you cover',
     'best number to reach you',
     'name and phone',
     'google maps location',

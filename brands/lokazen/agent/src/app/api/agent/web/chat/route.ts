@@ -516,7 +516,7 @@ function buildLokazenContextPatch(
     } else {
       setIfUseful(patch, 'property_address', answer);
     }
-  } else if (previousAssistant.includes('which area in bangalore can you cover')) {
+  } else if (previousAssistant.includes('which area can you cover')) {
     patch.user_type = 'scout';
     patch.lead_type = 'scout';
     setIfUseful(patch, 'scout_area_covered', answer);

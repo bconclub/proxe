@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-01 15:10 IST · lokazen — Scout misclassification fix + sync accumulated dev-tree work
+
+- **lokazen** — Fixed Scouts being misclassified as Brand leads: the widget button label (`"Join as a Scout"`) and the live prompt wording (`"Which area can you cover?"`) had drifted from the hardcoded detection strings (`"become a scout"`, `"which area in bangalore can you cover"`) in three places — `lib/agent-core/lokazenAudience.ts` (shared detector for web + WhatsApp), `app/api/agent/web/chat/route.ts` (duplicate check), `lib/agent-core/followUpGenerator.ts` (quick-reply suppression). All three now match the actual copy.
+- **lokazen** — `components/dashboard/LeadsTable.tsx`: Scouts have their own dedicated `/dashboard/scouts` page, so the default Leads view (and channel-filtered web/whatsapp views) now excludes `user_type: 'scout'` leads — Leads is brand + property-owner only.
+- **lokazen** — Data fix: reclassified an existing misclassified lead (Aniket Kumar Singh) from brand→scout directly in Supabase (`all_leads.unified_context.lokazen`), removed the stray brand-only `expansion_intent` field, filled in scout_name/scout_phone/scout_area_covered.
+- **lokazen** — Synced the accumulated uncommitted dev-tree work from the `C:\Users\user\Builds\PROXe` working copy into this tracked repo (this was the first commit of that backlog): new Scouts dashboard page (`app/dashboard/scouts/page.tsx`), the new `lokazenAudience.ts` module, CRE-aware Add Lead form updates, demo-data/seed script updates, widget/prompt/engine tweaks, and refreshed brand SVG assets (logo/mark/favicon/icon). User-facing: Scouts dashboard, cleaner Leads list, corrected lead classification.
+
 ## 2026-07-01 12:16 IST · lokazen — activate Scout Priority Zone Bonus (confirmed by user)
 
 - **lokazen** — Scout KB: the Priority Zone Bonus (extra ₹100 → ₹350 total for a verified listing in a priority zone) was ingested earlier as `category=scout_internal` (proposed/hidden, never retrievable) pending confirmation. User confirmed it as real, so it's been rewritten as a customer-facing entry and moved to `category=scout` — Loka can now cite it. Zero `scout_internal` rows remain; 18 `category=scout` rows total. (Supabase change, not in repo.)

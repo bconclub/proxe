@@ -286,6 +286,13 @@ export default function LeadsTable({
           : (brandData.user_type || brandData.business_type)
         return normalizedUserType === userTypeFilter
       })
+    } else if (showLokazenColumns) {
+      // Lokazen: Scouts have their own dedicated page — keep them out of the
+      // general Leads view, which is brand + property-owner only.
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        return brandData.user_type !== 'scout'
+      })
     }
 
     if (courseInterestFilter !== 'all') {

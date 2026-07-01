@@ -74,10 +74,11 @@ export function detectLokazenAudience(
     previousAssistant.includes('when do you need the space');
 
   const scoutQuestion =
-    previousAssistant.includes('which area in bangalore can you cover') ||
+    previousAssistant.includes('which area can you cover') ||
     previousAssistant.includes('do you already know any vacant commercial properties') ||
     previousAssistant.includes("what's your name and phone number") ||
-    previousAssistant.includes('would you like the team to help you get started');
+    previousAssistant.includes('would you like the team to help you get started') ||
+    previousAssistant.includes('join us as a scout');
 
   if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
     return 'owner';
@@ -85,7 +86,12 @@ export function detectLokazenAudience(
   if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
     return 'brand';
   }
-  if (buttons.some((b) => b.includes('become a scout')) || answerLower.includes('become a scout') || scoutQuestion) {
+  if (
+    buttons.some((b) => b.includes('become a scout') || b.includes('join as a scout')) ||
+    answerLower.includes('become a scout') ||
+    answerLower.includes('join as a scout') ||
+    scoutQuestion
+  ) {
     return 'scout';
   }
   return null;
