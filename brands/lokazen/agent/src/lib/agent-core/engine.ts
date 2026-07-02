@@ -25,7 +25,7 @@ import {
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
-import { notifySlackBooking } from '@/lib/services/slackNotifier';
+import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifier';
 
 /**
  * Lokazen has three separate audiences (brand/owner/scout) that must never
@@ -767,6 +767,25 @@ async function flagForHumanFollowup(
       .eq('id', lead.id);
 
     console.log(`[Engine] Flagged lead ${lead.id} for human follow-up: ${reason}`);
+
+    // Slack "needs a human" alert (no-op unless SLACK_WEBHOOK_URL is set).
+    let brandLabel = 'PROXe';
+    try { brandLabel = getBrandConfig()?.name || getCurrentBrandId() || 'PROXe'; } catch { /* keep default */ }
+    const audienceLabel =
+      input.lokazenAudience === 'brand' ? 'Brand'
+      : input.lokazenAudience === 'owner' ? 'Property Owner'
+      : input.lokazenAudience === 'scout' ? 'Scout'
+      : null;
+    await notifySlackLead({
+      brandLabel,
+      headline: `🚨 Needs human follow-up — ${brandLabel}`,
+      name: input.userProfile.name || null,
+      phone: input.userProfile.phone || null,
+      email: input.userProfile.email || null,
+      leadType: audienceLabel,
+      source: input.channel || null,
+      detail: reason,
+    });
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
   }

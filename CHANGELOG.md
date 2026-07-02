@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · slack — wire new-lead + needs-human alerts (all triggers live)
+
+- **lokazen** — `app/api/agent/leads/inbound/route.ts`: fires `notifySlackLead` ("🆕 New Lead") for every genuinely new inbound/form lead, with a detail line surfacing the captured Brand/Property fields (brand+category+areas+size+budget, or property type+size+area+rent). Verified end-to-end against a local capture server.
+- **agent-core** — `lib/services/leadManager.ts`: fires the same "🆕 New Lead" alert on chat/channel-originated new leads (single creator chokepoint), so both chat and form leads notify.
+- **agent-core** — `engine.ts` `flagForHumanFollowup`: fires `notifySlackLead` ("🚨 Needs human follow-up") whenever a lead is flagged for a human (AI generation failed, hallucinated booking, customer asked for a human, template send failed). All soft-fail + gated on `SLACK_WEBHOOK_URL`.
+
 ## 2026-07-02 · services — Slack notifier + booking notification (Incoming Webhook)
 
 - **services (all brands)** — new `lib/services/slackNotifier.ts`: one-way Slack notifications via an Incoming Webhook (`SLACK_WEBHOOK_URL`). No bot/token/scopes. `sendSlackMessage`, `notifySlackBooking` (rich Block Kit: name/phone/email/type/when/channel + topic + summary), `notifySlackLead` (hot-lead alert). Soft-fails everywhere: no `SLACK_WEBHOOK_URL` = no-op, and a Slack outage never blocks a booking/lead. Gated on per-deployment env, so only the brand whose Vercel project has the URL posts (no cross-brand leakage despite the shared module).

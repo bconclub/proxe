@@ -14,6 +14,7 @@ import {
   TIER_MESSAGES,
   TEMPLATE_HEADERS,
   TEMPLATE_BUTTONS,
+  notifySlackLead,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -617,6 +618,42 @@ export async function POST(request: NextRequest) {
         console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
       } else {
         taskCreated = true
+      }
+    }
+
+    // ── Slack "new lead" alert (no-op unless SLACK_WEBHOOK_URL is set) ────────
+    // Fires for genuinely new inbound leads (Brand / Property onboarding forms,
+    // ads, etc.). Awaited so Vercel doesn't drop it; soft-fails so Slack never
+    // blocks the lead. Detail line surfaces the captured Brand/Property fields.
+    if (isNew) {
+      try {
+        const lkz = brandCtxData
+        const typeLabel = lkz.user_type === 'owner' ? 'Property Owner' : lkz.user_type === 'brand' ? 'Brand' : null
+        const detailParts: string[] = []
+        if (lkz.user_type === 'owner') {
+          if (lkz.property_type) detailParts.push(`Type: ${lkz.property_type}`)
+          if (lkz.property_size_sqft) detailParts.push(`Size: ${lkz.property_size_sqft} sqft`)
+          if (lkz.property_zone) detailParts.push(`Area: ${lkz.property_zone}`)
+          if (lkz.asking_rent_monthly) detailParts.push(`Rent: ${lkz.asking_rent_monthly}`)
+        } else if (lkz.user_type === 'brand') {
+          if (lkz.brand_name) detailParts.push(`Brand: ${lkz.brand_name}`)
+          if (lkz.brand_category) detailParts.push(`Category: ${lkz.brand_category}`)
+          if (lkz.target_zones) detailParts.push(`Areas: ${lkz.target_zones}`)
+          if (lkz.required_size_sqft) detailParts.push(`Size: ${lkz.required_size_sqft} sqft`)
+          if (lkz.budget_monthly_rent) detailParts.push(`Budget: ${lkz.budget_monthly_rent}`)
+        }
+        await notifySlackLead({
+          brandLabel: leadBrand === 'lokazen' ? 'Lokazen' : leadBrand,
+          headline: `🆕 New Lead — ${leadBrand === 'lokazen' ? 'Lokazen' : leadBrand}`,
+          name: leadName,
+          phone: normalizedPhone,
+          email: email?.trim() || null,
+          leadType: typeLabel,
+          source: normalizedSource || leadSource,
+          detail: detailParts.join(' · ') || null,
+        })
+      } catch (slackErr: any) {
+        console.error('[inbound] Slack new-lead notify failed:', slackErr?.message || slackErr)
       }
     }
 

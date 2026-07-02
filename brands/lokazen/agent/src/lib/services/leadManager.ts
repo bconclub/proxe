@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { BRAND_ID } from '@/configs';
+import { notifySlackLead } from './slackNotifier';
 import { getServiceClient, getClient } from './supabase';
 import { getISTTimestamp, cleanSummary } from './utils';
 import { ensureSession, getChannelTable, type Channel } from './sessionManager';
@@ -299,6 +300,27 @@ export async function ensureOrUpdateLead(
     }
 
     console.log('[leadManager] New lead created', { leadId: created.id });
+
+    // Slack "new lead" alert (no-op unless SLACK_WEBHOOK_URL is set). Covers
+    // chat/channel-originated leads; the inbound webhook covers form leads.
+    // Soft-fails so a Slack hiccup never affects lead creation.
+    try {
+      const bctx = (unifiedContext?.[brand] || {}) as Record<string, any>;
+      const ut = bctx.user_type === 'property_owner' ? 'owner' : bctx.user_type;
+      const typeLabel = ut === 'owner' ? 'Property Owner' : ut === 'brand' ? 'Brand' : ut === 'scout' ? 'Scout' : null;
+      await notifySlackLead({
+        brandLabel: brand === 'lokazen' ? 'Lokazen' : brand,
+        headline: `🆕 New Lead — ${brand === 'lokazen' ? 'Lokazen' : brand}`,
+        name: customerName,
+        phone: normalizedPhone,
+        email,
+        leadType: typeLabel,
+        source: channel,
+      });
+    } catch (slackErr: any) {
+      console.error('[leadManager] Slack new-lead notify failed:', slackErr?.message || slackErr);
+    }
+
     return created.id;
   } catch (error) {
     console.error('[leadManager] Exception in ensureOrUpdateLead', { error: String(error), phone, normalizedPhone: normalizePhone(phone), brand: BRAND_ID });
