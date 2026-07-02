@@ -338,6 +338,10 @@ export async function POST(request: NextRequest) {
         if (amenities) brandCtxData.amenities = amenities
         const avail = asStr(pick('handoverDate', 'handover_date', 'availability_date', 'available_from'))
         if (avail) brandCtxData.availability_date = avail
+        const deposit = asStr(pick('deposit', 'security_deposit', 'deposit_amount'))
+        if (deposit) brandCtxData.deposit = deposit
+        const gmaps = asStr(pick('google_maps_link', 'google_maps_url', 'gmaps_link', 'map_link', 'maps_url'))
+        if (gmaps) brandCtxData.google_maps_url = gmaps
       } else if (lkzType === 'brand') {
         brandCtxData.user_type = 'brand'
         const bname = asStr(pick('brand_name', 'brandName', 'company', 'brand'))
@@ -365,6 +369,8 @@ export async function POST(request: NextRequest) {
         const budgetExplicit = asStr(pick('budget_rent', 'budget_monthly_rent', 'budget', 'rent'))
         const budget = budgetExplicit || (rentMin && rentMax ? `${rentMin}-${rentMax}` : rentMin || rentMax)
         if (budget) brandCtxData.budget_monthly_rent = budget
+        const audience = asStr(pick('target_audience', 'audience_type', 'customer_profile'))
+        if (audience) brandCtxData.target_audience = audience
       }
     }
 

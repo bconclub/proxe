@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — full CRE detail passthrough (owner deposit/amenities/maps, brand target audience)
+
+- **lokazen** — `app/api/agent/leads/inbound/route.ts`: extended the onboarding mapping after inspecting the live lokazen.in sender (`src/lib/proxe-lead.ts` + onboarding/owner routes). Owner now also maps `deposit`, `google_maps_url` (from google_maps_link); brand maps `target_audience`. Confirmed the sender's `x-api-key` = `lk_inbound_...` and set the same `INBOUND_API_KEY` locally so inbound auth is verifiable. Tested BOTH exact frontend payloads (seeker + owner) end-to-end with the real key — every CRE field maps into unified_context.lokazen and a Slack "New lead" alert fires. NOTE: matching frontend enrichment (forwarding deposit/amenities/maps for owner, additionalRequirements for brand) was made in the separate lokazen.in app (C:/Users/user/Lokazen, not this repo) — user deploys that.
+
 ## 2026-07-02 · slack — cleaner professional formatting (bold/italics, no emoji)
 
 - **services + callers** — replaced the emoji-per-field Block Kit with a clean, professional style per user feedback ("don't make it childish"): a bold title line (`*New lead* · _Lokazen_`), the lead/booking subject in *bold* with the type in _italics_, bold-label 2-column fields (no emoji), and an italic context footer. `notifySlackLead`/`notifySlackBooking` API: `headline` → plain `title`; detail field labels de-emojied (Brand/Category/Areas/Format/Size/Budget/Outlets · Property type/Size/Area/Rent/Floor). Verified live (HTTP 200).
