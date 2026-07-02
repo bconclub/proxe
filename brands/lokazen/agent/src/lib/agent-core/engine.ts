@@ -25,6 +25,7 @@ import {
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
+import { notifySlackBooking } from '@/lib/services/slackNotifier';
 
 /**
  * Lokazen has three separate audiences (brand/owner/scout) that must never
@@ -1091,6 +1092,33 @@ function buildBookingTools(
 
       // Mark this booking as completed to prevent re-detection loops
       bookingsCompletedThisSession.add(bookingKey);
+
+      // Slack notification (no-op unless SLACK_WEBHOOK_URL is set for this
+      // deployment). Awaited on purpose — we're still inside the tool handler,
+      // so Vercel won't drop it, and it soft-fails so Slack never blocks a
+      // booking. Lead type comes from the resolved Lokazen audience.
+      try {
+        const audienceLabel =
+          input.lokazenAudience === 'brand' ? 'Brand'
+          : input.lokazenAudience === 'owner' ? 'Property Owner'
+          : input.lokazenAudience === 'scout' ? 'Scout'
+          : null;
+        let brandLabel = 'PROXe';
+        try { brandLabel = getBrandConfig()?.name || getCurrentBrandId() || 'PROXe'; } catch { /* keep default */ }
+        await notifySlackBooking({
+          brandLabel,
+          name: bookingName,
+          phone: bookingPhone,
+          email: bookingEmail || null,
+          leadType: audienceLabel,
+          dateTime: `${date} · ${time}`,
+          title: bookingTitle,
+          channel: input.channel || null,
+          summary: input.summary || null,
+        });
+      } catch (slackErr: any) {
+        console.error('[Engine] Slack booking notify failed:', slackErr?.message || slackErr);
+      }
 
       // Create booking reminder flow tasks (Flow B + C)
       try {

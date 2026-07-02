@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · services — Slack notifier + booking notification (Incoming Webhook)
+
+- **services (all brands)** — new `lib/services/slackNotifier.ts`: one-way Slack notifications via an Incoming Webhook (`SLACK_WEBHOOK_URL`). No bot/token/scopes. `sendSlackMessage`, `notifySlackBooking` (rich Block Kit: name/phone/email/type/when/channel + topic + summary), `notifySlackLead` (hot-lead alert). Soft-fails everywhere: no `SLACK_WEBHOOK_URL` = no-op, and a Slack outage never blocks a booking/lead. Gated on per-deployment env, so only the brand whose Vercel project has the URL posts (no cross-brand leakage despite the shared module).
+- **agent-core** — `engine.ts` `book_consultation`: fires `notifySlackBooking` right after the booking is stored (awaited inside the handler so Vercel doesn't drop it; soft-fails). Lead type from the resolved Lokazen audience (Brand / Property Owner). Wire format verified end-to-end against a local echo server. Lead-crisis alert (`notifySlackLead`) is built but not yet wired pending trigger definition.
+
 ## 2026-07-02 · lokazen — onboarding leads: map Brand/Property details + stop the constraint drop
 
 - **lokazen** — `app/api/agent/leads/inbound/route.ts`: added Brand Onboarding + Property Owner Onboarding field mapping. The webhook had NO lokazen mapping (only windchasers/PAT), so onboarding details landed in `raw_form_fields` and the dashboard PROPERTY TYPE / SIZE / zone columns (which read `unified_context.lokazen.*`) stayed blank. Now maps the form's own keys + aliases: owner → property_type/property_size_sqft/property_zone/asking_rent_monthly/floor/frontage_ft/amenities/availability_date; brand → brand_name/brand_category/current_outlets/target_zones/required_size_sqft (min-max)/budget_monthly_rent (min-max). Audience (brand vs owner) resolved from an explicit type field, then form_type/source, then field presence. Verified end-to-end via simulated POSTs.
