@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — plan cards now trigger off the BUTTONS, not the text
+
+- **lokazen** — `components/widget/ChatWidget.tsx`: live test showed the plan message paraphrased by the LLM ("Perfect. Here's how we work: shortlist properties, guided visits...") — no "Tap a plan to see what's included", so the text-based card trigger missed and the plans fell through as flat text buttons. The cards now anchor off the plan BUTTONS the agent deterministically emits (≥2 of Starter/Professional/Premium in message.followUps → set that message as the plan-cards anchor + suppress the redundant text buttons). Text patterns kept as fallback. Single-plan detail unchanged (its "Starter - Rs" header is prompt-mandated); if it's ever paraphrased, text buttons remain as a graceful fallback.
+
 ## 2026-07-02 · lokazen — chat size/budget calibrated to real inventory + market guardrail
 
 - **Data first**: profiled the live Lokazen CRE database (Supabase `pasuywntzuyomkwfagep`, `properties` table, 164 rows / 155 usable): median listing 1,000 sqft at Rs 1.8L/mo, median Rs 186/sqft (p25 Rs 103 / p75 Rs 289); under Rs 50k = ~1% of stock; Rs 1L-5L = 61%. Restaurant median 850 sqft @ 1.5L; retail 1,650 sqft @ 2.6L. Top areas: Koramangala, Indiranagar, HSR, Jayanagar, Whitefield, Sarjapur Rd.

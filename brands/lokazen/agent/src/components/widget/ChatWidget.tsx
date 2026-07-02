@@ -266,6 +266,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
   const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
   const [flowOverrideButtons, setFlowOverrideButtons] = useState<string[] | null>(null);
+  // Message id that should render the Lokazen plan cards. Set from the plan
+  // BUTTONS the agent emits (deterministic) rather than the message text,
+  // which the LLM often paraphrases ("Perfect. Here's how we work...").
+  const [planCardsMessageId, setPlanCardsMessageId] = useState<string | null>(null);
   const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showMinimalButtons, setShowMinimalButtons] = useState(false);
@@ -1395,12 +1399,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       // LLM emitted [BTN: X] markers → useChatStream extracted them into
       // message.followUps. Surface them as quick-reply buttons.
       let followUps = message.followUps;
-      // On the Lokazen web widget the plan CARDS render the plan actions, so
-      // drop the redundant text buttons (Starter/Professional/Premium/Start this
-      // plan). WhatsApp keeps them — it has no cards.
-      const isPlanMsg = /\[\[plans?\]\]|\[\[plan:/i.test(message.text) || /tap a plan to see|ready to get started/i.test(message.text);
-      if (brand === 'lokazen' && isPlanMsg) {
-        followUps = followUps.filter((b) => !/^(starter|professional|premium)\b|start this plan/i.test(b.trim()));
+      if (brand === 'lokazen') {
+        // Plans overview: detect from the BUTTONS (deterministic), not the text
+        // — the LLM paraphrases the scripted plan message, so text matching
+        // missed it and the plans fell through as flat text buttons. When ≥2
+        // plan buttons are present, render the rich cards on this message and
+        // drop the redundant text buttons (cards provide the actions).
+        const planBtns = followUps.filter((b) => /^(starter|professional|premium)\b/i.test(b.trim()));
+        const isDetailMsg = /\[\[plan:/i.test(message.text) || /\b(starter|professional|premium)\s*[-–]\s*rs/i.test(message.text);
+        if (planBtns.length >= 2 && message.id) {
+          setPlanCardsMessageId(message.id);
+          followUps = followUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
+        } else if (isDetailMsg) {
+          // Single-plan detail card carries Start/Talk CTAs itself.
+          followUps = followUps.filter((b) => !/start this plan/i.test(b.trim()));
+        }
       }
       setFlowOverrideButtons(followUps);
       setDynamicQuickButtons(null);
@@ -3705,7 +3718,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         // detail replaces the flat text with one focused card.
                         const t = message.text || '';
                         const isLokazenAi = brand === 'lokazen' && message.type === 'ai' && !message.isStreaming;
-                        const isOverview = isLokazenAi && (/\[\[PLANS\]\]/i.test(t) || /tap a plan to see what'?s included/i.test(t));
+                        const isOverview = isLokazenAi && (
+                          message.id === planCardsMessageId // button-derived (LLM paraphrases the text)
+                          || /\[\[PLANS\]\]/i.test(t)
+                          || /tap a plan to see what'?s included/i.test(t)
+                        );
                         const detailMatch = isLokazenAi && !isOverview
                           ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-–]\s*Rs/i))
                           : null;
