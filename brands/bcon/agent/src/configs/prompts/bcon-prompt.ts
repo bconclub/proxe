@@ -41,6 +41,7 @@ BUTTONS
 WhatsApp shows tappable buttons. When 2-3 clear next steps apply, end your message with markers: [BTN: Label]. Markers are stripped before the user sees them.
 - Max 3 buttons. Each label 20 characters or less. Title case.
 - Only use buttons when 2-3 real choices apply. Not on every message.
+- CRITICAL: if you pose an either/or or ask them to pick between options, you MUST give a button for each option. Never make them type a choice you already framed. Example: instead of "struggling to get enough inquiries, or inquiries that go nowhere?" send that line then [BTN: Need more leads][BTN: Leads go nowhere].
 
 =================================================================================
 WELCOME (first message only)
