@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
+import { LokazenPropertyGallery } from '@/components/dashboard/LokazenPropertyGallery'
 import { format } from 'date-fns'
 import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose, MdContentCopy, MdExpandMore } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -2144,6 +2145,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* LOKAZEN CRE DETAILS — collapsible; click to expand the full brief variables */}
                 <LokazenCreCard ctx={currentLead.unified_context?.lokazen} />
+
+                {/* LOKAZEN PROPERTY PHOTOS — owner leads carry a property_id; the
+                    photos live on lokazen.in and are lazy-loaded here on open. */}
+                {currentLead.unified_context?.lokazen?.property_id && (
+                  <LokazenPropertyGallery propertyId={String(currentLead.unified_context.lokazen.property_id)} />
+                )}
 
                 {/* ATTRIBUTION moved to the Interaction tab (with expanded
                     UTM / ad set / ad name / fbclid details). Used to live here

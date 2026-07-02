@@ -377,6 +377,44 @@ export async function POST(request: NextRequest) {
         const audience = asStr(pick('target_audience', 'audience_type', 'customer_profile'))
         if (audience) brandCtxData.target_audience = audience
       }
+
+      // ── Common CRE extras (any lokazen form) ──────────────────────────────
+      // Fields the action/enquiry forms send that the brand/owner branches
+      // above don't cover. The frontend already forwards all of these; we just
+      // surface them as structured context instead of leaving them in
+      // raw_form_fields. property_id links the lead to the Loka listing (and
+      // powers the image gallery). requested_action captures high-intent forms
+      // (site visit / expert call) that otherwise look like a plain lead.
+      const propId = asStr(pick('property_id', 'propertyId'))
+      if (propId) brandCtxData.property_id = propId
+      const src = normalizedSource || String(cf2.lead_source || '')
+      if (src === 'site_visit_request' || cf2.lead_source === 'site_visit_request') {
+        brandCtxData.requested_action = 'site_visit'
+        const pt = asStr(pick('property_title', 'propertyTitle'))
+        if (pt) brandCtxData.property_title = pt
+        const pd = asStr(pick('preferred_date', 'preferredDate', 'schedule_date'))
+        const ptime = asStr(pick('preferred_time', 'preferredTime', 'schedule_time'))
+        const when = [pd, ptime].filter(Boolean).join(' ')
+        if (when) brandCtxData.preferred_visit_at = when
+      } else if (cf2.lead_source === 'expert_connect') {
+        brandCtxData.requested_action = 'expert_call'
+        const sd = asStr(pick('schedule_datetime', 'scheduleDateTime'))
+        if (sd) brandCtxData.preferred_visit_at = sd
+      }
+      // Free-text requirement (contact-team / search requirements / notes).
+      const req = asStr(pick('requirements', 'requirement', 'search_criteria'))
+      if (req) brandCtxData.requirement_notes = req
+      const bestTime = asStr(pick('best_time', 'bestTime'))
+      if (bestTime) brandCtxData.best_time = bestTime
+      // Owner extras (public-submit / hyderabad) the owner branch doesn't map.
+      const poss = asStr(pick('possession_date', 'possessionDate', 'availability'))
+      if (poss && !brandCtxData.availability_date) brandCtxData.availability_date = poss
+      const pstatus = asStr(pick('property_status'))
+      if (pstatus) brandCtxData.property_status = pstatus
+      const cafeFmt = asStr(pick('cafe_format'))
+      if (cafeFmt && !brandCtxData.preferred_format) brandCtxData.preferred_format = cafeFmt
+      const venue = asStr(pick('venue'))
+      if (venue) brandCtxData.venue = venue
     }
 
     if (Object.keys(brandCtxData).length > 0) {

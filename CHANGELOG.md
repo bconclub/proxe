@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — full form audit: map all action-form details + property photo gallery
+
+- **Audit**: tested all 11 lead forms end-to-end into the PROXe inbound webhook (brand onboard, owner onboard, public-submit, hyderabad, natura, palace, site-visit, expert-connect, contact-team, requirements, meta-ad). All insert OK + user_type resolves. The two main onboarding forms + mall enquiries were already fully mapped; the ACTION forms only resolved type and dropped their specifics into raw_form_fields.
+- **lokazen** — `app/api/agent/leads/inbound/route.ts`: added a "common CRE extras" block (all changes PROXe-side; frontend already forwards these). Now maps: `property_id` (links lead → listing), site-visit `property_title`/`preferred_visit_at` + `requested_action=site_visit`, expert `schedule_datetime` + `requested_action=expert_call`, `requirement_notes` (contact-team/search free-text), `best_time`, owner `possession_date→availability_date`/`property_status`/`cafe_format`/`venue`. Verified: every action form now surfaces its real details.
+- **lokazen** — images: owner photos live on lokazen.in (Loka Supabase, stored as base64 data-URIs — NOT forwarded to PROXe, and NOT changing the frontend). New same-origin media proxy `app/api/dashboard/leads/property-media/route.ts` lazy-fetches a listing's photos by property_id from Loka's PUBLIC `/api/properties/[id]` (no creds, base64+http, size-capped). New `components/dashboard/LokazenPropertyGallery.tsx` renders a thumbnail strip + full-screen lightbox (prev/next) + "View listing" link in the lead detail, shown whenever the lead has a property_id. Verified end-to-end against a real listing (prop-181, 3 photos).
+
 ## 2026-07-02 · lokazen — plan cards click out to the landing page; no repeat details, no stray chips, no step-narration
 
 - **lokazen** — `LokazenPlanCards.tsx`: "Choose <plan>" now opens the plan's landing page in a new tab (per-plan `url` on the plan data; PLACEHOLDERS currently `lokazen.in/for-brands?plan=<x>#plans` — user to supply the final checkout links) and no longer sends a chat message, so the plan detail step never repeats after the cards.
