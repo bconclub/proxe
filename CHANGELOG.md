@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — fix chat detail extraction (misfiled answers) + fire Slack on chat leads
+
+- **lokazen** — `app/api/agent/web/chat/route.ts` buildLokazenContextPatch: chat answers were mis-filed — the capture matched the previous QUESTION text, but the wording drifted ("What size are you looking for?" vs the code's `'what size range'`), and history lag put the timeline answer in budget, the plan answer in timeline, and dropped size entirely (seen on the "Dico Jalli" lead). Added deterministic capture off the exact quick-reply LABEL the user tapped (size/budget/timeline/zone/type/floor → the right brand OR owner field), which is unambiguous. The old question-text chain now only runs for free-text answers (guarded by `!capturedFlowField`) so it can't clobber the correct captures; also fixed `'what size range'`→`'what size'` for typed sizes. Verified against the exact screenshot flow — every answer lands in its field.
+- **lokazen** — SAME file: chat leads never fired a Slack notification (web chat creates leads via updateLeadProfile, not ensureOrUpdateLead where the hook lives). Added a one-time "New lead" Slack notify in the lokazen-context update — fires as soon as the lead has an identity (name/phone/email), with the captured Brand/Property detailFields, and sets `_slack_notified` so it never repeats. No-op unless SLACK_WEBHOOK_URL is set (still needs to be added to the lokazen-proxe Vercel env for prod).
+
 ## 2026-07-02 · lokazen — full form audit: map all action-form details + property photo gallery
 
 - **Audit**: tested all 11 lead forms end-to-end into the PROXe inbound webhook (brand onboard, owner onboard, public-submit, hyderabad, natura, palace, site-visit, expert-connect, contact-team, requirements, meta-ad). All insert OK + user_type resolves. The two main onboarding forms + mall enquiries were already fully mapped; the ACTION forms only resolved type and dropped their specifics into raw_form_fields.

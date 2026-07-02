@@ -24,6 +24,7 @@ import {
   logMessage,
   upsertSummary,
   isLikelyRealPersonName,
+  notifySlackLead,
 } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
@@ -425,6 +426,45 @@ function buildLokazenContextPatch(
     patch.lead_type = 'scout';
   }
 
+  // ── Deterministic button-answer capture (robust) ──────────────────────────
+  // The previousAssistant text-matching below was mis-filing answers when the
+  // scripted question wording drifted or the history lagged (e.g. the timeline
+  // answer "Immediately" landing in budget, the plan answer in timeline, and
+  // size dropped entirely). The quick-reply LABELS are fixed and unambiguous,
+  // so key off the exact button the user tapped. This wins over the text chain.
+  const A = answer.trim();
+  const al = A.toLowerCase();
+  const isOwnerFlow = audience === 'owner';
+  const exact = (opts: string[]) => opts.some((o) => al === o);
+  let capturedFlowField = false;
+  if (exact(['under 600 sqft', '600-1500 sqft', '1500+ sqft', 'under 500 sqft', '500-1500 sqft'])) {
+    setIfUseful(patch, isOwnerFlow ? 'property_size_sqft' : 'required_size_sqft', A); capturedFlowField = true;
+  } else if (exact(['under 1l', '1l-2.5l', 'above 2.5l', 'under 50k', '50k-1.5l', 'above 1.5l'])) {
+    setIfUseful(patch, isOwnerFlow ? 'asking_rent_monthly' : 'budget_monthly_rent', A); capturedFlowField = true;
+  } else if (exact(['immediately', '1-3 months', 'just exploring'])) {
+    setIfUseful(patch, isOwnerFlow ? 'availability_date' : 'timeline', A); capturedFlowField = true;
+  } else if (exact(['north bangalore', 'south bangalore', 'east bangalore', 'west bangalore', 'central bangalore'])) {
+    setIfUseful(patch, isOwnerFlow ? 'property_zone' : 'target_zones', A); capturedFlowField = true;
+  } else if (exact(['qsr / f&b', 'cafe / restaurant', 'retail', 'office', 'restaurant-ready'])) {
+    if (isOwnerFlow) { setIfUseful(patch, 'property_type', A); }
+    else {
+      setIfUseful(patch, 'business_type', A);
+      setIfUseful(patch, 'preferred_format', /retail/i.test(al) && !/restaurant/i.test(al) ? 'retail' : 'restaurant');
+    }
+    capturedFlowField = true;
+  } else if (exact(['ground floor', 'first floor', 'upper floor'])) {
+    setIfUseful(patch, 'floor', A); capturedFlowField = true;
+  }
+  if (capturedFlowField && !patch.user_type) {
+    patch.user_type = isOwnerFlow ? 'owner' : 'brand';
+    patch.lead_type = isOwnerFlow ? 'property_owner' : 'brand';
+  }
+
+  // Fall back to previous-question matching ONLY when the answer wasn't a known
+  // quick-reply — i.e. free-text answers (brand name, a typed area/size, owner
+  // fields). Button answers are already handled deterministically above, so this
+  // fragile chain must not re-run and clobber them.
+  if (!capturedFlowField) {
   if (previousAssistant.includes("what's your brand name") || previousAssistant.includes('what is your brand name')) {
     if (patch.user_type !== 'owner') {
       patch.user_type = 'brand';
@@ -451,7 +491,7 @@ function buildLokazenContextPatch(
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'target_zones', answer);
-  } else if (previousAssistant.includes('what size range')) {
+  } else if (previousAssistant.includes('what size')) {
     patch.user_type = 'brand';
     patch.lead_type = 'brand';
     setIfUseful(patch, 'required_size_sqft', answer);
@@ -544,6 +584,7 @@ function buildLokazenContextPatch(
       setIfUseful(patch, 'scout_next_action', answer);
     }
   }
+  } // end !capturedFlowField guard
 
   if (buttons.some((b) => b.includes('starter'))) patch.selected_plan = 'Starter';
   if (buttons.some((b) => b.includes('professional'))) patch.selected_plan = 'Professional';
@@ -568,7 +609,7 @@ async function updateLokazenLeadContext(
 
   const { data: ctxRow, error } = await supabase
     .from('all_leads')
-    .select('unified_context')
+    .select('unified_context, customer_name, phone, email, lead_stage')
     .eq('id', leadId)
     .maybeSingle();
 
@@ -592,6 +633,55 @@ async function updateLokazenLeadContext(
   }
 
   console.log(`[agent/web/chat/lokazen-context] lead=${leadId} captured=${JSON.stringify(patch)}`);
+
+  // ── Slack "new lead" notification (chat) ────────────────────────────────
+  // Web chat creates leads via updateLeadProfile (not ensureOrUpdateLead), so
+  // the leadManager Slack hook never fires for chat leads — that's why chat
+  // leads weren't being announced. Fire ONCE here, as soon as the lead has an
+  // identity (name/phone/email), and mark it so it never repeats. No-op unless
+  // SLACK_WEBHOOK_URL is set.
+  try {
+    const name = ctxRow?.customer_name || null;
+    const phone = ctxRow?.phone || null;
+    const email = ctxRow?.email || null;
+    const hasIdentity = !!(name || phone || email);
+    if (BRAND_ID === 'lokazen' && hasIdentity && !existingLokazen._slack_notified) {
+      const ut = nextLokazen.user_type === 'property_owner' ? 'owner' : nextLokazen.user_type;
+      const typeLabel = ut === 'owner' ? 'Property Owner' : ut === 'brand' ? 'Brand' : ut === 'scout' ? 'Scout' : null;
+      const df: Array<[string, string | number | null | undefined]> = ut === 'owner'
+        ? [
+            ['Property type', nextLokazen.property_type],
+            ['Size', nextLokazen.property_size_sqft ? `${nextLokazen.property_size_sqft} sqft` : null],
+            ['Area', nextLokazen.property_zone],
+            ['Rent', nextLokazen.asking_rent_monthly],
+          ]
+        : [
+            ['Brand', nextLokazen.brand_name],
+            ['Category', nextLokazen.brand_category || nextLokazen.business_type],
+            ['Areas', nextLokazen.target_zones],
+            ['Size', nextLokazen.required_size_sqft ? `${nextLokazen.required_size_sqft} sqft` : null],
+            ['Budget', nextLokazen.budget_monthly_rent],
+            ['Timeline', nextLokazen.timeline],
+          ];
+      const res = await notifySlackLead({
+        brandLabel: 'Lokazen',
+        title: 'New lead',
+        name, phone, email,
+        leadType: typeLabel,
+        source: 'web chat',
+        detailFields: df,
+        footer: 'new lead · chat',
+      });
+      if (res.success) {
+        await supabase
+          .from('all_leads')
+          .update({ unified_context: { ...ctx, lokazen: { ...nextLokazen, _slack_notified: true } } })
+          .eq('id', leadId);
+      }
+    }
+  } catch (slackErr: any) {
+    console.error('[agent/web/chat/lokazen-context] slack notify failed:', slackErr?.message || slackErr);
+  }
 }
 
 async function postProcess(
