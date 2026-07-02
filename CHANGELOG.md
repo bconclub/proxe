@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · slack — every message richly formatted (Block Kit, no walls of text)
+
+- **services** — `lib/services/slackNotifier.ts` rewritten so every notification is structured Block Kit: header → divider → 2-column contact fields (emoji labels) → divider → structured detail fields → context footer. Added `fieldsSection`/`mrkdwnField` helpers, whitespace-collapsing `clean()`, summary truncation (quote block, capped), and a `detailFields`/`footer` API on `notifySlackLead`. No more joined "·" lines or raw text dumps.
+- **callers** — inbound webhook now passes the Brand/Property details as structured `detailFields` (🏢 Brand / 🍽️ Category / 📍 Areas / 🏬 Format / 📐 Size / 💰 Budget / 🔢 Outlets, or 🏠 Type / 📐 Size / 📍 Area / 💰 Rent / 🪜 Floor for owners) instead of a joined string; leadManager + engine needs-human calls get consistent headers + footers. Verified live: a rich Brand new-lead posted to #lokazen-proxe (HTTP 200).
+
 ## 2026-07-02 · lokazen — onboarding mapping uses the REAL website field keys
 
 - **lokazen** — `app/api/agent/leads/inbound/route.ts`: the first mapping pass guessed the onboarding-form component key names, but a real form lead (Blue Tokai) revealed the actual webhook payload uses different keys: `user_type: "seeker"|"provider"`, `space_type`, `area_sqft`, `budget_rent`, `business_type`, `location_preference`, `current_outlets`. Updated the mapping to read these as PRIMARY aliases (kept the old ones as fallbacks). Now brand leads populate brand_category (from business_type), target_zones (location_preference), preferred_format (space_type), required_size_sqft (area_sqft), budget_monthly_rent (budget_rent); owners mirror with property_type/property_size_sqft/property_zone/asking_rent_monthly. `asType` maps seeker→brand, provider→owner. Verified end-to-end against the exact Blue Tokai payload — all 6 detail fields now map (were blank before).

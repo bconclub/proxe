@@ -310,12 +310,13 @@ export async function ensureOrUpdateLead(
       const typeLabel = ut === 'owner' ? 'Property Owner' : ut === 'brand' ? 'Brand' : ut === 'scout' ? 'Scout' : null;
       await notifySlackLead({
         brandLabel: brand === 'lokazen' ? 'Lokazen' : brand,
-        headline: `🆕 New Lead — ${brand === 'lokazen' ? 'Lokazen' : brand}`,
+        headline: `🆕 New Lead · ${brand === 'lokazen' ? 'Lokazen' : brand}`,
         name: customerName,
         phone: normalizedPhone,
         email,
         leadType: typeLabel,
         source: channel,
+        footer: 'new lead · chat',
       });
     } catch (slackErr: any) {
       console.error('[leadManager] Slack new-lead notify failed:', slackErr?.message || slackErr);

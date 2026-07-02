@@ -639,28 +639,37 @@ export async function POST(request: NextRequest) {
       try {
         const lkz = brandCtxData
         const typeLabel = lkz.user_type === 'owner' ? 'Property Owner' : lkz.user_type === 'brand' ? 'Brand' : null
-        const detailParts: string[] = []
-        if (lkz.user_type === 'owner') {
-          if (lkz.property_type) detailParts.push(`Type: ${lkz.property_type}`)
-          if (lkz.property_size_sqft) detailParts.push(`Size: ${lkz.property_size_sqft} sqft`)
-          if (lkz.property_zone) detailParts.push(`Area: ${lkz.property_zone}`)
-          if (lkz.asking_rent_monthly) detailParts.push(`Rent: ${lkz.asking_rent_monthly}`)
-        } else if (lkz.user_type === 'brand') {
-          if (lkz.brand_name) detailParts.push(`Brand: ${lkz.brand_name}`)
-          if (lkz.brand_category) detailParts.push(`Category: ${lkz.brand_category}`)
-          if (lkz.target_zones) detailParts.push(`Areas: ${lkz.target_zones}`)
-          if (lkz.required_size_sqft) detailParts.push(`Size: ${lkz.required_size_sqft} sqft`)
-          if (lkz.budget_monthly_rent) detailParts.push(`Budget: ${lkz.budget_monthly_rent}`)
-        }
+        // Structured detail — rendered as Slack 2-column fields, not a joined line.
+        const detailFields: Array<[string, string | number | null | undefined]> =
+          lkz.user_type === 'owner'
+            ? [
+                ['🏠 Property Type', lkz.property_type],
+                ['📐 Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
+                ['📍 Area', lkz.property_zone],
+                ['💰 Rent', lkz.asking_rent_monthly],
+                ['🪜 Floor', lkz.floor],
+              ]
+            : lkz.user_type === 'brand'
+            ? [
+                ['🏢 Brand', lkz.brand_name],
+                ['🍽️ Category', lkz.brand_category],
+                ['📍 Areas', lkz.target_zones],
+                ['🏬 Format', lkz.preferred_format],
+                ['📐 Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
+                ['💰 Budget', lkz.budget_monthly_rent],
+                ['🔢 Outlets', lkz.current_outlets],
+              ]
+            : []
         await notifySlackLead({
           brandLabel: leadBrand === 'lokazen' ? 'Lokazen' : leadBrand,
-          headline: `🆕 New Lead — ${leadBrand === 'lokazen' ? 'Lokazen' : leadBrand}`,
+          headline: `🆕 New Lead · ${leadBrand === 'lokazen' ? 'Lokazen' : leadBrand}`,
           name: leadName,
           phone: normalizedPhone,
           email: email?.trim() || null,
           leadType: typeLabel,
           source: normalizedSource || leadSource,
-          detail: detailParts.join(' · ') || null,
+          detailFields,
+          footer: 'new lead',
         })
       } catch (slackErr: any) {
         console.error('[inbound] Slack new-lead notify failed:', slackErr?.message || slackErr)

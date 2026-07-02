@@ -778,13 +778,14 @@ async function flagForHumanFollowup(
       : null;
     await notifySlackLead({
       brandLabel,
-      headline: `🚨 Needs human follow-up — ${brandLabel}`,
+      headline: `🚨 Needs human follow-up · ${brandLabel}`,
       name: input.userProfile.name || null,
       phone: input.userProfile.phone || null,
       email: input.userProfile.email || null,
       leadType: audienceLabel,
       source: input.channel || null,
       detail: reason,
+      footer: 'needs human',
     });
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
