@@ -139,6 +139,17 @@ export async function POST(request: NextRequest) {
     const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
     const leadBrand = brand || BRAND_ID
 
+    // The lokazen all_leads.first_touchpoint CHECK constraint only permits the
+    // base channels (web/whatsapp/voice/social). A form/ads/meta_forms/manual
+    // source would fail the INSERT and the lead would be LOST — the exact reason
+    // onboarding/ad leads weren't arriving. Coerce the value we WRITE to an
+    // allowed channel; the true source is still preserved in unified_context.
+    // attribution + agent_tasks.metadata.original_source. (Scoped to lokazen so
+    // brands with a wider constraint keep full touchpoint fidelity.)
+    const DB_ALLOWED_TOUCHPOINTS = new Set(['web', 'whatsapp', 'voice', 'social'])
+    const storedTouchpoint =
+      leadBrand === 'lokazen' && !DB_ALLOWED_TOUCHPOINTS.has(leadSource) ? 'web' : leadSource
+
     const supabase = getServiceClient() || getClient()
     if (!supabase) {
       return NextResponse.json({ error: 'Database connection unavailable' }, { status: 503 })
@@ -265,6 +276,87 @@ export async function POST(request: NextRequest) {
         brandCtxData.pat_completed_at = now
       }
     }
+
+    // ── Lokazen: map Brand Onboarding / Property Owner Onboarding form fields ──
+    // The lokazen.in onboarding forms (BrandOnboardingForm / PropertyOwner
+    // OnboardingForm) POST rich details, but without this mapping they only
+    // land in raw_form_fields and the dashboard's PROPERTY TYPE / SIZE / zone
+    // columns (which read unified_context.lokazen.*) stay blank. We read the
+    // form's own key names AND common aliases so it survives light renaming.
+    if (leadBrand === 'lokazen') {
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = cf2[k] ?? (body as Record<string, any>)[k]
+          if (v != null && String(v).trim() !== '') return v
+        }
+        return null
+      }
+      const asStr = (v: any) => (v == null ? null : String(Array.isArray(v) ? v.join(', ') : v).trim() || null)
+      const asType = (v: any): 'brand' | 'owner' | null => {
+        const s = String(v || '').toLowerCase().trim()
+        if (!s) return null
+        if (s.includes('owner') || s.includes('property') || s.includes('landlord') || s.includes('list')) return 'owner'
+        if (s.includes('brand') || s.includes('tenant') || s.includes('space')) return 'brand'
+        return null
+      }
+
+      // Resolve audience (brand vs owner). Explicit type field wins; else infer
+      // from the form_type/event_name/source, else from which fields are present.
+      let lkzType =
+        asType(pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type')) ||
+        asType(pick('form_type', 'event_name')) ||
+        asType(normalizedSource)
+
+      // Field presence fallback: property fields => owner, brand fields => brand.
+      const hasPropFields = !!pick('propertyType', 'property_type', 'spaceTypes', 'space_types', 'carpetArea', 'carpet_area', 'asking_rent', 'monthly_rent')
+      const hasBrandFields = !!pick('brandName', 'brand_name', 'outlets', 'current_outlets', 'sizeMin', 'size_min', 'rentMin', 'rent_min')
+      if (!lkzType) lkzType = hasPropFields ? 'owner' : hasBrandFields ? 'brand' : null
+
+      if (lkzType === 'owner') {
+        brandCtxData.user_type = 'owner'
+        const propType = asStr(pick('propertyType', 'property_type', 'spaceTypes', 'space_types', 'space_type'))
+        if (propType) brandCtxData.property_type = propType
+        const size = asStr(pick('carpetArea', 'carpet_area', 'builtUpArea', 'built_up_area', 'property_size_sqft', 'sqft', 'size', 'area_sqft'))
+        if (size) brandCtxData.property_size_sqft = size
+        const zone = asStr(pick('area', 'locality', 'zone', 'property_zone', 'micromarket', 'location'))
+        if (zone) brandCtxData.property_zone = zone
+        const rent = asStr(pick('rent', 'asking_rent', 'monthly_rent', 'asking_rent_monthly', 'expected_rent'))
+        if (rent) brandCtxData.asking_rent_monthly = rent
+        const floor = asStr(pick('floor'))
+        if (floor) brandCtxData.floor = floor
+        const frontage = asStr(pick('frontage', 'frontage_ft'))
+        if (frontage) brandCtxData.frontage_ft = frontage
+        const amenities = asStr(pick('amenities'))
+        if (amenities) brandCtxData.amenities = amenities
+        const avail = asStr(pick('handoverDate', 'handover_date', 'availability_date', 'available_from'))
+        if (avail) brandCtxData.availability_date = avail
+      } else if (lkzType === 'brand') {
+        brandCtxData.user_type = 'brand'
+        const bname = asStr(pick('brandName', 'brand_name', 'company', 'brand'))
+        if (bname) brandCtxData.brand_name = bname
+        const cat = asStr(pick('category', 'brand_category', 'business_category', 'brand_type'))
+        if (cat) brandCtxData.brand_category = cat
+        const outlets = asStr(pick('outlets', 'current_outlets', 'num_outlets'))
+        if (outlets) brandCtxData.current_outlets = outlets
+        const zones = asStr(pick('selectedAreas', 'selected_areas', 'target_zones', 'areas', 'preferred_areas', 'zone', 'area', 'locality'))
+        if (zones) brandCtxData.target_zones = zones
+        const fmt = asStr(pick('preferred_format', 'format', 'property_format'))
+        if (fmt) brandCtxData.preferred_format = fmt
+        // Size: prefer explicit sqft, else compose a min-max range.
+        const sizeMin = asStr(pick('sizeMin', 'size_min', 'min_size'))
+        const sizeMax = asStr(pick('sizeMax', 'size_max', 'max_size'))
+        const sizeExplicit = asStr(pick('required_size_sqft', 'size', 'sqft'))
+        const sizeRange = sizeExplicit || (sizeMin && sizeMax ? `${sizeMin}-${sizeMax}` : sizeMin || sizeMax)
+        if (sizeRange) brandCtxData.required_size_sqft = sizeRange
+        // Budget: prefer explicit, else compose min-max rent range.
+        const rentMin = asStr(pick('rentMin', 'rent_min', 'budget_min'))
+        const rentMax = asStr(pick('rentMax', 'rent_max', 'budget_max'))
+        const budgetExplicit = asStr(pick('budget_monthly_rent', 'budget', 'rent'))
+        const budget = budgetExplicit || (rentMin && rentMax ? `${rentMin}-${rentMax}` : rentMin || rentMax)
+        if (budget) brandCtxData.budget_monthly_rent = budget
+      }
+    }
+
     if (Object.keys(brandCtxData).length > 0) {
       inboundContext[leadBrand] = brandCtxData
     }
@@ -307,7 +399,7 @@ export async function POST(request: NextRequest) {
       // Update existing - don't overwrite name if already set
       const updates: Record<string, any> = {
         last_interaction_at: now,
-        last_touchpoint: leadSource,
+        last_touchpoint: storedTouchpoint,
       }
       if (email) updates.email = email.trim().toLowerCase()
       if (name && !existing.customer_name) updates.customer_name = name.trim()
@@ -349,8 +441,8 @@ export async function POST(request: NextRequest) {
           phone,
           customer_phone_normalized: normalizedPhone,
           brand: leadBrand,
-          first_touchpoint: leadSource,
-          last_touchpoint: leadSource,
+          first_touchpoint: storedTouchpoint,
+          last_touchpoint: storedTouchpoint,
           last_interaction_at: now,
           lead_stage: 'New',
           unified_context: {
