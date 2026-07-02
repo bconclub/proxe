@@ -202,7 +202,7 @@
 }
 
 .quickBtn {
-  padding: 6px 12px;
+  padding: 5px 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.9);
@@ -223,7 +223,7 @@
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
-  min-height: 44px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -516,7 +516,7 @@
   margin-bottom: 0 !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
-  width: 400px;
+  width: 360px;
   height: 68vh;
   min-height: 540px;
   max-height: 680px;
@@ -658,7 +658,7 @@
 /* Tablet breakpoint */
 @media (min-width: 769px) and (max-width: 1024px) {
   .chatboxContainer {
-    width: 380px !important;
+    width: 340px !important;
     height: calc(100vh - 130px) !important;
     max-height: calc(100vh - 110px) !important;
     max-height: calc(100dvh - 110px) !important;
@@ -702,7 +702,7 @@
   -webkit-transform: none !important;
   -moz-transform: none !important;
   -ms-transform: none !important;
-  width: 400px !important;
+  width: 360px !important;
   max-width: calc(100vw - 40px) !important;
   height: 68vh !important;
   min-height: 540px !important;
