@@ -8,7 +8,7 @@ import { AgentInput, AgentOutput, KnowledgeResult, StreamChunk } from './types';
 import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
 import { getPromptOverride } from '../promptConfig';
-import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage } from './claudeClient';
+import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage, getReasoningModel } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
 import { extractIntent, isBookingIntent, isBookingFlowStep, extractPainPoint, detectObjection } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
@@ -175,8 +175,9 @@ User's message: ${input.message}`
         maxToolRounds: 3,
       }, 512);
     } else {
-      // Non-booking WhatsApp messages and all other channels: simple response
-      rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
+      // Non-booking WhatsApp messages and all other channels: simple response.
+      // Reasoning model (Sonnet 5) for the actual conversation.
+      rawResponse = await generateResponse(systemPrompt, userPrompt, 512, getReasoningModel());
     }
   } catch (firstError: any) {
     console.error('[Engine] AI generation failed (attempt 1):', firstError?.message || firstError);
@@ -195,7 +196,7 @@ User's message: ${input.message}`
           maxToolRounds: 2,
         }, 512);
       } else {
-        rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
+        rawResponse = await generateResponse(systemPrompt, userPrompt, 512, getReasoningModel());
       }
     } catch (retryError: any) {
       console.error('[Engine] AI generation failed (attempt 2):', retryError?.message || retryError);
@@ -400,7 +401,7 @@ User's message: ${input.message}`
         yield { type: 'chunk', text: textChunk };
       }
     } else if (!hasBookingIntent) {
-      const rawResponse = await generateResponse(systemPrompt, userPrompt, 512);
+      const rawResponse = await generateResponse(systemPrompt, userPrompt, 512, getReasoningModel());
       finalResponse = suppressKnownContactReask(cleanResponse(rawResponse, input.channel), input, brandId);
       finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
       yield { type: 'chunk', text: finalResponse };

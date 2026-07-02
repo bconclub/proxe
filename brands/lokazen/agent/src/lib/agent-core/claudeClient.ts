@@ -47,6 +47,20 @@ function getModel(): string {
   return configured;
 }
 
+// Model for the actual CONVERSATION (the part that needs reasoning). Sonnet 5
+// by default so chat replies reason well; override with CLAUDE_MODEL_REASONING.
+// The cheap helpers — quick-reply buttons (generateShort), summaries, profile
+// extraction — deliberately stay on getModel() (Haiku) to keep token spend down.
+export function getReasoningModel(): string {
+  const configured = process.env.CLAUDE_MODEL_REASONING || 'claude-sonnet-5';
+  return RETIRED_MODEL_MAP[configured] || configured;
+}
+
+// Sonnet 5 / 4.6 default adaptive thinking ON when the param is omitted, which
+// adds latency + 3-10x output tokens. We don't need chain-of-thought for these
+// scripted flows, so disable it everywhere for cost + speed.
+const NO_THINKING = { type: 'disabled' as const };
+
 /**
  * Stream a response from Claude (for web chat SSE)
  * Returns an AsyncGenerator that yields text chunks
@@ -54,10 +68,11 @@ function getModel(): string {
 export async function* streamResponse(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens: number = 768
+  maxTokens: number = 768,
+  modelOverride?: string
 ): AsyncGenerator<string> {
   const anthropic = getClient();
-  const model = getModel();
+  const model = modelOverride || getReasoningModel();
 
   // Retry logic for overloaded errors
   const maxRetries = 3;
@@ -75,6 +90,7 @@ export async function* streamResponse(
       stream = await (anthropic.messages.stream as any)({
         model,
         max_tokens: maxTokens,
+        thinking: NO_THINKING,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -149,6 +165,7 @@ export async function generateResponse(
       const response = await (anthropic.messages.create as any)({
         model,
         max_tokens: maxTokens,
+        thinking: NO_THINKING,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -202,10 +219,11 @@ export async function generateResponseWithTools(
   userPrompt: string,
   toolOptions: ToolUseOptions,
   maxTokens: number = 1024,
-  category: TokenCategory = 'chat'
+  category: TokenCategory = 'chat',
+  modelOverride?: string
 ): Promise<string> {
   const anthropic = getClient();
-  const model = getModel();
+  const model = modelOverride || getReasoningModel();
   const { tools, toolHandlers, maxToolRounds = 5 } = toolOptions;
 
   const messages: Array<{ role: 'user' | 'assistant'; content: any }> = [
@@ -229,6 +247,7 @@ export async function generateResponseWithTools(
         response = await (anthropic.messages.create as any)({
           model,
           max_tokens: maxTokens,
+          thinking: NO_THINKING,
           system: cacheable(systemPrompt),
           messages,
           tools: tools as any,
