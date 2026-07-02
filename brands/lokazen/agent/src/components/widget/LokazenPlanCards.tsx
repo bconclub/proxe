@@ -20,14 +20,18 @@ export interface WidgetPlan {
   features: string[]
   /** The exact button label the agent expects, so Choose reuses the plan flow. */
   selectLabel: string
+  /** Landing/checkout URL — "Choose" clicks straight out to this page. */
+  url: string
 }
 
+// TODO(user): replace the three URLs with the final per-plan checkout links.
 export const LOKAZEN_PLANS: WidgetPlan[] = [
   {
     name: 'Starter',
     price: '₹4,999',
     features: ['Property database access', 'AI matching', 'Location reports', 'Owner contacts', '30 days validity'],
     selectLabel: 'Starter Rs 4,999',
+    url: 'https://www.lokazen.in/for-brands?plan=starter#plans',
   },
   {
     name: 'Professional',
@@ -35,12 +39,14 @@ export const LOKAZEN_PLANS: WidgetPlan[] = [
     popular: true,
     features: ['Everything in Starter', 'Dedicated account manager', 'On-ground site visits', 'Negotiation support', 'WhatsApp support', '60 days validity'],
     selectLabel: 'Professional 9,999',
+    url: 'https://www.lokazen.in/for-brands?plan=professional#plans',
   },
   {
     name: 'Premium',
     price: '₹19,999',
     features: ['Everything in Professional', '24/7 priority support', 'Unlimited site visits', 'Legal document review', 'Multi-location search', '90 days validity'],
     selectLabel: 'Premium Rs 19,999',
+    url: 'https://www.lokazen.in/for-brands?plan=premium#plans',
   },
 ]
 
@@ -160,7 +166,12 @@ export function LokazenPlanCards({
 
           <button
             type="button"
-            onClick={() => onChoose?.(p.selectLabel)}
+            onClick={() => {
+              // Click straight out to the plan's landing/checkout page — the
+              // plans were already fully shown here, no second detail step and
+              // no chat message (that would re-trigger the plan detail flow).
+              if (typeof window !== 'undefined') window.open(p.url, '_blank', 'noopener')
+            }}
             style={{
               marginTop: 10,
               width: '100%',

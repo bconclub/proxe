@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — plan cards click out to the landing page; no repeat details, no stray chips, no step-narration
+
+- **lokazen** — `LokazenPlanCards.tsx`: "Choose <plan>" now opens the plan's landing page in a new tab (per-plan `url` on the plan data; PLACEHOLDERS currently `lokazen.in/for-brands?plan=<x>#plans` — user to supply the final checkout links) and no longer sends a chat message, so the plan detail step never repeats after the cards.
+- **lokazen** — `ChatWidget.tsx`: the stray "Starter/Professional/Premium" chips under the cards came from TWO leaks: (1) a pre-existing hack that force-injects plan chips when the "how we work" message still shows a stale timeline rail — now gated off when the cards are anchored; (2) the followUps "safety net" effect re-applied the RAW unfiltered followUps after the main handler had stripped them — it now applies the same plan filtering.
+- **agent-core** — `engine.ts` cleanResponse: internal-narration leak guard — strips lines like 'User selected "Immediately". moving to Step 8.' and bare `--` separators (seen verbatim in prod). Prompt also gains a NEVER NARRATE FLOW MECHANICS rule. Sanitizer verified against the exact leaked transcript; served widget chunk HTTP-verified to carry the click-out code (preview-tab cache was masking it; prod chunks are content-hashed).
+
 ## 2026-07-02 · agent-core — booking flow no longer dies on an empty tool-loop reply
 
 - **agent-core (web)** — `engine.ts` processStream booking path: clicking "Start this plan" produced NOTHING — prod logs show the model spent its turn on tool calls (update_lead_profile, selected_plan captured) and returned no visible text (or [BTN:]-only text), so the widget rendered an empty bubble and the flow died. Added an EMPTY-RESPONSE GUARD after the tool loop: if the reply has no visible text once [BTN:] markers are stripped, substitute the deterministic next booking question (ask name+contact → ask contact → ask day/time, based on what's already known). The flow now always moves forward.

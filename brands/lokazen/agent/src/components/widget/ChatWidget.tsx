@@ -1945,11 +1945,26 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     if (!lastMsg.followUps || lastMsg.followUps.length === 0) return;
     if (pendingFlowOverrideRef.current) return;
 
+    // Apply the SAME Lokazen plan filtering as the main completion handler —
+    // this safety net was re-injecting the raw unfiltered followUps (the plan
+    // chips) right after the main handler had stripped them for the cards.
+    let safetyFollowUps = lastMsg.followUps;
+    if (brand === 'lokazen') {
+      const planBtns = safetyFollowUps.filter((b) => /^(starter|professional|premium)\b/i.test(b.trim()));
+      if (planBtns.length >= 2) {
+        if (lastMsg.id) setPlanCardsMessageId(lastMsg.id);
+        safetyFollowUps = safetyFollowUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
+      } else if (/\[\[plan:/i.test(lastMsg.text) || /\b(starter|professional|premium)\s*[-–]\s*rs/i.test(lastMsg.text)) {
+        safetyFollowUps = safetyFollowUps.filter((b) => !/start this plan/i.test(b.trim()));
+      }
+      if (safetyFollowUps.length === 0) return;
+    }
+
     setFlowOverrideButtons(current => {
       if (current && current.length > 0) return current;
-      return lastMsg.followUps!;
+      return safetyFollowUps;
     });
-  }, [isLoading, messages]);
+  }, [isLoading, messages, brand]);
 
   const resetChatState = useCallback(() => {
     closeCalendarWidget();
@@ -2095,10 +2110,16 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const isLokazenPlanMenuMessage = /how we work|tap a plan|01\s+choose plan/i.test(lastAiText);
   const isTimelineButtonRail = (buttons: string[] | null | undefined) =>
     Boolean(buttons?.some((button) => /^(Immediately|1-3 months|Just exploring)$/i.test(button.trim())));
+  // The plan CARDS own the plan actions now. When they're anchored to the last
+  // AI message, never re-inject the text chips (old fallback for stale timeline
+  // rails) and clear any stale rail entirely.
+  const planCardsActive = lastAiMessage?.id != null && lastAiMessage.id === planCardsMessageId;
   const visibleFlowOverrideButtons =
-    isLokazenPlanMenuMessage && isTimelineButtonRail(flowOverrideButtons)
-      ? ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999']
-      : flowOverrideButtons;
+    planCardsActive && (isLokazenPlanMenuMessage || isTimelineButtonRail(flowOverrideButtons))
+      ? null
+      : isLokazenPlanMenuMessage && isTimelineButtonRail(flowOverrideButtons)
+        ? ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999']
+        : flowOverrideButtons;
   const desktopWelcomeEligible =
     !isMobileViewport &&
     isOpen &&

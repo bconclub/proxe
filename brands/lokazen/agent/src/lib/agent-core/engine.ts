@@ -624,6 +624,15 @@ function cleanResponse(raw: string, channel?: string): string {
     .replace(/^[ \t]*(?:online|offline)[ \t]*$/gim, '')
     .replace(/\[?\s*(?:calling|checking)\s+(?:for\s+)?\d{4}-\d{2}-\d{2}\s*\]?\.?/gi, '')
     .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
+    // Internal-narration leak guard: the model sometimes verbalises its own
+    // flow instructions before the actual reply, e.g.
+    //   'User selected "Immediately". moving to Step 8.\n--\nHow we work: ...'
+    // Strip step-narration lines and any leftover '--' separator lines so the
+    // customer never sees the prompt's internals.
+    .replace(/^[ \t]*(?:the\s+)?user (?:selected|said|chose|clicked)[^\n]*$/gim, '')
+    .replace(/^[ \t]*[^\n]*\bmov(?:e|ing) (?:on\s+)?to step\s*\d+[^\n]*$/gim, '')
+    .replace(/^[ \t]*(?:proceeding|continuing|going)\s+to step\s*\d+[^\n]*$/gim, '')
+    .replace(/^[ \t]*(?:step\s+\d+[a-z]?\s*:)?[ \t]*-{2,}[ \t]*$/gim, '')
     .trim();
 
   cleaned = stripCapturedDetailWrapper(cleaned).trim();
