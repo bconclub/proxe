@@ -5,6 +5,7 @@ import { useChat } from '@/hooks/useChat';
 import type { Message } from '@/hooks/useChatStream';
 
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
+import { LokazenPlanCards } from '@/components/widget/LokazenPlanCards';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
 import { CostGuideFormInline } from '@/components/widget/CostGuideFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
@@ -1393,7 +1394,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     } else if (message.followUps && message.followUps.length > 0) {
       // LLM emitted [BTN: X] markers → useChatStream extracted them into
       // message.followUps. Surface them as quick-reply buttons.
-      setFlowOverrideButtons(message.followUps);
+      let followUps = message.followUps;
+      // On the Lokazen web widget the plan CARDS render the plan actions, so
+      // drop the redundant text buttons (Starter/Professional/Premium/Start this
+      // plan). WhatsApp keeps them — it has no cards.
+      const isPlanMsg = /\[\[plans?\]\]|\[\[plan:/i.test(message.text) || /tap a plan to see|ready to get started/i.test(message.text);
+      if (brand === 'lokazen' && isPlanMsg) {
+        followUps = followUps.filter((b) => !/^(starter|professional|premium)\b|start this plan/i.test(b.trim()));
+      }
+      setFlowOverrideButtons(followUps);
       setDynamicQuickButtons(null);
     }
 
@@ -3368,6 +3377,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     let cleanedText = text
       .replace(/→\s*BUTTON:\s*[^\n]*/gi, '') // Remove "→ BUTTON: ..." lines
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
+      .replace(/\[\[PLANS?\]\]/gi, '') // Plans-card marker — the cards render separately
+      .replace(/\[\[PLAN:[a-z]+\]\]/gi, '') // Single-plan-card marker
+      // The "Tap a plan" line + its inline plan list are replaced by the plan
+      // cards, so drop the now-redundant text tail on the plans message.
+      .replace(/tap a plan to see what'?s included:?/gi, '')
       .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
       .trim();
     cleanedText = spaceLokazenProcessSteps(cleanedText);
@@ -3684,8 +3698,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         <span />
                         <span />
                       </div>
-                    ) : (
+                    ) : (() => {
+                        // Lokazen plan cards — rich rendering of /for-brands#plans so
+                        // plans land visually instead of as flat text. Overview shows
+                        // all 3 (with the "how we work" intro above); the single-plan
+                        // detail replaces the flat text with one focused card.
+                        const t = message.text || '';
+                        const isLokazenAi = brand === 'lokazen' && message.type === 'ai' && !message.isStreaming;
+                        const isOverview = isLokazenAi && (/\[\[PLANS\]\]/i.test(t) || /tap a plan to see what'?s included/i.test(t));
+                        const detailMatch = isLokazenAi && !isOverview
+                          ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-–]\s*Rs/i))
+                          : null;
+                        const hideText = !!detailMatch; // the focused card replaces the flat detail text
+                        return (
                       <>
+                        {!hideText && (
                         <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
                           <div
                             className={styles.messageText}
@@ -3696,10 +3723,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                             <span className={styles.streamingCursor}>▋</span>
                           )}
                         </div>
+                        )}
 
+                        {isOverview && (
+                          <LokazenPlanCards onChoose={(label) => handleQuickButtonClick(label)} />
+                        )}
+                        {detailMatch && (
+                          <LokazenPlanCards focus={detailMatch[1]} onAction={(label) => handleQuickButtonClick(label)} />
+                        )}
 
                     </>
-                  )}
+                    );
+                  })()}
                   </div>
                 </div>
               </div>

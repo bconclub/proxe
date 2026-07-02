@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — plans shown as rich cards in the widget (not flat text)
+
+- **lokazen** — new `components/widget/LokazenPlanCards.tsx` + wiring in `ChatWidget.tsx`: the "how we work / choose a plan" message and each single-plan detail were flat walls of text with no emotion. Now the web widget renders them as brand-orange plan cards mirroring lokazen.in/for-brands#plans — overview shows all three (Starter ₹4,999 / Professional ₹9,999 "Most Popular" / Premium ₹19,999) with features + Choose buttons; picking one renders a focused card with Start-this-plan / Talk-to-the-team CTAs. Detection is off the existing scripted text ("tap a plan to see what's included" and the "Starter - Rs" detail header) so nothing leaks to WhatsApp, which keeps its [BTN:] buttons. Redundant plan text-buttons are suppressed on web (cards provide the actions). Verified in the preview widget (both modes, orange highlight, correct button hierarchy). Plan data is a plain array, ready to lift to brand config for reuse across brands.
+
 ## 2026-07-02 · lokazen — activity-focused summary + drop generic Buying Signals (CRE fit)
 
 - **lokazen** — `app/api/dashboard/leads/[id]/summary/route.ts`: the lead summary restated the requirement ("Captured CRE details: Size 1000-2000; Budget 300000...") even for a pure form-fill with no conversation. Rewrote it to describe what's HAPPENING, not what the lead is: form-fills (no customer messages) get "New brand enquiry captured via the website form. No conversation yet. Next step is first outreach."; leads with an actual back-and-forth get the conversation status. No size/budget technicals (those live in the CRE requirement card).
