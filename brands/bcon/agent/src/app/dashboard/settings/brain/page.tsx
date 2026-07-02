@@ -1,10 +1,11 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The Brain - an interactive React Flow map of how the task worker thinks.
-// Pan / zoom / drag / click. Each node is a real step in the live logic
-// (task-worker.js + engine.ts): understand -> score -> temperature -> branch ->
-// personalize -> time -> send -> learn, with the objection and nudge branches.
+// The Brain — a brain-first control surface with four tabs:
+//   Brain    — live neural map (100vh): what it has taken in + is handling now
+//   Map      — React Flow of how the task worker thinks on every lead
+//   Eval     — fire each engaged-journey message to the test phone
+//   Learning — decision match-rate + a Sonnet-5 read of what it learned today
 // ─────────────────────────────────────────────────────────────────────────────
 
 import ReactFlow, {
@@ -15,7 +16,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
-import { MdPsychology, MdArrowBack, MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp } from 'react-icons/md'
+import { MdPsychology, MdArrowBack, MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdAutoAwesome, MdRefresh } from 'react-icons/md'
 
 // ── tone palette (maps to the dashboard's CSS variables + temperature colors) ──
 const TONES: Record<string, { bg: string; border: string; accent: string }> = {
@@ -93,27 +94,136 @@ const E = (s: string, t: string, opts: Partial<Edge> = {}): Edge => ({
 })
 
 const EDGES: Edge[] = [
-  // main spine (top to bottom, clean)
   E('lead', 'understand'),
   E('understand', 'score'),
   E('score', 'temp'),
-  // temperature fan out
   E('temp', 'hot'), E('temp', 'warm'), E('temp', 'cool'), E('temp', 'cold'),
-  // rejoin (cold parks, no edge back)
   E('hot', 'personalize'), E('warm', 'personalize'), E('cool', 'personalize'),
   E('personalize', 'time'),
   E('time', 'send'),
   E('send', 'learn'),
-  // nudge branch - chained so no line ever runs behind a node
   E('quiet', 'q_read'), E('q_read', 'q_deliv'), E('q_deliv', 'q_reply'),
-  // objection branch - chained
   E('obj', 'a_price'), E('a_price', 'a_time'), E('a_time', 'a_trust'), E('a_trust', 'a_auth'), E('a_auth', 'a_need'),
 ]
 
-// ── Stage Test Bench ─────────────────────────────────────────────────────────
-// Read each engaged-journey stage exactly as it lands, and fire it to the test
-// phone (your own chat) on demand. Copy lives server-side in the test-stage route
-// (single source); this just renders + sends. Never touches a real lead.
+// ── Map tab — the React Flow canvas ──────────────────────────────────────────
+function MapView() {
+  const [nodes, , onNodesChange] = useNodesState(NODES)
+  const [edges, , onEdgesChange] = useEdgesState(EDGES)
+  return (
+    <div style={{ height: '100%', borderTop: '1px solid var(--border-primary)' }}>
+      <ReactFlow
+        nodes={nodes} edges={edges} nodeTypes={nodeTypes}
+        fitView fitViewOptions={{ padding: 0.15 }} minZoom={0.3} maxZoom={1.6}
+        proOptions={{ hideAttribution: true }}
+        onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-primary)" />
+        <Controls showInteractive={false} />
+        <MiniMap
+          pannable zoomable
+          nodeColor={(n) => (TONES[(n.data as any)?.kind]?.accent) || 'var(--text-muted)'}
+          maskColor="rgba(0,0,0,0.35)"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
+        />
+      </ReactFlow>
+    </div>
+  )
+}
+
+// ── Brain tab — the live neural map ──────────────────────────────────────────
+type Overview = {
+  taken_in: { kb_items: number; leads_total: number; channels: Record<string, number> }
+  handling_now: { active_sequences: number; chats_today: number; leads_in_flight: number; bookings_upcoming: number; hot: number; warm: number; cold: number }
+}
+
+// A metric node placed inside the brain cluster. cx/cy in the 900x560 viewBox.
+type Region = { id: string; label: string; value: number; cx: number; cy: number; color: string; group: 'in' | 'out' }
+
+function BrainHero() {
+  const [ov, setOv] = useState<Overview | null>(null)
+  const [err, setErr] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/dashboard/brain/overview')
+      .then((r) => r.json())
+      .then((d) => { if (alive) { if (d?.error) setErr(true); else setOv(d) } })
+      .catch(() => { if (alive) setErr(true) })
+    return () => { alive = false }
+  }, [])
+
+  const ti = ov?.taken_in
+  const hn = ov?.handling_now
+
+  // Left hemisphere = what it has taken in; right = what it is handling now.
+  const regions: Region[] = [
+    { id: 'kb',   label: 'Knowledge',   value: ti?.kb_items ?? 0,          cx: 300, cy: 200, color: 'var(--accent-primary)', group: 'in' },
+    { id: 'lead', label: 'Leads',       value: ti?.leads_total ?? 0,       cx: 250, cy: 320, color: '#3b82f6',               group: 'in' },
+    { id: 'chan', label: 'Channels',    value: ti ? Object.keys(ti.channels || {}).length : 0, cx: 350, cy: 400, color: '#a855f7', group: 'in' },
+    { id: 'seq',  label: 'Sequences',   value: hn?.active_sequences ?? 0,  cx: 600, cy: 200, color: '#22c55e',               group: 'out' },
+    { id: 'chat', label: 'Chats today', value: hn?.chats_today ?? 0,       cx: 650, cy: 320, color: '#f59e0b',               group: 'out' },
+    { id: 'flt',  label: 'In flight',   value: hn?.leads_in_flight ?? 0,   cx: 550, cy: 400, color: '#38bdf8',               group: 'out' },
+    { id: 'book', label: 'Bookings',    value: hn?.bookings_upcoming ?? 0, cx: 620, cy: 470, color: '#ef4444',               group: 'out' },
+  ]
+  const CORE = { cx: 450, cy: 300 }
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+      <style>{`
+        @keyframes brainPulse { 0%,100% { opacity: .55; transform: scale(1);} 50% { opacity: 1; transform: scale(1.06);} }
+        @keyframes synapse { 0% { stroke-dashoffset: 24; opacity:.25 } 50% { opacity:.9 } 100% { stroke-dashoffset: 0; opacity:.25 } }
+        @keyframes coreGlow { 0%,100% { filter: drop-shadow(0 0 10px var(--accent-primary)); } 50% { filter: drop-shadow(0 0 26px var(--accent-primary)); } }
+      `}</style>
+
+      <svg viewBox="0 0 900 560" style={{ width: 'min(92%, 980px)', height: 'auto', maxHeight: '70vh' }}>
+        {/* brain silhouette — two soft hemispheres */}
+        <g fill="none" stroke="var(--border-primary)" strokeWidth={1.5} opacity={0.55}>
+          <path d="M450 70 C 250 70, 150 190, 165 300 C 150 420, 260 500, 450 495" />
+          <path d="M450 70 C 650 70, 750 190, 735 300 C 750 420, 640 500, 450 495" />
+          <path d="M450 90 L450 495" strokeDasharray="4 8" opacity={0.5} />
+        </g>
+
+        {/* synapses core -> region */}
+        {regions.map((r) => (
+          <line key={`s-${r.id}`} x1={CORE.cx} y1={CORE.cy} x2={r.cx} y2={r.cy}
+            stroke={r.color} strokeWidth={1.4} strokeDasharray="4 4"
+            style={{ animation: `synapse ${2.2 + (r.cx % 5) * 0.3}s linear infinite`, opacity: 0.5 }} />
+        ))}
+
+        {/* region nodes */}
+        {regions.map((r) => {
+          const rad = 20 + Math.min(18, Math.log2((r.value || 0) + 1) * 4)
+          return (
+            <g key={r.id} style={{ animation: `brainPulse ${2.6 + (r.cy % 4) * 0.4}s ease-in-out infinite`, transformOrigin: `${r.cx}px ${r.cy}px` }}>
+              <circle cx={r.cx} cy={r.cy} r={rad} fill={r.color} opacity={0.16} />
+              <circle cx={r.cx} cy={r.cy} r={rad} fill="none" stroke={r.color} strokeWidth={1.6} opacity={0.85} />
+              <text x={r.cx} y={r.cy - 1} textAnchor="middle" fontSize={19} fontWeight={800} fill="var(--text-primary)">{r.value}</text>
+              <text x={r.cx} y={r.cy + rad + 14} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="var(--text-secondary)">{r.label}</text>
+            </g>
+          )
+        })}
+
+        {/* the core */}
+        <g style={{ animation: 'coreGlow 3s ease-in-out infinite' }}>
+          <circle cx={CORE.cx} cy={CORE.cy} r={38} fill="var(--accent-subtle)" stroke="var(--accent-primary)" strokeWidth={2} />
+          <circle cx={CORE.cx} cy={CORE.cy} r={38} fill="none" stroke="var(--accent-primary)" strokeWidth={1} opacity={0.4}
+            style={{ animation: 'brainPulse 2.4s ease-in-out infinite', transformOrigin: `${CORE.cx}px ${CORE.cy}px` }} />
+        </g>
+        <text x={CORE.cx} y={CORE.cy + 5} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--accent-primary)">PROXe</text>
+
+        {/* hemisphere captions */}
+        <text x={250} y={110} textAnchor="middle" fontSize={11} fontWeight={800} letterSpacing="1" fill="var(--text-muted)">TAKEN IN</text>
+        <text x={650} y={110} textAnchor="middle" fontSize={11} fontWeight={800} letterSpacing="1" fill="var(--text-muted)">HANDLING NOW</text>
+      </svg>
+
+      {err && <div style={{ position: 'absolute', bottom: 18, fontSize: 12, color: '#ef4444' }}>Could not load live brain data.</div>}
+      {!ov && !err && <div style={{ position: 'absolute', bottom: 18, fontSize: 12, color: 'var(--text-secondary)' }}>Waking the brain…</div>}
+    </div>
+  )
+}
+
+// ── Stage Test Bench (Eval tab) ──────────────────────────────────────────────
 type TestStage = { id: string; label: string; when: string; body: string; buttons: string[] }
 
 function StageTestBench() {
@@ -146,59 +256,62 @@ function StageTestBench() {
     }
   }
 
-  if (!stages.length) return null
   return (
-    <div style={{ flexShrink: 0, borderTop: '1px solid var(--border-primary)', background: 'var(--bg-secondary)', padding: '10px 16px 14px', maxHeight: '40vh', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9, flexWrap: 'wrap' }}>
+    <div style={{ height: '100%', overflowY: 'auto', borderTop: '1px solid var(--border-primary)', background: 'var(--bg-secondary)', padding: '14px 16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <MdWhatsapp size={16} style={{ color: '#22c55e' }} />
         <span style={{ fontSize: 13, fontWeight: 800 }}>Test the engaged journey</span>
         <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
           Fires the real message to your test number {testNumber || '…'} — your chat only, never a real lead.
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 10 }}>
-        {stages.map((s) => {
-          const st = status[s.id] || 'idle'
-          return (
-            <div key={s.id} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: '10px 11px', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{s.label}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.when}</span>
-              </div>
-              <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{s.body}</div>
-              {s.buttons?.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {s.buttons.map((b, i) => (
-                    <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(99,102,241,.3)', color: 'rgba(139,142,255,.95)', background: 'rgba(99,102,241,.08)' }}>{b}</span>
-                  ))}
+      {!stages.length ? (
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading test messages…</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 10 }}>
+          {stages.map((s) => {
+            const st = status[s.id] || 'idle'
+            return (
+              <div key={s.id} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: '10px 11px', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{s.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.when}</span>
                 </div>
-              )}
-              <button
-                onClick={() => send(s.id)} disabled={st === 'sending'}
-                style={{
-                  marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 700,
-                  padding: '7px 10px', borderRadius: 8, border: 'none', cursor: st === 'sending' ? 'default' : 'pointer',
-                  background: st === 'sent' ? 'rgba(34,197,94,.15)' : st === 'error' ? 'rgba(239,68,68,.15)' : '#22c55e',
-                  color: st === 'sent' ? '#22c55e' : st === 'error' ? '#ef4444' : '#fff', opacity: st === 'sending' ? 0.6 : 1,
-                }}
-              >
-                {st === 'sent' ? (<><MdCheckCircle size={14} /> Sent to your WhatsApp</>)
-                  : st === 'error' ? (<><MdErrorOutline size={14} /> Failed — retry</>)
-                  : st === 'sending' ? ('Sending…')
-                  : (<><MdSend size={13} /> Send to my WhatsApp</>)}
-              </button>
-              {st === 'error' && errorMsg[s.id] && (
-                <div style={{ fontSize: 10, color: '#ef4444' }} title={errorMsg[s.id]}>{String(errorMsg[s.id]).slice(0, 90)}</div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{s.body}</div>
+                {s.buttons?.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {s.buttons.map((b, i) => (
+                      <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(99,102,241,.3)', color: 'rgba(139,142,255,.95)', background: 'rgba(99,102,241,.08)' }}>{b}</span>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => send(s.id)} disabled={st === 'sending'}
+                  style={{
+                    marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 700,
+                    padding: '7px 10px', borderRadius: 8, border: 'none', cursor: st === 'sending' ? 'default' : 'pointer',
+                    background: st === 'sent' ? 'rgba(34,197,94,.15)' : st === 'error' ? 'rgba(239,68,68,.15)' : '#22c55e',
+                    color: st === 'sent' ? '#22c55e' : st === 'error' ? '#ef4444' : '#fff', opacity: st === 'sending' ? 0.6 : 1,
+                  }}
+                >
+                  {st === 'sent' ? (<><MdCheckCircle size={14} /> Sent to your WhatsApp</>)
+                    : st === 'error' ? (<><MdErrorOutline size={14} /> Failed — retry</>)
+                    : st === 'sending' ? ('Sending…')
+                    : (<><MdSend size={13} /> Send to my WhatsApp</>)}
+                </button>
+                {st === 'error' && errorMsg[s.id] && (
+                  <div style={{ fontSize: 10, color: '#ef4444' }} title={errorMsg[s.id]}>{String(errorMsg[s.id]).slice(0, 90)}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Learning panel — what the brain is learning from human decisions ──────────
+// ── Learning tab — decision match-rate + Sonnet-5 "what it learned today" ─────
 type LearnData = {
   total: number
   matchRate: number
@@ -207,9 +320,21 @@ type LearnData = {
   recent: Array<{ lead_id: string; lead_name: string; at: string; ai_action: string; human_action: string; matched: boolean; reason: string | null; stage: string | null; intent: string | null }>
 }
 
-function LearningPanel() {
+type SummaryData = {
+  chats_analyzed: number
+  decisions_today?: number
+  biggest_learning: string | null
+  understanding_shifts: string[]
+  objection_patterns: string[]
+  note?: string
+}
+
+function LearningView() {
   const [data, setData] = useState<LearnData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [summary, setSummary] = useState<SummaryData | null>(null)
+  const [summarizing, setSummarizing] = useState(false)
+  const [summaryErr, setSummaryErr] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -221,60 +346,140 @@ function LearningPanel() {
     return () => { alive = false }
   }, [])
 
+  const runSummary = async () => {
+    setSummarizing(true); setSummaryErr(null)
+    try {
+      const r = await fetch('/api/dashboard/brain/learning-summary', { method: 'POST' })
+      const d = await r.json()
+      if (d?.error) setSummaryErr(d.error)
+      else setSummary(d)
+    } catch (e: any) {
+      setSummaryErr(e?.message || 'Failed to reflect')
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
   return (
-    <div style={{ marginTop: 24, padding: 16, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <MdPsychology size={18} style={{ color: 'var(--accent-primary)' }} />
-        <h3 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>What the brain is learning</h3>
-      </div>
-      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
-        Every logged-call decision teaches it. When match rate climbs, the brain is ready to act on its own.
-      </p>
-
-      {loading ? (
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</div>
-      ) : !data || data.total === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No decisions logged yet. Log a call and pick an action to start teaching it.</div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-            <Stat label="decisions" value={String(data.total)} />
-            <Stat label="ai matched human" value={`${data.matchRate}%`} accent={data.matchRate >= 70 ? '#22c55e' : data.matchRate >= 40 ? '#f59e0b' : '#ef4444'} />
-            <Stat label="actions used" value={String(Object.keys(data.byAction).length)} />
+    <div style={{ height: '100%', overflowY: 'auto', borderTop: '1px solid var(--border-primary)', padding: '16px' }}>
+      {/* Sonnet-5 daily reflection */}
+      <div style={{ padding: 16, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <MdAutoAwesome size={18} style={{ color: 'var(--accent-primary)' }} />
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>What it learned today</h3>
           </div>
+          <button
+            onClick={runSummary} disabled={summarizing}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, padding: '7px 12px',
+              borderRadius: 8, border: '1px solid var(--accent-primary)', cursor: summarizing ? 'default' : 'pointer',
+              background: 'var(--accent-subtle)', color: 'var(--accent-primary)', opacity: summarizing ? 0.6 : 1,
+            }}
+          >
+            <MdRefresh size={14} /> {summarizing ? 'Reflecting…' : summary ? 'Refresh' : 'Reflect on today'}
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+          Sonnet 5 reads today's chats and human decisions and reports what changed in its understanding, not just sequence timing.
+        </p>
 
-          {data.byStageAction.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>patterns by stage</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {data.byStageAction.map((p) => (
-                  <div key={p.stage} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    Leads at <span style={{ color: 'var(--text-primary)' }}>{p.stage}</span> → humans mostly chose <span style={{ color: 'var(--accent-primary)' }}>{p.top_action}</span> ({p.top_count}/{p.count})
-                  </div>
-                ))}
-              </div>
+        {summaryErr && <div style={{ fontSize: 12, color: '#ef4444' }}>{summaryErr}</div>}
+        {!summary && !summaryErr && !summarizing && (
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Tap "Reflect on today" to generate the daily learning read.</div>
+        )}
+        {summary && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {summary.chats_analyzed} chat{summary.chats_analyzed === 1 ? '' : 's'} analyzed
+              {typeof summary.decisions_today === 'number' ? ` · ${summary.decisions_today} decision${summary.decisions_today === 1 ? '' : 's'}` : ''}
             </div>
-          )}
+            {summary.note && <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{summary.note}</div>}
+            {summary.biggest_learning && (
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, color: 'var(--accent-primary)', marginBottom: 4 }}>BIGGEST LEARNING</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{summary.biggest_learning}</div>
+              </div>
+            )}
+            {summary.understanding_shifts.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>understanding shifts</div>
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {summary.understanding_shifts.map((s, i) => (
+                    <li key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {summary.objection_patterns.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>objection patterns</div>
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {summary.objection_patterns.map((s, i) => (
+                    <li key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>recent decisions</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.recent.map((e, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0, background: e.matched ? '#22c55e' : '#f59e0b' }} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)' }}>
-                    {e.lead_name} · <span style={{ color: 'var(--text-secondary)' }}>{e.stage || 'unknown'}{e.intent ? ` · ${e.intent}` : ''}</span>
-                  </div>
-                  <div style={{ color: 'var(--text-secondary)' }}>
-                    ai proposed <span style={{ color: 'var(--text-primary)' }}>{e.ai_action}</span>, human chose <span style={{ color: e.matched ? '#22c55e' : '#f59e0b' }}>{e.human_action}</span>
-                    {e.reason ? ` — "${e.reason}"` : ''}
-                  </div>
+      {/* Decision match-rate (existing) */}
+      <div style={{ padding: 16, border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <MdPsychology size={18} style={{ color: 'var(--accent-primary)' }} />
+          <h3 style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Decisions vs the human</h3>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+          Every logged-call decision teaches it. When match rate climbs, the brain is ready to act on its own.
+        </p>
+
+        {loading ? (
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</div>
+        ) : !data || data.total === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No decisions logged yet. Log a call and pick an action to start teaching it.</div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <Stat label="decisions" value={String(data.total)} />
+              <Stat label="ai matched human" value={`${data.matchRate}%`} accent={data.matchRate >= 70 ? '#22c55e' : data.matchRate >= 40 ? '#f59e0b' : '#ef4444'} />
+              <Stat label="actions used" value={String(Object.keys(data.byAction).length)} />
+            </div>
+
+            {data.byStageAction.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>patterns by stage</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {data.byStageAction.map((p) => (
+                    <div key={p.stage} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      Leads at <span style={{ color: 'var(--text-primary)' }}>{p.stage}</span> → humans mostly chose <span style={{ color: 'var(--accent-primary)' }}>{p.top_action}</span> ({p.top_count}/{p.count})
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            )}
+
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>recent decisions</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {data.recent.map((e, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0, background: e.matched ? '#22c55e' : '#f59e0b' }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: 'var(--text-primary)' }}>
+                      {e.lead_name} · <span style={{ color: 'var(--text-secondary)' }}>{e.stage || 'unknown'}{e.intent ? ` · ${e.intent}` : ''}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)' }}>
+                      ai proposed <span style={{ color: 'var(--text-primary)' }}>{e.ai_action}</span>, human chose <span style={{ color: e.matched ? '#22c55e' : '#f59e0b' }}>{e.human_action}</span>
+                      {e.reason ? ` — "${e.reason}"` : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -288,61 +493,60 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   )
 }
 
+type Tab = 'brain' | 'map' | 'eval' | 'learning'
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'brain', label: 'Brain' },
+  { id: 'map', label: 'Map' },
+  { id: 'eval', label: 'Eval' },
+  { id: 'learning', label: 'Learning' },
+]
+
 export default function BrainPage() {
-  const [nodes, , onNodesChange] = useNodesState(NODES)
-  const [edges, , onEdgesChange] = useEdgesState(EDGES)
+  const [tab, setTab] = useState<Tab>('brain')
 
   return (
     <DashboardLayout>
       <div style={{ height: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
-        {/* Header */}
+        {/* Header + tab rail */}
         <div style={{ padding: '14px 20px 10px', flexShrink: 0 }}>
           <a href="/dashboard/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: 8 }}>
             <MdArrowBack size={15} /> Configure
           </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-            <span style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MdPsychology size={22} />
-            </span>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>The Brain</h1>
-              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
-                How the task worker thinks on every lead. Drag, zoom, and follow the flow. Runs every 5 minutes, approval-gated.
-              </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MdPsychology size={22} />
+              </span>
+              <div>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>The Brain</h1>
+                <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                  What the brain has taken in and is taking care of. Runs every 5 minutes, approval-gated.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
+              {TABS.map((t) => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  style={{
+                    fontSize: 13, fontWeight: 700, padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                    background: tab === t.id ? 'var(--bg-primary)' : 'transparent',
+                    color: tab === t.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.18)' : 'none',
+                  }}>
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Flow canvas */}
-        <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid var(--border-primary)' }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.15 }}
-            minZoom={0.3}
-            maxZoom={1.6}
-            proOptions={{ hideAttribution: true }}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-primary)" />
-            <Controls showInteractive={false} />
-            <MiniMap
-              pannable zoomable
-              nodeColor={(n) => (TONES[(n.data as any)?.kind]?.accent) || 'var(--text-muted)'}
-              maskColor="rgba(0,0,0,0.35)"
-              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
-            />
-          </ReactFlow>
+        {/* Active tab */}
+        <div style={{ flex: 1, minHeight: 0 }}>
+          {tab === 'brain' && <BrainHero />}
+          {tab === 'map' && <MapView />}
+          {tab === 'eval' && <StageTestBench />}
+          {tab === 'learning' && <LearningView />}
         </div>
-
-        {/* Stage test bench — fire each engaged-journey message to the test phone */}
-        <StageTestBench />
-
-        {/* Learning panel — what the brain is learning from human decisions */}
-        <LearningPanel />
       </div>
     </DashboardLayout>
   )
