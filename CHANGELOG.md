@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — send first-outreach WhatsApp template on new form leads
+
+- **lokazen** — `app/api/agent/leads/inbound/route.ts`: NO WhatsApp was going out on new form/website leads — the generic send was disabled (Windchasers leftover) and the only sends were WC-specific PAT/demo. But Meta DOES have approved Lokazen templates on this WABA (`lokazen_lead_confirm`, `lokazen_brand_welcome`, `lokazen_owner_confirm`, `scout_welcome`, scout KYC lifecycle). Wired the send: on a new lokazen lead, send `lokazen_lead_confirm` (POSITIONAL {{1}}=first name) for brand/owner, `scout_welcome` ({{1}}=name, {{2}}=portal URL) for scouts. Awaited + soft-fail + logged to conversations (inbox reflects it), needs_human on failure. Used only clean POSITIONAL templates — brand/owner welcome templates are NAMED-param with no example, so lead_confirm is the safe universal confirm. Verified live: a real `lokazen_lead_confirm` send to the test number was accepted by Meta (messageId returned).
+
 ## 2026-07-02 · lokazen — WhatsApp scout leads now tagged (out of Leads, into Scouts)
 
 - **agent-core** — `app/api/agent/whatsapp/meta/route.ts`: WhatsApp detected the Lokazen audience only for KB scoping and NEVER persisted it, so a clearly-scout WhatsApp lead had `unified_context.lokazen = {}` and kept showing in the general Leads view. Now reads the stored type as a sticky fallback and PERSISTS a newly-detected audience (user_type/lead_type) to the lead — so the LeadsTable filter routes scouts into the Scouts page.

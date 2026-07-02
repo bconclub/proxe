@@ -15,11 +15,16 @@ import {
   TEMPLATE_HEADERS,
   TEMPLATE_BUTTONS,
   notifySlackLead,
+  sendWhatsAppTemplate,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
+
+// Scout onboarding URL used in the scout_welcome WhatsApp template ({{2}}).
+const LOKAZEN_SCOUT_ONBOARDING_URL =
+  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://www.lokazen.in/scout#scout-form'
 
 /**
  * POST /api/agent/leads/inbound
@@ -679,6 +684,63 @@ export async function POST(request: NextRequest) {
         })
       } catch (slackErr: any) {
         console.error('[inbound] Slack new-lead notify failed:', slackErr?.message || slackErr)
+      }
+    }
+
+    // ── Lokazen: first-outreach WhatsApp template on a new form/website lead ──
+    // Form leads have no open 24h window, so the outbound MUST be an approved
+    // template. Meta-approved (this WABA): lokazen_lead_confirm (POSITIONAL,
+    // {{1}}=name) for brand+owner; scout_welcome (POSITIONAL, {{1}}=name,
+    // {{2}}=portal URL) for scouts. Awaited (Vercel won't drop it), soft-fails,
+    // and logged to conversations so the inbox reflects the send.
+    if (leadBrand === 'lokazen' && isNew && normalizedPhone) {
+      try {
+        const firstName = (leadName || 'there').split(' ')[0]
+        const ut = brandCtxData.user_type
+        let templateName: string
+        let params: Array<{ type: 'text'; text: string }>
+        let renderedBody: string
+        if (ut === 'scout') {
+          templateName = 'scout_welcome'
+          params = [{ type: 'text', text: firstName }, { type: 'text', text: LOKAZEN_SCOUT_ONBOARDING_URL }]
+          renderedBody = `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC). Open your dashboard: ${LOKAZEN_SCOUT_ONBOARDING_URL}`
+        } else {
+          templateName = 'lokazen_lead_confirm'
+          params = [{ type: 'text', text: firstName }]
+          renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
+        }
+        const waRes = await sendWhatsAppTemplate(
+          normalizedPhone,
+          templateName,
+          [{ type: 'body', parameters: params }],
+          'en',
+        )
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: waRes.success ? renderedBody : `[Template send FAILED: ${templateName}]\n\n${renderedBody}`,
+          message_type: 'template',
+          metadata: {
+            template_name: templateName,
+            template_language: 'en',
+            auto_sent: true,
+            trigger: 'inbound_new_lead',
+            sent_by: 'system (inbound webhook)',
+            send_succeeded: !!waRes.success,
+            send_error: waRes.success ? null : (waRes.error || 'unknown'),
+            http_status: (waRes as any).statusCode ?? null,
+            wa_message_id: (waRes as any).messageId ?? null,
+          },
+        })
+        if (!waRes.success) {
+          console.error(`[inbound] Lokazen WA template FAILED lead=${leadId} template=${templateName} status=${(waRes as any).statusCode} error=${waRes.error}`)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        } else {
+          console.log(`[inbound] Lokazen WA template sent lead=${leadId} template=${templateName} messageId=${(waRes as any).messageId}`)
+        }
+      } catch (waErr: any) {
+        console.error('[inbound] Lokazen WA send exception:', waErr?.message || waErr)
       }
     }
 
