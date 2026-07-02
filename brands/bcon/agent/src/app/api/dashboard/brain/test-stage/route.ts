@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendWhatsAppInteractiveButtons, logSystemWhatsApp } from '@/lib/services/whatsappSender'
+import { sendWhatsAppInteractiveButtons, sendWhatsAppText, logSystemWhatsApp } from '@/lib/services/whatsappSender'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,15 +68,30 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let stageId = ''
-  try { stageId = (await req.json())?.stage || '' } catch { /* noop */ }
-  const stage = STAGES.find((s) => s.id === stageId)
+  let payload: any = {}
+  try { payload = (await req.json()) || {} } catch { /* noop */ }
+
+  // Two modes, both ONLY to the test number:
+  //  { stage }                       -> a predefined engaged-journey stage
+  //  { body, buttons?, label? }      -> ANY custom step (the Eval simulator
+  //                                     fires each journey step through this)
+  let stage: Stage | null = STAGES.find((s) => s.id === (payload.stage || '')) || null
+  if (!stage && typeof payload.body === 'string' && payload.body.trim()) {
+    stage = {
+      id: 'custom',
+      label: String(payload.label || 'Journey step').slice(0, 60),
+      when: 'manual test',
+      body: String(payload.body).slice(0, 1024),
+      buttons: Array.isArray(payload.buttons) ? payload.buttons.map((b: any) => String(b).slice(0, 20)).slice(0, 3) : [],
+    }
+  }
   if (!stage) return NextResponse.json({ error: 'Unknown stage' }, { status: 400 })
 
   const body = clean(stage.body)
-  const res = await sendWhatsAppInteractiveButtons(TEST_NUMBER, body, stage.buttons, {
-    footerText: `TEST · ${stage.label}`,
-  })
+  // Buttons → interactive message; none → plain text (interactive requires 1-3).
+  const res: { success: boolean; error?: string; messageId?: string } = stage.buttons.length > 0
+    ? await sendWhatsAppInteractiveButtons(TEST_NUMBER, body, stage.buttons, { footerText: `TEST · ${stage.label}` })
+    : await sendWhatsAppText(TEST_NUMBER, body)
 
   // Thread it into the test number's own chat, flagged as a test send so the
   // inbox shows the TEST badge (never logged against a real lead).

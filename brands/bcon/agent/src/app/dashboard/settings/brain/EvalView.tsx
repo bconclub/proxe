@@ -1,126 +1,186 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EvalView — every message a lead can ever receive, by permutation.
-//  1. Journey simulator: pick Source × What happened → the exact composed path,
-//     each step with its real body ({{vars}} rendered as chips) + buttons.
-//  2. The full matrix: all journeys, all steps, all templates.
-//  3. The gates every send passes through.
-//  4. Test bench: fire any engaged-journey stage to YOUR WhatsApp (never a lead).
+// EvalView — plain-language message studio.
+// Pick how a lead arrives + what happens next → see the EXACT WhatsApp
+// conversation that follows (nudges included), each message as a WhatsApp-style
+// bubble with its Meta template name, real buttons, and a "Send to my WhatsApp"
+// so you can feel every message on your own phone before a lead ever does.
+// Bodies fill with a sample lead (toggle to see the raw variables).
 // Display truth = configs/journeys.ts (mirrors the worker's routing).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, Fragment } from 'react'
-import { MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdScience, MdAltRoute, MdShield } from 'react-icons/md'
+import { useState, Fragment } from 'react'
+import { MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdShield, MdExpandMore, MdExpandLess } from 'react-icons/md'
 import { JOURNEYS, GATES, TEMPLATE_BUTTONS, bodyFor, type Journey, type JourneyStep } from '@/configs/journeys'
 
-// Render {{variable}} slots as visible chips.
-function varChips(text: string) {
+// The sample lead every preview is filled with (same fixture as the test bench).
+const SAMPLE: Record<string, string> = {
+  customer_name: 'Shiv',
+  brand_name: "Shiv's Laundry",
+  business_name: "Shiv's Laundry",
+  service_interest: 'AI customer acquisition',
+  booking_time: 'tomorrow, 4:00 PM',
+  pain_point: 'getting consistent leads',
+  probe_question: "What's the one thing you want to fix first?",
+}
+const VAR_LABEL: Record<string, string> = {
+  customer_name: 'name', brand_name: 'brand', business_name: 'brand',
+  service_interest: 'goal', booking_time: 'time', pain_point: 'challenge', probe_question: 'probe',
+}
+
+/** Fill {{vars}} with sample values (plain string — used for the actual test send). */
+function fillPlain(text: string): string {
+  return text.replace(/\{\{\s*([\w]+)\s*\}\}/g, (_, k) => SAMPLE[k] || k)
+}
+
+/** Render body: sample values highlighted, or raw variable chips. */
+function renderBody(text: string, showVars: boolean) {
   return text.split(/(\{\{\s*[\w]+\s*\}\})/g).map((p, i) => {
     const m = p.match(/^\{\{\s*([\w]+)\s*\}\}$/)
     if (!m) return <Fragment key={i}>{p}</Fragment>
-    const label = m[1].replace(/^customer_name$/, 'name').replace(/^service_interest$/, 'goal').replace(/^brand_name$/, 'brand').replace(/^business_name$/, 'brand').replace(/^booking_time$/, 'time').replace(/^pain_point$/, 'challenge').replace(/^probe_question$/, 'probe')
+    const k = m[1]
     return (
       <span key={i} style={{
-        display: 'inline-block', padding: '0 5px', margin: '0 1px', borderRadius: 5, fontSize: '0.88em',
-        fontWeight: 700, color: 'var(--accent-primary)', background: 'var(--accent-subtle)',
-        border: '1px solid var(--accent-primary)', lineHeight: 1.45, whiteSpace: 'nowrap',
-      }}>{label}</span>
+        borderBottom: '1.5px dashed var(--accent-primary)', color: showVars ? 'var(--accent-primary)' : 'var(--text-primary)',
+        fontWeight: 700, padding: '0 1px',
+      }} title={`variable: ${VAR_LABEL[k] || k}`}>
+        {showVars ? `[${VAR_LABEL[k] || k}]` : (SAMPLE[k] || k)}
+      </span>
     )
   })
 }
 
-function StepCard({ step, tone, idx }: { step: JourneyStep; tone: string; idx: number }) {
+// One message as a WhatsApp-style bubble + template chip + test-send button.
+function Bubble({ step, tone, showVars, onSend, sendState }: {
+  step: JourneyStep; tone: string; showVars: boolean
+  onSend?: () => void; sendState?: 'idle' | 'sending' | 'sent' | 'error'
+}) {
   const body = step.freeform || bodyFor(step.template)
   const buttons = step.template ? TEMPLATE_BUTTONS[step.template] : undefined
   return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-        <span style={{ width: 22, height: 22, borderRadius: 999, background: tone, color: '#0a0a0a', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idx + 1}</span>
-        <span style={{ flex: 1, width: 2, background: 'var(--border-primary)', marginTop: 4 }} />
+    <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+      {/* timing rail */}
+      <div style={{ width: 76, flexShrink: 0, textAlign: 'right', paddingTop: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: tone }}>{step.delay}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.3 }}>{step.label}</div>
       </div>
-      <div style={{ flex: 1, paddingBottom: 14, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{step.label}</span>
-          <span style={{ fontSize: 10.5, color: tone, fontWeight: 700 }}>{step.delay}</span>
-          {step.template && <span style={{ fontSize: 9.5, fontFamily: 'ui-monospace, monospace', color: 'var(--text-muted)' }}>{step.template}</span>}
-          {!step.template && !step.freeform && <span style={{ fontSize: 9.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>no message</span>}
-          {!step.template && step.freeform && <span style={{ fontSize: 9.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>free-form (24h window)</span>}
+      <div style={{ width: 2, background: `${tone}44`, borderRadius: 2, flexShrink: 0 }} />
+      {/* the message */}
+      <div style={{ flex: 1, minWidth: 0, maxWidth: 460 }}>
+        {body ? (
+          <>
+            <div style={{
+              padding: '9px 12px', borderRadius: '2px 12px 12px 12px',
+              background: 'rgba(34,197,94,0.09)', border: '1px solid rgba(34,197,94,0.25)',
+              fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+            }}>
+              {renderBody(body, showVars)}
+            </div>
+            {buttons && buttons.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                {buttons.map((b, i) => (
+                  <span key={i} style={{ fontSize: 10.5, padding: '4px 11px', borderRadius: 999, border: '1px solid rgba(34,197,94,.4)', color: '#22c55e', background: 'rgba(34,197,94,.07)', fontWeight: 700 }}>{b}</span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic', paddingTop: 6 }}>{step.note || 'No message fires here.'}</div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+          {step.template && (
+            <span style={{ fontSize: 9.5, fontFamily: 'ui-monospace, monospace', color: 'var(--text-muted)', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 6, padding: '2px 7px' }}>
+              template: {step.template}
+            </span>
+          )}
+          {!step.template && step.freeform && (
+            <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>free-form · AI-written, inside the 24h window</span>
+          )}
+          {body && onSend && (
+            <button onClick={onSend} disabled={sendState === 'sending'} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 800,
+              padding: '4px 10px', borderRadius: 999, border: 'none', cursor: sendState === 'sending' ? 'default' : 'pointer',
+              background: sendState === 'sent' ? 'rgba(34,197,94,.15)' : sendState === 'error' ? 'rgba(239,68,68,.15)' : '#22c55e',
+              color: sendState === 'sent' ? '#22c55e' : sendState === 'error' ? '#ef4444' : '#fff',
+              opacity: sendState === 'sending' ? 0.6 : 1,
+            }}>
+              {sendState === 'sent' ? (<><MdCheckCircle size={12} /> On your WhatsApp</>)
+                : sendState === 'error' ? (<><MdErrorOutline size={12} /> Failed - retry</>)
+                : sendState === 'sending' ? 'Sending…'
+                : (<><MdWhatsapp size={12} /> Send to my WhatsApp</>)}
+            </button>
+          )}
         </div>
-        {body && (
-          <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: '2px 10px 10px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
-            {varChips(body)}
-          </div>
-        )}
-        {buttons && buttons.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-            {buttons.map((b, i) => (
-              <span key={i} style={{ fontSize: 10, padding: '3px 9px', borderRadius: 999, border: `1px solid ${tone}55`, color: tone, background: `${tone}12`, fontWeight: 600 }}>{b}</span>
-            ))}
-          </div>
-        )}
-        {step.note && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-muted)' }}>{step.note}</div>}
+        {body && step.note && <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>{step.note}</div>}
       </div>
     </div>
   )
 }
 
 const OUTCOMES: Array<{ id: string; label: string }> = [
-  { id: 'ghost', label: 'Never replied' },
-  { id: 'nudge', label: 'Went quiet mid-chat' },
-  { id: 'engaged', label: 'Chatting, not booked' },
-  { id: 'rnr', label: 'Call rang, no answer' },
+  { id: 'ghost', label: 'Never replies' },
+  { id: 'nudge', label: 'Goes quiet mid-chat' },
+  { id: 'engaged', label: 'Chats, does not book' },
+  { id: 'rnr', label: 'Call rings, no answer' },
   { id: 'demo', label: 'Demo / proposal done' },
-  { id: 'booked', label: 'Booked the call' },
-  { id: 'longtail', label: 'Faded — long-tail' },
+  { id: 'booked', label: 'Books the call' },
+  { id: 'longtail', label: 'Fades out slowly' },
 ]
 
 export default function EvalView() {
   const entry = JOURNEYS.find((j) => j.id === 'entry')!
   const [source, setSource] = useState(0)
-  const [outcome, setOutcome] = useState('ghost')
-  const [openMatrix, setOpenMatrix] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState('rnr')
+  const [showVars, setShowVars] = useState(false)
+  const [openJourney, setOpenJourney] = useState<string | null>(null)
+  const [sendState, setSendState] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({})
 
-  const totalSteps = JOURNEYS.reduce((a, j) => a + j.steps.length, 0)
-  const templates = new Set<string>()
-  JOURNEYS.forEach((j) => j.steps.forEach((s) => s.template && templates.add(s.template)))
-  const permutations = entry.steps.length * OUTCOMES.length
-
-  const chosenJourney = JOURNEYS.find((j) => j.id === outcome)!
+  const chosen = JOURNEYS.find((j) => j.id === outcome)!
+  const nudgeJourney = JOURNEYS.find((j) => j.id === 'nudge')!
   const entryStep = entry.steps[source]
+
+  // Fire any step's real message at the test number (server clamps to it).
+  const sendStep = async (key: string, step: JourneyStep) => {
+    const raw = step.freeform || bodyFor(step.template)
+    if (!raw) return
+    setSendState((s) => ({ ...s, [key]: 'sending' }))
+    try {
+      const r = await fetch('/api/dashboard/brain/test-stage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: fillPlain(raw),
+          buttons: step.template ? (TEMPLATE_BUTTONS[step.template] || []).slice(0, 3) : [],
+          label: step.label,
+        }),
+      })
+      const d = await r.json()
+      setSendState((s) => ({ ...s, [key]: d?.success ? 'sent' : 'error' }))
+    } catch {
+      setSendState((s) => ({ ...s, [key]: 'error' }))
+    }
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', borderTop: '1px solid var(--border-primary)', padding: '16px 18px 28px' }}>
-      {/* coverage stats */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-        {[
-          [String(permutations), 'source × outcome paths'],
-          [String(JOURNEYS.length), 'journeys'],
-          [String(totalSteps), 'distinct steps'],
-          [String(templates.size), 'Meta templates'],
-          [String(GATES.length), 'gates on every send'],
-        ].map(([v, l]) => (
-          <div key={l} style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
-            <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-primary)' }}>{v}</div>
-            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}>{l}</div>
-          </div>
-        ))}
+      {/* plain-words intro */}
+      <div style={{ marginBottom: 16, padding: '12px 15px', borderRadius: 12, background: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Every message PROXe can send, in one place.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
+          Pick how a lead arrives and what happens next. You'll see the exact WhatsApp messages in order - filled in for a sample lead - with the template behind each one. Tap <strong>Send to my WhatsApp</strong> on any message to feel it on your own phone. Real leads are never touched.
+        </div>
       </div>
 
-      {/* ── 1 · Journey simulator ── */}
-      <div style={{ padding: 16, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <MdAltRoute size={17} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: 14, fontWeight: 800 }}>Journey simulator</span>
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>pick a permutation, see every message that fires</span>
-        </div>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
+      {/* ── the simulator ── */}
+      <div style={{ padding: 16, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>SOURCE</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 6 }}>1 · HOW DOES THE LEAD ARRIVE?</div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {entry.steps.map((s, i) => (
                 <button key={s.label} onClick={() => setSource(i)} style={{
-                  fontSize: 11.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer',
+                  fontSize: 11.5, fontWeight: 700, padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
                   border: `1px solid ${i === source ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
                   background: i === source ? 'var(--accent-subtle)' : 'var(--bg-primary)',
                   color: i === source ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -129,11 +189,11 @@ export default function EvalView() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>THEN WHAT HAPPENED</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 6 }}>2 · THEN WHAT HAPPENS?</div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {OUTCOMES.map((o) => (
                 <button key={o.id} onClick={() => setOutcome(o.id)} style={{
-                  fontSize: 11.5, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer',
+                  fontSize: 11.5, fontWeight: 700, padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
                   border: `1px solid ${o.id === outcome ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
                   background: o.id === outcome ? 'var(--accent-subtle)' : 'var(--bg-primary)',
                   color: o.id === outcome ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -141,42 +201,67 @@ export default function EvalView() {
               ))}
             </div>
           </div>
+          <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer', alignSelf: 'flex-end' }}>
+            <input type="checkbox" checked={showVars} onChange={(e) => setShowVars(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
+            show variables instead of the sample lead
+          </label>
         </div>
 
-        <div style={{ padding: '4px 0 0' }}>
-          <StepCard step={{ ...entryStep, label: `Entry — ${entryStep.label}` }} tone="#8B5CF6" idx={0} />
-          <div style={{ margin: '0 0 12px 32px', fontSize: 10.5, color: chosenJourney.tone, fontWeight: 700 }}>
-            ↓ {chosenJourney.trigger} · {chosenJourney.stop}
+        <div style={{ borderTop: '1px dashed var(--border-primary)', margin: '12px 0 16px' }} />
+
+        {/* the conversation, in order */}
+        <Bubble
+          step={{ ...entryStep, label: entryStep.label }}
+          tone="#8B5CF6" showVars={showVars}
+          onSend={() => sendStep('entry', entryStep)} sendState={sendState['entry'] || 'idle'}
+        />
+
+        {/* the mid-chat nudge is part of REAL life on every path except a booked call */}
+        {outcome !== 'nudge' && outcome !== 'booked' && (
+          <div style={{ margin: '0 0 14px 90px', padding: '8px 12px', borderRadius: 10, background: 'rgba(168,85,247,.06)', border: '1px dashed rgba(168,85,247,.35)', fontSize: 11, color: 'var(--text-secondary)', maxWidth: 460 }}>
+            <strong style={{ color: '#a855f7' }}>Quiet after the chat?</strong> A tiered nudge fires first (hot 1h · warm 2h · cool 3h, 30 min after they read). Pick <em>"Goes quiet mid-chat"</em> above to see those three messages.
           </div>
-          {chosenJourney.steps.map((s, i) => (
-            <StepCard key={`${chosenJourney.id}-${i}`} step={s} tone={chosenJourney.tone} idx={i + 1} />
-          ))}
+        )}
+
+        <div style={{ margin: '0 0 14px 90px', fontSize: 11.5, fontWeight: 800, color: chosen.tone }}>
+          ↓ {chosen.trigger} — {chosen.stop}
         </div>
+
+        {(outcome === 'nudge' ? nudgeJourney : chosen).steps.map((s, i) => (
+          <Bubble
+            key={`${chosen.id}-${i}`} step={s} tone={chosen.tone} showVars={showVars}
+            onSend={() => sendStep(`${chosen.id}-${i}`, s)} sendState={sendState[`${chosen.id}-${i}`] || 'idle'}
+          />
+        ))}
       </div>
 
-      {/* ── 2 · The full matrix ── */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <MdScience size={17} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: 14, fontWeight: 800 }}>Every message in the system</span>
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>click a journey to expand its steps</span>
+      {/* ── all journeys (secondary, collapsed) ── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>
+          All journeys <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>· the full library, {JOURNEYS.reduce((a, j) => a + j.steps.length, 0)} messages</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {JOURNEYS.map((j: Journey) => {
-            const open = openMatrix === j.id
+            const open = openJourney === j.id
             return (
-              <div key={j.id} style={{ borderRadius: 12, border: `1px solid ${open ? j.tone : 'var(--border-primary)'}`, background: 'var(--bg-secondary)', overflow: 'hidden', gridColumn: open ? '1 / -1' : undefined }}>
-                <button onClick={() => setOpenMatrix(open ? null : j.id)} style={{ width: '100%', textAlign: 'left', padding: '11px 13px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)' }}>{j.title}</span>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: j.tone }}>{j.steps.length} steps {open ? '▴' : '▾'}</span>
+              <div key={j.id} style={{ borderRadius: 12, border: `1px solid ${open ? j.tone : 'var(--border-primary)'}`, background: 'var(--bg-secondary)' }}>
+                <button onClick={() => setOpenJourney(open ? null : j.id)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, textAlign: 'left', padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <div>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text-primary)' }}>{j.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8 }}>{j.who}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3 }}>{j.who}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>stops: {j.stop}</div>
+                  <span style={{ color: j.tone, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
+                    {j.steps.length} steps {open ? <MdExpandLess size={16} /> : <MdExpandMore size={16} />}
+                  </span>
                 </button>
                 {open && (
-                  <div style={{ padding: '4px 14px 8px' }}>
-                    {j.steps.map((s, i) => <StepCard key={i} step={s} tone={j.tone} idx={i} />)}
+                  <div style={{ padding: '4px 14px 10px' }}>
+                    {j.steps.map((s, i) => (
+                      <Bubble
+                        key={i} step={s} tone={j.tone} showVars={showVars}
+                        onSend={() => sendStep(`lib-${j.id}-${i}`, s)} sendState={sendState[`lib-${j.id}-${i}`] || 'idle'}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -185,108 +270,19 @@ export default function EvalView() {
         </div>
       </div>
 
-      {/* ── 3 · Gates ── */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <MdShield size={17} style={{ color: '#ec4899' }} />
-          <span style={{ fontSize: 14, fontWeight: 800 }}>Gates on every single send</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
-          {GATES.map((g) => (
-            <div key={g.label} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(236,72,153,.05)', border: '1px solid rgba(236,72,153,.25)' }}>
-              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#ec4899' }}>{g.label}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.4 }}>{g.detail}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 4 · Test bench ── */}
-      <StageTestBench />
-    </div>
-  )
-}
-
-// ── Test bench — fire the engaged-journey stages at YOUR test number ─────────
-type TestStage = { id: string; label: string; when: string; body: string; buttons: string[] }
-
-function StageTestBench() {
-  const [stages, setStages] = useState<TestStage[]>([])
-  const [testNumber, setTestNumber] = useState('')
-  const [status, setStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({})
-  const [errorMsg, setErrorMsg] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    fetch('/api/dashboard/brain/test-stage')
-      .then((r) => r.json())
-      .then((d) => {
-        if (Array.isArray(d?.stages)) setStages(d.stages)
-        if (d?.testNumber) setTestNumber(d.testNumber)
-      })
-      .catch(() => {})
-  }, [])
-
-  const send = async (id: string) => {
-    setStatus((s) => ({ ...s, [id]: 'sending' }))
-    try {
-      const r = await fetch('/api/dashboard/brain/test-stage', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage: id }),
-      })
-      const d = await r.json()
-      if (d?.success) setStatus((s) => ({ ...s, [id]: 'sent' }))
-      else { setStatus((s) => ({ ...s, [id]: 'error' })); setErrorMsg((m) => ({ ...m, [id]: d?.error || 'Send failed' })) }
-    } catch (e: any) {
-      setStatus((s) => ({ ...s, [id]: 'error' })); setErrorMsg((m) => ({ ...m, [id]: e?.message || 'Send failed' }))
-    }
-  }
-
-  if (!stages.length) return null
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-        <MdWhatsapp size={16} style={{ color: '#22c55e' }} />
-        <span style={{ fontSize: 14, fontWeight: 800 }}>Live test bench</span>
-        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-          fires the real message to your test number {testNumber || '…'} — your chat only, never a real lead
+      {/* ── gates, one light row ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, color: '#ec4899' }}>
+          <MdShield size={14} /> Before anything sends:
         </span>
+        {GATES.map((g) => (
+          <span key={g.label} title={g.detail} style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: 'rgba(236,72,153,.06)', border: '1px solid rgba(236,72,153,.25)', color: 'var(--text-secondary)', cursor: 'help' }}>
+            {g.label}
+          </span>
+        ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 10 }}>
-        {stages.map((s) => {
-          const st = status[s.id] || 'idle'
-          return (
-            <div key={s.id} style={{ border: '1px solid var(--border-primary)', borderRadius: 10, padding: '10px 11px', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{s.label}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.when}</span>
-              </div>
-              <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{s.body}</div>
-              {s.buttons?.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {s.buttons.map((b, i) => (
-                    <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(99,102,241,.3)', color: 'rgba(139,142,255,.95)', background: 'rgba(99,102,241,.08)' }}>{b}</span>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => send(s.id)} disabled={st === 'sending'}
-                style={{
-                  marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 700,
-                  padding: '7px 10px', borderRadius: 8, border: 'none', cursor: st === 'sending' ? 'default' : 'pointer',
-                  background: st === 'sent' ? 'rgba(34,197,94,.15)' : st === 'error' ? 'rgba(239,68,68,.15)' : '#22c55e',
-                  color: st === 'sent' ? '#22c55e' : st === 'error' ? '#ef4444' : '#fff', opacity: st === 'sending' ? 0.6 : 1,
-                }}
-              >
-                {st === 'sent' ? (<><MdCheckCircle size={14} /> Sent to your WhatsApp</>)
-                  : st === 'error' ? (<><MdErrorOutline size={14} /> Failed — retry</>)
-                  : st === 'sending' ? ('Sending…')
-                  : (<><MdSend size={13} /> Send to my WhatsApp</>)}
-              </button>
-              {st === 'error' && errorMsg[s.id] && (
-                <div style={{ fontSize: 10, color: '#ef4444' }} title={errorMsg[s.id]}>{String(errorMsg[s.id]).slice(0, 90)}</div>
-              )}
-            </div>
-          )
-        })}
+      <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--text-muted)' }}>
+        Hover a gate to see what it does. Test sends go only to the team test number <MdSend size={10} style={{ verticalAlign: '-1px' }} /> - never to a lead.
       </div>
     </div>
   )

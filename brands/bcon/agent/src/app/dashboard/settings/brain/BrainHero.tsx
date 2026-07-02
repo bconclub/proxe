@@ -143,6 +143,8 @@ export default function BrainHero() {
   const [selected, setSelected] = useState<RegionId | null>(null)
   const [ticker, setTicker] = useState<Array<{ kind: string; label: string; detail: string; at: string; key: number }>>([])
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const [regionItems, setRegionItems] = useState<Array<{ title: string; sub: string; at?: string | null }> | null>(null)
+  const [regionLoading, setRegionLoading] = useState(false)
   const queueRef = useRef<Array<{ kind: string; label: string; detail: string; at: string }>>([])
   const seenRef = useRef<Set<string>>(new Set())
   const keyRef = useRef(0)
@@ -206,6 +208,29 @@ export default function BrainHero() {
     }
   }
   const eventsFor = (id: RegionId) => ticker.filter((e) => REGIONS[id].kinds.includes(e.kind)).slice(0, 3)
+
+  // Fetch the region's actual contents when a part is clicked.
+  useEffect(() => {
+    if (!selected) { setRegionItems(null); return }
+    let alive = true
+    setRegionLoading(true); setRegionItems(null)
+    fetch(`/api/dashboard/brain/region?id=${selected}`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) setRegionItems(Array.isArray(d?.items) ? d.items : []) })
+      .catch(() => { if (alive) setRegionItems([]) })
+      .finally(() => { if (alive) setRegionLoading(false) })
+    return () => { alive = false }
+  }, [selected])
+
+  const OPEN_LINK: Record<RegionId, { href: string; label: string }> = {
+    intake: { href: '/dashboard/leads', label: 'Open Leads' },
+    scoring: { href: '/dashboard/leads', label: 'Open Leads' },
+    conversation: { href: '/dashboard/inbox', label: 'Open Inbox' },
+    decisions: { href: '/dashboard/tasks', label: 'Open Tasks' },
+    output: { href: '/dashboard/tasks', label: 'Open Tasks' },
+    timing: { href: '/dashboard/bookings', label: 'Open Bookings' },
+    memory: { href: '/dashboard/settings', label: 'Open Knowledge' },
+  }
 
   const active = selected || hovered
   const sel = selected ? REGIONS[selected] : null
@@ -380,8 +405,24 @@ export default function BrainHero() {
               </div>
             ))}
           </div>
+          {/* what's actually inside this part right now */}
+          <div style={{ marginTop: 10, maxHeight: 190, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {regionLoading && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Looking inside…</div>}
+            {!regionLoading && regionItems && regionItems.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Nothing in here yet.</div>
+            )}
+            {!regionLoading && (regionItems || []).map((it, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, padding: '5px 8px', borderRadius: 7, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{it.title}</strong>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>{it.sub}</span>
+                </span>
+                {it.at && <span style={{ color: 'var(--text-muted)', flexShrink: 0, fontSize: 10 }}>{relTime(it.at)}</span>}
+              </div>
+            ))}
+          </div>
           {eventsFor(selected).length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {eventsFor(selected).map((e) => (
                 <div key={e.key} style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                   <span style={{ color: sel.color }}>{KIND_ICON[e.kind] || '·'}</span>{' '}
@@ -390,6 +431,11 @@ export default function BrainHero() {
               ))}
             </div>
           )}
+          <div style={{ marginTop: 10, textAlign: 'right' }}>
+            <a href={OPEN_LINK[selected].href} style={{ fontSize: 11.5, fontWeight: 700, color: sel.color, textDecoration: 'none' }}>
+              {OPEN_LINK[selected].label} →
+            </a>
+          </div>
         </div>
       )}
 
