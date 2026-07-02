@@ -460,7 +460,7 @@ function UpNextCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: stri
         <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.lead_name || 'Unknown'}</span>
         {typeBadge(t.task_type)}
       </div>
-      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: '17px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview}</div>}
+      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: '17px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview.replace(/\[\[([^\]]+)\]\]/g, '$1')}</div>}
       <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
         <button style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer', background: '#3b82f6', color: '#fff' }} onClick={() => onAction(t.id, 'send_now')}>Send now</button>
         <button style={{ fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 7, cursor: 'pointer', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-primary, rgba(255,255,255,0.15))' }} onClick={() => setReSched(v => !v)}>Reschedule</button>
@@ -491,7 +491,7 @@ function FireRow({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string,
         <div style={{ minWidth: 0, flex: 1 }}>
           <span onClick={() => onLead(t)} style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{t.lead_name || 'Unknown'}</span>
           <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 7 }}>{t.task_type.replace(/_/g, ' ')}</span>
-          {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>{t.preview}</div>}
+          {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>{t.preview.replace(/\[\[([^\]]+)\]\]/g, '$1')}</div>}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 5, alignItems: 'center', paddingLeft: 59 }}>
@@ -522,7 +522,7 @@ function FireCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
         </div>
         {typeBadge(t.task_type)}
       </div>
-      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview}</div>}
+      {t.preview && <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{t.preview.replace(/\[\[([^\]]+)\]\]/g, '$1')}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
         <div style={{ display: 'flex', gap: 4 }}>
           <button style={boardBtn('rgba(34,197,94,0.15)', '#22c55e')} onClick={() => onAction(t.id, 'send_now')}>Send now</button>

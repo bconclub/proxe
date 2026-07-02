@@ -2941,20 +2941,62 @@ function getNextActiveTime(responsePatterns) {
  * Build and send the contextual nudge message based on last question.
  */
 async function executeSendNudgeMessage(task, waPhone) {
-  const lastQuestion = (task.metadata?.last_question || '').toLowerCase();
-  let message;
+  // Tier the nudge by how much we actually KNOW about the lead (not the last
+  // question). Three tiers, mirrored in the dashboard preview (buildNudgePreview
+  // in configs/template-bodies.ts — KEEP IN SYNC):
+  //   1) know nothing (just "hi")            -> open, curious prompt
+  //   2) know a goal / brand / pain          -> reference it, offer a 2-min fix
+  //   3) came from a form, know goal + brand -> reference both, offer a call
+  const name = (task.lead_name && task.lead_name.trim()) || 'there';
 
-  if (lastQuestion.includes('time') || lastQuestion.includes('when') || lastQuestion.includes('day')) {
-    message = `Hey ${task.lead_name}, just circling back. Did you figure out a good time?`;
-  } else if (lastQuestion.includes('business') || lastQuestion.includes('do')) {
-    message = `Hey ${task.lead_name}! Still curious about your business. Would love to hear more when you get a sec.`;
-  } else if (lastQuestion.includes('help') || lastQuestion.includes('need')) {
-    message = `Hey ${task.lead_name}, just following up. Let me know how I can help!`;
-  } else {
-    message = `Hey ${task.lead_name}, just following up on our chat. Let me know if you have any questions!`;
+  let lead = null;
+  if (task.lead_id) {
+    const { data } = await supabase
+      .from('all_leads')
+      .select('unified_context, first_touchpoint')
+      .eq('id', task.lead_id)
+      .maybeSingle();
+    lead = data;
   }
 
+  const message = buildTieredNudge(name, lead);
   return await executeSendMessage(task, waPhone, message);
+}
+
+/**
+ * Pick the nudge copy from what we genuinely know about the lead. Uses the RAW
+ * known values (no fabricated "AI marketing for your brand" fallback) so an
+ * empty lead correctly lands in tier 1.
+ */
+function buildTieredNudge(name, lead) {
+  const ctx = (lead && lead.unified_context) || {};
+  const formData = ctx.form_data || (ctx.whatsapp && ctx.whatsapp.profile) || (ctx.web && ctx.web.profile) || {};
+
+  let goal =
+    formData.service || formData.service_interest ||
+    extractInterestFromNotes(ctx) || extractServiceFromContext(ctx) || null;
+  if (goal) goal = ensureAiPrefix(goal);
+
+  const brand = resolveBrandName(ctx); // null when unknown
+  const pain = ctx.pain_point || null;
+
+  const src = String(
+    (ctx.attribution && (ctx.attribution.source || ctx.attribution.first_touch)) ||
+    (lead && lead.first_touchpoint) || ''
+  );
+  const cameFromForm = !!ctx.form_data || /form|meta|pabbly|facebook|lead[_ -]?machine/i.test(src);
+
+  // Tier 3 — form lead, goal + brand both known.
+  if (cameFromForm && goal && brand) {
+    return `Hey ${name}, saw you reached out about ${goal} for ${brand}. Want me to map out how we'd get you there? I can set up a quick call.`;
+  }
+  // Tier 2 — we know something concrete (goal, pain, or brand).
+  const detail = goal || pain || brand;
+  if (detail) {
+    return `Hey ${name}, you mentioned ${detail} earlier. Want me to show you how we'd fix that with AI? Takes 2 mins.`;
+  }
+  // Tier 1 — we know nothing yet.
+  return `Hey ${name}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?`;
 }
 
 /**
@@ -4097,7 +4139,9 @@ async function getTemplatePreview(task, lead) {
       };
     }
   } else {
-    return { name: 'bcon_proxe_rnr', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
+    // Fallback for any unmatched task type — use an APPROVED template, never the
+    // unsubmitted bcon_proxe_rnr placeholder (that send would fail on Meta).
+    return { name: 'bcon_proxe_reengagement_noengage', params: [{ label: 'Name', parameter_name: 'customer_name', value: leadName }] };
   }
 }
 

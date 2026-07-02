@@ -39,7 +39,7 @@ export const SEQUENCES: Sequence[] = [
       { label: 'Day 1', delay: '+1 day', template: 'bcon_proxe_followup_noengage' },
       { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
       { label: 'Day 5', delay: '+5 days', template: 'bcon_proxe_reengagement_noengage' },
-      { label: 'Re-engage', delay: 'final', template: 'bcon_proxe_rnr' },
+      { label: 'Re-engage', delay: 'final', template: 'bcon_proxe_reengagement_noengage' },
     ],
   },
   {

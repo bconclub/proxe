@@ -30,6 +30,59 @@ export const TEMPLATE_BODIES: Record<string, string> = {
  * We don't know the engaged/noengage rotation or the send-time window here, so
  * we pick the most representative variant for a preview.
  */
+// Friendly labels for each Meta template variable, used to render variable
+// SLOTS as chips in the preview (so the operator sees "that's a variable").
+export const VAR_LABELS: Record<string, string> = {
+  customer_name: 'Name',
+  service_interest: 'goal',
+  brand_name: 'brand',
+  business_name: 'brand',
+  booking_time: 'time',
+  pain_point: 'challenge',
+}
+
+// Wrap a variable slot in the [[label]] sentinel the UI turns into a chip.
+const chip = (key: string) => `[[${VAR_LABELS[key] || key}]]`
+
+/**
+ * Fill a template body but keep variables VISIBLE as [[label]] chips instead of
+ * substituting real values, so the preview shows exactly which parts are dynamic.
+ */
+export function fillTemplateWithChips(body: string): string {
+  return body
+    .replace(/\{\{\s*customer_name\s*\}\}/g, chip('customer_name'))
+    .replace(/\{\{\s*brand_name\s*\}\}/g, chip('brand_name'))
+    .replace(/\{\{\s*business_name\s*\}\}/g, chip('business_name'))
+    .replace(/\{\{\s*service_interest\s*\}\}/g, chip('service_interest'))
+    .replace(/\{\{\s*booking_time\s*\}\}/g, chip('booking_time'))
+    .replace(/\{\{\s*pain_point\s*\}\}/g, chip('pain_point'))
+}
+
+/**
+ * Tiered free-form nudge preview — MIRRORS the worker's buildTieredNudge
+ * (task-worker.js). Tiers on what the task metadata knows; variables render as
+ * [[label]] chips. KEEP IN SYNC with the worker.
+ */
+export function buildNudgePreview(md: Record<string, any>): string {
+  const goal = md?.service_interest || null
+  const brand = md?.brand_name || md?.business_name || null
+  const pain = md?.pain_point || null
+  const src = String(md?.bucket || md?.source || md?.channel || '')
+  const cameFromForm = /form|meta|pabbly|facebook|lead[_ -]?machine/i.test(src)
+
+  // Tier 3 — form lead, goal + brand known.
+  if (cameFromForm && goal && brand) {
+    return `Hey ${chip('customer_name')}, saw you reached out about ${chip('service_interest')} for ${chip('brand_name')}. Want me to map out how we'd get you there? I can set up a quick call.`
+  }
+  // Tier 2 — some concrete detail (goal, challenge, or brand).
+  if (goal || pain || brand) {
+    const detailChip = goal ? chip('service_interest') : pain ? chip('pain_point') : chip('brand_name')
+    return `Hey ${chip('customer_name')}, you mentioned ${detailChip} earlier. Want me to show you how we'd fix that with AI? Takes 2 mins.`
+  }
+  // Tier 1 — nothing known yet.
+  return `Hey ${chip('customer_name')}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?`
+}
+
 export function resolveTaskTemplate(taskType: string, bucket?: string | null): string | null {
   const t = taskType || ''
   if (t === 'booking_reminder_24h' || t === 'reminder_24h') return 'bcon_proxe_booking_reminder_24h'

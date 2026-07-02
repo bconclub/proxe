@@ -128,6 +128,23 @@ function getTaskTypeConfig(taskType: string): { color: string; bg: string; label
   return { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', label: dayLabel || taskType?.replace(/_/g, ' ') || 'Task' }
 }
 
+// Render a preview string, turning [[label]] variable slots into chips so the
+// operator can see exactly which parts of the message are dynamic variables.
+function renderPreviewWithVars(text: string) {
+  return text.split(/(\[\[[^\]]+\]\])/g).map((p, i) => {
+    const m = p.match(/^\[\[([^\]]+)\]\]$/)
+    if (!m) return <span key={i}>{p}</span>
+    return (
+      <span key={i} style={{
+        display: 'inline-block', padding: '0 5px', margin: '0 1px', borderRadius: 5,
+        fontSize: '0.9em', fontWeight: 700, lineHeight: 1.5, whiteSpace: 'nowrap',
+        color: 'var(--accent-primary)', background: 'var(--accent-subtle)',
+        border: '1px solid var(--accent-primary)',
+      }}>{m[1]}</span>
+    )
+  })
+}
+
 function getTaskActionLabel(task: any): string {
   const channel = task.metadata?.channel || 'WhatsApp'
   const t = (task.task_type || '').toLowerCase()
@@ -2834,7 +2851,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   <button
                                     key={task.id}
                                     onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
-                                    className="snap-start flex-shrink-0 w-[140px] text-left p-2 rounded-lg border transition-colors"
+                                    className="snap-start flex-shrink-0 w-[172px] text-left p-2 rounded-lg border transition-colors"
                                     style={{
                                       borderColor: isExpanded ? 'var(--accent-primary)' : 'var(--border-primary)',
                                       background: isExpanded ? 'var(--accent-subtle)' : 'var(--bg-primary)',
@@ -2857,6 +2874,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     {task.scheduled_at && (
                                       <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
                                         {formatCountdown(task.scheduled_at)}
+                                      </p>
+                                    )}
+                                    {hasPreview && (
+                                      <p
+                                        className="text-[10px] text-[var(--text-secondary)] mt-1 leading-snug"
+                                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                                      >
+                                        {String(task.preview || task.metadata?.preview || task.metadata?.message_preview || '').replace(/\[\[([^\]]+)\]\]/g, '$1')}
                                       </p>
                                     )}
                                   </button>
@@ -2895,7 +2920,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   </div>
                                   {preview ? (
                                     <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 p-2 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] whitespace-pre-wrap">
-                                      &ldquo;{preview}&rdquo;
+                                      &ldquo;{renderPreviewWithVars(preview)}&rdquo;
                                     </p>
                                   ) : (
                                     <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">No fixed template — the AI writes this live at send time using the angle below.</p>

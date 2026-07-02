@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
 // Brand-private template-body map (the board's outgoing-message preview).
-import { TEMPLATE_BODIES, resolveTaskTemplate } from '@/configs/template-bodies'
+import { TEMPLATE_BODIES, resolveTaskTemplate, fillTemplateWithChips, buildNudgePreview } from '@/configs/template-bodies'
 
 export const dynamic = 'force-dynamic'
 
-/** Render a short outgoing-message preview for a task. */
+/** Render a short outgoing-message preview for a task. Variables stay VISIBLE as
+ * [[label]] chips (the UI styles them) so the operator sees what's dynamic. */
 function renderPreview(t: any): string {
-  const name = (t.lead_name || 'there').split(' ')[0]
   const md = t.metadata || {}
+  // Waiting nudges send a free-form, info-tiered message (not a fixed template).
+  // Mirror the worker's tiering so the preview matches what actually goes out.
+  if (t.task_type === 'nudge_waiting') return buildNudgePreview(md)
   // Prefer an explicit template on the task; otherwise resolve the template the
   // worker WILL send for this task_type + bucket, so the timeline shows the
   // actual outgoing message per planned step (not a generic description).
   const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket)
   if (tmpl && TEMPLATE_BODIES[tmpl]) {
-    return TEMPLATE_BODIES[tmpl]
-      .replace(/\{\{\s*customer_name\s*\}\}/g, name)
-      .replace(/\{\{\s*brand_name\s*\}\}/g, md.brand_name || 'your brand')
-      .replace(/\{\{\s*business_name\s*\}\}/g, md.business_name || md.brand_name || 'your business')
-      .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || 'your goals')
-      .replace(/\{\{\s*booking_time\s*\}\}/g, md.booking_time || 'your slot')
-      .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
+    return fillTemplateWithChips(TEMPLATE_BODIES[tmpl])
   }
   // AI-dynamic tasks: message is generated at send time — use the stored
   // preview / description / angle as the best available hint.

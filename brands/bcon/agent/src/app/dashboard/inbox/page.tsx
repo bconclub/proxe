@@ -2685,7 +2685,7 @@ export default function InboxPage() {
                           {t.sequence_label && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t.sequence_label}</span>}
                         </div>
                         {t.preview && (
-                          <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{t.preview}</p>
+                          <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{t.preview.replace(/\[\[([^\]]+)\]\]/g, '$1')}</p>
                         )}
                       </div>
                     ))}
