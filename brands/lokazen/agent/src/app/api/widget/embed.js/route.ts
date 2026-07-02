@@ -25,6 +25,21 @@ export async function GET() {
   var scriptSrc = scriptEl ? scriptEl.src : '';
   var baseUrl = scriptSrc ? scriptSrc.replace(/\\/api\\/widget\\/embed\\.js.*$/, '') : (window.location.protocol + '//' + window.location.host);
   var pagePath = (window.location && window.location.pathname ? window.location.pathname : '').toLowerCase();
+
+  // The PROXe chat widget is for FRONT-END VISITORS only. Never show it on
+  // internal / logged-in app pages (admin, dashboards, auth, onboarding,
+  // payments, the scout portal/KYC/submit app, etc.). Self-suppress here so it
+  // doesn't matter where the embed <script> was placed on the host site.
+  var INTERNAL_PREFIXES = [
+    '/admin', '/dashboard', '/auth', '/login', '/signin', '/signup',
+    '/onboarding', '/profile', '/account', '/settings', '/payment',
+    '/shortlist', '/scout/portal', '/scout/submit', '/scout/kyc'
+  ];
+  for (var pi = 0; pi < INTERNAL_PREFIXES.length; pi++) {
+    var seg = INTERNAL_PREFIXES[pi];
+    if (pagePath === seg || pagePath.indexOf(seg + '/') === 0) return;
+  }
+
   var pageContext = pagePath.indexOf('scout') !== -1 ? 'lokazen_scout' : 'lokazen_default';
   iframe.src = baseUrl + '/widget/bubble?page_context=' + encodeURIComponent(pageContext);
   iframe.setAttribute('allowtransparency', 'true');

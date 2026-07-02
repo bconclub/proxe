@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · widget — chat bubble suppressed on internal/admin pages (front-end visitors only)
+
+- **widget embed (all brands)** — `app/api/widget/embed.js/route.ts`: the injected PROXe chat bubble was appearing on internal/logged-in pages of host sites (admin, dashboards, auth, the scout portal/KYC/submit app, etc.). Added a path guard that self-suppresses the widget on internal route prefixes (`/admin`, `/dashboard`, `/auth`, `/login`, `/signin`, `/signup`, `/onboarding`, `/profile`, `/account`, `/settings`, `/payment`, `/shortlist`, `/scout/portal`, `/scout/submit`, `/scout/kyc`) — it never injects there regardless of where the host site placed the `<script>`. Public marketing pages (incl. the public `/scout` join landing) still show it. Verified via a mock-DOM harness across 15 routes.
+
 ## 2026-07-02 · agent-core — chat never shows raw API errors, falls back gracefully
 
 - **agent-core (all brands)** — `lib/agent-core/claudeClient.ts` `getErrorMessage()`: the final fallback returned the raw provider message, so an Anthropic 400 ("Your credit balance is too low…") was rendered verbatim in the chat widget as "Error: 400 {…}". Now every unrecognised error (auth, billing/credit, 500/503, unknown) returns one graceful visitor-safe line; the real error is logged server-side (`engine.ts` catch now `console.error`s the raw error before yielding the safe message). Kept the friendly overloaded/rate-limit/network branches.
