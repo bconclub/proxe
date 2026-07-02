@@ -31,7 +31,11 @@ const normalizePhone = (phone: string): string => {
 // so without this they never receive the welcome template. Sends the bare
 // last-10 digits — the format the live task-worker uses successfully. Awaited
 // by the caller so the Vercel lambda doesn't drop it on freeze. Soft-fails.
-async function sendWebWelcome(name: string, normalizedPhone: string, brandData?: any): Promise<void> {
+async function sendWebWelcome(
+  name: string,
+  normalizedPhone: string,
+  opts?: { serviceInterest?: string | null; brandName?: string | null; supabase?: any; leadId?: string | null },
+): Promise<void> {
   const to = normalizedPhone.replace(/\D/g, '').slice(-10)
   if (!to || to.length < 10) return
   if (!process.env.META_WHATSAPP_PHONE_NUMBER_ID || !process.env.META_WHATSAPP_ACCESS_TOKEN) {
@@ -39,7 +43,17 @@ async function sendWebWelcome(name: string, normalizedPhone: string, brandData?:
     return
   }
   try {
-    const serviceInterest = brandData?.service_interest || 'General Inquiry'
+    // Use what the lead actually gave us. NEVER "General Inquiry", and the brand
+    // slot is the LEAD's brand, never ours ("BCON").
+    const serviceInterest = (opts?.serviceInterest || '').toString().trim() || 'AI marketing'
+    const brandName = (opts?.brandName || '').toString().trim() || 'your brand'
+    const si = serviceInterest.toLowerCase()
+    const probeQuestion =
+      si.includes('brand') ? "Starting from scratch or scaling what's working?" :
+      si.includes('app') ? 'Got something built already or starting fresh?' :
+      "What's the one thing you want to fix first?"
+    // Mirror of the approved bcon_welcome_web_v1 body, for the dashboard timeline.
+    const renderedBody = `Hey ${name}, got your enquiry about ${serviceInterest} for ${brandName}.\n\n${probeQuestion}, Lets get on call to discuss this.`
     const res = await fetch(
       `https://graph.facebook.com/v21.0/${process.env.META_WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -60,19 +74,75 @@ async function sendWebWelcome(name: string, normalizedPhone: string, brandData?:
               parameters: [
                 { type: 'text', parameter_name: 'customer_name', text: name },
                 { type: 'text', parameter_name: 'service_interest', text: serviceInterest },
-                { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
-                { type: 'text', parameter_name: 'probe_question', text: "What's the one thing you want to fix first?" },
+                { type: 'text', parameter_name: 'brand_name', text: brandName },
+                { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
               ],
             }],
           },
         }),
       }
     )
-    if (!res.ok) console.error('[web-agent] welcome template send failed:', await res.text())
-    else console.log(`[web-agent] welcome (bcon_welcome_web_v1) sent to ${to}`)
+    if (!res.ok) {
+      console.error('[web-agent] welcome template send failed:', await res.text())
+      return
+    }
+    console.log(`[web-agent] welcome (bcon_welcome_web_v1) sent to ${to}`)
+
+    // Record the outgoing welcome so the dashboard timeline shows it (the send
+    // went straight to Meta before — the dashboard had no record of it).
+    if (opts?.supabase && opts?.leadId) {
+      let wamid: string | null = null
+      try { wamid = (await res.clone().json())?.messages?.[0]?.id || null } catch { /* ignore */ }
+      const { error: logErr } = await opts.supabase.from('conversations').insert({
+        lead_id: opts.leadId,
+        channel: 'whatsapp',
+        sender: 'agent',
+        content: renderedBody,
+        message_type: 'text',
+        metadata: {
+          template_name: 'bcon_welcome_web_v1',
+          source: 'web_welcome',
+          ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}),
+        },
+      })
+      if (logErr) console.error('[web-agent] welcome conversation log failed:', logErr.message)
+    }
   } catch (e) {
     console.error('[web-agent] welcome send error:', e)
   }
+}
+
+// Mark the web welcome as 'pending' (defer until the lead states a goal) or
+// 'sent' (fired), tracked on unified_context.web so it fires exactly once.
+async function markWebWelcome(supabase: any, leadId: string, state: 'pending' | 'sent'): Promise<void> {
+  const { data } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
+  const ctx = data?.unified_context || {}
+  const web = { ...(ctx.web || {}) }
+  if (state === 'sent') { web.welcome_sent = true; web.welcome_pending = false }
+  else { web.welcome_pending = true }
+  await supabase.from('all_leads').update({ unified_context: { ...ctx, web } }).eq('id', leadId)
+}
+
+// Fire the deferred web welcome once we know what the lead wants (their first
+// message / button pick). No-op unless a welcome is pending and not yet sent.
+async function fireDeferredWebWelcome(supabase: any, leadId: string, interestHint?: string | null): Promise<void> {
+  const { data: lead } = await supabase
+    .from('all_leads')
+    .select('customer_name, phone, customer_phone_normalized, unified_context')
+    .eq('id', leadId)
+    .maybeSingle()
+  if (!lead) return
+  const ctx = lead.unified_context || {}
+  if (ctx.web?.welcome_sent || !ctx.web?.welcome_pending) return
+  const phone = lead.customer_phone_normalized || lead.phone
+  if (!phone) return
+  const interest =
+    ctx.service_interest || ctx.web?.service_interest || ctx.web?.profile?.service_interest ||
+    (interestHint ? String(interestHint).replace(/\s+/g, ' ').trim().slice(0, 80) : null)
+  const brandName = ctx.company || ctx.web?.profile?.company || ctx.web?.profile?.business_name || null
+  await sendWebWelcome(lead.customer_name || 'there', String(phone), { serviceInterest: interest, brandName, supabase, leadId })
+  const web = { ...(ctx.web || {}), welcome_sent: true, welcome_pending: false }
+  await supabase.from('all_leads').update({ unified_context: { ...ctx, web } }).eq('id', leadId)
 }
 
 // Helper function to update unified_context.web in all_leads (similar to updateWhatsAppContext)
@@ -404,10 +474,20 @@ export async function POST(request: NextRequest) {
         if (insertError) throw insertError
         leadId = newLead.id
 
-        // Brand-new web lead → fire the WhatsApp welcome template once.
-        // Awaited so it isn't dropped when the lambda freezes after the response.
+        // Brand-new web lead → the WhatsApp welcome fires AFTER the lead states a
+        // goal, so it reflects their real interest (not "General Inquiry"). If we
+        // already know the goal at the gate, send now; otherwise defer it and let
+        // the first message / button pick trigger it (fireDeferredWebWelcome).
+        // Awaited so nothing is dropped when the lambda freezes after the response.
         if (normalizedPhone) {
-          await sendWebWelcome(name, normalizedPhone, brandData)
+          const leadInterest = brandData?.service_interest || (body as any).service_interest || (metadata as any)?.service_interest || null
+          const leadBrand = brandData?.company || brandData?.brand_name || brandData?.business_name || (body as any).company || (body as any).business_name || null
+          if (leadInterest) {
+            await sendWebWelcome(name, normalizedPhone, { serviceInterest: leadInterest, brandName: leadBrand, supabase, leadId })
+            await markWebWelcome(supabase, leadId as string, 'sent')
+          } else {
+            await markWebWelcome(supabase, leadId as string, 'pending')
+          }
         }
       } else {
         // EXISTING LEAD - Update
@@ -578,6 +658,13 @@ export async function POST(request: NextRequest) {
         console.log('✅ Message inserted successfully for lead:', leadId)
       }
 
+      // The lead just told us what they want → fire the deferred welcome using
+      // their own words as the interest. No-op if already sent / not pending.
+      if (message_sender === 'customer' && leadId) {
+        await fireDeferredWebWelcome(supabase, leadId, message).catch((e) =>
+          console.error('[web-agent] deferred welcome (message) failed:', e))
+      }
+
       // Update unified_context.web with message data
       if (!leadId) {
         throw new Error('Lead ID is required but was not found')
@@ -672,6 +759,13 @@ export async function POST(request: NextRequest) {
             ...(metadata || {}),
           },
         })
+
+        // A button pick is a goal signal → fire the deferred welcome.
+        const btnHint =
+          (user_inputs_summary && (user_inputs_summary.service_interest || user_inputs_summary.interest || user_inputs_summary.goal)) ||
+          message || null
+        await fireDeferredWebWelcome(supabase, leadId, btnHint).catch((e) =>
+          console.error('[web-agent] deferred welcome (button) failed:', e))
       }
 
       return NextResponse.json({

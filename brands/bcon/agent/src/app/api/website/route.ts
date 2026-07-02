@@ -215,18 +215,25 @@ export async function POST(req: NextRequest) {
       await (async () => {
         try {
           if (normalizedPhone) {
-            // Determine probe_question based on service_interest
-            const serviceInterest = body.service_interest || '';
+            // The interest the lead actually selected/typed drives the probe.
+            const selectedInterest = (body.service_interest || '').toString().trim();
             let probeQuestion: string;
-            if (serviceInterest === 'AI in Marketing') {
+            if (selectedInterest === 'AI in Marketing') {
               probeQuestion = 'Ready to plug an AI system into your marketing?';
-            } else if (serviceInterest === 'Brand Marketing') {
+            } else if (selectedInterest === 'Brand Marketing') {
               probeQuestion = 'Starting from scratch or scaling what\'s working?';
-            } else if (serviceInterest === 'Business Apps') {
+            } else if (selectedInterest === 'Business Apps') {
               probeQuestion = 'Got something built already or starting fresh?';
             } else {
               probeQuestion = 'What\'s the one thing you want to fix first?';
             }
+            // What goes in "got your enquiry about ___": their selection first,
+            // else the actual message they typed, else a safe brand-appropriate
+            // label. NEVER the empty "General Inquiry".
+            const interestParam =
+              selectedInterest ||
+              (message ? String(message).replace(/\s+/g, ' ').trim().slice(0, 80) : '') ||
+              'AI marketing';
 
             // Route the welcome by source page. A lead from the AI Lead Machine
             // landing page came in FOR the AI Lead Machine, so it gets the Lead
@@ -255,8 +262,8 @@ export async function POST(req: NextRequest) {
                     type: 'body',
                     parameters: [
                       { type: 'text', parameter_name: 'customer_name', text: name },
-                      { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
-                      { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
+                      { type: 'text', parameter_name: 'service_interest', text: interestParam },
+                      { type: 'text', parameter_name: 'brand_name', text: brandName },
                       { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
                     ],
                   }],
@@ -283,6 +290,26 @@ export async function POST(req: NextRequest) {
 
             if (!response.ok) {
               console.error('Template send failed:', await response.text());
+            } else {
+              // Record the outgoing welcome so the dashboard timeline shows it.
+              const renderedBody = isLeadMachine
+                ? `Hi ${name}, thanks for your interest in AI Lead Machine for ${brandName}. We help businesses like yours capture, qualify and convert more leads on autopilot. Want to see it in action?`
+                : `Hey ${name}, got your enquiry about ${interestParam} for ${brandName}.\n\n${probeQuestion}, Lets get on call to discuss this.`;
+              let wamid: string | null = null;
+              try { wamid = (await response.clone().json())?.messages?.[0]?.id || null; } catch { /* ignore */ }
+              const { error: logErr } = await supabase.from('conversations').insert({
+                lead_id: leadId,
+                channel: 'whatsapp',
+                sender: 'agent',
+                content: renderedBody,
+                message_type: 'text',
+                metadata: {
+                  template_name: welcomeTemplate.name,
+                  source: 'web_welcome',
+                  ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}),
+                },
+              });
+              if (logErr) console.error('[website] welcome conversation log failed:', logErr.message);
             }
           } else if (email) {
             // Optional: Send email auto-responder via existing /api/send-email
