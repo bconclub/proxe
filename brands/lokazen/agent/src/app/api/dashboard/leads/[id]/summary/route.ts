@@ -96,38 +96,22 @@ async function buildLokazenSummaryResponse(
   const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null
 
   const leadKind =
-    userType === 'brand' ? 'brand looking for commercial space'
-    : userType === 'owner' ? 'property owner listing a commercial space'
-    : userType === 'scout' ? 'scout lead'
-    : 'Lokazen lead'
+    userType === 'brand' ? 'Brand'
+    : userType === 'owner' ? 'Property owner'
+    : userType === 'scout' ? 'Scout'
+    : 'Lead'
 
-  const fieldGroup =
-    userType === 'owner' ? ownerFields
-    : userType === 'scout' ? scoutFields
-    : brandFields.length > 0 ? brandFields
-    : ownerFields.length > 0 ? ownerFields
-    : scoutFields
-
-  const detailSentence = fieldGroup.length > 0
-    ? `Captured CRE details: ${fieldGroup.slice(0, 8).join('; ')}.`
-    : 'CRE requirement details are not captured yet.'
+  // A summary is only meaningful once there's an actual back-and-forth. A pure
+  // form-fill has no customer messages — for those, describe what's HAPPENING
+  // (enquiry captured, next step) rather than restating size/budget technicals
+  // that already show in the CRE requirement card.
+  const hasRealConversation = customerMessages.length > 0
 
   const bookingSentence = bookingDate || bookingTime
-    ? `Call booking is recorded for ${[bookingDate, bookingTime].filter(Boolean).join(' at ')}.`
-    : lkz.selected_plan || /talk to (the |lokazen )?team/i.test(allMessages.map((m: any) => m.content).join(' '))
-      ? 'The lead has shown intent to speak with the Lokazen team; a call is not booked until a date and time are selected.'
-      : 'No call booking is recorded yet.'
-
-  const contactSentence = contactFields.length > 0
-    ? `Contact captured: ${contactFields.join('; ')}.`
-    : 'Contact details are not captured yet.'
-
-  const summary = [
-    `${lead.customer_name || 'This lead'} is a ${leadKind} from the Lokazen ${lastMessage?.channel || 'web'} conversation.`,
-    detailSentence,
-    `${contactSentence} ${bookingSentence}`,
-    `Current stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`,
-  ].join(' ')
+    ? `A call is booked for ${[bookingDate, bookingTime].filter(Boolean).join(' at ')}.`
+    : (lkz.selected_plan || /talk to (the |lokazen )?team/i.test(allMessages.map((m: any) => m.content).join(' ')))
+      ? 'The lead asked to speak with the team; no call is booked yet.'
+      : ''
 
   const lastInteraction = lead.last_interaction_at || lead.created_at
   const daysInactive = lastInteraction
@@ -148,6 +132,27 @@ async function buildLokazenSummaryResponse(
       : lastMessage.sender === 'agent'
         ? `Waiting on customer (${hoursSinceLastMessage}h ago)`
         : `No response (${hoursSinceLastMessage}h ago)`
+
+  // Activity-focused summary: what is HAPPENING with the lead, not a restatement
+  // of their requirement. Form-fills (no conversation) get a simple status line.
+  const sourceLabel =
+    lead.first_touchpoint === 'whatsapp' ? 'WhatsApp'
+    : lead.first_touchpoint === 'voice' ? 'a call'
+    : lead.first_touchpoint === 'social' ? 'social'
+    : 'the website form'
+  const stageLabel = lead.lead_stage || 'New'
+
+  const summary = !hasRealConversation
+    ? [
+        `New ${leadKind.toLowerCase()} enquiry captured via ${sourceLabel}. No conversation yet.`,
+        bookingSentence,
+        `Next step is first outreach. Current stage: ${stageLabel}.`,
+      ].filter(Boolean).join(' ')
+    : [
+        `${leadKind} lead. ${conversationStatus}.`,
+        bookingSentence,
+        `Current stage: ${stageLabel}.`,
+      ].filter(Boolean).join(' ')
 
   let attribution = ''
   const { data: lastStageChangeData } = await supabase

@@ -3332,10 +3332,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                     {/* Compact Intelligence Insights - Only render when data exists */}
                     {(() => {
-                      // Scouts aren't buyers — Buying Signals (budget/interest/pain)
-                      // is meaningless for them (it was surfacing "Interest: scout"). Hide it.
-                      const isScoutLead = currentLead.unified_context?.lokazen?.user_type === 'scout'
-                      if (isScoutLead) return null
+                      // Lokazen is commercial real estate, not a generic sales funnel.
+                      // The "Buying Signals" block (Budget / Interest / Pain point) mis-
+                      // frames CRE data — it was showing Interest="brand" (the user type)
+                      // and Pain point=the target location. The real requirement (budget,
+                      // size, zones) already lives in the dedicated CRE card, so hide this
+                      // generic block for all Lokazen leads.
+                      const isLokazenLead = !!currentLead.unified_context?.lokazen
+                      if (isLokazenLead) return null
                       const hasKeyInfo = summaryData?.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints)
                       const brandProfileCheck = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {}
                       const hasProfile = Object.keys(brandProfileCheck).length > 0
