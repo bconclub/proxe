@@ -80,10 +80,11 @@ function detectLokazenStepButtons(response: string): string[] {
     return ['North Bangalore', 'South Bangalore', 'East Bangalore'];
   }
   if (r.includes('size') && (r.includes('sqft') || r.includes('looking for') || r.includes('space'))) {
-    return ['Under 500 sqft', '500-1500 sqft', '1500+ sqft'];
+    return ['Under 600 sqft', '600-1500 sqft', '1500+ sqft'];
   }
   if (r.includes('budget') || r.includes('monthly rent')) {
-    return ['Under 50k', '50k-1.5L', 'Above 1.5L'];
+    // Calibrated to live inventory (median listing ~Rs 1.8L/mo; under 50k is ~1% of stock).
+    return ['Under 1L', '1L-2.5L', 'Above 2.5L'];
   }
   if (
     r.includes('tap a plan') ||

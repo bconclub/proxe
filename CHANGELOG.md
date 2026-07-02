@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — chat size/budget calibrated to real inventory + market guardrail
+
+- **Data first**: profiled the live Lokazen CRE database (Supabase `pasuywntzuyomkwfagep`, `properties` table, 164 rows / 155 usable): median listing 1,000 sqft at Rs 1.8L/mo, median Rs 186/sqft (p25 Rs 103 / p75 Rs 289); under Rs 50k = ~1% of stock; Rs 1L-5L = 61%. Restaurant median 850 sqft @ 1.5L; retail 1,650 sqft @ 2.6L. Top areas: Koramangala, Indiranagar, HSR, Jayanagar, Whitefield, Sarjapur Rd.
+- **lokazen** — `configs/prompts/lokazen-prompt.ts`: budget buttons were anchored at "Under 50k / 50k-1.5L / Above 1.5L" (off-market). Now "Under 1L / 1L-2.5L / Above 2.5L" in both brand-budget and owner-rent steps; size buttons retuned to "Under 600 / 600-1500 / 1500+". Added a MARKET CONTEXT section (rates + typical listing + top areas from the live data) with an EXPECTATION RULE: on a clear size/budget mismatch (e.g. 1,500 sqft under 50k → really ~2.5L+), reply with one warm reality-check line and ask which side to adjust — never silently accept, never reject.
+- **lokazen** — `lib/agent-core/followUpGenerator.ts`: the deterministic fallback buttons had the same stale buckets; synced to the new ones.
+- **frontend (C:/Users/user/Lokazen, separate deploy)** — BrandOnboardingForm rent placeholders re-anchored: "Min e.g. 1,00,000 / Max e.g. 2,50,000" (was 50,000/1,50,000). Size placeholders (800/2,000) already match the data.
+
 ## 2026-07-02 · lokazen — plans shown as rich cards in the widget (not flat text)
 
 - **lokazen** — new `components/widget/LokazenPlanCards.tsx` + wiring in `ChatWidget.tsx`: the "how we work / choose a plan" message and each single-plan detail were flat walls of text with no emotion. Now the web widget renders them as brand-orange plan cards mirroring lokazen.in/for-brands#plans — overview shows all three (Starter ₹4,999 / Professional ₹9,999 "Most Popular" / Premium ₹19,999) with features + Choose buttons; picking one renders a focused card with Start-this-plan / Talk-to-the-team CTAs. Detection is off the existing scripted text ("tap a plan to see what's included" and the "Starter - Rs" detail header) so nothing leaks to WhatsApp, which keeps its [BTN:] buttons. Redundant plan text-buttons are suppressed on web (cards provide the actions). Verified in the preview widget (both modes, orange highlight, correct button hierarchy). Plan data is a plain array, ready to lift to brand config for reuse across brands.
