@@ -694,7 +694,8 @@
 
 .chatboxDocked {
   position: fixed !important;
-  bottom: 80px !important;
+  /* leave room below for the docked launcher bar (accordion collapse handle) */
+  bottom: 128px !important;
   right: 20px !important;
   left: auto !important;
   top: auto !important;

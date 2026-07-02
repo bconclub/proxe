@@ -2512,6 +2512,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, [isMobileViewport]);
 
   const handleSearchWidgetPress = useCallback(() => {
+    // Desktop accordion: when the chat is already open, the docked launcher bar
+    // acts as a collapse handle -> pressing it closes the chat.
+    if (isOpen && !isMobileViewport) {
+      handleCloseChat();
+      return;
+    }
     // Always open the chat modal when user interacts with search widget
     setIsDockedBubble(true);
     setIsOpen(true);
@@ -2526,7 +2532,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         inputRef.current?.focus();
       }, 50);
     }
-  }, [messages.length, conversationSummary, sessionRecord, isMobileViewport]);
+  }, [messages.length, conversationSummary, sessionRecord, isMobileViewport, isOpen, handleCloseChat]);
 
   const handleQuickButtonClick = (buttonText: string, e?: React.MouseEvent) => {
     if (e) {
@@ -2749,8 +2755,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     <div 
       ref={searchbarWrapperRef} 
       className={styles.searchbarWrapper}
-      aria-hidden={isOpen}
-      style={isOpen ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
+      aria-hidden={isOpen && isMobileViewport}
+      style={isOpen && isMobileViewport ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
       onMouseEnter={() => {
         setIsSearchbarHovered(true);
       }}
