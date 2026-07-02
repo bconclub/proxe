@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · agent-core — chat never shows raw API errors, falls back gracefully
+
+- **agent-core (all brands)** — `lib/agent-core/claudeClient.ts` `getErrorMessage()`: the final fallback returned the raw provider message, so an Anthropic 400 ("Your credit balance is too low…") was rendered verbatim in the chat widget as "Error: 400 {…}". Now every unrecognised error (auth, billing/credit, 500/503, unknown) returns one graceful visitor-safe line; the real error is logged server-side (`engine.ts` catch now `console.error`s the raw error before yielding the safe message). Kept the friendly overloaded/rate-limit/network branches.
+- **lokazen (widget, defense-in-depth)** — `hooks/useChatStream.ts`: both error render paths (SSE `type:'error'` and the network catch) no longer print `Error: <raw>`; they show the same graceful fallback bubble. A partially-streamed answer is preserved if present.
+
 ## 2026-07-02 · agent-core — web bookings no longer stall when only an email is given (phone optional)
 
 - **agent-core (all brands)** — `lib/agent-core/engine.ts`: the `book_consultation` tool schema listed `phone` in `required`, but the handler only needs phone OR email (`if (!bookingPhone && !bookingEmail)`). A web lead that gave only an email (e.g. Lokazen "g@lokazen.in") could never satisfy the schema, so the model collected date/time/name/email and then silently stopped — booking never fired, no calendar invite. Removed `phone` from `required` (now `['date','time','name','title']`) and documented on the field that phone is optional when an email is provided. WhatsApp brands are unaffected (phone is always present there). This unblocks Lokazen/BCON web email-only bookings.

@@ -419,6 +419,11 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
               } else if (data.type === 'error') {
                 const errorMessage = typeof data.error === 'string' ? data.error : 'Unknown error';
                 setError(errorMessage);
+                // Never render a raw error string to the visitor. The server
+                // already returns a graceful message, but as a hard guard the
+                // visible bubble always falls back to a friendly line rather
+                // than surfacing "Error: 400 {...}" style provider text.
+                const gracefulFallback = "Sorry, I'm having a little trouble responding right now. Please try again in a moment.";
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === streamingMessage.id
@@ -426,7 +431,7 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
                           ...msg,
                           isStreaming: false,
                           hasStreamed: true,
-                          text: msg.text || `Error: ${errorMessage}`,
+                          text: msg.text || gracefulFallback,
                         }
                       : msg
                   )
@@ -540,11 +545,11 @@ export function useChatStream({ brand, apiUrl, onMessageComplete }: UseChatStrea
       // Remove loading/streaming message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessage.id));
 
-      // Add error message to chat
+      // Add a graceful fallback message to chat — never the raw error text.
       setMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
         type: 'ai',
-        text: `Error: ${err.message || 'Failed to send message. Please make sure the backend server is running.'}`,
+        text: "Sorry, I'm having a little trouble responding right now. Please try again in a moment.",
         isStreaming: false,
         hasStreamed: true,
       }]);

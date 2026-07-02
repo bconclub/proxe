@@ -459,6 +459,10 @@ User's message: ${input.message}`
     });
 
   } catch (error: any) {
+    // Log the REAL error server-side; getErrorMessage() returns a graceful,
+    // visitor-safe string (never the raw provider message like a billing/credit
+    // 400) so nothing sensitive or ugly reaches the chat widget.
+    console.error('[Engine] processStream error:', error?.message || error);
     yield { type: 'error', error: getErrorMessage(error) };
   }
 }

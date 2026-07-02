@@ -406,7 +406,6 @@ export function isConfigured(): boolean {
  */
 export function getErrorMessage(error: any): string {
   let claudeErrorType = error?.error?.type;
-  let claudeErrorMessage = error?.error?.message;
   const errorMessage = error?.message || error?.toString() || 'Unknown error occurred';
 
   // Try to parse JSON error
@@ -415,7 +414,6 @@ export function getErrorMessage(error: any): string {
       const parsed = JSON.parse(errorMessage);
       if (parsed.error) {
         claudeErrorType = parsed.error.type;
-        claudeErrorMessage = parsed.error.message;
       }
     } catch { /* Not JSON */ }
   }
@@ -430,15 +428,14 @@ export function getErrorMessage(error: any): string {
   if (errorType === 'rate_limit_error' || error?.status_code === 429) {
     return 'Rate limit exceeded. Please wait a moment and try again.';
   }
-  if (errorMessage?.toLowerCase().includes('api key') || error?.status_code === 401) {
-    return 'Authentication error. Please check API configuration.';
-  }
   if (errorMessage?.toLowerCase().includes('network') || errorMessage?.toLowerCase().includes('fetch')) {
     return 'Network error. Please check your connection and try again.';
   }
-  if (error?.status_code === 500 || error?.status_code === 503) {
-    return 'The service is currently unavailable. Please try again in a moment.';
-  }
 
-  return claudeErrorMessage || errorMessage;
+  // Anything else — auth/API-key issues, billing/credit-balance (400
+  // invalid_request_error), 500/503, or any unrecognised provider error — must
+  // NEVER surface the raw provider text to a website visitor (they were seeing
+  // "Error: 400 {...credit balance too low...}"). The real error is logged
+  // server-side by the caller; the visitor just gets a graceful fallback.
+  return "Sorry, I'm having a little trouble responding right now. Please try again in a moment.";
 }
