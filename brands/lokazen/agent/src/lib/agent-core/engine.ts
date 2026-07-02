@@ -778,7 +778,7 @@ async function flagForHumanFollowup(
       : null;
     await notifySlackLead({
       brandLabel,
-      headline: `🚨 Needs human follow-up · ${brandLabel}`,
+      title: 'Needs human follow-up',
       name: input.userProfile.name || null,
       phone: input.userProfile.phone || null,
       email: input.userProfile.email || null,

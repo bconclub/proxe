@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · slack — cleaner professional formatting (bold/italics, no emoji)
+
+- **services + callers** — replaced the emoji-per-field Block Kit with a clean, professional style per user feedback ("don't make it childish"): a bold title line (`*New lead* · _Lokazen_`), the lead/booking subject in *bold* with the type in _italics_, bold-label 2-column fields (no emoji), and an italic context footer. `notifySlackLead`/`notifySlackBooking` API: `headline` → plain `title`; detail field labels de-emojied (Brand/Category/Areas/Format/Size/Budget/Outlets · Property type/Size/Area/Rent/Floor). Verified live (HTTP 200).
+
 ## 2026-07-02 · slack — every message richly formatted (Block Kit, no walls of text)
 
 - **services** — `lib/services/slackNotifier.ts` rewritten so every notification is structured Block Kit: header → divider → 2-column contact fields (emoji labels) → divider → structured detail fields → context footer. Added `fieldsSection`/`mrkdwnField` helpers, whitespace-collapsing `clean()`, summary truncation (quote block, capped), and a `detailFields`/`footer` API on `notifySlackLead`. No more joined "·" lines or raw text dumps.

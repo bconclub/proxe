@@ -1,15 +1,13 @@
 /**
- * Slack notifier — one-way, richly-formatted notifications to a Slack channel
- * via an Incoming Webhook. No bot token or scopes needed: create an Incoming
- * Webhook for the target channel (e.g. #lokazen-proxe) and put its URL in
- * SLACK_WEBHOOK_URL.
+ * Slack notifier — one-way notifications to a Slack channel via an Incoming
+ * Webhook. No bot token or scopes: create an Incoming Webhook for the target
+ * channel (e.g. #lokazen-proxe) and put its URL in SLACK_WEBHOOK_URL.
  *
- * Every message is built with Block Kit (header + divider + 2-column fields +
- * context footer) — never a raw wall of text. Everything soft-fails: if
- * SLACK_WEBHOOK_URL is unset, calls are no-ops (dark until configured, and a
- * Slack outage never breaks a booking or a lead insert). Because the URL lives
- * in each deployment's env, only the brand whose Vercel project has it set will
- * post — no cross-brand leakage even though this module is shared.
+ * Messages use clean Block Kit formatting — a bold title line, bold field
+ * labels, and italic meta — no emoji clutter, no walls of text. Everything
+ * soft-fails: no SLACK_WEBHOOK_URL = no-op, and a Slack outage never breaks a
+ * booking or a lead insert. The URL lives in each deployment's env, so only the
+ * brand whose Vercel project has it set will post — no cross-brand leakage.
  */
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
@@ -46,21 +44,24 @@ export async function sendSlackMessage(payload: {
   }
 }
 
-// ── Block Kit helpers ────────────────────────────────────────────────────────
+// ── Block Kit helpers (bold labels, italic meta, no emoji) ───────────────────
 
 type Pair = [label: string, value?: string | number | null];
 
 const clean = (v: unknown): string =>
   v == null ? '' : String(Array.isArray(v) ? v.join(', ') : v).replace(/\s+/g, ' ').trim();
 
-/** A labelled mrkdwn field (rendered in Slack's 2-column grid). Null if empty. */
+const section = (mrkdwn: string) => ({ type: 'section', text: { type: 'mrkdwn', text: mrkdwn } });
+const context = (mrkdwn: string) => ({ type: 'context', elements: [{ type: 'mrkdwn', text: mrkdwn.slice(0, 300) }] });
+
+/** A labelled field for Slack's 2-column grid: bold label over value. */
 function mrkdwnField(label: string, value: unknown): { type: 'mrkdwn'; text: string } | null {
   const v = clean(value);
   if (!v) return null;
   return { type: 'mrkdwn', text: `*${label}*\n${v}` };
 }
 
-/** Build a fields section from label/value pairs (Slack caps at 10 fields). */
+/** A 2-column fields section from label/value pairs (Slack caps at 10). */
 function fieldsSection(pairs: Pair[]): { type: 'section'; fields: unknown[] } | null {
   const fields = pairs
     .map(([label, value]) => mrkdwnField(label, value))
@@ -69,16 +70,6 @@ function fieldsSection(pairs: Pair[]): { type: 'section'; fields: unknown[] } | 
   if (!fields.length) return null;
   return { type: 'section', fields };
 }
-
-const HEADER = (text: string) => ({
-  type: 'header',
-  text: { type: 'plain_text', text: text.slice(0, 150), emoji: true },
-});
-const DIVIDER = { type: 'divider' };
-const CONTEXT = (text: string) => ({
-  type: 'context',
-  elements: [{ type: 'mrkdwn', text: text.slice(0, 300) }],
-});
 
 // ── Booking notification ─────────────────────────────────────────────────────
 
@@ -99,25 +90,22 @@ export async function notifySlackBooking(b: BookingNotice): Promise<SlackResult>
   if (!SLACK_WEBHOOK_URL) return { success: false, skipped: true };
   const brand = b.brandLabel || 'PROXe';
 
-  const blocks: unknown[] = [HEADER(`📅 New Booking · ${brand}`), DIVIDER];
-  if (clean(b.title)) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*:pushpin: ${clean(b.title)}*` } });
-  }
+  const blocks: unknown[] = [section(`*New booking* · _${brand}_`)];
+  const who = clean(b.name) || 'Lead';
+  const line = clean(b.leadType) ? `*${who}*  ·  _${clean(b.leadType)}_` : `*${who}*`;
+  blocks.push(section(line));
+  if (clean(b.title)) blocks.push(section(clean(b.title)));
+
   const fs = fieldsSection([
-    ['👤 Name', b.name],
-    ['📱 Phone', b.phone],
-    ['📧 Email', b.email],
-    ['🏷️ Type', b.leadType],
-    ['🗓️ When', b.dateTime],
-    ['💬 Channel', b.channel],
+    ['Phone', b.phone],
+    ['Email', b.email],
+    ['When', b.dateTime],
+    ['Channel', b.channel],
   ]);
   if (fs) blocks.push(fs);
-  if (clean(b.summary)) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `>${clean(b.summary).slice(0, 500)}` } });
-  }
-  blocks.push(DIVIDER, CONTEXT(`${brand} · PROXe · booking`));
+  if (clean(b.summary)) blocks.push(context(`_${clean(b.summary).slice(0, 500)}_`));
 
-  const text = `📅 New Booking · ${brand}: ${clean(b.name) || 'Lead'} (${clean(b.phone) || 'no phone'})${b.dateTime ? ` · ${clean(b.dateTime)}` : ''}`;
+  const text = `New booking · ${brand}: ${who}${b.dateTime ? ` · ${clean(b.dateTime)}` : ''}`;
   return sendSlackMessage({ text, blocks });
 }
 
@@ -132,40 +120,39 @@ export interface LeadNotice {
   score?: number | null;
   stage?: string | null;
   source?: string | null;
-  detail?: string | null;         // free-text (rendered as a quote block)
-  detailFields?: Pair[];          // structured detail (rendered as 2-col fields)
-  headline?: string;              // override the header line
-  footer?: string;                // override the context footer suffix
+  detail?: string | null;         // free-text (rendered italic)
+  detailFields?: Pair[];          // structured detail (2-col bold-label fields)
+  title?: string;                 // headline text, e.g. "New lead" / "Needs human follow-up"
+  footer?: string;                // small italic footer suffix
 }
 
 /** A lead alert — new lead, hot lead, or a needs-human escalation. */
 export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   if (!SLACK_WEBHOOK_URL) return { success: false, skipped: true };
   const brand = l.brandLabel || 'PROXe';
-  const head = l.headline || `🔥 Hot Lead · ${brand}`;
+  const title = l.title || 'Lead';
 
-  const blocks: unknown[] = [HEADER(head), DIVIDER];
+  const blocks: unknown[] = [section(`*${title}* · _${brand}_`)];
+
+  const who = clean(l.name) || clean(l.email) || clean(l.phone) || 'Lead';
+  const line = clean(l.leadType) ? `*${who}*  ·  _${clean(l.leadType)}_` : `*${who}*`;
+  blocks.push(section(line));
 
   const core = fieldsSection([
-    ['👤 Name', l.name],
-    ['📱 Phone', l.phone],
-    ['📧 Email', l.email],
-    ['🏷️ Type', l.leadType],
-    ['📊 Score', l.score != null ? String(l.score) : null],
-    ['📶 Stage', l.stage],
-    ['🌐 Source', l.source],
+    ['Phone', l.phone],
+    ['Email', l.email],
+    ['Source', l.source],
+    ['Score', l.score != null ? String(l.score) : null],
+    ['Stage', l.stage],
   ]);
   if (core) blocks.push(core);
 
-  // Structured Brand/Property detail as its own labelled fields block.
   const detail = fieldsSection(l.detailFields || []);
-  if (detail) blocks.push(DIVIDER, detail);
-  else if (clean(l.detail)) {
-    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `>${clean(l.detail).slice(0, 500)}` } });
-  }
+  if (detail) blocks.push(detail);
+  else if (clean(l.detail)) blocks.push(section(`_${clean(l.detail).slice(0, 500)}_`));
 
-  blocks.push(DIVIDER, CONTEXT(`${brand} · PROXe${l.footer ? ` · ${l.footer}` : ''}`));
+  blocks.push(context(`_${brand} · PROXe${l.footer ? ` · ${l.footer}` : ''}_`));
 
-  const text = `${head}: ${clean(l.name) || 'Lead'} (${clean(l.phone) || 'no phone'})${l.score != null ? ` · score ${l.score}` : ''}`;
+  const text = `${title} · ${brand}: ${who}${l.score != null ? ` · score ${l.score}` : ''}`;
   return sendSlackMessage({ text, blocks });
 }

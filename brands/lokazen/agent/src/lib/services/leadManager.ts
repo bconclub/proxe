@@ -310,7 +310,7 @@ export async function ensureOrUpdateLead(
       const typeLabel = ut === 'owner' ? 'Property Owner' : ut === 'brand' ? 'Brand' : ut === 'scout' ? 'Scout' : null;
       await notifySlackLead({
         brandLabel: brand === 'lokazen' ? 'Lokazen' : brand,
-        headline: `🆕 New Lead · ${brand === 'lokazen' ? 'Lokazen' : brand}`,
+        title: 'New lead',
         name: customerName,
         phone: normalizedPhone,
         email,

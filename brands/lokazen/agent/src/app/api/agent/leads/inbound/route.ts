@@ -643,26 +643,26 @@ export async function POST(request: NextRequest) {
         const detailFields: Array<[string, string | number | null | undefined]> =
           lkz.user_type === 'owner'
             ? [
-                ['🏠 Property Type', lkz.property_type],
-                ['📐 Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
-                ['📍 Area', lkz.property_zone],
-                ['💰 Rent', lkz.asking_rent_monthly],
-                ['🪜 Floor', lkz.floor],
+                ['Property type', lkz.property_type],
+                ['Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
+                ['Area', lkz.property_zone],
+                ['Rent', lkz.asking_rent_monthly],
+                ['Floor', lkz.floor],
               ]
             : lkz.user_type === 'brand'
             ? [
-                ['🏢 Brand', lkz.brand_name],
-                ['🍽️ Category', lkz.brand_category],
-                ['📍 Areas', lkz.target_zones],
-                ['🏬 Format', lkz.preferred_format],
-                ['📐 Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
-                ['💰 Budget', lkz.budget_monthly_rent],
-                ['🔢 Outlets', lkz.current_outlets],
+                ['Brand', lkz.brand_name],
+                ['Category', lkz.brand_category],
+                ['Areas', lkz.target_zones],
+                ['Format', lkz.preferred_format],
+                ['Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
+                ['Budget', lkz.budget_monthly_rent],
+                ['Outlets', lkz.current_outlets],
               ]
             : []
         await notifySlackLead({
           brandLabel: leadBrand === 'lokazen' ? 'Lokazen' : leadBrand,
-          headline: `🆕 New Lead · ${leadBrand === 'lokazen' ? 'Lokazen' : leadBrand}`,
+          title: 'New lead',
           name: leadName,
           phone: normalizedPhone,
           email: email?.trim() || null,
