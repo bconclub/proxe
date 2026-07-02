@@ -64,18 +64,16 @@ export default function BrainHero() {
   }, [])
   useEffect(() => { load(); const t = setInterval(load, 25000); return () => clearInterval(t) }, [load])
 
-  // Fire queued events one at a time into the brain; idle micro-fires keep it alive.
+  // Fire ONLY on a real event from the live feed — no random idle flashing.
+  // When nothing's happening the brain stays calm (lobes hold a steady glow by
+  // their live load); hovering a lobe is the other way to light one up.
   useEffect(() => {
     const t = setInterval(() => {
       const ev = queueRef.current.shift()
-      if (ev) {
-        setFiring(KIND_REGION[ev.kind] || 'memory')
-        setTicker((prev) => [{ ...ev, key: ++keyRef.current }, ...prev].slice(0, 9))
-      } else {
-        const ids = Object.keys(REGION_META) as RegionId[]
-        setFiring(ids[Math.floor(Math.random() * ids.length)])
-      }
-      setTimeout(() => setFiring(null), 850)
+      if (!ev) return
+      setFiring(KIND_REGION[ev.kind] || 'memory')
+      setTicker((prev) => [{ ...ev, key: ++keyRef.current }, ...prev].slice(0, 9))
+      setTimeout(() => setFiring(null), 900)
     }, 1500)
     return () => clearInterval(t)
   }, [])

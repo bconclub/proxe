@@ -112,7 +112,7 @@ export default function NeuralBrain({ firing, hovered, intensity, onPick, onHove
   // Mutable state read by the animation loop (avoids re-subscribing rAF).
   const stateRef = useRef({ firing, hovered, intensity })
   stateRef.current = { firing, hovered, intensity }
-  const rot = useRef({ yaw: 0.5, pitch: -0.12, vyaw: 0.0025, drag: false, px: 0, py: 0, idleYaw: 0.0025 })
+  const rot = useRef({ yaw: 0.5, pitch: -0.12, vyaw: 0.0025, drag: false, px: 0, py: 0, idleYaw: 0.0011 })
   const signalsRef = useRef<Signal[]>([])
   const projRef = useRef<Record<RegionId, { x: number; y: number; z: number }>>({} as any)
   const lastFire = useRef<RegionId | null>(null)
