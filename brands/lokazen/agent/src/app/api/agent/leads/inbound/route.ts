@@ -293,35 +293,42 @@ export async function POST(request: NextRequest) {
         return null
       }
       const asStr = (v: any) => (v == null ? null : String(Array.isArray(v) ? v.join(', ') : v).trim() || null)
+      // The lokazen.in website posts user_type "seeker" (wants space = brand)
+      // and "provider" (lists space = owner). Handle those FIRST, then the
+      // generic words, so real payloads classify correctly.
       const asType = (v: any): 'brand' | 'owner' | null => {
         const s = String(v || '').toLowerCase().trim()
         if (!s) return null
-        if (s.includes('owner') || s.includes('property') || s.includes('landlord') || s.includes('list')) return 'owner'
-        if (s.includes('brand') || s.includes('tenant') || s.includes('space')) return 'brand'
+        if (s.includes('seeker') || s.includes('brand') || s.includes('tenant')) return 'brand'
+        if (s.includes('provider') || s.includes('owner') || s.includes('property') || s.includes('landlord') || s.includes('list')) return 'owner'
+        if (s.includes('space')) return 'brand'
         return null
       }
 
       // Resolve audience (brand vs owner). Explicit type field wins; else infer
-      // from the form_type/event_name/source, else from which fields are present.
+      // from the form_type/event_name/lead_source/source, else field presence.
       let lkzType =
         asType(pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type')) ||
-        asType(pick('form_type', 'event_name')) ||
+        asType(pick('form_type', 'event_name', 'lead_source')) ||
         asType(normalizedSource)
 
-      // Field presence fallback: property fields => owner, brand fields => brand.
+      // Field presence fallback (only if the type is still unknown). current_outlets
+      // => brand; carpet/asking-rent => owner. space_type/area_sqft/budget_rent are
+      // sent by BOTH sides so they don't discriminate.
       const hasPropFields = !!pick('propertyType', 'property_type', 'spaceTypes', 'space_types', 'carpetArea', 'carpet_area', 'asking_rent', 'monthly_rent')
       const hasBrandFields = !!pick('brandName', 'brand_name', 'outlets', 'current_outlets', 'sizeMin', 'size_min', 'rentMin', 'rent_min')
       if (!lkzType) lkzType = hasPropFields ? 'owner' : hasBrandFields ? 'brand' : null
 
       if (lkzType === 'owner') {
         brandCtxData.user_type = 'owner'
-        const propType = asStr(pick('propertyType', 'property_type', 'spaceTypes', 'space_types', 'space_type'))
+        // Live website keys first: space_type / area_sqft / location_preference / budget_rent.
+        const propType = asStr(pick('space_type', 'propertyType', 'property_type', 'spaceTypes', 'space_types', 'property_kind'))
         if (propType) brandCtxData.property_type = propType
-        const size = asStr(pick('carpetArea', 'carpet_area', 'builtUpArea', 'built_up_area', 'property_size_sqft', 'sqft', 'size', 'area_sqft'))
+        const size = asStr(pick('area_sqft', 'carpetArea', 'carpet_area', 'builtUpArea', 'built_up_area', 'property_size_sqft', 'sqft', 'size'))
         if (size) brandCtxData.property_size_sqft = size
-        const zone = asStr(pick('area', 'locality', 'zone', 'property_zone', 'micromarket', 'location'))
+        const zone = asStr(pick('location_preference', 'area', 'locality', 'zone', 'property_zone', 'micromarket', 'location'))
         if (zone) brandCtxData.property_zone = zone
-        const rent = asStr(pick('rent', 'asking_rent', 'monthly_rent', 'asking_rent_monthly', 'expected_rent'))
+        const rent = asStr(pick('budget_rent', 'rent', 'asking_rent', 'monthly_rent', 'asking_rent_monthly', 'expected_rent'))
         if (rent) brandCtxData.asking_rent_monthly = rent
         const floor = asStr(pick('floor'))
         if (floor) brandCtxData.floor = floor
@@ -333,26 +340,29 @@ export async function POST(request: NextRequest) {
         if (avail) brandCtxData.availability_date = avail
       } else if (lkzType === 'brand') {
         brandCtxData.user_type = 'brand'
-        const bname = asStr(pick('brandName', 'brand_name', 'company', 'brand'))
+        const bname = asStr(pick('brand_name', 'brandName', 'company', 'brand'))
         if (bname) brandCtxData.brand_name = bname
-        const cat = asStr(pick('category', 'brand_category', 'business_category', 'brand_type'))
+        // Live website sends "business_type" (e.g. "Cafe / Coffee").
+        const cat = asStr(pick('business_type', 'category', 'brand_category', 'business_category', 'brand_type'))
         if (cat) brandCtxData.brand_category = cat
-        const outlets = asStr(pick('outlets', 'current_outlets', 'num_outlets'))
+        const outlets = asStr(pick('current_outlets', 'outlets', 'num_outlets'))
         if (outlets) brandCtxData.current_outlets = outlets
-        const zones = asStr(pick('selectedAreas', 'selected_areas', 'target_zones', 'areas', 'preferred_areas', 'zone', 'area', 'locality'))
+        // Live website sends "location_preference" (comma-joined areas).
+        const zones = asStr(pick('location_preference', 'selectedAreas', 'selected_areas', 'target_zones', 'areas', 'preferred_areas', 'zone', 'area', 'locality'))
         if (zones) brandCtxData.target_zones = zones
-        const fmt = asStr(pick('preferred_format', 'format', 'property_format'))
+        // What format of space they want (e.g. "restaurant").
+        const fmt = asStr(pick('space_type', 'preferred_format', 'format', 'property_format'))
         if (fmt) brandCtxData.preferred_format = fmt
-        // Size: prefer explicit sqft, else compose a min-max range.
+        // Size: live "area_sqft" is already a range (e.g. "800-2000"); else min-max.
         const sizeMin = asStr(pick('sizeMin', 'size_min', 'min_size'))
         const sizeMax = asStr(pick('sizeMax', 'size_max', 'max_size'))
-        const sizeExplicit = asStr(pick('required_size_sqft', 'size', 'sqft'))
+        const sizeExplicit = asStr(pick('area_sqft', 'required_size_sqft', 'size', 'sqft'))
         const sizeRange = sizeExplicit || (sizeMin && sizeMax ? `${sizeMin}-${sizeMax}` : sizeMin || sizeMax)
         if (sizeRange) brandCtxData.required_size_sqft = sizeRange
-        // Budget: prefer explicit, else compose min-max rent range.
+        // Budget: live "budget_rent"; else min-max range.
         const rentMin = asStr(pick('rentMin', 'rent_min', 'budget_min'))
         const rentMax = asStr(pick('rentMax', 'rent_max', 'budget_max'))
-        const budgetExplicit = asStr(pick('budget_monthly_rent', 'budget', 'rent'))
+        const budgetExplicit = asStr(pick('budget_rent', 'budget_monthly_rent', 'budget', 'rent'))
         const budget = budgetExplicit || (rentMin && rentMax ? `${rentMin}-${rentMax}` : rentMin || rentMax)
         if (budget) brandCtxData.budget_monthly_rent = budget
       }
