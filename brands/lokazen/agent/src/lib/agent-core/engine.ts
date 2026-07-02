@@ -432,6 +432,24 @@ User's message: ${input.message}`
 
       finalResponse = suppressKnownContactReask(cleanResponse(rawResponse), input, brandId);
       finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
+
+      // EMPTY-RESPONSE GUARD: in the tool loop the model sometimes spends its
+      // turn on tool calls (update_lead_profile etc.) and returns no visible
+      // text, or text that is ONLY [BTN:] markers — the widget then shows an
+      // empty bubble and the flow dies (seen live on "Start this plan").
+      // Substitute the deterministic next booking question so the flow
+      // always moves forward.
+      const visibleText = finalResponse.replace(/\[BTN:[^\]]*\]/gi, '').trim();
+      if (!visibleText) {
+        console.error('[Engine] Empty booking-flow response - substituting deterministic follow-up question.');
+        const profileName = input.userProfile?.name?.trim();
+        const hasContact = !!(input.userProfile?.email || input.userProfile?.phone);
+        finalResponse = !profileName
+          ? "Great. Who am I speaking with, and what is the best number or email to reach you?"
+          : !hasContact
+            ? `Thanks ${profileName.split(' ')[0]}. What is the best number or email to reach you?`
+            : 'Great. What day and time works best for a quick call?';
+      }
       yield { type: 'chunk', text: finalResponse };
     }
 

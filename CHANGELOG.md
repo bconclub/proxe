@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · agent-core — booking flow no longer dies on an empty tool-loop reply
+
+- **agent-core (web)** — `engine.ts` processStream booking path: clicking "Start this plan" produced NOTHING — prod logs show the model spent its turn on tool calls (update_lead_profile, selected_plan captured) and returned no visible text (or [BTN:]-only text), so the widget rendered an empty bubble and the flow died. Added an EMPTY-RESPONSE GUARD after the tool loop: if the reply has no visible text once [BTN:] markers are stripped, substitute the deterministic next booking question (ask name+contact → ask contact → ask day/time, based on what's already known). The flow now always moves forward.
+
 ## 2026-07-02 · lokazen — plan cards now trigger off the BUTTONS, not the text
 
 - **lokazen** — `components/widget/ChatWidget.tsx`: live test showed the plan message paraphrased by the LLM ("Perfect. Here's how we work: shortlist properties, guided visits...") — no "Tap a plan to see what's included", so the text-based card trigger missed and the plans fell through as flat text buttons. The cards now anchor off the plan BUTTONS the agent deterministically emits (≥2 of Starter/Professional/Premium in message.followUps → set that message as the plan-cards anchor + suppress the redundant text buttons). Text patterns kept as fallback. Single-plan detail unchanged (its "Starter - Rs" header is prompt-mandated); if it's ever paraphrased, text buttons remain as a graceful fallback.
