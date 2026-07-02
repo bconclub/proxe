@@ -78,7 +78,25 @@ export function detectLokazenAudience(
     previousAssistant.includes('do you already know any vacant commercial properties') ||
     previousAssistant.includes("what's your name and phone number") ||
     previousAssistant.includes('would you like the team to help you get started') ||
-    previousAssistant.includes('join us as a scout');
+    previousAssistant.includes('join us as a scout') ||
+    // Once the agent is in the scout flow, its replies mention these — keeps the
+    // audience sticky across follow-ups like "send me the app link".
+    previousAssistant.includes('scout app') ||
+    previousAssistant.includes('scouts spot') ||
+    previousAssistant.includes('scouts help');
+
+  // General scout intent in the user's own words — e.g. "help with my Lokazen
+  // Scout account", "the scout app", "i want to be a scout", "join as a scout".
+  // Requires the word "scout" so a brand/owner mentioning it in passing is safe.
+  const hasScoutWord = /\bscout\b/.test(answerLower);
+  const scoutIntent =
+    answerLower.includes('become a scout') ||
+    answerLower.includes('join as a scout') ||
+    answerLower.includes('as a scout') ||
+    answerLower.includes('scout account') ||
+    answerLower.includes('scout app') ||
+    (hasScoutWord && /(account|app|kyc|payout|join|register|sign\s?up|spot|verif|earn)/.test(answerLower)) ||
+    buttons.some((b) => b.includes('scout'));
 
   if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
     return 'owner';
@@ -86,12 +104,7 @@ export function detectLokazenAudience(
   if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
     return 'brand';
   }
-  if (
-    buttons.some((b) => b.includes('become a scout') || b.includes('join as a scout')) ||
-    answerLower.includes('become a scout') ||
-    answerLower.includes('join as a scout') ||
-    scoutQuestion
-  ) {
+  if (scoutIntent || scoutQuestion) {
     return 'scout';
   }
   return null;

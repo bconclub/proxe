@@ -882,9 +882,44 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 7. Build AgentInput and generate AI response
-    const lokazenAudience = BRAND_ID === 'lokazen'
+    let lokazenAudience = BRAND_ID === 'lokazen'
       ? detectLokazenAudience(messageText, conversationHistory, [])
       : null;
+
+    // Lokazen: make the audience sticky AND persist it to the lead. The web
+    // route already writes unified_context.lokazen; WhatsApp did not, so a
+    // clearly-scout WhatsApp lead stayed untyped ({}), kept showing in the
+    // general Leads view instead of moving into Scouts. Read the stored type as
+    // a fallback (so follow-ups like "send me the app link" stay scout), and
+    // persist a newly-detected type so the dashboard filter can route it.
+    if (BRAND_ID === 'lokazen') {
+      try {
+        const { data: leadRow } = await supabase
+          .from('all_leads')
+          .select('unified_context')
+          .eq('id', leadId)
+          .maybeSingle();
+        const ctx = leadRow?.unified_context || {};
+        const storedType = ctx.lokazen?.user_type as 'brand' | 'owner' | 'scout' | undefined;
+        if (!lokazenAudience && (storedType === 'scout' || storedType === 'brand' || storedType === 'owner')) {
+          lokazenAudience = storedType;
+        }
+        if (lokazenAudience && lokazenAudience !== storedType) {
+          const nextLokazen = {
+            ...(ctx.lokazen || {}),
+            user_type: lokazenAudience,
+            lead_type: lokazenAudience === 'owner' ? 'property_owner' : lokazenAudience,
+          };
+          await supabase
+            .from('all_leads')
+            .update({ unified_context: { ...ctx, lokazen: nextLokazen } })
+            .eq('id', leadId);
+          console.log(`[meta/webhook] lokazen audience tagged: lead=${leadId} type=${lokazenAudience}`);
+        }
+      } catch (e: any) {
+        console.error('[meta/webhook] lokazen audience persist failed:', e?.message || e);
+      }
+    }
 
     const agentInput: AgentInput = {
       channel: 'whatsapp',

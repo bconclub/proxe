@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-02 · lokazen — WhatsApp scout leads now tagged (out of Leads, into Scouts)
+
+- **agent-core** — `app/api/agent/whatsapp/meta/route.ts`: WhatsApp detected the Lokazen audience only for KB scoping and NEVER persisted it, so a clearly-scout WhatsApp lead had `unified_context.lokazen = {}` and kept showing in the general Leads view. Now reads the stored type as a sticky fallback and PERSISTS a newly-detected audience (user_type/lead_type) to the lead — so the LeadsTable filter routes scouts into the Scouts page.
+- **agent-core** — `lib/agent-core/lokazenAudience.ts`: broadened scout detection so plain user phrasing classifies correctly ("help with my Lokazen Scout account", "the scout app", "as a scout") — requires the word "scout" + an intent token (account/app/kyc/payout/join/spot/verify/earn) so a brand/owner passing mention is safe. Scout flow is also sticky via the agent's own replies ("scout app"/"scouts spot"). Verified against the live shambu-das transcript. Also tagged that existing lead scout in the DB so it moves now.
+
 ## 2026-07-02 · lokazen — full CRE detail passthrough (owner deposit/amenities/maps, brand target audience)
 
 - **lokazen** — `app/api/agent/leads/inbound/route.ts`: extended the onboarding mapping after inspecting the live lokazen.in sender (`src/lib/proxe-lead.ts` + onboarding/owner routes). Owner now also maps `deposit`, `google_maps_url` (from google_maps_link); brand maps `target_audience`. Confirmed the sender's `x-api-key` = `lk_inbound_...` and set the same `INBOUND_API_KEY` locally so inbound auth is verifiable. Tested BOTH exact frontend payloads (seeker + owner) end-to-end with the real key — every CRE field maps into unified_context.lokazen and a Slack "New lead" alert fires. NOTE: matching frontend enrichment (forwarding deposit/amenities/maps for owner, additionalRequirements for brand) was made in the separate lokazen.in app (C:/Users/user/Lokazen, not this repo) — user deploys that.
