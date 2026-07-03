@@ -1900,7 +1900,9 @@
   height: 18px;
 }
 
-/* Bubble Widget Styles */
+/* Bubble Widget Styles. Ring/glow/backdrop fall back to the historical gold,
+   but brands with styles.colorVarsFromConfig get their own palette via the
+   --bubble-* vars set from config.colors (see lib/widget-brand-vars.ts). */
 .bubbleButton {
   position: fixed;
   bottom: 24px;
@@ -1908,15 +1910,15 @@
   width: 69px;
   height: 69px;
   border-radius: 50%;
-  background: #1A0F0A;
-  border: 2px solid #C9A961;
+  background: var(--bubble-bg, #1A0F0A);
+  border: 2px solid var(--bubble-ring, #C9A961);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
     0 4px 15px rgba(0, 0, 0, 0.4),
-    0 0 10px rgba(201, 169, 97, 0.25);
+    0 0 10px var(--bubble-ring-glow, rgba(201, 169, 97, 0.25));
   z-index: 2147482999;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -1934,7 +1936,7 @@
   transform: scale(1.05);
   box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.4),
-    0 0 15px rgba(201, 169, 97, 0.4);
+    0 0 15px var(--bubble-ring-glow, rgba(201, 169, 97, 0.4));
 }
 
 .bubbleButton:active {

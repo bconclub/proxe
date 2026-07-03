@@ -31,6 +31,10 @@ const VAR_MAP: [cssVar: string, key: keyof BrandConfig['colors']][] = [
   ['--bubble-ai-shadow', 'bubbleAiShadow'],
   ['--button-bg', 'buttonBg'],
   ['--button-hover', 'buttonHover'],
+  // Closed-bubble chrome (ring + glow + backdrop) — otherwise hardcoded gold.
+  ['--bubble-ring', 'primaryVibrant'],
+  ['--bubble-ring-glow', 'borderGlow'],
+  ['--bubble-bg', 'darkBg'],
 ];
 
 export function applyBrandColorVars(config: BrandConfig): void {
