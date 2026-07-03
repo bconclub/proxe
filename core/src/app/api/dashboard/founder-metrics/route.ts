@@ -24,6 +24,24 @@ interface CachedMetrics {
 let metricsCache: CachedMetrics | null = null
 const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 
+// PostgREST caps any un-ranged select at 1000 rows, which silently clipped
+// every metric once a brand passed 1000 leads/sessions (windchasers reported
+// exactly 1000 leads while holding 1018). Page through with .range() instead.
+const PAGE_SIZE = 1000
+async function fetchAllRows<T = any>(
+  buildQuery: () => any,
+): Promise<{ data: T[] | null; error: any }> {
+  const all: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1)
+    if (error) return { data: all.length ? all : null, error }
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < PAGE_SIZE) break
+  }
+  return { data: all, error: null }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -70,26 +88,33 @@ export async function GET(request: NextRequest) {
       { data: stageChanges },
     ] = await Promise.all([
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
-      supabase
+      fetchAllRows(() => supabase
         .from('all_leads')
         .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
-        .order('lead_score', { ascending: false }),
+        .order('lead_score', { ascending: false })
+        .order('id', { ascending: true })),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
-      supabase
+      fetchAllRows(() => supabase
         .from('web_sessions')
-        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name'),
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })),
       // 3. whatsapp_sessions - conversation counting only (no booking columns on this table)
-      supabase
+      fetchAllRows(() => supabase
         .from('whatsapp_sessions')
-        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name'),
+        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })),
       // 4. voice_sessions - lead linkage only (no booking columns on this table)
-      supabase
+      fetchAllRows(() => supabase
         .from('voice_sessions')
-        .select('lead_id'),
+        .select('lead_id')
+        .order('id', { ascending: true })),
       // 5. social_sessions - lead linkage only (no booking columns on this table)
-      supabase
+      fetchAllRows(() => supabase
         .from('social_sessions')
-        .select('lead_id'),
+        .select('lead_id')
+        .order('id', { ascending: true })),
       // 6. lead_stage_changes - recent stage transitions
       supabase
         .from('lead_stage_changes')
