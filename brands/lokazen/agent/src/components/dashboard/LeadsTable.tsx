@@ -77,7 +77,10 @@ const SCOUT_STAGE_BY_EVENT: Record<string, string> = {
   kyc_submitted: 'KYC started',
   kyc_verified: 'KYC done',
   upi_added: 'UPI added',
-  submission: 'Submitting photos',
+  // A scout who is submitting shops IS an active scout — no separate "submitting"
+  // stage. Each photo submission still fires its own message (scout_submission_
+  // received); it just doesn't create a new stage. Payout keeps them Active too.
+  submission: 'Active',
   payout: 'Active',
 }
 const scoutStageLabel = (lkz: any): string => {
@@ -94,7 +97,6 @@ const SCOUT_STAGE_STYLE: Record<string, CSSProperties> = {
   'KYC started': { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
   'KYC done': { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' },
   'UPI added': { backgroundColor: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
-  'Submitting photos': { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
   'Active': { backgroundColor: 'rgba(16,185,129,0.2)', color: '#10b981' },
 }
 const scoutStageStyleFor = (stage: string): CSSProperties =>
