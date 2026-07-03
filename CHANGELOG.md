@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — declutter the lead detail card
+
+- **Lead modal** (`LeadDetailsModal`): removed the Brand / Property Owner / Scout type-override row (not needed right now; the `set-type` API stays for later). Hid the synthetic `owner_<phone>_<ts>@noemail.lokazen.in` placeholder email — it's an internal id, not a contact, so it no longer shows as the lead's email (new `displayEmail()` filter).
+- **Property photos** (`LokazenPropertyGallery`): replaced the inline thumbnail strip with a single compact cover thumbnail (with a +N badge for extras) that opens the full-screen lightbox on click — keeps the card uncluttered. "View listing" link + the collapsible "Property listing" brief unchanged (both confirmed working).
+
 ## 2026-07-03 · lokazen — branded Slack alerts (PROXe logo, header, colour stripe)
 
 - **slackNotifier** — Slack App webhooks ignore per-message avatar/name overrides, so the branding now lives in the message body: a header block, a top context row with the PROXe logo (public PNG `proxe.lokazen.in/logo.png`) + "PROXe · Lokazen", and a brand-colour left stripe via a wrapping attachment. Colour + logo URL are env-overridable (`SLACK_BRAND_COLOR` default `#E4002B` to match the red logo, `SLACK_LOGO_URL`). Wording tightened: the lead's requirement fields show first, dropped the internal Score field and the redundant "Lokazen · PROXe" footer. Applies to New lead / Needs-human / Booking alerts. (Sender avatar itself is set on the Slack app's Display Information.)

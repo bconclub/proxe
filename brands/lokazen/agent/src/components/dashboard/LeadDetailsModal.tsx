@@ -20,6 +20,14 @@ import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } fr
 // resend import was added to the barrel.
 import { cleanDisplayName } from '@/lib/services/utils'
 
+// Property-owner leads get a synthetic placeholder email
+// (owner_<phone>_<ts>@noemail.lokazen.in) when they have no real email. It's an
+// internal id, not a contact — never show it as the lead's email.
+function displayEmail(email: string | null | undefined): string | null {
+  if (!email) return null
+  return /@noemail\.|noreply|no-reply|placeholder/i.test(email) ? null : email
+}
+
 // Lokazen CRE details — collapsed by default, click the header to expand.
 // Keeps the contact card clean instead of cramming every field inline.
 function LokazenCreCard({ ctx }: { ctx: any }) {
@@ -91,66 +99,6 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
         </div>
       )}
     </>
-  )
-}
-
-// Manual lead-type override — auto-detection nails brand/owner but scout is
-// still being tuned, so operators need a one-click way to move a mis-tagged
-// lead to Scout (or correct any type). Posts to /set-type, which writes only
-// unified_context (no missing-table dependency), then refreshes the lead.
-function LokazenTypeSelector({ leadId, current, onDone }: { leadId: string; current: string; onDone: () => void }) {
-  const [saving, setSaving] = useState<string | null>(null)
-  const cur = current === 'property_owner' ? 'owner' : current
-  const OPTIONS: [string, string][] = [['brand', 'Brand'], ['owner', 'Property Owner'], ['scout', 'Scout']]
-
-  const setType = async (type: string) => {
-    if (type === cur || saving) return
-    setSaving(type)
-    try {
-      const res = await fetch(`/api/dashboard/leads/${leadId}/set-type`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        alert(`Could not change type: ${j.error || res.statusText}`)
-        return
-      }
-      onDone()
-    } catch (e) {
-      alert(`Could not change type: ${e instanceof Error ? e.message : 'network error'}`)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  return (
-    <div className="mt-1 flex items-center gap-1.5">
-      <span className="text-[10px] uppercase tracking-wide flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Type</span>
-      <div className="flex gap-1">
-        {OPTIONS.map(([val, label]) => {
-          const active = val === cur
-          return (
-            <button
-              key={val}
-              type="button"
-              disabled={active || !!saving}
-              onClick={() => setType(val)}
-              className="px-2 py-1 rounded-md text-[11px] font-medium border transition-colors disabled:opacity-100 hover:brightness-110"
-              style={{
-                borderColor: active ? 'var(--accent-primary)' : 'var(--border-primary)',
-                backgroundColor: active ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                color: active ? 'var(--accent-contrast, #fff)' : 'var(--text-secondary)',
-                cursor: active ? 'default' : 'pointer',
-              }}
-            >
-              {saving === val ? '…' : label}
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -2102,8 +2050,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
               {/* Contact Info Section - Bottom */}
               <address className="lead-contact-info space-y-1 mt-auto not-italic">
-                {/* Email with icon */}
-                {currentLead.email && (
+                {/* Email with icon — hidden for synthetic @noemail placeholders */}
+                {displayEmail(currentLead.email) && (
                   <div className="lead-contact-email group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdEmail className="text-[var(--text-secondary)]" size={14} />
@@ -2114,7 +2062,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       {currentLead.email}
                     </a>
-                    <CopyIconButton value={currentLead.email} label="email" />
+                    <CopyIconButton value={currentLead.email!} label="email" />
                   </div>
                 )}
 
@@ -2205,17 +2153,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* LOKAZEN CRE DETAILS — collapsible; click to expand the full brief variables */}
                 <LokazenCreCard ctx={currentLead.unified_context?.lokazen} />
-
-                {/* LOKAZEN TYPE OVERRIDE — reclassify Brand / Property Owner / Scout.
-                    Shown for any lokazen lead so mis-tagged scouts can be moved out
-                    of the Leads view with one click. */}
-                {currentLead.unified_context?.lokazen && (
-                  <LokazenTypeSelector
-                    leadId={String(currentLead.id)}
-                    current={String(currentLead.unified_context.lokazen.user_type || '')}
-                    onDone={loadFreshLeadData}
-                  />
-                )}
 
                 {/* LOKAZEN PROPERTY PHOTOS — owner leads carry a property_id; the
                     photos live on lokazen.in and are lazy-loaded here on open. */}

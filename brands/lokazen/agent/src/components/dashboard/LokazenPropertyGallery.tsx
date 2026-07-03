@@ -66,22 +66,26 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
       )}
 
       {state === 'ready' && (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-          {images.map((src, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setLightbox(i)}
-              style={{
-                flex: '0 0 auto', width: 96, height: 72, borderRadius: 10, overflow: 'hidden',
-                border: '1px solid var(--border-primary, rgba(255,255,255,0.1))', padding: 0, cursor: 'pointer', background: '#000',
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt={`Property photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            </button>
-          ))}
-        </div>
+        // Compact: one small cover thumbnail (with a +N badge when there are
+        // more) that opens the full lightbox — keeps the lead card uncluttered.
+        <button
+          type="button"
+          onClick={() => setLightbox(0)}
+          style={{
+            position: 'relative', width: 88, height: 66, borderRadius: 10, overflow: 'hidden',
+            border: '1px solid var(--border-primary, rgba(255,255,255,0.1))', padding: 0, cursor: 'pointer', background: '#000',
+          }}
+          aria-label={`View ${images.length} property photo${images.length > 1 ? 's' : ''}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={images[0]} alt="Property cover" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          {images.length > 1 && (
+            <span style={{
+              position: 'absolute', right: 4, bottom: 4, background: 'rgba(0,0,0,0.7)', color: '#fff',
+              fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '1px 6px',
+            }}>+{images.length - 1}</span>
+          )}
+        </button>
       )}
 
       {lightbox != null && images[lightbox] && (
