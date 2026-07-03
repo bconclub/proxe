@@ -1,14 +1,19 @@
 {
   "name": "proxe-agent-master",
-  "version": "0.0.20",
+  "version": "0.0.32",
   "private": true,
   "scripts": {
     "dev": "next dev -p 4002",
-    "prebuild": "node scripts/set-build-time.js",
+    "prebuild": "node scripts/stage-brand.js && node scripts/set-build-time.js",
     "build": "next build",
     "start": "next start -p ${PORT:-4002}",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:windchasers": "node scripts/build-brand.js windchasers",
+    "build:pop": "node scripts/build-brand.js pop",
+    "build:lokazen": "node scripts/build-brand.js lokazen",
+    "build:proxe": "node scripts/build-brand.js proxe",
+    "build:bcon": "node scripts/build-brand.js bcon"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
