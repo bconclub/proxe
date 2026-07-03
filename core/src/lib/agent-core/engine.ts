@@ -8,7 +8,7 @@ import { AgentInput, AgentOutput, KnowledgeResult, StreamChunk } from './types';
 import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
 import { getPromptOverride } from '../promptConfig';
-import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage } from './claudeClient';
+import { generateResponse, generateResponseWithTools, streamResponse, isConfigured, getErrorMessage, getReasoningModel } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
 import { extractIntent, isBookingIntent, isBookingFlowStep, extractPainPoint, detectObjection } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
@@ -25,6 +25,21 @@ import {
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
+import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifier';
+
+/**
+ * Lokazen has three separate audiences (brand/owner/scout) that must never
+ * cross-contaminate — a brand's pricing question should never surface Scout
+ * payout content, and vice versa. Only Scout currently has KB content, so
+ * for any other (or undetermined) audience we skip the KB search entirely
+ * rather than risk a leak; extend the 'scout' branch pattern here if
+ * brand/owner KB content is added later.
+ */
+function resolveKbScope(brandId: string, audience: AgentInput['lokazenAudience']): { skip: boolean; category: string | null } {
+  if (brandId !== 'lokazen') return { skip: false, category: null };
+  if (audience === 'scout') return { skip: false, category: 'scout' };
+  return { skip: true, category: null };
+}
 
 /**
  * Process a message and return a complete response (for WhatsApp, voice, etc.)
@@ -43,8 +58,9 @@ export async function process(
   // 1. Extract intent from message
   const intent = extractIntent(input.message, input.usedButtons);
 
-  // 2. Search knowledge base
-  const relevantDocs = await searchKnowledgeBase(supabase, input.message, 3);
+  // 2. Search knowledge base (audience-scoped for Lokazen — see resolveKbScope)
+  const kbScope = resolveKbScope(brandId, input.lokazenAudience);
+  const relevantDocs = kbScope.skip ? [] : await searchKnowledgeBase(supabase, input.message, 3, kbScope.category);
   const knowledgeContext = formatKnowledgeContext(relevantDocs);
 
   // 3. Check for existing booking
@@ -108,6 +124,16 @@ User's message: ${input.message}`
   // 5. Detect human handoff requests before AI generation
   const wantsHuman = detectHumanHandoffRequest(input.message);
 
+  // 5b. Scout support issues — a scout reporting an app/upload/KYC/payout problem
+  // must become a SUPPORT REQUEST (Slack ping to the team), deterministically,
+  // not left to the model. Scoped to scout audience so a brand/owner mentioning
+  // "photo" or "location" is never caught. These leads can't book a call, so the
+  // only escalation path is a support request.
+  const scoutSupportIssue =
+    input.lokazenAudience === 'scout' &&
+    /\b(can'?t|cannot|can not|unable|not able|couldn'?t|won'?t|isn'?t|doesn'?t|didn'?t|no|not)\b[^.?!]*\b(upload|uploaded|uploading|photo|picture|image|pic|location|gps|submit|submitted|kyc|verif|verified|login|log ?in|sign ?in|app|payout|paid|payment|money|reward)\b|\b(kyc|payout|payment|verification)\b[^.?!]*\b(stuck|pending|fail|failed|error|not|missing|issue|problem|delay)\b|\b(problem|issue|trouble|error|not working|doesn'?t work|stuck|help me)\b/i
+      .test(input.message || '');
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -136,8 +162,9 @@ User's message: ${input.message}`
     .reverse()
     .find((m) => m.role === 'assistant');
   const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-  const needsBookingTools = input.channel === 'whatsapp' &&
-    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow);
+  const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
+  const needsBookingTools = (input.channel === 'whatsapp' || lokazenBookingAction) &&
+    (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
   // check below can read it. The set is populated by the book_consultation
@@ -235,6 +262,10 @@ User's message: ${input.message}`
   // If user explicitly asked for a human, flag for follow-up regardless of AI response
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
+  } else if (scoutSupportIssue) {
+    // Scout hit a problem — raise a support request so the team gets pinged with
+    // the number + the issue. (No call for scouts; support goes this way.)
+    await flagForHumanFollowup(supabase, input, `Scout reported an issue: "${(input.message || '').slice(0, 160)}"`);
   }
 
   // Deterministic safety net: never let a booked slot survive as a tappable
@@ -244,7 +275,9 @@ User's message: ${input.message}`
     rawResponse = stripBookedTimeSlots(rawResponse, availabilityRef.current.availableTimes);
   }
 
-  const cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
+  let cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
+  cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
+  cleanedResponse = advanceLokazenBookingAfterEmail(cleanedResponse, input, brandId);
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
@@ -288,7 +321,7 @@ export async function* processStream(
   }
 
   try {
-    const brandId = getCurrentBrandId();
+    const brandId = input.brand || getCurrentBrandId();
     const brandConfig = getBrandConfig(brandId);
 
     // 1. Extract intent — determines which DB calls to make
@@ -305,11 +338,14 @@ export async function* processStream(
       .reverse()
       .find((m) => m.role === 'assistant');
     const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow;
+    const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
+    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction;
 
-    // 2. Parallelize DB calls: KB search always runs; booking check only when needed
+    // 2. Parallelize DB calls: KB search always runs (audience-scoped for
+    //    Lokazen — see resolveKbScope); booking check only when needed
+    const kbScope = resolveKbScope(brandId, input.lokazenAudience);
     const [relevantDocs, existingBookingMessage] = await Promise.all([
-      searchKnowledgeBase(supabase, input.message, 3),
+      kbScope.skip ? Promise.resolve([]) : searchKnowledgeBase(supabase, input.message, 3, kbScope.category),
       hasBookingIntent ? checkBooking(supabase, input) : Promise.resolve(null),
     ]);
     const knowledgeContext = formatKnowledgeContext(relevantDocs);
@@ -369,7 +405,7 @@ User's message: ${input.message}`
     //    tool-loop for booking messages (tools need a complete back-and-forth)
     let finalResponse = '';
 
-    if (!hasBookingIntent) {
+    if (!hasBookingIntent && brandId !== 'lokazen') {
       // True SSE streaming: first Claude token reaches client in ~300-600ms.
       // Greeting strips and em-dash replacements are handled by sanitizeAssistantText
       // in the client after the stream completes.
@@ -377,6 +413,11 @@ User's message: ${input.message}`
         finalResponse += textChunk;
         yield { type: 'chunk', text: textChunk };
       }
+    } else if (!hasBookingIntent) {
+      const rawResponse = await generateResponse(systemPrompt, userPrompt, 512, getReasoningModel());
+      finalResponse = suppressKnownContactReask(cleanResponse(rawResponse, input.channel), input, brandId);
+      finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
+      yield { type: 'chunk', text: finalResponse };
     } else {
       // Booking flow: needs tool loop (check_availability → book_consultation)
       const { tools, toolHandlers } = buildBookingTools(input, supabase);
@@ -403,7 +444,26 @@ User's message: ${input.message}`
         }
       }
 
-      finalResponse = cleanResponse(rawResponse);
+      finalResponse = suppressKnownContactReask(cleanResponse(rawResponse), input, brandId);
+      finalResponse = advanceLokazenBookingAfterEmail(finalResponse, input, brandId);
+
+      // EMPTY-RESPONSE GUARD: in the tool loop the model sometimes spends its
+      // turn on tool calls (update_lead_profile etc.) and returns no visible
+      // text, or text that is ONLY [BTN:] markers — the widget then shows an
+      // empty bubble and the flow dies (seen live on "Start this plan").
+      // Substitute the deterministic next booking question so the flow
+      // always moves forward.
+      const visibleText = finalResponse.replace(/\[BTN:[^\]]*\]/gi, '').trim();
+      if (!visibleText) {
+        console.error('[Engine] Empty booking-flow response - substituting deterministic follow-up question.');
+        const profileName = input.userProfile?.name?.trim();
+        const hasContact = !!(input.userProfile?.email || input.userProfile?.phone);
+        finalResponse = !profileName
+          ? "Great. Who am I speaking with, and what is the best number or email to reach you?"
+          : !hasContact
+            ? `Thanks ${profileName.split(' ')[0]}. What is the best number or email to reach you?`
+            : 'Great. What day and time works best for a quick call?';
+      }
       yield { type: 'chunk', text: finalResponse };
     }
 
@@ -430,6 +490,9 @@ User's message: ${input.message}`
     });
 
   } catch (error: any) {
+    // Log the REAL error server-side; getErrorMessage() returns a graceful,
+    // visitor-safe string so nothing sensitive or ugly reaches the chat widget.
+    console.error('[Engine] processStream error:', error?.message || error);
     yield { type: 'error', error: getErrorMessage(error) };
   }
 }
@@ -441,8 +504,111 @@ function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   return docs.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
 }
 
+function suppressKnownContactReask(response: string, input: AgentInput, brandId: string): string {
+  if (brandId !== 'lokazen') return response;
+
+  const hasKnownName = Boolean(input.userProfile.name?.trim());
+  const hasKnownPhone = Boolean(input.userProfile.phone?.trim());
+  if (!hasKnownName && !hasKnownPhone) return response;
+
+  const asksForKnownContact =
+    /\bwho should (?:the |our |lokazen )*team contact\b/i.test(response) ||
+    /\bshare your name and phone\b/i.test(response) ||
+    /\bshare (?:the )?(?:owner )?name and phone\b/i.test(response);
+  const asksForPhone =
+    /\bwhat(?:'s| is) your phone number\b/i.test(response) ||
+    /\byour phone number\b/i.test(response) ||
+    /\bshare your phone\b/i.test(response) ||
+    /\bbest number to reach you\b/i.test(response) ||
+    /\bnumber to reach you\b/i.test(response);
+
+  const recentHistoryText = (input.conversationHistory || [])
+    .slice(-6)
+    .map((entry) => entry.content)
+    .join('\n');
+  const isPropertyContactContext =
+    asksForKnownContact ||
+    /\bwho should (?:the |our |lokazen )*team contact\b/i.test(recentHistoryText) ||
+    /\bgoogle maps (?:link |location )?or full address\b/i.test(recentHistoryText) ||
+    /\bfull address\b/i.test(recentHistoryText);
+
+  if (!(hasKnownPhone && (asksForKnownContact || asksForPhone) && isPropertyContactContext)) {
+    return response;
+  }
+
+  return 'What would you like to do next?\n[BTN: Submit Property][BTN: Talk to Team]';
+}
+
+function isLokazenBookingAction(input: AgentInput): boolean {
+  const current = (input.message || '').toLowerCase();
+  const buttons = (input.usedButtons || []).map((b) => String(b).toLowerCase());
+  const text = [current, ...buttons].join(' ');
+  const lastAssistant = (input.conversationHistory || [])
+    .slice(-4)
+    .reverse()
+    .find((m) => m.role === 'assistant')?.content || '';
+
+  return (
+    /\b(start this plan|talk to (?:the |lokazen )?team|book a call|schedule a call|site visit)\b/i.test(text) ||
+    isBookingFlowStep(lastAssistant)
+  );
+}
+
+function advanceLokazenBookingAfterEmail(response: string, input: AgentInput, brandId: string): string {
+  if (brandId !== 'lokazen') return response;
+
+  const userMessage = input.message || '';
+  const emailProvided = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userMessage.trim());
+  if (!emailProvided) return response;
+
+  const lastAssistant = (input.conversationHistory || [])
+    .slice(-4)
+    .reverse()
+    .find((m) => m.role === 'assistant')?.content || '';
+  const askedForEmail = /\b(best|your|what'?s the best)\s+email\b/i.test(lastAssistant) ||
+    /\bemail\b[^.?!]*\b(reach|send|invite|calendar)\b/i.test(lastAssistant) ||
+    /\b(reach|send|invite|calendar)\b[^.?!]*\bemail\b/i.test(lastAssistant);
+  if (!askedForEmail) return response;
+
+  const puntsToTeam = /\b(team|we|lokazen)\b[^.?!]*(reach out|call you|schedule|confirm)/i.test(response) ||
+    /\bwill reach out\b/i.test(response);
+  const asksForSlot = /\b(date|day|time|slot|when works|what works)\b/i.test(response);
+
+  if (!puntsToTeam || asksForSlot) return response;
+
+  const name = input.userProfile.name?.trim();
+  const greeting = name ? `Got it, ${name.split(/\s+/)[0]}.` : 'Got it.';
+  return `${greeting} What day and time works best for a quick Lokazen call?`;
+}
+
+function stripCapturedDetailWrapper(raw: string): string {
+  const text = raw.trim();
+  const lines = text.split(/\r?\n/);
+  const separatorIndex = lines.findIndex((line, index) => {
+    if (index === 0) return false;
+    const trimmed = line.trim();
+    return /^-{2,}$/.test(trimmed) || /^—{2,}$/.test(trimmed) || /^–{2,}$/.test(trimmed);
+  });
+
+  if (separatorIndex < 0 || separatorIndex > 5) {
+    return raw;
+  }
+
+  const prefix = lines.slice(0, separatorIndex).join('\n');
+  const hasUserLabel = /^\s*(?:User|Customer|Lead)\s*:/im.test(prefix);
+  const hasQuestion = /\?\s*(?:\n|$)/.test(prefix);
+  const remaining = lines.slice(separatorIndex + 1).join('\n').trim();
+
+  if (hasUserLabel && hasQuestion && remaining) {
+    return remaining;
+  }
+
+  return raw;
+}
+
 function cleanResponse(raw: string, channel?: string): string {
   let cleaned = raw
+    .replace(/^\s*(?:User|Customer|Lead)\s*:\s*[^\n]+\n-{2,}\s*/i, '')
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .replace(/\[BUTTONS:[^\]]*\]/gi, '')
@@ -469,7 +635,18 @@ function cleanResponse(raw: string, channel?: string): string {
     .replace(/^[ \t]*(?:online|offline)[ \t]*$/gim, '')
     .replace(/\[?\s*(?:calling|checking)\s+(?:for\s+)?\d{4}-\d{2}-\d{2}\s*\]?\.?/gi, '')
     .replace(/Let me check (today's|tomorrow's|the) (slots|availability|times?|calendar)( for you)?\.?\s*$/gi, '')
+    // Internal-narration leak guard: the model sometimes verbalises its own
+    // flow instructions before the actual reply, e.g.
+    //   'User selected "Immediately". moving to Step 8.\n--\nHow we work: ...'
+    // Strip step-narration lines and any leftover '--' separator lines so the
+    // customer never sees the prompt's internals.
+    .replace(/^[ \t]*(?:the\s+)?user (?:selected|said|chose|clicked)[^\n]*$/gim, '')
+    .replace(/^[ \t]*[^\n]*\bmov(?:e|ing) (?:on\s+)?to step\s*\d+[^\n]*$/gim, '')
+    .replace(/^[ \t]*(?:proceeding|continuing|going)\s+to step\s*\d+[^\n]*$/gim, '')
+    .replace(/^[ \t]*(?:step\s+\d+[a-z]?\s*:)?[ \t]*-{2,}[ \t]*$/gim, '')
     .trim();
+
+  cleaned = stripCapturedDetailWrapper(cleaned).trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.
   // Replace with a sentence break ('. ') rather than a hyphen — using '-'
@@ -628,6 +805,30 @@ async function flagForHumanFollowup(
       .eq('id', lead.id);
 
     console.log(`[Engine] Flagged lead ${lead.id} for human follow-up: ${reason}`);
+
+    // Slack "needs a human" alert (no-op unless SLACK_WEBHOOK_URL is set).
+    let brandLabel = 'PROXe';
+    try { brandLabel = getBrandConfig()?.name || getCurrentBrandId() || 'PROXe'; } catch { /* keep default */ }
+    const audienceLabel =
+      input.lokazenAudience === 'brand' ? 'Brand'
+      : input.lokazenAudience === 'owner' ? 'Property Owner'
+      : input.lokazenAudience === 'scout' ? 'Scout'
+      : null;
+    // Scouts can't book a call — their escalations are SUPPORT requests, so the
+    // channel reads "Scout support request" (with the number + issue) rather than
+    // a generic lead follow-up.
+    const isScout = input.lokazenAudience === 'scout';
+    await notifySlackLead({
+      brandLabel,
+      title: isScout ? 'Scout support request' : 'Needs human follow-up',
+      name: input.userProfile.name || null,
+      phone: input.userProfile.phone || null,
+      email: input.userProfile.email || null,
+      leadType: audienceLabel,
+      source: input.channel || null,
+      detail: reason,
+      footer: isScout ? 'scout support' : 'needs human',
+    });
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
   }
@@ -701,7 +902,7 @@ function buildBookingTools(
           },
           phone: {
             type: 'string',
-            description: 'Phone number of the person booking',
+            description: 'Phone number of the person booking. Optional: web users usually book with an email instead — provide whichever contact you have (phone OR email), not necessarily both.',
           },
           title: {
             type: 'string',
@@ -718,7 +919,7 @@ function buildBookingTools(
             description: 'Use online unless the user explicitly asks for offline, in-person, campus, or facility visit.',
           },
         },
-        required: ['date', 'time', 'name', 'phone', 'title'],
+        required: ['date', 'time', 'name', 'title'],
       },
     },
     {
@@ -772,8 +973,17 @@ function buildBookingTools(
     },
   ];
 
+  // Scouts can NEVER book a call — there is nothing to schedule for a scout, and
+  // their issues go through a support request, not a call. Hard-refuse both
+  // booking tools regardless of what the model attempts.
+  const scoutBookingBlock = () =>
+    JSON.stringify({
+      error: 'This is a Scout conversation. Scouts cannot book a call — do NOT offer or book one. If the scout has a problem, raise a support request for the team instead.',
+    });
+
   const toolHandlers: Record<string, ToolHandler> = {
     check_availability: async (toolInput: Record<string, any>) => {
+      if (input.lokazenAudience === 'scout') return scoutBookingBlock();
       const { date } = toolInput;
       const sessionType = normalizeBookingSessionType(toolInput.session_type);
 
@@ -849,6 +1059,7 @@ function buildBookingTools(
     },
 
     book_consultation: async (toolInput: Record<string, any>) => {
+      if (input.lokazenAudience === 'scout') return scoutBookingBlock();
       const { date, time, name, email, phone, course_interest, title } = toolInput;
       const sessionType = normalizeBookingSessionType(toolInput.session_type);
 
@@ -953,6 +1164,33 @@ function buildBookingTools(
 
       // Mark this booking as completed to prevent re-detection loops
       bookingsCompletedThisSession.add(bookingKey);
+
+      // Slack notification (no-op unless SLACK_WEBHOOK_URL is set for this
+      // deployment). Awaited on purpose — we're still inside the tool handler,
+      // so Vercel won't drop it, and it soft-fails so Slack never blocks a
+      // booking. Lead type comes from the resolved Lokazen audience.
+      try {
+        const audienceLabel =
+          input.lokazenAudience === 'brand' ? 'Brand'
+          : input.lokazenAudience === 'owner' ? 'Property Owner'
+          : input.lokazenAudience === 'scout' ? 'Scout'
+          : null;
+        let brandLabel = 'PROXe';
+        try { brandLabel = getBrandConfig()?.name || getCurrentBrandId() || 'PROXe'; } catch { /* keep default */ }
+        await notifySlackBooking({
+          brandLabel,
+          name: bookingName,
+          phone: bookingPhone,
+          email: bookingEmail || null,
+          leadType: audienceLabel,
+          dateTime: `${date} · ${time}`,
+          title: bookingTitle,
+          channel: input.channel || null,
+          summary: input.summary || null,
+        });
+      } catch (slackErr: any) {
+        console.error('[Engine] Slack booking notify failed:', slackErr?.message || slackErr);
+      }
 
       // Create booking reminder flow tasks (Flow B + C)
       try {

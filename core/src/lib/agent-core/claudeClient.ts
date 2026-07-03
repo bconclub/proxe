@@ -47,6 +47,16 @@ function getModel(): string {
   return configured;
 }
 
+// Model for the actual CONVERSATION (the part that needs reasoning). Sonnet 5
+// by default so chat replies reason well; override with CLAUDE_MODEL_REASONING.
+// The cheap helpers — quick-reply buttons (generateShort), summaries, profile
+// extraction — deliberately stay on getModel() (Haiku) to keep token spend down.
+// Currently used only by the Lokazen-gated non-streaming web path in engine.ts.
+export function getReasoningModel(): string {
+  const configured = process.env.CLAUDE_MODEL_REASONING || 'claude-sonnet-5';
+  return RETIRED_MODEL_MAP[configured] || configured;
+}
+
 /**
  * Stream a response from Claude (for web chat SSE)
  * Returns an AsyncGenerator that yields text chunks

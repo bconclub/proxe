@@ -5,6 +5,7 @@ export const bconConfig: BrandConfig = {
   brand: 'bcon',
   tagline: 'BCON',
   website: 'https://bconclub.com',
+  iconPath: '/bcon-icon.png',
   widget: {
     headerName: 'BCON AI',
     welcomeSequence: [

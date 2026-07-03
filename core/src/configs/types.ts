@@ -4,6 +4,7 @@ export interface BrandConfig {
   tagline?: string;          // login/invite subtitle (e.g. 'WindChasers Aviation Academy')
   website?: string;          // public site linked from auth pages
   themeDataAttr?: string;    // <html data-theme> value (defaults to `brand`)
+  iconPath?: string;         // favicon/app icon path in the brand's public/ (defaults to /logo.png)
   // Widget chrome + copy. Everything here used to be hardcoded windchasers
   // strings in ChatWidget — brand identity lives in the pack, not in core.
   widget?: {
@@ -22,6 +23,7 @@ export interface BrandConfig {
     pipelineFunnel?: boolean;   // Pipeline funnel widget
     followUpSequence?: boolean; // re-engagement follow-up cron (needs approved template)
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)
+    scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
   };
   apiUrl?: string;
   supabase?: {

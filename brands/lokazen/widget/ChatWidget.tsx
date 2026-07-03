@@ -1,0 +1,4355 @@
+﻿'use client'
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useChat } from '@/hooks/useChat';
+import type { Message } from '@/hooks/useChatStream';
+
+import { BookingCalendarWidget, type BookingCalendarWidgetProps } from './BookingCalendarWidget';
+import { LokazenPlanCards } from './LokazenPlanCards';
+import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import { CostGuideFormInline } from '@/components/widget/CostGuideFormInline';
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import type { BrandConfig } from '@/configs';
+import { useDeployModal } from '@/contexts/DeployModalContext';
+import styles from './ChatWidget.module.css';
+import {
+  ensureSession,
+  initializeSession,
+  type SessionRecord,
+} from '@/lib/services/sessionManager';
+import { updateLeadProfile } from '@/lib/services/leadManager';
+import {
+  fetchSummary,
+  upsertSummary,
+  fetchConversations,
+} from '@/lib/services/conversationLogger';
+import {
+  checkExistingBookingClient,
+  storeBookingClient,
+} from '@/lib/widget-helpers';
+import {
+  getStoredSessionId,
+  storeSessionId,
+  clearSessionId,
+  getStoredUser,
+  storeUserProfile,
+  clearStoredUser,
+  type LocalUserProfile,
+  type StorageBrandKey,
+} from '@/lib/chatLocalStorage';
+import { createClient } from '@/lib/supabase/client';
+import Vapi from '@vapi-ai/web';
+
+interface ChatWidgetProps {
+  apiUrl?: string;
+  widgetStyle?: 'searchbar' | 'bubble';
+  resetOnLoad?: boolean;
+}
+
+interface FlowOverrideRule {
+  responseText?: string;
+  followUpButtons: string[];
+}
+
+type LokazenPageContext = 'default' | 'scout';
+
+const FLOW_COUNTRIES = ['USA', 'Canada', 'Hungary', 'New Zealand', 'Thailand', 'Australia'] as const;
+
+// PROXE Logo component (white icon version)
+const PROXELogo = () => (
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 643 643" style={{ width: '100%', height: '100%' }}>
+    <path d="M0 0 C2.55518105 -0.00322395 5.11036192 -0.00658882 7.6655426 -0.01008606 C12.99993388 -0.01603919 18.33430821 -0.01797345 23.66870117 -0.01733398 C29.7556638 -0.01673585 35.84253706 -0.02725095 41.92947716 -0.04307765 C47.87319933 -0.05795756 53.81689546 -0.0613159 59.76063728 -0.06072426 C62.24751207 -0.06188581 64.73438789 -0.06620156 67.22125053 -0.07405663 C89.27651721 -0.13719172 111.50963207 0.39970382 133.25390625 4.41796875 C134.45168701 4.63267822 135.64946777 4.8473877 136.88354492 5.06860352 C147.60885456 7.06782473 158.02060533 9.75624396 168.37890625 13.16796875 C169.07161621 13.39033203 169.76432617 13.61269531 170.47802734 13.84179688 C191.49998952 20.69734064 211.08444408 32.02655021 227.1953125 47.16015625 C229.37705947 49.22309608 229.37705947 49.22309608 231.88671875 51.109375 C236.4059078 54.84231015 239.77832631 59.57161291 243.37890625 64.16796875 C244.02988281 64.96847656 244.68085937 65.76898438 245.3515625 66.59375 C261.74568838 87.70076627 270.32398638 114.04301497 274.37890625 140.16796875 C274.49459961 140.85906738 274.61029297 141.55016602 274.72949219 142.26220703 C282.29318243 189.02466583 276.19902808 244.9042784 249.0546875 284.67578125 C242.86549658 293.12246066 235.81558031 300.81162913 228.37890625 308.16796875 C227.6209375 308.92335938 226.86296875 309.67875 226.08203125 310.45703125 C183.60584066 350.90410446 121.23455315 356.3199838 65.62890625 356.3359375 C63.63650026 356.33834297 61.64409426 356.34075098 59.65168858 356.34339792 C53.40043889 356.35147619 47.14920354 356.35398837 40.89794922 356.35327148 C34.53035799 356.35267292 28.16285207 356.363196 21.79528236 356.37901515 C16.25824922 356.3922615 10.72124335 356.39744833 5.18419456 356.39681607 C1.90836564 356.39656594 -1.36737224 356.40012154 -4.64318848 356.40999413 C-26.38672218 356.46938784 -48.32070333 356.0589274 -69.74609375 351.98046875 C-71.47291382 351.65900879 -71.47291382 351.65900879 -73.23461914 351.33105469 C-105.21391229 345.11926535 -134.61598121 333.2708796 -159.62109375 312.16796875 C-160.48605469 311.44480469 -161.35101563 310.72164063 -162.2421875 309.9765625 C-167.1711856 305.72914592 -171.55937074 301.24923357 -175.62109375 296.16796875 C-176.44351563 295.14445312 -177.2659375 294.1209375 -178.11328125 293.06640625 C-203.72182995 260.22737116 -212.112449 219.37733841 -211.93359375 178.54296875 C-211.93177094 177.67255951 -211.92994812 176.80215027 -211.92807007 175.90536499 C-211.79053856 136.73576322 -204.02988251 95.33486431 -178.62109375 64.16796875 C-178.19634766 63.63397461 -177.77160156 63.09998047 -177.33398438 62.54980469 C-147.98305281 25.80939317 -103.87677367 9.67884258 -58.62109375 2.98046875 C-57.50653809 2.81329346 -56.39198242 2.64611816 -55.24365234 2.47387695 C-36.90877248 -0.10235019 -18.47621475 0.00554858 0 0 Z M-100.62109375 91.16796875 C-101.4615625 91.91691406 -102.30203125 92.66585937 -103.16796875 93.4375 C-117.16855627 106.56835405 -124.00505891 123.93954179 -128.62109375 142.16796875 C-128.62109375 143.15796875 -128.62109375 144.14796875 -128.62109375 145.16796875 C-22.36109375 145.16796875 83.89890625 145.16796875 193.37890625 145.16796875 C188.17784025 120.8963274 178.51473758 98.48989587 157.00390625 84.41796875 C155.14428381 83.30844612 153.26890815 82.22491196 151.37890625 81.16796875 C150.44304687 80.64460938 149.5071875 80.12125 148.54296875 79.58203125 C115.02122643 61.87751855 75.19191438 63.8227628 38.39355469 63.90722656 C33.38502202 63.91862023 28.37670188 63.91184575 23.36817646 63.90034962 C-42.92876378 62.5392535 -42.92876378 62.5392535 -100.62109375 91.16796875 Z M-128.62109375 210.16796875 C-125.15512694 229.23078619 -118.87165345 245.7767931 -105.62109375 260.16796875 C-105.08226562 260.79832031 -104.5434375 261.42867188 -103.98828125 262.078125 C-85.80274544 282.13704515 -54.52949136 289.03297211 -28.62109375 291.16796875 C-24.65424345 291.3166575 -20.69031115 291.33505996 -16.72094727 291.3449707 C-15.56170746 291.3515419 -14.40246765 291.3581131 -13.20809937 291.36488342 C-9.38873207 291.38451451 -5.56940411 291.39626245 -1.75 291.40625 C-0.43370039 291.41032553 0.88259922 291.41440105 2.2387867 291.41860008 C8.50187462 291.43762766 14.76495108 291.45185362 21.02806228 291.46021205 C28.1796475 291.46992108 35.33091798 291.49608268 42.48239273 291.53671294 C48.05745887 291.56726177 53.63243696 291.58171756 59.20758492 291.58499306 C62.51390939 291.58730356 65.81963419 291.59782163 69.12591362 291.62145424 C103.19356045 291.84963689 140.10551561 288.14765068 166.37890625 264.16796875 C167.10851562 263.51957031 167.838125 262.87117188 168.58984375 262.203125 C173.95691046 257.17535561 177.75339023 251.53934043 181.37890625 245.16796875 C181.97832031 244.11738281 182.57773437 243.06679688 183.1953125 241.984375 C188.18472261 232.66290687 193.37890625 220.92132356 193.37890625 210.16796875 C87.11890625 210.16796875 -19.14109375 210.16796875 -128.62109375 210.16796875 Z " fill="#FFFFFF" transform="translate(281.62109375,128.83203125)"/>
+  </svg>
+);
+
+// Infinity symbol component (white)
+const InfinitySymbol = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" enableBackground="new 0 0 32 32" viewBox="0 0 32 32" style={{ width: '100%', height: '100%' }}>
+    <path d="M27.89453,10.09025c-2.22363-1.14404-4.86914-0.95166-6.9043,0.50146L16,14.15666l-4.99023-3.56494c-2.03516-1.45313-4.68262-1.64551-6.9043-0.50146C1.88184,11.23478,0.5,13.49894,0.5,15.99992s1.38184,4.76514,3.60547,5.90967c2.22461,1.14355,4.86914,0.95215,6.9043-0.50146L16,17.84318l4.99023,3.56494c1.15332,0.82373,2.50195,1.24219,3.85938,1.24219c1.03809,0,2.08203-0.24512,3.04492-0.74072C30.11816,20.76506,31.5,18.5009,31.5,15.99992S30.11816,11.23478,27.89453,10.09025z M9.26563,18.96672c-1.13281,0.80957-2.54688,0.91357-3.78809,0.27539C4.23926,18.60441,3.5,17.3925,3.5,15.99992s0.73926-2.60449,1.97754-3.24219c0.53906-0.27686,1.11133-0.41406,1.67871-0.41406c0.73828,0,1.46875,0.23193,2.10938,0.68945l4.15332,2.9668L9.26563,18.96672z M26.52246,19.24211c-1.24023,0.63818-2.6543,0.53418-3.78809-0.27539l-4.15332-2.9668l4.15332-2.9668c1.13379-0.80957,2.54785-0.91162,3.78809-0.27539C27.76074,13.39543,28.5,14.60734,28.5,15.99992S27.76074,18.60441,26.52246,19.24211z" fill="#ffffff"/>
+  </svg>
+);
+
+
+// Connecting ring â€” gold arc that fills 0â†’100% over 2.4s (Windchasers brand)
+const ConnectingRingOrb = () => (
+  <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
+    <circle
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="rgba(197, 165, 114, 0.18)"
+      strokeWidth="3"
+    />
+    <circle
+      className={styles.voiceConnectingArc}
+      cx="120" cy="120" r="112"
+      fill="none"
+      stroke="#C5A572"
+      strokeWidth="3"
+      strokeLinecap="round"
+      pathLength={100}
+      transform="rotate(-90 120 120)"
+    />
+  </svg>
+);
+
+const ICONS = {
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+  ),
+  send: (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+    </svg>
+  ),
+  reset: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+      <path d="M21 3v5h-5"></path>
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+      <path d="M3 21v-5h5"></path>
+    </svg>
+  ),
+  close: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  ),
+  chevronDown: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  ),
+  chevronUp: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 15 12 9 18 15"></polyline>
+    </svg>
+  ),
+  user: (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M12 14c-6 0-8 3-8 3v7h16v-7s-2-3-8-3z"/>
+    </svg>
+  ),
+  ai: (brand: string, config?: BrandConfig) => {
+    // Use brand config avatar if available
+    if (config?.chatStructure?.avatar) {
+      const avatarType = config.chatStructure.avatar.type;
+      if (avatarType === 'logo' && brand === 'proxe') {
+        return <PROXELogo />;
+      }
+      if (avatarType === 'image' && config.chatStructure.avatar.source) {
+        return <img src={config.chatStructure.avatar.source} alt={config.name} />;
+      }
+    }
+    // Fallback: Use image logo for Windchasers, infinity symbol for others
+    if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
+      return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
+    }
+    return <InfinitySymbol />;
+  },
+  infinity: <InfinitySymbol />,
+  attachment: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+    </svg>
+  ),
+  mic: (
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.32.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
+    </svg>
+  ),
+  sun: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4"></circle>
+      <line x1="12" y1="2" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="22"></line>
+      <line x1="2" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="22" y2="12"></line>
+      <line x1="4.9" y1="4.9" x2="7" y2="7"></line>
+      <line x1="17" y1="17" x2="19.1" y2="19.1"></line>
+      <line x1="17" y1="7" x2="19.1" y2="4.9"></line>
+      <line x1="4.9" y1="19.1" x2="7" y2="17"></line>
+    </svg>
+  ),
+  moon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3c.5 0 .8.54.53.96A7 7 0 1 0 20.04 12.26c.42-.27.96.03.96.53z"></path>
+    </svg>
+  ),
+};
+
+// Lokazen welcome bubble â€” three-part intro sequence.
+const lokazenDefaultWelcomeSequence = [
+  { text: "Hi, I'm Loka,", delay: 0 },
+  { text: "Lokazen's commercial real estate assistant.", delay: 800 },
+  { text: "Looking for space, or have a property to list? Tell me what you need.", delay: 1600 },
+];
+
+const lokazenScoutWelcomeSequence = [
+  { text: "Hi, I'm Loka, Lokazen's commercial real estate assistant.", delay: 0 },
+  { text: "Are you looking to join us as a Scout? How can I help you today?", delay: 800 },
+];
+
+const lokazenScoutQuickButtons = [
+  'Join as a Scout',
+  'How it works',
+];
+
+// Helper function to clean metadata strings from conversation summary
+const cleanSummary = (summary: string | null | undefined): string => {
+  if (!summary) return '';
+  return summary
+    .replace(/\[User's name is[^\]]+\]/gi, '')
+    .replace(/\[Booking Status:[^\]]+\]/gi, '')
+    .replace(/\n\n+/g, '\n')
+    .trim();
+};
+
+export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = false }: ChatWidgetProps) {
+  const brand = getCurrentBrandId();
+  const config = getBrandConfig(brand);
+  const { openModal: openDeployModal, setOnFormSubmit } = useDeployModal();
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [showQuickButtons, setShowQuickButtons] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isInputActive, setIsInputActive] = useState(false);
+  const [isSearchbarHovered, setIsSearchbarHovered] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showCalendly, setShowCalendly] = useState<string | null>(null);
+  const [calendarAnchorId, setCalendarAnchorId] = useState<string | null>(null);
+  const [pendingCalendar, setPendingCalendar] = useState(false);
+  const [forceCalendarFromBookButton, setForceCalendarFromBookButton] = useState(false);
+  const [skipBookingCheck, setSkipBookingCheck] = useState(false);
+  const [showDeployForm, setShowDeployForm] = useState<string | null>(null);
+  const [bookingCompleted, setBookingCompleted] = useState(false);
+  const [bookedSummary, setBookedSummary] = useState<string>('');
+  const [showCostGuideForm, setShowCostGuideForm] = useState<string | null>(null);
+  const [usedButtons, setUsedButtons] = useState<string[]>([]);
+  const [showVideo, setShowVideo] = useState<string | null>(null);
+  const [videoAnchorId, setVideoAnchorId] = useState<string | null>(null);
+  const [showPortfolio, setShowPortfolio] = useState<string | null>(null);
+  const [portfolioAnchorId, setPortfolioAnchorId] = useState<string | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isParentMobile, setIsParentMobile] = useState<boolean | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
+  const [externalSessionId, setExternalSessionId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<LocalUserProfile>({});
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [showPhonePrompt, setShowPhonePrompt] = useState(false);
+  const [emailPromptDismissed, setEmailPromptDismissed] = useState(false);
+  const [phonePromptDismissed, setPhonePromptDismissed] = useState(false);
+  const [namePromptDismissed, setNamePromptDismissed] = useState(false);
+  const [hasAskedName, setHasAskedName] = useState(false);
+  const [hasAskedEmail, setHasAskedEmail] = useState(false);
+  const [hasAskedPhone, setHasAskedPhone] = useState(false);
+  const [hasReceivedFirstResponse, setHasReceivedFirstResponse] = useState(false);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  const [pendingButtons, setPendingButtons] = useState<string[]>([]);
+  const [pendingRequirement, setPendingRequirement] = useState<'name' | 'email' | 'phone' | null>(null);
+  const [skipAddingUserMessage, setSkipAddingUserMessage] = useState(false);
+  const [conversationSummary, setConversationSummary] = useState<string>('');
+  const [recentHistory, setRecentHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [nameInput, setNameInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [dynamicQuickButtons, setDynamicQuickButtons] = useState<string[] | null>(null);
+  const [exploreButtons, setExploreButtons] = useState<string[] | null>(null);
+  const [flowOverrideButtons, setFlowOverrideButtons] = useState<string[] | null>(null);
+  // Message id that should render the Lokazen plan cards. Set from the plan
+  // BUTTONS the agent emits (deterministic) rather than the message text,
+  // which the LLM often paraphrases ("Perfect. Here's how we work...").
+  const [planCardsMessageId, setPlanCardsMessageId] = useState<string | null>(null);
+  const [pendingFlowOverride, setPendingFlowOverride] = useState<FlowOverrideRule | null>(null);
+  const [welcomeComplete, setWelcomeComplete] = useState(false);
+  const [showMinimalButtons, setShowMinimalButtons] = useState(false);
+  const [pageContext, setPageContext] = useState<LokazenPageContext>('default');
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('dark');
+  const [hasInteractedWithSearchbar, setHasInteractedWithSearchbar] = useState(false);
+  const SEARCHBAR_BASE_OFFSET = 60;
+  const SEARCHBAR_KEYBOARD_OFFSET = 20;
+  const [isDockedBubble, setIsDockedBubble] = useState(false);
+  const [preLoadedLeadContext, setPreLoadedLeadContext] = useState<{ name?: string; service?: string; brand?: string; lead_id?: string } | null>(null);
+  const SEARCHBAR_KEYBOARD_GAP = 5;
+  const EMAIL_PROMPT_THRESHOLD = 5;
+  const PHONE_PROMPT_THRESHOLD = 7;
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const quickButtonsRef = useRef<HTMLDivElement>(null);
+  const hasEverOpenedRef = useRef(false);
+  const vapiRef = useRef<Vapi | null>(null);
+  const vapiPrewarmedRef = useRef(false);
+  const vapiCallReadyRef = useRef(false);
+  const [isVapiActive, setIsVapiActive] = useState(false);
+  const [vapiConnecting, setVapiConnecting] = useState(false);
+  const [vapiEnding, setVapiEnding] = useState(false);
+  const [vapiError, setVapiError] = useState(false);
+  const [vapiSpeaker, setVapiSpeaker] = useState<'user' | 'assistant' | 'idle'>('idle');
+  const [vapiVolume, setVapiVolume] = useState(0);
+  const [vapiTranscript, setVapiTranscript] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
+  const [vapiDebugLog, setVapiDebugLog] = useState<string[]>([]);
+  const [micPermission, setMicPermission] = useState<string>('unknown');
+  const vapiTranscriptRef = useRef<HTMLDivElement>(null);
+  const userSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vapiMicHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vapiCallIdRef = useRef<string | null>(null);
+  const vapiTranscriptSeqRef = useRef(0);
+  const chatboxContainerRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const searchbarWrapperRef = useRef<HTMLDivElement>(null);
+  const namePromptInputRef = useRef<HTMLInputElement>(null);
+  const emailPromptInputRef = useRef<HTMLInputElement>(null);
+  const phonePromptInputRef = useRef<HTMLInputElement>(null);
+  const dragStartX = useRef<number>(0);
+  const dragStartScrollLeft = useRef<number>(0);
+  const hasDraggedRef = useRef<boolean>(false);
+  const interactionCountRef = useRef<number>(0);
+  const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const deployFormScrolledRef = useRef<boolean>(false);
+  const conversationsToRestoreRef = useRef<Array<{ id: string; type: 'user' | 'ai'; text: string; created_at: string }>>([]);
+  const hasRestoredMessagesRef = useRef<boolean>(false);
+  const hasShownWelcomeRef = useRef<boolean>(false);
+  const hasResetOnLoadRef = useRef<boolean>(false);
+  const pendingFlowOverrideRef = useRef<FlowOverrideRule | null>(null);
+  const prevIsLoadingRef = useRef(false);
+  const bookingConfirmedRef = useRef(false);
+  const brandKey = brand as StorageBrandKey;
+  const finalApiUrl = apiUrl || config.apiUrl || '/api/agent/web/chat';
+  const isLokazenScoutPage = brandKey === 'lokazen' && pageContext === 'scout';
+
+  const setPendingFlowOverrideState = useCallback((rule: FlowOverrideRule | null) => {
+    pendingFlowOverrideRef.current = rule;
+    setPendingFlowOverride(rule);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      setWidgetTheme(savedTheme);
+    }
+
+    const initialPageContext = new URLSearchParams(window.location.search).get('page_context');
+    if (initialPageContext === 'lokazen_scout' || initialPageContext === 'scout') {
+      setPageContext('scout');
+    }
+  }, []);
+
+  const toggleWidgetTheme = useCallback(() => {
+    setWidgetTheme((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('windchasers-widget-theme', next);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleOpenChat = useCallback(() => {
+    setShowCloseConfirm(false);
+    setIsDockedBubble(true);
+    setIsOpen(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsInputActive(true);
+    // Notify parent iframe to enable pointer events
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-open', '*');
+    }
+  }, []);
+
+  // Once chat opens, keep widget in docked bubble mode so it docks right as a bubble
+  useEffect(() => {
+    if (isOpen) {
+      setIsDockedBubble(true);
+    }
+  }, [isOpen]);
+
+  // Listen for viewport info and lead context from parent (for embed widget)
+  useEffect(() => {
+    if (widgetStyle !== 'bubble') return;
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'wc-viewport') {
+        setIsParentMobile(e.data.isMobile);
+      }
+      if (e.data && e.data.type === 'proxe_page_context') {
+        const nextContext = e.data.pageContext === 'lokazen_scout' || e.data.pageContext === 'scout'
+          ? 'scout'
+          : 'default';
+        setPageContext(nextContext);
+      }
+      if (e.data && e.data.type === 'proxe_lead_context') {
+        console.log('[ChatWidget] Received lead context from parent:', e.data.lead);
+        setPreLoadedLeadContext(e.data.lead);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [widgetStyle]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const doInitSession = async () => {
+      try {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[ChatWidget ${brandKey}] Initialising session`, { brandKey });
+        }
+
+        if (resetOnLoad && !hasResetOnLoadRef.current) {
+          clearSessionId(brandKey);
+          clearStoredUser(brandKey);
+          conversationsToRestoreRef.current = [];
+          hasRestoredMessagesRef.current = false;
+          hasResetOnLoadRef.current = true;
+        }
+
+        let storedId = getStoredSessionId(brandKey);
+        if (!storedId) {
+          storedId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+          storeSessionId(storedId, brandKey);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[ChatWidget] Generated new session id', { storedId, brandKey });
+          }
+        }
+        if (cancelled) return;
+        setExternalSessionId(storedId);
+
+        // Initialize session in Supabase immediately when chat opens
+        try {
+          const sessionRecord = await initializeSession(storedId, 'web');
+          if (sessionRecord) {
+            console.log('[ChatWidget] Session initialized in Supabase', {
+              externalSessionId: storedId,
+              sessionId: sessionRecord.id
+            });
+          }
+        } catch (error) {
+          console.error('[ChatWidget] Failed to initialize session in Supabase', error);
+        }
+
+        const storedUser = getStoredUser(brandKey);
+        if (storedUser && !cancelled) {
+          setUserProfile(storedUser);
+          if (typeof storedUser.emailSkipped === 'boolean') {
+            setEmailPromptDismissed(storedUser.emailSkipped);
+          }
+          if (typeof storedUser.phoneSkipped === 'boolean') {
+            setPhonePromptDismissed(storedUser.phoneSkipped);
+          }
+          if (typeof storedUser.promptedName === 'boolean') {
+            setHasAskedName(storedUser.promptedName);
+          }
+          if (typeof storedUser.promptedEmail === 'boolean') {
+            setHasAskedEmail(storedUser.promptedEmail);
+          }
+          if (typeof storedUser.promptedPhone === 'boolean') {
+            setHasAskedPhone(storedUser.promptedPhone);
+          }
+        }
+
+        // Apply pre-loaded lead context from parent page (form submission)
+        if (preLoadedLeadContext && !cancelled) {
+          console.log('[ChatWidget] Applying pre-loaded lead context:', preLoadedLeadContext);
+          const leadProfile: LocalUserProfile = {
+            ...storedUser,
+            name: preLoadedLeadContext.name || storedUser?.name,
+          };
+          setUserProfile(leadProfile);
+          storeUserProfile(leadProfile, brandKey);
+          if (preLoadedLeadContext.name) {
+            setHasAskedName(true);
+          }
+        }
+
+        // Always create session (even for incomplete leads) so we can track the conversation
+        // But only populate with data when it becomes a complete lead
+        const hasCompleteLead = storedUser && 
+          storedUser.name?.trim() && 
+          storedUser.email?.trim() && 
+          storedUser.phone?.trim();
+
+        let record: SessionRecord | null = null;
+        
+        // Create session regardless of lead completeness
+        record = await ensureSession(storedId, 'web');
+        if (!record) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[ChatWidget] Unable to ensure session in Supabase', {
+              storedId,
+              brandKey,
+              recordPresent: Boolean(record),
+              cancelled,
+            });
+          }
+          return;
+        }
+        
+        // Only set session record if it's a complete lead
+        // This ensures we only track complete leads in the UI state
+        if (hasCompleteLead) {
+          setSessionRecord(record);
+        } else {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[ChatWidget] Session created but incomplete lead - will populate when complete', {
+              hasName: Boolean(storedUser?.name?.trim()),
+              hasEmail: Boolean(storedUser?.email?.trim()),
+              hasPhone: Boolean(storedUser?.phone?.trim()),
+            });
+          }
+        }
+        
+        if (cancelled) return;
+
+        // Sync profile differences back to Supabase/local storage
+        const updates: LocalUserProfile = { ...storedUser };
+        let needsUpdate = false;
+        let needsSupabaseSync = false;
+        
+        // Sync from Supabase to localStorage
+        if (record.userName && record.userName !== storedUser?.name) {
+          updates.name = record.userName;
+          needsUpdate = true;
+        }
+        if (record.email && record.email !== storedUser?.email) {
+          updates.email = record.email;
+          needsUpdate = true;
+        }
+        if (record.phone && record.phone !== storedUser?.phone) {
+          updates.phone = record.phone;
+          needsUpdate = true;
+        }
+        if (record.websiteUrl && record.websiteUrl !== storedUser?.websiteUrl) {
+          updates.websiteUrl = record.websiteUrl;
+          needsUpdate = true;
+        }
+        
+        // Sync from localStorage to Supabase (if localStorage has data Supabase doesn't)
+        if (storedUser?.name && !record.userName) {
+          needsSupabaseSync = true;
+        }
+        if (storedUser?.email && !record.email) {
+          needsSupabaseSync = true;
+        }
+        if (storedUser?.phone && !record.phone) {
+          needsSupabaseSync = true;
+        }
+        if (storedUser?.websiteUrl && !record.websiteUrl) {
+          needsSupabaseSync = true;
+        }
+        
+        if (needsUpdate) {
+          storeUserProfile(updates, brandKey);
+          setUserProfile(updates);
+          if (updates.name) {
+            setHasAskedName(true);
+          }
+          if (updates.email) {
+            setHasAskedEmail(true);
+          }
+          if (updates.phone) {
+            setHasAskedPhone(true);
+          }
+        }
+        
+        // Sync localStorage data to Supabase if needed
+        if (needsSupabaseSync && storedUser) {
+          await updateLeadProfile(
+            storedId,
+            {
+              userName: storedUser.name,
+              email: storedUser.email ?? null,
+              phone: storedUser.phone ?? null,
+              websiteUrl: storedUser.websiteUrl ?? null,
+            },
+            'web'
+          );
+        }
+
+        const summaryRow = await fetchSummary(storedId, 'web');
+
+        if (!cancelled) {
+          const cleanedSummary = cleanSummary(summaryRow?.summary);
+          setConversationSummary(cleanedSummary);
+          // Restore user inputs from session record if available
+          if (record.userInputsSummary && record.userInputsSummary.length > 0) {
+            // Convert user inputs to history format for context
+            const history = record.userInputsSummary
+              .slice(-6) // Last 6 user inputs
+              .map((userInput) => ({
+                role: 'user' as const,
+                content: userInput.input,
+              }));
+            setRecentHistory(history);
+            // Don't count restored messages towards email/phone prompts - start fresh each session
+            interactionCountRef.current = 0;
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[ChatWidget] Restored user inputs', {
+                inputsCount: record.userInputsSummary.length,
+                hasSummary: Boolean(summaryRow?.summary),
+                hasBooking: Boolean(record.bookingDate),
+              });
+            }
+          } else if (process.env.NODE_ENV !== 'production') {
+            console.log('[ChatWidget] No prior user inputs for session', { sessionId: record.id });
+          }
+          
+          // Fetch and restore conversation messages if we have a lead_id
+          // Get lead_id from web_sessions
+          const supabase = createClient();
+          if (supabase && storedId) {
+            try {
+              const { data: sessionData, error: sessionError } = await supabase
+                .from('web_sessions')
+                .select('lead_id')
+                .eq('external_session_id', storedId)
+                .maybeSingle();
+              
+              if (!sessionError && sessionData?.lead_id) {
+                const conversations = await fetchConversations(sessionData.lead_id);
+                if (conversations.length > 0 && !cancelled) {
+                  // Store conversations to restore when chat opens
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.log('[ChatWidget] Found conversations to restore', {
+                      count: conversations.length,
+                      leadId: sessionData.lead_id
+                    });
+                  }
+                  // Convert to Message format and store in ref
+                  conversationsToRestoreRef.current = conversations.map((conv) => ({
+                    id: conv.id,
+                    type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+                    text: conv.content,
+                    created_at: conv.created_at
+                  }));
+                }
+              }
+            } catch (err) {
+              console.error('[ChatWidget] Error fetching lead_id for conversation restoration:', err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[ChatWidget] Failed to initialise session', error);
+      }
+    };
+
+    doInitSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preLoadedLeadContext]);
+
+  // Initialize welcome video visibility from localStorage
+  // Video embed temporarily disabled
+  // useEffect(() => {
+  //   if (typeof window !== 'undefined') {
+  //     const dismissed = window.localStorage.getItem('bcon_video_closed');
+  //     if (dismissed === 'true') {
+  //       setShowWelcomeVideo(false);
+  //     }
+  //   }
+  // }, []);
+
+  useEffect(() => {
+    if (showNamePrompt) {
+      setNameInput(userProfile.name || '');
+      const cleanPhone = userProfile.phone ? userProfile.phone.replace(/^\+1\s*/, '').trim() : '';
+      setPhoneInput(cleanPhone);
+    }
+  }, [showNamePrompt, userProfile.name, userProfile.phone]);
+
+  // Removed auto-focus to prevent keyboard from automatically opening
+  // User will click on input to open keyboard, keeping full screen experience
+  // useEffect(() => {
+  //   if (showNamePrompt && namePromptInputRef.current) {
+  //     namePromptInputRef.current.focus();
+  //   }
+  // }, [showNamePrompt]);
+
+  useEffect(() => {
+    if (showEmailPrompt) {
+      setEmailInput(userProfile.email || '');
+    }
+  }, [showEmailPrompt, userProfile.email]);
+
+  // Removed auto-focus to prevent keyboard from automatically opening
+  // User will click on input to open keyboard, keeping full screen experience
+  // useEffect(() => {
+  //   if (showEmailPrompt && emailPromptInputRef.current) {
+  //     emailPromptInputRef.current.focus();
+  //   }
+  // }, [showEmailPrompt]);
+
+  useEffect(() => {
+    if (showPhonePrompt) {
+      // Remove +1 prefix if present
+      const cleanPhone = userProfile.phone ? userProfile.phone.replace(/^\+1\s*/, '').trim() : '';
+      setPhoneInput(cleanPhone);
+    }
+  }, [showPhonePrompt, userProfile.phone]);
+
+  // Removed auto-focus to prevent keyboard from automatically opening
+  // User will click on input to open keyboard, keeping full screen experience
+  // useEffect(() => {
+  //   if (showPhonePrompt && phonePromptInputRef.current) {
+  //     phonePromptInputRef.current.focus();
+  //   }
+  // }, [showPhonePrompt]);
+
+  const applyLocalProfile = useCallback((updates: LocalUserProfile) => {
+    setUserProfile((prev) => {
+      const merged: LocalUserProfile = { ...prev, ...updates };
+      storeUserProfile(merged, brandKey);
+      return merged;
+    });
+
+    if (typeof updates.emailSkipped === 'boolean') {
+      setEmailPromptDismissed(updates.emailSkipped);
+    }
+    if (typeof updates.phoneSkipped === 'boolean') {
+      setPhonePromptDismissed(updates.phoneSkipped);
+    }
+    if (typeof updates.promptedName === 'boolean') {
+      setHasAskedName(updates.promptedName);
+    }
+    if (typeof updates.promptedEmail === 'boolean') {
+      setHasAskedEmail(updates.promptedEmail);
+    }
+    if (typeof updates.promptedPhone === 'boolean') {
+      setHasAskedPhone(updates.promptedPhone);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      if (updates.name) {
+        setHasAskedName(true);
+        setNamePromptDismissed(false);
+      }
+      setShowNamePrompt(false);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'email')) {
+      if (updates.email) {
+        setHasAskedEmail(true);
+      }
+      setShowEmailPrompt(false);
+      if (updates.email) {
+        setEmailPromptDismissed(false);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'phone')) {
+      if (updates.phone) {
+        setHasAskedPhone(true);
+      }
+      setShowPhonePrompt(false);
+      if (updates.phone) {
+        setPhonePromptDismissed(false);
+      }
+    }
+  }, [brandKey]);
+
+  const persistUserProfile = useCallback(async (updates: LocalUserProfile, options: { sync?: boolean } = {}) => {
+    const { sync = true } = options;
+    console.log('[persistUserProfile] Called', { updates, sync, externalSessionId, brandKey });
+    
+    applyLocalProfile(updates);
+
+    if (!sync) {
+      console.log('[persistUserProfile] Sync disabled, skipping Supabase update');
+      return;
+    }
+    
+    if (!externalSessionId) {
+      console.warn('[persistUserProfile] No externalSessionId, cannot update Supabase', { updates });
+      return;
+    }
+
+    const supabaseUpdates: { userName?: string; phone?: string | null; email?: string | null; websiteUrl?: string | null } = {};
+    if (Object.prototype.hasOwnProperty.call(updates, 'name') && updates.name !== undefined) {
+      supabaseUpdates.userName = updates.name && updates.name.trim() ? updates.name.trim() : undefined;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'email') && updates.email !== undefined) {
+      supabaseUpdates.email = updates.email && updates.email.trim() ? updates.email.trim() : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'phone') && updates.phone !== undefined) {
+      supabaseUpdates.phone = updates.phone && updates.phone.trim() ? updates.phone.trim() : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'websiteUrl') && updates.websiteUrl !== undefined) {
+      supabaseUpdates.websiteUrl = updates.websiteUrl && updates.websiteUrl.trim() ? updates.websiteUrl.trim() : null;
+    }
+    
+    console.log('[persistUserProfile] Prepared Supabase updates', { supabaseUpdates, updateCount: Object.keys(supabaseUpdates).length });
+    
+    if (Object.keys(supabaseUpdates).length > 0) {
+      console.log('[persistUserProfile] Calling updateLeadProfile', { externalSessionId, supabaseUpdates, brandKey });
+      await updateLeadProfile(externalSessionId, supabaseUpdates, 'web');
+      
+      // After updating profile, check if we now have a complete lead and create session if needed
+      const updatedProfile = { ...userProfile, ...updates };
+      const hasCompleteLead = updatedProfile.name?.trim() && 
+                              updatedProfile.email?.trim() && 
+                              updatedProfile.phone?.trim();
+      
+      if (hasCompleteLead && !sessionRecord) {
+        // Session was just created, fetch it to update state
+        const newRecord = await ensureSession(externalSessionId, 'web');
+        if (newRecord) {
+          setSessionRecord(newRecord);
+        }
+      }
+    } else {
+      console.warn('[persistUserProfile] No Supabase updates to apply', { updates });
+    }
+  }, [applyLocalProfile, externalSessionId, brandKey, userProfile, sessionRecord]);
+
+  const handleContactDraft = useCallback((data: { name?: string; email?: string; phone?: string; websiteUrl?: string }) => {
+    const updates: LocalUserProfile = {};
+    if (data.name && data.name.trim()) {
+      updates.name = data.name.trim();
+      updates.promptedName = true;
+    }
+    if (data.email && data.email.trim()) {
+      updates.email = data.email.trim();
+      updates.promptedEmail = true;
+    }
+    if (data.phone && data.phone.trim()) {
+      updates.phone = data.phone.trim();
+      updates.promptedPhone = true;
+    }
+    if (data.websiteUrl && data.websiteUrl.trim()) {
+      updates.websiteUrl = data.websiteUrl.trim();
+    }
+    if (Object.keys(updates).length > 0) {
+      applyLocalProfile(updates);
+    }
+  }, [applyLocalProfile]);
+
+  const handleContactPersist = useCallback(async (data: { name?: string; email?: string; phone?: string; websiteUrl?: string }) => {
+    console.log('[handleContactPersist] Called', { data, externalSessionId });
+    const updates: LocalUserProfile = {};
+    if (data.name && data.name.trim()) {
+      updates.name = data.name.trim();
+      updates.promptedName = true;
+    }
+    if (data.email && data.email.trim()) {
+      updates.email = data.email.trim();
+      updates.promptedEmail = true;
+    }
+    if (data.phone && data.phone.trim()) {
+      updates.phone = data.phone.trim();
+      updates.promptedPhone = true;
+    }
+    if (data.websiteUrl && data.websiteUrl.trim()) {
+      updates.websiteUrl = data.websiteUrl.trim();
+    }
+    console.log('[handleContactPersist] Prepared updates', { updates, updateCount: Object.keys(updates).length });
+    if (Object.keys(updates).length > 0) {
+      await persistUserProfile(updates);
+    } else {
+      console.warn('[handleContactPersist] No valid updates to persist', { data });
+    }
+  }, [persistUserProfile, externalSessionId]);
+
+  const appendHistory = (entry: { role: 'user' | 'assistant'; content: string }) => {
+    historyRef.current = [...historyRef.current, entry].slice(-6);
+    setRecentHistory(historyRef.current);
+  };
+
+
+  const buildRequestPayload = () => ({
+    pageContext,
+    lokazenAudience: isLokazenScoutPage ? 'scout' : undefined,
+    session: {
+      externalId: externalSessionId,
+      supabaseId: sessionRecord?.id ?? null,
+      brand: brandKey,
+      pageContext,
+      user: {
+        name: userProfile.name ?? null,
+        email: userProfile.email ?? null,
+        phone: userProfile.phone ?? null,
+      },
+    },
+    memory: {
+      summary: cleanSummary(conversationSummary),
+      recentHistory: historyRef.current,
+    },
+  });
+
+  const persistWebEvents = useCallback(async (
+    eventMessages: Array<{
+      sender: 'customer' | 'agent' | 'system';
+      content: string;
+      messageType?: string;
+      metadata?: Record<string, any>;
+    }>,
+  ) => {
+    if (!externalSessionId || eventMessages.length === 0) return;
+
+    try {
+      await fetch('/api/agent/web/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+          messages: eventMessages,
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist web event:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
+  const persistVoiceTranscript = useCallback(async (
+    role: 'user' | 'assistant',
+    transcript: string,
+    transcriptType: string = 'final',
+  ) => {
+    const text = transcript.trim();
+    if (!externalSessionId || !text) return;
+
+    try {
+      await fetch('/api/agent/voice/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: externalSessionId,
+          leadId: sessionRecord?.leadId || preLoadedLeadContext?.lead_id || null,
+          callId: vapiCallIdRef.current,
+          role,
+          transcript: text,
+          transcriptType,
+          sequence: vapiTranscriptSeqRef.current,
+          user: {
+            name: userProfile.name || null,
+            email: userProfile.email || null,
+            phone: userProfile.phone || null,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error('[ChatWidget] Failed to persist voice transcript:', err);
+    }
+  }, [
+    externalSessionId,
+    preLoadedLeadContext?.lead_id,
+    sessionRecord?.leadId,
+    userProfile.email,
+    userProfile.name,
+    userProfile.phone,
+  ]);
+
+  const closeCalendarWidget = useCallback(() => {
+    setShowCalendly(null);
+    setPendingCalendar(false);
+    setForceCalendarFromBookButton(false);
+    setCalendarAnchorId(null);
+  }, []);
+
+  const deployFormRef = useRef<HTMLDivElement>(null);
+  
+  const closeDeployForm = useCallback(() => {
+    setShowDeployForm(null);
+    deployFormScrolledRef.current = false;
+  }, []);
+
+  const closeVideoWidget = useCallback(() => {
+    setShowVideo(null);
+    setVideoAnchorId(null);
+  }, []);
+
+  const closePortfolio = useCallback(() => {
+    setShowPortfolio(null);
+    setPortfolioAnchorId(null);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setShowCloseConfirm(false);
+    setIsOpen(false);
+    setIsInputActive(false);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsSearchbarHovered(false);
+    setIsDockedBubble(false);
+    closeCalendarWidget();
+    closeVideoWidget();
+    closeDeployForm();
+    closePortfolio();
+    setDynamicQuickButtons(null);
+    setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverrideState(null);
+    // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
+    // Only reset if user explicitly resets the chat
+    // Notify parent iframe to disable pointer events
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-close', '*');
+    }
+  }, [closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
+
+  const handleRequestCloseChat = useCallback(() => {
+    setShowCloseConfirm(true);
+  }, []);
+
+  const handleCancelCloseChat = useCallback(() => {
+    setShowCloseConfirm(false);
+  }, []);
+
+  const handleConfirmCloseChat = useCallback(() => {
+    setShowCloseConfirm(false);
+    handleCloseChat();
+  }, [handleCloseChat]);
+
+  const queuePendingMessage = (message: string, buttons: string[], requirement: 'name' | 'email' | 'phone') => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Queueing pending message', { message, buttons });
+    }
+    setPendingUserMessage(message);
+    setPendingButtons(buttons);
+    setPendingRequirement(requirement);
+    // Ensure chat panel is visible while we collect required details
+    setIsOpen(true);
+    setIsInputActive(true);
+    setIsExpanded(true);
+    setShowQuickButtons(false);
+  };
+
+  const requestNameBeforeProceed = (message: string, buttons: string[]) => {
+    // Lokazen web chats must become reachable dashboard leads before the AI flow starts.
+    // Collect name + WhatsApp number once, then let /api/agent/web/chat create the lead server-side.
+    const needContact = (!userProfile.name || !userProfile.phone) && messageCount === 0;
+    if (!needContact) return false;
+
+    if (!showNamePrompt) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[ChatWidget] Requesting Lokazen name + phone before first AI response');
+      }
+      setHasAskedName(true);
+      setHasAskedPhone(true);
+      addUserMessage(message);
+      queuePendingMessage(message, buttons, 'name');
+      setSkipAddingUserMessage(true);
+      setIsOpen(true);
+      setIsInputActive(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setShowNamePrompt(true);
+    }
+    return true;
+  };
+  const requestEmailBeforeProceed = (_message: string, _buttons: string[]) => false;
+  const requestPhoneBeforeProceed = (_message: string, _buttons: string[]) => false;
+
+  const submitMessage = async (rawMessage: string, buttons: string[] = usedButtons) => {
+    const trimmed = rawMessage.trim();
+    if (!trimmed) return;
+    const normalizedTrimmed = trimmed.toLowerCase();
+    const lastAiMessageText =
+      [...messages].reverse().find((message) => message.type === 'ai')?.text?.toLowerCase() || '';
+    const isAffirmativeConsultationReply =
+      /^yes[.!?]*$/.test(normalizedTrimmed) &&
+      (
+        lastAiMessageText.includes('set up a 1:1 consultation') ||
+        lastAiMessageText.includes('book a consultation')
+      );
+    const isExactDemoBookingTrigger =
+      normalizedTrimmed === 'book a demo session' || normalizedTrimmed === 'book a demo';
+    const isBookButtonMessage =
+      buttons.some((button) => button.trim().toLowerCase() === normalizedTrimmed) &&
+      normalizedTrimmed.includes('book');
+    const shouldForceCalendarFromBookButton =
+      isExactDemoBookingTrigger || isBookButtonMessage || isAffirmativeConsultationReply;
+
+    if (showCalendly) {
+      closeCalendarWidget();
+    }
+
+    // Close any open prompt cards when user sends a message
+    if (showNamePrompt) {
+      setShowNamePrompt(false);
+      setNamePromptDismissed(true);
+    }
+    if (showEmailPrompt) {
+      setShowEmailPrompt(false);
+    }
+    if (showPhonePrompt) {
+      setShowPhonePrompt(false);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Submitting message', { trimmed, buttons });
+    }
+
+    const nextCount = messageCount + 1;
+    let contextualMessage = trimmed;
+    let displayMessage = trimmed; // Message to show in chat and store
+
+    // Keep quick-button instructions hidden from the visible user bubble.
+    if (/^explore ai marketing solutions$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user for business and industry context before suggesting solutions.] ${trimmed}`;
+    } else if (/^view use cases$/i.test(trimmed)) {
+      contextualMessage = `[Button intent: Ask user industry first, then show relevant case studies.] ${trimmed}`;
+    }
+
+    // Age input detection: user typed their age after the "how old are you?" question
+    const lastAiText = [...messages].reverse().find(m => m.type === 'ai')?.text?.toLowerCase() || '';
+    const isAgeQuestion = lastAiText.includes('how old are you') || (lastAiText.includes('quick question') && lastAiText.includes('old'));
+    const ageMatch = trimmed.match(/^(\d{1,2})$/);
+    if (isAgeQuestion && ageMatch) {
+      const age = parseInt(ageMatch[1]);
+      if (age >= 10 && age <= 65) {
+        contextualMessage = `[User's age is ${age}] ${trimmed}`;
+        if (age <= 21) {
+          setPendingFlowOverrideState({ followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'] });
+        } else {
+          setPendingFlowOverrideState({ followUpButtons: ['Studying', 'Working', 'Taking a Break'] });
+        }
+      }
+    }
+
+    const isBookingRepeat = bookingCompleted && containsBookingKeywords(trimmed);
+    if (isBookingRepeat) {
+      setInputValue('');
+      addUserMessage(trimmed);
+      const rebookMsg = bookedSummary
+        ? `You already have a call booked for ${bookedSummary}. Would you like to reschedule?`
+        : 'You already have a call booked. Would you like to reschedule?';
+      addAIMessage(rebookMsg);
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+      return;
+    }
+
+    // Add name context to AI message only (not displayed to user)
+    if (nextCount === 1 && userProfile.name) {
+      contextualMessage = `[User's name is ${userProfile.name}] ${contextualMessage}`;
+      // displayMessage stays as original trimmed message
+    }
+
+    setInputValue('');
+    setMessageCount(nextCount);
+    setExploreButtons(null);
+    setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
+
+    if (
+      (containsBookingKeywords(trimmed) || isExactDemoBookingTrigger || isAffirmativeConsultationReply) &&
+      !bookingCompleted
+    ) {
+      // Open calendar immediately while AI response streams
+      setPendingCalendar(true);
+      setForceCalendarFromBookButton(shouldForceCalendarFromBookButton);
+      const calendarMessageId = `calendar-${Date.now()}`;
+      setShowCalendly(calendarMessageId);
+      setCalendarAnchorId(calendarMessageId);
+    }
+
+    setIsOpen(true);
+    setIsInputActive(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+
+    // Store the display message (without context prefix) in history
+    appendHistory({ role: 'user', content: displayMessage });
+    // Note: User input is saved server-side in /api/agent/web/chat route to avoid duplicates
+
+    // For forced calendar opens (book buttons like "Skip and book consultation"), skip the AI.
+    // The calendar widget collects name/email/phone directly, so sending to the AI causes it to
+    // ask for contact info (redundant) and/or generate a conflicting booking confirmation.
+    if (shouldForceCalendarFromBookButton) {
+      addUserMessage(displayMessage);
+      const calendarOpenMessage = 'Let me pull up available slots for you.';
+      addAIMessage(calendarOpenMessage);
+      appendHistory({ role: 'assistant', content: calendarOpenMessage });
+      void persistWebEvents([
+        {
+          sender: 'customer',
+          content: displayMessage,
+          messageType: 'text',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+        {
+          sender: 'agent',
+          content: calendarOpenMessage,
+          messageType: 'booking_prompt',
+          metadata: { intent: 'booking_calendar_opened', skipped_ai: true },
+        },
+      ]);
+      return;
+    }
+
+    // Send contextual message (with name context) to AI, but display original message in chat
+    sendMessage(contextualMessage, nextCount, buttons, buildRequestPayload(), skipAddingUserMessage, displayMessage);
+    
+    // Reset the flag after using it
+    if (skipAddingUserMessage) {
+      setSkipAddingUserMessage(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingUserMessage || !pendingRequirement) return;
+
+    const hasName = Boolean(userProfile.name && userProfile.name.trim());
+    const hasEmail = Boolean(userProfile.email && userProfile.email.trim());
+    const hasPhone = Boolean(userProfile.phone && userProfile.phone.trim());
+
+    const requirementSatisfied =
+      (pendingRequirement === 'name' && hasName) ||
+      (pendingRequirement === 'email' && (hasEmail || emailPromptDismissed)) ||
+      (pendingRequirement === 'phone' && (hasPhone || phonePromptDismissed));
+
+    if (requirementSatisfied) {
+      const message = pendingUserMessage;
+      const buttons = pendingButtons.length ? pendingButtons : usedButtons;
+      setPendingUserMessage(null);
+      setPendingButtons([]);
+      setPendingRequirement(null);
+      submitMessage(message, buttons);
+    }
+  }, [
+    pendingUserMessage,
+    pendingRequirement,
+    pendingButtons,
+    usedButtons,
+    userProfile.name,
+    userProfile.email,
+    userProfile.phone,
+    emailPromptDismissed,
+    phonePromptDismissed,
+    submitMessage,
+  ]);
+
+  const flushPendingMessage = () => {
+    if (!pendingUserMessage) return;
+    const message = pendingUserMessage;
+    const buttons = pendingButtons.length ? pendingButtons : usedButtons;
+    setPendingUserMessage(null);
+    setPendingButtons([]);
+    setPendingRequirement(null);
+    submitMessage(message, buttons);
+  };
+
+  const handleNameSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const cleanPhone = phoneInput.replace(/[^\d+]/g, '');
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+    if (!nameInput.trim() || phoneDigits.length < 8) return;
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Lokazen name + phone submitted', { name: nameInput.trim() });
+    }
+    setHasAskedName(true);
+    setHasAskedPhone(true);
+    setNamePromptDismissed(false);
+    setPhonePromptDismissed(false);
+    setShowNamePrompt(false);
+    
+    await persistUserProfile({
+      name: nameInput.trim(),
+      phone: cleanPhone,
+      promptedName: true,
+      promptedPhone: true,
+    }, { sync: false });
+    setNameInput('');
+    setPhoneInput('');
+  };
+
+  const handleNameDismiss = () => {
+    setNamePromptDismissed(true);
+    setShowNamePrompt(false);
+    flushPendingMessage();
+  };
+
+  const handleEmailSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!emailInput.trim()) return;
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Email submitted');
+    }
+    // Set flag immediately to prevent re-asking
+    setHasAskedEmail(true);
+    setShowEmailPrompt(false);
+    
+    await persistUserProfile({
+      email: emailInput.trim(),
+      emailSkipped: false,
+      promptedEmail: true,
+    });
+    setEmailInput('');
+  };
+
+  const handleEmailSkip = () => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Email prompt skipped');
+    }
+    persistUserProfile({ emailSkipped: true, promptedEmail: true }, { sync: false });
+    setEmailInput('');
+    setShowEmailPrompt(false);
+  };
+
+  const handlePhoneSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!phoneInput.trim()) return;
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Phone submitted');
+    }
+    // Set flag immediately to prevent re-asking
+    setHasAskedPhone(true);
+    setShowPhonePrompt(false);
+    
+    await persistUserProfile({
+      phone: phoneInput.trim(),
+      phoneSkipped: false,
+      promptedPhone: true,
+    });
+    setPhoneInput('');
+  };
+
+  const handlePhoneSkip = () => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ChatWidget] Phone prompt skipped');
+    }
+    persistUserProfile({ phoneSkipped: true, promptedPhone: true }, { sync: false });
+    setShowPhonePrompt(false);
+  };
+
+  // Helper to get absolute API URL (works in iframe)
+  const getApiUrl = (path: string) => {
+    if (typeof window === 'undefined') return path;
+    if (path.startsWith('http')) return path;
+    return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
+  };
+
+  const summarizeConversation = async (lastMessageTimestamp: string) => {
+    if (!externalSessionId || historyRef.current.length === 0) return;
+    try {
+      const response = await fetch(getApiUrl('/api/agent/summarize'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          summary: cleanSummary(conversationSummary),
+          history: historyRef.current,
+          brand,
+          session: {
+            externalId: externalSessionId,
+            supabaseId: sessionRecord?.id ?? null,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to summarize conversation (${response.status})`);
+      }
+
+      const data = await response.json();
+      if (data.summary && typeof data.summary === 'string') {
+        const cleanedSummary = cleanSummary(data.summary);
+        setConversationSummary(cleanedSummary);
+        if (externalSessionId) {
+          await upsertSummary(externalSessionId, cleanedSummary, lastMessageTimestamp, 'web');
+        }
+      }
+    } catch (error) {
+      console.error('[ChatWidget] Failed to summarize conversation', error);
+    }
+  };
+
+  const handleAssistantMessageComplete = async (message: Message) => {
+    const activeFlowOverride = pendingFlowOverrideRef.current;
+    console.log(
+      'DEBUG flowOverride:',
+      activeFlowOverride,
+      'flowOverrideButtons:',
+      flowOverrideButtons,
+    );
+    if (activeFlowOverride) {
+      if (activeFlowOverride.responseText && message.id) {
+        updateMessageText(message.id, activeFlowOverride.responseText);
+      }
+      setFlowOverrideButtons(activeFlowOverride.followUpButtons);
+      setDynamicQuickButtons(null);
+      setPendingFlowOverrideState(null);
+    } else if (message.followUps && message.followUps.length > 0) {
+      // LLM emitted [BTN: X] markers â†’ useChatStream extracted them into
+      // message.followUps. Surface them as quick-reply buttons.
+      let followUps = message.followUps;
+      if (brand === 'lokazen') {
+        // Plans overview: detect from the BUTTONS (deterministic), not the text
+        // â€” the LLM paraphrases the scripted plan message, so text matching
+        // missed it and the plans fell through as flat text buttons. When â‰¥2
+        // plan buttons are present, render the rich cards on this message and
+        // drop the redundant text buttons (cards provide the actions).
+        const planBtns = followUps.filter((b) => /^(starter|professional|premium)\b/i.test(b.trim()));
+        const isDetailMsg = /\[\[plan:/i.test(message.text) || /\b(starter|professional|premium)\s*[-â€“]\s*rs/i.test(message.text);
+        if (planBtns.length >= 2 && message.id) {
+          setPlanCardsMessageId(message.id);
+          followUps = followUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
+        } else if (isDetailMsg) {
+          // Single-plan detail card carries Start/Talk CTAs itself.
+          followUps = followUps.filter((b) => !/start this plan/i.test(b.trim()));
+        }
+      }
+      setFlowOverrideButtons(followUps);
+      setDynamicQuickButtons(null);
+    }
+
+    if (message.text) {
+      // Strip HTML tags before adding to history for summarization
+      const finalMessageText = activeFlowOverride?.responseText || message.text;
+      const plainText = finalMessageText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      appendHistory({ role: 'assistant', content: plainText });
+      // Don't store assistant messages - we focus on user inputs and summaries
+    }
+
+    if (!hasReceivedFirstResponse) {
+      setHasReceivedFirstResponse(true);
+    }
+
+    interactionCountRef.current += 1;
+
+    const lastMessageTimestamp = new Date().toISOString();
+
+    const shouldSummarize = interactionCountRef.current > 0 && interactionCountRef.current % 5 === 0;
+    if (shouldSummarize) {
+      await summarizeConversation(lastMessageTimestamp);
+    }
+  };
+
+  // Keep searchbarWrapper fixed at bottom at all times
+  useEffect(() => {
+    const fixSearchbarPosition = () => {
+      if (!searchbarWrapperRef.current) return;
+      if (keyboardHeight > 0) return; // let keyboard handler control position
+      
+      const isMobile = window.innerWidth < 769;
+      
+      if (isMobile) {
+        // Mobile: Full width at bottom with consistent padding
+        searchbarWrapperRef.current.style.setProperty('position', 'fixed', 'important');
+        searchbarWrapperRef.current.style.setProperty('bottom', `${SEARCHBAR_BASE_OFFSET}px`, 'important');
+        searchbarWrapperRef.current.style.setProperty('left', '20px', 'important');
+        searchbarWrapperRef.current.style.setProperty('right', '20px', 'important');
+        searchbarWrapperRef.current.style.setProperty('top', 'auto', 'important');
+        searchbarWrapperRef.current.style.setProperty('transform', 'none', 'important');
+        searchbarWrapperRef.current.style.setProperty('-webkit-transform', 'none', 'important');
+        searchbarWrapperRef.current.style.setProperty('width', 'auto', 'important');
+        searchbarWrapperRef.current.style.setProperty('z-index', '9999', 'important');
+      } else {
+        // Desktop: Centered at bottom
+        searchbarWrapperRef.current.style.setProperty('position', 'fixed', 'important');
+        searchbarWrapperRef.current.style.setProperty('bottom', `${SEARCHBAR_BASE_OFFSET}px`, 'important');
+        searchbarWrapperRef.current.style.setProperty('top', 'auto', 'important');
+        searchbarWrapperRef.current.style.setProperty('left', '50%', 'important');
+        searchbarWrapperRef.current.style.setProperty('right', 'auto', 'important');
+        searchbarWrapperRef.current.style.setProperty('transform', 'translateX(-50%)', 'important');
+        searchbarWrapperRef.current.style.setProperty('-webkit-transform', 'translateX(-50%)', 'important');
+        searchbarWrapperRef.current.style.setProperty('z-index', '9999', 'important');
+      }
+    };
+    
+    // Fix immediately
+    fixSearchbarPosition();
+    
+    // Fix on resize
+    window.addEventListener('resize', fixSearchbarPosition);
+    
+    // Fix periodically to prevent any CSS from overriding
+    const interval = setInterval(fixSearchbarPosition, 200);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', fixSearchbarPosition);
+    };
+  }, [isOpen, isExpanded, showQuickButtons, isInputActive, keyboardHeight]); // Run when these states change
+
+  // Track desktop/mobile for behavior; layout handled by CSS (docked)
+  useEffect(() => {
+    const applyDeviceStyles = () => {
+      const desktop = window.innerWidth >= 769;
+      setIsDesktop(desktop);
+    };
+    applyDeviceStyles();
+    window.addEventListener('resize', applyDeviceStyles);
+    return () => window.removeEventListener('resize', applyDeviceStyles);
+  }, [isOpen]);
+
+  // Force docked positioning (right, above bubble) when open
+  useEffect(() => {
+    if (!isOpen || !chatboxContainerRef.current) return;
+    const el = chatboxContainerRef.current;
+    // Bubble embeds can be narrow desktop iframes. Only switch to fullscreen
+    // mobile layout when the parent explicitly reports a mobile viewport.
+    const isMobile = widgetStyle === 'bubble'
+      ? isParentMobile === true
+      : window.innerWidth < 769;
+
+    el.style.setProperty('position', 'fixed', 'important');
+    el.style.setProperty('transform', 'none', 'important');
+    el.style.setProperty('-webkit-transform', 'none', 'important');
+
+    if (isMobile) {
+      el.style.setProperty('top', '0', 'important');
+      el.style.setProperty('left', '0', 'important');
+      el.style.setProperty('right', '0', 'important');
+      el.style.setProperty('bottom', '0', 'important');
+      el.style.setProperty('width', '100%', 'important');
+      el.style.setProperty('max-width', '100%', 'important');
+      el.style.setProperty('height', '100dvh', 'important');
+      el.style.setProperty('height', '100vh', 'important');
+      el.style.setProperty('max-height', '100dvh', 'important');
+      el.style.setProperty('max-height', '100vh', 'important');
+      el.style.setProperty('margin', '0', 'important');
+    } else {
+      el.style.setProperty('right', '24px', 'important');
+      el.style.setProperty('left', 'auto', 'important');
+      el.style.setProperty('top', '0', 'important');
+      el.style.setProperty('bottom', '0', 'important');
+      el.style.setProperty('width', '400px', 'important');
+      el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
+      el.style.setProperty('height', '580px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
+      el.style.setProperty('margin-top', 'auto', 'important');
+      el.style.setProperty('margin-bottom', 'auto', 'important');
+    }
+  }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
+
+  // Lock body scroll when interacting with the floating search bar (allow background interaction while chat is open)
+  useEffect(() => {
+    const shouldLock = (isSearchbarHovered || isInputActive) && !isOpen;
+    if (!shouldLock) return;
+
+    const bodyStyle = document.body.style;
+    const htmlStyle = document.documentElement.style;
+    const originalOverflow = bodyStyle.overflow;
+    const originalPosition = bodyStyle.position;
+    const originalTop = bodyStyle.top;
+    const originalWidth = bodyStyle.width;
+    const originalLeft = bodyStyle.left;
+    const originalRight = bodyStyle.right;
+    const originalHtmlOverflow = htmlStyle.overflow;
+    const originalHtmlOverscroll = htmlStyle.overscrollBehavior;
+    const scrollY = window.scrollY;
+
+    // Only apply aggressive position:fixed lock when chat is NOT fully open
+    // When chat IS open, just prevent scrolling without shifting the page
+    if (!isOpen) {
+      // Searchbar expanded state - use position fixed to prevent background scroll
+      bodyStyle.overflow = 'hidden';
+      bodyStyle.position = 'fixed';
+      bodyStyle.top = `-${scrollY}px`;
+      bodyStyle.width = '100%';
+      bodyStyle.left = '0';
+      bodyStyle.right = '0';
+    } else {
+      // Chat is open - just hide overflow without position fixed to avoid cutting off bubbles
+      bodyStyle.overflow = 'hidden';
+    }
+    htmlStyle.overflow = 'hidden';
+    htmlStyle.overscrollBehavior = 'none';
+
+    const scrollableContainers = new Set<HTMLElement>();
+    const messagesContainer = messagesAreaRef.current;
+    if (messagesContainer) scrollableContainers.add(messagesContainer);
+
+    const dynamicallyMarkedScrollables = document.querySelectorAll<HTMLElement>('[data-scroll-lock="allow"]');
+    dynamicallyMarkedScrollables.forEach((element) => {
+      scrollableContainers.add(element);
+    });
+
+    const getScrollableContainer = (node: Node | null): HTMLElement | null => {
+      if (!(node instanceof Element)) {
+        return null;
+      }
+
+      const scrollable = node.closest<HTMLElement>('[data-scroll-lock="allow"]');
+      if (scrollable && scrollableContainers.has(scrollable)) {
+        return scrollable;
+      }
+      return null;
+    };
+
+    let lastTouchY = 0;
+    let activeScrollable: HTMLElement | null = null;
+
+    const handleTouchStart = (event: TouchEvent) => {
+      const target = event.target;
+      const targetNode = target instanceof Node ? target : null;
+      activeScrollable = getScrollableContainer(targetNode);
+      lastTouchY = event.touches[0]?.clientY ?? 0;
+
+      // Allow tap interactions; scroll locking handled during touchmove
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const target = event.target;
+      const targetNode = target instanceof Node ? target : null;
+      const scrollable = activeScrollable ?? getScrollableContainer(targetNode);
+
+      if (!scrollable) {
+        event.preventDefault();
+        return;
+      }
+
+      const currentY = event.touches[0]?.clientY ?? 0;
+      const deltaY = lastTouchY - currentY;
+      lastTouchY = currentY;
+
+      const maxScrollTop = scrollable.scrollHeight - scrollable.clientHeight;
+      const currentScrollTop = scrollable.scrollTop;
+
+      const isScrollingDown = deltaY > 0;
+      const isScrollingUp = deltaY < 0;
+
+      const atTop = currentScrollTop <= 0;
+      const atBottom = currentScrollTop >= maxScrollTop;
+
+      if ((atTop && isScrollingUp) || (atBottom && isScrollingDown)) {
+        const parentScrollable = messagesAreaRef.current;
+        if (parentScrollable && parentScrollable !== scrollable) {
+          activeScrollable = parentScrollable;
+          parentScrollable.scrollTop += deltaY;
+          return;
+        }
+        activeScrollable = null;
+        return;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      activeScrollable = null;
+    };
+
+    const preventWheel = (event: WheelEvent) => {
+      if (window.innerWidth >= 769) return;
+
+      const target = event.target;
+      const targetNode = target instanceof Node ? target : null;
+      const scrollable = getScrollableContainer(targetNode);
+
+      if (!scrollable) {
+        event.preventDefault();
+        return;
+      }
+
+      const maxScrollTop = scrollable.scrollHeight - scrollable.clientHeight;
+      const currentScrollTop = scrollable.scrollTop;
+
+      if (
+        (currentScrollTop <= 0 && event.deltaY < 0) ||
+        (currentScrollTop >= maxScrollTop && event.deltaY > 0)
+      ) {
+        const parentScrollable = messagesAreaRef.current;
+        if (parentScrollable && parentScrollable !== scrollable) {
+          parentScrollable.scrollTop += event.deltaY;
+        }
+        return;
+      }
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true, capture: true });
+    document.addEventListener('wheel', preventWheel, { passive: false, capture: true });
+
+    return () => {
+      bodyStyle.overflow = originalOverflow;
+      bodyStyle.position = originalPosition;
+      bodyStyle.top = originalTop;
+      bodyStyle.width = originalWidth;
+      bodyStyle.left = originalLeft;
+      bodyStyle.right = originalRight;
+      htmlStyle.overflow = originalHtmlOverflow;
+      htmlStyle.overscrollBehavior = originalHtmlOverscroll;
+
+      // Only restore scroll position if we used position fixed
+      if (!isOpen) {
+        window.scrollTo(0, scrollY);
+      }
+
+      document.removeEventListener('touchstart', handleTouchStart, true);
+      document.removeEventListener('touchmove', handleTouchMove, true);
+      document.removeEventListener('touchend', handleTouchEnd, true);
+      document.removeEventListener('wheel', preventWheel, true);
+    };
+  }, [isSearchbarHovered, isInputActive, isOpen, showCalendly]);
+
+  // Handle keyboard appearance and adjust searchbar position
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const viewport = window.visualViewport;
+
+    const handleViewportChange = () => {
+      if (!viewport) return;
+
+      // Calculate keyboard height
+      const windowHeight = window.innerHeight;
+      const viewportHeight = viewport.height;
+      const calculatedKeyboardHeight = windowHeight - viewportHeight;
+      
+      setKeyboardHeight(calculatedKeyboardHeight);
+
+      // Adjust searchbar position when keyboard is visible
+      if (searchbarWrapperRef.current && calculatedKeyboardHeight > 0) {
+        const gapValue = `calc(${SEARCHBAR_KEYBOARD_GAP}px + env(safe-area-inset-bottom, 0px))`;
+        searchbarWrapperRef.current.style.removeProperty('transform');
+        searchbarWrapperRef.current.style.setProperty('bottom', gapValue, 'important');
+      } else if (searchbarWrapperRef.current && calculatedKeyboardHeight === 0) {
+        // Keyboard is hidden, restore original position
+        searchbarWrapperRef.current.style.removeProperty('transform');
+        searchbarWrapperRef.current.style.setProperty('bottom', `${SEARCHBAR_BASE_OFFSET}px`, 'important');
+      }
+
+      // Adjust input area and chat container when keyboard is visible (mobile only)
+      // Bubble embeds can be narrow desktop iframes. Only use mobile keyboard
+      // handling when the parent explicitly reports a mobile viewport.
+      const isMobileForKeyboard = widgetStyle === 'bubble'
+        ? isParentMobile === true
+        : window.innerWidth < 769;
+      if (isOpen && isMobileForKeyboard) {
+        const inputAreaElement = chatboxContainerRef.current?.querySelector(`.${styles.inputArea}`) as HTMLElement;
+        const footerElement = chatboxContainerRef.current?.querySelector(`.${styles.chatFooter}`) as HTMLElement;
+        const messagesArea = messagesAreaRef.current;
+        const mobileQuickActionsElement = chatboxContainerRef.current?.querySelector(`.${styles.mobileQuickActions}`) as HTMLElement;
+        
+        if (calculatedKeyboardHeight > 0) {
+          // Keyboard is visible - adjust layout without cutting off top
+          if (chatboxContainerRef.current) {
+            // Keep container at full height but adjust its internal layout
+            chatboxContainerRef.current.style.setProperty('height', '100vh', 'important');
+            chatboxContainerRef.current.style.setProperty('height', '100dvh', 'important');
+            chatboxContainerRef.current.style.setProperty('max-height', '100vh', 'important');
+            chatboxContainerRef.current.style.setProperty('max-height', '100dvh', 'important');
+            chatboxContainerRef.current.style.setProperty('overscroll-behavior', 'none', 'important');
+          }
+          
+          if (inputAreaElement) {
+            inputAreaElement.style.setProperty('position', 'fixed', 'important');
+            inputAreaElement.style.setProperty('bottom', '0', 'important');
+            inputAreaElement.style.setProperty('left', '0', 'important');
+            inputAreaElement.style.setProperty('right', '0', 'important');
+            inputAreaElement.style.setProperty('margin', '0', 'important');
+            inputAreaElement.style.setProperty('margin-left', '0', 'important');
+            inputAreaElement.style.setProperty('margin-right', '0', 'important');
+            inputAreaElement.style.setProperty('margin-bottom', '0', 'important');
+            inputAreaElement.style.setProperty('transform', 'translateZ(0)', 'important');
+            inputAreaElement.style.setProperty('-webkit-transform', 'translateZ(0)', 'important');
+            inputAreaElement.style.setProperty('z-index', '9999', 'important');
+            // Add background to prevent scrolling content from showing through
+            inputAreaElement.style.setProperty('background', 'rgba(8, 10, 22, 0.95)', 'important');
+            inputAreaElement.style.setProperty('backdrop-filter', 'blur(20px) saturate(140%)', 'important');
+            inputAreaElement.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(140%)', 'important');
+            inputAreaElement.style.setProperty('padding-top', '12px', 'important');
+            inputAreaElement.style.setProperty('padding-bottom', 'max(12px, env(safe-area-inset-bottom, 12px))', 'important');
+            inputAreaElement.style.setProperty('padding-left', 'max(16px, env(safe-area-inset-left, 16px))', 'important');
+            inputAreaElement.style.setProperty('padding-right', 'max(16px, env(safe-area-inset-right, 16px))', 'important');
+            inputAreaElement.style.setProperty('width', '100%', 'important');
+            inputAreaElement.style.setProperty('box-sizing', 'border-box', 'important');
+          }
+          
+          // Position mobile quick actions and adjust messages area after input is positioned
+          // Use requestAnimationFrame to ensure accurate measurements
+          requestAnimationFrame(() => {
+            if (mobileQuickActionsElement && inputAreaElement) {
+              // Get full input area height (includes privacy notice if visible)
+              const inputAreaHeight = inputAreaElement.offsetHeight || 60;
+              // Position quick actions above the entire input area (0px bottom + full input area height + spacing)
+              const bottomPosition = inputAreaHeight + 0 + 8; // 8px spacing between quick actions and input area
+              mobileQuickActionsElement.style.setProperty('position', 'fixed', 'important');
+              mobileQuickActionsElement.style.setProperty('bottom', `${bottomPosition}px`, 'important');
+              mobileQuickActionsElement.style.setProperty('left', '0', 'important');
+              mobileQuickActionsElement.style.setProperty('right', '0', 'important');
+              mobileQuickActionsElement.style.setProperty('z-index', '9998', 'important');
+              mobileQuickActionsElement.style.setProperty('padding-left', 'max(16px, env(safe-area-inset-left, 16px))', 'important');
+              mobileQuickActionsElement.style.setProperty('padding-right', 'max(16px, env(safe-area-inset-right, 16px))', 'important');
+              
+              // Adjust messages area padding to account for both input area and quick actions
+              if (messagesArea) {
+                const quickActionsHeight = mobileQuickActionsElement.offsetHeight || 0;
+                const footerHeight = footerElement?.offsetHeight || 0;
+                messagesArea.style.setProperty('padding-bottom', `${inputAreaHeight + quickActionsHeight + footerHeight + 20}px`, 'important');
+              }
+            } else if (messagesArea && inputAreaElement) {
+              // If quick actions not visible, just account for input area and footer
+              const inputAreaHeight = inputAreaElement.offsetHeight || 60;
+              const footerHeight = footerElement?.offsetHeight || 0;
+              messagesArea.style.setProperty('padding-bottom', `${inputAreaHeight + footerHeight + 10}px`, 'important');
+            }
+          });
+          
+          // Keep footer visible but ensure it has background and proper positioning
+          if (footerElement) {
+            footerElement.style.removeProperty('display');
+            footerElement.style.setProperty('position', 'fixed', 'important');
+            footerElement.style.setProperty('bottom', '0', 'important');
+            footerElement.style.setProperty('left', '0', 'important');
+            footerElement.style.setProperty('right', '0', 'important');
+            footerElement.style.setProperty('z-index', '9997', 'important');
+            footerElement.style.setProperty('background', 'rgba(8, 10, 22, 0.95)', 'important');
+            footerElement.style.setProperty('backdrop-filter', 'blur(20px) saturate(140%)', 'important');
+            footerElement.style.setProperty('-webkit-backdrop-filter', 'blur(20px) saturate(140%)', 'important');
+            footerElement.style.setProperty('margin', '0', 'important');
+            footerElement.style.setProperty('width', '100%', 'important');
+            footerElement.style.setProperty('box-sizing', 'border-box', 'important');
+            // Position footer above input area
+            requestAnimationFrame(() => {
+              if (inputAreaElement && footerElement) {
+                const inputAreaHeight = inputAreaElement.offsetHeight || 60;
+                footerElement.style.setProperty('bottom', `${inputAreaHeight}px`, 'important');
+              }
+            });
+          }
+        } else {
+          // Keyboard is hidden - restore normal position
+          if (chatboxContainerRef.current) {
+            chatboxContainerRef.current.style.setProperty('height', '100vh', 'important');
+            chatboxContainerRef.current.style.setProperty('height', '100dvh', 'important');
+            chatboxContainerRef.current.style.setProperty('max-height', '100vh', 'important');
+            chatboxContainerRef.current.style.setProperty('max-height', '100dvh', 'important');
+            chatboxContainerRef.current.style.setProperty('overscroll-behavior', 'none', 'important');
+          }
+          
+          // Restore messages area padding
+          if (messagesArea) {
+            messagesArea.style.setProperty('padding-bottom', '100px', 'important');
+          }
+          
+          if (inputAreaElement) {
+            inputAreaElement.style.removeProperty('position');
+            inputAreaElement.style.removeProperty('bottom');
+            inputAreaElement.style.removeProperty('left');
+            inputAreaElement.style.removeProperty('right');
+            inputAreaElement.style.removeProperty('margin');
+            inputAreaElement.style.removeProperty('margin-left');
+            inputAreaElement.style.removeProperty('margin-right');
+            inputAreaElement.style.removeProperty('margin-bottom');
+            inputAreaElement.style.removeProperty('transform');
+            inputAreaElement.style.removeProperty('-webkit-transform');
+            inputAreaElement.style.removeProperty('z-index');
+            inputAreaElement.style.removeProperty('background');
+            inputAreaElement.style.removeProperty('backdrop-filter');
+            inputAreaElement.style.removeProperty('-webkit-backdrop-filter');
+            inputAreaElement.style.removeProperty('padding-top');
+            inputAreaElement.style.removeProperty('padding-bottom');
+            inputAreaElement.style.removeProperty('padding-left');
+            inputAreaElement.style.removeProperty('padding-right');
+            inputAreaElement.style.removeProperty('width');
+            inputAreaElement.style.removeProperty('box-sizing');
+          }
+          
+          // Restore mobile quick actions to normal sticky positioning
+          if (mobileQuickActionsElement) {
+            mobileQuickActionsElement.style.removeProperty('position');
+            mobileQuickActionsElement.style.removeProperty('bottom');
+            mobileQuickActionsElement.style.removeProperty('left');
+            mobileQuickActionsElement.style.removeProperty('right');
+            mobileQuickActionsElement.style.removeProperty('z-index');
+            mobileQuickActionsElement.style.removeProperty('padding-left');
+            mobileQuickActionsElement.style.removeProperty('padding-right');
+          }
+          
+          // Restore footer to normal positioning when keyboard is hidden
+          if (footerElement) {
+            footerElement.style.removeProperty('display');
+            footerElement.style.removeProperty('position');
+            footerElement.style.removeProperty('bottom');
+            footerElement.style.removeProperty('left');
+            footerElement.style.removeProperty('right');
+            footerElement.style.removeProperty('z-index');
+            footerElement.style.removeProperty('background');
+            footerElement.style.removeProperty('backdrop-filter');
+            footerElement.style.removeProperty('-webkit-backdrop-filter');
+          }
+        }
+      }
+    };
+
+    // Listen for viewport changes (keyboard show/hide)
+    viewport.addEventListener('resize', handleViewportChange);
+    viewport.addEventListener('scroll', handleViewportChange);
+    
+    // Initial check
+    handleViewportChange();
+
+    return () => {
+      viewport.removeEventListener('resize', handleViewportChange);
+      viewport.removeEventListener('scroll', handleViewportChange);
+    };
+  }, [isOpen]);
+
+
+  const { messages, isLoading, sendMessage, clearMessages, addUserMessage, addAIMessage, addStreamingAIMessage, updateMessageText, finishMessage } = useChat({
+    brand,
+    apiUrl: finalApiUrl,
+    onMessageComplete: handleAssistantMessageComplete,
+  });
+
+  // Safety net: apply pending flow-override buttons when the AI message
+  // finishes streaming. handleAssistantMessageComplete is the primary path;
+  // this effect fires after every render so it catches any case where the
+  // callback chain misses the override (stale closure, timing race, etc.).
+  useEffect(() => {
+    if (isLoading) return;
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    const pendingOverride = pendingFlowOverrideRef.current;
+    if (!pendingOverride) return;
+
+    pendingFlowOverrideRef.current = null;
+    setPendingFlowOverride(null);
+    if (pendingOverride.responseText && lastMsg.id) {
+      updateMessageText(lastMsg.id, pendingOverride.responseText);
+    }
+    setFlowOverrideButtons(pendingOverride.followUpButtons);
+    setDynamicQuickButtons(null);
+  }, [isLoading, messages, updateMessageText]);
+
+  // Safety net: when isLoading transitions trueâ†’false, read followUps directly
+  // from the last AI message and apply them as flow override buttons.
+  // This catches the case where onMessageComplete fires before React commits
+  // the setMessages update (making completedMessageForCallback null), which
+  // prevents handleAssistantMessageComplete from seeing the followUps.
+  useEffect(() => {
+    const justFinished = prevIsLoadingRef.current && !isLoading;
+    prevIsLoadingRef.current = isLoading;
+    if (!justFinished) return;
+
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    if (!lastMsg || lastMsg.isStreaming || !lastMsg.hasStreamed) return;
+    if (!lastMsg.followUps || lastMsg.followUps.length === 0) return;
+    if (pendingFlowOverrideRef.current) return;
+
+    // Apply the SAME Lokazen plan filtering as the main completion handler â€”
+    // this safety net was re-injecting the raw unfiltered followUps (the plan
+    // chips) right after the main handler had stripped them for the cards.
+    let safetyFollowUps = lastMsg.followUps;
+    if (brand === 'lokazen') {
+      const planBtns = safetyFollowUps.filter((b) => /^(starter|professional|premium)\b/i.test(b.trim()));
+      if (planBtns.length >= 2) {
+        if (lastMsg.id) setPlanCardsMessageId(lastMsg.id);
+        safetyFollowUps = safetyFollowUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
+      } else if (/\[\[plan:/i.test(lastMsg.text) || /\b(starter|professional|premium)\s*[-â€“]\s*rs/i.test(lastMsg.text)) {
+        safetyFollowUps = safetyFollowUps.filter((b) => !/start this plan/i.test(b.trim()));
+      }
+      if (safetyFollowUps.length === 0) return;
+    }
+
+    setFlowOverrideButtons(current => {
+      if (current && current.length > 0) return current;
+      return safetyFollowUps;
+    });
+  }, [isLoading, messages, brand]);
+
+  const resetChatState = useCallback(() => {
+    closeCalendarWidget();
+    closeVideoWidget();
+    closeDeployForm();
+    closePortfolio();
+    setShowDeployForm(null);
+    deployFormScrolledRef.current = false;
+    setBookingCompleted(false);
+    bookingConfirmedRef.current = false;
+    setUsedButtons([]);
+    setMessageCount(0);
+    clearMessages();
+    historyRef.current = [];
+    setRecentHistory([]);
+    setConversationSummary('');
+    interactionCountRef.current = 0;
+    setPendingUserMessage(null);
+    setPendingButtons([]);
+    setPendingRequirement(null);
+    setShowNamePrompt(false);
+    setShowEmailPrompt(false);
+    setShowPhonePrompt(false);
+    setHasAskedName(false);
+    setHasAskedEmail(false);
+    setHasAskedPhone(false);
+    setHasReceivedFirstResponse(false);
+    setNamePromptDismissed(false);
+    setEmailPromptDismissed(false);
+    setPhonePromptDismissed(false);
+    setInputValue('');
+    setNameInput('');
+    setEmailInput('');
+    setPhoneInput('');
+    setUserProfile({});
+    storeUserProfile({}, brandKey);
+    setDynamicQuickButtons(null);
+    setExploreButtons(null);
+    setFlowOverrideButtons(null);
+    setPendingFlowOverrideState(null);
+    setWelcomeComplete(false);
+    setShowMinimalButtons(false);
+    // Reset conversation restoration flags
+    conversationsToRestoreRef.current = [];
+    hasRestoredMessagesRef.current = false;
+    hasShownWelcomeRef.current = false;
+    // Close the chat
+    setIsOpen(false);
+    setIsInputActive(false);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsSearchbarHovered(false);
+    setIsDockedBubble(false);
+    hasEverOpenedRef.current = false;
+  }, [brandKey, clearMessages, closeCalendarWidget, closeVideoWidget, closeDeployForm, closePortfolio]);
+
+  const streamWelcomeMessage = useCallback(async (text: string, charDelay: number = 25) => {
+    const msg = addStreamingAIMessage('');
+    if (!msg) return;
+
+    setTimeout(() => {
+      window.dispatchEvent(new Event('message-updated'));
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+
+    const chars = text.split('');
+    for (let i = 0; i < chars.length; i++) {
+      const chunk = chars.slice(0, i + 1).join('');
+      updateMessageText(msg.id, chunk);
+      if (i % 3 === 0) {
+        window.dispatchEvent(new Event('message-updated'));
+      }
+      await new Promise(resolve => setTimeout(resolve, charDelay));
+    }
+
+    finishMessage(msg.id);
+    window.dispatchEvent(new Event('message-updated'));
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [addStreamingAIMessage, updateMessageText, finishMessage]);
+
+  const playWelcomeSequence = useCallback(async () => {
+    if (hasShownWelcomeRef.current) return;
+    hasShownWelcomeRef.current = true;
+
+    // If pre-loaded lead context exists, stream a single contextual message
+    if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
+      const text = `Hi! Welcome to Lokazen,\nI can help you find commercial space or list your property.`;
+      await streamWelcomeMessage(text, 20);
+      setWelcomeComplete(true);
+      return;
+    }
+
+    // Instant bubbles â€” CSS messageIn handles the fade-up animation
+    const welcomeSequence = isLokazenScoutPage
+      ? lokazenScoutWelcomeSequence
+      : lokazenDefaultWelcomeSequence;
+
+    for (let i = 0; i < welcomeSequence.length; i++) {
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 120));
+      }
+      addAIMessage(welcomeSequence[i].text);
+      window.dispatchEvent(new Event('message-updated'));
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setWelcomeComplete(true);
+  }, [preLoadedLeadContext, streamWelcomeMessage, addAIMessage, isLokazenScoutPage]);
+
+  const handleRequestResetChat = useCallback(() => {
+    if (messages.length > 0) {
+      setShowResetConfirm(true);
+      return;
+    }
+    resetChatState();
+  }, [messages.length, resetChatState]);
+
+  const handleConfirmResetChat = useCallback(() => {
+    setShowResetConfirm(false);
+    resetChatState();
+  }, [resetChatState]);
+
+  const handleCancelResetChat = useCallback(() => {
+    setShowResetConfirm(false);
+  }, []);
+
+  const isMobileViewport = typeof window !== 'undefined' ? window.innerWidth < 769 : !isDesktop;
+  const isMobileNewChat = useMemo(
+    () => isMobileViewport && messages.length === 0,
+    [isMobileViewport, messages.length]
+  );
+
+  const configuredQuickButtons = isLokazenScoutPage
+    ? lokazenScoutQuickButtons
+    : (config.quickButtons || ["Explore AI Solutions", "Book a Strategy Call", "See Our Work"]);
+  const mobileQuickActions = configuredQuickButtons;
+  const defaultQuickButtons = dynamicQuickButtons ?? configuredQuickButtons;
+  const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
+  const hasQuickButtons = quickButtonOptions.length > 0;
+  const hasUserMessage = messages.some((m) => m.type === 'user');
+  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && welcomeComplete && !hasUserMessage;
+  const lastAiMessage = [...messages].reverse().find((message) => message.type === 'ai');
+  const lastAiText = lastAiMessage?.text || '';
+  const isLokazenPlanMenuMessage = /how we work|tap a plan|01\s+choose plan/i.test(lastAiText);
+  const isTimelineButtonRail = (buttons: string[] | null | undefined) =>
+    Boolean(buttons?.some((button) => /^(Immediately|1-3 months|Just exploring)$/i.test(button.trim())));
+  // The plan CARDS own the plan actions now. When they're anchored to the last
+  // AI message, never re-inject the text chips (old fallback for stale timeline
+  // rails) and clear any stale rail entirely.
+  const planCardsActive = lastAiMessage?.id != null && lastAiMessage.id === planCardsMessageId;
+  const visibleFlowOverrideButtons =
+    planCardsActive && (isLokazenPlanMenuMessage || isTimelineButtonRail(flowOverrideButtons))
+      ? null
+      : isLokazenPlanMenuMessage && isTimelineButtonRail(flowOverrideButtons)
+        ? ['Starter Rs 4,999', 'Professional 9,999', 'Premium Rs 19,999']
+        : flowOverrideButtons;
+  const desktopWelcomeEligible =
+    !isMobileViewport &&
+    isOpen &&
+    hasQuickButtons &&
+    welcomeComplete &&
+    !hasUserMessage &&
+    hasShownWelcomeRef.current &&
+    messages.length >= 1 &&
+    messages[0].type === 'ai' &&
+    !messages[0].isStreaming &&
+    conversationsToRestoreRef.current.length === 0;
+  const challengeButtons = ['Leads', 'Engagement', 'Conversion', 'Retention'];
+  const contextualButtons = useMemo(() => {
+    const text = lastAiMessage?.text || '';
+    if (!text) return [] as string[];
+
+    const match = text.match(/is it\s+([^?]+)\?/i);
+    if (!match?.[1]) return [] as string[];
+
+    const cleanedOptions = match[1]
+      .split(/,\s*|\s+or\s+/i)
+      .map((option) =>
+        option
+          .replace(/^(getting|converting|keeping|improving|boosting)\s+/i, '')
+          .replace(/[?.!,]+$/g, '')
+          .trim()
+      )
+      .filter((option) => option.length > 2)
+      .map((option) => option.charAt(0).toUpperCase() + option.slice(1))
+      .slice(0, 4);
+
+    return Array.from(new Set(cleanedOptions));
+  }, [lastAiMessage?.text]);
+  const hasSelectedContextual = usedButtons.some((button) =>
+    contextualButtons.includes(button)
+  );
+  const showContextualButtons =
+    isOpen &&
+    !isLoading &&
+    contextualButtons.length >= 2 &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedContextual;
+  const hasSelectedChallenge = usedButtons.some((button) =>
+    challengeButtons.includes(button)
+  );
+  const showChallengeButtons =
+    isOpen &&
+    !isLoading &&
+    Boolean(lastAiMessage?.text) &&
+    !lastAiMessage?.isStreaming &&
+    !hasSelectedChallenge &&
+    contextualButtons.length === 0 &&
+    /biggest marketing challenge/i.test(lastAiMessage?.text || '');
+
+  const isResponding = useMemo(
+    () =>
+      isLoading ||
+      messages.some(
+        (message) =>
+          message.type === 'ai' && (message.isStreaming || !message.hasStreamed)
+      ),
+    [isLoading, messages]
+  );
+  const isBubbleWidget = widgetStyle === 'bubble';
+  const isBubbleMobileLayout = isBubbleWidget && isParentMobile === true;
+  const isBubbleDesktopLayout = isBubbleWidget && !isBubbleMobileLayout;
+
+  // Track if any message has streaming text (to hide 3-dot loader when streaming starts)
+  const hasStreamingText = useMemo(
+    () => messages.some((m) => m.isStreaming && m.text),
+    [messages]
+  );
+
+  // Register callback for when Deploy form is submitted
+  useEffect(() => {
+    const handleDeployFormSubmit = async () => {
+      // Sync websiteUrl from localStorage to Supabase
+      const storedUser = getStoredUser(brandKey);
+      if (storedUser?.websiteUrl && externalSessionId) {
+        await persistUserProfile({ websiteUrl: storedUser.websiteUrl });
+      }
+      
+      // Add confirmation message to chat
+      addAIMessage("Thanks! We've received your details. Our team will review them and get back to you within 24 hours. In the meantime, feel free to ask any questions about PROXe!");
+      
+      // Open chat to show the confirmation message
+      setIsOpen(true);
+      setIsInputActive(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+    };
+
+    setOnFormSubmit(handleDeployFormSubmit);
+
+    // Clean up on unmount
+    return () => {
+      setOnFormSubmit(null);
+    };
+  }, [addAIMessage, setOnFormSubmit, externalSessionId, brandKey, persistUserProfile]);
+
+  // Restore conversation messages when chat opens
+  useEffect(() => {
+    if (isOpen && conversationsToRestoreRef.current.length > 0 && !hasRestoredMessagesRef.current && messages.length === 0 && addUserMessage && addAIMessage) {
+      // Restore messages from conversations table
+      const conversations = conversationsToRestoreRef.current;
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[ChatWidget] Restoring conversation messages', {
+          count: conversations.length
+        });
+      }
+      
+      // Restore messages in order
+      conversations.forEach((conv) => {
+        if (conv.type === 'user') {
+          addUserMessage(conv.text);
+        } else {
+          addAIMessage(conv.text);
+        }
+      });
+      
+      // Mark as restored so we don't restore again
+      hasRestoredMessagesRef.current = true;
+      hasShownWelcomeRef.current = true; // Don't show welcome if we restored messages
+      
+      // Scroll to bottom after restoring
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+        }
+      }, 100);
+    }
+  }, [isOpen, messages.length, addUserMessage, addAIMessage]);
+
+  // Re-fetch conversations when chat reopens (if not already restored)
+  useEffect(() => {
+    if (isOpen && messages.length === 0 && !hasRestoredMessagesRef.current && !hasShownWelcomeRef.current && externalSessionId) {
+      // Re-fetch conversations when chat reopens
+      const fetchConversationsOnReopen = async () => {
+        try {
+          const supabase = createClient();
+          if (supabase && externalSessionId) {
+            const { data: sessionData, error: sessionError } = await supabase
+              .from('web_sessions')
+              .select('lead_id')
+              .eq('external_session_id', externalSessionId)
+              .maybeSingle();
+            
+            if (!sessionError && sessionData?.lead_id) {
+              const conversations = await fetchConversations(sessionData.lead_id);
+              if (conversations.length > 0) {
+                // Store conversations to restore
+                conversationsToRestoreRef.current = conversations.map((conv) => ({
+                  id: conv.id,
+                  type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+                  text: conv.content,
+                  created_at: conv.created_at
+                }));
+                
+                // Trigger restoration
+                if (addUserMessage && addAIMessage) {
+                  conversations.forEach((conv) => {
+                    if (conv.sender === 'customer') {
+                      addUserMessage(conv.content);
+                    } else {
+                      addAIMessage(conv.content);
+                    }
+                  });
+                  
+                  hasRestoredMessagesRef.current = true;
+                  hasShownWelcomeRef.current = true;
+                  
+                  // Scroll to bottom after restoring
+                  setTimeout(() => {
+                    if (messagesEndRef.current) {
+                      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+                    }
+                  }, 100);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[ChatWidget] Error fetching conversations on reopen:', err);
+        }
+      };
+      
+      fetchConversationsOnReopen();
+    }
+  }, [isOpen, externalSessionId, messages.length, addUserMessage, addAIMessage, brandKey]);
+
+  // Show welcome + optionally restore prior conversation when widget opens
+  useEffect(() => {
+    if (!isOpen || messages.length !== 0 || hasShownWelcomeRef.current) return;
+
+    // â”€â”€ Show welcome immediately â€” never block on an async DB check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // This removes the ~500 ms round-trip delay that was visible on first open.
+    playWelcomeSequence();
+
+    // â”€â”€ Background: restore prior conversation for returning users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // If the session has a linked lead with past messages, swap the welcome
+    // content out (typically < 1 s, invisible to first-time visitors).
+    if (!hasRestoredMessagesRef.current && externalSessionId) {
+      (async () => {
+        try {
+          const supabase = createClient();
+          if (!supabase) return;
+
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('web_sessions')
+            .select('lead_id')
+            .eq('external_session_id', externalSessionId)
+            .maybeSingle();
+
+          if (sessionError || !sessionData?.lead_id) return;
+
+          const conversations = await fetchConversations(sessionData.lead_id);
+          if (conversations.length === 0) return;
+
+          // Replace welcome with the restored conversation history
+          conversationsToRestoreRef.current = conversations.map((conv) => ({
+            id: conv.id,
+            type: conv.sender === 'customer' ? 'user' as const : 'ai' as const,
+            text: conv.content,
+            created_at: conv.created_at,
+          }));
+          clearMessages();
+          hasShownWelcomeRef.current = true;
+          hasRestoredMessagesRef.current = true;
+          conversations.forEach((conv) => {
+            if (conv.sender === 'customer') {
+              addUserMessage?.(conv.content);
+            } else {
+              addAIMessage?.(conv.content);
+            }
+          });
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+          }, 80);
+        } catch (err) {
+          // Non-fatal â€” welcome is already visible
+          console.error('[ChatWidget] Background conversation restore failed:', err);
+        }
+      })();
+    }
+  }, [isOpen, messages.length, externalSessionId, addUserMessage, addAIMessage, playWelcomeSequence]);
+
+  // Ensure viewport starts at absolute top when chat widget first opens
+  useEffect(() => {
+    if (isOpen && messagesEndRef.current) {
+      // Scroll to bottom when chat opens
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    // Scroll behavior when messages update
+    if (isOpen) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        // Check if last message is a booking confirmation
+        const lastMessage = messages[messages.length - 1];
+        const isBookingConfirmation = lastMessage && 
+          lastMessage.type === 'ai' && 
+          lastMessage.text && 
+          lastMessage.text.includes('scheduled for') &&
+          bookingCompleted;
+        
+        if (isBookingConfirmation) {
+          // Find and scroll to the booking confirmation message
+          const messageElement = document.querySelector(`[data-message-id="${lastMessage.id}"]`);
+          if (messageElement) {
+            messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else if (messagesEndRef.current) {
+            // Fallback: scroll to bottom
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        } else if (messagesEndRef.current) {
+          // Scroll to bottom for subsequent messages
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 300);
+    }
+    
+    // Check if we should show calendar widget after AI response completes
+    if (pendingCalendar && messages.length > 0 && !bookingCompleted) {
+      const lastMessage = messages[messages.length - 1];
+      
+      // Wait for AI message to be fully streamed and not currently streaming
+      // Also check that message has text content (more reliable than just hasStreamed)
+      if (lastMessage && lastMessage.type === 'ai' && !lastMessage.isStreaming && lastMessage.text && lastMessage.text.length > 0) {
+        const normalizedLastText = lastMessage.text.toLowerCase();
+        const hasInlineTimeSlots =
+          (lastMessage.text.match(/\b\d{1,2}:\d{2}\s?(am|pm)\b/gi)?.length ?? 0) >= 2;
+        const isAskingForTimeChoice =
+          /which time works|what time works|pick a time|choose a time/.test(normalizedLastText);
+
+        // If the AI already showed concrete time slots in text, don't open calendar too.
+        if (hasInlineTimeSlots && isAskingForTimeChoice && !forceCalendarFromBookButton) {
+          setPendingCalendar(false);
+          return;
+        }
+
+        // Use setTimeout to ensure state updates properly
+        const timer = setTimeout(async () => {
+          setPendingCalendar(false);
+          setForceCalendarFromBookButton(false);
+
+          // Skip booking check when user explicitly chose to reschedule
+          if (!skipBookingCheck) {
+            const phone = userProfile.phone;
+            const email = userProfile.email;
+
+            if (phone || email) {
+              const existingBooking = await checkExistingBookingClient(phone, email);
+
+              if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
+                const date = new Date(existingBooking.bookingDate);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                const formattedTime = existingBooking.bookingTime;
+                const bookingMessage = `You already have a booking scheduled for ${formattedDate} at ${formattedTime}.`;
+                addAIMessage(bookingMessage);
+                setBookingCompleted(true);
+                return;
+              }
+            }
+          }
+
+          setSkipBookingCheck(false);
+
+          // Show calendar anchored to last message
+          const calendarMessageId = `calendar-${Date.now()}`;
+          setShowCalendly(calendarMessageId);
+          if (lastMessage?.id) {
+            setCalendarAnchorId(lastMessage.id);
+          } else {
+            setCalendarAnchorId(null);
+          }
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+    
+  }, [messages, isOpen, pendingCalendar, showCalendly, bookingCompleted, userProfile.phone, userProfile.email, brandKey, forceCalendarFromBookButton, skipBookingCheck]);
+
+  // Handle booking completion
+  const handleBookingComplete = useCallback(async (bookingData: any) => {
+    if (bookingConfirmedRef.current) return;
+    bookingConfirmedRef.current = true;
+    setBookingCompleted(true);
+    if (bookingData) {
+      // Close any open prompts immediately
+      if (bookingData.name) {
+        setShowNamePrompt(false);
+        setHasAskedName(true);
+      }
+      if (bookingData.email) {
+        setShowEmailPrompt(false);
+        setHasAskedEmail(true);
+      }
+      if (bookingData.phone) {
+        setShowPhonePrompt(false);
+        setHasAskedPhone(true);
+      }
+      
+      // Persist the contact information
+      await handleContactPersist({
+        name: bookingData.name,
+        email: bookingData.email,
+        phone: bookingData.phone,
+      });
+
+      // Store booking details in Supabase (include contact info to ensure it's saved)
+      if (externalSessionId && bookingData.date && bookingData.time) {
+        const storedBooking = await storeBookingClient(
+          externalSessionId,
+          {
+            date: bookingData.date,
+            time: bookingData.time,
+            googleEventId: bookingData.googleEventId,
+            status: 'Call Booked',
+            name: bookingData.name,
+            email: bookingData.email,
+            phone: bookingData.phone,
+          },
+        );
+
+        // Format date and time for display message
+        const bookingDate = new Date(bookingData.date);
+        const formattedDate = bookingDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+        const formattedTime = bookingData.time; // Already in "11:00 AM" format
+
+        setBookedSummary(`${formattedDate} at ${formattedTime}`);
+        const bookingMessage = `Your call is scheduled for ${formattedDate} at ${formattedTime}.`;
+        addAIMessage(bookingMessage);
+        await persistWebEvents([
+          {
+            sender: 'system',
+            content: `Booking ${storedBooking ? 'confirmed' : 'attempted'} for ${formattedDate} at ${formattedTime}.`,
+            messageType: 'booking',
+            metadata: {
+              intent: 'booking_complete',
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+          {
+            sender: 'agent',
+            content: bookingMessage,
+            messageType: 'booking_confirmation',
+            metadata: {
+              booking_date: bookingData.date,
+              booking_time: bookingData.time,
+              google_event_id: bookingData.googleEventId || null,
+              stored_booking: storedBooking,
+            },
+          },
+        ]);
+
+        // Note: Booking info will be naturally included in the summary when the AI processes the booking message
+        // No need to manually append metadata strings - let the summarize API handle it naturally
+      }
+    }
+  }, [handleContactPersist, externalSessionId, brandKey, addAIMessage, conversationSummary, persistWebEvents]);
+
+  // Check for existing booking before showing calendar
+  const checkAndShowBooking = useCallback(async () => {
+    const phone = userProfile.phone;
+    const email = userProfile.email;
+    
+    if (!phone && !email) {
+      // No contact info yet, allow booking
+      return true;
+    }
+
+    const existingBooking = await checkExistingBookingClient(phone, email);
+    
+    if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
+      // Format date and time for display
+      const date = new Date(existingBooking.bookingDate);
+      const formattedDate = date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      
+      // Format time (assuming it's in "HH:MM AM/PM" format)
+      const formattedTime = existingBooking.bookingTime;
+      
+      setBookedSummary(`${formattedDate} at ${formattedTime}`);
+      const bookingMessage = `You already have a call booked for ${formattedDate} at ${formattedTime}. Would you like to reschedule?`;
+      addAIMessage(bookingMessage);
+      setBookingCompleted(true);
+      setFlowOverrideButtons(['Yes, Reschedule', 'Keep My Booking']);
+
+      return false; // Don't show calendar
+    }
+    
+    return true; // Allow booking
+  }, [userProfile.phone, userProfile.email, brandKey, addAIMessage]);
+
+  // Handle mobile keyboard appearance for chat input
+  useEffect(() => {
+    if (!isOpen || !chatInputRef.current) return;
+
+    const handleViewportResize = () => {
+      const input = chatInputRef.current;
+      if (!input || document.activeElement !== input) return;
+
+      // Use visual viewport if available
+      if (window.visualViewport) {
+        const viewport = window.visualViewport;
+        const inputRect = input.getBoundingClientRect();
+        const viewportHeight = viewport.height;
+        const inputBottom = inputRect.bottom;
+
+        // If input is hidden by keyboard, scroll it into view
+        if (inputBottom > viewportHeight - 10) {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              input.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center',
+                inline: 'nearest' 
+              });
+            }, 150);
+          });
+        }
+      }
+    };
+
+    // Listen for viewport resize (keyboard appearance/disappearance)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleViewportResize);
+      };
+    }
+  }, [isOpen]);
+
+  // Listen for streaming updates to auto-scroll
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const container = messagesAreaRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleMessageUpdate = () => {
+      // Always keep latest message in focus
+      scrollMessagesToBottom('smooth');
+    };
+
+    window.addEventListener('message-updated', handleMessageUpdate);
+    return () => {
+      window.removeEventListener('message-updated', handleMessageUpdate);
+    };
+  }, [isOpen, messages.length, scrollMessagesToBottom]);
+
+  // Always scroll to bottom when messages change
+  useEffect(() => {
+    if (isOpen) {
+      scrollMessagesToBottom('smooth');
+    }
+  }, [messages, isOpen, scrollMessagesToBottom]);
+
+  // Scroll deploy form into view only once when it first appears
+  useEffect(() => {
+    if (showDeployForm && deployFormRef.current && !deployFormScrolledRef.current) {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (deployFormRef.current) {
+            deployFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            deployFormScrolledRef.current = true;
+          }
+        }, 200);
+      });
+    }
+  }, [showDeployForm]);
+
+  // Helper function to check if text contains booking keywords (call or demo)
+  const containsBookingKeywords = (text: string): boolean => {
+    const lowerText = text.toLowerCase().trim();
+    if (lowerText === 'book a demo session' || lowerText === 'book a demo') {
+      return true;
+    }
+    // Check for booking-related keywords
+    return lowerText.includes('call') ||
+           lowerText.includes('demo') ||
+           lowerText.includes('book') ||
+           lowerText.includes('schedule') ||
+           lowerText.includes('meeting') ||
+           lowerText.includes('appointment') ||
+           lowerText.includes('audit') ||
+           lowerText.includes('counsellor') ||
+           lowerText.includes('counselor');
+  };
+
+  const vapiLog = (event: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    const entry = `${ts} ${event}`;
+    console.log('[Vapi]', entry);
+    setVapiDebugLog(prev => [...prev.slice(-20), entry]);
+  };
+
+  const attachVapiListeners = (vapi: Vapi) => {
+    const ensureMicLive = () => {
+      try {
+        if (vapi.isMuted()) {
+          vapi.setMuted(false);
+          vapiLog('mic was muted â†’ force-unmuted');
+        }
+      } catch { /* older SDK versions don't expose isMuted */ }
+    };
+
+    vapi.on('call-start', () => {
+      vapiLog('call-start âœ…');
+      if (!vapiCallIdRef.current) {
+        vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
+      vapiCallReadyRef.current = true;
+      setVapiConnecting(false);
+      ensureMicLive();
+      // Periodic health-check: re-unmute every 3 s in case the browser
+      // or Daily.co mutes the track after assistant speech turns.
+      if (vapiMicHealthRef.current) clearInterval(vapiMicHealthRef.current);
+      vapiMicHealthRef.current = setInterval(ensureMicLive, 3000);
+    });
+    vapi.on('call-end', () => {
+      vapiLog('call-end');
+      vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
+      setVapiSpeaker('idle');
+      vapiCallIdRef.current = null;
+      // Flash red ring for 700ms before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
+    });
+    vapi.on('error', (e: any) => {
+      vapiLog(`error âŒ ${JSON.stringify(e)}`);
+      vapiCallReadyRef.current = false;
+      vapiPrewarmedRef.current = false;
+      vapiCallIdRef.current = null;
+      setVapiSpeaker('idle');
+      // Flash amber ring for 1.2s before overlay unmounts
+      setVapiError(true);
+      setVapiConnecting(false);
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiError(false);
+        setVapiConnecting(false);
+      }, 1200);
+    });
+    vapi.on('speech-start', () => {
+      vapiLog('speech-start (assistant)');
+      setVapiConnecting(false);
+      setVapiSpeaker('assistant');
+    });
+    vapi.on('speech-end', () => {
+      vapiLog('speech-end');
+      setVapiSpeaker('idle');
+      // Re-confirm mic is live every time the assistant finishes speaking.
+      // Some browsers/Daily.co silently mute the user track during assistant audio.
+      setTimeout(ensureMicLive, 150);
+    });
+    // Volume-level fires continuously with user mic amplitude (0â€“1).
+    // Drive the on-screen mic bar so we can visually confirm audio capture.
+    vapi.on('volume-level', (level: number) => {
+      setVapiVolume(level);
+    });
+    vapi.on('message', (msg: any) => {
+      vapiLog(`msg type=${msg.type} role=${msg.role} txType=${msg.transcriptType ?? '-'}`);
+      if (msg.type === 'transcript' && msg.role === 'user') {
+        setVapiSpeaker('user');
+        if (userSpeakingTimerRef.current) clearTimeout(userSpeakingTimerRef.current);
+        userSpeakingTimerRef.current = setTimeout(() => setVapiSpeaker('idle'), 1200);
+      }
+      if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        const transcript = String(msg.transcript || '').trim();
+        vapiTranscriptSeqRef.current += 1;
+        setVapiTranscript(prev => [...prev, { role, text: transcript }]);
+        void persistVoiceTranscript(role, transcript, msg.transcriptType);
+        setTimeout(() => {
+          vapiTranscriptRef.current?.scrollTo({ top: vapiTranscriptRef.current.scrollHeight, behavior: 'smooth' });
+        }, 50);
+      }
+    });
+  };
+
+  // Pre-warm: instantiate Vapi + attach listeners only â€” do NOT call .start() here.
+  // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
+  // grant mic permission correctly, especially on iOS Safari and Android Chrome.
+  // Do NOT pre-request getUserMedia here â€” claiming and releasing the mic before
+  // Vapi grabs it causes the device to reject Vapi's subsequent capture on mobile.
+  const startVapiPrewarm = () => {
+    if (vapiPrewarmedRef.current) return;
+    vapiPrewarmedRef.current = true;
+    const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!);
+    vapiRef.current = vapi;
+    attachVapiListeners(vapi);
+  };
+
+  const handleVoiceToggle = async () => {
+    // â”€â”€ End call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (isVapiActive) {
+      // Flash red ring briefly before overlay unmounts
+      setVapiEnding(true);
+      setVapiConnecting(false);
+      setVapiSpeaker('idle');
+      if (vapiMicHealthRef.current) { clearInterval(vapiMicHealthRef.current); vapiMicHealthRef.current = null; }
+      try { vapiRef.current?.stop(); } catch {}
+      vapiRef.current = null;
+      vapiPrewarmedRef.current = false;
+      vapiCallReadyRef.current = false;
+      setTimeout(() => {
+        setIsVapiActive(false);
+        setVapiEnding(false);
+      }, 700);
+      return;
+    }
+
+    // â”€â”€ Start call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    setVapiTranscript([]);
+    setVapiDebugLog([]);
+    vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    vapiTranscriptSeqRef.current = 0;
+    setIsVapiActive(true);
+    setVapiConnecting(true);
+
+    try {
+      // Guard: env key must be present
+      const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
+      if (!publicKey) {
+        vapiLog('error âŒ NEXT_PUBLIC_VAPI_PUBLIC_KEY not set');
+        setIsVapiActive(false);
+        setVapiConnecting(false);
+        return;
+      }
+
+      // Always create a fresh instance â€” reusing a pre-warmed or stale instance
+      // can cause silent failures on mobile browsers.
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+      vapiPrewarmedRef.current = true;
+
+      // Preflight getUserMedia â€” must happen BEFORE Vapi's network handshake.
+      // In cross-origin iframes Chrome's transient user-activation window is
+      // ~1 second. Vapi.start() fires a server request before calling
+      // getUserMedia() internally; by then the activation expires and Chrome
+      // silently rejects the mic request with no dialog. Calling getUserMedia()
+      // here, immediately in the click handler, fires the permission dialog
+      // within the activation window. Once the user taps Allow the permission
+      // is stored for this origin and Vapi's own internal getUserMedia() works.
+      // iOS Safari note: iOS 16.4+ also requires the call to stay in the
+      // synchronous part of the user-gesture stack â€” await here is fine because
+      // we're still inside the same event-loop task initiated by the click.
+      if (navigator.mediaDevices?.getUserMedia) {
+        try {
+          const preflightStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          preflightStream.getTracks().forEach(track => track.stop());
+          vapiLog('mic preflight âœ… permission granted');
+        } catch (micErr: any) {
+          vapiLog(`mic preflight âŒ ${micErr?.message ?? micErr}`);
+          setIsVapiActive(false);
+          setVapiConnecting(false);
+          vapiPrewarmedRef.current = false;
+          return;
+        }
+      }
+
+      const vapi = new Vapi(publicKey);
+      vapiRef.current = vapi;
+      attachVapiListeners(vapi);
+
+      vapiLog('calling vapi.startâ€¦');
+      // No client-side overrides â€” all config lives in the Vapi dashboard.
+      // Passing overrides risks schema-validation rejection on the server side
+      // which silently drops firstMessage and transcriber settings. Match the
+      // VapiOrb pattern: just pass the assistant ID, nothing else.
+      await vapi.start('25540ee9-8332-413c-82d5-326bc79d6059');
+      vapiLog('vapi.start() resolved');
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      vapiLog(`start failed âŒ ${msg}`);
+      setIsVapiActive(false);
+      setVapiConnecting(false);
+      if (vapiRef.current) {
+        try { vapiRef.current.stop(); } catch {}
+        vapiRef.current = null;
+      }
+    }
+  };
+
+  const handleSend = () => {
+    const message = inputValue.trim();
+    if (!message) return;
+
+    // Open the chat modal when user submits text from the search widget
+    if (!isOpen) {
+      setIsDockedBubble(true);
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(true);
+    }
+
+    // Close any open prompt cards when user sends a message from the input
+    if (showNamePrompt) {
+      setShowNamePrompt(false);
+      setNamePromptDismissed(true);
+    }
+    if (showEmailPrompt) {
+      setShowEmailPrompt(false);
+    }
+    if (showPhonePrompt) {
+      setShowPhonePrompt(false);
+    }
+
+    if (requestNameBeforeProceed(message, usedButtons)) return;
+    if (requestEmailBeforeProceed(message, usedButtons)) return;
+    if (requestPhoneBeforeProceed(message, usedButtons)) return;
+
+    // Parent flow: if the user just typed contact info in response to
+    // 'Send me the cost guide' / 'Send me the roadmap', show the
+    // post-capture rail buttons after the bot's "Sent" reply.
+    const lastClick = usedButtons[usedButtons.length - 1]?.toLowerCase() ?? '';
+    if (
+      lastClick === 'send me the cost guide' ||
+      lastClick === 'send me the roadmap'
+    ) {
+      setPendingFlowOverrideState({
+        followUpButtons: ['Talk to a counsellor', 'Ask another question', 'Not right now'],
+      });
+    }
+
+    submitMessage(message, usedButtons);
+  };
+
+  const openChatAndFocus = useCallback(() => {
+    setIsDockedBubble(true);
+    setIsOpen(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsInputActive(true);
+    if (!isMobileViewport) {
+      setTimeout(() => {
+        chatInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isMobileViewport]);
+
+  const handleSearchWidgetPress = useCallback(() => {
+    // Always open the chat modal when user interacts with search widget
+    setIsDockedBubble(true);
+    setIsOpen(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsInputActive(true);
+    if (!isMobileViewport) {
+      setTimeout(() => {
+        chatInputRef.current?.focus();
+      }, 50);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [messages.length, conversationSummary, sessionRecord, isMobileViewport]);
+
+  const handleQuickButtonClick = (buttonText: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const message = buttonText.trim();
+    if (!message) return;
+
+    setIsDockedBubble(true);
+    setIsOpen(true);
+    setIsExpanded(false);
+    setShowQuickButtons(false);
+    setIsInputActive(true);
+    setExploreButtons(null);
+    setDynamicQuickButtons(null);
+    setFlowOverrideButtons(null);
+
+    const nextButtons = [...usedButtons, buttonText];
+    setUsedButtons(nextButtons);
+
+    const normalizedButton = message.toLowerCase();
+
+    // Rebook flow â€” intercept before AI
+    if (normalizedButton === 'yes, reschedule') {
+      setBookingCompleted(false);
+      bookingConfirmedRef.current = false;
+      setBookedSummary('');
+      setSkipBookingCheck(true);
+      addUserMessage(buttonText);
+      addAIMessage('No problem. Pick a new date and time below.');
+      setPendingCalendar(true);
+      return;
+    }
+    if (normalizedButton === 'keep my booking') {
+      addUserMessage(buttonText);
+      addAIMessage(bookedSummary ? `Your call is confirmed for ${bookedSummary}. Anything else I can help with?` : 'Your booking is confirmed. Anything else?');
+      setFlowOverrideButtons([]);
+      return;
+    }
+
+    // Cost guide / roadmap â€” show inline WhatsApp contact form, skip AI
+    if (normalizedButton === 'send me the cost guide' || normalizedButton === 'send me the roadmap') {
+      addUserMessage(buttonText);
+      const formId = `cost-guide-${Date.now()}`;
+      setShowCostGuideForm(formId);
+      setFlowOverrideButtons([]);
+      return;
+    }
+
+    // Parent path is sticky from the moment the user picks "I am a parent" so
+    // we can disambiguate child-status labels that overlap with the aspirant
+    // activity step (e.g. "Working", "Taking a break").
+    const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
+    const flowRule = (() : FlowOverrideRule | null => {
+      // Pilot Assessment entry â€” open the assessment in a new tab with chat
+      // context attached. Accept the legacy "take the pat" label as well so
+      // older chat states (mid-session) still route correctly.
+      if (
+        normalizedButton === 'take pilot assessment' ||
+        normalizedButton === 'take the pat'
+      ) {
+        if (typeof window !== 'undefined') {
+          try {
+            const assessmentUrl = new URL('https://windchasers.in/assessment');
+            assessmentUrl.searchParams.set('source', 'chat');
+            if (externalSessionId) {
+              assessmentUrl.searchParams.set('conversation_id', externalSessionId);
+            }
+            window.open(assessmentUrl.toString(), '_blank', 'noopener,noreferrer');
+          } catch {
+            /* noop â€” popup blocker or invalid URL */
+          }
+        }
+        return {
+          followUpButtons: ['I finished the assessment', 'Skip and book consultation'],
+        };
+      }
+      if (
+        normalizedButton === 'i finished the assessment' ||
+        normalizedButton === 'i finished the pat'
+      ) {
+        return {
+          followUpButtons: ['Book a Consultation'],
+        };
+      }
+      // 'skip and book consultation' contains 'book' so the booking-keyword path
+      // in submitMessage will trigger BookingCalendarWidget; no override needed.
+
+      // Aspirant entry
+      if (normalizedButton === 'i want to become a pilot') {
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'airplane' || normalizedButton === 'helicopter') {
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (normalizedButton === 'yes, completed dgca') {
+        return {
+          followUpButtons: [...FLOW_COUNTRIES],
+        };
+      }
+      if (FLOW_COUNTRIES.some((country) => country.toLowerCase() === normalizedButton)) {
+        return {
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
+        };
+      }
+      if (normalizedButton === 'no, starting fresh') {
+        return {
+          followUpButtons: ['Yes, Completed 12th Science', 'Still in School'],
+        };
+      }
+      if (normalizedButton === 'yes, completed 12th science') {
+        // No buttons â€” user types their age freely, submitMessage detects it and routes
+        return { followUpButtons: [] };
+      }
+      // Aspirant activity acknowledgement â€” only fires when not on the parent path.
+      if (
+        !isParentPath && (
+          normalizedButton === 'studying' ||
+          normalizedButton === 'working' ||
+          normalizedButton === 'taking a break'
+        )
+      ) {
+        return {
+          followUpButtons: ['Take Pilot Assessment', 'Skip and book consultation'],
+        };
+      }
+
+      // â”€â”€ Parent path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      if (normalizedButton === 'i am a parent') {
+        return {
+          followUpButtons: [
+            'Real Cost & Timeline',
+            'Pilot Career Growth',
+            'Just Exploring',
+          ],
+        };
+      }
+      // First-level parent topic answers â€” every topic ends on the same
+      // 3-button rail so the parent always has the same exits.
+      if (
+        isParentPath && (
+          normalizedButton === 'real cost & timeline' ||
+          normalizedButton === 'pilot career growth'
+        )
+      ) {
+        return {
+          followUpButtons: ['Send me the cost guide', 'Talk to a counsellor', 'Ask another question'],
+        };
+      }
+      if (isParentPath && normalizedButton === 'just exploring') {
+        return {
+          followUpButtons: ['Send me the roadmap', 'Ask a question', 'Maybe later'],
+        };
+      }
+      // Cost guide / roadmap â€” bot asks for contact; suppress buttons during
+      // the contact-capture turn so the user can type their info.
+      if (
+        isParentPath && (
+          normalizedButton === 'send me the cost guide' ||
+          normalizedButton === 'send me the roadmap'
+        )
+      ) {
+        return { followUpButtons: [] };
+      }
+      // Post-capture acknowledgement rail â€” the parent has shared contact
+      // and the bot has acknowledged. Offer counsellor / another question / exit.
+      // (Parent must explicitly click these; "ask another question" / "maybe
+      // later" / "not right now" are handled below.)
+
+      // 'Ask another question' / 'Ask a question' â€” drop into free-form,
+      // no flow override. Bot responds from KB + prompt context.
+      if (
+        isParentPath && (
+          normalizedButton === 'ask another question' ||
+          normalizedButton === 'ask a question'
+        )
+      ) {
+        return null;
+      }
+      // 'Maybe later' / 'Not right now' â€” graceful exit; bot says the closing
+      // line and we suppress further buttons.
+      if (
+        isParentPath && (
+          normalizedButton === 'maybe later' ||
+          normalizedButton === 'not right now'
+        )
+      ) {
+        return { followUpButtons: [] };
+      }
+
+      // â”€â”€ Explore Training Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Each sub-program funnels into an existing flow rather than
+      // dead-ending in LLM-improv, fixing the "Cabin Crew got stuck" bug.
+      if (normalizedButton === 'explore training options') {
+        return {
+          followUpButtons: config.exploreButtons ?? [],
+        };
+      }
+      if (normalizedButton === 'pilot training') {
+        // Same downstream as the Aspirant entry.
+        return { followUpButtons: ['Airplane', 'Helicopter'] };
+      }
+      if (normalizedButton === 'helicopter pilot') {
+        // Skip the airplane/helicopter pick â€” they already chose helicopter.
+        return {
+          followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
+        };
+      }
+      if (
+        normalizedButton === 'flight schools' ||
+        normalizedButton === 'cabin crew'
+      ) {
+        // Info-only programs â€” bot answers from KB, then offers a counsellor
+        // call or a follow-up question. Prevents the "stuck on Yes" bug.
+        return {
+          followUpButtons: ['Talk to a counsellor', 'Ask a question'],
+        };
+      }
+
+      return null;
+    })();
+    setPendingFlowOverrideState(flowRule);
+
+    if (requestNameBeforeProceed(message, nextButtons)) return;
+    if (requestEmailBeforeProceed(message, nextButtons)) return;
+    if (requestPhoneBeforeProceed(message, nextButtons)) return;
+
+    submitMessage(message, nextButtons);
+  };
+
+  const renderWelcomeButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {quickButtonOptions.slice(0, 3).map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [handleQuickButtonClick, quickButtonOptions]
+  );
+
+  const renderChallengeButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {challengeButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [challengeButtons, handleQuickButtonClick]
+  );
+
+  const renderContextualButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {contextualButtons.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles[`accent-${index}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [contextualButtons, handleQuickButtonClick]
+  );
+
+  const renderFlowOverrideButtons = useCallback(
+    (wrapperClassName: string) => (
+      <div className={wrapperClassName}>
+        <div className={styles.welcomeQuickButtonsContainer}>
+          <div className={styles.welcomeQuickButtonRow}>
+            {visibleFlowOverrideButtons?.map((buttonText, index) => (
+              <button
+                key={buttonText}
+                className={`${styles.quickBtn} ${styles.flowOverrideBtn} ${styles[`accent-${index % 7}`]}`}
+                style={{ animationDelay: `${index * 90}ms` }}
+                onClick={(e) => handleQuickButtonClick(buttonText, e)}
+              >
+                {buttonText}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    [visibleFlowOverrideButtons, handleQuickButtonClick]
+  );
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (showCalendly) {
+      closeCalendarWidget();
+    }
+    if (showVideo) {
+      closeVideoWidget();
+    }
+    if (showPortfolio) {
+      closePortfolio();
+    }
+    setIsInputActive(true);
+    if (!isOpen) {
+      // Check if there's an existing conversation
+      const hasExistingConversation = 
+        messages.length > 0 || 
+        conversationSummary.trim().length > 0 || 
+        (sessionRecord?.userInputsSummary && sessionRecord.userInputsSummary.length > 0);
+      
+      // If there's an existing conversation, open the chat directly
+      if (hasExistingConversation) {
+        setIsDockedBubble(true);
+        setIsOpen(true);
+        setIsExpanded(false);
+        setShowQuickButtons(false);
+        if (!isMobileViewport) {
+          setTimeout(() => {
+            chatInputRef.current?.focus();
+          }, 50);
+        }
+        return;
+      }
+      
+      setIsExpanded(true);
+      // Show quick buttons only when expanded and no existing conversation
+      setShowQuickButtons(true);
+    }
+    
+    // Scroll input into view above keyboard on mobile
+    // Use Visual Viewport API if available for better keyboard handling
+    const scrollInputIntoView = () => {
+      const input = e.target;
+      if (input) {
+        // Use visual viewport if available (better for mobile keyboards)
+        if (window.visualViewport) {
+          const viewport = window.visualViewport;
+          const inputRect = input.getBoundingClientRect();
+          const viewportHeight = viewport.height;
+          
+          // Calculate if input is hidden by keyboard
+          const inputBottom = inputRect.bottom;
+          const visibleHeight = viewportHeight;
+          
+          if (inputBottom > visibleHeight) {
+            // Scroll the input to be visible above keyboard
+            input.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center',
+              inline: 'nearest' 
+            });
+          }
+        } else {
+          // Fallback for browsers without Visual Viewport API
+          input.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest' 
+          });
+        }
+      }
+    };
+    
+    // Use requestAnimationFrame for immediate execution, then small delay for keyboard
+    requestAnimationFrame(() => {
+      setTimeout(scrollInputIntoView, 150);
+    });
+  };
+
+  const handleInputBlur = (e: React.FocusEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (relatedTarget && relatedTarget.closest(`.${styles.quickBtn}`)) {
+      return;
+    }
+
+    setTimeout(() => {
+      if (!inputValue.trim() && !isOpen) {
+        setShowQuickButtons(false);
+        setIsExpanded(false);
+        setIsInputActive(false);
+      }
+    }, 200);
+  };
+
+  const spaceLokazenProcessSteps = (text: string): string => {
+    if (!/How we work|01\s+Choose Plan|02\s+Get Matched/i.test(text)) {
+      return text;
+    }
+
+    return text
+      .replace(/(\*?How we work:\*?)\n(?=\*?01\s+)/i, '$1\n\n')
+      .replace(/\n(?=\*?0[2-4]\s+)/g, '\n\n')
+      .replace(/\n(?=Tap a plan\b)/i, '\n\n')
+      .replace(/\n{3,}/g, '\n\n');
+  };
+
+  const formatText = (text: string): string => {
+    if (!text) return '';
+    // Remove button instruction patterns (e.g., "â†’ BUTTON: Schedule a Demo") before formatting
+    // These are metadata instructions that shouldn't be displayed to users
+    let cleanedText = text
+      .replace(/â†’\s*BUTTON:\s*[^\n]*/gi, '') // Remove "â†’ BUTTON: ..." lines
+      .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
+      .replace(/\[\[PLANS?\]\]/gi, '') // Plans-card marker â€” the cards render separately
+      .replace(/\[\[PLAN:[a-z]+\]\]/gi, '') // Single-plan-card marker
+      // The "Tap a plan" line + its inline plan list are replaced by the plan
+      // cards, so drop the now-redundant text tail on the plans message.
+      .replace(/tap a plan to see what'?s included:?/gi, '')
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
+      .trim();
+    cleanedText = spaceLokazenProcessSteps(cleanedText);
+    
+    // Basic markdown to HTML conversion
+    // Convert double newlines to breaks
+    // Preserve single newlines (they indicate intentional line breaks for formatting)
+    // Preserve line breaks for bullet points (lines starting with â€¢)
+    // Convert <br> tags if already present
+    const linkStyle = 'color:var(--accent-primary,#FF5200);text-decoration:underline;word-break:break-all';
+    return cleanedText
+      .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
+      // Markdown links [text](url) â†’ anchor (before newline/emphasis passes so the
+      // parens and url aren't mangled).
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi,
+        `<a href="$2" target="_blank" rel="noopener noreferrer" style="${linkStyle}">$1</a>`)
+      .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
+      .replace(/\n(?=\s*â€¢)/g, '<br>') // Preserve line breaks before bullet points
+      .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // Bare URLs â†’ clickable (last, so <br>/emphasis are already applied and the
+      // url isn't split). The leading-char guard skips urls already inside an
+      // href="..." attribute; the trailing class drops a stray end punctuation.
+      .replace(/(^|[^"'=])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/gi,
+        `$1<a href="$2" target="_blank" rel="noopener noreferrer" style="${linkStyle}">$2</a>`);
+  };
+  
+  useEffect(() => {
+    if (isOpen) {
+      hasEverOpenedRef.current = true;
+    }
+  }, [isOpen]);
+
+  // Pre-warm Vapi the moment the widget opens so mic click is instant
+  useEffect(() => {
+    if (!isOpen) return;
+    startVapiPrewarm();
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  const hasConversation = messages.length > 0;
+  const hasExistingConversation = 
+    hasConversation || 
+    conversationSummary.trim().length > 0 || 
+    (sessionRecord?.userInputsSummary && sessionRecord.userInputsSummary.length > 0);
+  const searchbar = (
+    <div 
+      ref={searchbarWrapperRef} 
+      className={styles.searchbarWrapper}
+      aria-hidden={isOpen}
+      style={isOpen ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
+      onMouseEnter={() => {
+        setIsSearchbarHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsSearchbarHovered(false);
+      }}
+    >
+      <div 
+        className={`${styles.searchbar} ${isExpanded ? styles.searchbarExpanded : ''}`}
+        onMouseDown={(e) => {
+          // Don't prevent default - let click event fire
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+            handleSearchWidgetPress();
+        }}
+        onTouchStart={(e) => {
+            handleSearchWidgetPress();
+        }}
+        style={{ cursor: 'pointer' }}
+      >
+        <div className={styles.searchIcon} onClick={(e) => {
+          e.stopPropagation();
+            handleSearchWidgetPress();
+        }}>
+          {ICONS.search}
+        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          className={styles.searchInput}
+          placeholder={hasInteractedWithSearchbar ? "Ask me anything" : "see PROXe in action"}
+          value={inputValue}
+          autoComplete="off"
+          data-form-type="other"
+          data-lpignore="true"
+          onChange={(e) => {
+              const nextValue = e.target.value;
+              setInputValue(nextValue);
+              if (!isOpen && isMobileNewChat && nextValue.trim()) {
+                openChatAndFocus();
+              }
+            // Close any open prompt cards when user starts typing in searchbar
+              if (nextValue && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
+              if (showNamePrompt) {
+                setShowNamePrompt(false);
+                setNamePromptDismissed(true);
+              }
+              if (showEmailPrompt) {
+                setShowEmailPrompt(false);
+              }
+              if (showPhonePrompt) {
+                setShowPhonePrompt(false);
+              }
+            }
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setHasInteractedWithSearchbar(true);
+              handleSearchWidgetPress();
+          }}
+          onFocus={(e) => {
+            setHasInteractedWithSearchbar(true);
+            if (showDeployForm) {
+              closeDeployForm();
+            }
+            if (showPortfolio) {
+              closePortfolio();
+            }
+              handleSearchWidgetPress();
+          }}
+          onBlur={handleInputBlur}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && inputValue.trim()) {
+              handleSend();
+            }
+          }}
+        />
+        {inputValue.trim() && (
+          <button 
+            className={styles.sendBtn} 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSend();
+            }}
+          >
+            {ICONS.send}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  if (!isOpen) {
+    // Bubble widget style or docked bubble mode
+    if (widgetStyle === 'bubble' || isDockedBubble) {
+      return (
+        <button
+          className={styles.bubbleButton}
+          data-brand={brand}
+          onClick={handleOpenChat}
+          aria-label="Open chat"
+        >
+          <div className={styles.bubbleIcon}>
+            {ICONS.ai(brand, config)}
+          </div>
+        </button>
+      );
+    }
+
+    // Searchbar widget style (default)
+    return searchbar;
+  }
+
+  return (
+    <>
+    {/* Only show searchbar if widgetStyle is not 'bubble' */}
+    {widgetStyle !== 'bubble' && searchbar}
+    <div 
+      ref={chatboxContainerRef}
+      className={`${styles.chatboxContainer} ${widgetTheme === 'light' ? `${styles.themeLight} themeLight` : `${styles.themeDark} themeDark`} ${widgetStyle !== 'bubble' ? styles.chatboxDocked : ''} ${isBubbleWidget ? styles.chatboxBubble : ''} ${isBubbleMobileLayout ? styles.chatboxBubbleMobile : ''} ${isBubbleDesktopLayout ? styles.chatboxBubbleDesktop : ''} ${isResponding ? styles.chatboxResponding : ''}`}
+      data-brand={brand}
+    >
+          {isVapiActive && (
+        <div className={styles.voiceOverlay}>
+          {/* Glass orb â€” speaker state drives halo colour via data-speaker */}
+          <div
+            className={styles.voiceOrbWrap}
+            data-speaker={vapiSpeaker}
+            data-state={vapiConnecting ? 'connecting' : vapiEnding ? 'ending' : vapiError ? 'error' : 'connected'}
+          >
+            {vapiConnecting && <ConnectingRingOrb />}
+            <span className={styles.voiceOrbRingHalo} aria-hidden="true" />
+            <span className={styles.voiceOrbInner} aria-hidden="true" />
+            <span className={styles.voiceOrbShine} aria-hidden="true" />
+            <span className={styles.voiceOrbRim} aria-hidden="true" />
+          </div>
+          <div className={styles.voiceMeta}>
+            <p className={styles.voiceName}>Avia</p>
+            <p className={styles.voiceStatus}>
+              {vapiConnecting ? 'Connectingâ€¦'
+                : vapiEnding ? 'Endingâ€¦'
+                : vapiError ? 'Connection issue'
+                : vapiSpeaker === 'assistant' ? 'Speakingâ€¦'
+                : vapiSpeaker === 'user' ? 'Listeningâ€¦'
+                : 'Connected'}
+            </p>
+          </div>
+          {/* Mic volume bar â€” shows live amplitude from user's mic.
+              If this bar never moves when speaking, mic audio isn't reaching Vapi. */}
+          {!vapiConnecting && !vapiEnding && (
+            <div className={styles.voiceMicBar}>
+              <div
+                className={styles.voiceMicBarFill}
+                style={{ width: `${Math.min(100, vapiVolume * 400)}%` }}
+              />
+            </div>
+          )}
+          {vapiTranscript.length > 0 && (
+            <div className={styles.voiceTranscript} ref={vapiTranscriptRef}>
+              {vapiTranscript.slice(-2).map((m, i) => (
+                <p key={i} className={m.role === 'user' ? styles.voiceTxUser : styles.voiceTxAvia}>
+                  {m.text}
+                </p>
+              ))}
+            </div>
+          )}
+          <button className={styles.voiceEndBtn} onClick={handleVoiceToggle} aria-label="End call">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className={styles.chatContent}>
+        {showResetConfirm && (
+          <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
+            <div className={styles.closeConfirmCard}>
+              <p className={styles.closeConfirmMessage}>Chat history will be lost. Do you wish to continue?</p>
+              <div className={styles.closeConfirmActions}>
+                <button className={styles.closeConfirmEndBtn} onClick={handleConfirmResetChat}>
+                  Reset Chat
+                </button>
+                <button className={styles.closeConfirmContinueBtn} onClick={handleCancelResetChat}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showCloseConfirm && (
+          <div className={styles.closeConfirmOverlay} role="dialog" aria-modal="true">
+            <div className={styles.closeConfirmCard}>
+              <p className={styles.closeConfirmMessage}>End this chat?</p>
+              <div className={styles.closeConfirmActions}>
+                <button className={styles.closeConfirmEndBtn} onClick={handleConfirmCloseChat}>
+                  End Chat
+                </button>
+                <button className={styles.closeConfirmContinueBtn} onClick={handleCancelCloseChat}>
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className={styles.chatHeader}>
+        <div className={styles.brandName}>
+          <div className={styles.avatar}>
+            {ICONS.ai(brand, config)}
+          </div>
+          <span>{config?.name || 'Lokazen'}</span>
+        </div>
+        <div className={styles.headerActions}>
+          <button
+            className={styles.themeBtn}
+            onClick={toggleWidgetTheme}
+            aria-label={widgetTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            title={widgetTheme === 'light' ? 'Dark theme' : 'Light theme'}
+          >
+            {widgetTheme === 'light' ? ICONS.moon : ICONS.sun}
+          </button>
+          <button
+            className={styles.closeBtn}
+            onClick={handleRequestCloseChat}
+          >
+            {ICONS.close}
+          </button>
+        </div>
+      </div>
+      <div 
+        ref={messagesAreaRef}
+        className={styles.messagesArea}
+        data-scroll-lock="allow"
+        onClick={(e) => {
+          // Only close widgets if clicking directly on the messages area, not on messages or buttons
+          const target = e.target as HTMLElement;
+          const isClickOnMessage = target.closest(`.${styles.message}`);
+          const isClickOnCalendar = target.closest(`.${styles.calendarContainer}`);
+          const isClickOnVideo = target.closest(`.${styles.videoContainer}`);
+          const isClickOnPortfolio = target.closest(`.${styles.portfolioGrid}`);
+          
+          if (!isClickOnMessage && !isClickOnCalendar && !isClickOnVideo && !isClickOnPortfolio) {
+            // Close widgets when clicking in empty messages area (clicking away)
+            closeCalendarWidget();
+            closeVideoWidget();
+            closePortfolio();
+          }
+        }}
+      >
+        {messages.map((message, index) => {
+          // Rotate through accent colors (0-6 for 7 colors)
+          const accentIndex = index % 7;
+          const accentClass = `accent-${accentIndex}`;
+          
+          // When the booking calendar is anchored to this message, the calendar
+          // widget renders its own AI bubble below â€” so suppress this empty
+          // anchor bubble to avoid a chrome-only "broken bubble" above it.
+          const calendarAnchoredHere = !!showCalendly && calendarAnchorId === message.id;
+          return (
+          <React.Fragment key={message.id}>
+            {!calendarAnchoredHere && (
+            <div
+              className={`${styles.message} ${styles[message.type]} ${styles[accentClass]}`}
+              data-message-id={message.id}
+            >
+              <div className={styles.messageContent}>
+                <div className={`${styles.bubble} ${message.isStreaming && !message.text && !hasStreamingText ? styles.typingBubble : ''}`}>
+                  <div className={styles.bubbleContent}>
+                    {/* Typing indicator for loading state */}
+                    {message.isStreaming && !message.text && !hasStreamingText ? (
+                      <div className={styles.typingIndicator}>
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    ) : (() => {
+                        // Lokazen plan cards â€” rich rendering of /for-brands#plans so
+                        // plans land visually instead of as flat text. Overview shows
+                        // all 3 (with the "how we work" intro above); the single-plan
+                        // detail replaces the flat text with one focused card.
+                        const t = message.text || '';
+                        const isLokazenAi = brand === 'lokazen' && message.type === 'ai' && !message.isStreaming;
+                        const isOverview = isLokazenAi && (
+                          message.id === planCardsMessageId // button-derived (LLM paraphrases the text)
+                          || /\[\[PLANS\]\]/i.test(t)
+                          || /tap a plan to see what'?s included/i.test(t)
+                        );
+                        const detailMatch = isLokazenAi && !isOverview
+                          ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-â€“]\s*Rs/i))
+                          : null;
+                        // The cards carry the plan info AND the "Choose" actions, so
+                        // suppress the flat text on BOTH the overview and the focused
+                        // detail â€” otherwise the "01 Choose Planâ€¦" roadmap duplicates
+                        // the cards and reads like an unclickable button.
+                        const hideText = !!detailMatch || isOverview;
+                        return (
+                      <>
+                        {!hideText && (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
+                          <div
+                            className={styles.messageText}
+                            style={{ flex: '1 1 auto', minWidth: 0 }}
+                            dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
+                          />
+                          {message.isStreaming && message.text && (
+                            <span className={styles.streamingCursor}>â–‹</span>
+                          )}
+                        </div>
+                        )}
+
+                        {isOverview && (
+                          <LokazenPlanCards onChoose={(label) => handleQuickButtonClick(label)} />
+                        )}
+                        {detailMatch && (
+                          <LokazenPlanCards focus={detailMatch[1]} onAction={(label) => handleQuickButtonClick(label)} />
+                        )}
+
+                    </>
+                    );
+                  })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {showCalendly && calendarAnchorId === message.id && (
+              <div
+                key={showCalendly}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']} ${styles.calendarMessage}`}
+                onClick={(e) => e.stopPropagation()}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      {/* Close button */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closeCalendarWidget}
+                          aria-label="Close booking widget"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      {/* Custom Google Calendar widget */}
+                  <div
+                    className={styles.calendarScrollArea}
+                    data-scroll-lock="allow"
+                  >
+                        <BookingCalendarWidget
+                          {...({
+                            brand,
+                            config,
+                            sessionId: externalSessionId || undefined,
+                            onBookingComplete: handleBookingComplete,
+                            prefillName: userProfile.name || '',
+                            prefillEmail: userProfile.email || '',
+                            prefillPhone: userProfile.phone || '',
+                            onContactDraft: handleContactDraft,
+                            onContactSubmit: handleContactPersist,
+                          } satisfies BookingCalendarWidgetProps)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+            {showVideo && videoAnchorId === message.id && (
+              <div 
+                key={showVideo}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                onClick={(e) => e.stopPropagation()}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      {/* Header with avatar and name inside the bubble */}
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closeVideoWidget}
+                          aria-label="Close video"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      
+                      {/* Video player */}
+                      <div
+                        className={styles.videoContainer}
+                        data-scroll-lock="allow"
+                      >
+                        <video
+                          controls
+                          autoPlay
+                          playsInline
+                          style={{
+                            width: '100%',
+                            maxHeight: '400px',
+                            borderRadius: '8px',
+                            backgroundColor: '#000',
+                          }}
+                        >
+                          <source src="/brands/proxe/assets/Markx.mp4" type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showPortfolio && portfolioAnchorId === message.id && (
+              <div 
+                key={showPortfolio}
+                className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+                onClick={(e) => e.stopPropagation()}
+                ref={(el) => {
+                  if (el) {
+                    requestAnimationFrame(() => {
+                      setTimeout(() => {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                      }, 100);
+                    });
+                  }
+                }}
+              >
+                <div className={styles.messageContent}>
+                  <div className={styles.bubble}>
+                    <div className={styles.bubbleContent}>
+                      <div className={styles.bubbleHeader}>
+                        <div className={styles.bubbleAvatar}>
+                          {ICONS.ai(brand, config)}
+                        </div>
+                        <span className={styles.bubbleName}>
+                          {config.name}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.calendarCloseBtn}
+                          onClick={closePortfolio}
+                          aria-label="Close portfolio"
+                        >
+                          {ICONS.close}
+                        </button>
+                      </div>
+                      
+                      <div className={styles.portfolioGrid} data-scroll-lock="allow">
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>ðŸŽ¯</div>
+                          <div className={styles.portfolioTitle}>Customer Acquisition</div>
+                          <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>ðŸŽ¨</div>
+                          <div className={styles.portfolioTitle}>Brand Management</div>
+                          <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>ðŸ“</div>
+                          <div className={styles.portfolioTitle}>Content & Ads</div>
+                          <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
+                        </div>
+                        <div className={styles.portfolioCard}>
+                          <div className={styles.portfolioIcon}>ðŸ¤–</div>
+                          <div className={styles.portfolioTitle}>AI Automation</div>
+                          <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+          );
+        })}
+
+        {showDeployForm && (
+          <div 
+            ref={deployFormRef}
+            key={showDeployForm}
+            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  {/* Header with avatar and name inside the bubble */}
+                  <div className={`${styles.bubbleHeader} ${styles.inlinePromptHeader}`}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.calendarCloseBtn}
+                      onClick={closeDeployForm}
+                      aria-label="Close deploy form"
+                    >
+                      {ICONS.close}
+                    </button>
+                  </div>
+                  
+                  {/* Deploy Form */}
+                  <DeployFormInline
+                    brand={brand}
+                    config={config}
+                    userProfile={userProfile}
+                    onContactDraft={handleContactDraft}
+                    onContactSubmit={handleContactPersist}
+                    onFormSubmit={async () => {
+                      // Sync websiteUrl from localStorage to Supabase
+                      const storedUser = getStoredUser(brandKey);
+                      if (storedUser?.websiteUrl && externalSessionId) {
+                        await persistUserProfile({ websiteUrl: storedUser.websiteUrl });
+                      }
+                      
+                      // Add confirmation message to chat
+                      addAIMessage("Thanks! We've received your details. Our team will review them and get back to you within 24 hours. In the meantime, feel free to ask any questions about PROXe!");
+                      
+                      // Close the form
+                      closeDeployForm();
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
+        {/* Cost Guide / Roadmap WhatsApp Form */}
+        {showCostGuideForm && (
+          <CostGuideFormInline
+            key={showCostGuideForm}
+            prefillName={userProfile.name || ''}
+            prefillPhone={userProfile.phone || ''}
+            waNumber="918046733388"
+            onContactDraft={handleContactDraft}
+            onSubmit={async (name, phone) => {
+              await handleContactPersist({ name, phone });
+              addAIMessage('Sending the guide now on WhatsApp. Anything else?');
+              setShowCostGuideForm(null);
+            }}
+            onClose={() => setShowCostGuideForm(null)}
+            config={config}
+            brand={brand}
+          />
+        )}
+
+        {/* Inline Name Prompt Card */}
+        {showNamePrompt && !showCalendly && !showDeployForm && (
+          <div
+            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+            ref={(el) => {
+              if (el) {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 100);
+                });
+              }
+            }}
+          >
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                  </div>
+                  <p className={styles.inlinePromptText}>A quick intro before we dive in.</p>
+                  <form onSubmit={handleNameSubmit} className={styles.inlinePromptForm}>
+                    <div className={styles.inlinePromptInputWrapper}>
+                      <input
+                        ref={namePromptInputRef}
+                        className={styles.inlinePromptInput}
+                        placeholder="Your name"
+                        value={nameInput}
+                        onChange={(event) => setNameInput(event.target.value)}
+                      />
+                    </div>
+                    <div className={styles.inlinePromptInputWrapper} style={{ marginTop: '8px' }}>
+                      <input
+                        className={styles.inlinePromptInput}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="WhatsApp number"
+                        value={phoneInput}
+                        onChange={(event) => setPhoneInput(event.target.value.replace(/[^\d+\-\s]/g, ''))}
+                      />
+                      <button
+                        type="submit"
+                        className={styles.inlinePromptSendBtn}
+                        disabled={!nameInput.trim() || phoneInput.replace(/\D/g, '').length < 8}
+                      >
+                        {ICONS.send}
+                      </button>
+                    </div>
+                    {phoneInput.trim().length > 0 && phoneInput.replace(/\D/g, '').length < 8 && (
+                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Enter a valid WhatsApp number to continue
+                      </p>
+                    )}
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inline Email Prompt Card */}
+        {showEmailPrompt && !showCalendly && !showDeployForm && (
+          <div
+            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+            ref={(el) => {
+              if (el) {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 100);
+                });
+              }
+            }}
+          >
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.inlinePromptClose}
+                      onClick={handleEmailSkip}
+                      aria-label="Close email prompt"
+                    >
+                      {ICONS.close}
+                    </button>
+                  </div>
+                  <p className={styles.inlinePromptText}>Where can we reach you?</p>
+                  <form onSubmit={handleEmailSubmit} className={styles.inlinePromptForm}>
+                    <div className={styles.inlinePromptInputWrapper}>
+                      <input
+                        ref={emailPromptInputRef}
+                        className={styles.inlinePromptInput}
+                        placeholder="name@example.com"
+                        type="email"
+                        value={emailInput}
+                        onChange={(event) => setEmailInput(event.target.value)}
+                      />
+                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!emailInput.trim()}>
+                        {ICONS.send}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inline Phone Prompt Card */}
+        {showPhonePrompt && !showCalendly && !showDeployForm && (
+          <div
+            className={`${styles.message} ${styles.ai} ${styles['accent-0']}`}
+            ref={(el) => {
+              if (el) {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 100);
+                });
+              }
+            }}
+          >
+            <div className={styles.messageContent}>
+              <div className={styles.bubble}>
+                <div className={styles.bubbleContent}>
+                  <div className={styles.bubbleHeader}>
+                    <div className={styles.bubbleAvatar}>
+                      {ICONS.ai(brand, config)}
+                    </div>
+                    <span className={styles.bubbleName}>
+                      {config.name}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.inlinePromptClose}
+                      onClick={handlePhoneSkip}
+                      aria-label="Close phone prompt"
+                    >
+                      {ICONS.close}
+                    </button>
+                  </div>
+                  <p className={styles.inlinePromptText}>Share your phone number so we can follow up</p>
+                  <form onSubmit={handlePhoneSubmit} className={styles.inlinePromptForm}>
+                    <div className={styles.inlinePromptInputWrapper}>
+                      <input
+                        ref={phonePromptInputRef}
+                        className={styles.inlinePromptInput}
+                        type="tel"
+                        placeholder="Enter your phone number"
+                        value={phoneInput}
+                        onChange={(event) => setPhoneInput(event.target.value)}
+                      />
+                      <button type="submit" className={styles.inlinePromptSendBtn} disabled={!phoneInput.trim()}>
+                        {ICONS.send}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {isOpen &&
+          !isLoading &&
+          visibleFlowOverrideButtons &&
+          visibleFlowOverrideButtons.length > 0 &&
+          !lastAiMessage?.isStreaming &&
+          renderFlowOverrideButtons(styles.welcomeQuickButtons)}
+        <div ref={messagesEndRef} />
+      </div>
+      {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
+      {desktopWelcomeEligible && renderWelcomeButtons(styles.welcomeQuickButtons)}
+      {showChallengeButtons && renderChallengeButtons(styles.welcomeQuickButtons)}
+      {showContextualButtons && renderContextualButtons(styles.welcomeQuickButtons)}
+
+
+      {/* Welcome video embed temporarily disabled */}
+      {/* {showWelcomeVideo && config.showWelcomeVideo && messages.length <= 1 && (
+        <div className={styles.videoEmbedContainerBottom}>...</div>
+      )} */}
+
+      <div className={styles.inputArea}>
+        {isOpen && showPrivacyNotice && (
+          <div className={styles.privacyNotice}>
+            <span className={styles.privacyPoweredIcon}>
+              <PROXELogo />
+            </span>
+            <span>Powered by PROXe</span>
+          </div>
+        )}
+        <div className={styles.chatInputRow}>
+          <button
+            className={`${styles.micCta} ${isVapiActive ? styles.micCtaActive : ''}`}
+            aria-label={isVapiActive ? 'End call' : 'Call Avia'}
+            type="button"
+            onClick={handleVoiceToggle}
+          >
+            {ICONS.mic}
+          </button>
+          <div className={styles.chatInputWrapper}>
+            <input
+              ref={chatInputRef}
+              type="text"
+              className={styles.chatInput}
+              placeholder="Type your message..."
+              value={inputValue}
+              autoComplete="off"
+              data-form-type="other"
+              data-lpignore="true"
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                // Close any open prompt cards when user starts typing
+                if (e.target.value && (showNamePrompt || showEmailPrompt || showPhonePrompt)) {
+                  if (showNamePrompt) {
+                    setShowNamePrompt(false);
+                    setNamePromptDismissed(true);
+                  }
+                  if (showEmailPrompt) {
+                    setShowEmailPrompt(false);
+                  }
+                  if (showPhonePrompt) {
+                    setShowPhonePrompt(false);
+                  }
+                }
+              }}
+              onFocus={(e) => {
+                if (showCalendly) {
+                  closeCalendarWidget();
+                }
+                if (showVideo) {
+                  closeVideoWidget();
+                }
+                if (showDeployForm) {
+                  closeDeployForm();
+                }
+                if (showPortfolio) {
+                  closePortfolio();
+                }
+                // Scroll input into view above keyboard on mobile
+    const scrollInputIntoView = () => {
+                const input = e.target;
+                if (input) {
+                  if (window.visualViewport) {
+          return; // rely on visual viewport adjustments
+        } else {
+          input.scrollIntoView({
+            behavior: 'smooth',
+            block: 'end',
+            inline: 'nearest'
+          });
+                  }
+                }
+              };
+              requestAnimationFrame(() => {
+                setTimeout(scrollInputIntoView, 150);
+              });
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && inputValue.trim()) {
+                handleSend();
+              }
+            }}
+          />
+        </div>
+        <button className={styles.sendBtn} onClick={handleSend} disabled={!inputValue.trim() || isLoading}>
+          {ICONS.send}
+        </button>
+        </div>
+      </div>
+      </div>
+    </div>
+    {(isDesktop || isBubbleDesktopLayout) && (
+      <button
+        className={styles.bubbleButton}
+        onClick={isOpen ? handleCloseChat : handleOpenChat}
+        aria-label={isOpen ? "Close chat" : "Open chat"}
+        data-brand={brand}
+        data-open={isOpen ? "true" : undefined}
+      >
+        <div className={styles.bubbleIcon}>
+          {isOpen ? ICONS.chevronUp : ICONS.chevronDown}
+        </div>
+      </button>
+    )}
+  </>
+  );
+}
+
+

@@ -12,13 +12,15 @@ const inter = Inter({
   weight: ['400', '500', '600', '700', '800', '900'],
 })
 
+const brandIcon = brandConfig.iconPath || '/logo.png'
+
 export const metadata: Metadata = {
   title: brandConfig.brand === 'proxe' ? 'PROXe' : `PROXe ${brandConfig.name}`,
   description: `${brandConfig.name} Dashboard`,
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: brandIcon,
+    shortcut: brandIcon,
+    apple: brandIcon,
   },
 }
 

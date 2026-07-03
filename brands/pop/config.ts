@@ -5,6 +5,7 @@ export const popConfig: BrandConfig = {
   brand: 'pop',
   tagline: 'Pulse of Punjab',
   website: 'https://goproxe.com',
+  iconPath: '/pop-icon.png',
   widget: {
     headerName: 'Pulse of Punjab',
     welcomeSequence: [
@@ -19,7 +20,7 @@ export const popConfig: BrandConfig = {
   // until live numbers are wired.
   features: {
     voice: true,
-    brain: true,
+    brain: false, // Brain UI is BCON-only for now — flip to true to enable
     pipelineFunnel: true,
     followUpSequence: true,
     warRoom: true,

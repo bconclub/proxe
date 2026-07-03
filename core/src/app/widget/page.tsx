@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { ChatWidget } from '@/components/widget/ChatWidget'
+// @brand/widget resolves to the pack's widget: either a re-export of core's
+// ChatWidget or the brand's own fork-exact implementation.
+import { ChatWidget } from '@brand/widget'
 import { getBrandConfig } from '@/configs'
 import { applyBrandColorVars } from '@/lib/widget-brand-vars'
 

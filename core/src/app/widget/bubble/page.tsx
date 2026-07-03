@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { ChatWidget } from '@/components/widget/ChatWidget'
+import { ChatWidget } from '@brand/widget'
 import { getBrandConfig } from '@/configs'
 import { applyBrandColorVars } from '@/lib/widget-brand-vars'
 

@@ -237,6 +237,9 @@ export function isBookingFlowStep(message: string): boolean {
   return (
     /what (date|day|time)\b/.test(t) ||
     /\bwhat date works\b/.test(t) ||
+    /\b(best|your|what'?s the best)\s+email\b/.test(t) ||
+    /\bemail\b[^.?!]*\b(reach|send|invite|calendar)\b/.test(t) ||
+    /\b(reach|send|invite|calendar)\b[^.?!]*\bemail\b/.test(t) ||
     /which (works|one works|time|slot)/.test(t) ||
     /\b(drop|share|send)\b[^.?!]*\b(name|email)\b/.test(t) ||
     /\block (it|the slot)?\s*in\b/.test(t) ||

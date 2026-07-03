@@ -5,6 +5,7 @@ export const lokazenConfig: BrandConfig = {
   brand: 'lokazen',
   tagline: 'Bangalore',
   website: 'https://lokazen.in',
+  iconPath: '/lokazen-icon.jpg',
   widget: {
     headerName: 'Lokazen',
     welcomeSequence: [
@@ -16,9 +17,10 @@ export const lokazenConfig: BrandConfig = {
   // Sensible defaults for a fresh brand — flip on as Lokazen adopts each feature.
   features: {
     voice: false,
-    brain: true,
+    brain: false, // Brain UI is BCON-only for now — flip to true to enable
     pipelineFunnel: true,
     followUpSequence: false,
+    scouts: true, // Scout segment: /dashboard/scouts + scout widget mode + scout KB scope
   },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {

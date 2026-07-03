@@ -9,7 +9,7 @@ import LeadDetailsModal from './LeadDetailsModal'
 import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, brandConfig } from '@/configs'
 import {
   MdLanguage,
   MdChat,
@@ -67,6 +67,38 @@ const getStageColor = (stage: string | null) => {
   }
   return stageColors[stage || 'New'] || stageColors['New']
 }
+
+// Scouts have their OWN lifecycle — they don't run brand/owner follow-up
+// sequences, so the STAGE column shows the scout's actual progress derived from
+// the latest scout_event PROXe received (logged in -> KYC -> submitting -> active),
+// not a generic lead stage.
+const SCOUT_STAGE_BY_EVENT: Record<string, string> = {
+  signup: 'Logged in',
+  kyc_submitted: 'KYC started',
+  kyc_verified: 'KYC done',
+  upi_added: 'UPI added',
+  submission: 'Submitting photos',
+  payout: 'Active',
+}
+const scoutStageLabel = (lkz: any): string => {
+  const ev = String(lkz?.scout_event || '').toLowerCase()
+  if (SCOUT_STAGE_BY_EVENT[ev]) return SCOUT_STAGE_BY_EVENT[ev]
+  if (String(lkz?.kyc_status || '').toLowerCase() === 'verified') return 'KYC done'
+  return 'Logged in'
+}
+// Colour by progression so the funnel is glanceable: grey (just in) -> amber
+// (KYC in progress) -> green (KYC done) -> teal (payout-ready) -> blue
+// (submitting) -> emerald (fully active).
+const SCOUT_STAGE_STYLE: Record<string, CSSProperties> = {
+  'Logged in': { backgroundColor: 'rgba(107,114,128,0.18)', color: '#9ca3af' },
+  'KYC started': { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+  'KYC done': { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+  'UPI added': { backgroundColor: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
+  'Submitting photos': { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+  'Active': { backgroundColor: 'rgba(16,185,129,0.2)', color: '#10b981' },
+}
+const scoutStageStyleFor = (stage: string): CSSProperties =>
+  SCOUT_STAGE_STYLE[stage] || SCOUT_STAGE_STYLE['Logged in']
 
 const getScoreColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined) return 'var(--text-secondary)'
@@ -139,6 +171,11 @@ interface LeadsTableProps {
   hideFilters?: boolean
   showLimitSelector?: boolean
   showViewAll?: boolean
+  /** Scouts feature only: lock the user-type filter (e.g. 'scout') and hide the dropdown that would otherwise let it be changed. */
+  initialUserTypeFilter?: string
+  hideUserTypeFilter?: boolean
+  /** Overrides the header label (defaults to "Leads" / "Engaged Leads" / "Warm Leads"). */
+  title?: string
 }
 
 export default function LeadsTable({
@@ -147,10 +184,16 @@ export default function LeadsTable({
   hideFilters = false,
   showLimitSelector = false,
   showViewAll = false,
+  initialUserTypeFilter,
+  hideUserTypeFilter = false,
+  title,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
   const showAviationColumns = brandId === 'windchasers'
+  // Scout segment — gated by the brand's features.scouts toggle (lokazen) so
+  // scout UI never leaks into brands that don't run scouts.
+  const showScouts = Boolean(brandConfig.features?.scouts)
   const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
@@ -163,7 +206,7 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(initialUserTypeFilter || 'all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
@@ -171,6 +214,11 @@ export default function LeadsTable({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 100)
+
+  // Scout VIEW = the scouts feature is on AND the table is filtered to scouts
+  // (either via the dropdown or the locked initialUserTypeFilter on /dashboard/scouts).
+  // Swaps the brand/owner columns for scout-specific ones.
+  const scoutView = showScouts && userTypeFilter === 'scout'
 
   useEffect(() => {
     if (initialLimit) {
@@ -238,7 +286,20 @@ export default function LeadsTable({
     if (userTypeFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
+        if (showScouts) {
+          const normalizedUserType = brandData.user_type === 'property_owner'
+            ? 'owner'
+            : (brandData.user_type || brandData.business_type)
+          return normalizedUserType === userTypeFilter
+        }
         return (brandData.user_type || brandData.business_type) === userTypeFilter
+      })
+    } else if (showScouts) {
+      // Scouts have their own dedicated page — keep them out of the
+      // general Leads view, which is brand + property-owner only.
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        return brandData.user_type !== 'scout'
       })
     }
 
@@ -508,7 +569,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
+            {title || (presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads')}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -567,6 +628,16 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
+              {/* Scouts feature: Brand vs Property Owner vs Scout is the primary filter — show it first. */}
+              {showScouts && !hideUserTypeFilter && (
+                <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All leads</option>
+                  <option value="brand">Brands</option>
+                  <option value="owner">Property owners</option>
+                  <option value="scout">Scouts</option>
+                </select>
+              )}
+
               <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All time</option>
                 <option value="today">Today</option>
@@ -682,6 +753,8 @@ export default function LeadsTable({
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
+            {scoutView && <col style={{ width: '9%' }} />}  {/* Area Covered */}
+            {scoutView && <col style={{ width: '8%' }} />}  {/* Knows Properties */}
             <col style={{ width: '9%' }} />   {/* Owner */}
           </colgroup>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
@@ -700,6 +773,10 @@ export default function LeadsTable({
                   { label: 'Course', align: 'center' as const },
                   { label: 'PAT',    align: 'center' as const },
                 ] : []),
+                ...(scoutView ? [
+                  { label: 'Area Covered',     align: 'center' as const },
+                  { label: 'Knows Properties', align: 'center' as const },
+                ] : []),
                 { label: 'Owner',  align: 'left' as const },
               ].map(({ label, align }) => (
                 <th
@@ -716,7 +793,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 12 : 9}
+                  colSpan={showAviationColumns ? 12 : scoutView ? 11 : 9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -766,6 +843,22 @@ export default function LeadsTable({
                 // If no name, use email as primary identifier
                 const displayName = resolvedName || lead.email || lead.phone || '-'
                 const isEmailAsName = !resolvedName && !!lead.email
+
+                // Scouts feature (lokazen): lead-type badge + scout lifecycle stage.
+                const lkz = showScouts ? (uc?.[brandId] || {}) : {}
+                const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
+                const lkzType = showScouts
+                  ? (lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : '')
+                  : ''
+                // Scouts show their lifecycle stage (from scout_event), not a lead stage.
+                const isScoutRow = showScouts && lkzUserType === 'scout'
+                const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
+                const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyleFor(rowStage) : (stageColor.style || {})
+                // Scout's "area covered" is their single most useful field — dedupe
+                // repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
+                const scoutLocation = isScoutRow
+                  ? Array.from(new Set(String(lkz.scout_area_covered || '').split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
+                  : ''
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -1067,12 +1160,26 @@ export default function LeadsTable({
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                        {displayName}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {displayName}
+                        </span>
+                        {lkzType && (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
+                            style={lkzType === 'Brand'
+                              ? { backgroundColor: '#FF5200', color: '#fff' }
+                              : lkzType === 'Scout'
+                              ? { backgroundColor: '#7c3aed', color: '#fff' }
+                              : { backgroundColor: '#2563eb', color: '#fff' }}
+                          >
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Property Owner'}
+                          </span>
+                        )}
                       </div>
-                      {(brandName || city) && !isEmailAsName && (
+                      {(isScoutRow ? !!scoutLocation : !!(brandName || city)) && !isEmailAsName && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
-                          {[brandName, city].filter(Boolean).join(' \u00b7 ')}
+                          {isScoutRow ? scoutLocation : [brandName, city].filter(Boolean).join(' \u00b7 ')}
                         </div>
                       )}
                       {/* Date the lead came in */}
@@ -1243,13 +1350,13 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* STAGE - badge */}
+                    {/* STAGE - badge (scouts show their lifecycle stage) */}
                     <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
-                        style={stageColor.style || {}}
+                        style={rowStageStyle}
                       >
-                        {displayStage}
+                        {rowStage}
                       </span>
                     </td>
 
@@ -1374,6 +1481,30 @@ export default function LeadsTable({
                         </td>
                       )
                     })()}
+
+                    {/* SCOUTS: Area Covered + Knows Properties (scout view only) */}
+                    {scoutView && (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_area_covered ? (
+                            <span className="inline-block px-2 py-0.5 rounded-2xl text-[10px] font-semibold capitalize whitespace-normal break-words leading-snug max-w-[180px] align-middle" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
+                              {lkz.scout_area_covered}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_knows_properties ? (
+                            <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>
+                              {lkz.scout_knows_properties === 'yes' ? 'Yes' : lkz.scout_knows_properties === 'not_yet' ? 'Not yet' : lkz.scout_knows_properties}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </>
+                    )}
 
                     {/* OWNER */}
                     <td className="px-3 py-2 text-xs">

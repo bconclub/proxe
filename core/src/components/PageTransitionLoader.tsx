@@ -47,7 +47,7 @@ export default function PageTransitionLoader() {
           />
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
             <Image
-              src="/logo.png"
+              src={brandConfig.iconPath || '/logo.png'}
               alt={brandConfig.name}
               width={80}
               height={80}

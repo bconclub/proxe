@@ -103,6 +103,9 @@ export const proxeConfig: BrandConfig = {
   brand: 'proxe',
   tagline: 'PROXe',
   website: 'https://goproxe.com',
+  // Matches the LIVE proxe deployment, which serves the windchasers icon today.
+  // Swap for a real PROXe icon when one exists.
+  iconPath: '/windchasers-icon.png',
   widget: {
     headerName: 'PROXe',
     welcomeSequence: [

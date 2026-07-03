@@ -20,7 +20,7 @@ export const windchasersConfig: BrandConfig = {
   // calling — flip voice:true to surface the Calls dashboard + Vapi webhook.
   features: {
     voice: false,
-    brain: true,
+    brain: false, // Brain UI is BCON-only for now — flip to true to enable
     pipelineFunnel: true,
     followUpSequence: false,
   },

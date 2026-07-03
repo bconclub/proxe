@@ -36,6 +36,11 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias['@brand'] = BRAND_LINK
     config.resolve.alias['@'] = path.resolve(__dirname, 'src')
+    // Brand-pack modules live OUTSIDE core (/brands/<id>/widget etc. via
+    // externalDir). Bare imports there ('react', '@vapi-ai/web') must still
+    // resolve against core's node_modules, which upward-walking from /brands
+    // would never find.
+    config.resolve.modules = [path.resolve(__dirname, 'node_modules'), 'node_modules']
     return config
   },
   async headers() {

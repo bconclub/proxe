@@ -31,6 +31,7 @@ import {
   MdViewKanban,
   MdCall,
   MdLogout,
+  MdTwoWheeler,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
@@ -52,6 +53,7 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'People', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Scouts', href: '/dashboard/scouts', icon: MdTwoWheeler },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
@@ -66,11 +68,11 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 4), after Flow (index 7).
-// Calls sits at index 3 (gated off for brands without voice); its array slot is
-// counted here so the dividers land in the same rendered position whether or not
-// Calls is shown.
-const DIVIDER_AFTER_INDICES = [4, 7]
+// Divider positions: after Pipeline (index 5), after Flow (index 8).
+// Calls (index 4) and Scouts (index 2) are feature-gated per brand; their array
+// slots are counted here so the dividers land in the same rendered position
+// whether or not they are shown.
+const DIVIDER_AFTER_INDICES = [5, 8]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -496,6 +498,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
+              // Feature toggle: Scouts segment (lokazen) only for brands with scouts on.
+              if (item.href === '/dashboard/scouts' && !brandFeatures.scouts) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:

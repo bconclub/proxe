@@ -1,0 +1,124 @@
+/**
+ * Lokazen conversation-audience detection — shared by the web chat and
+ * WhatsApp routes (and by engine.ts for KB scoping) so brand/owner/scout
+ * detection has one source of truth instead of drifting per channel.
+ */
+import { AgentInput, HistoryEntry } from './types';
+
+export type LokazenAudience = 'brand' | 'owner' | 'scout' | null;
+
+function compactAnswer(value: unknown): string {
+  return String(value || '')
+    .replace(/\[BTN\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lowerText(value: unknown): string {
+  return compactAnswer(value).toLowerCase();
+}
+
+function latestAssistantPrompt(history: HistoryEntry[] | AgentInput['conversationHistory']): string {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i]?.role === 'assistant') return history[i].content || '';
+  }
+  return '';
+}
+
+/**
+ * Detects which of the three Lokazen conversation flows (brand/owner/scout)
+ * the current turn belongs to, from the previous assistant question and any
+ * buttons clicked. Used both to persist the right lead type and to scope
+ * knowledge-base retrieval so, e.g., a Scout's KYC question never surfaces
+ * brand pricing, and vice versa.
+ */
+export function detectLokazenAudience(
+  userMessage: string,
+  conversationHistory: HistoryEntry[] | AgentInput['conversationHistory'],
+  usedButtons: string[],
+): LokazenAudience {
+  const answerLower = compactAnswer(userMessage).toLowerCase();
+  const previousAssistant = lowerText(latestAssistantPrompt(conversationHistory));
+  const buttons = usedButtons.map(lowerText);
+
+  const ownerQuestion =
+    previousAssistant.includes('which area is the property') ||
+    previousAssistant.includes('what type of property') ||
+    previousAssistant.includes('what size is the space') ||
+    previousAssistant.includes('how big is the space') ||
+    previousAssistant.includes('monthly rent') ||
+    previousAssistant.includes('asking rent') ||
+    previousAssistant.includes('which floor') ||
+    previousAssistant.includes('frontage') ||
+    previousAssistant.includes('when is it available') ||
+    previousAssistant.includes('amenities') ||
+    previousAssistant.includes('parking') ||
+    previousAssistant.includes('photos') ||
+    previousAssistant.includes('google maps link') ||
+    previousAssistant.includes('full address');
+
+  const brandQuestion =
+    previousAssistant.includes("what's your brand name") ||
+    previousAssistant.includes('what is your brand name') ||
+    previousAssistant.includes('what kind of brand') ||
+    previousAssistant.includes('how many outlets') ||
+    previousAssistant.includes('first outlet') ||
+    previousAssistant.includes('expansion') ||
+    previousAssistant.includes('which part of bangalore') ||
+    previousAssistant.includes('which areas') ||
+    previousAssistant.includes('preferred format') ||
+    previousAssistant.includes('high-street') ||
+    previousAssistant.includes('what size range') ||
+    previousAssistant.includes('rent budget') ||
+    previousAssistant.includes('budget range') ||
+    previousAssistant.includes('when do you need the space');
+
+  const scoutQuestion =
+    previousAssistant.includes('which area can you cover') ||
+    previousAssistant.includes('do you already know any vacant commercial properties') ||
+    previousAssistant.includes("what's your name and phone number") ||
+    previousAssistant.includes('would you like the team to help you get started') ||
+    previousAssistant.includes('join us as a scout') ||
+    // Once the agent is in the scout flow, its replies mention these — keeps the
+    // audience sticky across follow-ups like "send me the app link".
+    previousAssistant.includes('scout app') ||
+    previousAssistant.includes('scouts spot') ||
+    previousAssistant.includes('scouts help');
+
+  // General scout intent in the user's own words — e.g. "help with my Lokazen
+  // Scout account", "the scout app", "i want to be a scout", "join as a scout".
+  // Requires the word "scout" so a brand/owner mentioning it in passing is safe.
+  const hasScoutWord = /\bscout\b/.test(answerLower);
+  // Gig-worker scout intent even without the word "scout" — the tell-tale
+  // phrases are unique to the scout product (KYC/verification to get paid,
+  // per-listing earnings, spotting empty "To Let" shops, UPI payout). Brand
+  // and owner intent is matched FIRST below, so a space-seeker/landlord that
+  // happens to use one of these words won't be misread as a scout.
+  const scoutPhrase =
+    /\bto[\s-]?let\b/.test(answerLower) ||
+    /(empty|vacant)\s+(shop|store|commercial)/.test(answerLower) ||
+    /(how (much|long).{0,20}(earn|paid|verif))|get (verified|paid)|verify.{0,10}(to get paid|for payout)/.test(answerLower) ||
+    /(earn|₹|rs\.?\s*\d).{0,25}(per|each).{0,20}(listing|property|shop|verif)/.test(answerLower) ||
+    /\b(payout|per verified|upi id|when (do|will) i get paid)\b/.test(answerLower) ||
+    /(spot|photograph|click a photo of).{0,20}(shop|property|space|to[\s-]?let)/.test(answerLower);
+  const scoutIntent =
+    answerLower.includes('become a scout') ||
+    answerLower.includes('join as a scout') ||
+    answerLower.includes('as a scout') ||
+    answerLower.includes('scout account') ||
+    answerLower.includes('scout app') ||
+    (hasScoutWord && /(account|app|kyc|payout|join|register|sign\s?up|spot|verif|earn)/.test(answerLower)) ||
+    scoutPhrase ||
+    buttons.some((b) => b.includes('scout'));
+
+  if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
+    return 'owner';
+  }
+  if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
+    return 'brand';
+  }
+  if (scoutIntent || scoutQuestion) {
+    return 'scout';
+  }
+  return null;
+}
