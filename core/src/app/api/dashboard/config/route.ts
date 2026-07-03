@@ -43,8 +43,8 @@ const INTEGRATIONS: IntegrationSpec[] = [
   {
     id: 'supabase', name: 'Supabase', desc: 'Database & auth',
     fields: [
-      { env: 'NEXT_PUBLIC_BCON_SUPABASE_URL', label: 'Project URL', required: true },
-      { env: 'NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY', label: 'Anon key', secret: true, required: true },
+      { env: 'NEXT_PUBLIC_SUPABASE_URL', label: 'Project URL', required: true },
+      { env: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', label: 'Anon key', secret: true, required: true },
       { env: 'SUPABASE_SERVICE_ROLE_KEY', label: 'Service-role key', secret: true, required: true },
     ],
   },

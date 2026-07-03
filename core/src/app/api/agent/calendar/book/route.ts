@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log and validate GOOGLE_CALENDAR_ID
-    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
     console.log('[agent/calendar/book] Using calendar ID:', calendarId, '(from env:', !!process.env.GOOGLE_CALENDAR_ID, ')');
 
     // Create Google Calendar event

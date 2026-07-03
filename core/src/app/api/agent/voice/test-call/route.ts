@@ -1,3 +1,4 @@
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
           'X-Auth-Token': authToken || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST', caller_name: 'BCON Club' }),
+        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST', caller_name: getBrandConfig().name }),
       }
     );
 

@@ -3,7 +3,7 @@ import { google } from 'googleapis'
 import { createClient } from '@/lib/supabase/server'
 import { getBrandConfig, getCurrentBrandId } from '@/configs'
 
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com'
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary'
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata'
 
 async function getAuthClient() {

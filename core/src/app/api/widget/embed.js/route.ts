@@ -1,3 +1,4 @@
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,7 @@ export async function GET() {
         lead_id: leadId,
         name: name,
         service: service,
-        brand: brand || 'BCON'
+        brand: brand || getCurrentBrandId()
       };
     }
   }

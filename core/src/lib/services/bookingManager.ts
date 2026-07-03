@@ -19,7 +19,7 @@ import { updateLeadProfile } from './leadManager';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com';
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata';
 
 export type BookingSessionType = 'online' | 'offline';

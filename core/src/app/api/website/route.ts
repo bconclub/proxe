@@ -1,3 +1,4 @@
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone } from '@/lib/services';
 
@@ -18,7 +19,7 @@ function getWelcomeTemplate(formType: string, name: string): string {
   if (formType === 'newsletter') {
     return `Hi ${name}, thanks for subscribing to BCON insights. Expect AI-powered business growth tips weekly. Want to chat about your specific challenges? Reply here.`;
   }
-  return `Hi ${name}, got your message from our website. I'm BCON's AI assistant. While our team reviews your inquiry, can you tell me: What's your biggest business challenge right now?`;
+  return `Hi ${name}, got your message from our website. I'm ${getBrandConfig().name}'s AI assistant. While our team reviews your inquiry, can you tell me: What's your biggest business challenge right now?`;
 }
 
 function getEmailTemplate(formType: string, name: string): string {
@@ -207,14 +208,14 @@ export async function POST(req: NextRequest) {
                   to: normalizedPhone.replace(/^\+/, ''),
                   type: 'template',
                   template: {
-                    name: 'bcon_welcome_web_v1',
+                    name: `${getCurrentBrandId()}_welcome_web_v1`,
                     language: { code: 'en' },
                     components: [{
                       type: 'body',
                       parameters: [
                         { type: 'text', parameter_name: 'customer_name', text: name },
                         { type: 'text', parameter_name: 'service_interest', text: serviceInterest || 'General Inquiry' },
-                        { type: 'text', parameter_name: 'brand_name', text: 'BCON' },
+                        { type: 'text', parameter_name: 'brand_name', text: getBrandConfig().name },
                         { type: 'text', parameter_name: 'probe_question', text: probeQuestion },
                       ]
                     }]
@@ -235,7 +236,7 @@ export async function POST(req: NextRequest) {
                 type: 'lead',
                 email: email,
                 name: name,
-                subject: 'We received your message - BCON',
+                subject: `We received your message - ${getBrandConfig().name}`,
                 message: getEmailTemplate(form_type || 'contact', name)
               })
             });

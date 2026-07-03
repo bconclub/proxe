@@ -5,7 +5,7 @@
  * correct Supabase project for each brand deployment.
  *
  * Lookup order (URL example):
- *   1. NEXT_PUBLIC_{BRAND}_SUPABASE_URL   (e.g. NEXT_PUBLIC_BCON_SUPABASE_URL)
+ *   1. NEXT_PUBLIC_{BRAND}_SUPABASE_URL   (e.g. NEXT_PUBLIC_SUPABASE_URL)
  *   2. NEXT_PUBLIC_SUPABASE_URL           (generic)
  *   3. NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL (legacy fallback)
  *

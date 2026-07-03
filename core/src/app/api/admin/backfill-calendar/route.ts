@@ -1,3 +1,4 @@
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
@@ -6,7 +7,7 @@ import crypto from 'crypto'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const CALENDAR_ID = 'bconclubx@gmail.com'
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary'
 const TIMEZONE = 'Asia/Kolkata'
 const EVENT_DURATION_MINUTES = 30
 
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
           resource: {
             summary: b.title,
             description: [
-              'BCON Strategy Call',
+              `${getBrandConfig().name} Strategy Call`,
               `Lead: ${b.name || 'Unknown'}`,
               `Brand: ${b.brand || 'Unknown'}`,
               `Phone: ${b.phone || 'N/A'}`,

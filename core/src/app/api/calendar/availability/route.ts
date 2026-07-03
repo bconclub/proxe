@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { getAvailableBookingSlotStarts, normalizeBookingSessionType } from '@/lib/services'
 
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'bconclubx@gmail.com'
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary'
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata'
 
 async function getAuthClient() {

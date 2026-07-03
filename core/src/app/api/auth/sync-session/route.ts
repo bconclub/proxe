@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
     
     // Static env var access (Next.js requires static string keys for NEXT_PUBLIC_*)
     const supabaseUrl =
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
       ''
     const supabaseAnonKey =
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       ''
 
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -175,14 +175,14 @@ export async function GET(request: NextRequest) {
   try {
     // Static env var access (Next.js requires static string keys for NEXT_PUBLIC_*)
     const supabaseUrl =
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
       ''
     const supabaseAnonKey =
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       ''
     
     const cookieStore = await cookies()
