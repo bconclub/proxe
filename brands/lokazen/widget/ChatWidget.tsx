@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
@@ -70,7 +70,7 @@ const InfinitySymbol = () => (
 );
 
 
-// Connecting ring â€” gold arc that fills 0â†’100% over 2.4s (Windchasers brand)
+// Connecting ring — gold arc that fills 0→100% over 2.4s (Windchasers brand)
 const ConnectingRingOrb = () => (
   <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
     <circle
@@ -182,7 +182,7 @@ const ICONS = {
   ),
 };
 
-// Lokazen welcome bubble â€” three-part intro sequence.
+// Lokazen welcome bubble — three-part intro sequence.
 const lokazenDefaultWelcomeSequence = [
   { text: "Hi, I'm Loka,", delay: 0 },
   { text: "Lokazen's commercial real estate assistant.", delay: 800 },
@@ -1396,17 +1396,17 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       setDynamicQuickButtons(null);
       setPendingFlowOverrideState(null);
     } else if (message.followUps && message.followUps.length > 0) {
-      // LLM emitted [BTN: X] markers â†’ useChatStream extracted them into
+      // LLM emitted [BTN: X] markers → useChatStream extracted them into
       // message.followUps. Surface them as quick-reply buttons.
       let followUps = message.followUps;
       if (brand === 'lokazen') {
         // Plans overview: detect from the BUTTONS (deterministic), not the text
-        // â€” the LLM paraphrases the scripted plan message, so text matching
-        // missed it and the plans fell through as flat text buttons. When â‰¥2
+        // — the LLM paraphrases the scripted plan message, so text matching
+        // missed it and the plans fell through as flat text buttons. When ≥2
         // plan buttons are present, render the rich cards on this message and
         // drop the redundant text buttons (cards provide the actions).
         const planBtns = followUps.filter((b) => /^(starter|professional|premium)\b/i.test(b.trim()));
-        const isDetailMsg = /\[\[plan:/i.test(message.text) || /\b(starter|professional|premium)\s*[-â€“]\s*rs/i.test(message.text);
+        const isDetailMsg = /\[\[plan:/i.test(message.text) || /\b(starter|professional|premium)\s*[-–]\s*rs/i.test(message.text);
         if (planBtns.length >= 2 && message.id) {
           setPlanCardsMessageId(message.id);
           followUps = followUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
@@ -1930,7 +1930,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     setDynamicQuickButtons(null);
   }, [isLoading, messages, updateMessageText]);
 
-  // Safety net: when isLoading transitions trueâ†’false, read followUps directly
+  // Safety net: when isLoading transitions true→false, read followUps directly
   // from the last AI message and apply them as flow override buttons.
   // This catches the case where onMessageComplete fires before React commits
   // the setMessages update (making completedMessageForCallback null), which
@@ -1945,7 +1945,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     if (!lastMsg.followUps || lastMsg.followUps.length === 0) return;
     if (pendingFlowOverrideRef.current) return;
 
-    // Apply the SAME Lokazen plan filtering as the main completion handler â€”
+    // Apply the SAME Lokazen plan filtering as the main completion handler —
     // this safety net was re-injecting the raw unfiltered followUps (the plan
     // chips) right after the main handler had stripped them for the cards.
     let safetyFollowUps = lastMsg.followUps;
@@ -1954,7 +1954,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       if (planBtns.length >= 2) {
         if (lastMsg.id) setPlanCardsMessageId(lastMsg.id);
         safetyFollowUps = safetyFollowUps.filter((b) => !/^(starter|professional|premium)\b/i.test(b.trim()));
-      } else if (/\[\[plan:/i.test(lastMsg.text) || /\b(starter|professional|premium)\s*[-â€“]\s*rs/i.test(lastMsg.text)) {
+      } else if (/\[\[plan:/i.test(lastMsg.text) || /\b(starter|professional|premium)\s*[-–]\s*rs/i.test(lastMsg.text)) {
         safetyFollowUps = safetyFollowUps.filter((b) => !/start this plan/i.test(b.trim()));
       }
       if (safetyFollowUps.length === 0) return;
@@ -2057,7 +2057,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       return;
     }
 
-    // Instant bubbles â€” CSS messageIn handles the fade-up animation
+    // Instant bubbles — CSS messageIn handles the fade-up animation
     const welcomeSequence = isLokazenScoutPage
       ? lokazenScoutWelcomeSequence
       : lokazenDefaultWelcomeSequence;
@@ -2316,11 +2316,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   useEffect(() => {
     if (!isOpen || messages.length !== 0 || hasShownWelcomeRef.current) return;
 
-    // â”€â”€ Show welcome immediately â€” never block on an async DB check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Show welcome immediately — never block on an async DB check ──────────
     // This removes the ~500 ms round-trip delay that was visible on first open.
     playWelcomeSequence();
 
-    // â”€â”€ Background: restore prior conversation for returning users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Background: restore prior conversation for returning users ───────────
     // If the session has a linked lead with past messages, swap the welcome
     // content out (typically < 1 s, invisible to first-time visitors).
     if (!hasRestoredMessagesRef.current && externalSessionId) {
@@ -2361,7 +2361,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
             messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
           }, 80);
         } catch (err) {
-          // Non-fatal â€” welcome is already visible
+          // Non-fatal — welcome is already visible
           console.error('[ChatWidget] Background conversation restore failed:', err);
         }
       })();
@@ -2713,13 +2713,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       try {
         if (vapi.isMuted()) {
           vapi.setMuted(false);
-          vapiLog('mic was muted â†’ force-unmuted');
+          vapiLog('mic was muted → force-unmuted');
         }
       } catch { /* older SDK versions don't expose isMuted */ }
     };
 
     vapi.on('call-start', () => {
-      vapiLog('call-start âœ…');
+      vapiLog('call-start ✅');
       if (!vapiCallIdRef.current) {
         vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       }
@@ -2747,7 +2747,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       }, 700);
     });
     vapi.on('error', (e: any) => {
-      vapiLog(`error âŒ ${JSON.stringify(e)}`);
+      vapiLog(`error ❌ ${JSON.stringify(e)}`);
       vapiCallReadyRef.current = false;
       vapiPrewarmedRef.current = false;
       vapiCallIdRef.current = null;
@@ -2773,7 +2773,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       // Some browsers/Daily.co silently mute the user track during assistant audio.
       setTimeout(ensureMicLive, 150);
     });
-    // Volume-level fires continuously with user mic amplitude (0â€“1).
+    // Volume-level fires continuously with user mic amplitude (0–1).
     // Drive the on-screen mic bar so we can visually confirm audio capture.
     vapi.on('volume-level', (level: number) => {
       setVapiVolume(level);
@@ -2798,10 +2798,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     });
   };
 
-  // Pre-warm: instantiate Vapi + attach listeners only â€” do NOT call .start() here.
+  // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
   // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
   // grant mic permission correctly, especially on iOS Safari and Android Chrome.
-  // Do NOT pre-request getUserMedia here â€” claiming and releasing the mic before
+  // Do NOT pre-request getUserMedia here — claiming and releasing the mic before
   // Vapi grabs it causes the device to reject Vapi's subsequent capture on mobile.
   const startVapiPrewarm = () => {
     if (vapiPrewarmedRef.current) return;
@@ -2812,7 +2812,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   };
 
   const handleVoiceToggle = async () => {
-    // â”€â”€ End call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── End call ──────────────────────────────────────────────────────────────
     if (isVapiActive) {
       // Flash red ring briefly before overlay unmounts
       setVapiEnding(true);
@@ -2830,7 +2830,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       return;
     }
 
-    // â”€â”€ Start call â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Start call ─────────────────────────────────────────────────────────────
     setVapiTranscript([]);
     setVapiDebugLog([]);
     vapiCallIdRef.current = `vapi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2842,13 +2842,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       // Guard: env key must be present
       const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
       if (!publicKey) {
-        vapiLog('error âŒ NEXT_PUBLIC_VAPI_PUBLIC_KEY not set');
+        vapiLog('error ❌ NEXT_PUBLIC_VAPI_PUBLIC_KEY not set');
         setIsVapiActive(false);
         setVapiConnecting(false);
         return;
       }
 
-      // Always create a fresh instance â€” reusing a pre-warmed or stale instance
+      // Always create a fresh instance — reusing a pre-warmed or stale instance
       // can cause silent failures on mobile browsers.
       if (vapiRef.current) {
         try { vapiRef.current.stop(); } catch {}
@@ -2856,7 +2856,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       }
       vapiPrewarmedRef.current = true;
 
-      // Preflight getUserMedia â€” must happen BEFORE Vapi's network handshake.
+      // Preflight getUserMedia — must happen BEFORE Vapi's network handshake.
       // In cross-origin iframes Chrome's transient user-activation window is
       // ~1 second. Vapi.start() fires a server request before calling
       // getUserMedia() internally; by then the activation expires and Chrome
@@ -2865,15 +2865,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       // within the activation window. Once the user taps Allow the permission
       // is stored for this origin and Vapi's own internal getUserMedia() works.
       // iOS Safari note: iOS 16.4+ also requires the call to stay in the
-      // synchronous part of the user-gesture stack â€” await here is fine because
+      // synchronous part of the user-gesture stack — await here is fine because
       // we're still inside the same event-loop task initiated by the click.
       if (navigator.mediaDevices?.getUserMedia) {
         try {
           const preflightStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           preflightStream.getTracks().forEach(track => track.stop());
-          vapiLog('mic preflight âœ… permission granted');
+          vapiLog('mic preflight ✅ permission granted');
         } catch (micErr: any) {
-          vapiLog(`mic preflight âŒ ${micErr?.message ?? micErr}`);
+          vapiLog(`mic preflight ❌ ${micErr?.message ?? micErr}`);
           setIsVapiActive(false);
           setVapiConnecting(false);
           vapiPrewarmedRef.current = false;
@@ -2885,8 +2885,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       vapiRef.current = vapi;
       attachVapiListeners(vapi);
 
-      vapiLog('calling vapi.startâ€¦');
-      // No client-side overrides â€” all config lives in the Vapi dashboard.
+      vapiLog('calling vapi.start…');
+      // No client-side overrides — all config lives in the Vapi dashboard.
       // Passing overrides risks schema-validation rejection on the server side
       // which silently drops firstMessage and transcriber settings. Match the
       // VapiOrb pattern: just pass the assistant ID, nothing else.
@@ -2894,7 +2894,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       vapiLog('vapi.start() resolved');
     } catch (err: any) {
       const msg = err?.message ?? String(err);
-      vapiLog(`start failed âŒ ${msg}`);
+      vapiLog(`start failed ❌ ${msg}`);
       setIsVapiActive(false);
       setVapiConnecting(false);
       if (vapiRef.current) {
@@ -3002,7 +3002,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
 
     const normalizedButton = message.toLowerCase();
 
-    // Rebook flow â€” intercept before AI
+    // Rebook flow — intercept before AI
     if (normalizedButton === 'yes, reschedule') {
       setBookingCompleted(false);
       bookingConfirmedRef.current = false;
@@ -3020,7 +3020,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       return;
     }
 
-    // Cost guide / roadmap â€” show inline WhatsApp contact form, skip AI
+    // Cost guide / roadmap — show inline WhatsApp contact form, skip AI
     if (normalizedButton === 'send me the cost guide' || normalizedButton === 'send me the roadmap') {
       addUserMessage(buttonText);
       const formId = `cost-guide-${Date.now()}`;
@@ -3034,7 +3034,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     // activity step (e.g. "Working", "Taking a break").
     const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
     const flowRule = (() : FlowOverrideRule | null => {
-      // Pilot Assessment entry â€” open the assessment in a new tab with chat
+      // Pilot Assessment entry — open the assessment in a new tab with chat
       // context attached. Accept the legacy "take the pat" label as well so
       // older chat states (mid-session) still route correctly.
       if (
@@ -3050,7 +3050,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
             }
             window.open(assessmentUrl.toString(), '_blank', 'noopener,noreferrer');
           } catch {
-            /* noop â€” popup blocker or invalid URL */
+            /* noop — popup blocker or invalid URL */
           }
         }
         return {
@@ -3093,10 +3093,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         };
       }
       if (normalizedButton === 'yes, completed 12th science') {
-        // No buttons â€” user types their age freely, submitMessage detects it and routes
+        // No buttons — user types their age freely, submitMessage detects it and routes
         return { followUpButtons: [] };
       }
-      // Aspirant activity acknowledgement â€” only fires when not on the parent path.
+      // Aspirant activity acknowledgement — only fires when not on the parent path.
       if (
         !isParentPath && (
           normalizedButton === 'studying' ||
@@ -3109,7 +3109,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         };
       }
 
-      // â”€â”€ Parent path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Parent path ────────────────────────────────────────────────────
       if (normalizedButton === 'i am a parent') {
         return {
           followUpButtons: [
@@ -3119,7 +3119,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
           ],
         };
       }
-      // First-level parent topic answers â€” every topic ends on the same
+      // First-level parent topic answers — every topic ends on the same
       // 3-button rail so the parent always has the same exits.
       if (
         isParentPath && (
@@ -3136,7 +3136,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
           followUpButtons: ['Send me the roadmap', 'Ask a question', 'Maybe later'],
         };
       }
-      // Cost guide / roadmap â€” bot asks for contact; suppress buttons during
+      // Cost guide / roadmap — bot asks for contact; suppress buttons during
       // the contact-capture turn so the user can type their info.
       if (
         isParentPath && (
@@ -3146,12 +3146,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       ) {
         return { followUpButtons: [] };
       }
-      // Post-capture acknowledgement rail â€” the parent has shared contact
+      // Post-capture acknowledgement rail — the parent has shared contact
       // and the bot has acknowledged. Offer counsellor / another question / exit.
       // (Parent must explicitly click these; "ask another question" / "maybe
       // later" / "not right now" are handled below.)
 
-      // 'Ask another question' / 'Ask a question' â€” drop into free-form,
+      // 'Ask another question' / 'Ask a question' — drop into free-form,
       // no flow override. Bot responds from KB + prompt context.
       if (
         isParentPath && (
@@ -3161,7 +3161,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
       ) {
         return null;
       }
-      // 'Maybe later' / 'Not right now' â€” graceful exit; bot says the closing
+      // 'Maybe later' / 'Not right now' — graceful exit; bot says the closing
       // line and we suppress further buttons.
       if (
         isParentPath && (
@@ -3172,7 +3172,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         return { followUpButtons: [] };
       }
 
-      // â”€â”€ Explore Training Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Explore Training Options ──────────────────────────────────────
       // Each sub-program funnels into an existing flow rather than
       // dead-ending in LLM-improv, fixing the "Cabin Crew got stuck" bug.
       if (normalizedButton === 'explore training options') {
@@ -3185,7 +3185,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
       if (normalizedButton === 'helicopter pilot') {
-        // Skip the airplane/helicopter pick â€” they already chose helicopter.
+        // Skip the airplane/helicopter pick — they already chose helicopter.
         return {
           followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
         };
@@ -3194,7 +3194,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
         normalizedButton === 'flight schools' ||
         normalizedButton === 'cabin crew'
       ) {
-        // Info-only programs â€” bot answers from KB, then offers a counsellor
+        // Info-only programs — bot answers from KB, then offers a counsellor
         // call or a follow-up question. Prevents the "stuck on Yes" bug.
         return {
           followUpButtons: ['Talk to a counsellor', 'Ask a question'],
@@ -3406,12 +3406,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
 
   const formatText = (text: string): string => {
     if (!text) return '';
-    // Remove button instruction patterns (e.g., "â†’ BUTTON: Schedule a Demo") before formatting
+    // Remove button instruction patterns (e.g., "→ BUTTON: Schedule a Demo") before formatting
     // These are metadata instructions that shouldn't be displayed to users
     let cleanedText = text
-      .replace(/â†’\s*BUTTON:\s*[^\n]*/gi, '') // Remove "â†’ BUTTON: ..." lines
+      .replace(/→\s*BUTTON:\s*[^\n]*/gi, '') // Remove "→ BUTTON: ..." lines
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
-      .replace(/\[\[PLANS?\]\]/gi, '') // Plans-card marker â€” the cards render separately
+      .replace(/\[\[PLANS?\]\]/gi, '') // Plans-card marker — the cards render separately
       .replace(/\[\[PLAN:[a-z]+\]\]/gi, '') // Single-plan-card marker
       // The "Tap a plan" line + its inline plan list are replaced by the plan
       // cards, so drop the now-redundant text tail on the plans message.
@@ -3423,21 +3423,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     // Basic markdown to HTML conversion
     // Convert double newlines to breaks
     // Preserve single newlines (they indicate intentional line breaks for formatting)
-    // Preserve line breaks for bullet points (lines starting with â€¢)
+    // Preserve line breaks for bullet points (lines starting with •)
     // Convert <br> tags if already present
     const linkStyle = 'color:var(--accent-primary,#FF5200);text-decoration:underline;word-break:break-all';
     return cleanedText
       .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
-      // Markdown links [text](url) â†’ anchor (before newline/emphasis passes so the
+      // Markdown links [text](url) → anchor (before newline/emphasis passes so the
       // parens and url aren't mangled).
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi,
         `<a href="$2" target="_blank" rel="noopener noreferrer" style="${linkStyle}">$1</a>`)
       .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
-      .replace(/\n(?=\s*â€¢)/g, '<br>') // Preserve line breaks before bullet points
+      .replace(/\n(?=\s*•)/g, '<br>') // Preserve line breaks before bullet points
       .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Bare URLs â†’ clickable (last, so <br>/emphasis are already applied and the
+      // Bare URLs → clickable (last, so <br>/emphasis are already applied and the
       // url isn't split). The leading-char guard skips urls already inside an
       // href="..." attribute; the trailing class drops a stray end punctuation.
       .replace(/(^|[^"'=])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/gi,
@@ -3592,7 +3592,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          {/* Glass orb â€” speaker state drives halo colour via data-speaker */}
+          {/* Glass orb — speaker state drives halo colour via data-speaker */}
           <div
             className={styles.voiceOrbWrap}
             data-speaker={vapiSpeaker}
@@ -3607,15 +3607,15 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
           <div className={styles.voiceMeta}>
             <p className={styles.voiceName}>Avia</p>
             <p className={styles.voiceStatus}>
-              {vapiConnecting ? 'Connectingâ€¦'
-                : vapiEnding ? 'Endingâ€¦'
+              {vapiConnecting ? 'Connecting…'
+                : vapiEnding ? 'Ending…'
                 : vapiError ? 'Connection issue'
-                : vapiSpeaker === 'assistant' ? 'Speakingâ€¦'
-                : vapiSpeaker === 'user' ? 'Listeningâ€¦'
+                : vapiSpeaker === 'assistant' ? 'Speaking…'
+                : vapiSpeaker === 'user' ? 'Listening…'
                 : 'Connected'}
             </p>
           </div>
-          {/* Mic volume bar â€” shows live amplitude from user's mic.
+          {/* Mic volume bar — shows live amplitude from user's mic.
               If this bar never moves when speaking, mic audio isn't reaching Vapi. */}
           {!vapiConnecting && !vapiEnding && (
             <div className={styles.voiceMicBar}>
@@ -3722,7 +3722,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
           const accentClass = `accent-${accentIndex}`;
           
           // When the booking calendar is anchored to this message, the calendar
-          // widget renders its own AI bubble below â€” so suppress this empty
+          // widget renders its own AI bubble below — so suppress this empty
           // anchor bubble to avoid a chrome-only "broken bubble" above it.
           const calendarAnchoredHere = !!showCalendly && calendarAnchorId === message.id;
           return (
@@ -3743,7 +3743,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         <span />
                       </div>
                     ) : (() => {
-                        // Lokazen plan cards â€” rich rendering of /for-brands#plans so
+                        // Lokazen plan cards — rich rendering of /for-brands#plans so
                         // plans land visually instead of as flat text. Overview shows
                         // all 3 (with the "how we work" intro above); the single-plan
                         // detail replaces the flat text with one focused card.
@@ -3755,11 +3755,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                           || /tap a plan to see what'?s included/i.test(t)
                         );
                         const detailMatch = isLokazenAi && !isOverview
-                          ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-â€“]\s*Rs/i))
+                          ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-–]\s*Rs/i))
                           : null;
                         // The cards carry the plan info AND the "Choose" actions, so
                         // suppress the flat text on BOTH the overview and the focused
-                        // detail â€” otherwise the "01 Choose Planâ€¦" roadmap duplicates
+                        // detail — otherwise the "01 Choose Plan…" roadmap duplicates
                         // the cards and reads like an unclickable button.
                         const hideText = !!detailMatch || isOverview;
                         return (
@@ -3772,7 +3772,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                             dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
                           />
                           {message.isStreaming && message.text && (
-                            <span className={styles.streamingCursor}>â–‹</span>
+                            <span className={styles.streamingCursor}>▋</span>
                           )}
                         </div>
                         )}
@@ -3947,22 +3947,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                       
                       <div className={styles.portfolioGrid} data-scroll-lock="allow">
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸŽ¯</div>
+                          <div className={styles.portfolioIcon}>🎯</div>
                           <div className={styles.portfolioTitle}>Customer Acquisition</div>
                           <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸŽ¨</div>
+                          <div className={styles.portfolioIcon}>🎨</div>
                           <div className={styles.portfolioTitle}>Brand Management</div>
                           <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸ“</div>
+                          <div className={styles.portfolioIcon}>📝</div>
                           <div className={styles.portfolioTitle}>Content & Ads</div>
                           <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸ¤–</div>
+                          <div className={styles.portfolioIcon}>🤖</div>
                           <div className={styles.portfolioTitle}>AI Automation</div>
                           <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
                         </div>

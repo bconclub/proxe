@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
@@ -176,7 +176,7 @@ const readLandingAttribution = (
     const hasSignal =
       Object.values(utm).some(Boolean) ||
       (referrer && !referrer.includes(window.location.host));
-    if (!hasSignal) return null; // organic/direct â€” let it resolve to Direct
+    if (!hasSignal) return null; // organic/direct — let it resolve to Direct
     const attr = { utm, page_url: window.location.href, referrer };
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(attr)); } catch { /* ignore */ }
     return attr;
@@ -931,7 +931,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // REQUIRED gate: ask for name + WhatsApp number on the first message, before
     // the AI responds, so every web chat becomes a reachable lead (founder:
     // "otherwise people are just talking"). This blocks unconditionally while
-    // either is missing â€” typing in the main input can't bypass it.
+    // either is missing — typing in the main input can't bypass it.
     const needContact = (!userProfile.name || !userProfile.phone) && messageCount === 0;
     if (!needContact) return false;
 
@@ -1105,7 +1105,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setNamePromptDismissed(false);
     setShowNamePrompt(false);
 
-    // sync:false â€” save name+phone LOCALLY only; do NOT create the lead from the
+    // sync:false — save name+phone LOCALLY only; do NOT create the lead from the
     // browser here. The contact rides along in userProfile to /api/agent/web/chat,
     // which creates the single lead server-side. Creating it both here AND on the
     // server raced and produced duplicate leads (same phone, ~2s apart).
@@ -2151,7 +2151,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // AI-DRIVEN calendar trigger: the calendar otherwise only opens when the
     // USER's message contains a booking keyword (call/book/schedule). But the
     // visitor often just replies "tomorrow" or picks a time in prose, and the AI
-    // responds by offering slots â€” with no calendar widget shown (the bug: "still
+    // responds by offering slots — with no calendar widget shown (the bug: "still
     // throwing text, not giving the booking model"). So when the AI's COMPLETED
     // reply is clearly offering booking slots, flip pendingCalendar so the block
     // below opens the visual picker.
@@ -2190,7 +2190,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         // bcon-web-prompt.ts "Present as plain text; the visitor sees a
         // calendar widget to pick"). This used to bail out here whenever the
         // AI's text contained time slots, which suppressed the widget on
-        // EVERY booking reply (the prompt always lists slots as text) â€” the
+        // EVERY booking reply (the prompt always lists slots as text) — the
         // widget effectively never showed. Always continue to open it.
 
         // Use setTimeout to ensure state updates properly
@@ -2718,10 +2718,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   const formatText = (text: string): string => {
     if (!text) return '';
-    // Remove button instruction patterns (e.g., "â†’ BUTTON: Schedule a Demo") before formatting
+    // Remove button instruction patterns (e.g., "→ BUTTON: Schedule a Demo") before formatting
     // These are metadata instructions that shouldn't be displayed to users
     let cleanedText = text
-      .replace(/â†’\s*BUTTON:\s*[^\n]*/gi, '') // Remove "â†’ BUTTON: ..." lines
+      .replace(/→\s*BUTTON:\s*[^\n]*/gi, '') // Remove "→ BUTTON: ..." lines
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
       .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
       .trim();
@@ -2729,12 +2729,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // Basic markdown to HTML conversion
     // Convert double newlines to breaks
     // Preserve single newlines (they indicate intentional line breaks for formatting)
-    // Preserve line breaks for bullet points (lines starting with â€¢)
+    // Preserve line breaks for bullet points (lines starting with •)
     // Convert <br> tags if already present
     return cleanedText
       .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
       .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
-      .replace(/\n(?=\s*â€¢)/g, '<br>') // Preserve line breaks before bullet points
+      .replace(/\n(?=\s*•)/g, '<br>') // Preserve line breaks before bullet points
       .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -2987,7 +2987,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                               dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
                             />
                             {message.isStreaming && message.text && (
-                              <span className={styles.streamingCursor}>â–‹</span>
+                              <span className={styles.streamingCursor}>▋</span>
                             )}
                           </div>
                         )}
@@ -3154,22 +3154,22 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       
                       <div className={styles.portfolioGrid} data-scroll-lock="allow">
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸŽ¯</div>
+                          <div className={styles.portfolioIcon}>🎯</div>
                           <div className={styles.portfolioTitle}>Customer Acquisition</div>
                           <div className={styles.portfolioDesc}>AI-powered lead generation & Meta ad systems</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸŽ¨</div>
+                          <div className={styles.portfolioIcon}>🎨</div>
                           <div className={styles.portfolioTitle}>Brand Management</div>
                           <div className={styles.portfolioDesc}>Identity, content strategy & positioning</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸ“</div>
+                          <div className={styles.portfolioIcon}>📝</div>
                           <div className={styles.portfolioTitle}>Content & Ads</div>
                           <div className={styles.portfolioDesc}>End-to-end creative & campaign execution</div>
                         </div>
                         <div className={styles.portfolioCard}>
-                          <div className={styles.portfolioIcon}>ðŸ¤–</div>
+                          <div className={styles.portfolioIcon}>🤖</div>
                           <div className={styles.portfolioTitle}>AI Automation</div>
                           <div className={styles.portfolioDesc}>Chatbots, workflows & business intelligence</div>
                         </div>
@@ -3412,7 +3412,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         
         
         {/* Quick-reply chips render INSIDE the scroll flow, right under the last
-            message â€” so they sit directly below the question (left-aligned) and
+            message — so they sit directly below the question (left-aligned) and
             scroll with the conversation instead of pinning to the widget bottom. */}
         {(!isMobileViewport) &&
           isOpen &&

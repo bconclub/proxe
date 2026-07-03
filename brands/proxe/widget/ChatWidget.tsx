@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
@@ -116,7 +116,7 @@ const ICONS = {
 const welcomeMessages: Record<string, string> = {
   windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
   bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
-  proxe: "Hi! I'm PROXe â€” your AI-powered business assistant. How can I help you today?",
+  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
 };
 function getWelcomeMessage(brand: string): string {
   return welcomeMessages[brand] || welcomeMessages['proxe'];
@@ -2554,10 +2554,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   const formatText = (text: string): string => {
     if (!text) return '';
-    // Remove button instruction patterns (e.g., "â†’ BUTTON: Schedule a Demo") before formatting
+    // Remove button instruction patterns (e.g., "→ BUTTON: Schedule a Demo") before formatting
     // These are metadata instructions that shouldn't be displayed to users
     let cleanedText = text
-      .replace(/â†’\s*BUTTON:\s*[^\n]*/gi, '') // Remove "â†’ BUTTON: ..." lines
+      .replace(/→\s*BUTTON:\s*[^\n]*/gi, '') // Remove "→ BUTTON: ..." lines
       .replace(/BUTTON:\s*[^\n]*/gi, '') // Remove "BUTTON: ..." lines (without arrow)
       .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple empty lines
       .trim();
@@ -2565,12 +2565,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // Basic markdown to HTML conversion
     // Convert double newlines to breaks
     // Preserve single newlines (they indicate intentional line breaks for formatting)
-    // Preserve line breaks for bullet points (lines starting with â€¢)
+    // Preserve line breaks for bullet points (lines starting with •)
     // Convert <br> tags if already present
     return cleanedText
       .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
       .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
-      .replace(/\n(?=\s*â€¢)/g, '<br>') // Preserve line breaks before bullet points
+      .replace(/\n(?=\s*•)/g, '<br>') // Preserve line breaks before bullet points
       .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -2821,7 +2821,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                           dangerouslySetInnerHTML={{ __html: formatText(message.text) }}
                         />
                         {message.isStreaming && message.text && (
-                          <span className={styles.streamingCursor}>â–‹</span>
+                          <span className={styles.streamingCursor}>▋</span>
                         )}
                       </div>
                       
