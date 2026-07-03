@@ -3747,7 +3747,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
                         const detailMatch = isLokazenAi && !isOverview
                           ? (t.match(/\[\[PLAN:([a-z]+)\]\]/i) || t.match(/\b(Starter|Professional|Premium)\s*[-–]\s*Rs/i))
                           : null;
-                        const hideText = !!detailMatch; // the focused card replaces the flat detail text
+                        // The cards carry the plan info AND the "Choose" actions, so
+                        // suppress the flat text on BOTH the overview and the focused
+                        // detail — otherwise the "01 Choose Plan…" roadmap duplicates
+                        // the cards and reads like an unclickable button.
+                        const hideText = !!detailMatch || isOverview;
                         return (
                       <>
                         {!hideText && (
