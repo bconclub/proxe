@@ -82,7 +82,10 @@ async function resolveTestLead() {
 function convLeadId(realLeadId) {
   return TEST_RECIPIENT ? TEST_LEAD_ID : realLeadId;
 }
-function routePhone(phone) {
+function routePhone(phone, bypassTest = false) {
+  // Welcomes for brand-new leads (first_outreach) must ALWAYS reach the real
+  // lead — TEST mode only holds back the follow-up sequences we're tuning.
+  if (bypassTest) return phone;
   if (TEST_RECIPIENT) {
     console.log(`[TEST_RECIPIENT] Redirect send: real=${phone} -> test=${TEST_RECIPIENT}`);
     return TEST_RECIPIENT;
@@ -3073,15 +3076,16 @@ async function executeFirstOutreach(task, waPhone) {
     task_type: 'first_outreach',
   });
 
-  // Log to conversations (test mode → test lead thread, never the real lead)
-  if (task.lead_id && convLeadId(task.lead_id)) {
+  // The welcome went to the REAL lead (it bypasses TEST mode), so log it against
+  // the real lead — never the test-lead thread, and without the test_mode stamp.
+  if (task.lead_id) {
     await supabase.from('conversations').insert({
-      lead_id: convLeadId(task.lead_id),
+      lead_id: task.lead_id,
       channel: 'whatsapp',
       sender: 'agent',
       content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
       message_type: 'text',
-      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, template_buttons: TEMPLATE_BUTTONS[templateName] || undefined, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}), ...TEST_META }
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, template_buttons: TEMPLATE_BUTTONS[templateName] || undefined, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}) }
     }).then(({ error }) => {
       if (error) console.error('[FirstOutreach] Conversation log error:', error.message);
     });
@@ -4357,7 +4361,8 @@ async function sendWhatsApp(phone, message) {
 // Routes to the correct template per task type.
 // ============================================
 async function sendWhatsAppTemplate(phone, task) {
-  phone = routePhone(phone); // TEST MODE: redirect to test number if set
+  // Welcomes (first_outreach) always go to the real lead; follow-ups honour TEST mode.
+  phone = routePhone(phone, task?.task_type === 'first_outreach');
   // Fetch lead record for context-aware template selection
   let lead = null;
   if (task.lead_id) {
