@@ -3425,13 +3425,23 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
     // Preserve single newlines (they indicate intentional line breaks for formatting)
     // Preserve line breaks for bullet points (lines starting with •)
     // Convert <br> tags if already present
+    const linkStyle = 'color:var(--accent-primary,#FF5200);text-decoration:underline;word-break:break-all';
     return cleanedText
       .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
+      // Markdown links [text](url) → anchor (before newline/emphasis passes so the
+      // parens and url aren't mangled).
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi,
+        `<a href="$2" target="_blank" rel="noopener noreferrer" style="${linkStyle}">$1</a>`)
       .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
       .replace(/\n(?=\s*•)/g, '<br>') // Preserve line breaks before bullet points
       .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>');
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // Bare URLs → clickable (last, so <br>/emphasis are already applied and the
+      // url isn't split). The leading-char guard skips urls already inside an
+      // href="..." attribute; the trailing class drops a stray end punctuation.
+      .replace(/(^|[^"'=])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/gi,
+        `$1<a href="$2" target="_blank" rel="noopener noreferrer" style="${linkStyle}">$2</a>`);
   };
   
   useEffect(() => {
