@@ -4,10 +4,9 @@
  */
 
 import { Channel, HistoryEntry } from './types';
-import { getWindchasersSystemPrompt } from '../../configs/prompts/windchasers-prompt';
-import { getWindchasersWebSystemPrompt } from '../../configs/prompts/windchasers-web-prompt';
-import { getBconSystemPrompt } from '../../configs/prompts/bcon-prompt';
-import { getBconWebSystemPrompt } from '../../configs/prompts/bcon-web-prompt';
+// Active brand's prompt, loaded via @brand (→ /brands/<id>/prompts). Adding a
+// brand needs NO edit here — the alias resolves its prompt at build time.
+import { getSystemPrompt, getWebSystemPrompt } from '@brand/prompts';
 import { isLikelyRealPersonName } from '../services/utils';
 
 interface PromptOptions {
@@ -39,18 +38,11 @@ export function getDefaultBrandPrompt(brand: string, channel?: Channel, context 
  * base: resolve the brand and pick its prompt. Adding a brand = drop in its
  * prompt module + one case here (no other core edits).
  */
-function getBrandSystemPrompt(brand: string, context: string, messageCount?: number, channel?: Channel): string {
-  switch (brand.toLowerCase()) {
-    case 'bcon':
-      return channel === 'web'
-        ? getBconWebSystemPrompt(context, messageCount)
-        : getBconSystemPrompt(context, messageCount);
-    case 'windchasers':
-    default:
-      return channel === 'web'
-        ? getWindchasersWebSystemPrompt(context, messageCount)
-        : getWindchasersSystemPrompt(context, messageCount);
-  }
+function getBrandSystemPrompt(_brand: string, context: string, messageCount?: number, channel?: Channel): string {
+  // @brand IS the active brand — no switch needed. Its prompt is picked at build.
+  return channel === 'web'
+    ? getWebSystemPrompt(context, messageCount)
+    : getSystemPrompt(context, messageCount);
 }
 
 /**

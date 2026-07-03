@@ -3,7 +3,7 @@
  * Brand facts live in @/lib/brand-facts — never duplicate them here.
  */
 
-import { getBrandFactsForPrompt, BRAND_IDENTITY, PRIMARY_CTAS } from '@/lib/brand-facts';
+import { getBrandFactsForPrompt, BRAND_IDENTITY, PRIMARY_CTAS } from '@brand/brand-facts';
 
 export function getWindchasersWebSystemPrompt(context: string, messageCount?: number): string {
   const isFirstMessage = messageCount === 1 || messageCount === 0;

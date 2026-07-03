@@ -7,7 +7,7 @@
  * Run: npx ts-node -e "import('./windchasers-voice-prompt').then(m => console.log(m.getAviaVoicePrompt()))"
  */
 
-import { getBrandFactsForPrompt, BRAND_IDENTITY, LOCKED_ANSWERS, PRIMARY_CTAS } from '@/lib/brand-facts';
+import { getBrandFactsForPrompt, BRAND_IDENTITY, LOCKED_ANSWERS, PRIMARY_CTAS } from '@brand/brand-facts';
 
 export function getAviaVoicePrompt(): string {
   return `You are Avia, pronounced AY-vee-ah. The voice-based AI aviation career advisor for ${BRAND_IDENTITY.name}.
