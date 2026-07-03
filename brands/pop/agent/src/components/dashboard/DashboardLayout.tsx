@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
@@ -51,7 +51,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
-  { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'People', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
@@ -74,6 +74,7 @@ const DIVIDER_AFTER_INDICES = [4, 7]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands — only the resolved values differ per brand.
   const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
@@ -421,14 +422,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: !showExpanded ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandId === 'pop') ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
+              } else if (showExpanded && brandId === 'pop') {
+                router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : brandId === 'pop' ? 'Enter the War Room' : undefined}
           >
             {brandLogo && (
               <img
@@ -441,12 +444,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {showExpanded && (
             <>
-              <h1
-                className="dashboard-layout-sidebar-logo flex-1 truncate"
-                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
-              >
-                {brandName}
-              </h1>
+              {brandId === 'pop' ? (
+                <a
+                  href="/war-room"
+                  title="Enter the War Room"
+                  className="dashboard-layout-sidebar-logo flex-1 min-w-0"
+                  style={{ fontSize: '12.5px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em', color: 'var(--accent-primary)', textDecoration: 'none', whiteSpace: 'normal' }}
+                >
+                  {brandName}
+                </a>
+              ) : (
+                <h1
+                  className="dashboard-layout-sidebar-logo flex-1 truncate"
+                  style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--accent-primary)' }}
+                >
+                  {brandName}
+                </h1>
+              )}
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}

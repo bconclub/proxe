@@ -497,19 +497,8 @@ export default function FounderDashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* POP: prominent War Room launcher. It lives here (overview — a
-              pop-private file that survives sync) rather than only on the sidebar,
-              because the shared DashboardLayout keeps getting re-synced to WC gold
-              and dropping the sidebar entry. This door can't be wiped by sync. */}
-          {brandCfg.brand === 'pop' && (
-            <a
-              href="/war-room"
-              title="Open the Pulse of Punjab War Room"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#F06C18', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(240,108,24,0.35)' }}
-            >
-              <span aria-hidden>⚡</span> War Room <span aria-hidden>→</span>
-            </a>
-          )}
+          {/* War Room entry lives on the sidebar brand mark (Pulse of Punjab logo
+              + name → /war-room), per founder — no separate launcher button. */}
           {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
               icon on the right next to the profile. */}
           <TodaySnapshotButton inline label="Snapshot" />
