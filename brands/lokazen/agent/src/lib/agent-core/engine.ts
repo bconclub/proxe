@@ -124,6 +124,16 @@ User's message: ${input.message}`
   // 5. Detect human handoff requests before AI generation
   const wantsHuman = detectHumanHandoffRequest(input.message);
 
+  // 5b. Scout support issues — a scout reporting an app/upload/KYC/payout problem
+  // must become a SUPPORT REQUEST (Slack ping to the team), deterministically,
+  // not left to the model. Scoped to scout audience so a brand/owner mentioning
+  // "photo" or "location" is never caught. These leads can't book a call, so the
+  // only escalation path is a support request.
+  const scoutSupportIssue =
+    input.lokazenAudience === 'scout' &&
+    /\b(can'?t|cannot|can not|unable|not able|couldn'?t|won'?t|isn'?t|doesn'?t|didn'?t|no|not)\b[^.?!]*\b(upload|uploaded|uploading|photo|picture|image|pic|location|gps|submit|submitted|kyc|verif|verified|login|log ?in|sign ?in|app|payout|paid|payment|money|reward)\b|\b(kyc|payout|payment|verification)\b[^.?!]*\b(stuck|pending|fail|failed|error|not|missing|issue|problem|delay)\b|\b(problem|issue|trouble|error|not working|doesn'?t work|stuck|help me)\b/i
+      .test(input.message || '');
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -253,6 +263,10 @@ User's message: ${input.message}`
   // If user explicitly asked for a human, flag for follow-up regardless of AI response
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
+  } else if (scoutSupportIssue) {
+    // Scout hit a problem — raise a support request so the team gets pinged with
+    // the number + the issue. (No call for scouts; support goes this way.)
+    await flagForHumanFollowup(supabase, input, `Scout reported an issue: "${(input.message || '').slice(0, 160)}"`);
   }
 
   // Deterministic safety net: never let a booked slot survive as a tappable
@@ -804,16 +818,20 @@ async function flagForHumanFollowup(
       : input.lokazenAudience === 'owner' ? 'Property Owner'
       : input.lokazenAudience === 'scout' ? 'Scout'
       : null;
+    // Scouts can't book a call — their escalations are SUPPORT requests, so the
+    // channel reads "Scout support request" (with the number + issue) rather than
+    // a generic lead follow-up.
+    const isScout = input.lokazenAudience === 'scout';
     await notifySlackLead({
       brandLabel,
-      title: 'Needs human follow-up',
+      title: isScout ? 'Scout support request' : 'Needs human follow-up',
       name: input.userProfile.name || null,
       phone: input.userProfile.phone || null,
       email: input.userProfile.email || null,
       leadType: audienceLabel,
       source: input.channel || null,
       detail: reason,
-      footer: 'needs human',
+      footer: isScout ? 'scout support' : 'needs human',
     });
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
@@ -959,8 +977,17 @@ function buildBookingTools(
     },
   ];
 
+  // Scouts can NEVER book a call — there is nothing to schedule for a scout, and
+  // their issues go through a support request, not a call. Hard-refuse both
+  // booking tools regardless of what the model attempts.
+  const scoutBookingBlock = () =>
+    JSON.stringify({
+      error: 'This is a Scout conversation. Scouts cannot book a call — do NOT offer or book one. If the scout has a problem, raise a support request for the team instead.',
+    });
+
   const toolHandlers: Record<string, ToolHandler> = {
     check_availability: async (toolInput: Record<string, any>) => {
+      if (input.lokazenAudience === 'scout') return scoutBookingBlock();
       const { date } = toolInput;
       const sessionType = normalizeBookingSessionType(toolInput.session_type);
 
@@ -1036,6 +1063,7 @@ function buildBookingTools(
     },
 
     book_consultation: async (toolInput: Record<string, any>) => {
+      if (input.lokazenAudience === 'scout') return scoutBookingBlock();
       const { date, time, name, email, phone, course_interest, title } = toolInput;
       const sessionType = normalizeBookingSessionType(toolInput.session_type);
 

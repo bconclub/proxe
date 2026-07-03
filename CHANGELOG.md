@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — scouts never book calls; scout problems become support requests
+
+- **Hard no-booking for scouts** (`engine.ts`): both booking tools (`check_availability`, `book_consultation`) hard-refuse when the audience is scout — the model cannot book a call for a scout even if it tries. Deterministic backstop to the prompt rule.
+- **Scout problems → support request + Slack ping** (`engine.ts`): a deterministic detector fires when a SCOUT reports an app/upload/KYC/payout/location/photo problem, calling `flagForHumanFollowup` → the team gets a Slack alert titled "Scout support request" with the number + the issue. Scoped to scout audience so a brand/owner saying "photo"/"location" is never caught.
+- **Prompt** (`lokazen-prompt.ts`): new SCOUT SUPPORT section — never a call; never read a scout's photo/location as owner property data; if unsure ask exactly one question ("looking for space, or a Scout facing an issue?"); raise a support request and confirm it's logged with their number.
+
 ## 2026-07-03 · lokazen — fix "Meta Form" mislabel + last-touch after WA send
 
 - **Inbox form card** (`app/dashboard/inbox/page.tsx`, shared file): the form-submission card hardcoded "Meta Form Submission" / "Meta Form" — wrong for a web-form lead. Now the label DERIVES from the actual channel/first_touchpoint: Meta/Facebook leads still read "Meta Form", everything else reads "Form Submission" / "Form". (Universally correct; Meta leads unaffected.)
