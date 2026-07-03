@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — scout lifecycle stages (no follow-up sequences)
+
+- **Scout STAGE column** (`LeadsTable`): scouts no longer show a generic lead stage ("In Sequence"). The Scouts view now derives each scout's real lifecycle stage from the latest `scout_event` PROXe received: Logged in → KYC started → KYC done → UPI added → Submitting photos → Active (purple badge). Brand/owner rows unchanged.
+- **No follow-up sequence for scouts** (`inbound/route.ts`): scout leads no longer queue a `first_outreach` / sequence task — they run their own lifecycle drip (signup/KYC/submission/payout via scout_event templates), not the brand/owner follow-up sequence.
+- Next: a scout funnel counts strip ("how many at each stage / how many KYC-done") on the Scouts page — offered, not yet built.
+
 ## 2026-07-03 · lokazen — scouts never book calls; scout problems become support requests
 
 - **Hard no-booking for scouts** (`engine.ts`): both booking tools (`check_availability`, `book_consultation`) hard-refuse when the audience is scout — the model cannot book a call for a scout even if it tries. Deterministic backstop to the prompt rule.

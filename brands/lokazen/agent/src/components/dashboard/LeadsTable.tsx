@@ -68,6 +68,26 @@ const getStageColor = (stage: string | null) => {
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
+// Scouts have their OWN lifecycle — they don't run brand/owner follow-up
+// sequences, so the STAGE column shows the scout's actual progress derived from
+// the latest scout_event PROXe received (logged in -> KYC -> submitting -> active),
+// not a generic lead stage.
+const SCOUT_STAGE_BY_EVENT: Record<string, string> = {
+  signup: 'Logged in',
+  kyc_submitted: 'KYC started',
+  kyc_verified: 'KYC done',
+  upi_added: 'UPI added',
+  submission: 'Submitting photos',
+  payout: 'Active',
+}
+const scoutStageLabel = (lkz: any): string => {
+  const ev = String(lkz?.scout_event || '').toLowerCase()
+  if (SCOUT_STAGE_BY_EVENT[ev]) return SCOUT_STAGE_BY_EVENT[ev]
+  if (String(lkz?.kyc_status || '').toLowerCase() === 'verified') return 'KYC done'
+  return 'Logged in'
+}
+const scoutStageStyle: CSSProperties = { backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }
+
 // Lokazen property-type chip colors — high-street/retail (prime) lean green,
 // then distinct hues per type. Falls back to grey for unknowns.
 const lkzPropTypeStyle = (value: string): CSSProperties => {
@@ -875,6 +895,10 @@ export default function LeadsTable({
                 const lkz = uc?.[brandId] || {}
                 const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
                 const lkzType = lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : ''
+                // Scouts show their lifecycle stage (from scout_event), not a lead stage.
+                const isScoutRow = showLokazenColumns && lkzUserType === 'scout'
+                const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
+                const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyle : (stageColor.style || {})
                 const rawLocation = lkzUserType === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
                   : lkzUserType === 'owner'
@@ -1396,13 +1420,13 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* STAGE - badge */}
+                    {/* STAGE - badge (scouts show their lifecycle stage) */}
                     <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
-                        style={stageColor.style || {}}
+                        style={rowStageStyle}
                       >
-                        {displayStage}
+                        {rowStage}
                       </span>
                     </td>
 

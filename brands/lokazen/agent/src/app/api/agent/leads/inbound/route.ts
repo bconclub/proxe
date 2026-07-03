@@ -678,7 +678,13 @@ export async function POST(request: NextRequest) {
       .in('status', ['pending', 'queued', 'awaiting_approval'])
       .limit(1)
 
-    if (existingOutreach && existingOutreach.length > 0) {
+    // Scouts do NOT run the brand/owner follow-up sequence — they have their own
+    // lifecycle drip (signup/KYC/submission/payout via scout_event templates), so
+    // never queue a first_outreach / sequence task for a scout lead.
+    const isScoutLead = leadBrand === 'lokazen' && brandCtxData.user_type === 'scout'
+    if (isScoutLead) {
+      console.log(`[inbound] Scout lead ${leadName} — no follow-up sequence (scout lifecycle only)`)
+    } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
     } else {
