@@ -1847,7 +1847,7 @@ export default function InboxPage() {
                               {selectedConversation?.lead_name || 'Lead'}
                             </span>
                             <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
-                              Meta Form Submission
+                              {/meta|facebook|\bfb\b/i.test(String(filteredMessages[0]?.channel || (selectedConversation as any)?.first_touchpoint || '')) ? 'Meta Form Submission' : 'Form Submission'}
                             </span>
                           </div>
                         </div>
@@ -1915,7 +1915,7 @@ export default function InboxPage() {
                                 {selectedConversation?.lead_name || 'Customer'}
                               </span>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
-                                Meta Form
+                                {/meta|facebook|\bfb\b/i.test(String(msg.channel || '')) ? 'Meta Form' : 'Form'}
                               </span>
                               <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(59,130,246,0.1)', color: '#93b4f5' }}>
                                 {formKind}

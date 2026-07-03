@@ -811,6 +811,12 @@ export async function POST(request: NextRequest) {
           console.error(`[inbound] Lokazen WA template FAILED lead=${leadId} template=${templateName} status=${(waRes as any).statusCode} error=${waRes.error}`)
           await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
         } else {
+          // We just reached the lead on WhatsApp — that's the latest touch now, so
+          // the lead card/list stops showing "web" after an outbound template.
+          // (first_touchpoint stays 'web' — that's the origin.)
+          await supabase.from('all_leads')
+            .update({ last_touchpoint: 'whatsapp', last_interaction_at: new Date().toISOString() })
+            .eq('id', leadId)
           console.log(`[inbound] Lokazen WA template sent lead=${leadId} template=${templateName} messageId=${(waRes as any).messageId}`)
         }
       } catch (waErr: any) {

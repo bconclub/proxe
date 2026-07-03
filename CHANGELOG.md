@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — fix "Meta Form" mislabel + last-touch after WA send
+
+- **Inbox form card** (`app/dashboard/inbox/page.tsx`, shared file): the form-submission card hardcoded "Meta Form Submission" / "Meta Form" — wrong for a web-form lead. Now the label DERIVES from the actual channel/first_touchpoint: Meta/Facebook leads still read "Meta Form", everything else reads "Form Submission" / "Form". (Universally correct; Meta leads unaffected.)
+- **Last touch after outbound WA** (`inbound/route.ts`): sending the `lokazen_lead_confirm` / owner-brand welcome template now updates `last_touchpoint='whatsapp'` + `last_interaction_at`, so the lead card/list stops showing "web" as the last touch after we've messaged them on WhatsApp. `first_touchpoint` stays the origin.
+- **Note**: the lead type-override row removal (`f017e79`) was the "breaking modal" — confirmed removed; deploy pending when the screenshots were taken.
+
 ## 2026-07-03 · lokazen — declutter the lead detail card
 
 - **Lead modal** (`LeadDetailsModal`): removed the Brand / Property Owner / Scout type-override row (not needed right now; the `set-type` API stays for later). Hid the synthetic `owner_<phone>_<ts>@noemail.lokazen.in` placeholder email — it's an internal id, not a contact, so it no longer shows as the lead's email (new `displayEmail()` filter).
