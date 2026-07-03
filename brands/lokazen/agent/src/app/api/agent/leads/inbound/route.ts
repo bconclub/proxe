@@ -310,12 +310,24 @@ export async function POST(request: NextRequest) {
         return null
       }
 
+      // Scout is deterministic: the website scout routes post user_type='scout'
+      // (and/or source/lead_source containing "scout") plus a scout_event tag for
+      // the lifecycle step. Scout is checked FIRST and short-circuits the
+      // brand/owner inference so a scout never gets misclassified.
+      const rawTypeStr = String(
+        pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type', 'form_type', 'event_name', 'lead_source') ||
+        normalizedSource || '',
+      ).toLowerCase()
+      const isScout = /\bscout\b/.test(rawTypeStr)
+      const scoutEvent = asStr(pick('scout_event', 'lifecycle_event', 'scout_stage'))
+
       // Resolve audience (brand vs owner). Explicit type field wins; else infer
       // from the form_type/event_name/lead_source/source, else field presence.
-      let lkzType =
-        asType(pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type')) ||
-        asType(pick('form_type', 'event_name', 'lead_source')) ||
-        asType(normalizedSource)
+      let lkzType: 'brand' | 'owner' | 'scout' | null = isScout
+        ? 'scout'
+        : asType(pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type')) ||
+          asType(pick('form_type', 'event_name', 'lead_source')) ||
+          asType(normalizedSource)
 
       // Field presence fallback (only if the type is still unknown). current_outlets
       // => brand; carpet/asking-rent => owner. space_type/area_sqft/budget_rent are
@@ -324,7 +336,19 @@ export async function POST(request: NextRequest) {
       const hasBrandFields = !!pick('brandName', 'brand_name', 'outlets', 'current_outlets', 'sizeMin', 'size_min', 'rentMin', 'rent_min')
       if (!lkzType) lkzType = hasPropFields ? 'owner' : hasBrandFields ? 'brand' : null
 
-      if (lkzType === 'owner') {
+      if (lkzType === 'scout') {
+        brandCtxData.user_type = 'scout'
+        brandCtxData.lead_type = 'scout'
+        if (scoutEvent) brandCtxData.scout_event = scoutEvent
+        const area = asStr(pick('scout_area', 'area_covered', 'coverage_area', 'area', 'location'))
+        if (area) brandCtxData.scout_area_covered = area
+        const kyc = asStr(pick('kyc_status'))
+        if (kyc) brandCtxData.kyc_status = kyc
+        const subArea = asStr(pick('submission_area', 'property_area'))
+        if (subArea) brandCtxData.last_submission_area = subArea
+        const payout = asStr(pick('payout_amount', 'amount'))
+        if (payout) brandCtxData.last_payout_amount = payout
+      } else if (lkzType === 'owner') {
         brandCtxData.user_type = 'owner'
         // Live website keys first: space_type / area_sqft / location_preference / budget_rent.
         const propType = asStr(pick('space_type', 'propertyType', 'property_type', 'spaceTypes', 'space_types', 'property_kind'))
@@ -731,7 +755,16 @@ export async function POST(request: NextRequest) {
     // {{1}}=name) for brand+owner; scout_welcome (POSITIONAL, {{1}}=name,
     // {{2}}=portal URL) for scouts. Awaited (Vercel won't drop it), soft-fails,
     // and logged to conversations so the inbox reflects the send.
-    if (leadBrand === 'lokazen' && isNew && normalizedPhone) {
+    // A scout LIFECYCLE event (kyc_reminder/kyc_approved/submission/payout) is
+    // handled by the dedicated sender below, not the new-lead welcome — so a
+    // returning scout doesn't get a "welcome" on their KYC step.
+    const scoutLifecycleEvent =
+      brandCtxData.user_type === 'scout' &&
+      brandCtxData.scout_event &&
+      brandCtxData.scout_event !== 'signup'
+        ? String(brandCtxData.scout_event)
+        : null
+    if (leadBrand === 'lokazen' && isNew && normalizedPhone && !scoutLifecycleEvent) {
       try {
         const firstName = (leadName || 'there').split(' ')[0]
         const ut = brandCtxData.user_type
@@ -779,6 +812,88 @@ export async function POST(request: NextRequest) {
         }
       } catch (waErr: any) {
         console.error('[inbound] Lokazen WA send exception:', waErr?.message || waErr)
+      }
+    }
+
+    // ── Lokazen SCOUT lifecycle messaging ────────────────────────────────────
+    // PROXe owns every scout touchpoint. The website scout routes forward each
+    // step (kyc_reminder / kyc_approved / submission / payout) to this webhook
+    // with user_type='scout' + scout_event; here we send the matching approved
+    // template. A template only fires when its name is in the ACTIVE allowlist
+    // (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, default just scout_welcome) so events
+    // whose Meta template isn't approved yet persist context WITHOUT spamming
+    // failed sends — add the name to the env once Meta approves it, no redeploy.
+    if (leadBrand === 'lokazen' && scoutLifecycleEvent && normalizedPhone) {
+      try {
+        const firstName = (leadName || 'there').split(' ')[0]
+        const portal = LOKAZEN_SCOUT_ONBOARDING_URL
+        const area = String(brandCtxData.last_submission_area || brandCtxData.scout_area_covered || 'your area')
+        const amount = String(brandCtxData.last_payout_amount || '')
+        const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
+          kyc_reminder: {
+            template: 'scout_kyc_reminder',
+            params: [{ type: 'text', text: firstName }, { type: 'text', text: portal }],
+            body: `Hi ${firstName}, one step left to start earning: finish your quick ID check. It takes 2 minutes. ${portal}`,
+          },
+          kyc_approved: {
+            template: 'scout_kyc_approved',
+            params: [{ type: 'text', text: firstName }, { type: 'text', text: portal }],
+            body: `Hi ${firstName}, your Lokazen Scout account is verified. Start submitting shops and earn per verified listing. ${portal}`,
+          },
+          submission: {
+            template: 'scout_submission_received',
+            params: [{ type: 'text', text: firstName }, { type: 'text', text: area }],
+            body: `Hi ${firstName}, we have received your shop submission at ${area}. Our team will verify it and update you.`,
+          },
+          payout: {
+            template: 'scout_payout',
+            params: [{ type: 'text', text: firstName }, { type: 'text', text: area }, { type: 'text', text: amount || 'Your reward' }, { type: 'text', text: portal }],
+            body: `Hi ${firstName}, your submission at ${area} is verified. ${amount || 'Your reward'} added to your payouts. Confirm your UPI to receive it: ${portal}`,
+          },
+        }
+        const mapped = SCOUT_EVENT_MAP[scoutLifecycleEvent]
+        const activeTemplates = new Set(
+          (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || 'scout_welcome')
+            .split(',').map((s) => s.trim()).filter(Boolean),
+        )
+        if (!mapped) {
+          console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutLifecycleEvent} (context persisted, no send)`)
+        } else if (!activeTemplates.has(mapped.template)) {
+          console.log(`[inbound] Lokazen scout template not yet active: ${mapped.template} (context persisted, no send). Add to LOKAZEN_ACTIVE_SCOUT_TEMPLATES once Meta-approved.`)
+        } else {
+          const waRes = await sendWhatsAppTemplate(
+            normalizedPhone,
+            mapped.template,
+            [{ type: 'body', parameters: mapped.params }],
+            'en',
+          )
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: waRes.success ? mapped.body : `[Template send FAILED: ${mapped.template}]\n\n${mapped.body}`,
+            message_type: 'template',
+            metadata: {
+              template_name: mapped.template,
+              template_language: 'en',
+              auto_sent: true,
+              trigger: `scout_${scoutLifecycleEvent}`,
+              sent_by: 'system (inbound webhook)',
+              send_succeeded: !!waRes.success,
+              send_error: waRes.success ? null : (waRes.error || 'unknown'),
+              http_status: (waRes as any).statusCode ?? null,
+              wa_message_id: (waRes as any).messageId ?? null,
+            },
+          })
+          if (!waRes.success) {
+            console.error(`[inbound] Lokazen scout WA FAILED lead=${leadId} template=${mapped.template} status=${(waRes as any).statusCode} error=${waRes.error}`)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          } else {
+            console.log(`[inbound] Lokazen scout WA sent lead=${leadId} template=${mapped.template} messageId=${(waRes as any).messageId}`)
+          }
+        }
+      } catch (scoutErr: any) {
+        console.error('[inbound] Lokazen scout lifecycle send exception:', scoutErr?.message || scoutErr)
       }
     }
 
