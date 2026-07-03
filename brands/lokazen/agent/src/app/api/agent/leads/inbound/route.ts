@@ -348,6 +348,14 @@ export async function POST(request: NextRequest) {
         if (subArea) brandCtxData.last_submission_area = subArea
         const payout = asStr(pick('payout_amount', 'amount'))
         if (payout) brandCtxData.last_payout_amount = payout
+        // The website forwards the exact deep-link it would have texted (portal /
+        // profile / submit, already carrying the scout's submission_token) plus
+        // the UPI on the upi_added step. PROXe re-uses these so the message links
+        // land the scout on the right page without PROXe needing the token.
+        const scoutUrl = asStr(pick('scout_url', 'portal_url', 'profile_url', 'submit_url', 'deep_link'))
+        if (scoutUrl) brandCtxData.scout_url = scoutUrl
+        const upi = asStr(pick('upi_id', 'upi'))
+        if (upi) brandCtxData.scout_upi_id = upi
       } else if (lkzType === 'owner') {
         brandCtxData.user_type = 'owner'
         // Live website keys first: space_type / area_sqft / location_preference / budget_rent.
@@ -755,44 +763,26 @@ export async function POST(request: NextRequest) {
     // {{1}}=name) for brand+owner; scout_welcome (POSITIONAL, {{1}}=name,
     // {{2}}=portal URL) for scouts. Awaited (Vercel won't drop it), soft-fails,
     // and logged to conversations so the inbox reflects the send.
-    // A scout LIFECYCLE event (kyc_reminder/kyc_approved/submission/payout) is
-    // handled by the dedicated sender below, not the new-lead welcome — so a
-    // returning scout doesn't get a "welcome" on their KYC step.
-    const scoutLifecycleEvent =
-      brandCtxData.user_type === 'scout' &&
-      brandCtxData.scout_event &&
-      brandCtxData.scout_event !== 'signup'
-        ? String(brandCtxData.scout_event)
-        : null
-    // The Lokazen WEBSITE already owns the scout transactional drip (welcome,
-    // kyc_submitted, kyc_verified, upi_added — its own Meta-approved templates).
-    // So PROXe must NOT re-send those, or scouts get double-texted. PROXe's scout
-    // sends are OPT-IN: a scout template only fires if its name is in this
-    // allowlist (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY). PROXe still
-    // OWNS the scout lead (dashboard/timeline); it just stays silent unless a
-    // genuinely net-new message (that the site does NOT send) is switched on.
+    // PROXe now owns ALL scout messaging: the website forwards each scout_event
+    // (signup / kyc_submitted / kyc_verified / upi_added / submission / payout)
+    // and no longer sends its own scout WhatsApp. Every scout template is OPT-IN
+    // via this allowlist (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) so
+    // nothing fires until each is confirmed live on PROXe's WABA — this prevents
+    // double-texting during the site->PROXe cutover. Scouts are handled entirely
+    // by the dedicated sender below, never by the brand/owner welcome here.
     const activeScoutTemplates = new Set(
       (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || '')
         .split(',').map((s) => s.trim()).filter(Boolean),
     )
-    const skipScoutWelcome =
-      brandCtxData.user_type === 'scout' && !activeScoutTemplates.has('scout_welcome')
-    if (leadBrand === 'lokazen' && isNew && normalizedPhone && !scoutLifecycleEvent && !skipScoutWelcome) {
+    const scoutEventToSend = brandCtxData.user_type === 'scout'
+      ? String(brandCtxData.scout_event || (isNew ? 'signup' : ''))
+      : null
+    if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
       try {
         const firstName = (leadName || 'there').split(' ')[0]
-        const ut = brandCtxData.user_type
-        let templateName: string
-        let params: Array<{ type: 'text'; text: string }>
-        let renderedBody: string
-        if (ut === 'scout') {
-          templateName = 'scout_welcome'
-          params = [{ type: 'text', text: firstName }, { type: 'text', text: LOKAZEN_SCOUT_ONBOARDING_URL }]
-          renderedBody = `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC). Open your dashboard: ${LOKAZEN_SCOUT_ONBOARDING_URL}`
-        } else {
-          templateName = 'lokazen_lead_confirm'
-          params = [{ type: 'text', text: firstName }]
-          renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
-        }
+        const templateName = 'lokazen_lead_confirm'
+        const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
+        const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
         const waRes = await sendWhatsAppTemplate(
           normalizedPhone,
           templateName,
@@ -828,48 +818,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Lokazen SCOUT lifecycle messaging ────────────────────────────────────
-    // PROXe owns every scout touchpoint. The website scout routes forward each
-    // step (kyc_reminder / kyc_approved / submission / payout) to this webhook
-    // with user_type='scout' + scout_event; here we send the matching approved
-    // template. A template only fires when its name is in the ACTIVE allowlist
-    // (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, default just scout_welcome) so events
-    // whose Meta template isn't approved yet persist context WITHOUT spamming
-    // failed sends — add the name to the env once Meta approves it, no redeploy.
-    if (leadBrand === 'lokazen' && scoutLifecycleEvent && normalizedPhone) {
+    // ── Lokazen SCOUT messaging — PROXe owns the whole drip ──────────────────
+    // The website forwards every scout_event and no longer texts scouts itself.
+    // Templates 1-4 REUSE the exact names + param order the site already had
+    // Meta-approved (scout_welcome / scout_kyc_submitted / scout_kyc_verified /
+    // scout_upi_added); 5-6 (scout_submission_received / scout_payout) are new.
+    // A template only fires when its name is in the ACTIVE allowlist (env
+    // LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) — so during cutover an event
+    // persists context WITHOUT sending until that template is confirmed live on
+    // PROXe's WABA. Add names to the env to switch them on, no redeploy.
+    if (leadBrand === 'lokazen' && scoutEventToSend && normalizedPhone) {
       try {
         const firstName = (leadName || 'there').split(' ')[0]
-        const portal = LOKAZEN_SCOUT_ONBOARDING_URL
+        const url = String(brandCtxData.scout_url || LOKAZEN_SCOUT_ONBOARDING_URL)
         const area = String(brandCtxData.last_submission_area || brandCtxData.scout_area_covered || 'your area')
         const amount = String(brandCtxData.last_payout_amount || '')
+        const upi = String(brandCtxData.scout_upi_id || '')
+        const t = (text: string) => ({ type: 'text' as const, text })
         const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
-          kyc_reminder: {
-            template: 'scout_kyc_reminder',
-            params: [{ type: 'text', text: firstName }, { type: 'text', text: portal }],
-            body: `Hi ${firstName}, one step left to start earning: finish your quick ID check. It takes 2 minutes. ${portal}`,
+          // 1-4: same names + param order as the site's approved templates.
+          signup: {
+            template: 'scout_welcome',
+            params: [t(firstName), t(url)],
+            body: `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC) so we can pay you - it takes about 5 minutes. Open your dashboard: ${url}\n\nSee you out there.`,
           },
-          kyc_approved: {
-            template: 'scout_kyc_approved',
-            params: [{ type: 'text', text: firstName }, { type: 'text', text: portal }],
-            body: `Hi ${firstName}, your Lokazen Scout account is verified. Start submitting shops and earn per verified listing. ${portal}`,
+          kyc_submitted: {
+            template: 'scout_kyc_submitted',
+            params: [t(firstName)],
+            body: `Thanks ${firstName} - your ID verification request is submitted. We'll message you the moment it's reviewed. You can keep spotting and submitting shops in the meantime - your payout is simply held until verification completes.`,
           },
+          kyc_verified: {
+            template: 'scout_kyc_verified',
+            params: [t(firstName), t(url)],
+            body: `You're verified, ${firstName}! Your identity check is complete and you can now be paid. Last step: add your UPI ID in your profile so we can send your ₹250 per verified property. Add it here: ${url}\n\nAlmost there.`,
+          },
+          upi_added: {
+            template: 'scout_upi_added',
+            params: [t(firstName), t(upi || 'your UPI'), t(url)],
+            body: `All set, ${firstName}! Your UPI (${upi || 'your UPI'}) is saved and you're ready to earn. Go spot a To Let shop, take one clear photo, and submit - most verified listings pay within 24 to 48 hours. Submit here: ${url}\n\nHappy scouting.`,
+          },
+          // 5-6: net-new touchpoints the site never messaged.
           submission: {
             template: 'scout_submission_received',
-            params: [{ type: 'text', text: firstName }, { type: 'text', text: area }],
-            body: `Hi ${firstName}, we have received your shop submission at ${area}. Our team will verify it and update you.`,
+            params: [t(firstName), t(area)],
+            body: `Hi ${firstName}, we have received your shop submission at ${area}. Our team will verify it and update you soon.`,
           },
           payout: {
             template: 'scout_payout',
-            params: [{ type: 'text', text: firstName }, { type: 'text', text: area }, { type: 'text', text: amount || 'Your reward' }, { type: 'text', text: portal }],
-            body: `Hi ${firstName}, your submission at ${area} is verified. ${amount || 'Your reward'} added to your payouts. Confirm your UPI to receive it: ${portal}`,
+            params: [t(firstName), t(area), t(amount || 'Your reward')],
+            body: `Hi ${firstName}, your submission at ${area} is verified and ${amount || 'your reward'} has been sent to your UPI. Keep spotting To Let shops to earn more.`,
           },
         }
-        const mapped = SCOUT_EVENT_MAP[scoutLifecycleEvent]
+        const mapped = SCOUT_EVENT_MAP[scoutEventToSend]
         const activeTemplates = activeScoutTemplates
         if (!mapped) {
-          console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutLifecycleEvent} (context persisted, no send)`)
+          console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
-          console.log(`[inbound] Lokazen scout template not yet active: ${mapped.template} (context persisted, no send). Add to LOKAZEN_ACTIVE_SCOUT_TEMPLATES once Meta-approved.`)
+          console.log(`[inbound] Lokazen scout template not yet active: ${mapped.template} (context persisted, no send). Add to LOKAZEN_ACTIVE_SCOUT_TEMPLATES once live on PROXe's WABA.`)
         } else {
           const waRes = await sendWhatsAppTemplate(
             normalizedPhone,
@@ -887,7 +892,7 @@ export async function POST(request: NextRequest) {
               template_name: mapped.template,
               template_language: 'en',
               auto_sent: true,
-              trigger: `scout_${scoutLifecycleEvent}`,
+              trigger: `scout_${scoutEventToSend}`,
               sent_by: 'system (inbound webhook)',
               send_succeeded: !!waRes.success,
               send_error: waRes.success ? null : (waRes.error || 'unknown'),

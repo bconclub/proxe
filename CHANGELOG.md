@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — PROXe owns the FULL scout drip (all 6 touchpoints)
+
+- **Decision**: after mapping the live website, found it already runs its own Meta-approved scout WhatsApp drip (welcome / kyc_submitted / kyc_verified / upi_added). User chose PROXe should take over ALL scout sending (not just the gaps), plus add the 2 touchpoints nobody messages today (submission-received, payout).
+- **inbound** — reworked the scout sender to handle every `scout_event`: `signup / kyc_submitted / kyc_verified / upi_added / submission / payout`. Templates 1-4 REUSE the exact names + param order the site already had approved (`scout_welcome`, `scout_kyc_submitted`, `scout_kyc_verified`, `scout_upi_added`) with the site's exact body copy mirrored in the conversation log; 5-6 (`scout_submission_received`, `scout_payout`) are new. Scouts no longer flow through the brand/owner `lokazen_lead_confirm` welcome. Captures `scout_url` (deep-link the site forwards) + `scout_upi_id` so message links land on the right page.
+- **Opt-in / cutover-safe**: every scout template stays gated behind `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` (DEFAULT EMPTY). During the site→PROXe cutover an event persists context WITHOUT sending until its template is confirmed live on PROXe's WABA and added to the env — no double-texting, no failed-send spam.
+- **BLOCKED on**: (1) confirm PROXe-lokazen's WhatsApp number/WABA is the same as the site's (+91 6366826978) — decides reuse vs recreate of the 4 templates; (2) create the 2 new templates; (3) frontend edits (remove the 5 site `sendScout*` calls + forward each event via `sendLeadToProxe`).
+
 ## 2026-07-03 · lokazen — PROXe takes ownership of the scout lifecycle
 
 - **Root-cause the "scouts messing up" bug** — the scout-page origin already flows end-to-end (embed.js sees `/scout` → `page_context=lokazen_scout` → the chat route resolves `pageAudience='scout'`), but `buildLokazenContextPatch` re-guessed the lead type from message content and ignored it. A scout typing "empty shop / rent / space" got persisted as brand/owner and leaked into the Leads view. Fixed: scout page-origin is now authoritative — threaded `pageAudience` through `updateLokazenLeadContext` → `buildLokazenContextPatch`; when origin is scout, force `user_type/lead_type=scout`, skip brand/owner flow-field capture, never let the text-chain flip it. (`a853c26`)
