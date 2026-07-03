@@ -12,16 +12,24 @@
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 
+// Brand marks for the message body (the sender AVATAR/name is set on the Slack
+// app itself — app webhooks ignore per-message username/icon). The logo must be
+// a public PNG/JPG URL Slack can fetch (SVG is not rendered). Both overridable
+// per-deployment so another brand's channel can reuse this notifier.
+const SLACK_BRAND_COLOR = process.env.SLACK_BRAND_COLOR || '#E4002B'; // matches the logo (red)
+const SLACK_LOGO_URL = process.env.SLACK_LOGO_URL || 'https://proxe.lokazen.in/logo.png';
+
 export interface SlackResult {
   success: boolean;
   skipped?: boolean;
   error?: string;
 }
 
-/** Low-level: POST a raw Slack message payload (text and/or Block Kit blocks). */
+/** Low-level: POST a raw Slack message payload (text, blocks, and/or attachments). */
 export async function sendSlackMessage(payload: {
   text: string;
   blocks?: unknown[];
+  attachments?: unknown[];
 }): Promise<SlackResult> {
   if (!SLACK_WEBHOOK_URL) {
     return { success: false, skipped: true };
@@ -71,6 +79,31 @@ function fieldsSection(pairs: Pair[]): { type: 'section'; fields: unknown[] } | 
   return { type: 'section', fields };
 }
 
+/** Big bold headline (header blocks are plain_text only — no markdown/emoji). */
+const header = (title: string) => ({
+  type: 'header',
+  text: { type: 'plain_text', text: title.slice(0, 150), emoji: false },
+});
+
+/** Top branding row: PROXe logo thumbnail + "PROXe · <brand>". */
+const brandRow = (brand: string) => ({
+  type: 'context',
+  elements: [
+    { type: 'image', image_url: SLACK_LOGO_URL, alt_text: 'PROXe' },
+    { type: 'mrkdwn', text: brand && brand !== 'PROXe' ? `*PROXe* · ${brand}` : '*PROXe*' },
+  ],
+});
+
+/**
+ * Wrap the message in a single attachment so it gets the brand-colour left
+ * stripe, with the logo/header on top. Falls back to plain blocks if Slack ever
+ * rejects the attachment. `text` is the notification/preview line.
+ */
+function brandedSend(title: string, brand: string, content: unknown[], text: string): Promise<SlackResult> {
+  const blocks = [header(title), brandRow(brand), ...content.filter(Boolean)];
+  return sendSlackMessage({ text, attachments: [{ color: SLACK_BRAND_COLOR, blocks }] });
+}
+
 // ── Booking notification ─────────────────────────────────────────────────────
 
 export interface BookingNotice {
@@ -90,23 +123,21 @@ export async function notifySlackBooking(b: BookingNotice): Promise<SlackResult>
   if (!SLACK_WEBHOOK_URL) return { success: false, skipped: true };
   const brand = b.brandLabel || 'PROXe';
 
-  const blocks: unknown[] = [section(`*New booking* · _${brand}_`)];
   const who = clean(b.name) || 'Lead';
-  const line = clean(b.leadType) ? `*${who}*  ·  _${clean(b.leadType)}_` : `*${who}*`;
-  blocks.push(section(line));
-  if (clean(b.title)) blocks.push(section(clean(b.title)));
-
-  const fs = fieldsSection([
+  const content: unknown[] = [
+    section(clean(b.leadType) ? `*${who}*  ·  _${clean(b.leadType)}_` : `*${who}*`),
+  ];
+  if (clean(b.title)) content.push(section(clean(b.title)));
+  content.push(fieldsSection([
     ['Phone', b.phone],
     ['Email', b.email],
     ['When', b.dateTime],
     ['Channel', b.channel],
-  ]);
-  if (fs) blocks.push(fs);
-  if (clean(b.summary)) blocks.push(context(`_${clean(b.summary).slice(0, 500)}_`));
+  ]));
+  if (clean(b.summary)) content.push(context(`_${clean(b.summary).slice(0, 500)}_`));
 
   const text = `New booking · ${brand}: ${who}${b.dateTime ? ` · ${clean(b.dateTime)}` : ''}`;
-  return sendSlackMessage({ text, blocks });
+  return brandedSend('New booking', brand, content, text);
 }
 
 // ── Lead notification (new lead / hot lead / needs-human) ────────────────────
@@ -132,27 +163,25 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   const brand = l.brandLabel || 'PROXe';
   const title = l.title || 'Lead';
 
-  const blocks: unknown[] = [section(`*${title}* · _${brand}_`)];
-
   const who = clean(l.name) || clean(l.email) || clean(l.phone) || 'Lead';
-  const line = clean(l.leadType) ? `*${who}*  ·  _${clean(l.leadType)}_` : `*${who}*`;
-  blocks.push(section(line));
+  const content: unknown[] = [
+    section(clean(l.leadType) ? `*${who}*  ·  _${clean(l.leadType)}_` : `*${who}*`),
+  ];
 
-  const core = fieldsSection([
+  // What the lead wants comes first (the glanceable line), then contact/meta.
+  const detail = fieldsSection(l.detailFields || []);
+  if (detail) content.push(detail);
+  else if (clean(l.detail)) content.push(section(`_${clean(l.detail).slice(0, 500)}_`));
+
+  content.push(fieldsSection([
     ['Phone', l.phone],
     ['Email', l.email],
     ['Source', l.source],
-    ['Score', l.score != null ? String(l.score) : null],
     ['Stage', l.stage],
-  ]);
-  if (core) blocks.push(core);
+  ]));
 
-  const detail = fieldsSection(l.detailFields || []);
-  if (detail) blocks.push(detail);
-  else if (clean(l.detail)) blocks.push(section(`_${clean(l.detail).slice(0, 500)}_`));
-
-  blocks.push(context(`_${brand} · PROXe${l.footer ? ` · ${l.footer}` : ''}_`));
+  if (l.footer) content.push(context(`_${clean(l.footer)}_`));
 
   const text = `${title} · ${brand}: ${who}${l.score != null ? ` · score ${l.score}` : ''}`;
-  return sendSlackMessage({ text, blocks });
+  return brandedSend(title, brand, content, text);
 }
