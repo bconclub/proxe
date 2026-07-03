@@ -86,7 +86,19 @@ const scoutStageLabel = (lkz: any): string => {
   if (String(lkz?.kyc_status || '').toLowerCase() === 'verified') return 'KYC done'
   return 'Logged in'
 }
-const scoutStageStyle: CSSProperties = { backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }
+// Colour by progression so the funnel is glanceable: grey (just in) -> amber
+// (KYC in progress) -> green (KYC done) -> teal (payout-ready) -> blue
+// (submitting) -> emerald (fully active).
+const SCOUT_STAGE_STYLE: Record<string, CSSProperties> = {
+  'Logged in': { backgroundColor: 'rgba(107,114,128,0.18)', color: '#9ca3af' },
+  'KYC started': { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+  'KYC done': { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+  'UPI added': { backgroundColor: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
+  'Submitting photos': { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+  'Active': { backgroundColor: 'rgba(16,185,129,0.2)', color: '#10b981' },
+}
+const scoutStageStyleFor = (stage: string): CSSProperties =>
+  SCOUT_STAGE_STYLE[stage] || SCOUT_STAGE_STYLE['Logged in']
 
 // Lokazen property-type chip colors — high-street/retail (prime) lean green,
 // then distinct hues per type. Falls back to grey for unknowns.
@@ -898,7 +910,7 @@ export default function LeadsTable({
                 // Scouts show their lifecycle stage (from scout_event), not a lead stage.
                 const isScoutRow = showLokazenColumns && lkzUserType === 'scout'
                 const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
-                const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyle : (stageColor.style || {})
+                const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyleFor(rowStage) : (stageColor.style || {})
                 const rawLocation = lkzUserType === 'brand'
                   ? (lkz.target_zones || lkz.area || '')
                   : lkzUserType === 'owner'
