@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-03 · lokazen — branded Slack alerts (PROXe logo, header, colour stripe)
+
+- **slackNotifier** — Slack App webhooks ignore per-message avatar/name overrides, so the branding now lives in the message body: a header block, a top context row with the PROXe logo (public PNG `proxe.lokazen.in/logo.png`) + "PROXe · Lokazen", and a brand-colour left stripe via a wrapping attachment. Colour + logo URL are env-overridable (`SLACK_BRAND_COLOR` default `#E4002B` to match the red logo, `SLACK_LOGO_URL`). Wording tightened: the lead's requirement fields show first, dropped the internal Score field and the redundant "Lokazen · PROXe" footer. Applies to New lead / Needs-human / Booking alerts. (Sender avatar itself is set on the Slack app's Display Information.)
+- **Still open**: scouts currently post as a bare "New lead" (no name/type at signup) — recommend suppressing scouts from #lokazen-proxe (separate change, not in this push).
+
 ## 2026-07-03 · lokazen — PROXe owns the FULL scout drip (all 6 touchpoints)
 
 - **Decision**: after mapping the live website, found it already runs its own Meta-approved scout WhatsApp drip (welcome / kyc_submitted / kyc_verified / upi_added). User chose PROXe should take over ALL scout sending (not just the gaps), plus add the 2 touchpoints nobody messages today (submission-received, payout).
