@@ -1,12 +1,12 @@
 {
   "name": "proxe-agent-master",
-  "version": "0.0.32",
+  "version": "0.0.39",
   "private": true,
   "scripts": {
     "dev": "next dev -p 4002",
     "prebuild": "node scripts/stage-brand.js && node scripts/set-build-time.js",
     "build": "next build",
-    "start": "next start -p ${PORT:-4002}",
+    "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "build:windchasers": "node scripts/build-brand.js windchasers",
