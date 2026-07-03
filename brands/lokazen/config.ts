@@ -27,6 +27,8 @@ export const lokazenConfig: BrandConfig = {
   styles: {
     // TODO: dedicated themes/lokazen.css follow-up; using shared theme for now.
     themePath: '@/styles/theme.css',
+    // No lokazen block in theme.css — widget derives its palette from colors below.
+    colorVarsFromConfig: true,
   },
   chatStructure: {
     showQuickButtons: true,

@@ -29,6 +29,8 @@ export const popConfig: BrandConfig = {
   },
   styles: {
     themePath: '@/styles/theme.css',
+    // No pop block in theme.css — widget derives its palette from colors below.
+    colorVarsFromConfig: true,
   },
   chatStructure: {
     showQuickButtons: true,

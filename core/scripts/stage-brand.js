@@ -47,10 +47,22 @@ if (fs.existsSync(brandEnv)) fs.copyFileSync(brandEnv, path.join(core, '.env.loc
 //    names a brand. tsconfig `paths` beats webpack aliases in Next's resolver —
 //    a hardcoded brand there silently builds that brand for EVERY BRAND_ID.
 const brandLink = path.join(core, '.brand');
+let prevBrand = null;
+try { prevBrand = path.basename(fs.realpathSync(brandLink)); } catch {}
 try {
   const st = fs.lstatSync(brandLink);
   if (st.isSymbolicLink() || st.isDirectory()) fs.rmSync(brandLink, { recursive: true, force: true });
 } catch {}
 fs.symlinkSync(brandDir, brandLink, 'junction');
+
+// 4. brand switch → wipe .next. Compiled chunks inline NEXT_PUBLIC_* values and
+//    @brand modules at build time; Next does NOT reliably invalidate them when
+//    the env/alias change underneath it, so a stale cache serves the PREVIOUS
+//    brand's Supabase project and config. (On Vercel each project builds one
+//    brand, so prevBrand === brand and the cache survives as intended.)
+if (prevBrand && prevBrand !== brand) {
+  fs.rmSync(path.join(core, '.next'), { recursive: true, force: true });
+  console.log(`[stage-brand] brand switch ${prevBrand} -> ${brand}: cleared .next`);
+}
 
 console.log(`[stage-brand] staged "${brand}" (public${fs.existsSync(brandEnv) ? ' + env' : ''} + .brand link)`);

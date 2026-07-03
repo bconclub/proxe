@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { ChatWidget } from '@/components/widget/ChatWidget'
+import { getBrandConfig } from '@/configs'
+import { applyBrandColorVars } from '@/lib/widget-brand-vars'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +16,7 @@ export default function BubblePage() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    applyBrandColorVars(getBrandConfig())
     setMounted(true)
   }, [])
 

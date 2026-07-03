@@ -36,6 +36,10 @@ export interface BrandConfig {
   styles?: {
     themePath?: string; // Path to theme CSS file (e.g., '@/styles/themes/proxe.css')
     customStyles?: string; // Inline custom styles if needed
+    // Widget pages derive their CSS variables from config.colors instead of
+    // theme.css. For brands without a hand-tuned theme.css block — otherwise
+    // they render in another brand's defaults (bw-dark white / PROXe purple).
+    colorVarsFromConfig?: boolean;
   };
   // Chat structure customization
   chatStructure?: {
