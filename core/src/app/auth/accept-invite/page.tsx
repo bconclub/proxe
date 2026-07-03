@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
 import { getBrandConfig } from '@/configs'
 
-const WINDCHASERS_TAGLINE = 'WindChasers Aviation Academy'
-
 function AcceptInviteForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -14,7 +12,7 @@ function AcceptInviteForm() {
 
   const brand = useMemo(() => getBrandConfig(), [])
   const colors = brand.colors
-  const tagline = WINDCHASERS_TAGLINE
+  const tagline = brand.tagline || brand.name
   const logoLetter = brand.name.charAt(0).toUpperCase()
   const logoImage = brand.chatStructure?.avatar?.source
 

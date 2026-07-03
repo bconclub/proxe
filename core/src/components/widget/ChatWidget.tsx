@@ -139,8 +139,8 @@ const ICONS = {
         return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
       }
     }
-    // Fallback: Use image logo for Windchasers, infinity symbol for others
-    if (brand === 'windchasers' && config && config.chatStructure?.avatar?.source) {
+    // Fallback: use the brand's avatar image when the pack provides one, infinity symbol otherwise
+    if (config && config.chatStructure?.avatar?.source) {
       return <img src={config.chatStructure.avatar.source} alt={config.name} style={{ width: '85%', height: '85%', objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 'auto' }} />;
     }
     return <InfinitySymbol />;
@@ -176,11 +176,10 @@ const ICONS = {
   ),
 };
 
-// Windchasers welcome bubble — three-part Avia intro sequence.
-const windchasersWelcomeSequence = [
-  { text: "Hi, I am Avia,", delay: 0 },
-  { text: "I am Windchasers AI Aviation Counsellor.", delay: 800 },
-  { text: "I am here to help you with your Pilot Career Path. What's on your mind?", delay: 1600 },
+// Opening AI bubbles — brand copy lives in the pack (config.widget.welcomeSequence).
+const activeBrandConfig = getBrandConfig();
+const welcomeSequence = activeBrandConfig.widget?.welcomeSequence ?? [
+  { text: `Hi! I'm ${activeBrandConfig.name}'s AI assistant. How can I help you today?`, delay: 0 },
 ];
 
 // Helper function to clean metadata strings from conversation summary
@@ -311,7 +310,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const savedTheme = window.localStorage.getItem('windchasers-widget-theme');
+    const savedTheme = window.localStorage.getItem(`${brand}-widget-theme`);
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setWidgetTheme(savedTheme);
     }
@@ -321,7 +320,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setWidgetTheme((prev) => {
       const next = prev === 'light' ? 'dark' : 'light';
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('windchasers-widget-theme', next);
+        window.localStorage.setItem(`${brand}-widget-theme`, next);
       }
       return next;
     });
@@ -1914,18 +1913,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     // If pre-loaded lead context exists, stream a single contextual message
     if (preLoadedLeadContext?.name && preLoadedLeadContext?.service) {
-      const text = `Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.`;
+      const text = config.widget?.leadContextWelcome ?? `Hi! Welcome to ${config.name},\nHow can I help you today?`;
       await streamWelcomeMessage(text, 20);
       setWelcomeComplete(true);
       return;
     }
 
     // Instant bubbles — CSS messageIn handles the fade-up animation
-    for (let i = 0; i < windchasersWelcomeSequence.length; i++) {
+    for (let i = 0; i < welcomeSequence.length; i++) {
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 120));
       }
-      addAIMessage(windchasersWelcomeSequence[i].text);
+      addAIMessage(welcomeSequence[i].text);
       window.dispatchEvent(new Event('message-updated'));
     }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2877,12 +2876,13 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // context attached. Accept the legacy "take the pat" label as well so
       // older chat states (mid-session) still route correctly.
       if (
-        normalizedButton === 'take pilot assessment' ||
-        normalizedButton === 'take the pat'
+        (normalizedButton === 'take pilot assessment' ||
+          normalizedButton === 'take the pat') &&
+        config.widget?.assessmentUrl
       ) {
         if (typeof window !== 'undefined') {
           try {
-            const assessmentUrl = new URL('https://windchasers.in/assessment');
+            const assessmentUrl = new URL(config.widget.assessmentUrl);
             assessmentUrl.searchParams.set('source', 'chat');
             if (externalSessionId) {
               assessmentUrl.searchParams.set('conversation_id', externalSessionId);
@@ -3488,7 +3488,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           <div className={styles.avatar}>
             {ICONS.ai(brand, config)}
           </div>
-          <span>Windchasers</span>
+          <span>{config.widget?.headerName || config.name}</span>
         </div>
         <div className={styles.headerActions}>
           <button

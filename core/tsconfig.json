@@ -20,7 +20,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"], "@brand/*": ["../brands/windchasers/*"], "@brand": ["../brands/windchasers"]
+      "@/*": ["./src/*"], "@brand/*": ["./.brand/*"], "@brand": ["./.brand"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

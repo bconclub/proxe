@@ -3,6 +3,15 @@ import type { BrandConfig } from '@/configs/types';
 export const popConfig: BrandConfig = {
   name: 'Pulse of Punjab',
   brand: 'pop',
+  tagline: 'Pulse of Punjab',
+  website: 'https://goproxe.com',
+  widget: {
+    headerName: 'Pulse of Punjab',
+    welcomeSequence: [
+      { text: "Hi, I am PROXe, Pulse of Punjab's AI assistant.", delay: 0 },
+      { text: 'Raise a grievance, get campaign updates, or volunteer — how can I help?', delay: 800 },
+    ],
+  },
   // Pulse of Punjab (POP) runs the full grievance-driven campaign stack:
   // grievance intake on every channel, WhatsApp/SMS/voice follow-up, pipeline,
   // and the re-engagement sequence. Senders are guardrailed to mock in this

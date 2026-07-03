@@ -31,11 +31,26 @@ function copyDir(src, dst) {
   }
 }
 
-// 1. brand public assets → core/public
-copyDir(path.join(brandDir, 'public'), path.join(core, 'public'));
+// 1. brand public assets → core/public (wipe first — a previous brand's assets
+//    must never survive into this brand's staging)
+const corePublic = path.join(core, 'public');
+fs.rmSync(corePublic, { recursive: true, force: true });
+fs.mkdirSync(corePublic, { recursive: true });
+copyDir(path.join(brandDir, 'public'), corePublic);
 
 // 2. local env (Vercel injects env itself, so this file only exists locally)
 const brandEnv = path.join(brandDir, '.env.local');
 if (fs.existsSync(brandEnv)) fs.copyFileSync(brandEnv, path.join(core, '.env.local'));
 
-console.log(`[stage-brand] staged "${brand}" (public${fs.existsSync(brandEnv) ? ' + env' : ''})`);
+// 3. `.brand` junction/symlink → /brands/<id>. BOTH resolvers (tsconfig paths
+//    AND the webpack alias) point at this fixed dir, so no config file ever
+//    names a brand. tsconfig `paths` beats webpack aliases in Next's resolver —
+//    a hardcoded brand there silently builds that brand for EVERY BRAND_ID.
+const brandLink = path.join(core, '.brand');
+try {
+  const st = fs.lstatSync(brandLink);
+  if (st.isSymbolicLink() || st.isDirectory()) fs.rmSync(brandLink, { recursive: true, force: true });
+} catch {}
+fs.symlinkSync(brandDir, brandLink, 'junction');
+
+console.log(`[stage-brand] staged "${brand}" (public${fs.existsSync(brandEnv) ? ' + env' : ''} + .brand link)`);

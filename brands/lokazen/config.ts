@@ -1,0 +1,122 @@
+import type { BrandConfig } from '@/configs/types';
+
+export const lokazenConfig: BrandConfig = {
+  name: 'Lokazen',
+  brand: 'lokazen',
+  tagline: 'Bangalore',
+  website: 'https://lokazen.in',
+  widget: {
+    headerName: 'Lokazen',
+    welcomeSequence: [
+      { text: "Hi, I'm Loka,", delay: 0 },
+      { text: "Lokazen's commercial real estate assistant.", delay: 800 },
+      { text: 'Looking for space, or have a property to list? Tell me what you need.', delay: 1600 },
+    ],
+  },
+  // Sensible defaults for a fresh brand — flip on as Lokazen adopts each feature.
+  features: {
+    voice: false,
+    brain: true,
+    pipelineFunnel: true,
+    followUpSequence: false,
+  },
+  apiUrl: '/api/agent/web/chat',
+  systemPrompt: {
+    path: '@/api/prompts/lokazen-prompt',
+  },
+  styles: {
+    // TODO: dedicated themes/lokazen.css follow-up; using shared theme for now.
+    themePath: '@/styles/theme.css',
+  },
+  chatStructure: {
+    showQuickButtons: true,
+    showFollowUpButtons: true,
+    maxFollowUps: 3,
+    avatar: {
+      type: 'image',
+      source: '/lokazen-icon.jpg',
+    },
+  },
+  colors: {
+    // Lokazen brand — hot orange primary, red secondary (pulled from globals.css --d2-brand / --d2-brand-2)
+    primary: '#FF5200',              // Lokazen orange
+    primaryLight: '#FFF3EE',          // orange tint (cards/highlights)
+    primaryDark: '#0A0B0F',           // near-black dashboard page
+    primaryVibrant: '#E4002B',        // brand red accent
+
+    // Gradient
+    gradientStart: '#0A0B0F',
+    gradientMid: '#FF5200',
+    gradientEnd: '#E4002B',
+
+    // Backgrounds (dark dashboard tokens: --d2-bg-page / --d2-bg-card)
+    darkBg: '#0A0B0F',
+    darkCard: 'rgba(255, 82, 0, 0.10)',
+    darkSurface: 'rgba(20, 22, 28, 0.6)',
+    glassBg: 'rgba(255, 82, 0, 0.05)',
+    glassBorder: 'rgba(248, 249, 250, 0.10)',
+    glassShadow: 'rgba(255, 82, 0, 0.20)',
+
+    // Text
+    textPrimary: '#F8F9FA',
+    textSecondary: 'rgba(248, 249, 250, 0.7)',
+    textTertiary: 'rgba(248, 249, 250, 0.5)',
+    textMuted: 'rgba(248, 249, 250, 0.4)',
+    white: '#FFFFFF',
+    textButton: '#FFFFFF',
+
+    // Borders
+    borderLight: 'rgba(248, 249, 250, 0.08)',
+    borderMedium: 'rgba(248, 249, 250, 0.12)',
+    borderAccent: 'rgba(255, 82, 0, 0.3)',
+    borderGlow: 'rgba(255, 82, 0, 0.4)',
+    borderColor: 'rgba(255, 82, 0, 0.2)',
+
+    // Accents
+    greenSuccess: '#10B981',
+    orangeAccent: '#FF5200',
+    goldAccent: '#FF5200',
+    burgundyAccent: '#E4002B',
+
+    // Background variants
+    bgPrimary: 'rgba(20, 22, 28, 0.05)',
+    bgHeader: 'rgba(10, 11, 15, 0.85)',
+    bgMessageArea: 'rgba(255, 82, 0, 0.03)',
+    bgHover: 'rgba(255, 82, 0, 0.12)',
+    bgActive: 'rgba(255, 82, 0, 0.15)',
+
+    // Chat bubbles
+    bubbleUserBg: 'rgba(255, 82, 0, 0.22)',
+    bubbleUserBorder: 'rgba(255, 82, 0, 0.7)',
+    bubbleUserShadow: '0 8px 32px rgba(255, 82, 0, 0.25)',
+    bubbleAiBg: 'rgba(20, 22, 28, 0.4)',
+    bubbleAiBorder: 'rgba(20, 22, 28, 0.7)',
+    bubbleAiShadow: '0 8px 32px rgba(10, 11, 15, 0.25)',
+
+    // Buttons
+    buttonBg: 'rgba(255, 82, 0, 0.12)',
+    buttonHover: 'rgba(255, 82, 0, 0.2)',
+    buttonActive: 'rgba(255, 82, 0, 0.3)',
+  },
+  // 3 buttons shown when chat opens — split across both audiences
+  quickButtons: [
+    'Find Commercial Space',
+    'List My Property',
+    'Talk to Lokazen team',
+  ],
+  // Shown when exploring — commercial property types
+  exploreButtons: [
+    'Retail',
+    'Office',
+    'Warehouse',
+    'Restaurant Space',
+  ],
+  followUpButtons: ['Get Matched', 'Book a Site Visit', 'Talk to Lokazen team', 'Request a Callback'],
+  firstMessageButtons: ['I need space', 'I have a property'],
+  support: {
+    whatsapp: '+916366826978',
+    email: 'support@lokazen.in',
+  },
+};
+
+export const brandConfig = lokazenConfig;

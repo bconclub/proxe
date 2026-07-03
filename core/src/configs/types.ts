@@ -1,6 +1,17 @@
 export interface BrandConfig {
   name: string;
   brand: string;
+  tagline?: string;          // login/invite subtitle (e.g. 'WindChasers Aviation Academy')
+  website?: string;          // public site linked from auth pages
+  themeDataAttr?: string;    // <html data-theme> value (defaults to `brand`)
+  // Widget chrome + copy. Everything here used to be hardcoded windchasers
+  // strings in ChatWidget — brand identity lives in the pack, not in core.
+  widget?: {
+    headerName?: string;                              // chat header title (defaults to `name`)
+    welcomeSequence?: { text: string; delay: number }[]; // opening AI bubbles
+    leadContextWelcome?: string;                      // welcome when a pre-loaded lead context exists
+    assessmentUrl?: string;                           // external assessment flow (windchasers)
+  };
   // Per-brand feature toggles. Code for these features ships to ALL brands
   // (promoted via master), but each brand switches them on/off here — e.g.
   // Windchasers carries the Voice/Calls code but keeps voice:false until they
@@ -83,6 +94,7 @@ export interface BrandConfig {
     buttonHover: string;
     buttonActive: string;
   };
+  showWelcomeVideo?: boolean;
   quickButtons: string[];
   exploreButtons?: string[];
   followUpButtons: string[]; // Default follow-up buttons

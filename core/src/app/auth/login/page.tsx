@@ -5,18 +5,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
 import { getBrandConfig } from '@/configs'
 
-/** Windchasers website (this fork only serves windchasers — no cross-brand maps). */
-const WINDCHASERS_WEBSITE = 'https://windchasers.in'
-const WINDCHASERS_TAGLINE = 'WindChasers Aviation Academy'
-
 export default function LoginPage() {
   const router = useRouter()
 
-  // Brand config (always windchasers in this fork — kept as call for shape stability).
+  // Brand identity comes from the active pack (@brand via getBrandConfig).
   const brand = useMemo(() => getBrandConfig(), [])
   const colors = brand.colors
-  const tagline = WINDCHASERS_TAGLINE
-  const website = WINDCHASERS_WEBSITE
+  const tagline = brand.tagline || brand.name
+  const website = brand.website || 'https://goproxe.com'
   const logoLetter = brand.name.charAt(0).toUpperCase()
   const logoImage = brand.chatStructure?.avatar?.source
 

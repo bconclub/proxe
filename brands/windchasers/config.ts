@@ -3,6 +3,19 @@ import type { BrandConfig } from '@/configs/types';
 export const windchasersConfig: BrandConfig = {
   name: 'Windchasers',
   brand: 'windchasers',
+  tagline: 'WindChasers Aviation Academy',
+  website: 'https://windchasers.in',
+  themeDataAttr: 'aviation-gold',
+  widget: {
+    headerName: 'Windchasers',
+    welcomeSequence: [
+      { text: 'Hi, I am Avia,', delay: 0 },
+      { text: 'I am Windchasers AI Aviation Counsellor.', delay: 800 },
+      { text: "I am here to help you with your Pilot Career Path. What's on your mind?", delay: 1600 },
+    ],
+    leadContextWelcome: 'Hi! Welcome to Windchasers,\nI am here to help you with our Aviation Training Queries.',
+    assessmentUrl: 'https://windchasers.in/assessment',
+  },
   // Voice/Calls code ships here but stays OFF until Windchasers wants outbound
   // calling — flip voice:true to surface the Calls dashboard + Vapi webhook.
   features: {

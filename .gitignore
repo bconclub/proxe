@@ -37,6 +37,10 @@ nul
 debug-*.mjs
 test-*.mjs
 
+# staged brand artifacts (stage-brand.js regenerates these every dev/build)
+core/.brand
+core/public/
+
 # vercel
 .vercel
 

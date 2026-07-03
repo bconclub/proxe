@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
+import { brandConfig } from '@/configs'
+
+const brandTheme = brandConfig.themeDataAttr || brandConfig.brand
 
 const inter = Inter({
   subsets: ['latin'],
@@ -10,8 +13,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'PROXe Windchasers',
-  description: 'Windchasers Dashboard',
+  title: brandConfig.brand === 'proxe' ? 'PROXe' : `PROXe ${brandConfig.name}`,
+  description: `${brandConfig.name} Dashboard`,
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
@@ -25,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="windchasers" data-theme="aviation-gold">
+    <html lang="en" suppressHydrationWarning data-brand={brandConfig.brand} data-theme={brandTheme}>
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
@@ -41,7 +44,7 @@ export default function RootLayout({
                     el.classList.add('light');
                     el.classList.remove('dark');
                   } else if (t === 'brand') {
-                    el.setAttribute('data-theme', 'aviation-gold');
+                    el.setAttribute('data-theme', '${brandTheme}');
                     el.classList.add('dark');
                     el.classList.remove('light');
                   } else {

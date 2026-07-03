@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { brandConfig } from '@/configs'
 
 export default function PageTransitionLoader() {
   const [isLoading, setIsLoading] = useState(false)
@@ -47,7 +48,7 @@ export default function PageTransitionLoader() {
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
             <Image
               src="/logo.png"
-              alt="Windchasers"
+              alt={brandConfig.name}
               width={80}
               height={80}
               className="page-transition-loader-icon drop-shadow-lg"

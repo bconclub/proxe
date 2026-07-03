@@ -3,6 +3,14 @@ import type { BrandConfig } from '@/configs/types';
 export const bconConfig: BrandConfig = {
   name: 'BCON',
   brand: 'bcon',
+  tagline: 'BCON',
+  website: 'https://bconclub.com',
+  widget: {
+    headerName: 'BCON AI',
+    welcomeSequence: [
+      { text: "HI i am PROXe, BCON's AI Marketing Strategist\n\nHow can I help with your marketing today?", delay: 0 },
+    ],
+  },
   // BCON runs the Vapi voice/calls stack and the dashboard extras.
   features: {
     voice: true,

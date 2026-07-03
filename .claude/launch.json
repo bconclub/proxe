@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "windchasers",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=windchasers&&npm run dev"],
+      "port": 4002
+    },
+    {
+      "name": "pop",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&npm run dev"],
+      "port": 4002
+    },
+    {
+      "name": "lokazen",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&npm run dev"],
+      "port": 4002
+    },
+    {
+      "name": "proxe",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=proxe&&npm run dev"],
+      "port": 4002
+    },
+    {
+      "name": "bcon",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=bcon&&npm run dev"],
+      "port": 4002
+    }
+  ]
+}
