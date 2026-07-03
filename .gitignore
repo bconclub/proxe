@@ -52,3 +52,6 @@ core/public/
 next-env.d.ts
 
 
+
+# build-skill state (local only)
+.claude/state/
