@@ -355,6 +355,9 @@ export function ConversationsTrendChart({ data, color, days, animate = true }: {
   const showLabels = n <= 10
   const xInterval = n <= 8 ? 0 : Math.max(1, Math.floor(n / 7))
   const gradientId = `convgrad-${stroke.replace(/[^a-zA-Z0-9]/g, '')}`
+  // Abbreviate large values (10500 → 10.5K) so the y-axis ticks don't clip and
+  // the per-point labels don't collide. No-op under 1000 (other brands unaffected).
+  const compact = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1).replace(/\.0$/, '')}K` : `${Math.round(v)}`)
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -378,10 +381,11 @@ export function ConversationsTrendChart({ data, color, days, animate = true }: {
           scale="sqrt"
           domain={[0, niceMax]}
           ticks={yTicks}
+          tickFormatter={compact}
           tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
           tickLine={false}
           axisLine={false}
-          width={32}
+          width={38}
         />
         <Area
           type="monotone"
@@ -395,7 +399,7 @@ export function ConversationsTrendChart({ data, color, days, animate = true }: {
           style={{ filter: `drop-shadow(0 0 3px ${stroke}66)` }}
         >
           {showLabels && (
-            <LabelList dataKey="value" position="top" offset={8} fill="var(--text-primary)" style={{ fontSize: 9, fontWeight: 600 }} />
+            <LabelList dataKey="value" position="top" offset={8} formatter={compact} fill="var(--text-primary)" style={{ fontSize: 9, fontWeight: 600 }} />
           )}
         </Area>
       </AreaChart>
