@@ -89,6 +89,18 @@ export function detectLokazenAudience(
   // Scout account", "the scout app", "i want to be a scout", "join as a scout".
   // Requires the word "scout" so a brand/owner mentioning it in passing is safe.
   const hasScoutWord = /\bscout\b/.test(answerLower);
+  // Gig-worker scout intent even without the word "scout" — the tell-tale
+  // phrases are unique to the scout product (KYC/verification to get paid,
+  // per-listing earnings, spotting empty "To Let" shops, UPI payout). Brand
+  // and owner intent is matched FIRST below, so a space-seeker/landlord that
+  // happens to use one of these words won't be misread as a scout.
+  const scoutPhrase =
+    /\bto[\s-]?let\b/.test(answerLower) ||
+    /(empty|vacant)\s+(shop|store|commercial)/.test(answerLower) ||
+    /(how (much|long).{0,20}(earn|paid|verif))|get (verified|paid)|verify.{0,10}(to get paid|for payout)/.test(answerLower) ||
+    /(earn|₹|rs\.?\s*\d).{0,25}(per|each).{0,20}(listing|property|shop|verif)/.test(answerLower) ||
+    /\b(payout|per verified|upi id|when (do|will) i get paid)\b/.test(answerLower) ||
+    /(spot|photograph|click a photo of).{0,20}(shop|property|space|to[\s-]?let)/.test(answerLower);
   const scoutIntent =
     answerLower.includes('become a scout') ||
     answerLower.includes('join as a scout') ||
@@ -96,6 +108,7 @@ export function detectLokazenAudience(
     answerLower.includes('scout account') ||
     answerLower.includes('scout app') ||
     (hasScoutWord && /(account|app|kyc|payout|join|register|sign\s?up|spot|verif|earn)/.test(answerLower)) ||
+    scoutPhrase ||
     buttons.some((b) => b.includes('scout'));
 
   if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
