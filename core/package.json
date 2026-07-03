@@ -26,6 +26,8 @@
     "autoprefixer": "^10.4.17",
     "clsx": "^2.1.0",
     "date-fns": "^3.0.6",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "googleapis": "^164.1.0",
     "lottie-react": "^2.4.1",
     "mammoth": "^1.11.0",

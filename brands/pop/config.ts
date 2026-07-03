@@ -22,6 +22,7 @@ export const popConfig: BrandConfig = {
     brain: true,
     pipelineFunnel: true,
     followUpSequence: true,
+    warRoom: true,
   },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {

@@ -41,6 +41,9 @@ test-*.mjs
 core/.brand
 core/public/
 
+# multi-brand local test clones (generated; junction-shared node_modules)
+.multi/
+
 # vercel
 .vercel
 
