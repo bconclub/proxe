@@ -346,6 +346,10 @@ export async function POST(request: NextRequest) {
         if (kyc) brandCtxData.kyc_status = kyc
         const subArea = asStr(pick('submission_area', 'property_area'))
         if (subArea) brandCtxData.last_submission_area = subArea
+        // Count of shops this scout has submitted (drives the Properties column).
+        // Default 1 for a brand-new scout's first submission; for an existing
+        // scout it's recomputed as existing + 1 at the merge below.
+        if (scoutEvent === 'submission') brandCtxData.scout_submissions_count = 1
         const payout = asStr(pick('payout_amount', 'amount'))
         if (payout) brandCtxData.last_payout_amount = payout
         // The website forwards the exact deep-link it would have texted (portal /
@@ -510,6 +514,12 @@ export async function POST(request: NextRequest) {
         const mergedBrandCtx = inboundContext[leadBrand]
           ? { ...(existingCtx[leadBrand] || {}), ...inboundContext[leadBrand] }
           : existingCtx[leadBrand]
+        // A submission event increments the scout's running submitted count
+        // (the shallow merge above would otherwise reset it to the default 1).
+        if (mergedBrandCtx && brandCtxData.scout_event === 'submission') {
+          mergedBrandCtx.scout_submissions_count =
+            Number((existingCtx[leadBrand] as any)?.scout_submissions_count || 0) + 1
+        }
         // Attribution is IMMUTABLE — never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
         const mergedAttribution = existingCtx.attribution ?? attribution

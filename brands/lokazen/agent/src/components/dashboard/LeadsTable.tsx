@@ -818,7 +818,7 @@ export default function LeadsTable({
                 { label: 'Score',      align: 'center' as const },
                 { label: 'Stage',      align: 'center' as const },
                 { label: 'Active',     align: 'left'   as const },
-                { label: 'Booking',    align: 'center' as const },
+                { label: showLokazenColumns && userTypeFilter === 'scout' ? 'Properties' : 'Booking', align: 'center' as const },
                 ...(showAviationColumns ? [
                   { label: 'Type',   align: 'center' as const },
                   { label: 'Course', align: 'center' as const },
@@ -1449,9 +1449,19 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING - compact chip with calendar icon + online/offline subtext */}
+                    {/* BOOKING (brand/owner) OR PROPERTIES SUBMITTED (scout) */}
                     <td className="px-3 py-2 text-xs text-center">
-                      {bookingDate ? (() => {
+                      {isScoutRow ? (() => {
+                        const n = Number(lkz.scout_submissions_count ?? (lkz.last_submission_area ? 1 : 0)) || 0
+                        return (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums"
+                            style={n > 0 ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' } : { color: 'var(--text-muted)' }}
+                          >
+                            {n > 0 ? `${n} submitted` : '0'}
+                          </span>
+                        )
+                      })() : bookingDate ? (() => {
                         // Resolve session type: explicit field wins, else infer from meet link presence.
                         const brandCtx = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
                         const explicit = String(brandCtx.session_type || brandCtx.demo_type || uc?.raw_form_fields?.demo_type || '').toLowerCase()
