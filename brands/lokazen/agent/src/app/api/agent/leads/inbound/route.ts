@@ -764,7 +764,20 @@ export async function POST(request: NextRequest) {
       brandCtxData.scout_event !== 'signup'
         ? String(brandCtxData.scout_event)
         : null
-    if (leadBrand === 'lokazen' && isNew && normalizedPhone && !scoutLifecycleEvent) {
+    // The Lokazen WEBSITE already owns the scout transactional drip (welcome,
+    // kyc_submitted, kyc_verified, upi_added — its own Meta-approved templates).
+    // So PROXe must NOT re-send those, or scouts get double-texted. PROXe's scout
+    // sends are OPT-IN: a scout template only fires if its name is in this
+    // allowlist (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY). PROXe still
+    // OWNS the scout lead (dashboard/timeline); it just stays silent unless a
+    // genuinely net-new message (that the site does NOT send) is switched on.
+    const activeScoutTemplates = new Set(
+      (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || '')
+        .split(',').map((s) => s.trim()).filter(Boolean),
+    )
+    const skipScoutWelcome =
+      brandCtxData.user_type === 'scout' && !activeScoutTemplates.has('scout_welcome')
+    if (leadBrand === 'lokazen' && isNew && normalizedPhone && !scoutLifecycleEvent && !skipScoutWelcome) {
       try {
         const firstName = (leadName || 'there').split(' ')[0]
         const ut = brandCtxData.user_type
@@ -852,10 +865,7 @@ export async function POST(request: NextRequest) {
           },
         }
         const mapped = SCOUT_EVENT_MAP[scoutLifecycleEvent]
-        const activeTemplates = new Set(
-          (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || 'scout_welcome')
-            .split(',').map((s) => s.trim()).filter(Boolean),
-        )
+        const activeTemplates = activeScoutTemplates
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutLifecycleEvent} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
