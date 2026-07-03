@@ -14,11 +14,17 @@ import {
   TIER_MESSAGES,
   TEMPLATE_HEADERS,
   TEMPLATE_BUTTONS,
+  notifySlackLead,
+  sendWhatsAppTemplate,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
+
+// Scout onboarding URL used in the scout_welcome WhatsApp template ({{2}}).
+const LOKAZEN_SCOUT_ONBOARDING_URL =
+  process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://www.lokazen.in/scout#scout-form'
 
 /**
  * POST /api/agent/leads/inbound
@@ -138,6 +144,17 @@ export async function POST(request: NextRequest) {
     // The original raw source is preserved in agent_tasks.metadata.source below.
     const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
     const leadBrand = brand || BRAND_ID
+
+    // The lokazen all_leads.first_touchpoint CHECK constraint only permits the
+    // base channels (web/whatsapp/voice/social). A form/ads/meta_forms/manual
+    // source would fail the INSERT and the lead would be LOST — the exact reason
+    // onboarding/ad leads weren't arriving. Coerce the value we WRITE to an
+    // allowed channel; the true source is still preserved in unified_context.
+    // attribution + agent_tasks.metadata.original_source. (Scoped to lokazen so
+    // brands with a wider constraint keep full touchpoint fidelity.)
+    const DB_ALLOWED_TOUCHPOINTS = new Set(['web', 'whatsapp', 'voice', 'social'])
+    const storedTouchpoint =
+      leadBrand === 'lokazen' && !DB_ALLOWED_TOUCHPOINTS.has(leadSource) ? 'web' : leadSource
 
     const supabase = getServiceClient() || getClient()
     if (!supabase) {
@@ -265,6 +282,177 @@ export async function POST(request: NextRequest) {
         brandCtxData.pat_completed_at = now
       }
     }
+
+    // ── Lokazen: map Brand Onboarding / Property Owner Onboarding form fields ──
+    // The lokazen.in onboarding forms (BrandOnboardingForm / PropertyOwner
+    // OnboardingForm) POST rich details, but without this mapping they only
+    // land in raw_form_fields and the dashboard's PROPERTY TYPE / SIZE / zone
+    // columns (which read unified_context.lokazen.*) stay blank. We read the
+    // form's own key names AND common aliases so it survives light renaming.
+    if (leadBrand === 'lokazen') {
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = cf2[k] ?? (body as Record<string, any>)[k]
+          if (v != null && String(v).trim() !== '') return v
+        }
+        return null
+      }
+      const asStr = (v: any) => (v == null ? null : String(Array.isArray(v) ? v.join(', ') : v).trim() || null)
+      // The lokazen.in website posts user_type "seeker" (wants space = brand)
+      // and "provider" (lists space = owner). Handle those FIRST, then the
+      // generic words, so real payloads classify correctly.
+      const asType = (v: any): 'brand' | 'owner' | null => {
+        const s = String(v || '').toLowerCase().trim()
+        if (!s) return null
+        if (s.includes('seeker') || s.includes('brand') || s.includes('tenant')) return 'brand'
+        if (s.includes('provider') || s.includes('owner') || s.includes('property') || s.includes('landlord') || s.includes('list')) return 'owner'
+        if (s.includes('space')) return 'brand'
+        return null
+      }
+
+      // Scout is deterministic: the website scout routes post user_type='scout'
+      // (and/or source/lead_source containing "scout") plus a scout_event tag for
+      // the lifecycle step. Scout is checked FIRST and short-circuits the
+      // brand/owner inference so a scout never gets misclassified.
+      const rawTypeStr = String(
+        pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type', 'form_type', 'event_name', 'lead_source') ||
+        normalizedSource || '',
+      ).toLowerCase()
+      const isScout = /\bscout\b/.test(rawTypeStr)
+      const scoutEvent = asStr(pick('scout_event', 'lifecycle_event', 'scout_stage'))
+
+      // Resolve audience (brand vs owner). Explicit type field wins; else infer
+      // from the form_type/event_name/lead_source/source, else field presence.
+      let lkzType: 'brand' | 'owner' | 'scout' | null = isScout
+        ? 'scout'
+        : asType(pick('user_type', 'audience', 'lead_type', 'onboarding_type', 'type')) ||
+          asType(pick('form_type', 'event_name', 'lead_source')) ||
+          asType(normalizedSource)
+
+      // Field presence fallback (only if the type is still unknown). current_outlets
+      // => brand; carpet/asking-rent => owner. space_type/area_sqft/budget_rent are
+      // sent by BOTH sides so they don't discriminate.
+      const hasPropFields = !!pick('propertyType', 'property_type', 'spaceTypes', 'space_types', 'carpetArea', 'carpet_area', 'asking_rent', 'monthly_rent')
+      const hasBrandFields = !!pick('brandName', 'brand_name', 'outlets', 'current_outlets', 'sizeMin', 'size_min', 'rentMin', 'rent_min')
+      if (!lkzType) lkzType = hasPropFields ? 'owner' : hasBrandFields ? 'brand' : null
+
+      if (lkzType === 'scout') {
+        brandCtxData.user_type = 'scout'
+        brandCtxData.lead_type = 'scout'
+        if (scoutEvent) brandCtxData.scout_event = scoutEvent
+        const area = asStr(pick('scout_area', 'area_covered', 'coverage_area', 'area', 'location'))
+        if (area) brandCtxData.scout_area_covered = area
+        const kyc = asStr(pick('kyc_status'))
+        if (kyc) brandCtxData.kyc_status = kyc
+        const subArea = asStr(pick('submission_area', 'property_area'))
+        if (subArea) brandCtxData.last_submission_area = subArea
+        // Count of shops this scout has submitted (drives the Properties column).
+        // Default 1 for a brand-new scout's first submission; for an existing
+        // scout it's recomputed as existing + 1 at the merge below.
+        if (scoutEvent === 'submission') brandCtxData.scout_submissions_count = 1
+        const payout = asStr(pick('payout_amount', 'amount'))
+        if (payout) brandCtxData.last_payout_amount = payout
+        // The website forwards the exact deep-link it would have texted (portal /
+        // profile / submit, already carrying the scout's submission_token) plus
+        // the UPI on the upi_added step. PROXe re-uses these so the message links
+        // land the scout on the right page without PROXe needing the token.
+        const scoutUrl = asStr(pick('scout_url', 'portal_url', 'profile_url', 'submit_url', 'deep_link'))
+        if (scoutUrl) brandCtxData.scout_url = scoutUrl
+        const upi = asStr(pick('upi_id', 'upi'))
+        if (upi) brandCtxData.scout_upi_id = upi
+      } else if (lkzType === 'owner') {
+        brandCtxData.user_type = 'owner'
+        // Live website keys first: space_type / area_sqft / location_preference / budget_rent.
+        const propType = asStr(pick('space_type', 'propertyType', 'property_type', 'spaceTypes', 'space_types', 'property_kind'))
+        if (propType) brandCtxData.property_type = propType
+        const size = asStr(pick('area_sqft', 'carpetArea', 'carpet_area', 'builtUpArea', 'built_up_area', 'property_size_sqft', 'sqft', 'size'))
+        if (size) brandCtxData.property_size_sqft = size
+        const zone = asStr(pick('location_preference', 'area', 'locality', 'zone', 'property_zone', 'micromarket', 'location'))
+        if (zone) brandCtxData.property_zone = zone
+        const rent = asStr(pick('budget_rent', 'rent', 'asking_rent', 'monthly_rent', 'asking_rent_monthly', 'expected_rent'))
+        if (rent) brandCtxData.asking_rent_monthly = rent
+        const floor = asStr(pick('floor'))
+        if (floor) brandCtxData.floor = floor
+        const frontage = asStr(pick('frontage', 'frontage_ft'))
+        if (frontage) brandCtxData.frontage_ft = frontage
+        const amenities = asStr(pick('amenities'))
+        if (amenities) brandCtxData.amenities = amenities
+        const avail = asStr(pick('handoverDate', 'handover_date', 'availability_date', 'available_from'))
+        if (avail) brandCtxData.availability_date = avail
+        const deposit = asStr(pick('deposit', 'security_deposit', 'deposit_amount'))
+        if (deposit) brandCtxData.deposit = deposit
+        const gmaps = asStr(pick('google_maps_link', 'google_maps_url', 'gmaps_link', 'map_link', 'maps_url'))
+        if (gmaps) brandCtxData.google_maps_url = gmaps
+      } else if (lkzType === 'brand') {
+        brandCtxData.user_type = 'brand'
+        const bname = asStr(pick('brand_name', 'brandName', 'company', 'brand'))
+        if (bname) brandCtxData.brand_name = bname
+        // Live website sends "business_type" (e.g. "Cafe / Coffee").
+        const cat = asStr(pick('business_type', 'category', 'brand_category', 'business_category', 'brand_type'))
+        if (cat) brandCtxData.brand_category = cat
+        const outlets = asStr(pick('current_outlets', 'outlets', 'num_outlets'))
+        if (outlets) brandCtxData.current_outlets = outlets
+        // Live website sends "location_preference" (comma-joined areas).
+        const zones = asStr(pick('location_preference', 'selectedAreas', 'selected_areas', 'target_zones', 'areas', 'preferred_areas', 'zone', 'area', 'locality'))
+        if (zones) brandCtxData.target_zones = zones
+        // What format of space they want (e.g. "restaurant").
+        const fmt = asStr(pick('space_type', 'preferred_format', 'format', 'property_format'))
+        if (fmt) brandCtxData.preferred_format = fmt
+        // Size: live "area_sqft" is already a range (e.g. "800-2000"); else min-max.
+        const sizeMin = asStr(pick('sizeMin', 'size_min', 'min_size'))
+        const sizeMax = asStr(pick('sizeMax', 'size_max', 'max_size'))
+        const sizeExplicit = asStr(pick('area_sqft', 'required_size_sqft', 'size', 'sqft'))
+        const sizeRange = sizeExplicit || (sizeMin && sizeMax ? `${sizeMin}-${sizeMax}` : sizeMin || sizeMax)
+        if (sizeRange) brandCtxData.required_size_sqft = sizeRange
+        // Budget: live "budget_rent"; else min-max range.
+        const rentMin = asStr(pick('rentMin', 'rent_min', 'budget_min'))
+        const rentMax = asStr(pick('rentMax', 'rent_max', 'budget_max'))
+        const budgetExplicit = asStr(pick('budget_rent', 'budget_monthly_rent', 'budget', 'rent'))
+        const budget = budgetExplicit || (rentMin && rentMax ? `${rentMin}-${rentMax}` : rentMin || rentMax)
+        if (budget) brandCtxData.budget_monthly_rent = budget
+        const audience = asStr(pick('target_audience', 'audience_type', 'customer_profile'))
+        if (audience) brandCtxData.target_audience = audience
+      }
+
+      // ── Common CRE extras (any lokazen form) ──────────────────────────────
+      // Fields the action/enquiry forms send that the brand/owner branches
+      // above don't cover. The frontend already forwards all of these; we just
+      // surface them as structured context instead of leaving them in
+      // raw_form_fields. property_id links the lead to the Loka listing (and
+      // powers the image gallery). requested_action captures high-intent forms
+      // (site visit / expert call) that otherwise look like a plain lead.
+      const propId = asStr(pick('property_id', 'propertyId'))
+      if (propId) brandCtxData.property_id = propId
+      const src = normalizedSource || String(cf2.lead_source || '')
+      if (src === 'site_visit_request' || cf2.lead_source === 'site_visit_request') {
+        brandCtxData.requested_action = 'site_visit'
+        const pt = asStr(pick('property_title', 'propertyTitle'))
+        if (pt) brandCtxData.property_title = pt
+        const pd = asStr(pick('preferred_date', 'preferredDate', 'schedule_date'))
+        const ptime = asStr(pick('preferred_time', 'preferredTime', 'schedule_time'))
+        const when = [pd, ptime].filter(Boolean).join(' ')
+        if (when) brandCtxData.preferred_visit_at = when
+      } else if (cf2.lead_source === 'expert_connect') {
+        brandCtxData.requested_action = 'expert_call'
+        const sd = asStr(pick('schedule_datetime', 'scheduleDateTime'))
+        if (sd) brandCtxData.preferred_visit_at = sd
+      }
+      // Free-text requirement (contact-team / search requirements / notes).
+      const req = asStr(pick('requirements', 'requirement', 'search_criteria'))
+      if (req) brandCtxData.requirement_notes = req
+      const bestTime = asStr(pick('best_time', 'bestTime'))
+      if (bestTime) brandCtxData.best_time = bestTime
+      // Owner extras (public-submit / hyderabad) the owner branch doesn't map.
+      const poss = asStr(pick('possession_date', 'possessionDate', 'availability'))
+      if (poss && !brandCtxData.availability_date) brandCtxData.availability_date = poss
+      const pstatus = asStr(pick('property_status'))
+      if (pstatus) brandCtxData.property_status = pstatus
+      const cafeFmt = asStr(pick('cafe_format'))
+      if (cafeFmt && !brandCtxData.preferred_format) brandCtxData.preferred_format = cafeFmt
+      const venue = asStr(pick('venue'))
+      if (venue) brandCtxData.venue = venue
+    }
+
     if (Object.keys(brandCtxData).length > 0) {
       inboundContext[leadBrand] = brandCtxData
     }
@@ -307,7 +495,7 @@ export async function POST(request: NextRequest) {
       // Update existing - don't overwrite name if already set
       const updates: Record<string, any> = {
         last_interaction_at: now,
-        last_touchpoint: leadSource,
+        last_touchpoint: storedTouchpoint,
       }
       if (email) updates.email = email.trim().toLowerCase()
       if (name && !existing.customer_name) updates.customer_name = name.trim()
@@ -326,6 +514,12 @@ export async function POST(request: NextRequest) {
         const mergedBrandCtx = inboundContext[leadBrand]
           ? { ...(existingCtx[leadBrand] || {}), ...inboundContext[leadBrand] }
           : existingCtx[leadBrand]
+        // A submission event increments the scout's running submitted count
+        // (the shallow merge above would otherwise reset it to the default 1).
+        if (mergedBrandCtx && brandCtxData.scout_event === 'submission') {
+          mergedBrandCtx.scout_submissions_count =
+            Number((existingCtx[leadBrand] as any)?.scout_submissions_count || 0) + 1
+        }
         // Attribution is IMMUTABLE — never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
         const mergedAttribution = existingCtx.attribution ?? attribution
@@ -349,8 +543,8 @@ export async function POST(request: NextRequest) {
           phone,
           customer_phone_normalized: normalizedPhone,
           brand: leadBrand,
-          first_touchpoint: leadSource,
-          last_touchpoint: leadSource,
+          first_touchpoint: storedTouchpoint,
+          last_touchpoint: storedTouchpoint,
           last_interaction_at: now,
           lead_stage: 'New',
           unified_context: {
@@ -494,7 +688,13 @@ export async function POST(request: NextRequest) {
       .in('status', ['pending', 'queued', 'awaiting_approval'])
       .limit(1)
 
-    if (existingOutreach && existingOutreach.length > 0) {
+    // Scouts do NOT run the brand/owner follow-up sequence — they have their own
+    // lifecycle drip (signup/KYC/submission/payout via scout_event templates), so
+    // never queue a first_outreach / sequence task for a scout lead.
+    const isScoutLead = leadBrand === 'lokazen' && brandCtxData.user_type === 'scout'
+    if (isScoutLead) {
+      console.log(`[inbound] Scout lead ${leadName} — no follow-up sequence (scout lifecycle only)`)
+    } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
     } else {
@@ -525,6 +725,213 @@ export async function POST(request: NextRequest) {
         console.error('[inbound] Failed to create first_outreach task:', taskErr.message)
       } else {
         taskCreated = true
+      }
+    }
+
+    // ── Slack "new lead" alert (no-op unless SLACK_WEBHOOK_URL is set) ────────
+    // Fires for genuinely new inbound leads (Brand / Property onboarding forms,
+    // ads, etc.). Awaited so Vercel doesn't drop it; soft-fails so Slack never
+    // blocks the lead. Detail line surfaces the captured Brand/Property fields.
+    // (Core note: gated to lokazen — other brands keep their existing behavior.)
+    if (isNew && leadBrand === 'lokazen') {
+      try {
+        const lkz = brandCtxData
+        const typeLabel = lkz.user_type === 'owner' ? 'Property Owner' : lkz.user_type === 'brand' ? 'Brand' : null
+        // Structured detail — rendered as Slack 2-column fields, not a joined line.
+        const detailFields: Array<[string, string | number | null | undefined]> =
+          lkz.user_type === 'owner'
+            ? [
+                ['Property type', lkz.property_type],
+                ['Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
+                ['Area', lkz.property_zone],
+                ['Rent', lkz.asking_rent_monthly],
+                ['Floor', lkz.floor],
+              ]
+            : lkz.user_type === 'brand'
+            ? [
+                ['Brand', lkz.brand_name],
+                ['Category', lkz.brand_category],
+                ['Areas', lkz.target_zones],
+                ['Format', lkz.preferred_format],
+                ['Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
+                ['Budget', lkz.budget_monthly_rent],
+                ['Outlets', lkz.current_outlets],
+              ]
+            : []
+        await notifySlackLead({
+          brandLabel: leadBrand === 'lokazen' ? 'Lokazen' : leadBrand,
+          title: 'New lead',
+          name: leadName,
+          phone: normalizedPhone,
+          email: email?.trim() || null,
+          leadType: typeLabel,
+          source: normalizedSource || leadSource,
+          detailFields,
+          footer: 'new lead',
+        })
+      } catch (slackErr: any) {
+        console.error('[inbound] Slack new-lead notify failed:', slackErr?.message || slackErr)
+      }
+    }
+
+    // ── Lokazen: first-outreach WhatsApp template on a new form/website lead ──
+    // Form leads have no open 24h window, so the outbound MUST be an approved
+    // template. Meta-approved (this WABA): lokazen_lead_confirm (POSITIONAL,
+    // {{1}}=name) for brand+owner; scout_welcome (POSITIONAL, {{1}}=name,
+    // {{2}}=portal URL) for scouts. Awaited (Vercel won't drop it), soft-fails,
+    // and logged to conversations so the inbox reflects the send.
+    // PROXe now owns ALL scout messaging: the website forwards each scout_event
+    // (signup / kyc_submitted / kyc_verified / upi_added / submission / payout)
+    // and no longer sends its own scout WhatsApp. Every scout template is OPT-IN
+    // via this allowlist (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) so
+    // nothing fires until each is confirmed live on PROXe's WABA — this prevents
+    // double-texting during the site->PROXe cutover. Scouts are handled entirely
+    // by the dedicated sender below, never by the brand/owner welcome here.
+    const activeScoutTemplates = new Set(
+      (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || '')
+        .split(',').map((s) => s.trim()).filter(Boolean),
+    )
+    const scoutEventToSend = brandCtxData.user_type === 'scout'
+      ? String(brandCtxData.scout_event || (isNew ? 'signup' : ''))
+      : null
+    if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
+      try {
+        const firstName = (leadName || 'there').split(' ')[0]
+        const templateName = 'lokazen_lead_confirm'
+        const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
+        const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
+        const waRes = await sendWhatsAppTemplate(
+          normalizedPhone,
+          templateName,
+          [{ type: 'body', parameters: params }],
+          'en',
+        )
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: waRes.success ? renderedBody : `[Template send FAILED: ${templateName}]\n\n${renderedBody}`,
+          message_type: 'template',
+          metadata: {
+            template_name: templateName,
+            template_language: 'en',
+            auto_sent: true,
+            trigger: 'inbound_new_lead',
+            sent_by: 'system (inbound webhook)',
+            send_succeeded: !!waRes.success,
+            send_error: waRes.success ? null : (waRes.error || 'unknown'),
+            http_status: (waRes as any).statusCode ?? null,
+            wa_message_id: (waRes as any).messageId ?? null,
+          },
+        })
+        if (!waRes.success) {
+          console.error(`[inbound] Lokazen WA template FAILED lead=${leadId} template=${templateName} status=${(waRes as any).statusCode} error=${waRes.error}`)
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        } else {
+          // We just reached the lead on WhatsApp — that's the latest touch now, so
+          // the lead card/list stops showing "web" after an outbound template.
+          // (first_touchpoint stays 'web' — that's the origin.)
+          await supabase.from('all_leads')
+            .update({ last_touchpoint: 'whatsapp', last_interaction_at: new Date().toISOString() })
+            .eq('id', leadId)
+          console.log(`[inbound] Lokazen WA template sent lead=${leadId} template=${templateName} messageId=${(waRes as any).messageId}`)
+        }
+      } catch (waErr: any) {
+        console.error('[inbound] Lokazen WA send exception:', waErr?.message || waErr)
+      }
+    }
+
+    // ── Lokazen SCOUT messaging — PROXe owns the whole drip ──────────────────
+    // The website forwards every scout_event and no longer texts scouts itself.
+    // Templates 1-4 REUSE the exact names + param order the site already had
+    // Meta-approved (scout_welcome / scout_kyc_submitted / scout_kyc_verified /
+    // scout_upi_added); 5-6 (scout_submission_received / scout_payout) are new.
+    // A template only fires when its name is in the ACTIVE allowlist (env
+    // LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) — so during cutover an event
+    // persists context WITHOUT sending until that template is confirmed live on
+    // PROXe's WABA. Add names to the env to switch them on, no redeploy.
+    if (leadBrand === 'lokazen' && scoutEventToSend && normalizedPhone) {
+      try {
+        const firstName = (leadName || 'there').split(' ')[0]
+        const url = String(brandCtxData.scout_url || LOKAZEN_SCOUT_ONBOARDING_URL)
+        const area = String(brandCtxData.last_submission_area || brandCtxData.scout_area_covered || 'your area')
+        const amount = String(brandCtxData.last_payout_amount || '')
+        const upi = String(brandCtxData.scout_upi_id || '')
+        const t = (text: string) => ({ type: 'text' as const, text })
+        const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
+          // 1-4: same names + param order as the site's approved templates.
+          signup: {
+            template: 'scout_welcome',
+            params: [t(firstName), t(url)],
+            body: `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC) so we can pay you - it takes about 5 minutes. Open your dashboard: ${url}\n\nSee you out there.`,
+          },
+          kyc_submitted: {
+            template: 'scout_kyc_submitted',
+            params: [t(firstName)],
+            body: `Thanks ${firstName} - your ID verification request is submitted. We'll message you the moment it's reviewed. You can keep spotting and submitting shops in the meantime - your payout is simply held until verification completes.`,
+          },
+          kyc_verified: {
+            template: 'scout_kyc_verified',
+            params: [t(firstName), t(url)],
+            body: `You're verified, ${firstName}! Your identity check is complete and you can now be paid. Last step: add your UPI ID in your profile so we can send your ₹250 per verified property. Add it here: ${url}\n\nAlmost there.`,
+          },
+          upi_added: {
+            template: 'scout_upi_added',
+            params: [t(firstName), t(upi || 'your UPI'), t(url)],
+            body: `All set, ${firstName}! Your UPI (${upi || 'your UPI'}) is saved and you're ready to earn. Go spot a To Let shop, take one clear photo, and submit - most verified listings pay within 24 to 48 hours. Submit here: ${url}\n\nHappy scouting.`,
+          },
+          // 5-6: net-new touchpoints the site never messaged.
+          submission: {
+            template: 'scout_submission_received',
+            params: [t(firstName), t(area)],
+            body: `Hi ${firstName}, we have received your shop submission at ${area}. Our team will verify it and update you soon.`,
+          },
+          payout: {
+            template: 'scout_payout',
+            params: [t(firstName), t(area), t(amount || 'Your reward')],
+            body: `Hi ${firstName}, your submission at ${area} is verified and ${amount || 'your reward'} has been sent to your UPI. Keep spotting To Let shops to earn more.`,
+          },
+        }
+        const mapped = SCOUT_EVENT_MAP[scoutEventToSend]
+        const activeTemplates = activeScoutTemplates
+        if (!mapped) {
+          console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
+        } else if (!activeTemplates.has(mapped.template)) {
+          console.log(`[inbound] Lokazen scout template not yet active: ${mapped.template} (context persisted, no send). Add to LOKAZEN_ACTIVE_SCOUT_TEMPLATES once live on PROXe's WABA.`)
+        } else {
+          const waRes = await sendWhatsAppTemplate(
+            normalizedPhone,
+            mapped.template,
+            [{ type: 'body', parameters: mapped.params }],
+            'en',
+          )
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: waRes.success ? mapped.body : `[Template send FAILED: ${mapped.template}]\n\n${mapped.body}`,
+            message_type: 'template',
+            metadata: {
+              template_name: mapped.template,
+              template_language: 'en',
+              auto_sent: true,
+              trigger: `scout_${scoutEventToSend}`,
+              sent_by: 'system (inbound webhook)',
+              send_succeeded: !!waRes.success,
+              send_error: waRes.success ? null : (waRes.error || 'unknown'),
+              http_status: (waRes as any).statusCode ?? null,
+              wa_message_id: (waRes as any).messageId ?? null,
+            },
+          })
+          if (!waRes.success) {
+            console.error(`[inbound] Lokazen scout WA FAILED lead=${leadId} template=${mapped.template} status=${(waRes as any).statusCode} error=${waRes.error}`)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          } else {
+            console.log(`[inbound] Lokazen scout WA sent lead=${leadId} template=${mapped.template} messageId=${(waRes as any).messageId}`)
+          }
+        }
+      } catch (scoutErr: any) {
+        console.error('[inbound] Lokazen scout lifecycle send exception:', scoutErr?.message || scoutErr)
       }
     }
 

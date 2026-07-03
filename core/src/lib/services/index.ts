@@ -145,3 +145,12 @@ export {
   sendEmail,
   sendInvitationEmail,
 } from './email';
+
+export {
+  type SlackResult,
+  type BookingNotice,
+  type LeadNotice,
+  sendSlackMessage,
+  notifySlackBooking,
+  notifySlackLead,
+} from './slackNotifier';

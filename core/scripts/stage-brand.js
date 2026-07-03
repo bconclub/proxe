@@ -55,6 +55,23 @@ try {
 } catch {}
 fs.symlinkSync(brandDir, brandLink, 'junction');
 
+// 3b. repo-root node_modules junction → core/node_modules. Brand-pack files
+//     (/brands/<id>/widget) live outside core; their bare imports ('react',
+//     '@vapi-ai/web') resolve by upward walk, which must find ONE canonical
+//     node_modules. (resolve.modules/react aliases were tried and load dual
+//     react copies in junctioned setups — see next.config.js comment.)
+const rootModules = path.resolve(core, '..', 'node_modules');
+try {
+  fs.lstatSync(rootModules);
+} catch {
+  try {
+    fs.symlinkSync(path.join(core, 'node_modules'), rootModules, 'junction');
+    console.log('[stage-brand] linked repo-root node_modules -> core/node_modules');
+  } catch (e) {
+    console.warn(`[stage-brand] could not link repo-root node_modules: ${e.message}`);
+  }
+}
+
 // 4. brand switch → wipe .next. Compiled chunks inline NEXT_PUBLIC_* values and
 //    @brand modules at build time; Next does NOT reliably invalidate them when
 //    the env/alias change underneath it, so a stale cache serves the PREVIOUS
