@@ -14,7 +14,7 @@ import { processStream } from '@/lib/agent-core/engine';
 import { generateSummary } from '@/lib/agent-core/summarizer';
 import { AgentInput } from '@/lib/agent-core/types';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
-import { detectLokazenAudience } from '@/lib/agent-core/lokazenAudience';
+import { detectLokazenAudience, type LokazenAudience } from '@/lib/agent-core/lokazenAudience';
 import {
   getServiceClient,
   getClient,
@@ -407,6 +407,7 @@ function buildLokazenContextPatch(
   userMessage: string,
   agentInput: AgentInput,
   usedButtons: string[],
+  originAudience?: LokazenAudience,
 ): LokazenContextPatch {
   const answer = compactAnswer(userMessage);
   const answerLower = answer.toLowerCase();
@@ -414,7 +415,15 @@ function buildLokazenContextPatch(
   const buttons = usedButtons.map(lowerText);
   const patch: LokazenContextPatch = {};
 
-  const audience = detectLokazenAudience(userMessage, agentInput.conversationHistory, usedButtons);
+  // Scout PAGE-ORIGIN is authoritative. If the widget was loaded on /scout
+  // (embed.js → page_context=lokazen_scout → pageAudience='scout'), the person
+  // IS a scout — even when their message mentions "shop"/"space"/"rent", which
+  // content-only detection would misread as brand/owner and drop them into the
+  // Leads view. Origin wins; we never let content flip a scout to brand/owner.
+  const forcedScout = originAudience === 'scout';
+  const audience = forcedScout
+    ? 'scout'
+    : detectLokazenAudience(userMessage, agentInput.conversationHistory, usedButtons);
   if (audience === 'owner') {
     patch.user_type = 'owner';
     patch.lead_type = 'property_owner';
@@ -437,6 +446,10 @@ function buildLokazenContextPatch(
   const isOwnerFlow = audience === 'owner';
   const exact = (opts: string[]) => opts.some((o) => al === o);
   let capturedFlowField = false;
+  // Brand/owner flow-field capture is skipped entirely for scouts — those size/
+  // budget/format buttons never appear in the scout flow, and running it would
+  // only pollute a scout with brand fields.
+  if (!forcedScout) {
   if (exact(['under 600 sqft', '600-1500 sqft', '1500+ sqft', 'under 500 sqft', '500-1500 sqft'])) {
     setIfUseful(patch, isOwnerFlow ? 'property_size_sqft' : 'required_size_sqft', A); capturedFlowField = true;
   } else if (exact(['under 1l', '1l-2.5l', 'above 2.5l', 'under 50k', '50k-1.5l', 'above 1.5l'])) {
@@ -459,6 +472,7 @@ function buildLokazenContextPatch(
     patch.user_type = isOwnerFlow ? 'owner' : 'brand';
     patch.lead_type = isOwnerFlow ? 'property_owner' : 'brand';
   }
+  } // end !forcedScout brand/owner capture
 
   // Fall back to previous-question matching ONLY when the answer wasn't a known
   // quick-reply — i.e. free-text answers (brand name, a typed area/size, owner
@@ -586,6 +600,13 @@ function buildLokazenContextPatch(
   }
   } // end !capturedFlowField guard
 
+  // Scout page-origin is final: never let the brand/owner text-chain above flip
+  // a scout's type. (Scout-specific fields captured in that chain still stick.)
+  if (forcedScout) {
+    patch.user_type = 'scout';
+    patch.lead_type = 'scout';
+  }
+
   if (buttons.some((b) => b.includes('starter'))) patch.selected_plan = 'Starter';
   if (buttons.some((b) => b.includes('professional'))) patch.selected_plan = 'Professional';
   if (buttons.some((b) => b.includes('premium'))) patch.selected_plan = 'Premium';
@@ -603,8 +624,9 @@ async function updateLokazenLeadContext(
   agentInput: AgentInput,
   usedButtons: string[],
   supabase: any,
+  originAudience?: LokazenAudience,
 ) {
-  const patch = buildLokazenContextPatch(userMessage, agentInput, usedButtons);
+  const patch = buildLokazenContextPatch(userMessage, agentInput, usedButtons, originAudience);
   if (Object.keys(patch).length === 0) return;
 
   const { data: ctxRow, error } = await supabase
@@ -822,6 +844,7 @@ async function postProcess(
         agentInput,
         usedButtons,
         supabase,
+        pageAudience,
       );
     }
 
