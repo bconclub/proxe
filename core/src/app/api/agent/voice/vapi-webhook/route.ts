@@ -267,26 +267,52 @@ export async function POST(req: NextRequest) {
     //     POP-only + only fields we actually got (never null-overwrite).
     if (BRAND_ID === 'pop' && leadId) {
       const structured: any =
-        msg.analysis?.structuredData || call.analysis?.structuredData || null;
+        msg.analysis?.structuredData || call.analysis?.structuredData ||
+        msg.analysis?.structuredOutputs || call.analysis?.structuredOutputs || null;
       if (structured && typeof structured === 'object') {
+        // The pop all_leads columns carry CHECK constraints (pop_lean_chk etc.).
+        // Supabase updates are atomic, so a single off-schema value (e.g. the LLM
+        // returning lean="negative") rejects the WHOLE row — losing the grievance
+        // text too. So validate every constrained field and drop/map strays.
+        const LEAN = ['supporter', 'leaning', 'undecided', 'opposed'];
+        const CAT = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other'];
+        const INTENT = ['vote', 'volunteer', 'rally', 'share', 'none'];
+        const LEAN_MAP: Record<string, string> = { negative: 'opposed', against: 'opposed', positive: 'supporter', support: 'supporter', supportive: 'supporter', neutral: 'undecided', unsure: 'undecided' };
+        const norm = (v: any) => String(v ?? '').toLowerCase().trim();
+        const oneOf = (v: any, set: string[]) => (set.includes(norm(v)) ? norm(v) : null);
+
         const cols: Record<string, any> = {};
         const put = (k: string, v: any) => { if (v !== null && v !== undefined && v !== '') cols[k] = v; };
-        put('constituency', structured.constituency);
-        put('district', structured.district);
-        put('language', structured.language);
-        put('grievance_category', structured.grievance_category);
-        put('grievance_text', structured.grievance_text);
-        if (typeof structured.salience === 'number') cols.salience = structured.salience;
-        put('action_intent', structured.action_intent);
-        put('lean', structured.lean);
+        put('constituency', typeof structured.constituency === 'string' ? structured.constituency.trim() : null);
+        put('district', typeof structured.district === 'string' ? structured.district.trim() : null);
+        put('language', oneOf(structured.language, ['pa', 'hi', 'en']));
+        put('grievance_category', oneOf(structured.grievance_category, CAT));
+        put('grievance_text', typeof structured.grievance_text === 'string' ? structured.grievance_text.trim() : null);
+        const sal = Number(structured.salience);
+        if (Number.isFinite(sal) && sal >= 1 && sal <= 3) cols.salience = Math.round(sal);
+        put('action_intent', oneOf(structured.action_intent, INTENT));
+        put('lean', oneOf(structured.lean, LEAN) || (LEAN_MAP[norm(structured.lean)] || null));
+        // A name, if the agent captured one — so the row stops reading "Unknown".
+        const capturedName = typeof structured.name === 'string' ? structured.name.trim() : '';
         // A logged grievance enters the follow-up loop as "raised".
         if (structured.captured !== false && (cols.grievance_text || cols.grievance_category)) {
           cols.loop_status = 'raised';
         }
+        if (capturedName && !vapiName) {
+          const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
+          if (cur && !cur.customer_name) cols.customer_name = capturedName;
+        }
         if (Object.keys(cols).length) {
           const { error: gErr } = await supabase.from('all_leads').update(cols).eq('id', leadId);
-          if (gErr) console.error('[vapi-webhook] grievance columns update failed:', gErr.message, gErr.details || '');
-          else console.log('[vapi-webhook] grievance captured →', Object.keys(cols).join(', '));
+          if (gErr) {
+            console.error('[vapi-webhook] grievance update failed:', gErr.message);
+            // Last resort: write ONLY the free-text grievance so it's never lost.
+            if (cols.grievance_text) {
+              await supabase.from('all_leads').update({ grievance_text: cols.grievance_text, loop_status: 'raised' }).eq('id', leadId);
+            }
+          } else {
+            console.log('[vapi-webhook] grievance captured →', Object.keys(cols).join(', '));
+          }
         }
       }
     }
