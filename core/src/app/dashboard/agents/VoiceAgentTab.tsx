@@ -24,10 +24,13 @@ export default function VoiceAgentTab() {
   const voiceNumber = isBcon
     ? '+918046733388'
     : (process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending');
+  // Business + industry are BCON's B2B context — irrelevant for POP grievance
+  // calls, where only a phone (and optional contact name) matter.
+  const showBusinessFields = isBcon;
   // Contact name is OPTIONAL: with a name the agent greets the person; without
-  // one it confirms the business and asks to be put through. Business + industry
-  // + phone are still required for context.
-  const canCall = !!(phone.trim() && businessName.trim() && industry.trim());
+  // one it introduces itself and asks. Phone is always required; business +
+  // industry are required only where they're shown (bcon).
+  const canCall = !!phone.trim() && (!showBusinessFields || !!(businessName.trim() && industry.trim()));
 
   type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
 
@@ -191,13 +194,15 @@ export default function VoiceAgentTab() {
           <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
           <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            PROXE will call with full context — contact name optional (it asks for the right person if blank)
+            {showBusinessFields
+              ? 'PROXE will call with full context — contact name optional (it asks for the right person if blank)'
+              : 'Enter a number to call. Contact name is optional — the agent introduces itself and asks.'}
           </p>
           {[
-            { ph: 'Contact name (optional)', val: personName, set: setPersonName },
-            { ph: 'Business name', val: businessName, set: setBusinessName },
-            { ph: 'Industry', val: industry, set: setIndustry },
-          ].map((f) => (
+            { ph: 'Contact name (optional)', val: personName, set: setPersonName, show: true },
+            { ph: 'Business name', val: businessName, set: setBusinessName, show: showBusinessFields },
+            { ph: 'Industry', val: industry, set: setIndustry, show: showBusinessFields },
+          ].filter((f) => f.show).map((f) => (
             <input
               key={f.ph}
               type="text"
