@@ -99,19 +99,25 @@ export async function GET(request: NextRequest) {
         .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, booking_date, booking_time, booking_status, booking_created_at, customer_name')
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })),
-      // 3. whatsapp_sessions - conversation counting only (no booking columns on this table)
+      // 3. whatsapp_sessions - conversation counting; BCON's table also carries
+      //    booking columns (the WhatsApp booking flow writes them there) — not
+      //    selecting them meant WhatsApp bookings never reached Upcoming Events.
+      //    Other brands' tables don't have those columns, so they keep the
+      //    narrow select (a select on a missing column errors in PostgREST).
       fetchAllRows(() => supabase
         .from('whatsapp_sessions')
-        .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name')
+        .select(BRAND_ID === 'bcon'
+          ? 'id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name, booking_date, booking_time, booking_status, booking_created_at'
+          : 'id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name')
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })),
       // 4. voice_sessions - lead linkage only (no booking columns on this table).
-      //    POP also pulls call facts (direction/status/duration) for its Calls
-      //    overview tile (ported from the pop fork); other brands keep the
-      //    narrow select so their fetched data is unchanged.
+      //    POP and BCON also pull call facts (direction/status/duration) for
+      //    their Calls overview tile (ported from those forks); other brands
+      //    keep the narrow select so their fetched data is unchanged.
       fetchAllRows(() => supabase
         .from('voice_sessions')
-        .select(BRAND_ID === 'pop'
+        .select(['bcon', 'pop'].includes(BRAND_ID)
           ? 'lead_id, call_direction, call_status, call_duration_seconds, created_at'
           : 'lead_id')
         .order('id', { ascending: true })),
@@ -1037,15 +1043,22 @@ export async function GET(request: NextRequest) {
       responseTimeTrend.push({ value: dayAvgResponse })
     }
     
-    // Calculate % changes
-    const leadChange = leadTrend.length >= 2 
-      ? Math.round(((leadTrend[leadTrend.length - 1].value - leadTrend[0].value) / Math.max(leadTrend[0].value, 1)) * 100)
-      : 0
-    const bookingChange = bookingTrend.length >= 2
-      ? Math.round(((bookingTrend[bookingTrend.length - 1].value - bookingTrend[0].value) / Math.max(bookingTrend[0].value, 1)) * 100)
-      : 0
-    const responseTimeChange = responseTimeTrend.length >= 2
-      ? Math.round(((responseTimeTrend[0].value - responseTimeTrend[responseTimeTrend.length - 1].value) / Math.max(responseTimeTrend[0].value, 1)) * 100)
+    // Calculate % changes. When the baseline is 0, a real % is undefined — show
+    // +100 if we went from nothing to something, else 0 (never a divide-by-1
+    // explosion). Clamped to a sane range. (Fix ported from the bcon fork.)
+    const pctChangeTrend = (first: number, last: number) => {
+      if (first <= 0) return last > 0 ? 100 : 0
+      return Math.max(-999, Math.min(999, Math.round(((last - first) / first) * 100)))
+    }
+    const leadChange = leadTrend.length >= 2 ? pctChangeTrend(leadTrend[0].value, leadTrend[leadTrend.length - 1].value) : 0
+    const bookingChange = bookingTrend.length >= 2 ? pctChangeTrend(bookingTrend[0].value, bookingTrend[bookingTrend.length - 1].value) : 0
+    // Only compute a % change when the baseline day actually has response data.
+    // The old Math.max(value,1) denominator turned a 0ms baseline into a
+    // divide-by-1, so a recent 7500ms read as -750000% (the "712055" bug).
+    const rtFirst = responseTimeTrend[0]?.value || 0
+    const rtLast = responseTimeTrend[responseTimeTrend.length - 1]?.value || 0
+    const responseTimeChange = (responseTimeTrend.length >= 2 && rtFirst >= 100)
+      ? Math.max(-999, Math.min(999, Math.round(((rtFirst - rtLast) / rtFirst) * 100)))
       : 0
 
     // 14. 24-hour activity for sparkline
@@ -1122,8 +1135,11 @@ export async function GET(request: NextRequest) {
     )
 
     if (leadsNeedingScores.length > 0) {
+      // Cap at 20 RPC calls per request — scoring 100+ leads in parallel exhausts
+      // the DB connection pool under load. Unscored leads beyond the cap stay at 0.
+      // (Fix ported from the bcon fork.)
       const scoreResults = await Promise.all(
-        leadsNeedingScores.map(async (lead) => {
+        leadsNeedingScores.slice(0, 20).map(async (lead) => {
           try {
             const { data, error } = await supabase
               .rpc('calculate_lead_score', { lead_uuid: lead.id })
@@ -1631,7 +1647,8 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================================================
-    // POP-ONLY EXTRAS (ported from the pop fork's dashboard-home divergence).
+    // BCON/POP EXTRAS (cohort funnel + calls overview — present in both forks;
+    // bcon computes them ungated in its fork, pop's were ported earlier).
     // Gated on BRAND_ID so every other brand's response stays byte-identical.
     // ============================================================================
     let funnel:
@@ -1650,7 +1667,7 @@ export async function GET(request: NextRequest) {
           trend: { data: Array<{ value: number }>; change: number }
         }
       | undefined
-    if (BRAND_ID === 'pop') {
+    if (['bcon', 'pop'].includes(BRAND_ID)) {
       // Cohort funnel for the Engine Overview toggle: of leads ACQUIRED in the
       // window, how many reached each stage — so EVERY node (incl. Follow-up Due +
       // Booked) scales with the window instead of staying constant.

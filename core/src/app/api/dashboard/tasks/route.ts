@@ -1,22 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
 // Brand-private template-body map (the board's outgoing-message preview).
-import { TEMPLATE_BODIES } from '@/configs/template-bodies'
+import { TEMPLATE_BODIES, resolveTaskTemplate, fillTemplateWithChips, buildNudgePreview } from '@/configs/template-bodies'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
-/** Render a short outgoing-message preview for a task. */
+/** Render a short outgoing-message preview for a task.
+ * bcon: variables stay VISIBLE as [[label]] chips (the UI styles them) and the
+ * template the worker WILL send is resolved per task_type + bucket — so the
+ * timeline shows the actual outgoing message per planned step. Other brands
+ * keep the value-substituted preview their forks shipped. */
 function renderPreview(t: any): string {
   const name = (t.lead_name || 'there').split(' ')[0]
   const md = t.metadata || {}
-  const tmpl = md.template_name || md.template
-  if (tmpl && TEMPLATE_BODIES[tmpl]) {
-    return TEMPLATE_BODIES[tmpl]
-      .replace(/\{\{\s*customer_name\s*\}\}/g, name)
-      .replace(/\{\{\s*brand_name\s*\}\}/g, md.brand_name || 'your brand')
-      .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || 'your goals')
-      .replace(/\{\{\s*booking_time\s*\}\}/g, md.booking_time || 'your slot')
-      .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
+  if (BRAND_ID === 'bcon') {
+    // Waiting nudges send a free-form, info-tiered message (not a fixed template).
+    if (t.task_type === 'nudge_waiting') return buildNudgePreview(md)
+    const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket)
+    if (tmpl && TEMPLATE_BODIES[tmpl]) {
+      return fillTemplateWithChips(TEMPLATE_BODIES[tmpl])
+    }
+  } else {
+    const tmpl = md.template_name || md.template
+    if (tmpl && TEMPLATE_BODIES[tmpl]) {
+      return TEMPLATE_BODIES[tmpl]
+        .replace(/\{\{\s*customer_name\s*\}\}/g, name)
+        .replace(/\{\{\s*brand_name\s*\}\}/g, md.brand_name || 'your brand')
+        .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || 'your goals')
+        .replace(/\{\{\s*booking_time\s*\}\}/g, md.booking_time || 'your slot')
+        .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
+    }
   }
   // AI-dynamic tasks: message is generated at send time — use the stored
   // preview / description / angle as the best available hint.
@@ -179,6 +193,11 @@ export async function GET(request: NextRequest) {
       if (t.metadata?.completed_action) {
         enriched.completed_action = t.metadata.completed_action
       }
+
+      // Outgoing-message preview: the actual template (filled with lead details)
+      // this task will send. The inbox lead-panel timeline shows this when you
+      // click a step, so you can see exactly what's going out per follow-up.
+      enriched.preview = renderPreview(t)
 
       return enriched
     })

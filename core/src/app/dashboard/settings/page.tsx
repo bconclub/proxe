@@ -14,7 +14,7 @@ import {
 } from '@/lib/sound-prefs';
 import { ACCENT_THEMES } from '@/lib/accent-theme';
 import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
-import { BRAND_ID } from '@/configs';
+import { BRAND_ID, getBrandConfig } from '@/configs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
   { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
@@ -170,6 +170,32 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
+        {/* The Brain — single entry to the interactive flow (feature-gated: bcon) */}
+        {getBrandConfig().features?.brain && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+              The Brain
+            </h2>
+            <a
+              href="/dashboard/settings/brain"
+              className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
+              style={{ background: 'var(--bg-secondary)' }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                    Open the flow
+                  </h3>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    An interactive map of how the worker scores leads, reads temperature and intent, handles objections, and times every follow-up.
+                  </p>
+                </div>
+                <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
+              </div>
+            </a>
+          </div>
+        )}
+
         {/* Team & Access — link to user management */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>

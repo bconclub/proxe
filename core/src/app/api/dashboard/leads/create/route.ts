@@ -53,6 +53,13 @@ export async function POST(request: NextRequest) {
     const courseInterest = clean(body.course_interest)
     const userType = clean(body.user_type).toLowerCase()
     const education = clean(body.education)
+    // Agency-business intake (bcon/pop AddLeadModal) — only those brands send these.
+    const businessName = clean(body.business_name)
+    const businessType = clean(body.business_type)
+    const serviceInterest = clean(body.service_interest)
+    const websiteStatus = clean(body.website_status)
+    const leadVolume = clean(body.lead_volume)
+    const urgency = clean(body.urgency)
     const note = clean(body.note)
     const sendWelcome = body.send_welcome === true
 
@@ -97,6 +104,13 @@ export async function POST(request: NextRequest) {
     if (['student', 'parent', 'professional', 'early_stage'].includes(userType)) {
       brandCtx.user_type = userType
     }
+    // bcon/pop agency-business fields — same shape conversation-intelligence writes.
+    if (businessName) brandCtx.business_name = businessName
+    if (businessType) brandCtx.business_type = businessType
+    if (serviceInterest) brandCtx.service_interest = serviceInterest
+    if (websiteStatus) brandCtx.website_status = websiteStatus
+    if (leadVolume) brandCtx.lead_volume = leadVolume
+    if (urgency) brandCtx.urgency = urgency
 
     // ── Dedup by (phone, brand) ───────────────────────────────────────────────
     const { data: existing } = await supabase

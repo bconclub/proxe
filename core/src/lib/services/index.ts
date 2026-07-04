@@ -135,8 +135,11 @@ export {
   type NoteClassification,
   type ClassifyAndActInput,
   type OrchestratorResult,
+  type PlanProposal,
   classifyAndAct,
   classifyNote,
+  proposePlan,
+  resolveBookingDate,
 } from './noteOrchestrator';
 
 // Transactional email (Resend)

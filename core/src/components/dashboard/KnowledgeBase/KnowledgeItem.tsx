@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { MdPictureAsPdf, MdLink, MdTextSnippet, MdDescription, MdDelete } from 'react-icons/md'
+import { createPortal } from 'react-dom'
+import { MdPictureAsPdf, MdLink, MdTextSnippet, MdDescription, MdDelete, MdVisibility, MdClose } from 'react-icons/md'
 import type { KnowledgeBaseItem as KBItem } from '@/types'
 
 interface KnowledgeItemProps {
@@ -47,6 +48,7 @@ function formatFileSize(bytes: number | null): string {
 
 export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
   const [deleting, setDeleting] = useState(false)
+  const [viewing, setViewing] = useState(false)
 
   const typeConfig = TYPE_CONFIG[item.type] || TYPE_CONFIG.text
   const statusConfig = STATUS_CONFIG[item.embeddings_status] || STATUS_CONFIG.pending
@@ -80,16 +82,22 @@ export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
         </div>
       </td>
 
-      {/* Title */}
+      {/* Title (click to view full content) */}
       <td className="px-4 py-3">
-        <p className="text-sm font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }}>
-          {item.title}
-        </p>
-        {item.content && (
-          <p className="text-xs truncate max-w-[200px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            {item.content.substring(0, 80)}...
+        <button
+          onClick={() => setViewing(true)}
+          className="text-left group"
+          title="Click to view full content"
+        >
+          <p className="text-sm font-medium truncate max-w-[200px] group-hover:underline" style={{ color: 'var(--text-primary)' }}>
+            {item.title}
           </p>
-        )}
+          {item.content && (
+            <p className="text-xs truncate max-w-[200px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              {item.content.substring(0, 80)}...
+            </p>
+          )}
+        </button>
       </td>
 
       {/* Source */}
@@ -128,15 +136,74 @@ export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
 
       {/* Actions */}
       <td className="px-4 py-3">
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          className="p-2 rounded-lg transition-colors hover:bg-red-500/10 disabled:opacity-50"
-          title="Delete item"
-        >
-          <MdDelete size={18} style={{ color: deleting ? 'var(--text-secondary)' : '#EF4444' }} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setViewing(true)}
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+            title="View content"
+          >
+            <MdVisibility size={18} style={{ color: 'var(--text-secondary)' }} />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="p-2 rounded-lg transition-colors hover:bg-red-500/10 disabled:opacity-50"
+            title="Delete item"
+          >
+            <MdDelete size={18} style={{ color: deleting ? 'var(--text-secondary)' : '#EF4444' }} />
+          </button>
+        </div>
       </td>
+
+      {/* View modal — full content of this KB item (portaled to body to escape the table) */}
+      {viewing && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setViewing(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl border shadow-xl"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider" style={{ color: typeConfig.color, background: `${typeConfig.color}15` }}>
+                    {typeConfig.label}
+                  </span>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: statusConfig.bg, color: statusConfig.color }}>
+                    {statusConfig.label}
+                  </span>
+                </div>
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                  {source !== '-' ? `${source} · ` : ''}{formatDate(item.created_at)}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewing(false)}
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] flex-shrink-0"
+                title="Close"
+              >
+                <MdClose size={18} style={{ color: 'var(--text-secondary)' }} />
+              </button>
+            </div>
+            {/* Body — full content */}
+            <div className="overflow-y-auto px-5 py-4">
+              {item.content ? (
+                <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                  {item.content}
+                </p>
+              ) : (
+                <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>No content stored for this item.</p>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </tr>
   )
 }

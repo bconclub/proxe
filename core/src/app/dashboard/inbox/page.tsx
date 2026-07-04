@@ -27,6 +27,12 @@ import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 import WhatsAppTemplatePicker from '@/components/dashboard/WhatsAppTemplatePicker'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
+import { getCurrentBrandId } from '@/configs'
+
+// One brand per build — resolves statically. bcon's inbox carries extra
+// fork-specific UI (full Meta-form card, planned follow-ups timeline) and a
+// form parser tuned to its question-sentence Meta forms.
+const IS_BCON = getCurrentBrandId() === 'bcon'
 
 // Channel icons — plain SVG, no container. Tinted with the channel brand
 // colour via CSS filter (for img tags) or stroke (for inline SVG). The old
@@ -173,8 +179,13 @@ interface Message {
 function cleanMessageContent(text: string): string {
   if (!text) return '';
 
-  // Remove [User's name is ...] metadata
-  return text.replace(/\[User's name is [^\]]+\]\s*/g, '').trim();
+  // Strip the system annotations the agent prepends to a button click before
+  // sending it to the LLM ([User's name is X], [Button intent: ...]) so the
+  // inbox shows the clean label the customer actually tapped.
+  return text
+    .replace(/\[User's name is [^\]]+\]\s*/g, '')
+    .replace(/\[Button intent:[^\]]*\]\s*/gi, '')
+    .trim();
 }
 
 function renderMarkdown(text: string) {
@@ -207,12 +218,16 @@ function renderMarkdown(text: string) {
  */
 function renderWhatsAppMarkdown(text: string): React.ReactNode {
   if (!text) return null;
-  // Split on whichever WA marker appears (single * for bold, _ for italic, ~ for strikethrough)
-  // and newlines. Captured groups stay in the result; uncaptured separators don't.
-  const re = /(\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
-  const segments = text.split(re).filter((s) => s !== undefined && s !== '');
+  const cleanedText = cleanMessageContent(text);
+  // Handles both **double** (Markdown) and *single* (WhatsApp) bold, _italic_,
+  // ~strike~, and newlines — so messages render identically on every channel.
+  const re = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
+  const segments = cleanedText.split(re).filter((s) => s !== undefined && s !== '');
   return segments.map((seg, i) => {
     if (seg === '\n') return <br key={i} />;
+    if (seg.startsWith('**') && seg.endsWith('**') && seg.length > 4) {
+      return <strong key={i} className="font-semibold">{seg.slice(2, -2)}</strong>;
+    }
     if (seg.startsWith('*') && seg.endsWith('*') && seg.length > 2) {
       return <strong key={i} className="font-semibold">{seg.slice(1, -1)}</strong>;
     }
@@ -237,7 +252,15 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
   // Trailing [?_]* handles Meta's "what_is_your_age?_:" shape (question mark AND
   // a stray underscore before the colon) — otherwise that field mashed into the
   // previous value.
-  const fieldPattern = /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+[?_]*)\s*:\s*/gi;
+  // bcon: Meta "click to WhatsApp" forms arrive as ONE run-on line of English
+  // question sentences ("How are you managing leads?: answer ..."). A key is
+  // EITHER a question that STARTS with a question-word and ends in "?", OR a
+  // known plain label, OR a snake_case (Pabbly) key — anchoring questions to a
+  // leading question-word lets the parser skip over multi-word answers.
+  // Other brands keep the snake_case-first pattern their forms produce.
+  const fieldPattern = IS_BCON
+    ? /((?:Who|What|When|Where|Why|Which|How|Do|Does|Are|Is)\b[^:?]*\?|Full name|First name|Last name|Company name|Brand name|Business name|Phone number|Phone|Email|City|State|Location|Name|\w+(?:_\w+)+)\s*:\s*/gi
+    : /\b(first name|last name|full name|phone|email|city|location|state|[a-z][a-z0-9]*(?:[_'’][a-z0-9]+)+[?_]*)\s*:\s*/gi;
   const matches = [...content.matchAll(fieldPattern)];
   if (matches.length < 3) return null;
 
@@ -249,12 +272,24 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
     const valueStart = matches[i].index! + matches[i][0].length;
     const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
     const value = content.substring(valueStart, valueEnd).trim();
-    const cleanKey = rawKey
-      .replace(/[?_]+$/, '')
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+    let cleanKey: string;
+    if (IS_BCON) {
+      // Preserve the EXACT form question (original casing + "?") so the inbox
+      // card shows the real form verbatim. Only snake_case keys (e.g. Pabbly
+      // "full_name") get title-cased.
+      const trimmedKey = rawKey.trim();
+      const isSnake = /_/.test(trimmedKey) && !/\s/.test(trimmedKey);
+      cleanKey = isSnake
+        ? trimmedKey.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        : trimmedKey;
+    } else {
+      cleanKey = rawKey
+        .replace(/[?_]+$/, '')
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
     fields.push({ key: cleanKey, value });
   }
   return { intro, fields };
@@ -263,6 +298,23 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
 /** Extract a short label for a form field */
 function getFormFieldLabel(key: string): string {
   const k = key.toLowerCase();
+  if (IS_BCON) {
+    // bcon's agency-business form questions (fork-exact label set).
+    if (k.includes('brand name') || k.includes('business name') || k.includes('company name')) return 'Brand';
+    if (k.includes('full name') || k === 'name' || k === 'first name') return 'Name';
+    if (k.includes('email')) return 'Email';
+    if (k.includes('phone')) return 'Phone';
+    if (k.includes('city') || k.includes('location')) return 'City';
+    if (k.includes('how fast') || k.includes('how soon') || k.includes('want to start') || k.includes('urgency')) return 'Urgency';
+    if (k.includes('who are your customers') || k.includes('customers')) return 'Customers';
+    if (k.includes('what does your business') || k.includes('business do') || k.includes('business type') || k.includes('choose business')) return 'Business';
+    if (k.includes('managing leads') || k.includes('currently managing') || k.includes('current system')) return 'Current System';
+    if (k.includes('marketing spend') || k.includes('marketing budget') || k.includes('spend')) return 'Spend';
+    if (k.includes('website')) return 'Website';
+    if (k.includes('leads') || k.includes('handle')) return 'Volume';
+    if (k.includes('ai system')) return 'AI Systems';
+    return key.length > 48 ? key.substring(0, 48) + '…' : key;
+  }
   if (k.includes('brand name') || k.includes('business name')) return 'Brand';
   if (k.includes('full name') || k === 'name') return 'Name';
   if (k.includes('email')) return 'Email';
@@ -284,6 +336,28 @@ function getFormFieldLabel(key: string): string {
   // Fallback: show the full label (don't hard-truncate to 15 chars — that's what
   // produced unreadable "WHAT IS YOUR PR…" labels). Cap generously instead.
   return key.length > 48 ? key.substring(0, 48) + '…' : key;
+}
+
+/** Date + time for a planned follow-up, IST, e.g. "Fri 27 Jun, 9:00 AM". */
+function fmtPlannedWhen(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const date = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+  return `${date}, ${time}`
+}
+
+/** Short human label for a task type shown on the planned-follow-up timeline. */
+function humanizeTaskType(t: string): string {
+  const map: Record<string, string> = {
+    follow_up_24h: 'Follow-up', follow_up_day1: 'Day 1', follow_up_day3: 'Day 3',
+    follow_up_day5: 'Day 5', follow_up_day7: 'Day 7', follow_up_day30: 'Day 30', follow_up_day90: 'Day 90',
+    re_engage: 'Re-engage', nudge_waiting: 'Nudge', push_to_book: 'Push to book',
+    booking_reminder_24h: 'Reminder 24h', booking_reminder_30m: 'Reminder 30m',
+    try_voice_call: 'Voice call', human_callback: 'Callback', human_followup: 'Your task',
+    missed_call_followup: 'Missed-call', first_outreach: 'Welcome',
+  }
+  return map[t] || (t || 'task').replace(/_/g, ' ')
 }
 
 /** Format a time gap in ms to a human-readable short string */
@@ -396,6 +470,10 @@ export default function InboxPage() {
   // lead_score is often null/0; this lets the list reflect real engagement.
   const [calculatedConvScores, setCalculatedConvScores] = useState<Record<string, number>>({})
   const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
+  // bcon: Meta-form card expand/collapse + planned follow-ups timeline
+  const [formCardExpanded, setFormCardExpanded] = useState(false)
+  const [plannedActions, setPlannedActions] = useState<any[]>([])
+  const [loadingPlanned, setLoadingPlanned] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -428,6 +506,41 @@ export default function InboxPage() {
       }
     }
   }, [conversations, selectedLeadId, searchParams])
+
+  // bcon: collapse the form card again whenever a different lead is opened.
+  useEffect(() => { setFormCardExpanded(false) }, [selectedLeadId])
+
+  // bcon: load this lead's planned follow-ups (the sequence they're in) for the
+  // right-panel timeline — every upcoming agent_task with its message preview,
+  // date-wise. Reuses the tasks board API (already resolves the template body).
+  useEffect(() => {
+    if (!IS_BCON) return
+    if (!selectedLeadId) { setPlannedActions([]); return }
+    let alive = true
+    setLoadingPlanned(true)
+    fetch(`/api/dashboard/tasks?lead_id=${selectedLeadId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!alive) return
+        const b = d?.board
+        if (!b) { setPlannedActions([]); return }
+        const flat = [
+          ...(b.nextToFire || []),
+          ...(b.upcoming?.soon || []),
+          ...(b.upcoming?.today || []),
+          ...(b.upcoming?.tomorrow || []),
+          ...(b.upcoming?.later || []),
+          ...((b.needsAttention || []).filter((t: any) => t.action === 'approve')),
+        ]
+        const seen = new Set<string>()
+        const dedup = flat.filter((t: any) => t?.scheduled_at && !seen.has(t.id) && seen.add(t.id))
+        dedup.sort((a: any, x: any) => new Date(a.scheduled_at).getTime() - new Date(x.scheduled_at).getTime())
+        setPlannedActions(dedup)
+      })
+      .catch(() => { if (alive) setPlannedActions([]) })
+      .finally(() => { if (alive) setLoadingPlanned(false) })
+    return () => { alive = false }
+  }, [selectedLeadId])
 
   // Set default channel when conversation is selected
   useEffect(() => {
@@ -1843,6 +1956,93 @@ export default function InboxPage() {
                     </div>
                   ) : null;
 
+                  if (formData && IS_BCON) {
+                    // bcon Meta-form card — shows the form EXACTLY as submitted
+                    // (real question text + answer, original order), merges in any
+                    // raw_form_fields the message text dropped, collapsible past 6.
+                    const withFields = formData.fields
+                      .map(f => {
+                        const kind = getFormFieldLabel(f.key);
+                        let value = (f.value || '').trim();
+                        if (kind === 'Name' && !value) value = (selectedConversation?.lead_name || '').trim();
+                        if (kind === 'Phone' && value.replace(/\D/g, '').length < 7) value = (selectedConversation?.lead_phone || value).trim();
+                        return { label: f.key, value };
+                      })
+                      .filter(f => f.value && f.value !== '+');
+
+                    // The message text only carries the fields that got formatted
+                    // into it — the FULL Meta submission (every question) is kept
+                    // in unified_context.raw_form_fields. Merge in any of those not
+                    // already shown so the card is the complete form, not half of it.
+                    const rawFF = (selectedConversation?.unified_context?.raw_form_fields || {}) as Record<string, any>;
+                    const shownValues = new Set(withFields.map(f => f.value.toLowerCase().trim()));
+                    const shownKinds = new Set(withFields.map(f => getFormFieldLabel(f.label).toLowerCase()));
+                    const humanizeKey = (k: string) =>
+                      k.replace(/[_?]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\w/, c => c.toUpperCase());
+                    const extraFields = Object.entries(rawFF)
+                      .filter(([k, v]) => {
+                        if (v == null) return false;
+                        const val = String(v).trim();
+                        if (!val || val === '+') return false;
+                        if (shownValues.has(val.toLowerCase())) return false;      // same answer already shown
+                        if (shownKinds.has(getFormFieldLabel(k).toLowerCase())) return false; // same field kind already shown
+                        return true;
+                      })
+                      .map(([k, v]) => ({ label: humanizeKey(k), value: String(v).trim() }));
+
+                    const allFields = [...withFields, ...extraFields];
+                    const PRIMARY = 6;
+                    const hasMore = allFields.length > PRIMARY;
+                    const visibleFields = (hasMore && !formCardExpanded) ? allFields.slice(0, PRIMARY) : allFields;
+
+                    const FieldRow = ({ f }: { f: { label: string; value: string } }) => (
+                      <div className="flex flex-col gap-0.5 py-1 border-b last:border-b-0" style={{ borderColor: 'rgba(59,130,246,0.12)' }}>
+                        <span className="text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span className="text-[12.5px] font-medium break-words" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                      </div>
+                    );
+
+                    return (
+                      <React.Fragment key={msg.id}>
+                      {dateSeparator}
+                      <div className="flex justify-start">
+                        <div
+                          className="w-[500px] max-w-[88%] rounded-xl px-3.5 py-2.5 border"
+                          style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <ChannelIcon channel={msg.channel} size={10} active={true} />
+                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                                {selectedConversation?.lead_name || 'Customer'}
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(59,130,246,0.18)', color: '#60a5fa' }}>
+                                Meta Form
+                              </span>
+                            </div>
+                            <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
+                          </div>
+                          {/* The complete form — every submitted field, collapsible */}
+                          <div>
+                            {visibleFields.map((f, i) => <FieldRow key={i} f={f} />)}
+                          </div>
+                          {hasMore && (
+                            <button
+                              type="button"
+                              onClick={() => setFormCardExpanded(v => !v)}
+                              className="mt-1.5 text-[10.5px] font-semibold"
+                              style={{ color: '#60a5fa' }}
+                            >
+                              {formCardExpanded ? 'Show less' : `Show all ${allFields.length} fields`}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      </React.Fragment>
+                    );
+                  }
+
                   if (formData) {
                     // Meta-form card — clean, ordered, blue-tinted (so it reads as
                     // "came from Meta" the way agent bubbles read green).
@@ -2724,6 +2924,42 @@ export default function InboxPage() {
                   <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
                 )}
               </div>
+
+              {/* ── PLANNED FOLLOW-UPS (bcon — the sequence this lead is in) ── */}
+              {IS_BCON && (
+                <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Planned follow-ups</p>
+                    {plannedActions.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{plannedActions.length}</span>
+                    )}
+                  </div>
+                  {loadingPlanned ? (
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+                  ) : plannedActions.length === 0 ? (
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No follow-ups scheduled</p>
+                  ) : (
+                    <div className="flex flex-col">
+                      {plannedActions.map((t, i) => (
+                        <div key={t.id} className="relative pl-4 pb-3 last:pb-0">
+                          {i < plannedActions.length - 1 && (
+                            <span className="absolute top-3 bottom-0 w-px" style={{ left: '3px', background: 'var(--border-primary)' }} />
+                          )}
+                          <span className="absolute w-[7px] h-[7px] rounded-full" style={{ left: 0, top: '5px', background: 'var(--accent-primary)' }} />
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtPlannedWhen(t.scheduled_at)}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wide" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>{humanizeTaskType(t.task_type)}</span>
+                            {t.sequence_label && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{t.sequence_label}</span>}
+                          </div>
+                          {t.preview && (
+                            <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{t.preview.replace(/\[\[([^\]]+)\]\]/g, '$1')}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── VIEW FULL DETAILS ── */}
               <div className="px-5 py-4 mt-auto">

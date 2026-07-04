@@ -11,6 +11,7 @@ import {
   MdCheckCircle,
   MdInfoOutline
 } from 'react-icons/md'
+import { getCurrentBrandId } from '@/configs'
 
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
@@ -35,7 +36,8 @@ export default function WebAgentSettingsClient() {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
         if (key && (
-          key.startsWith('windchasers-') ||
+          // Brand-scoped widget keys (e.g. "bcon-...", "windchasers-...")
+          key.startsWith(`${getCurrentBrandId()}-`) ||
           key.startsWith('chat-') ||
           key.startsWith('session-') ||
           key.includes('widget') ||

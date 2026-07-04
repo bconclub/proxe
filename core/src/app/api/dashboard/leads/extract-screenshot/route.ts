@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateFromImage, type VisionMediaType } from '@/lib/agent-core'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 // Vision calls can run a few seconds; give them headroom on Vercel.
@@ -18,7 +19,34 @@ const ALLOWED_MEDIA: Record<string, VisionMediaType> = {
 // with a clear message instead of letting the API throw an opaque 400.
 const MAX_BASE64_LEN = 7_000_000
 
-const SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers — pilot training, DGCA, cabin crew, drone).
+// bcon (and its clone pop) run the agency-business extraction; other brands
+// keep the aviation-training extraction their forks shipped with.
+const IS_AGENCY_BRAND = ['bcon', 'pop'].includes(BRAND_ID)
+
+const AGENCY_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat / lead form and pull out business-lead details for BCON, an AI-first marketing agency that sells to businesses.
+
+Return ONLY a single JSON object, no prose, no markdown fences. Schema:
+{
+  "name": string | null,             // the person's name from the chat header / contact
+  "phone": string | null,            // their phone, digits + country code, else null
+  "email": string | null,            // email if visible, else null
+  "city": string | null,             // city/location if mentioned, else null
+  "business_name": string | null,    // the company/brand name if mentioned
+  "business_type": string | null,    // what the business does (e.g. "interior design", "dental clinic")
+  "service_interest": string | null, // what they want from BCON (e.g. "lead automation", "AI brand audit", "ads", "website")
+  "website_status": string | null,   // e.g. "has a website", "no website", a URL — if mentioned
+  "lead_volume": string | null,      // any volume of leads/enquiries/customers mentioned (e.g. "around 100 leads a month")
+  "urgency": string | null,          // how soon they want to start, if stated (e.g. "asap", "next month")
+  "summary": string | null           // one or two short sentences summarising what they want
+}
+
+Rules:
+- Only use information actually visible in the image. Never invent a phone number, email, or name.
+- The name is usually at the top of the chat. If it is itself a phone number, put it in "phone" and leave "name" null.
+- Phone: keep country code if shown (e.g. +91...). Strip spaces and dashes. If no digits are visible, use null.
+- If a field isn't present, use null. Do not guess.`
+
+const AVIATION_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers — pilot training, DGCA, cabin crew, drone).
 
 Return ONLY a single JSON object, no prose, no markdown fences. Schema:
 {
@@ -36,6 +64,8 @@ Rules:
 - The name is usually at the top of the chat. If it is itself a phone number, put it in "phone" and leave "name" null.
 - Phone: keep country code if shown (e.g. +91...). Strip spaces and dashes. If no digits are visible, use null.
 - If a field isn't present, use null. Do not guess.`
+
+const SYSTEM_PROMPT = IS_AGENCY_BRAND ? AGENCY_SYSTEM_PROMPT : AVIATION_SYSTEM_PROMPT
 
 export async function POST(request: NextRequest) {
   try {
@@ -120,8 +150,19 @@ export async function POST(request: NextRequest) {
         phone: str(parsed.phone),
         email: str(parsed.email),
         city: str(parsed.city),
-        interest: str(parsed.interest),
-        education: str(parsed.education),
+        ...(IS_AGENCY_BRAND
+          ? {
+              business_name: str(parsed.business_name),
+              business_type: str(parsed.business_type),
+              service_interest: str(parsed.service_interest),
+              website_status: str(parsed.website_status),
+              lead_volume: str(parsed.lead_volume),
+              urgency: str(parsed.urgency),
+            }
+          : {
+              interest: str(parsed.interest),
+              education: str(parsed.education),
+            }),
         summary: str(parsed.summary),
       },
     })

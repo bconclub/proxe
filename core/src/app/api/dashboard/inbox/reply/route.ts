@@ -151,9 +151,13 @@ async function sendWhatsAppTemplate(params: {
  * paths. Non-fatal.
  */
 async function reassignOwnerToActor(supabase: any, leadId: string): Promise<void> {
-  const authClient = await createClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  await assignOwnerOnTouch(supabase, leadId, user);
+  try {
+    const authClient = await createClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    await assignOwnerOnTouch(supabase, leadId, user);
+  } catch (e: any) {
+    console.warn('[inbox/reply] reassignOwnerToActor failed (non-fatal):', e?.message || e);
+  }
 }
 
 export async function POST(request: NextRequest) {

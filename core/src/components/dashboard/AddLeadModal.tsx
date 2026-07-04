@@ -18,6 +18,22 @@ const USER_TYPE_OPTIONS = [
   { value: 'professional', label: 'Professional' },
 ]
 
+// Agency-business intake (bcon live behavior; pop is a bcon clone and shares it)
+const SERVICE_OPTIONS = [
+  'AI Brand Audit',
+  'Lead Automation',
+  'Marketing / Ads',
+  'Website / Funnel',
+  'AI Agent / Chatbot',
+  'Other',
+]
+const URGENCY_OPTIONS = [
+  { value: 'asap', label: 'ASAP' },
+  { value: '1-3mo', label: '1-3 months' },
+  { value: '3-6mo', label: '3-6 months' },
+  { value: 'exploring', label: 'Just exploring' },
+]
+
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-[#262626] text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50'
 const labelClass = 'block text-sm font-medium mb-1.5'
@@ -25,6 +41,9 @@ const labelClass = 'block text-sm font-medium mb-1.5'
 export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModalProps) {
   const brandId = getCurrentBrandId()
   const showAviationFields = brandId === 'windchasers'
+  // bcon (and its clone pop) capture agency-business intake instead of the
+  // course/education fields, and have no welcome-message checkbox.
+  const showAgencyFields = ['bcon', 'pop'].includes(brandId)
 
   const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
@@ -34,6 +53,12 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
   const [courseInterest, setCourseInterest] = useState('')
   const [userType, setUserType] = useState('')
   const [education, setEducation] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [businessType, setBusinessType] = useState('')
+  const [serviceInterest, setServiceInterest] = useState('')
+  const [websiteStatus, setWebsiteStatus] = useState('')
+  const [leadVolume, setLeadVolume] = useState('')
+  const [urgency, setUrgency] = useState('')
   const [note, setNote] = useState('')
   const [sendWelcome, setSendWelcome] = useState(false)
 
@@ -49,7 +74,9 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
   const resetForm = useCallback(() => {
     setStep(1)
     setName(''); setPhone(''); setEmail(''); setCity('')
-    setCourseInterest(''); setUserType(''); setEducation(''); setNote('')
+    setCourseInterest(''); setUserType(''); setEducation('')
+    setBusinessName(''); setBusinessType(''); setServiceInterest('')
+    setWebsiteStatus(''); setLeadVolume(''); setUrgency(''); setNote('')
     setSendWelcome(false)
     setImagePreview(null); setExtractMsg(null); setError(null)
   }, [])
@@ -80,11 +107,24 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
       if (ex.phone) setPhone((p) => p || ex.phone)
       if (ex.email) setEmail((p) => p || ex.email)
       if (ex.city) setCity((p) => p || ex.city)
-      if (ex.education) setEducation((p) => p || ex.education)
-      const noteBits = [ex.summary, ex.interest ? `Interested in: ${ex.interest}` : null].filter(Boolean)
-      if (noteBits.length) setNote((p) => p || noteBits.join('\n'))
+      if (showAgencyFields) {
+        if (ex.business_name) setBusinessName((p) => p || ex.business_name)
+        if (ex.business_type) setBusinessType((p) => p || ex.business_type)
+        if (ex.service_interest) setServiceInterest((p) => p || ex.service_interest)
+        if (ex.website_status) setWebsiteStatus((p) => p || ex.website_status)
+        if (ex.lead_volume) setLeadVolume((p) => p || ex.lead_volume)
+        if (ex.urgency) setUrgency((p) => p || ex.urgency)
+        if (ex.summary) setNote((p) => p || ex.summary)
+      } else {
+        if (ex.education) setEducation((p) => p || ex.education)
+        const noteBits = [ex.summary, ex.interest ? `Interested in: ${ex.interest}` : null].filter(Boolean)
+        if (noteBits.length) setNote((p) => p || noteBits.join('\n'))
+      }
 
-      const found = ['name', 'phone', 'email', 'city', 'education'].filter((k) => ex[k]).length
+      const foundKeys = showAgencyFields
+        ? ['name', 'phone', 'email', 'city', 'business_name', 'business_type', 'service_interest']
+        : ['name', 'phone', 'email', 'city', 'education']
+      const found = foundKeys.filter((k) => ex[k]).length
       setExtractMsg(
         found > 0
           ? `Read ${found} field${found > 1 ? 's' : ''} from the screenshot. Review before saving.`
@@ -95,7 +135,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     } finally {
       setExtracting(false)
     }
-  }, [])
+  }, [showAgencyFields])
 
   const handleFile = useCallback((file: File | null | undefined) => {
     if (!file) return
@@ -147,11 +187,22 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           phone: phone.trim(),
           email: email.trim(),
           city: city.trim(),
-          course_interest: courseInterest.trim(),
-          user_type: userType.trim(),
-          education: education.trim(),
           note: note.trim(),
-          send_welcome: sendWelcome,
+          ...(showAgencyFields
+            ? {
+                business_name: businessName.trim(),
+                business_type: businessType.trim(),
+                service_interest: serviceInterest.trim(),
+                website_status: websiteStatus.trim(),
+                lead_volume: leadVolume.trim(),
+                urgency: urgency.trim(),
+              }
+            : {
+                course_interest: courseInterest.trim(),
+                user_type: userType.trim(),
+                education: education.trim(),
+                send_welcome: sendWelcome,
+              }),
         }),
       })
       const data = await res.json()
@@ -171,7 +222,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     } finally {
       setSaving(false)
     }
-  }, [name, phone, email, city, courseInterest, userType, education, note, sendWelcome, resetForm, onCreated, onClose])
+  }, [name, phone, email, city, courseInterest, userType, education, businessName, businessType, serviceInterest, websiteStatus, leadVolume, urgency, note, sendWelcome, showAgencyFields, resetForm, onCreated, onClose])
 
   if (!isOpen) return null
 
@@ -219,7 +270,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <StepDot n={1} label="Details" />
             <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-primary)' }} />
-            <StepDot n={2} label="More" />
+            <StepDot n={2} label={showAgencyFields ? 'Business' : 'More'} />
           </div>
 
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -250,8 +301,8 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 py-2">
                       <MdImage size={26} style={{ color: 'var(--text-secondary)' }} />
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Drop a WhatsApp screenshot</span>
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>or click / paste — we’ll read name, number &amp; details</span>
+                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{showAgencyFields ? 'Drop a chat / form screenshot' : 'Drop a WhatsApp screenshot'}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{showAgencyFields ? 'or click / paste — we’ll read name, number & business details' : 'or click / paste — we’ll read name, number & details'}</span>
                     </div>
                   )}
                 </div>
@@ -290,7 +341,53 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
             )}
 
             {/* ───────── STEP 2 — More ───────── */}
-            {step === 2 && (
+            {step === 2 && showAgencyFields && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Business name</label>
+                    <input className={inputClass} value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Company / brand" disabled={saving} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Business type</label>
+                    <input className={inputClass} value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="e.g. interior design" disabled={saving} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Service interest</label>
+                    <select className={inputClass} value={serviceInterest} onChange={(e) => setServiceInterest(e.target.value)} disabled={saving}>
+                      <option value="">—</option>
+                      {SERVICE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>City</label>
+                    <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" disabled={saving} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Website status</label>
+                    <input className={inputClass} value={websiteStatus} onChange={(e) => setWebsiteStatus(e.target.value)} placeholder="has site / no site / URL" disabled={saving} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Lead volume</label>
+                    <input className={inputClass} value={leadVolume} onChange={(e) => setLeadVolume(e.target.value)} placeholder="e.g. ~100 / month" disabled={saving} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Urgency</label>
+                    <select className={inputClass} value={urgency} onChange={(e) => setUrgency(e.target.value)} disabled={saving}>
+                      <option value="">—</option>
+                      {URGENCY_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Note</label>
+                  <textarea className={inputClass} rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything worth remembering about this lead…" disabled={saving} />
+                </div>
+              </>
+            )}
+
+            {step === 2 && !showAgencyFields && (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

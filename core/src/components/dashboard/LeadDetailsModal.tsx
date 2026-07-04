@@ -10,6 +10,8 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } fro
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
+import LogCallDecisionHub from './LogCallDecisionHub'
+import { getCurrentBrandId } from '@/configs'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
@@ -131,6 +133,38 @@ function formatCountdown(scheduledAt: string): string {
 
   if (hours > 0) return `In ${hours}h ${minutes % 60}m`
   return `In ${minutes}m`
+}
+
+// Task types encode their day offset in the name (follow_up_day3, follow_up_24h,
+// booking_reminder_30m, ...) — surface that instead of a generic "Follow-up"
+// label so the timeline reads like an actual cadence, not repeated placeholders.
+// (bcon Next Actions timeline.)
+function getDayLabel(taskType: string): string | null {
+  const t = (taskType || '').toLowerCase()
+  const dayMatch = t.match(/day\s*(\d+)/)
+  if (dayMatch) return `Day ${dayMatch[1]}`
+  if (t.includes('24h')) return 'Day 1'
+  if (t.includes('30m')) return '30 min'
+  if (t.includes('try_voice_call')) return 'Voice call'
+  return null
+}
+
+// Render a preview string, turning [[label]] variable slots into chips so the
+// operator can see exactly which parts of the message are dynamic variables.
+// (bcon Next Actions timeline.)
+function renderPreviewWithVars(text: string) {
+  return text.split(/(\[\[[^\]]+\]\])/g).map((p, i) => {
+    const m = p.match(/^\[\[([^\]]+)\]\]$/)
+    if (!m) return <span key={i}>{p}</span>
+    return (
+      <span key={i} style={{
+        display: 'inline-block', padding: '0 5px', margin: '0 1px', borderRadius: 5,
+        fontSize: '0.9em', fontWeight: 700, lineHeight: 1.5, whiteSpace: 'nowrap',
+        color: 'var(--accent-primary)', background: 'var(--accent-subtle)',
+        border: '1px solid var(--accent-primary)',
+      }}>{m[1]}</span>
+    )
+  })
 }
 
 function getTaskTypeConfig(taskType: string): { color: string; bg: string; label: string } {
@@ -326,6 +360,7 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
+  const brandId = getCurrentBrandId()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   // Lead-modal tab visibility — configured per brand at Configure → Lead Modal.
   // Defaults every tab ON; only an explicit `false` hides one.
@@ -438,6 +473,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
+  // bcon: the decision hub opens after the draft (outcome + notes) is entered.
+  // It shows the AI's proposed plan and lets the human confirm or override.
+  const [showLogCallHub, setShowLogCallHub] = useState(false)
 
   // Send Message state
   const [showSendMessageForm, setShowSendMessageForm] = useState(false)
@@ -463,12 +501,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   // messed up. Rather than showing random things, just stop showing anything,
   // figure out what needs to be done, then set up Next Actions." Flip to true
   // once the auto-task logic is reworked.
-  const SHOW_NEXT_ACTIONS = false
+  // bcon redesigned it (horizontal step timeline with inline previews) and pop
+  // ships the classic vertical list — both live with Next Actions on.
+  const SHOW_NEXT_ACTIONS = ['bcon', 'pop'].includes(brandId)
 
   // Next Actions state
   const [leadTasks, setLeadTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
   const [, setTick] = useState(0)
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+
+  // Lead owner (assignment) state
+  const [owner, setOwner] = useState<{ id: string; name: string; email: string | null } | null>(null)
+  const [showOwnerDropdown, setShowOwnerDropdown] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+  const [savingOwner, setSavingOwner] = useState(false)
 
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
@@ -743,6 +791,56 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshLeadData, isOpen])
+
+  // Sync owner from the effective lead's unified_context
+  useEffect(() => {
+    const o = (freshLeadData || lead)?.unified_context?.owner
+    setOwner(o && o.id ? { id: String(o.id), name: String(o.name || o.email || 'User'), email: o.email || null } : null)
+  }, [freshLeadData, lead])
+
+  // Lazy-load the team-member list the first time the owner picker opens
+  const loadTeamMembers = async () => {
+    if (teamMembers.length > 0 || loadingTeamMembers) return
+    setLoadingTeamMembers(true)
+    try {
+      const res = await fetch('/api/dashboard/team-members')
+      const data = await res.json()
+      setTeamMembers(Array.isArray(data?.members) ? data.members : [])
+    } catch {
+      setTeamMembers([])
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
+  // Assign or clear the owner (optimistic), persisting via the owner route
+  const assignOwner = async (member: { id: string; name: string; email: string | null } | null) => {
+    if (!lead) return
+    const prev = owner
+    setOwner(member) // optimistic
+    setShowOwnerDropdown(false)
+    setSavingOwner(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${lead.id}/owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner: member ? { id: member.id, name: member.name, email: member.email } : null }),
+      })
+      if (!res.ok) throw new Error('failed')
+      const data = await res.json()
+      const o = data?.owner
+      setOwner(o && o.id ? { id: String(o.id), name: String(o.name || o.email || 'User'), email: o.email || null } : null)
+      // Keep freshLeadData in sync so the value survives re-renders
+      setFreshLeadData((fd) => {
+        const base = fd || lead
+        return { ...base, unified_context: { ...(base.unified_context || {}), owner: data?.owner ?? null } } as Lead
+      })
+    } catch {
+      setOwner(prev) // revert on failure
+    } finally {
+      setSavingOwner(false)
+    }
+  }
 
 
   // Load 30-day interaction data when interaction tab is active
@@ -1289,8 +1387,26 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  // bcon routes the call log through the decision hub (AI-proposed plan the
+  // human confirms/overrides) instead of the direct classify-and-log POST.
+  const finishLogCall = () => {
+    setShowLogCallHub(false)
+    setShowLogCallForm(false)
+    setLogCallOutcome('Connected')
+    setLogCallNotes('')
+    setActiveTab('notes') // surface the logged call in the Notes tab
+    loadActivities()
+    loadLeadTasks()
+    loadFreshLeadData()
+  }
+
   const handleLogCall = async () => {
     if (!lead) return
+    if (brandId === 'bcon') {
+      if (savingLogCall) return
+      setShowLogCallHub(true)
+      return
+    }
     const callNote = logCallNotes.trim()
     setSavingLogCall(true)
     setNoteProgress({
@@ -2034,6 +2150,30 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     as a collapsible block on the contact card — too noisy on
                     a card meant for at-a-glance info. */}
 
+                {/* TOP-LEVEL BUSINESS (bcon) — only the brand and the industry. The full
+                    form submission belongs in the chat, not crammed into the contact card. */}
+                {brandId === 'bcon' && (() => {
+                  const ctx: any = currentLead.unified_context || {};
+                  const fd: any = ctx.form_data || {};
+                  const raw: any = ctx.raw_form_fields || {};
+                  const prof: any = ctx.whatsapp?.profile || ctx.web?.profile || {};
+                  const fmt = (s: any) => { const v = String(s ?? '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim(); return v ? v.charAt(0).toUpperCase() + v.slice(1) : ''; };
+                  const rows: { label: string; value: string }[] = [];
+                  const push = (label: string, v: any) => { const f = fmt(v); if (f && !rows.some(r => r.label === label)) rows.push({ label, value: f }); };
+                  push('Brand', prof.company || raw['Company Name'] || raw.company);
+                  push('Industry', fd.business_type || prof.business_type || ctx.bcon?.business_type);
+                  if (!rows.length) return null;
+                  return (
+                    <div className="lead-form-details flex flex-wrap gap-1.5 pt-2 mt-1.5 border-t border-[var(--border-primary)]">
+                      {rows.map((r, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }} title={`${r.label}: ${r.value}`}>
+                          <span className="text-[var(--text-muted)]">{r.label}</span> {r.value}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
                 {(() => {
                   const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};
@@ -2229,7 +2369,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 )}
 
                 {/* Log a Call form */}
-                {showLogCallForm && (
+                {/* Log a Call form — draft row (hidden once the bcon hub opens) */}
+                {showLogCallForm && !showLogCallHub && (
                   <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
                     <select
                       value={logCallOutcome}
@@ -2275,6 +2416,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       <MdCheck size={12} />
                     </button>
                   </div>
+                )}
+
+                {/* Decision hub (bcon) — opens after the draft is saved */}
+                {showLogCallForm && showLogCallHub && lead && (
+                  <LogCallDecisionHub
+                    leadId={lead.id}
+                    leadName={lead.name || 'this lead'}
+                    outcome={logCallOutcome}
+                    notes={logCallNotes}
+                    onCancel={() => setShowLogCallHub(false)}
+                    onDone={finishLogCall}
+                  />
                 )}
 
                 {/* Send Message form */}
@@ -3166,6 +3319,111 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             </p>
                           )
                         }
+                        if (brandId === 'bcon') return (
+                          <div>
+                            {/* Horizontal timeline — click a step to reveal the exact outgoing message.
+                                Wheel scroll is translated to horizontal so a normal scroll moves the
+                                strip sideways; native trackpad/scrollbar drag still works too. */}
+                            <div
+                              className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth cursor-grab"
+                              onWheel={(e) => {
+                                const el = e.currentTarget
+                                if (el.scrollWidth > el.clientWidth && e.deltaY !== 0) {
+                                  el.scrollLeft += e.deltaY
+                                }
+                              }}
+                            >
+                              {pendingTasks.map((task: any, i: number) => {
+                                const typeConfig = getTaskTypeConfig(task.task_type)
+                                const stepLabel = getDayLabel(task.task_type) || typeConfig.label
+                                const isExpanded = expandedTaskId === task.id
+                                const hasPreview = !!(task.preview || task.metadata?.preview || task.metadata?.message_preview)
+                                return (
+                                  <button
+                                    key={task.id}
+                                    onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                                    className="snap-start flex-shrink-0 w-[172px] text-left p-2 rounded-lg border transition-colors"
+                                    style={{
+                                      borderColor: isExpanded ? 'var(--accent-primary)' : 'var(--border-primary)',
+                                      background: isExpanded ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span
+                                        className="text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wider"
+                                        style={{ color: typeConfig.color, backgroundColor: typeConfig.bg }}
+                                      >
+                                        {i + 1}
+                                      </span>
+                                      {hasPreview && (
+                                        <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                                          {isExpanded ? '▲' : '▼'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate">{stepLabel}</p>
+                                    {task.scheduled_at && (
+                                      <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">
+                                        {formatCountdown(task.scheduled_at)}
+                                      </p>
+                                    )}
+                                    {hasPreview && (
+                                      <p
+                                        className="text-[10px] text-[var(--text-secondary)] mt-1 leading-snug"
+                                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                                      >
+                                        {String(task.preview || task.metadata?.preview || task.metadata?.message_preview || '').replace(/\[\[([^\]]+)\]\]/g, '$1')}
+                                      </p>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+
+                            {/* Expanded detail strip for the selected step */}
+                            {(() => {
+                              const task = pendingTasks.find(t => t.id === expandedTaskId)
+                              if (!task) return null
+                              const dayLabel = getDayLabel(task.task_type)
+                              const actionLabel = getTaskActionLabel(task)
+                              const fullLabel = dayLabel ? `${dayLabel} · ${actionLabel}` : actionLabel
+                              const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
+                              const preview = task.preview || task.metadata?.preview || task.metadata?.message_preview || ''
+                              const sequenceLabel = task.sequence_label || (task.metadata?.sequence && task.metadata?.step != null
+                                ? `Step ${task.metadata.step} of ${task.metadata.total_steps || 4} - ${task.metadata.sequence}`
+                                : '')
+                              return (
+                                <div className="mt-1 p-2.5 rounded-lg border group" style={{ borderColor: 'var(--accent-primary)', background: 'var(--bg-primary)' }}>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{fullLabel}</p>
+                                      {sequenceLabel && (
+                                        <p className="text-[10px] font-medium mt-0.5" style={{ color: 'var(--accent-primary)' }}>{sequenceLabel}</p>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => handleCancelTask(task.id)}
+                                      className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
+                                      title="Cancel task"
+                                    >
+                                      <MdClose size={14} />
+                                    </button>
+                                  </div>
+                                  {preview ? (
+                                    <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 p-2 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] whitespace-pre-wrap">
+                                      &ldquo;{renderPreviewWithVars(preview)}&rdquo;
+                                    </p>
+                                  ) : (
+                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">No fixed template — the AI writes this live at send time using the angle below.</p>
+                                  )}
+                                  {reason && (
+                                    <p className="text-[10px] text-[var(--text-muted)] mt-1">{reason}</p>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )
                         return (
                           <div className="space-y-2">
                             {pendingTasks.map((task: any) => {
@@ -3712,8 +3970,78 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             >
               Delete Lead
             </button>
-            <div className="text-[10px] text-[var(--text-muted)]">
-              ID: {lead?.id?.slice(0, 8)}...
+            <div className="flex items-center gap-3">
+              {/* Owner (assignment) */}
+              <div className="lead-owner-container flex items-center gap-1.5 relative">
+                <span className="text-[10px] uppercase tracking-wider font-semibold flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  Owner
+                </span>
+                {owner ? (
+                  <span
+                    className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[140px]"
+                    style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
+                    title={owner.name}
+                  >
+                    {owner.name}
+                  </span>
+                ) : (
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Unassigned</span>
+                )}
+                <button
+                  onClick={() => {
+                    const next = !showOwnerDropdown
+                    setShowOwnerDropdown(next)
+                    if (next) loadTeamMembers()
+                  }}
+                  disabled={savingOwner}
+                  className="p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
+                  title="Assign owner"
+                  aria-label="Assign lead owner"
+                  aria-expanded={showOwnerDropdown}
+                  aria-haspopup="true"
+                >
+                  <MdEdit size={12} className="text-[var(--text-muted)]" />
+                </button>
+
+                {showOwnerDropdown && (
+                  <div
+                    className="absolute right-0 bottom-full mb-1 z-50 min-w-[180px] max-h-[240px] overflow-y-auto rounded-md shadow-lg py-1"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
+                  >
+                    {loadingTeamMembers ? (
+                      <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => assignOwner(null)}
+                          className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          Unassigned
+                        </button>
+                        {teamMembers.length === 0 ? (
+                          <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>No team members</div>
+                        ) : (
+                          teamMembers.map((m) => (
+                            <button
+                              key={m.id}
+                              onClick={() => assignOwner(m)}
+                              className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-tertiary)] transition-colors truncate"
+                              style={{ color: owner?.id === m.id ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                              title={m.email || m.name}
+                            >
+                              {m.name}
+                            </button>
+                          ))
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)]">
+                ID: {lead?.id?.slice(0, 8)}...
+              </div>
             </div>
           </footer>
         </dialog>

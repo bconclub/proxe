@@ -10,6 +10,9 @@
  *   - Auto-fallback: try text first, retry with template if 24h error
  */
 
+import { logMessage } from './conversationLogger';
+import { getServiceClient } from './supabase';
+
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
@@ -41,6 +44,74 @@ function extractUrlSuffix(url: string): string {
   if (calMatch) return calMatch[1];
   // Fallback: return as-is
   return url;
+}
+
+/**
+ * Resolve a lead_id from a phone number so a system-sent message can thread
+ * into the right chat. Phone is stored inconsistently across the DB (+CC vs
+ * bare digits), so match on the last 10 digits. Falls back to whatsapp_sessions
+ * when the number isn't in all_leads yet.
+ */
+async function resolveLeadIdByPhone(phone: string): Promise<string | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  const digits = normalizePhone(phone);
+  const last10 = digits.slice(-10) || digits;
+  if (!last10) return null;
+  try {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('id')
+      .ilike('phone', `%${last10}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lead?.id) return lead.id;
+
+    const { data: sess } = await supabase
+      .from('whatsapp_sessions')
+      .select('lead_id')
+      .ilike('customer_phone', `%${last10}`)
+      .not('lead_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return sess?.lead_id ?? null;
+  } catch (err: any) {
+    console.error('[whatsappSender] lead resolution failed:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Log a SYSTEM-sent WhatsApp message to `conversations` so it shows up in the
+ * dashboard Chats — the single place every automated outbound (booking
+ * confirmation, reminder, missed-call, re-engagement) funnels through.
+ *
+ * Live conversational agent replies are already logged by their own routes
+ * (meta/respond/webhook + noteOrchestrator); this closes the gap for the
+ * automated senders that previously went out completely invisibly.
+ *
+ * Soft-fail: never throws, never blocks a send. Awaited (NOT fire-and-forget)
+ * so the write isn't dropped when a serverless function freezes.
+ */
+export async function logSystemWhatsApp(
+  to: string,
+  content: string,
+  messageType: 'text' | 'template' = 'text',
+  metadata: Record<string, any> = {},
+): Promise<void> {
+  try {
+    if (!content) return;
+    const leadId = await resolveLeadIdByPhone(to);
+    if (!leadId) {
+      console.warn(`[whatsappSender] no lead matched for ${normalizePhone(to)} - message sent but not logged to chats`);
+      return;
+    }
+    await logMessage(leadId, 'whatsapp', 'agent', content, messageType, { source: 'system_send', ...metadata });
+  } catch (err: any) {
+    console.error('[whatsappSender] system-send conversation log failed (non-fatal):', err?.message || err);
+  }
 }
 
 /**

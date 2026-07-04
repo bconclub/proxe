@@ -125,13 +125,18 @@ function fmtMs(ms: number): string {
   return `${h}h ${m}m`
 }
 
-// ── POP dashboard-home divergence (ported from the pop fork, brand-gated) ──
+// ── POP/BCON dashboard-home divergence (ported from those forks, brand-gated) ──
 // One brand per build, so these resolve statically at module load.
 const brandCfg = getBrandConfig()
 const isPop = brandCfg.brand === 'pop'
-// POP uses subtler KPI-card tints (4% bg / 14% border); other brands keep core's 7%/22%.
-const TINT_BG = isPop ? '4%' : '7%'
-const TINT_BORDER = isPop ? '14%' : '22%'
+const isBcon = brandCfg.brand === 'bcon'
+// BCON + POP share the newer dashboard-home look (bcon is the origin fork,
+// pop is its clone): subtler tints, cohort funnel with a Today window,
+// reply-rate-driven Follow-up Health, compact Upcoming Events rows.
+const hasNewHomeLook = isPop || isBcon
+// BCON/POP use subtler KPI-card tints (4% bg / 14% border); other brands keep core's 7%/22%.
+const TINT_BG = hasNewHomeLook ? '4%' : '7%'
+const TINT_BORDER = hasNewHomeLook ? '14%' : '22%'
 
 // Thousands separator for the full KPI numbers (8,832 / 1,284). Indian grouping.
 const fmtComma = (n: number | string): string => (typeof n === 'number' ? n.toLocaleString('en-IN') : String(n))
@@ -217,8 +222,22 @@ export default function FounderDashboard() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (cancelled) return
-        const meta = (user?.user_metadata || {}) as Record<string, unknown>
-        const name = (meta.full_name as string) || (meta.name as string) || ''
+        // Prefer the name set in User Management (dashboard_users.full_name) —
+        // that's the field the admin edits. Fall back to auth metadata, then to
+        // the email prefix. Editing the name in User Management must reflect here.
+        let name = ''
+        if (user?.id) {
+          const { data: du } = await supabase
+            .from('dashboard_users')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (du?.full_name) name = du.full_name as string
+        }
+        if (!name) {
+          const meta = (user?.user_metadata || {}) as Record<string, unknown>
+          name = (meta.full_name as string) || (meta.name as string) || ''
+        }
         setUser({ name, email: user?.email || '' })
       } catch { /* soft-fail — greeting falls back to "Founder" */ }
     })()
@@ -431,7 +450,7 @@ export default function FounderDashboard() {
           <div className="relative">
             <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
-              <Image src={isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : '/logo.png'} alt={isPop ? brandCfg.name : 'Windchasers'} width={80} height={80} className="drop-shadow-lg" priority />
+              <Image src={isBcon ? '/bcon-icon.png' : isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : '/logo.png'} alt={isPop || isBcon ? brandCfg.name : 'Windchasers'} width={80} height={80} className="drop-shadow-lg" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
@@ -459,10 +478,10 @@ export default function FounderDashboard() {
   // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
   // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
   // range in the metrics yet).
-  // POP: cohort funnel for the selected window — all five nodes scale together
+  // BCON/POP: cohort funnel for the selected window — all five nodes scale together
   // (leads acquired in the window → how far each got). Falls back to the old
   // per-metric counts (identical to core's expressions) when `funnel` is absent.
-  const fn = isPop ? metrics.funnel?.[engineRange] : undefined
+  const fn = hasNewHomeLook ? metrics.funnel?.[engineRange] : undefined
   const engTotal = fn ? fn.total : engineRange === 'Today' ? (metrics.totalLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
   const engEngaged = fn ? fn.engaged : engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
   const engWarm = fn ? fn.warm : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
@@ -498,11 +517,11 @@ export default function FounderDashboard() {
   const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
   const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
   // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
-  // POP: health follows the REPLY RATE shown on the card (not the response-time
-  // bucket) — so a 100% reply rate never reads as "Fair" (ported from the pop
-  // fork). Other brands keep core's responseHealth.status verbatim.
+  // BCON/POP: health follows the REPLY RATE shown on the card (not the
+  // response-time bucket) — so a 100% reply rate never reads as "Fair" (ported
+  // from those forks). Other brands keep core's responseHealth.status verbatim.
   const replyRate = Math.round(rm?.responseRate ?? 0)
-  const healthLevel: 'good' | 'warning' | 'critical' = isPop
+  const healthLevel: 'good' | 'warning' | 'critical' = hasNewHomeLook
     ? (replyRate >= 90 ? 'good' : replyRate >= 70 ? 'warning' : 'critical')
     : metrics.responseHealth.status
   const healthColor = healthLevel === 'good' ? '#22c55e' : healthLevel === 'warning' ? '#f59e0b' : '#ef4444'
@@ -598,7 +617,7 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className={`wc-bento grid grid-cols-2 md:grid-cols-3 ${isPop ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-3 sm:gap-4 shrink-0`}>
+      <div className={`wc-bento grid grid-cols-2 md:grid-cols-3 ${features.voice ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-3 sm:gap-4 shrink-0`}>
         {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, #3B82F6 ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, #3B82F6 ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
@@ -636,10 +655,10 @@ export default function FounderDashboard() {
         </div>
         {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
         <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor={isPop ? '#22c55e' : '#ef4444'}
+          icon={<MdLocalFireDepartment size={15} />} iconColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
           label="High Intent Leads"
           value={fmt(metrics.hotLeads?.count ?? 0)}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor={isPop ? '#22c55e' : '#ef4444'}
+          sparkData={metrics.trends?.hotLeads?.data} sparkColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
           sub="flagged high-intent by PROXe"
           onClick={() => router.push('/dashboard/leads?filter=hot')}
         />
@@ -657,7 +676,7 @@ export default function FounderDashboard() {
             </div>
             <RadialProgress value={replyRate} size={48} color={healthColor} showPercentage={false} label="" />
           </div>
-          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {isPop ? (healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention') : 'on track'}</span>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {hasNewHomeLook ? (healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention') : 'on track'}</span>
         </div>
         <KpiCard
           icon={<MdEvent size={15} />} iconColor="#a855f7"
@@ -675,8 +694,9 @@ export default function FounderDashboard() {
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
         />
-        {/* POP-only: Calls — inbound + outbound voice volume (links to the Calls view). */}
-        {isPop && (
+        {/* Calls — inbound + outbound voice volume (links to the Calls view).
+            Only shown when the Voice/Calls feature is enabled for this brand. */}
+        {features.voice && (
           <KpiCard
             icon={<MdCall size={15} />} iconColor="#06b6d4"
             label="Calls"
@@ -696,7 +716,7 @@ export default function FounderDashboard() {
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
             <div className="flex items-center gap-0.5 shrink-0">
-              {(isPop ? (['Today', '7D', '14D', 'All'] as const) : (['All', '7D', '14D'] as const)).map((p) => (
+              {(hasNewHomeLook ? (['Today', '7D', '14D', 'All'] as const) : (['All', '7D', '14D'] as const)).map((p) => (
                 <button
                   key={p} type="button" onClick={() => setEngineRange(p)}
                   className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
@@ -713,10 +733,10 @@ export default function FounderDashboard() {
             <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
             <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engK(engBooked)} label="Booked" sub={isPop ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week'} last />
+            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engK(engBooked)} label="Booked" sub={hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week'} last />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
-            <span className="inline-block w-2 h-2 rounded-full" style={{ background: isPop ? healthColor : '#22c55e' }} />
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
             {healthLevel === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
           </div>
         </section>
@@ -744,8 +764,8 @@ export default function FounderDashboard() {
                     {/* Line 1 — name · date · owner, with the recency-coloured
                         countdown chip on the right (only thing that's coloured). */}
                     <div className="flex items-center justify-between gap-2">
-                      {isPop ? (
-                        /* POP layout (fork parity): name · when · owner, no category chip. */
+                      {hasNewHomeLook ? (
+                        /* BCON/POP layout (fork parity): name · when · owner, no category chip. */
                         <div className="flex items-baseline gap-2.5 min-w-0">
                           <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
                           <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
@@ -780,7 +800,7 @@ export default function FounderDashboard() {
                       if (booking.title) return (
                         <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
                       )
-                      if (isPop) return null
+                      if (hasNewHomeLook) return null
                       const cat = eventCategory(booking.courseInterest, booking.title)
                       const bits = [
                         cat?.label || booking.courseInterest || null,
@@ -889,7 +909,7 @@ export default function FounderDashboard() {
           </div>
           <div className="flex-1 min-h-0">
             {convSeries.length > 1 ? (
-              <ConversationsTrendChart data={convSeries} days={rangeDays} color={isPop ? 'var(--accent-primary)' : '#afd510'} />
+              <ConversationsTrendChart data={convSeries} days={rangeDays} color={hasNewHomeLook ? 'var(--accent-primary)' : '#afd510'} />
             ) : (
               <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
             )}

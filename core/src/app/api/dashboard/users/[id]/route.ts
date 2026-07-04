@@ -48,14 +48,18 @@ export async function PATCH(
     const service = (auth as any).service
 
     const targetUserId = params.id
-    if ((auth as any).user.id === targetUserId) {
+    const isSelf = (auth as any).user.id === targetUserId
+    const body = await request.json()
+
+    // Self-editing your own display name is safe (cosmetic, can't lock you
+    // out); only role/is_active on your own account are blocked, since
+    // demoting or deactivating yourself could strand the team with no admin.
+    if (isSelf && (body.role !== undefined || body.is_active !== undefined)) {
       return NextResponse.json(
-        { error: "You cannot modify your own role or status. Ask another admin." },
+        { error: "You cannot change your own role or status. Ask another admin." },
         { status: 400 },
       )
     }
-
-    const body = await request.json()
     const updates: Record<string, any> = {}
     if (body.role !== undefined) {
       if (!['admin', 'viewer'].includes(body.role)) {
