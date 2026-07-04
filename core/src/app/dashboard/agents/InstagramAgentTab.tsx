@@ -2,15 +2,31 @@
 
 import { useEffect, useState } from 'react';
 import { FaInstagram } from 'react-icons/fa';
+import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
-const INSTAGRAM_APP_ID = '1667051187795636';
+const BRAND_ID = getCurrentBrandId();
+
+// windchasers/lokazen still run the original windchasers Instagram app;
+// newer brands (bcon, pop) use the central PROXe-IG app (Tech Provider).
+const LEGACY_IG_APP_BRANDS = ['windchasers', 'lokazen'];
+const INSTAGRAM_APP_ID = LEGACY_IG_APP_BRANDS.includes(BRAND_ID)
+  ? '1667051187795636'
+  : '734209706078170';
 const INSTAGRAM_SCOPES = [
   'instagram_business_basic',
   'instagram_business_manage_messages',
   'instagram_business_manage_comments',
 ].join(',');
 
+// Brand-specific — never hardcode another brand's account here. Env wins;
+// known brand handles keep their fork-exact default.
+const TARGET_ACCOUNT =
+  process.env.NEXT_PUBLIC_IG_ACCOUNT ||
+  ({ windchasers: '@windchasersblr', bcon: '@bconclub' } as Record<string, string>)[BRAND_ID] ||
+  'your Instagram account';
+
 export default function InstagramAgentTab() {
+  const brandName = getBrandConfig().name;
   const [authReturned, setAuthReturned] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -32,7 +48,8 @@ export default function InstagramAgentTab() {
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: INSTAGRAM_SCOPES,
-      state: 'windchasers-instagram-agent',
+      // Same literal value as before for windchasers; brand-scoped for the rest.
+      state: `${BRAND_ID}-instagram-agent`,
     });
 
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
@@ -67,11 +84,11 @@ export default function InstagramAgentTab() {
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              Connect the official WindChasers Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
+              Connect the official {brandName} Instagram professional account so PROXe can route Instagram DMs and comments into the dashboard alongside WhatsApp and web chat.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
               <span className="h-2 w-2 rounded-full bg-[#E1306C]" />
-              Target account: @windchasersblr
+              Target account: {TARGET_ACCOUNT}
             </div>
           </div>
 
@@ -92,7 +109,7 @@ export default function InstagramAgentTab() {
                 Instagram connection pending
               </div>
               <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                Complete Instagram Business Login to authorize account identity, DMs, and comments for the WindChasers workspace.
+                Complete Instagram Business Login to authorize account identity, DMs, and comments for the {brandName} workspace.
               </p>
             </div>
 
@@ -116,7 +133,7 @@ export default function InstagramAgentTab() {
             <ol className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
               <li>1. Open Dashboard, then Agents, then Instagram.</li>
               <li>2. Click Connect Instagram Business.</li>
-              <li>3. Select the WindChasers Instagram professional account.</li>
+              <li>3. Select the {brandName} Instagram professional account.</li>
               <li>4. Approve the requested basic, messages, and comments permissions.</li>
               <li>5. Return to PROXe and show the authorization success state.</li>
             </ol>
@@ -130,9 +147,9 @@ export default function InstagramAgentTab() {
             </h3>
             <div className="grid gap-4 md:grid-cols-3">
               {[
-                ['1', 'Connect', 'Admin connects windchasersblr through Instagram Business Login.'],
+                ['1', 'Connect', `Admin connects ${TARGET_ACCOUNT} through Instagram Business Login.`],
                 ['2', 'Receive', 'Meta webhooks send Instagram DMs and comments to PROXe.'],
-                ['3', 'Respond', 'The WindChasers team handles enquiries in the dashboard.'],
+                ['3', 'Respond', `The ${brandName} team handles enquiries in the dashboard.`],
               ].map(([step, title, body]) => (
                 <div
                   key={step}
@@ -149,7 +166,9 @@ export default function InstagramAgentTab() {
 
             <div className="mt-6 rounded-lg bg-[var(--bg-primary)] p-4">
               <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                Note: The webhook endpoint is already configured at /api/agent/instagram/meta. Server-side token exchange and permanent account storage are the next production steps after app review setup.
+                {LEGACY_IG_APP_BRANDS.includes(BRAND_ID)
+                  ? 'Note: The webhook endpoint is already configured at /api/agent/instagram/meta. Server-side token exchange and permanent account storage are the next production steps after app review setup.'
+                  : 'Note: The webhook endpoint is configured at /api/agent/meta/instagram. Incoming Instagram DMs and comments are routed into the unified inbox on the Social channel.'}
               </p>
             </div>
           </div>

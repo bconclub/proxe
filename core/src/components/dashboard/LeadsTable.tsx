@@ -10,6 +10,7 @@ import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId, brandConfig } from '@/configs'
+import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
   MdChat,
@@ -107,6 +108,50 @@ const getScoreColor = (score: number | null | undefined): string => {
   if (score >= 70) return '#22C55E'
   if (score >= 40) return '#F59E0B'
   return '#EF4444'
+}
+
+// ── POP (Pulse of Punjab) constituent display config ────────────────────────
+// Pop reskins the leads table into an electoral/grievance view. These maps drive
+// the pop-only columns (lean / grievance / intent / channel / loop). Brand-gated
+// at the render site, so no other brand is affected.
+const POP_LEAN: Record<string, { label: string; color: string }> = {
+  supporter: { label: 'Supporter', color: '#22C55E' },
+  leaning:   { label: 'Leaning',   color: '#84CC16' },
+  undecided: { label: 'Undecided', color: '#F59E0B' },
+  opposed:   { label: 'Opposed',   color: '#EF4444' },
+}
+const POP_GRIEVANCE: Record<string, { label: string; icon: string; color: string }> = {
+  jobs:      { label: 'Jobs',       icon: '💼', color: '#3B82F6' },
+  water:     { label: 'Water',      icon: '💧', color: '#06B6D4' },
+  power:     { label: 'Power',      icon: '⚡', color: '#F59E0B' },
+  roads:     { label: 'Roads',      icon: '🛣️', color: '#A78BFA' },
+  drugs:     { label: 'Drugs',      icon: '💊', color: '#EC4899' },
+  farm_debt: { label: 'Farm Debt',  icon: '🌾', color: '#F97316' },
+  health:    { label: 'Health',     icon: '🏥', color: '#EF4444' },
+  education: { label: 'Education',  icon: '📚', color: '#8B5CF6' },
+  other:     { label: 'Other',      icon: '📌', color: '#6B7280' },
+}
+const POP_INTENT: Record<string, { label: string; color: string }> = {
+  vote:      { label: 'Vote',      color: '#22C55E' },
+  volunteer: { label: 'Volunteer', color: '#3B82F6' },
+  rally:     { label: 'Rally',     color: '#F97316' },
+  share:     { label: 'Share',     color: '#A78BFA' },
+  none:      { label: '—',         color: '#6B7280' },
+}
+const POP_LOOP: Record<string, { label: string; color: string }> = {
+  raised:   { label: 'Raised',   color: '#F59E0B' },
+  routed:   { label: 'Routed',   color: '#3B82F6' },
+  resolved: { label: 'Resolved', color: '#22C55E' },
+}
+// AC number lookup (numbered constituency chip) + a stable per-district color so
+// every row from the same district reads the same hue. Built from the war-room
+// reference (117 ECI seats). Hash→hue gives a deterministic mid-tone that works
+// on both light and dark.
+const POP_AC_BY_NAME = new Map(CONSTITUENCIES.map((c) => [normSeat(c.name), c]))
+function popDistrictColor(d: string): string {
+  let h = 0
+  for (let i = 0; i < d.length; i++) h = (h * 31 + d.charCodeAt(i)) % 360
+  return `hsl(${h}, 60%, 52%)`
 }
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -571,7 +616,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {title || (presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads')}
+            {title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -726,10 +771,10 @@ export default function LeadsTable({
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-1.5 pl-2 pr-3 py-1.5 text-xs font-semibold rounded-md text-[var(--text-button)] shadow-sm transition-transform hover:scale-[1.04]"
             style={{ backgroundColor: 'var(--button-bg)' }}
-            title="Add a new lead"
+            title={brandId === 'pop' ? 'Add a person' : 'Add a new lead'}
           >
             <MdAdd size={18} />
-            Add Lead
+            {brandId === 'pop' ? 'Add Person' : 'Add Lead'}
           </button>
         </div>
       </div>
@@ -740,6 +785,20 @@ export default function LeadsTable({
           the page scrolls, and the "sticky" header rides away with it. */}
       <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
+          {brandId === 'pop' ? (
+            <colgroup>
+              {/* POP constituent view — widths sum to 100% */}
+              <col style={{ width: '14%' }} />  {/* Constituent (name + captured) */}
+              <col style={{ width: '11%' }} />  {/* Contact (phone) */}
+              <col style={{ width: '12%' }} />  {/* Source (origin + entry point) */}
+              <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
+              <col style={{ width: '12%' }} />  {/* Constituency (+ district·booth) */}
+              <col style={{ width: '18%' }} />  {/* Grievance (category + salience + text) */}
+              <col style={{ width: '9%' }} />   {/* Lean */}
+              <col style={{ width: '7%' }} />   {/* Intent */}
+              <col style={{ width: '6%' }} />   {/* Loop */}
+            </colgroup>
+          ) : (
           <colgroup>
             {/* Tightened column widths: Lead/Contact were oversized,
                 Booking was a wide text column (now a compact chip),
@@ -759,9 +818,22 @@ export default function LeadsTable({
             {scoutView && <col style={{ width: '8%' }} />}  {/* Knows Properties */}
             <col style={{ width: '9%' }} />   {/* Owner */}
           </colgroup>
+          )}
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
-              {[
+              {(brandId === 'pop'
+                ? [
+                    { label: 'Constituent',  align: 'left'   as const },
+                    { label: 'Contact',      align: 'left'   as const },
+                    { label: 'Source',       align: 'center' as const },
+                    { label: 'Last Touch',   align: 'center' as const },
+                    { label: 'Constituency', align: 'left'   as const },
+                    { label: 'Grievance',    align: 'left'   as const },
+                    { label: 'Lean',         align: 'center' as const },
+                    { label: 'Intent',       align: 'center' as const },
+                    { label: 'Loop',         align: 'center' as const },
+                  ]
+                : [
                 { label: 'Lead',       align: 'left'   as const },
                 { label: 'Contact',    align: 'left'   as const },
                 { label: 'Source',     align: 'center' as const },
@@ -780,7 +852,7 @@ export default function LeadsTable({
                   { label: 'Knows Properties', align: 'center' as const },
                 ] : []),
                 { label: 'Owner',  align: 'left' as const },
-              ].map(({ label, align }) => (
+              ]).map(({ label, align }) => (
                 <th
                   key={label}
                   className={`px-3 py-2.5 text-${align} text-[10px] font-semibold uppercase tracking-wider`}
@@ -799,7 +871,7 @@ export default function LeadsTable({
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  No leads found
+                  {brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
                 </td>
               </tr>
             ) : (
@@ -1149,9 +1221,222 @@ export default function LeadsTable({
 
                 // Score pill colors
                 // Score pill classes - using CSS variables for consistency
-                const scorePillClass = score != null 
+                const scorePillClass = score != null
                   ? (score >= 70 ? 'bg-[rgba(34,197,94,0.15)] text-[#22c55e]' : score >= 40 ? 'bg-[rgba(245,158,11,0.15)] text-[#f59e0b]' : 'bg-[rgba(239,68,68,0.15)] text-[#ef4444]')
                   : ''
+
+                // ── POP constituent row (electoral view) ──────────────────────
+                if (brandId === 'pop') {
+                  const pl = lead as any
+                  const capturedAt = pl.created_at || lead.timestamp
+                  const leanCfg = pl.lean ? POP_LEAN[pl.lean] : null
+                  const grvCfg = pl.grievance_category ? POP_GRIEVANCE[pl.grievance_category] : null
+                  const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
+                  const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
+                  const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
+                  const seatRef = pl.constituency ? POP_AC_BY_NAME.get(normSeat(pl.constituency)) : undefined
+                  const acNo = seatRef?.no
+                  const districtName = pl.district || seatRef?.district || ''
+                  const distColor = districtName ? popDistrictColor(districtName) : ''
+
+                  return (
+                    <tr
+                      key={lead.id}
+                      className="cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
+                      style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
+                      onClick={() => handleRowClick(lead)}
+                    >
+                      {/* CONSTITUENT — name + captured date */}
+                      <td className="px-3 py-2">
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {displayName}
+                        </div>
+                        {capturedAt && (
+                          <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(capturedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* CONTACT — phone + email (when provided) */}
+                      <td className="px-3 py-2">
+                        {lead.phone && (
+                          <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
+                            {lead.phone}
+                          </a>
+                        )}
+                        {lead.email && (
+                          <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
+                            {lead.email}
+                          </a>
+                        )}
+                        {!lead.phone && !lead.email && <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+
+                      {/* SOURCE — origin marketing source + entry point (real attribution) */}
+                      <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
+                            style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                          >
+                            {srcCfg.label}
+                          </span>
+                          {subSource && (
+                            <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
+                              {subSource}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* LAST TOUCH — last channel + actor (real attribution) */}
+                      <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
+                        {(() => {
+                          const actor = (lead.unified_context as any)?.last_actor || null
+                          const lastTouchConfig: Record<string, { label: string; color: string }> = {
+                            web: { label: 'Web', color: '#3B82F6' }, form: { label: 'Form', color: '#3B82F6' },
+                            whatsapp: { label: 'WhatsApp', color: '#22C55E' }, voice: { label: 'Voice', color: '#8B5CF6' },
+                            social: { label: 'Social', color: '#EC4899' }, facebook: { label: 'Facebook', color: '#1877F2' },
+                            facebook_lead: { label: 'Facebook', color: '#1877F2' }, meta_forms: { label: 'Meta', color: '#1877F2' },
+                            google: { label: 'Google', color: '#EA4335' }, ads: { label: 'Ads', color: '#F97316' },
+                            pabbly: { label: 'Pabbly', color: '#F59E0B' }, referral: { label: 'Referral', color: '#10B981' },
+                            organic: { label: 'Organic', color: '#84CC16' }, manual: { label: 'Manual', color: '#6B7280' },
+                            landing_page: { label: 'Landing', color: '#3B82F6' }, email: { label: 'Email', color: '#0EA5E9' },
+                          }
+                          const channelCfg = lastTouch
+                            ? (lastTouchConfig[lastTouch] || { label: lastTouch.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), color: '#6B7280' })
+                            : null
+                          let actorBadge: { label: string; tooltip: string } | null = null
+                          if (actor?.type === 'user' && (actor.name || actor.email)) {
+                            const aname = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                            actorBadge = { label: aname, tooltip: `Last touched by ${actor.email || aname}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
+                          } else if (actor?.type === 'proxe') {
+                            actorBadge = { label: 'PROXe', tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
+                          }
+                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              {channelCfg && (
+                                <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap" style={{ backgroundColor: `${channelCfg.color}22`, color: channelCfg.color }} title={`Channel: ${channelCfg.label}`}>
+                                  {channelCfg.label}
+                                </span>
+                              )}
+                              {actorBadge && (
+                                <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }} title={actorBadge.tooltip}>
+                                  @{actorBadge.label.toLowerCase().replace(/\s+/g, '')}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
+
+                      {/* CONSTITUENCY — numbered AC chip + seat + district color pill */}
+                      <td className="px-3 py-2">
+                        {pl.constituency ? (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              {acNo != null && (
+                                <span
+                                  className="inline-flex items-center justify-center text-[9px] font-bold tabular-nums rounded"
+                                  title={`AC ${acNo}`}
+                                  style={{ minWidth: 18, height: 16, padding: '0 4px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                                >
+                                  {acNo}
+                                </span>
+                              )}
+                              <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{pl.constituency}</span>
+                            </div>
+                            {(districtName || pl.booth) && (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                {districtName && (
+                                  <span
+                                    className="inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap"
+                                    style={{ color: distColor, backgroundColor: `color-mix(in srgb, ${distColor} 16%, transparent)` }}
+                                  >
+                                    {districtName}
+                                  </span>
+                                )}
+                                {pl.booth && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{pl.booth}</span>}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* GRIEVANCE — category badge + salience + text */}
+                      <td className="px-3 py-2">
+                        {grvCfg ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                              style={{ backgroundColor: `${grvCfg.color}1f`, color: grvCfg.color }}
+                            >
+                              <span aria-hidden="true">{grvCfg.icon}</span>{grvCfg.label}
+                            </span>
+                            {salience > 0 && (
+                              <span className="text-[10px] tracking-tighter" title={`Salience ${salience}/3`} style={{ color: '#F59E0B' }}>
+                                {'●'.repeat(salience)}<span style={{ color: 'var(--border-primary)' }}>{'●'.repeat(3 - salience)}</span>
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                        {pl.grievance_text && (
+                          <div className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }} title={pl.grievance_text}>
+                            {pl.grievance_text}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* LEAN — pill */}
+                      <td className="px-3 py-2 text-center">
+                        {leanCfg ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ backgroundColor: `${leanCfg.color}22`, color: leanCfg.color }}
+                          >
+                            {leanCfg.label}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* INTENT — action badge */}
+                      <td className="px-3 py-2 text-center">
+                        {intentCfg ? (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap"
+                            style={{ backgroundColor: `${intentCfg.color}1f`, color: intentCfg.color }}
+                          >
+                            {intentCfg.label}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* LOOP — status badge */}
+                      <td className="px-3 py-2 text-center">
+                        {loopCfg ? (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                            style={{ backgroundColor: `${loopCfg.color}1f`, color: loopCfg.color }}
+                          >
+                            {loopCfg.label}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                }
 
                 return (
                   <tr

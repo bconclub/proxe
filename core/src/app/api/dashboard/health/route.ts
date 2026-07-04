@@ -28,6 +28,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
+import { brandConfig } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -220,7 +221,7 @@ export async function GET() {
         status: 'ok' as Status,
         last_at: latestWebAgentMsg.data?.created_at || null,
         minutes_since: webChatMin,
-        hint: 'Chat widget on windchasers.in',
+        hint: `Chat widget on ${(brandConfig.website || 'the site').replace(/^https?:\/\//, '')}`,
       },
       anthropic_ai: {
         label: 'AI Generation (Claude)',

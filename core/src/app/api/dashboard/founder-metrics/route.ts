@@ -105,10 +105,15 @@ export async function GET(request: NextRequest) {
         .select('id, lead_id, created_at, message_count, last_message_at, conversation_summary, customer_name')
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })),
-      // 4. voice_sessions - lead linkage only (no booking columns on this table)
+      // 4. voice_sessions - lead linkage only (no booking columns on this table).
+      //    POP also pulls call facts (direction/status/duration) for its Calls
+      //    overview tile (ported from the pop fork); other brands keep the
+      //    narrow select so their fetched data is unchanged.
       fetchAllRows(() => supabase
         .from('voice_sessions')
-        .select('lead_id')
+        .select(BRAND_ID === 'pop'
+          ? 'lead_id, call_direction, call_status, call_duration_seconds, created_at'
+          : 'lead_id')
         .order('id', { ascending: true })),
       // 5. social_sessions - lead linkage only (no booking columns on this table)
       fetchAllRows(() => supabase
@@ -1625,6 +1630,96 @@ export async function GET(request: NextRequest) {
       // soft-fail → 0; the card just shows 0 rather than 500-ing the dashboard
     }
 
+    // ============================================================================
+    // POP-ONLY EXTRAS (ported from the pop fork's dashboard-home divergence).
+    // Gated on BRAND_ID so every other brand's response stays byte-identical.
+    // ============================================================================
+    let funnel:
+      | Record<'Today' | '7D' | '14D' | 'All', { total: number; engaged: number; warm: number; followUpDue: number; booked: number }>
+      | undefined
+    let calls:
+      | {
+          total: number
+          inbound: number
+          outbound: number
+          today: number
+          todayInbound: number
+          todayOutbound: number
+          count7D: number
+          trend7D: number
+          trend: { data: Array<{ value: number }>; change: number }
+        }
+      | undefined
+    if (BRAND_ID === 'pop') {
+      // Cohort funnel for the Engine Overview toggle: of leads ACQUIRED in the
+      // window, how many reached each stage — so EVERY node (incl. Follow-up Due +
+      // Booked) scales with the window instead of staying constant.
+      const engagedIdSet = new Set(engagedLeadsList.map((l: any) => l.id))
+      const staleIdSet = new Set(staleLeads.map((l: any) => l.id))
+      const hasBooking = (l: any) => !!getBookingData(l).bookingDate
+      const FUNNEL_DAY = 24 * 60 * 60 * 1000
+      const funnelFor = (days: number | null) => {
+        const cohort = days == null
+          ? safeLeads
+          : safeLeads.filter((l: any) => (now.getTime() - new Date(l.created_at).getTime()) <= days * FUNNEL_DAY)
+        return {
+          total: cohort.length,
+          engaged: cohort.filter((l: any) => engagedIdSet.has(l.id)).length,
+          warm: cohort.filter(isWarmLead).length,
+          followUpDue: cohort.filter((l: any) => staleIdSet.has(l.id)).length,
+          booked: cohort.filter(hasBooking).length,
+        }
+      }
+      funnel = {
+        Today: funnelFor(1),
+        '7D': funnelFor(7),
+        '14D': funnelFor(14),
+        All: funnelFor(null),
+      }
+
+      // ==========================================================================
+      // CALLS OVERVIEW — inbound/outbound counts + today/7d windows + 7-day trend.
+      // voiceSessions comes through fetchAllRows above, so unlike the fork (which
+      // read the table un-ranged and was silently clipped at PostgREST's 1000-row
+      // cap) these counts cover the FULL table.
+      // ==========================================================================
+      const allCalls = voiceSessions || []
+      const isOutbound = (c: any) => String(c.call_direction || '').toLowerCase() === 'outbound'
+      const callsInWindow = (from: Date) => allCalls.filter((c: any) => c.created_at && new Date(c.created_at) >= from)
+      const callsToday = callsInWindow(oneDayAgo)
+      const calls7D = callsInWindow(sevenDaysAgo)
+      const callsPrev7D = allCalls.filter((c: any) => {
+        if (!c.created_at) return false
+        const d = new Date(c.created_at)
+        return d >= previous7DaysStart && d < sevenDaysAgo
+      })
+      const callsTrend = (() => {
+        const prev = callsPrev7D.length
+        return prev > 0 ? Math.round(((calls7D.length - prev) / prev) * 100) : (calls7D.length > 0 ? 100 : 0)
+      })()
+      // 7-day per-day call volume for the sparkline.
+      const callsTrendSeries: Array<{ value: number }> = []
+      for (let i = 6; i >= 0; i--) {
+        const day = new Date(now)
+        day.setDate(day.getDate() - i)
+        const dayStr = day.toISOString().split('T')[0]
+        callsTrendSeries.push({
+          value: allCalls.filter((c: any) => c.created_at && new Date(c.created_at).toISOString().split('T')[0] === dayStr).length,
+        })
+      }
+      calls = {
+        total: allCalls.length,
+        inbound: allCalls.filter((c: any) => !isOutbound(c)).length,
+        outbound: allCalls.filter(isOutbound).length,
+        today: callsToday.length,
+        todayInbound: callsToday.filter((c: any) => !isOutbound(c)).length,
+        todayOutbound: callsToday.filter(isOutbound).length,
+        count7D: calls7D.length,
+        trend7D: callsTrend,
+        trend: { data: callsTrendSeries, change: callsTrend },
+      }
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1677,6 +1772,8 @@ export async function GET(request: NextRequest) {
         newLeads: todayNewLeads.length,
       },
       leadsRecovered: { count: leadsRecoveredCount },
+      // POP-only cohort funnel — key omitted entirely for other brands.
+      ...(funnel ? { funnel } : {}),
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
@@ -1688,6 +1785,8 @@ export async function GET(request: NextRequest) {
         leads: staleLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown' })),
       },
       leadFlow,
+      // POP-only calls overview — key omitted entirely for other brands.
+      ...(calls ? { calls } : {}),
       channelPerformance,
       scoreDistribution,
       recentActivity,
