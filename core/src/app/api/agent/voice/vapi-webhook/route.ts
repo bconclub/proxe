@@ -300,7 +300,9 @@ export async function POST(req: NextRequest) {
         const LEAN = ['supporter', 'leaning', 'undecided', 'opposed'];
         const CAT = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other'];
         const INTENT = ['vote', 'volunteer', 'rally', 'share', 'none'];
-        const LEAN_MAP: Record<string, string> = { negative: 'opposed', against: 'opposed', positive: 'supporter', support: 'supporter', supportive: 'supporter', neutral: 'undecided', unsure: 'undecided' };
+        // NOTE: no 'negative'→'opposed' — a stray sentiment word is not political
+        // opposition. Only genuine anti-party words map to opposed.
+        const LEAN_MAP: Record<string, string> = { against: 'opposed', anti: 'opposed', positive: 'supporter', support: 'supporter', supportive: 'supporter', neutral: 'undecided', unsure: 'undecided' };
         const norm = (v: any) => String(v ?? '').toLowerCase().trim();
         const oneOf = (v: any, set: string[]) => (set.includes(norm(v)) ? norm(v) : null);
 
@@ -315,8 +317,15 @@ export async function POST(req: NextRequest) {
         put('grievance_text', gtRaw ? await toEnglish(gtRaw) : null);
         const sal = Number(structured.salience);
         if (Number.isFinite(sal) && sal >= 1 && sal <= 3) cols.salience = Math.round(sal);
-        put('action_intent', oneOf(structured.action_intent, INTENT));
-        put('lean', oneOf(structured.lean, LEAN) || (LEAN_MAP[norm(structured.lean)] || null));
+        const intentVal = oneOf(structured.action_intent, INTENT);
+        put('action_intent', intentVal);
+        // Resolve lean: valid enum → map known synonyms → else infer from intent
+        // (a citizen who agrees to vote/volunteer/rally/share leans IN, not opposed).
+        let leanVal = oneOf(structured.lean, LEAN) || LEAN_MAP[norm(structured.lean)] || null;
+        if (!leanVal && intentVal && ['vote', 'volunteer', 'rally', 'share'].includes(intentVal)) {
+          leanVal = 'leaning';
+        }
+        put('lean', leanVal);
         // A name, if the agent captured one — so the row stops reading "Unknown".
         const capturedName = typeof structured.name === 'string' ? structured.name.trim() : '';
         // A logged grievance enters the follow-up loop as "raised".
