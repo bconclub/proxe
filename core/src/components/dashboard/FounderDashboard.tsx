@@ -450,7 +450,7 @@ export default function FounderDashboard() {
           <div className="relative">
             <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
-              <Image src={isBcon ? '/bcon-icon.png' : isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : '/logo.png'} alt={isPop || isBcon ? brandCfg.name : 'Windchasers'} width={80} height={80} className="drop-shadow-lg" priority />
+              <Image src={isBcon ? '/bcon-icon.png' : isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : (brandCfg.iconPath || '/logo.png')} alt={brandCfg.name} width={80} height={80} className="drop-shadow-lg" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>

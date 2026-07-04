@@ -52,7 +52,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
-  { name: 'People', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Scouts', href: '/dashboard/scouts', icon: MdTwoWheeler },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
