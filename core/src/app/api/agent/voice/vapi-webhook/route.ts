@@ -260,6 +260,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 2b) POP grievance calls: the assistant's analysisPlan extracts the grievance
+    //     fields from the transcript AFTER the call (silently — never spoken). Land
+    //     them on the lead's constituent columns so the People table shows
+    //     constituency / grievance / lean / intent / loop for this caller.
+    //     POP-only + only fields we actually got (never null-overwrite).
+    if (BRAND_ID === 'pop' && leadId) {
+      const structured: any =
+        msg.analysis?.structuredData || call.analysis?.structuredData || null;
+      if (structured && typeof structured === 'object') {
+        const cols: Record<string, any> = {};
+        const put = (k: string, v: any) => { if (v !== null && v !== undefined && v !== '') cols[k] = v; };
+        put('constituency', structured.constituency);
+        put('district', structured.district);
+        put('language', structured.language);
+        put('grievance_category', structured.grievance_category);
+        put('grievance_text', structured.grievance_text);
+        if (typeof structured.salience === 'number') cols.salience = structured.salience;
+        put('action_intent', structured.action_intent);
+        put('lean', structured.lean);
+        // A logged grievance enters the follow-up loop as "raised".
+        if (structured.captured !== false && (cols.grievance_text || cols.grievance_category)) {
+          cols.loop_status = 'raised';
+        }
+        if (Object.keys(cols).length) {
+          const { error: gErr } = await supabase.from('all_leads').update(cols).eq('id', leadId);
+          if (gErr) console.error('[vapi-webhook] grievance columns update failed:', gErr.message, gErr.details || '');
+          else console.log('[vapi-webhook] grievance captured →', Object.keys(cols).join(', '));
+        }
+      }
+    }
+
     // 3) Log transcript turns into conversations (idempotent per call_id).
     //    lead_id may be null (column is nullable); the Calls view joins by call_id,
     //    so the transcript still surfaces even when no lead could be resolved.
