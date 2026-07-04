@@ -71,17 +71,17 @@ async function vapiTestCall(req: NextRequest) {
   // (never touching the shared Vapi assistant) to a Punjabi-capable model. All
   // three knobs are env-tunable so the provider/language can be swapped without a
   // code change if accuracy needs work. POP only; other brands keep their config.
-  // Default = 11labs Scribe, Punjabi. Chosen because (a) Scribe supports Punjabi
-  // ('pa'), and (b) 11labs credentials are already on this Vapi account — it's
-  // the assistant's VOICE provider — so the transcriber actually runs. (Google/
-  // Azure validated schema-wise but faulted at runtime for lack of account creds;
-  // Deepgram/OpenAI/AssemblyAI don't support Punjabi at all.) All knobs env-tunable.
+  // Transcriber override is OPT-IN: only when VAPI_POP_TRANSCRIBER_PROVIDER is
+  // explicitly set. Default = no override, so the POP Grievance assistant's OWN
+  // transcriber (set in the Vapi dashboard) wins — that assistant is POP-dedicated,
+  // so tuning it in Vapi is the clean home for this, and an unconditional code
+  // override would otherwise silently mask whatever's picked in the dashboard.
   const popTranscriber =
-    BRAND_ID === 'pop'
+    BRAND_ID === 'pop' && process.env.VAPI_POP_TRANSCRIBER_PROVIDER
       ? {
-          provider: process.env.VAPI_POP_TRANSCRIBER_PROVIDER || '11labs',
-          model: process.env.VAPI_POP_TRANSCRIBER_MODEL || 'scribe_v1',
-          language: process.env.VAPI_POP_TRANSCRIBER_LANGUAGE || 'pa',
+          provider: process.env.VAPI_POP_TRANSCRIBER_PROVIDER,
+          ...(process.env.VAPI_POP_TRANSCRIBER_MODEL ? { model: process.env.VAPI_POP_TRANSCRIBER_MODEL } : {}),
+          ...(process.env.VAPI_POP_TRANSCRIBER_LANGUAGE ? { language: process.env.VAPI_POP_TRANSCRIBER_LANGUAGE } : {}),
         }
       : null;
 
@@ -147,13 +147,20 @@ async function vapiTestCall(req: NextRequest) {
             .eq('external_session_id', callId)
             .maybeSingle();
 
+          // Supabase does NOT throw on write errors — it returns { error }. These
+          // were previously unchecked, so a failing insert vanished silently (no
+          // row, no log) and the call never appeared in the dashboard.
           if (existing?.id) {
-            await supabase.from('voice_sessions').update(sessionFields).eq('id', existing.id);
+            const { error: upErr } = await supabase.from('voice_sessions').update(sessionFields).eq('id', existing.id);
+            if (upErr) console.error('[test-call] voice_sessions update failed:', upErr.message, upErr.details || '');
           } else {
-            await supabase
+            const { error: insErr } = await supabase
               .from('voice_sessions')
               .insert({ external_session_id: callId, created_at: new Date().toISOString(), ...sessionFields });
+            if (insErr) console.error('[test-call] voice_sessions insert failed:', insErr.message, insErr.details || '');
           }
+        } else {
+          console.error('[test-call] getServiceClient() returned null — no service key at runtime');
         }
       } catch (e: any) {
         console.error('[test-call] failed to persist lead/session (non-fatal):', e?.message);

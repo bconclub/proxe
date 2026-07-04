@@ -15,7 +15,13 @@ import {
   MdGraphicEq,
   MdPersonOutline,
   MdSmartToy,
+  MdLanguage,
 } from 'react-icons/md'
+import { getCurrentBrandId } from '@/configs'
+
+// bcon tags anonymous web-widget calls (no phone, no lead name) with a
+// "Website" source badge so operators can tell them from phone calls.
+const SHOW_WEBSITE_BADGE = getCurrentBrandId() === 'bcon'
 
 // ── Types (mirror /api/dashboard/calls) ─────────────────────────────────────
 interface CallRow {
@@ -141,6 +147,24 @@ export default function CallsTable() {
     load()
   }, [load])
 
+  // Pull final status/transcript/recording for any calls whose end-of-call
+  // webhook never landed (always the case on localhost; a rare miss in prod),
+  // then reload. Best-effort — never blocks showing what we already have.
+  const [syncing, setSyncing] = useState(false)
+  const syncThenLoad = useCallback(async () => {
+    setSyncing(true)
+    try {
+      await fetch('/api/agent/voice/vapi-sync', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      })
+    } catch { /* ignore — show existing rows regardless */ }
+    finally { setSyncing(false) }
+    await load()
+  }, [load])
+
+  // Reconcile once on mount so freshly-placed calls fill in without a click.
+  useEffect(() => { syncThenLoad() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // No auto-refresh — the page loads on mount and when filters/search change.
   // (Founder feedback: the constant 15s reload was distracting and unnecessary.)
   // Use the manual refresh control to pull new calls.
@@ -180,11 +204,12 @@ export default function CallsTable() {
           <h1 className="text-lg sm:text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>Calls</h1>
         </div>
         <button
-          onClick={load}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors"
+          onClick={syncThenLoad}
+          disabled={syncing || loading}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors disabled:opacity-60"
           style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-primary)' }}
         >
-          <MdRefresh size={15} /> Refresh
+          <MdRefresh size={15} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Syncing…' : 'Refresh'}
         </button>
       </div>
 
@@ -262,7 +287,14 @@ export default function CallsTable() {
                         <div className="flex items-center gap-3 min-w-[150px]">
                           <ScoreRing score={c.leadScore} size={32} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
+                              {SHOW_WEBSITE_BADGE && !c.phone && !c.leadName && (
+                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                                  <MdLanguage size={10} /> Website
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</p>
                           </div>
                         </div>
@@ -337,7 +369,14 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
           <div className="flex items-center gap-3 min-w-0">
             <DirectionBadge direction={call.direction} />
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{call.leadName || 'Unknown caller'}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{call.leadName || 'Unknown caller'}</p>
+                {SHOW_WEBSITE_BADGE && !call.phone && !call.leadName && (
+                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                    <MdLanguage size={10} /> Website
+                  </span>
+                )}
+              </div>
               <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{call.phone || '—'} · {out ? 'Outbound' : 'Inbound'}</p>
             </div>
           </div>
