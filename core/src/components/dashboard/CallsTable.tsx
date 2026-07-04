@@ -16,6 +16,7 @@ import {
   MdPersonOutline,
   MdSmartToy,
   MdLanguage,
+  MdTranslate,
 } from 'react-icons/md'
 import { getCurrentBrandId } from '@/configs'
 
@@ -350,6 +351,26 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
   const out = (call.direction || '').toLowerCase() === 'outbound'
   const tint = statusTint(call.status)
 
+  // English transcript toggle. The audio is Punjabi/Hindi; staff read English.
+  // Translation is fetched once on demand, then cached in state (and server-side).
+  const [showEn, setShowEn] = useState(false)
+  const [enTurns, setEnTurns] = useState<string[] | null>(null)
+  const [translating, setTranslating] = useState(false)
+  const toggleEnglish = useCallback(async () => {
+    if (showEn) { setShowEn(false); return }
+    if (enTurns) { setShowEn(true); return }
+    setTranslating(true)
+    try {
+      const res = await fetch(`/api/dashboard/calls/${encodeURIComponent(call.id)}/translate`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setEnTurns((data.turns || []).map((t: any) => t.content_en || ''))
+        setShowEn(true)
+      }
+    } catch { /* leave original on failure */ }
+    finally { setTranslating(false) }
+  }, [showEn, enTurns, call.id])
+
   // Close on Escape.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -430,13 +451,27 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
 
           {/* Transcript */}
           <div>
-            <h4 className="text-[11px] uppercase tracking-wide font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Transcript</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: 'var(--text-muted)' }}>Transcript</h4>
+              {call.turns && call.turns.length > 0 && (
+                <button
+                  onClick={toggleEnglish}
+                  disabled={translating}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold border transition-colors disabled:opacity-60"
+                  style={{ borderColor: 'var(--border-primary)', color: showEn ? 'var(--accent-primary)' : 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}
+                  title="Toggle English translation (audio stays original)"
+                >
+                  <MdTranslate size={12} /> {translating ? 'Translating…' : showEn ? 'Original' : 'English'}
+                </button>
+              )}
+            </div>
             {loading ? (
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading transcript…</p>
             ) : call.turns && call.turns.length > 0 ? (
               <div className="space-y-2.5">
                 {call.turns.map((t, i) => {
                   const isAgent = t.sender === 'agent'
+                  const text = showEn && enTurns && enTurns[i] ? enTurns[i] : t.content
                   return (
                     <div key={i} className="flex gap-2.5">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full mt-0.5" style={{ backgroundColor: isAgent ? 'var(--accent-subtle)' : 'var(--bg-tertiary)', color: isAgent ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
@@ -444,7 +479,7 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
                       </span>
                       <div className="min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{isAgent ? 'Agent' : 'Caller'}</p>
-                        <p className="text-sm leading-snug" style={{ color: 'var(--text-primary)' }}>{t.content}</p>
+                        <p className="text-sm leading-snug" style={{ color: 'var(--text-primary)' }}>{text}</p>
                       </div>
                     </div>
                   )
