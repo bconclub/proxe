@@ -8,9 +8,13 @@ export default function VoiceAgentTab() {
   // Default "call myself" details — prefilled so one click dials without re-typing.
   // Edit any field to call someone else; "Call myself" resets back to these.
   // bcon keeps its live founder prefill; other brands get neutral placeholders.
+  // Non-bcon brands (pop grievance) send NO business/industry — leaving the brand
+  // name in `business` leaked it into the greeting and named the lead after the
+  // brand ("Pulse of Punjab"). Keep them empty so the caller's real name (typed or
+  // captured in-call) is the only name.
   const DEFAULT_ME = isBcon
     ? { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' }
-    : { name: '', business: getBrandConfig().name, industry: '', phone: '' };
+    : { name: '', business: '', industry: '', phone: '' };
 
   const [phone, setPhone] = useState(DEFAULT_ME.phone);
   const [personName, setPersonName] = useState(DEFAULT_ME.name);

@@ -221,7 +221,12 @@ export async function POST(req: NextRequest) {
     // dial time) — so a lead created/updated from a voice call carries a name
     // instead of showing "Unknown caller".
     const vv = call?.assistantOverrides?.variableValues || msg?.assistantOverrides?.variableValues || {};
-    const vapiName = String(vv['vh-contactname'] || vv['vh-greetingname'] || vv['vh-businessname'] || '').trim() || null;
+    // POP grievance calls have no business — never let a business name become the
+    // caller's name (it produced leads named "Pulse of Punjab"). Only the typed
+    // contact name counts here; the real name is captured in-call via analysis.
+    const vapiName = BRAND_ID === 'pop'
+      ? (String(vv['vh-contactname'] || '').trim() || null)
+      : (String(vv['vh-contactname'] || vv['vh-greetingname'] || vv['vh-businessname'] || '').trim() || null);
 
     console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length, name: vapiName });
 
