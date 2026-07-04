@@ -1,6 +1,6 @@
 {
   "name": "proxe-agent-master",
-  "version": "0.0.119",
+  "version": "0.0.129",
   "private": true,
   "scripts": {
     "predev": "node scripts/stage-brand.js",

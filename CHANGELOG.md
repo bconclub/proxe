@@ -14,6 +14,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · one-core → main + pop ElevenLabs telephony A/B
+
+- **one-core is now `main`** — the single `/core` app (brand = data, selected by `BRAND_ID`) is the source of truth for all 5 brands. Old `brands/*/agent` forks kept in-tree until each brand's Vercel project is cut over (Root Directory → `core` + `BRAND_ID` + secrets per `DEPLOY.md`).
+- **Vapi ↔ ElevenLabs engine toggle** (`pop`): the POP call form can dial the same Vobiz number (`+918046733388`) via the existing Vapi pipeline OR a fully-native ElevenLabs agent ("Grievance PUNJAB"), which originates over the same Vobiz trunk via a dedicated `elevenlabs-pop` SIP credential (isolated from Vapi). `test-call` route dispatches by engine.
+- **Calls list cleanup** (`vapi-sync`): skips `webCall` type (Vapi dashboard browser tests) — only real inbound/outbound phone calls sync. Stale web-test rows purged.
+- **Voice call panel redesign** (`VoiceAgentTab`): removed "Call myself" → single Call button; rebuilt live-call status (pulsing dot + label + mm:ss timer + ended state); cleaned the engine toggle.
+- User-facing: POP operators get a cleaner call panel with a live ringing→connected→ended readout and a Vapi/ElevenLabs switch.
+
 ## 2026-07-03 · lokazen — scout lifecycle stages (no follow-up sequences)
 
 - **Scout STAGE column** (`LeadsTable`): scouts no longer show a generic lead stage ("In Sequence"). The Scouts view now derives each scout's real lifecycle stage from the latest `scout_event` PROXe received: Logged in → KYC started → KYC done → UPI added → Submitting photos → Active (purple badge). Brand/owner rows unchanged.

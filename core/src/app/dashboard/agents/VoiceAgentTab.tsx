@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
 export default function VoiceAgentTab() {
   const isBcon = getCurrentBrandId() === 'bcon';
+  const isPop = getCurrentBrandId() === 'pop';
   // Default "call myself" details — prefilled so one click dials without re-typing.
   // Edit any field to call someone else; "Call myself" resets back to these.
   // bcon keeps its live founder prefill; other brands get neutral placeholders.
@@ -24,6 +25,19 @@ export default function VoiceAgentTab() {
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
+  // POP-only A/B: which engine dials — Vapi (orchestration + 11labs voice) or
+  // ElevenLabs end-to-end (its own STT+LLM+TTS). Same Vobiz number either way.
+  const [engine, setEngine] = useState<'vapi' | 'elevenlabs'>('vapi');
+  // Live elapsed timer while a call is active (ringing/connected), so the status
+  // panel counts up instead of only refreshing every poll.
+  const [elapsed, setElapsed] = useState(0);
+  const callActive = !!live && live.status !== 'ended';
+  useEffect(() => {
+    if (!callActive) return;
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [callActive]);
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
   const voiceNumber = isBcon
     ? '+918046733388'
@@ -48,17 +62,25 @@ export default function VoiceAgentTab() {
     if (!override && !canCall) return;
     setCalling(true);
     setStatus('');
+    setElapsed(0);
+    setLive(null);
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...vals, direction: 'cold_intro' }),
+        body: JSON.stringify({ ...vals, direction: 'cold_intro', engine }),
       });
       const data = await res.json();
       if (data.success && data.callId) {
-        setStatus(`Dialing +91 ${vals.phone}`);
-        setLive({ status: 'queued' });
-        pollStatus(String(data.callId));
+        setStatus('');
+        // Vapi exposes live status via our call-status proxy; ElevenLabs calls
+        // aren't tracked there yet, so we just show "dialing" for that engine.
+        if (engine === 'elevenlabs') {
+          setLive({ status: 'placed' });
+        } else {
+          setLive({ status: 'queued' });
+          pollStatus(String(data.callId));
+        }
       } else {
         setStatus(`Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
         setLive(null);
@@ -87,31 +109,24 @@ export default function VoiceAgentTab() {
     }
   }
 
-  // Friendly live badge text/color from the polled status.
-  function liveBadge(l: NonNullable<typeof live>): { txt: string; color: string } {
-    if (l.status === 'queued' || l.status === 'ringing') return { txt: '📞 Ringing…', color: '#eab308' };
-    if (l.status === 'in-progress') return { txt: '🟢 Connected — on the call', color: '#22c55e' };
-    if (l.status === 'ended') {
-      const dur = l.durationSeconds != null ? ` · ${l.durationSeconds}s` : '';
-      const bad = /busy|no answer|timeout|unavailable|error|credit/i.test(l.reasonText || '');
-      return { txt: `${bad ? '✗' : '✓'} ${l.reasonText || 'Call ended'}${dur}`, color: bad ? '#ef4444' : '#22c55e' };
+  // Map the polled/placed status to a clean live-panel model (label, colour,
+  // whether it's still active, and — when ended — good/bad).
+  function callState(l: NonNullable<typeof live>) {
+    switch (l.status) {
+      case 'queued':
+      case 'ringing':
+        return { label: 'Ringing…', color: '#eab308', active: true, ended: false };
+      case 'placed':
+        return { label: 'Dialing via ElevenLabs…', color: '#eab308', active: true, ended: false };
+      case 'in-progress':
+        return { label: 'Connected', color: '#22c55e', active: true, ended: false };
+      case 'ended': {
+        const bad = /busy|no answer|timeout|unavailable|error|credit|fail|declin/i.test(l.reasonText || '');
+        return { label: l.reasonText || 'Call ended', color: bad ? '#ef4444' : '#22c55e', active: false, ended: true };
+      }
+      default:
+        return { label: l.status, color: 'var(--text-secondary)', active: true, ended: false };
     }
-    return { txt: l.status, color: 'var(--text-secondary)' };
-  }
-
-  // One-click dial to myself: restore the default details, then call them directly
-  // (pass values explicitly so we don't wait on async state updates).
-  function callMyself() {
-    setPersonName(DEFAULT_ME.name);
-    setBusinessName(DEFAULT_ME.business);
-    setIndustry(DEFAULT_ME.industry);
-    setPhone(DEFAULT_ME.phone);
-    triggerCall({
-      phone: DEFAULT_ME.phone,
-      contactName: DEFAULT_ME.name,
-      businessName: DEFAULT_ME.business,
-      industry: DEFAULT_ME.industry,
-    });
   }
 
   function copyNumber() {
@@ -257,49 +272,110 @@ export default function VoiceAgentTab() {
             />
           </div>
 
-          {/* Buttons: one-click dial-myself + dial whoever is in the fields */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button
-              onClick={callMyself}
-              disabled={calling}
-              className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-primary)',
-                cursor: calling ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <MdPhone size={16} /> Call myself
-            </button>
-            <button
-              onClick={() => triggerCall()}
-              disabled={calling || !canCall}
-              className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--button-bg)',
-                color: 'var(--text-button)',
-                cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {calling ? 'Calling...' : 'Call'}
-            </button>
-          </div>
+          {/* POP A/B: pick which engine dials — same Vobiz number either way */}
+          {isPop && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  padding: '3px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)',
+                }}
+              >
+                {([['vapi', 'Vapi'], ['elevenlabs', 'ElevenLabs']] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setEngine(val)}
+                    disabled={calling}
+                    className="rounded-lg px-4 py-1.5 text-xs font-semibold transition-opacity"
+                    style={{
+                      backgroundColor: engine === val ? 'var(--button-bg)' : 'transparent',
+                      color: engine === val ? 'var(--text-button)' : 'var(--text-secondary)',
+                      border: 'none',
+                      cursor: calling ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {engine === 'elevenlabs' ? 'ElevenLabs end-to-end · Grievance PUNJAB' : 'Vapi pipeline · POP Grievance Outbound'}
+              </p>
+            </div>
+          )}
+
+          {/* Single primary action — dials whoever is in the fields */}
+          <button
+            onClick={() => triggerCall()}
+            disabled={calling || !canCall}
+            className="flex items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{
+              width: '100%',
+              maxWidth: '340px',
+              padding: '12px',
+              backgroundColor: 'var(--button-bg)',
+              color: 'var(--text-button)',
+              cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <MdPhone size={18} /> {calling ? 'Calling…' : 'Call'}
+          </button>
+
+          {/* Error / non-live status */}
           {status && !live && (
             <p className="text-sm" style={{ color: status.startsWith('Failed') || status.startsWith('Error') ? '#ef4444' : 'var(--text-secondary)' }}>
               {status}
             </p>
           )}
-          {live && (
-            <div className="flex flex-col items-center gap-1">
-              <p className="text-sm font-semibold" style={{ color: liveBadge(live).color }}>
-                {liveBadge(live).txt}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {live.status === 'ended' ? 'Logged to the lead — open the inbox to see the full call.' : status}
-              </p>
-            </div>
-          )}
+
+          {/* Live call panel — dialing → ringing → connected (timer) → ended */}
+          {live && (() => {
+            const s = callState(live);
+            const secs = live.status === 'ended' ? (live.durationSeconds ?? elapsed) : elapsed;
+            return (
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '340px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  backgroundColor: 'var(--bg-primary)',
+                  border: `1px solid ${s.ended ? 'var(--border-primary)' : s.color}`,
+                }}
+              >
+                <span
+                  className={s.active ? 'animate-pulse' : ''}
+                  style={{
+                    width: '11px',
+                    height: '11px',
+                    borderRadius: '50%',
+                    backgroundColor: s.color,
+                    boxShadow: `0 0 0 4px ${s.color}22`,
+                    flex: 'none',
+                  }}
+                />
+                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                  <p className="text-sm font-semibold" style={{ color: s.color }}>{s.label}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {s.ended
+                      ? 'Logged to the lead — open the inbox for the full call.'
+                      : `+91 ${phone} · ${engine === 'elevenlabs' ? 'ElevenLabs' : 'Vapi'}`}
+                  </p>
+                </div>
+                {live.status !== 'placed' && (s.active || live.durationSeconds != null) && (
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {mmss(secs)}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

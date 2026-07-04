@@ -49,6 +49,12 @@ export async function POST(req: NextRequest) {
 
   for (const call of calls) {
     if (call.status !== 'ended') { continue; }
+    // Only REAL phone calls belong on the Calls dashboard. `webCall` sessions are
+    // the Vapi dashboard's "Talk to Assistant" browser tester — they have no phone
+    // number or direction, so they'd surface as bogus "Inbound / Unknown caller"
+    // rows. Tests stay in the Vapi dashboard; the dashboard shows only inbound +
+    // outbound PSTN calls to/from the number.
+    if (call.type && call.type !== 'inboundPhoneCall' && call.type !== 'outboundPhoneCall') continue;
     // Only this brand's assistant (shared account guard). If we can't tell the
     // assistant (older calls), fall back to matching our outbound number id.
     if (myAssistant && call.assistantId && call.assistantId !== myAssistant) continue;

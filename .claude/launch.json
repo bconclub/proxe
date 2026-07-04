@@ -30,6 +30,36 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd core&&set BRAND_ID=bcon&&npm run dev"],
       "port": 4002
+    },
+    {
+      "name": "windchasers-multi",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd .multi\\windchasers&&npx next dev -p 4003"],
+      "port": 4003
+    },
+    {
+      "name": "lokazen-multi",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd .multi\\lokazen&&npx next dev -p 4004"],
+      "port": 4004
+    },
+    {
+      "name": "proxe-multi",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd .multi\\proxe&&npx next dev -p 4005"],
+      "port": 4005
+    },
+    {
+      "name": "bcon-multi",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd .multi\\bcon&&npx next dev -p 4006"],
+      "port": 4006
+    },
+    {
+      "name": "kargil-gas",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\user\\Desktop\\Gas\\kargil-gas-app && npm run dev -- -p 4100"],
+      "port": 4100
     }
   ]
 }

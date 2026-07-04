@@ -26,8 +26,15 @@ const VAPI_OUTBOUND_PHONE_NUMBER_ID =
 const VAPI_ASSISTANT_ID =
   process.env.VAPI_ASSISTANT_ID || '999bf28c-6c2e-402d-8b05-a24899749a22';
 
-async function vapiTestCall(req: NextRequest) {
-  const { phone, leadName, contactName, businessName, industry } = await req.json();
+// ElevenLabs end-to-end telephony (POP A/B). The agent "Grievance PUNJAB" dials
+// out over the SAME Vobiz trunk as Vapi (a dedicated `elevenlabs-pop` SIP
+// credential), so it's the same number/caller — only the brain differs. Lets us
+// compare 11labs' own STT+LLM+TTS+turn-taking against the Vapi pipeline.
+const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+
+async function vapiTestCall(body: any) {
+  const { phone, leadName, contactName, businessName, industry } = body;
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
 
   const name = (contactName || leadName || '').trim();
@@ -209,7 +216,78 @@ async function vobizTestCall(req: NextRequest) {
   }
 }
 
+// POP A/B: dial the SAME Vobiz number/trunk through ElevenLabs' native SIP
+// telephony instead of Vapi. Enrichment (transcript/recording) will come from
+// ElevenLabs' own conversation API later; for now this places the call so the
+// voice/latency/turn-taking can be compared head-to-head.
+async function elevenLabsTestCall(body: any) {
+  const { phone, contactName, leadName } = body;
+  if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey || !ELEVENLABS_AGENT_ID || !ELEVENLABS_PHONE_NUMBER_ID) {
+    return NextResponse.json(
+      { success: false, error: 'ElevenLabs not configured (ELEVENLABS_API_KEY / ELEVENLABS_AGENT_ID / ELEVENLABS_PHONE_NUMBER_ID)' },
+      { status: 500 },
+    );
+  }
+
+  const digits = String(phone).replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
+  const name = (contactName || leadName || '').trim();
+
+  try {
+    const res = await fetch('https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call', {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent_id: ELEVENLABS_AGENT_ID,
+        agent_phone_number_id: ELEVENLABS_PHONE_NUMBER_ID,
+        to_number: e164,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return NextResponse.json({ success: false, error: data?.detail || data }, { status: res.status });
+    }
+    const callId: string | null =
+      data?.conversation_id || data?.callSid || data?.call_sid || data?.sip_call_id || null;
+
+    // Best-effort persist so the call surfaces in the Calls list, tagged as the
+    // 11labs engine (call_summary marker — no schema change needed for the A/B).
+    if (callId) {
+      try {
+        const supabase = getServiceClient();
+        if (supabase) {
+          const leadId = await ensureOrUpdateLead(name || null, null, e164, 'voice', undefined, supabase);
+          const { error: insErr } = await supabase.from('voice_sessions').insert({
+            external_session_id: callId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            lead_id: leadId,
+            customer_phone: e164,
+            customer_phone_normalized: last10,
+            call_direction: 'outbound',
+            call_status: 'queued',
+            brand: BRAND_ID,
+            call_summary: 'engine:elevenlabs',
+          });
+          if (insErr) console.error('[test-call:11labs] voice_sessions insert failed:', insErr.message);
+        }
+      } catch (e: any) {
+        console.error('[test-call:11labs] persist failed (non-fatal):', e?.message);
+      }
+    }
+    return NextResponse.json({ success: true, callId, engine: 'elevenlabs' });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
-  if (VAPI_BRANDS.includes(getCurrentBrandId())) return vapiTestCall(req);
-  return vobizTestCall(req);
+  if (!VAPI_BRANDS.includes(getCurrentBrandId())) return vobizTestCall(req);
+  // VAPI brands share one JSON body read here so we can dispatch by engine.
+  const body = await req.json().catch(() => ({} as any));
+  if (getCurrentBrandId() === 'pop' && body?.engine === 'elevenlabs') return elevenLabsTestCall(body);
+  return vapiTestCall(body);
 }
