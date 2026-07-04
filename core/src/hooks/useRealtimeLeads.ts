@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '../lib/supabase/client'
+import { getCurrentBrandId } from '@/configs'
 
 interface Lead {
   id: string
@@ -25,7 +26,27 @@ interface Lead {
   stage_override?: boolean | null
   last_scored_at?: string | null
   is_active_chat?: boolean | null
+  // POP-only constituent columns (present on POP's all_leads only; selected
+  // and mapped solely when the active brand is pop, so other brands' DBs are
+  // never queried for columns they don't have).
+  constituency?: string | null
+  district?: string | null
+  booth?: string | null
+  language?: string | null
+  lean?: string | null
+  magnet?: string | null
+  grievance_category?: string | null
+  grievance_text?: string | null
+  salience?: number | null
+  action_intent?: string | null
+  loop_status?: string | null
 }
+
+// Extra columns that exist ONLY on POP's all_leads (migration 022). Appended to
+// the select string for the pop brand only — keeps the shared query intact for
+// every other brand whose schema lacks these columns.
+const POP_COLUMNS =
+  ', constituency, district, booth, language, lean, magnet, grievance_category, grievance_text, salience, action_intent, loop_status'
 
 export function useRealtimeLeads() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -35,13 +56,15 @@ export function useRealtimeLeads() {
   useEffect(() => {
     const supabase = createClient()
 
+    const isPop = getCurrentBrandId() === 'pop'
+
     const fetchLeads = async () => {
       try {
         // Try all_leads first (has enriched columns like lead_score, lead_stage),
         // fallback to unified_leads if it doesn't exist
         const { data: allLeadsData, error: allLeadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, status, brand, metadata')
+          .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, status, brand, metadata' + (isPop ? POP_COLUMNS : ''))
           .order('last_interaction_at', { ascending: false })
           .limit(1000)
 
@@ -94,6 +117,21 @@ export function useRealtimeLeads() {
           stage_override: lead.stage_override ?? null,
           last_scored_at: lead.last_scored_at || null,
           is_active_chat: lead.is_active_chat ?? null,
+          // POP constituent fields — only attached for the pop brand (undefined
+          // and harmless for everyone else).
+          ...(isPop ? {
+            constituency: lead.constituency ?? null,
+            district: lead.district ?? null,
+            booth: lead.booth ?? null,
+            language: lead.language ?? null,
+            lean: lead.lean ?? null,
+            magnet: lead.magnet ?? null,
+            grievance_category: lead.grievance_category ?? null,
+            grievance_text: lead.grievance_text ?? null,
+            salience: lead.salience ?? null,
+            action_intent: lead.action_intent ?? null,
+            loop_status: lead.loop_status ?? null,
+          } : {}),
         }))
 
         setLeads(mappedLeads)
