@@ -31,7 +31,10 @@ async function vapiTestCall(req: NextRequest) {
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
 
   const name = (contactName || leadName || '').trim();
-  const business = (businessName || '').trim();
+  // POP grievance calls have NO business concept — ignore any businessName the
+  // client sends (a stale form defaulted it to the brand name, which then leaked
+  // into the greeting and named leads "Pulse of Punjab"). Other brands keep it.
+  const business = BRAND_ID === 'pop' ? '' : (businessName || '').trim();
   // Greeting target: confirm the person if we have a name, else the company.
   // ("Hi, is this Thanzeel?" vs "Hi, is this AB Developers?"). When there's no
   // person, vh-contactname stays empty so the agent asks to be put through.

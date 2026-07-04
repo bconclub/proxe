@@ -331,15 +331,22 @@ export async function POST(req: NextRequest) {
           leanVal = 'leaning';
         }
         put('lean', leanVal);
-        // A name, if the agent captured one — so the row stops reading "Unknown".
-        const capturedName = typeof structured.name === 'string' ? structured.name.trim() : '';
+        // The name the caller gave in-call. The extractor may key it as `name` or
+        // `caller_name` — accept either.
+        const capturedName = String(structured.name || structured.caller_name || '').trim();
         // A logged grievance enters the follow-up loop as "raised".
         if (structured.captured !== false && (cols.grievance_text || cols.grievance_category)) {
           cols.loop_status = 'raised';
         }
-        if (capturedName && !vapiName) {
-          const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
-          if (cur && !cur.customer_name) cols.customer_name = capturedName;
+        if (capturedName) {
+          // For pop the in-call name is authoritative — it also corrects any
+          // brand-name leak already on the row. Other brands only fill a blank.
+          if (BRAND_ID === 'pop') {
+            cols.customer_name = capturedName;
+          } else if (!vapiName) {
+            const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
+            if (cur && !cur.customer_name) cols.customer_name = capturedName;
+          }
         }
         if (Object.keys(cols).length) {
           const { error: gErr } = await supabase.from('all_leads').update(cols).eq('id', leadId);
