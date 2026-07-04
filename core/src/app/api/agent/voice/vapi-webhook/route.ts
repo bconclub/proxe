@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, getClient } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
+import Anthropic from '@anthropic-ai/sdk';
 
 export const dynamic = 'force-dynamic';
+
+// The dashboard reads English. Grievance text extracted from a Punjabi/Hindi call
+// may come back in Gurmukhi/Devanagari — translate it to English before storing so
+// the People table is always legible. English/Latin text passes straight through;
+// on any failure we keep the original rather than lose the grievance.
+async function toEnglish(text: string): Promise<string> {
+  if (!text) return text;
+  if (!/[ऀ-ॿ਀-੿]/.test(text)) return text; // already Latin
+  const apiKey = process.env.CLAUDE_API_KEY;
+  if (!apiKey) return text;
+  try {
+    const anthropic = new Anthropic({ apiKey });
+    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+    const resp = await (anthropic.messages.create as any)({
+      model, max_tokens: 200,
+      system: 'Translate the grievance to concise natural English. Reply with ONLY the English, no quotes or commentary.',
+      messages: [{ role: 'user', content: text }],
+    });
+    const en = (resp.content || []).map((b: any) => b.text || '').join('').trim();
+    return en || text;
+  } catch { return text; }
+}
 
 // Vapi voice webhook. Handles two event types:
 //   • status-update     → write/refresh a voice_sessions row WHILE the call is
@@ -287,7 +310,9 @@ export async function POST(req: NextRequest) {
         put('district', typeof structured.district === 'string' ? structured.district.trim() : null);
         put('language', oneOf(structured.language, ['pa', 'hi', 'en']));
         put('grievance_category', oneOf(structured.grievance_category, CAT));
-        put('grievance_text', typeof structured.grievance_text === 'string' ? structured.grievance_text.trim() : null);
+        // Always store the grievance in English for the dashboard.
+        const gtRaw = typeof structured.grievance_text === 'string' ? structured.grievance_text.trim() : '';
+        put('grievance_text', gtRaw ? await toEnglish(gtRaw) : null);
         const sal = Number(structured.salience);
         if (Number.isFinite(sal) && sal >= 1 && sal <= 3) cols.salience = Math.round(sal);
         put('action_intent', oneOf(structured.action_intent, INTENT));
