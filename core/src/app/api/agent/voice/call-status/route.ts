@@ -24,7 +24,30 @@ function friendlyReason(reason: string | null): string | null {
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
+  const engine = req.nextUrl.searchParams.get('engine');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  // V3 (Sarvam pipeline) tracks its own live state — poll it instead of Vapi.
+  if (engine === 'sarvam') {
+    const base = process.env.V3_PIPELINE_URL || 'http://localhost:8080';
+    try {
+      const r = await fetch(`${base}/status`, { cache: 'no-store' });
+      const d: any = await r.json();
+      const ended = !!d.ended;
+      return NextResponse.json({
+        status: d.status || 'ringing', // ringing | in-progress | ended
+        ended,
+        endedReason: null,
+        reasonText: ended ? 'Call ended' : null,
+        durationSeconds: null,
+        number: null,
+        summary: null,
+      });
+    } catch {
+      // Pipeline unreachable — report as still connecting so the UI doesn't error out.
+      return NextResponse.json({ status: 'ringing', ended: false });
+    }
+  }
 
   const key = process.env.VAPI_PRIVATE_API_KEY;
   if (!key) return NextResponse.json({ error: 'VAPI_PRIVATE_API_KEY not set' }, { status: 500 });

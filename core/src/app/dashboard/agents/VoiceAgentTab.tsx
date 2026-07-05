@@ -27,7 +27,7 @@ export default function VoiceAgentTab() {
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
   // POP-only A/B: which engine dials — V1 (Vapi orchestration + 11labs voice) or
   // V2 (ElevenLabs end-to-end: its own STT+LLM+TTS). Same number either way.
-  const [engine, setEngine] = useState<'vapi' | 'elevenlabs'>('vapi');
+  const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>('vapi');
   const [elapsed, setElapsed] = useState(0);
   const callActive = !!live && live.status !== 'ended';
   useEffect(() => {
@@ -43,9 +43,10 @@ export default function VoiceAgentTab() {
   const showBusinessFields = isBcon;
   const canCall = !!phone.trim() && (!showBusinessFields || !!(businessName.trim() && industry.trim()));
   // V1/V2 labels + the stack each runs, so it's clear what the flow is.
-  const ENGINES: Record<'vapi' | 'elevenlabs', { label: string; stack: string; flow: string }> = {
+  const ENGINES: Record<'vapi' | 'elevenlabs' | 'sarvam', { label: string; stack: string; flow: string }> = {
     vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: isPop ? 'POP Grievance Outbound' : getBrandConfig().name },
     elevenlabs: { label: 'V2', stack: 'ElevenLabs end-to-end · ASR + LLM + TTS', flow: 'Grievance PUNJAB' },
+    sarvam: { label: 'V3', stack: 'Sarvam end-to-end · STT + LLM + TTS (over Vobiz stream)', flow: 'Sarvam Grievance' },
   };
   const activeFlow = isPop ? ENGINES[engine].flow : getBrandConfig().name;
 
@@ -72,11 +73,16 @@ export default function VoiceAgentTab() {
       const data = await res.json();
       if (data.success && data.callId) {
         setStatus('');
-        if (engine === 'elevenlabs') {
-          setLive({ status: 'placed' });
-        } else {
+        if (engine === 'vapi') {
+          // Vapi exposes live status via our call-status proxy.
           setLive({ status: 'queued' });
           pollStatus(String(data.callId));
+        } else if (engine === 'sarvam') {
+          // V3 pipeline tracks its own state (ringing → in-progress → ended).
+          setLive({ status: 'placed' });
+          pollStatus(String(data.callId), 'sarvam');
+        } else {
+          setLive({ status: 'placed' });
         }
       } else {
         setStatus(`Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
@@ -90,11 +96,12 @@ export default function VoiceAgentTab() {
     }
   }
 
-  async function pollStatus(id: string) {
+  async function pollStatus(id: string, eng?: string) {
     for (let i = 0; i < 80; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       try {
-        const r = await fetch(`/api/agent/voice/call-status?id=${encodeURIComponent(id)}`);
+        const q = `id=${encodeURIComponent(id)}${eng ? `&engine=${eng}` : ''}`;
+        const r = await fetch(`/api/agent/voice/call-status?${q}`);
         const d = await r.json();
         if (d && d.status) {
           setLive({ status: d.status, reasonText: d.reasonText, durationSeconds: d.durationSeconds });
@@ -110,9 +117,9 @@ export default function VoiceAgentTab() {
       case 'ringing':
         return { label: 'Ringing…', color: '#eab308', active: true, ended: false };
       case 'placed':
-        return { label: 'Dialing via V2 (ElevenLabs)…', color: '#eab308', active: true, ended: false };
+        return { label: 'Dialing…', color: '#eab308', active: true, ended: false };
       case 'in-progress':
-        return { label: 'Connected', color: '#22c55e', active: true, ended: false };
+        return { label: 'Talking', color: '#22c55e', active: true, ended: false };
       case 'ended': {
         const bad = /busy|no answer|timeout|unavailable|error|credit|fail|declin/i.test(l.reasonText || '');
         return { label: l.reasonText || 'Call ended', color: bad ? '#ef4444' : '#22c55e', active: false, ended: true };
@@ -205,16 +212,17 @@ export default function VoiceAgentTab() {
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Outbound provider</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {(['vapi', 'elevenlabs'] as const).map((val) => {
+                  {(['vapi', 'elevenlabs', 'sarvam'] as const).map((val) => {
                     const on = engine === val;
+                    const c = val === 'sarvam' ? '#8b5cf6' : 'var(--accent-primary)';
                     return (
                       <button key={val} onClick={() => setEngine(val)} disabled={calling}
                         style={{
                           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 12px', borderRadius: 10,
                           fontSize: 13, fontWeight: 800, cursor: calling ? 'not-allowed' : 'pointer',
-                          background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
-                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                          border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                          background: on ? (val === 'sarvam' ? '#8b5cf622' : 'var(--accent-subtle)') : 'var(--bg-primary)',
+                          color: on ? c : 'var(--text-secondary)',
+                          border: `1px solid ${on ? c : 'var(--border-primary)'}`,
                         }}>
                         <MdGraphicEq size={15} /> {ENGINES[val].label}
                       </button>

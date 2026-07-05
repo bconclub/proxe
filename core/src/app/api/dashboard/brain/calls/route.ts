@@ -149,12 +149,13 @@ function perfFromEleven(detail: any) {
     // The felt turn latency: caller goes silent → agent audio starts. This IS the
     // comparable-to-Vapi number; the service ttfbs above are just sub-components.
     const s = m.convai_ttf_audio_since_silence ? Math.round(m.convai_ttf_audio_since_silence.elapsed_time * 1000) : 0
-    // Only count real turns — a silence→audio gap over REAL_TURN_MAX is the caller
-    // not talking / trailing silence, not a response time. Excludes the 17s outliers.
+    // Component latencies are per-service and live on different turns (ASR on the
+    // caller's turn, LLM/TTS on the agent's) — capture each whenever present, else
+    // STT reads 0. Only the turn TOTAL (silence→audio) gets the trailing-silence cap.
+    if (a) asr.push(a)
+    if (l) llm.push(l)
+    if (v) tts.push(v)
     if (s > 0 && s <= REAL_TURN_MAX) {
-      if (a) asr.push(a)
-      if (l) llm.push(l)
-      if (v) tts.push(v)
       // Endpointing = the turn-taking wait ElevenLabs adds internally (silence →
       // audio, minus the STT/LLM/TTS pipeline). Its equivalent of Vapi endpointing.
       const e = Math.max(0, s - a - l - v)

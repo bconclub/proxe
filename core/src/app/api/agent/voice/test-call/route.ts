@@ -284,10 +284,40 @@ async function elevenLabsTestCall(body: any) {
   }
 }
 
+// V3 (POP A/B): dial through the Sarvam pipeline — Vobiz's own <Stream> forwards
+// the call audio to our Pipecat+Sarvam server (STT+LLM+TTS), same trunk/number.
+// This route just proxies to the pipeline's /start (server-side → no browser CORS).
+// V3_PIPELINE_URL points at the running pipeline (localhost:8080 in local dev; the
+// VPS/tunnel host in prod).
+async function sarvamPipelineCall(body: any) {
+  const { phone } = body;
+  if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+  const digits = String(phone).replace(/\D/g, '');
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${digits.slice(-10)}`;
+  const url = process.env.V3_PIPELINE_URL || 'http://localhost:8080';
+  try {
+    const res = await fetch(`${url}/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: e164 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    // pipeline returns { status: <vobiz http status>, body: <vobiz response text> }
+    const vobizOk = typeof data.status === 'number' && data.status >= 200 && data.status < 300;
+    if (!res.ok || !vobizOk) {
+      return NextResponse.json({ success: false, error: `V3 dial failed: ${data.body || data.error || res.status}` }, { status: 502 });
+    }
+    let callId = `v3-${Date.now()}`;
+    try { const vb = JSON.parse(data.body); callId = vb.request_uuid || vb.api_id || callId; } catch { /* keep synth id */ }
+    return NextResponse.json({ success: true, callId, engine: 'sarvam' });
+  } catch {
+    return NextResponse.json({ success: false, error: `V3 pipeline unreachable at ${url} — is the pipeline server running?` }, { status: 502 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!VAPI_BRANDS.includes(getCurrentBrandId())) return vobizTestCall(req);
   // VAPI brands share one JSON body read here so we can dispatch by engine.
   const body = await req.json().catch(() => ({} as any));
+  if (getCurrentBrandId() === 'pop' && body?.engine === 'sarvam') return sarvamPipelineCall(body);
   if (getCurrentBrandId() === 'pop' && body?.engine === 'elevenlabs') return elevenLabsTestCall(body);
   return vapiTestCall(body);
 }
