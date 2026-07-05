@@ -20,7 +20,7 @@ export const popConfig: BrandConfig = {
   // until live numbers are wired.
   features: {
     voice: true,
-    brain: false, // Brain UI is BCON-only for now — flip to true to enable
+    brain: true, // enabled for POP — the Calls tab is the voice A/B latency bench
     pipelineFunnel: true,
     followUpSequence: true,
     warRoom: true,

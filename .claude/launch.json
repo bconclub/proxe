@@ -14,10 +14,22 @@
       "port": 4002
     },
     {
+      "name": "pop-core",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&node scripts/stage-brand.js&&npx next dev -p 4007"],
+      "port": 4007
+    },
+    {
       "name": "lokazen",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&npm run dev"],
       "port": 4002
+    },
+    {
+      "name": "lokazen-core",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&node scripts/stage-brand.js&&npx next dev -p 4008"],
+      "port": 4008
     },
     {
       "name": "proxe",

@@ -16,7 +16,7 @@ import { MdPsychology, MdArrowBack } from 'react-icons/md'
 import { brandConfig } from '@/configs'
 import BrainHero from './BrainHero'
 import MapView from './MapView'
-import EvalView from './EvalView'
+import EvalTabs from './EvalTabs'
 import LearningView from './LearningView'
 
 type Tab = 'brain' | 'map' | 'eval' | 'learning'
@@ -56,7 +56,7 @@ export default function BrainPage() {
                 <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
                   {tab === 'brain' && 'Alive view — lobes fire on real activity. Thinks every 5 minutes, approval-gated.'}
                   {tab === 'map' && 'How it thinks on every lead — sources, spine, ladders, gates. Live counts on the badges.'}
-                  {tab === 'eval' && 'Every message a lead can ever receive, by permutation. Test any stage on your own WhatsApp.'}
+                  {tab === 'eval' && 'Two benches — WhatsApp messages by permutation, and every voice call measured (latency, turns, cost). Switch below.'}
                   {tab === 'learning' && 'The recursive loop — what it reads, what it learned, what the thinking costs.'}
                 </p>
               </div>
@@ -81,7 +81,7 @@ export default function BrainPage() {
         <div style={{ flex: 1, minHeight: 0 }}>
           {tab === 'brain' && <BrainHero />}
           {tab === 'map' && <MapView />}
-          {tab === 'eval' && <EvalView />}
+          {tab === 'eval' && <EvalTabs />}
           {tab === 'learning' && <LearningView />}
         </div>
       </div>

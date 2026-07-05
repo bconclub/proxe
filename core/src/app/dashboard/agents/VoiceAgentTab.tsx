@@ -1,18 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
+import {
+  MdContentCopy, MdCheckCircle, MdPhone, MdGraphicEq, MdSignalCellularAlt,
+  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward,
+} from 'react-icons/md';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
 export default function VoiceAgentTab() {
   const isBcon = getCurrentBrandId() === 'bcon';
   const isPop = getCurrentBrandId() === 'pop';
   // Default "call myself" details — prefilled so one click dials without re-typing.
-  // Edit any field to call someone else; "Call myself" resets back to these.
   // bcon keeps its live founder prefill; other brands get neutral placeholders.
   // Non-bcon brands (pop grievance) send NO business/industry — leaving the brand
-  // name in `business` leaked it into the greeting and named the lead after the
-  // brand ("Pulse of Punjab"). Keep them empty so the caller's real name (typed or
-  // captured in-call) is the only name.
+  // name in `business` leaked it into the greeting and named the lead after the brand.
   const DEFAULT_ME = isBcon
     ? { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' }
     : { name: '', business: '', industry: '', phone: '' };
@@ -25,11 +25,9 @@ export default function VoiceAgentTab() {
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
-  // POP-only A/B: which engine dials — Vapi (orchestration + 11labs voice) or
-  // ElevenLabs end-to-end (its own STT+LLM+TTS). Same Vobiz number either way.
+  // POP-only A/B: which engine dials — V1 (Vapi orchestration + 11labs voice) or
+  // V2 (ElevenLabs end-to-end: its own STT+LLM+TTS). Same number either way.
   const [engine, setEngine] = useState<'vapi' | 'elevenlabs'>('vapi');
-  // Live elapsed timer while a call is active (ringing/connected), so the status
-  // panel counts up instead of only refreshing every poll.
   const [elapsed, setElapsed] = useState(0);
   const callActive = !!live && live.status !== 'ended';
   useEffect(() => {
@@ -42,13 +40,14 @@ export default function VoiceAgentTab() {
   const voiceNumber = isBcon
     ? '+918046733388'
     : (process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending');
-  // Business + industry are BCON's B2B context — irrelevant for POP grievance
-  // calls, where only a phone (and optional contact name) matter.
   const showBusinessFields = isBcon;
-  // Contact name is OPTIONAL: with a name the agent greets the person; without
-  // one it introduces itself and asks. Phone is always required; business +
-  // industry are required only where they're shown (bcon).
   const canCall = !!phone.trim() && (!showBusinessFields || !!(businessName.trim() && industry.trim()));
+  // V1/V2 labels + the stack each runs, so it's clear what the flow is.
+  const ENGINES: Record<'vapi' | 'elevenlabs', { label: string; stack: string; flow: string }> = {
+    vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: isPop ? 'POP Grievance Outbound' : getBrandConfig().name },
+    elevenlabs: { label: 'V2', stack: 'ElevenLabs end-to-end · ASR + LLM + TTS', flow: 'Grievance PUNJAB' },
+  };
+  const activeFlow = isPop ? ENGINES[engine].flow : getBrandConfig().name;
 
   type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
 
@@ -73,8 +72,6 @@ export default function VoiceAgentTab() {
       const data = await res.json();
       if (data.success && data.callId) {
         setStatus('');
-        // Vapi exposes live status via our call-status proxy; ElevenLabs calls
-        // aren't tracked there yet, so we just show "dialing" for that engine.
         if (engine === 'elevenlabs') {
           setLive({ status: 'placed' });
         } else {
@@ -93,8 +90,6 @@ export default function VoiceAgentTab() {
     }
   }
 
-  // Poll our backend (which proxies Vapi) for live call status until it ends, so
-  // the card shows ringing -> connected -> ended instead of fire-and-forget.
   async function pollStatus(id: string) {
     for (let i = 0; i < 80; i++) {
       await new Promise((r) => setTimeout(r, 3000));
@@ -109,15 +104,13 @@ export default function VoiceAgentTab() {
     }
   }
 
-  // Map the polled/placed status to a clean live-panel model (label, colour,
-  // whether it's still active, and — when ended — good/bad).
   function callState(l: NonNullable<typeof live>) {
     switch (l.status) {
       case 'queued':
       case 'ringing':
         return { label: 'Ringing…', color: '#eab308', active: true, ended: false };
       case 'placed':
-        return { label: 'Dialing via ElevenLabs…', color: '#eab308', active: true, ended: false };
+        return { label: 'Dialing via V2 (ElevenLabs)…', color: '#eab308', active: true, ended: false };
       case 'in-progress':
         return { label: 'Connected', color: '#22c55e', active: true, ended: false };
       case 'ended': {
@@ -135,247 +128,187 @@ export default function VoiceAgentTab() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)',
+    border: '1px solid var(--border-primary)', borderRadius: 10, padding: '11px 14px',
+    fontSize: 13.5, outline: 'none', width: '100%',
+  };
+
+  const CHECKS = [
+    { icon: <MdGraphicEq size={18} />, title: 'Voice Quality', desc: "Clarity, naturalness, and stability of the agent's voice." },
+    { icon: <MdSignalCellularAlt size={18} />, title: 'Latency', desc: 'Real-time responsiveness and interruption handling.' },
+    { icon: <MdChatBubbleOutline size={18} />, title: 'Intro & Flow', desc: 'Agent introduction and correct start of the flow.' },
+    { icon: <MdLink size={18} />, title: 'Pipeline Handoff', desc: 'Accurate handoff to the configured pipeline.' },
+  ];
+
   return (
-    <div style={{
-      padding: '28px 32px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '24px',
-      overflowY: 'auto',
-      height: '100%',
-    }}>
-      {/* Status */}
-      <div className="flex items-center gap-3 p-4 rounded-xl" style={{
-        backgroundColor: 'var(--bg-secondary)',
-        border: '1px solid var(--border-primary)',
-      }}>
-        <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#22c55e' }} />
+    <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20, overflowY: 'auto', height: '100%' }}>
+      {/* status bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '14px 18px', borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
+        <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <MdGraphicEq size={22} />
+        </span>
         <div>
-          <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Voice Agent</p>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{voiceNumber} · {isBcon ? 'voiceproxe.bconclub.com' : getBrandConfig().name}</p>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>Voice Agent</p>
+          <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            {getBrandConfig().name} · Ready for testing · {voiceNumber}
+          </p>
         </div>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: '#22c55e', padding: '5px 11px', borderRadius: 999, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} className="animate-pulse" /> Live
+        </span>
       </div>
 
-      {/* Two-column sections */}
-      <div style={{ display: 'flex', gap: '24px' }}>
-        {/* Section 1 — Inbound (Call Us) */}
-        <div style={{
-          flex: 1,
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-primary)',
-          borderRadius: '16px',
-          padding: '32px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '16px',
-        }}>
-          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call to Test</h2>
-          <p style={{
-            color: 'var(--text-primary)',
-            fontSize: '28px',
-            fontWeight: 700,
-            letterSpacing: '1px',
-          }}>{voiceNumber}</p>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Call this number to speak with the AI agent
-          </p>
-          <button
-            onClick={copyNumber}
-            className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-all"
-            style={{
-              backgroundColor: copied ? 'var(--button-bg)' : 'var(--bg-tertiary)',
-              color: copied ? 'var(--text-button)' : 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            {copied ? <MdCheckCircle size={16} /> : <MdContentCopy size={16} />}
-            {copied ? 'Copied!' : 'Copy Number'}
-          </button>
+      {/* two columns: call form | what this test checks */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
+        {/* ── LEFT: call form ── */}
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, padding: 28, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--accent-primary)', marginBottom: 10 }}>
+            <MdGraphicEq size={16} />
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase' }}>Test Voice Agent</span>
+          </div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)' }}>Call a Number</h2>
+          <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-secondary)' }}>The agent will introduce itself and begin the configured flow.</p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 460 }}>
+            {/* contact name */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Contact name (optional)</label>
+              <input type="text" placeholder="e.g., Ravi Sharma" value={personName}
+                onChange={(e) => setPersonName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }} style={inputStyle} />
+            </div>
+
+            {/* bcon-only business context */}
+            {showBusinessFields && (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input type="text" placeholder="Business name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} />
+                <input type="text" placeholder="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)} style={inputStyle} />
+              </div>
+            )}
+
+            {/* phone */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Phone number</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 12px', borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', fontSize: 13.5, fontWeight: 700 }}>
+                  🇮🇳 +91
+                </span>
+                <input type="tel" inputMode="numeric" placeholder="Enter phone number" value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(-10))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }} style={inputStyle} />
+              </div>
+            </div>
+
+            {/* V1 / V2 provider (pop A/B) */}
+            {isPop && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Outbound provider</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['vapi', 'elevenlabs'] as const).map((val) => {
+                    const on = engine === val;
+                    return (
+                      <button key={val} onClick={() => setEngine(val)} disabled={calling}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px 12px', borderRadius: 10,
+                          fontSize: 13, fontWeight: 800, cursor: calling ? 'not-allowed' : 'pointer',
+                          background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                        }}>
+                        <MdGraphicEq size={15} /> {ENGINES[val].label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{ENGINES[engine].stack}</p>
+              </div>
+            )}
+
+            {/* active flow */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              <MdLink size={15} style={{ color: 'var(--accent-primary)' }} />
+              Active flow: <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{activeFlow}</span>
+            </div>
+
+            {/* start */}
+            <button onClick={() => triggerCall()} disabled={calling || !canCall}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '14px', borderRadius: 12, marginTop: 4,
+                fontSize: 15, fontWeight: 800, border: 'none', width: '100%',
+                background: 'var(--button-bg)', color: 'var(--text-button)',
+                cursor: (calling || !canCall) ? 'not-allowed' : 'pointer', opacity: (calling || !canCall) ? 0.5 : 1,
+              }}>
+              <MdPhone size={19} /> {calling ? 'Calling…' : 'Start Test Call'}
+            </button>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+              <MdShield size={12} /> This test call uses real minutes from your plan.
+            </p>
+
+            {/* error / non-live status */}
+            {status && !live && (
+              <p style={{ fontSize: 13, textAlign: 'center', color: status.startsWith('Failed') || status.startsWith('Error') ? '#ef4444' : 'var(--text-secondary)' }}>{status}</p>
+            )}
+
+            {/* live call panel */}
+            {live && (() => {
+              const s = callState(live);
+              const secs = live.status === 'ended' ? (live.durationSeconds ?? elapsed) : elapsed;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12, background: 'var(--bg-primary)', border: `1px solid ${s.ended ? 'var(--border-primary)' : s.color}` }}>
+                  <span className={s.active ? 'animate-pulse' : ''} style={{ width: 11, height: 11, borderRadius: '50%', background: s.color, boxShadow: `0 0 0 4px ${s.color}22`, flex: 'none' }} />
+                  <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: s.color }}>{s.label}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.ended ? 'Logged — open Call Logs for the full breakdown.' : `+91 ${phone} · ${ENGINES[engine].label}`}
+                    </p>
+                  </div>
+                  {live.status !== 'placed' && (s.active || live.durationSeconds != null) && (
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{mmss(secs)}</span>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
-        {/* Section 2 — Outbound call */}
-        <div style={{
-          flex: 1,
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-primary)',
-          borderRadius: '16px',
-          padding: '32px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '16px',
-        }}>
-          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {showBusinessFields
-              ? 'PROXE will call with full context — contact name optional (it asks for the right person if blank)'
-              : 'Enter a number to call. Contact name is optional — the agent introduces itself and asks.'}
-          </p>
-          {[
-            { ph: 'Contact name (optional)', val: personName, set: setPersonName, show: true },
-            { ph: 'Business name', val: businessName, set: setBusinessName, show: showBusinessFields },
-            { ph: 'Industry', val: industry, set: setIndustry, show: showBusinessFields },
-          ].filter((f) => f.show).map((f) => (
-            <input
-              key={f.ph}
-              type="text"
-              placeholder={f.ph}
-              value={f.val}
-              onChange={(e) => f.set(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }}
-              className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
-              style={{
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-primary)',
-                maxWidth: '320px',
-                textAlign: 'center',
-              }}
-            />
-          ))}
-
-          {/* Phone with fixed +91 India code (route prepends 91 for routing) */}
-          <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '320px' }}>
-            <span
-              className="rounded-lg px-3 text-sm font-semibold"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-primary)',
-              }}
-            >
-              +91
-            </span>
-            <input
-              type="tel"
-              inputMode="numeric"
-              placeholder={isBcon ? '9731660933' : 'Enter phone number'}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(-10))}
-              onKeyDown={(e) => { if (e.key === 'Enter') triggerCall(); }}
-              className="rounded-lg px-4 py-2.5 text-sm outline-none"
-              style={{
-                flex: 1,
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-primary)',
-                textAlign: 'center',
-              }}
-            />
+        {/* ── RIGHT: what this test checks ── */}
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <MdShield size={18} style={{ color: 'var(--accent-primary)' }} />
+            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>What this test checks</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {CHECKS.map((c) => (
+              <div key={c.title} style={{ display: 'flex', gap: 12 }}>
+                <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 10, background: 'var(--accent-subtle)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{c.icon}</span>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>{c.title}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{c.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* POP A/B: pick which engine dials — same Vobiz number either way */}
-          {isPop && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  padding: '3px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-primary)',
-                }}
-              >
-                {([['vapi', 'Vapi'], ['elevenlabs', 'ElevenLabs']] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => setEngine(val)}
-                    disabled={calling}
-                    className="rounded-lg px-4 py-1.5 text-xs font-semibold transition-opacity"
-                    style={{
-                      backgroundColor: engine === val ? 'var(--button-bg)' : 'transparent',
-                      color: engine === val ? 'var(--text-button)' : 'var(--text-secondary)',
-                      border: 'none',
-                      cursor: calling ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {engine === 'elevenlabs' ? 'ElevenLabs end-to-end · Grievance PUNJAB' : 'Vapi pipeline · POP Grievance Outbound'}
-              </p>
-            </div>
-          )}
+          {/* link to the Calls eval */}
+          <a href="/dashboard/settings/brain" style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, padding: '13px 15px', borderRadius: 12,
+            background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', textDecoration: 'none',
+          }}>
+            <MdSignalCellularAlt size={18} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            <span style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              Monitor live activity and detailed logs in <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>Call Logs</span>
+            </span>
+            <MdArrowForward size={16} style={{ color: 'var(--text-muted)', marginLeft: 'auto', flexShrink: 0 }} />
+          </a>
 
-          {/* Single primary action — dials whoever is in the fields */}
-          <button
-            onClick={() => triggerCall()}
-            disabled={calling || !canCall}
-            className="flex items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{
-              width: '100%',
-              maxWidth: '340px',
-              padding: '12px',
-              backgroundColor: 'var(--button-bg)',
-              color: 'var(--text-button)',
-              cursor: (calling || !canCall) ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <MdPhone size={18} /> {calling ? 'Calling…' : 'Call'}
+          {/* inbound number (small, for reference) */}
+          <button onClick={copyNumber} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 10, padding: '10px', borderRadius: 10,
+            background: 'transparent', border: '1px dashed var(--border-primary)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}>
+            {copied ? <MdCheckCircle size={14} /> : <MdContentCopy size={14} />} {copied ? 'Copied!' : `Inbound: ${voiceNumber}`}
           </button>
-
-          {/* Error / non-live status */}
-          {status && !live && (
-            <p className="text-sm" style={{ color: status.startsWith('Failed') || status.startsWith('Error') ? '#ef4444' : 'var(--text-secondary)' }}>
-              {status}
-            </p>
-          )}
-
-          {/* Live call panel — dialing → ringing → connected (timer) → ended */}
-          {live && (() => {
-            const s = callState(live);
-            const secs = live.status === 'ended' ? (live.durationSeconds ?? elapsed) : elapsed;
-            return (
-              <div
-                style={{
-                  width: '100%',
-                  maxWidth: '340px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '14px 16px',
-                  borderRadius: '12px',
-                  backgroundColor: 'var(--bg-primary)',
-                  border: `1px solid ${s.ended ? 'var(--border-primary)' : s.color}`,
-                }}
-              >
-                <span
-                  className={s.active ? 'animate-pulse' : ''}
-                  style={{
-                    width: '11px',
-                    height: '11px',
-                    borderRadius: '50%',
-                    backgroundColor: s.color,
-                    boxShadow: `0 0 0 4px ${s.color}22`,
-                    flex: 'none',
-                  }}
-                />
-                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                  <p className="text-sm font-semibold" style={{ color: s.color }}>{s.label}</p>
-                  <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                    {s.ended
-                      ? 'Logged to the lead — open the inbox for the full call.'
-                      : `+91 ${phone} · ${engine === 'elevenlabs' ? 'ElevenLabs' : 'Vapi'}`}
-                  </p>
-                </div>
-                {live.status !== 'placed' && (s.active || live.durationSeconds != null) && (
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                    {mmss(secs)}
-                  </span>
-                )}
-              </div>
-            );
-          })()}
         </div>
       </div>
     </div>
