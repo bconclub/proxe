@@ -158,6 +158,25 @@ function SplitRow({ engine, split }: { engine: 'vapi' | 'elevenlabs'; split: Eng
   )
 }
 
+// V3 (Sarvam) placeholder row — keeps the V1/V2/V3 stack aligned until live calls exist.
+function V3Row() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', opacity: 0.72 }}>
+      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.5, padding: '2px 8px', borderRadius: 999, flexShrink: 0, color: '#8b5cf6', background: '#8b5cf61f', border: '1px solid #8b5cf655' }}>V3</span>
+      <StageChip label="STT" value={null} where="outside" />
+      <StageChip label="LLM" value={null} where="outside" />
+      <StageChip label="Voice" value={null} where="outside" />
+      <StageChip label="Endpoint" value={null} where="inside" />
+      <StageChip label="Network" value={null} where="network" />
+      <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 82 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
+        <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>—</div>
+      </div>
+      <span title="Sarvam pipeline built; live calls pending Vobiz Call-API creds" style={{ fontSize: 10.5, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf618', border: '1px solid #8b5cf644', borderRadius: 999, padding: '4px 10px', cursor: 'help' }}>Sarvam · wiring</span>
+    </div>
+  )
+}
+
 const GRID = '132px 1fr 56px 48px 46px 78px 78px 66px 26px'
 
 export default function CallsView() {
@@ -308,16 +327,11 @@ export default function CallsView() {
           </div>
           {view.vapi && <SplitRow engine="vapi" split={view.vapi} />}
           {view.elevenlabs && <SplitRow engine="elevenlabs" split={view.elevenlabs} />}
+          {(eng === 'all' || eng === 'sarvam') && <V3Row />}
           {view.insight && eng === 'all' && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: view.insight.tone, background: `${view.insight.tone}18`, border: `1px solid ${view.insight.tone}44`, borderRadius: 999, padding: '4px 11px' }}>
               <MdBolt size={13} /> {view.insight.text}
             </span>
-          )}
-          {eng === 'sarvam' && (
-            <div style={{ padding: '12px 16px', borderRadius: 12, border: '1px dashed #8b5cf655', background: '#8b5cf610', maxWidth: 400, textAlign: 'left' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: '#8b5cf6', marginBottom: 3 }}>V3 · Sarvam — not wired to live calls yet</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>Sarvam has no dial API. Live V3 needs Vapi custom-voice (deployed) or a custom pipeline over the trunk. STT/TTS quality already proven separately.</div>
-            </div>
           )}
           {eng !== 'sarvam' && !view.vapi && !view.elevenlabs && shown.length > 0 && (
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
