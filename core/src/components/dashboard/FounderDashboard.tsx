@@ -448,7 +448,7 @@ export default function FounderDashboard() {
       <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
+            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: brandCfg.colors?.primary || 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
               <Image src={isBcon ? '/bcon-icon.png' : isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : (brandCfg.markPath || brandCfg.iconPath || '/logo.png')} alt={brandCfg.name} width={80} height={80} className="drop-shadow-lg" priority />
             </div>

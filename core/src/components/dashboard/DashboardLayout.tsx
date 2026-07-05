@@ -80,8 +80,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands — only the resolved values differ per brand.
-  const { name: brandName, brand: brandId, chatStructure: brandChat } = getBrandConfig()
+  const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors } = getBrandConfig()
   const brandLogo = brandChat?.avatar?.source || '' // never fall back to another brand's asset
+  // Transparent mark for the full-screen auth loader (jpg avatars render as a
+  // square box). Falls back to the avatar when a brand has no dedicated mark.
+  const brandMark = markPath || brandLogo
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. a brand keeps Voice/Calls off).
   const brandFeatures = useFeatureFlags()
@@ -377,7 +380,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div
               className="dashboard-layout-auth-loader-pulse absolute inset-0 rounded-full animate-ping opacity-30"
               style={{
-                backgroundColor: 'var(--accent-primary)',
+                backgroundColor: brandColors?.primary || 'var(--accent-primary)',
                 width: '100px',
                 height: '100px',
                 margin: '-10px auto',
@@ -386,9 +389,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               }}
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
-              {brandLogo && (
+              {brandMark && (
                 <img
-                  src={brandLogo}
+                  src={brandMark}
                   alt={brandName}
                   className="w-full h-full object-contain drop-shadow-lg"
                 />

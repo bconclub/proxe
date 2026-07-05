@@ -39,7 +39,7 @@ export default function PageTransitionLoader() {
           <div
             className="page-transition-loader-pulse absolute inset-0 rounded-full animate-ping opacity-30"
             style={{
-              backgroundColor: 'var(--accent-primary)',
+              backgroundColor: brandConfig.colors?.primary || 'var(--accent-primary)',
               width: '100px',
               height: '100px',
               margin: '-10px',
