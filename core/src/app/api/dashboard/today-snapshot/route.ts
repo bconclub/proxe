@@ -18,6 +18,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
 import { cleanDisplayName } from '@/lib/services/utils';
+import { BRAND_ID, brandConfig } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,7 +80,11 @@ export async function GET(request: Request) {
       .lte('created_at', endIso)
       .order('created_at', { ascending: false });
 
-    const leads = todayLeads || [];
+    // Scouts (lokazen's "Gig" segment) are not sales leads — keep them out of
+    // today's lead total + breakdowns, mirroring the Leads table + Overview.
+    const leads = brandConfig.features?.scouts
+      ? (todayLeads || []).filter((l: any) => l?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+      : (todayLeads || []);
 
     // Resolve a friendly source label, mirroring LeadsTable's logic at a higher
     // level: prefer attribution.source_label; fall back to first_touchpoint.

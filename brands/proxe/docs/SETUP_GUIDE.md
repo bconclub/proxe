@@ -61,7 +61,7 @@
 6. A modal will pop up - select **"Create new user"** tab
 7. Fill in the form:
    - **Email**: `proxeadmin@proxe.com`
-   - **Password**: `proxepass`
+   - **Password**: `<choose-a-strong-password>`
    - ✅ **Check the box** "Auto Confirm User" (important!)
 8. Click **"Create User"** button
 9. After creation, you'll see the user in the list
@@ -216,7 +216,7 @@ npm run dev
 2. You'll be redirected to login page
 3. Login with:
    - **Email**: `proxeadmin@proxe.com`
-   - **Password**: `proxepass`
+   - **Password**: `<choose-a-strong-password>`
 4. Or click **"Continue with Google"** (if configured)
 
 ## Step 7: Verify Setup

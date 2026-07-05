@@ -31,7 +31,7 @@ import {
   MdViewKanban,
   MdCall,
   MdLogout,
-  MdTwoWheeler,
+  MdHandshake,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
@@ -53,10 +53,11 @@ const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
-  { name: 'Scouts', href: '/dashboard/scouts', icon: MdTwoWheeler },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
+  // Scouts (lokazen = "Gigs") sits directly under Pipeline; feature-gated per brand.
+  { name: 'Scouts', href: '/dashboard/scouts', icon: MdHandshake },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
@@ -68,8 +69,8 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 5), after Flow (index 8).
-// Calls (index 4) and Scouts (index 2) are feature-gated per brand; their array
+// Divider positions: after Scouts/Gigs (index 5), after Flow (index 8).
+// Calls (index 3) and Scouts (index 5) are feature-gated per brand; their array
 // slots are counted here so the dividers land in the same rendered position
 // whether or not they are shown.
 const DIVIDER_AFTER_INDICES = [5, 8]
@@ -84,6 +85,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Per-brand feature toggles — hides nav entries for features this brand has
   // switched off (e.g. a brand keeps Voice/Calls off).
   const brandFeatures = useFeatureFlags()
+  // Per-brand nav label overrides — same base nav array across brands, only the
+  // rendered label differs (pop: Leads→People, lokazen: Scouts→Gigs).
+  const navLabel = (name: string): string => {
+    if (name === 'Leads' && brandId === 'pop') return 'People'
+    if (name === 'Scouts' && brandId === 'lokazen') return 'Gigs'
+    return name
+  }
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
@@ -574,7 +582,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </span>
                     {showExpanded && (
                       <>
-                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}</span>
+                        <span className="dashboard-layout-nav-item-label flex-1 truncate" style={{ lineHeight: '20px' }}>{navLabel(navItem.name)}</span>
                         {isInbox && !isChild && unreadCount > 0 && (
                           <span className="dashboard-layout-nav-item-badge bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                             {unreadCount}
@@ -610,7 +618,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           pointerEvents: 'none',
                         }}
                       >
-                        {navItem.name === 'Leads' && brandId === 'pop' ? 'People' : navItem.name}
+                        {navLabel(navItem.name)}
                       </span>
                     )}
                   </>

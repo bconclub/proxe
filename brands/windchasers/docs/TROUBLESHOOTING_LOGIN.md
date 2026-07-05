@@ -39,7 +39,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-windchasers-service-role-key
 3. Click **"Add user"** → **"Create new user"**
 4. Enter:
    - Email: `windchasersblr@gmail.com` (or your email)
-   - Password: `Wind#826991` (or your password)
+   - Password: `<your-password>` (or your password)
    - **Auto Confirm User**: ✅ (check this to skip email verification)
 5. Click **"Create user"**
 6. **Copy the User ID** (you'll need it for Step 3)
@@ -84,7 +84,7 @@ If it returns `false`, run `windchasers/doc/QUICK_FIX_DASHBOARD_USERS.sql` first
 
 3. Enter your credentials:
    - Email: `windchasersblr@gmail.com`
-   - Password: `Wind#826991`
+   - Password: `<your-password>`
 
 4. Click **"Log in"**
 

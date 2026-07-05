@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { cleanDisplayName } from '@/lib/services/utils'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, brandConfig } from '@/configs'
 
 // Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
 // decorative junk so the dashboard reads as a professional system. Falls back to
@@ -164,8 +164,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Ensure leads is an array
-    const safeLeads = leads || []
+    // Ensure leads is an array. Scouts (lokazen's "Gig" segment) are NOT sales
+    // leads — they have their own dashboard page and must never inflate the
+    // Overview lead totals or stage buckets. Mirrors the exclusion the Leads
+    // table applies (LeadsTable: user_type !== 'scout' when scouts are on).
+    const rawLeads = leads || []
+    const safeLeads = brandConfig.features?.scouts
+      ? rawLeads.filter((lead: any) => lead?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+      : rawLeads
 
     // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
     // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the

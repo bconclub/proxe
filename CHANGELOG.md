@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · lokazen: "Gigs" segment (nav/label/chip) + scouts excluded from lead counts; scrub passwords from docs
+
+- **lokazen** — Scout segment surfaces as **"Gigs"** (umbrella): nav item renamed via a shared `navLabel` helper (pop's Leads→People preserved), Gigs page title, and the nav entry moved directly under **Pipeline** (above Events). Nav icon changed bike → handshake (`MdHandshake`). Per-lead **type chip stays "Scout"** (Scout is a type under Gigs; Connector reserved for later) and was restyled from a big solid pill to a small tinted chip.
+- **lokazen** — Scouts (Gigs) are no longer counted as sales **Leads**: excluded `user_type === 'scout'` from Overview totals + stage buckets (`founder-metrics`), Today snapshot, the Pipeline kanban, and `PipelineFunnel` counts. Gated by `features.scouts`, so other brands are unaffected. (The Leads table already excluded them.)
+- **security** — removed plaintext admin passwords from committed docs (`proxe/docs/SETUP_GUIDE.md` + `Dashboard.md`: `proxepass`; `windchasers/docs/CREATE_LOGIN_USER.md` + `TROUBLESHOOTING_LOGIN.md`: `Wind#826991`) → placeholders. NOTE: same secrets still live in ~16 seed scripts and in git history; rotate `Wind#826991` (a real Google login) regardless.
+
 ## 2026-07-05 · deploy: Supabase env name bridge (unblock Vercel go-live)
 
 - `next.config` now inlines the generic `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` from the active brand's OWN value — generic first, else this brand's fork-era prefixed name (`NEXT_PUBLIC_<BRAND>_SUPABASE_*`). Lets each per-brand Vercel project build `/core` against ITS OWN database with the env vars already present (no rename, no secret re-entry). Each brand → its own Supabase; nothing shared. Verified: core-as-bcon boots + Supabase client initializes; fallback resolves to bcon's DB when the generic is absent (Vercel case).

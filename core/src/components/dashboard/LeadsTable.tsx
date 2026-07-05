@@ -1453,14 +1453,14 @@ export default function LeadsTable({
                         </span>
                         {lkzType && (
                           <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
+                            className="px-1.5 py-px rounded text-[9px] font-semibold tracking-wide flex-shrink-0 whitespace-nowrap"
                             style={lkzType === 'Brand'
-                              ? { backgroundColor: '#FF5200', color: '#fff' }
+                              ? { backgroundColor: 'rgba(255,82,0,0.14)', color: '#FF7A33' }
                               : lkzType === 'Scout'
-                              ? { backgroundColor: '#7c3aed', color: '#fff' }
-                              : { backgroundColor: '#2563eb', color: '#fff' }}
+                              ? { backgroundColor: 'rgba(139,92,246,0.16)', color: '#A78BFA' }
+                              : { backgroundColor: 'rgba(37,99,235,0.16)', color: '#60A5FA' }}
                           >
-                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Property Owner'}
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Owner'}
                           </span>
                         )}
                       </div>

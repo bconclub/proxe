@@ -6,6 +6,7 @@ import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 import PipelineFunnel from '@/components/dashboard/PipelineFunnel'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import type { Lead as ScoredLead } from '@/types'
+import { BRAND_ID, brandConfig } from '@/configs'
 
 // --- Types ---
 
@@ -22,6 +23,7 @@ interface Lead {
   city: string | null
   lead_stage: string | null
   phone?: string
+  unified_context?: Record<string, any>
 }
 
 interface Stage {
@@ -169,7 +171,14 @@ export default function PipelinePage() {
     try {
       const res = await fetch('/api/dashboard/leads?limit=1000')
       const data = await res.json()
-      setLeads(data.leads || [])
+      const rawLeads: Lead[] = data.leads || []
+      // Scouts (lokazen's "Gig" segment) are not sales leads — keep them out of
+      // the pipeline kanban, mirroring the Leads table + Overview exclusion.
+      setLeads(
+        brandConfig.features?.scouts
+          ? rawLeads.filter((l) => l?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+          : rawLeads,
+      )
     } catch (err) {
       console.error('Failed to fetch leads:', err)
     } finally {

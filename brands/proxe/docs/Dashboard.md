@@ -555,7 +555,7 @@ npm install
 2. Click **"Add User"** > **"Create new user"**
 3. Fill in:
    - **Email**: `proxeadmin@proxe.com`
-   - **Password**: `proxepass`
+   - **Password**: `<choose-a-strong-password>`
    - ✅ **Check "Auto Confirm User"** (important!)
 4. Click **"Create User"**
 5. Copy the **UUID** of the created user
@@ -631,7 +631,7 @@ The application will start at [http://localhost:3000](http://localhost:3000)
 2. You'll be redirected to login page
 3. Login with:
    - **Email**: `proxeadmin@proxe.com`
-   - **Password**: `proxepass`
+   - **Password**: `<choose-a-strong-password>`
 
 ---
 

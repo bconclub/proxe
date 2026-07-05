@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { BRAND_ID, brandConfig } from '@/configs'
 import {
   MdPersonOutline, MdChatBubbleOutline, MdVerifiedUser, MdStar,
   MdCheckCircle, MdDescription, MdEmojiEvents,
@@ -65,11 +66,17 @@ export default function PipelineFunnel() {
     ;(async () => {
       try {
         const supabase = createClient()
+        // Scouts (lokazen's "Gig" segment) are not sales leads — exclude them from
+        // every funnel count. Rows with no user_type are kept (only explicit
+        // scouts are dropped), mirroring the Leads table + Overview exclusion.
+        const scoutPath = `unified_context->${BRAND_ID}->>user_type`
+        const excludeScouts = (q: any) =>
+          brandConfig.features?.scouts ? q.or(`${scoutPath}.is.null,${scoutPath}.neq.scout`) : q
         const countFor = async (stages: readonly string[]) => {
-          const { count } = await supabase.from('all_leads').select('id', { count: 'exact', head: true }).in('lead_stage', stages as string[])
+          const { count } = await excludeScouts(supabase.from('all_leads').select('id', { count: 'exact', head: true }).in('lead_stage', stages as string[]))
           return count || 0
         }
-        const totalQ = await supabase.from('all_leads').select('id', { count: 'exact', head: true })
+        const totalQ = await excludeScouts(supabase.from('all_leads').select('id', { count: 'exact', head: true }))
         const keys = Object.keys(GROUPS) as GroupKey[]
         const vals = await Promise.all(keys.map((k) => countFor(GROUPS[k])))
         if (cancelled) return

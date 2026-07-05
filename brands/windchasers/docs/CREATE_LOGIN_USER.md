@@ -21,7 +21,7 @@ The Supabase connection is working, but the user `windchasersblr@gmail.com` does
    - Select **"Create new user"**
    - Fill in:
      - **Email**: `windchasersblr@gmail.com`
-     - **Password**: `Wind#826991`
+     - **Password**: `<your-password>`
      - ✅ **Check "Auto Confirm User"** (IMPORTANT - this skips email verification)
    - Click **"Create user"**
 
@@ -59,7 +59,7 @@ The Supabase connection is working, but the user `windchasersblr@gmail.com` does
 7. **Try Login Again:**
    - Go to: http://localhost:4001/auth/login
    - Email: `windchasersblr@gmail.com`
-   - Password: `Wind#826991`
+   - Password: `<your-password>`
    - Click "Log in"
 
 ### Option 2: Check if User Already Exists
