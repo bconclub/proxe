@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · deploy: Supabase env name bridge (unblock Vercel go-live)
+
+- `next.config` now inlines the generic `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` from the active brand's OWN value — generic first, else this brand's fork-era prefixed name (`NEXT_PUBLIC_<BRAND>_SUPABASE_*`). Lets each per-brand Vercel project build `/core` against ITS OWN database with the env vars already present (no rename, no secret re-entry). Each brand → its own Supabase; nothing shared. Verified: core-as-bcon boots + Supabase client initializes; fallback resolves to bcon's DB when the generic is absent (Vercel case).
+- Still required per project to actually deploy: remove the fork-era Ignored Build Step (it cancels every one-core build), set Root Directory → `core`, add `BRAND_ID`. `SUPABASE_SERVICE_ROLE_KEY` is read generically and must be valid (bcon-proxe's shows "Needs Attention").
+
 ## 2026-07-05 · one-core → main + pop ElevenLabs telephony A/B
 
 - **one-core is now `main`** — the single `/core` app (brand = data, selected by `BRAND_ID`) is the source of truth for all 5 brands. Old `brands/*/agent` forks kept in-tree until each brand's Vercel project is cut over (Root Directory → `core` + `BRAND_ID` + secrets per `DEPLOY.md`).

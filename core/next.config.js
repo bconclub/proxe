@@ -27,6 +27,22 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BRAND: BRAND_ID,
     NEXT_PUBLIC_BRAND_ID: BRAND_ID,
+    // Supabase name bridge. One-core reads the GENERIC names
+    // (NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY), but the existing per-brand Vercel
+    // projects still store them fork-era brand-prefixed
+    // (NEXT_PUBLIC_<BRAND>_SUPABASE_*). Resolve the ACTIVE brand's own value here
+    // — generic first, else this brand's prefixed — and inline it under the
+    // generic name. Each brand's build reads ITS OWN database (bcon->bcon,
+    // pop->pop); nothing is shared and no secret needs renaming/re-entering.
+    // Dynamic process.env access is fine HERE (build-time Node), unlike client code.
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env[`NEXT_PUBLIC_${BRAND_ID.toUpperCase()}_SUPABASE_URL`] ||
+      '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env[`NEXT_PUBLIC_${BRAND_ID.toUpperCase()}_SUPABASE_ANON_KEY`] ||
+      '',
   },
   typescript: {
     ignoreBuildErrors: process.env.VERCEL === '1' || process.env.NODE_ENV === 'production',
