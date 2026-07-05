@@ -55,21 +55,31 @@ function connectorOf(c: any) {
 }
 
 // The real latency breakdown, from Vapi's own metrics. Everything in ms.
+// A real conversational turn tops out a few seconds. When the caller goes quiet
+// (or trailing silence after the close), Vapi still logs a "turn" with a 10-20s
+// latency — that's not a response time, it's a person not talking. Exclude those
+// so avg/worst reflect real turns, and recompute from the kept turns (Vapi's own
+// averages include the outliers).
+const REAL_TURN_MAX = 8000
+
 function perfOf(c: any) {
   const pm = c.artifact?.performanceMetrics
   if (!pm) return null
-  const turns: any[] = Array.isArray(pm.turnLatencies) ? pm.turnLatencies : []
+  const all: any[] = Array.isArray(pm.turnLatencies) ? pm.turnLatencies : []
+  const turns = all.filter((t) => { const v = round(t.turnLatency); return v > 0 && v <= REAL_TURN_MAX })
+  if (!turns.length) return null
+  const mean = (f: (t: any) => any) => Math.round(turns.reduce((a, t) => a + round(f(t)), 0) / turns.length)
   return {
-    turnAvg: round(pm.turnLatencyAverage) || null,
-    worst: turns.length ? Math.max(...turns.map((t) => round(t.turnLatency))) : null,
-    best: turns.length ? Math.min(...turns.map((t) => round(t.turnLatency))) : null,
-    // per-stage averages (ms). transcriber/model/voice = OUTSIDE (providers);
-    // endpointing = INSIDE (our startSpeakingPlan); transport = network.
+    turnAvg: mean((t) => t.turnLatency),
+    worst: Math.max(...turns.map((t) => round(t.turnLatency))),
+    best: Math.min(...turns.map((t) => round(t.turnLatency))),
+    // per-stage averages (ms) over real turns. transcriber/model/voice = OUTSIDE
+    // (providers); endpointing = INSIDE (our startSpeakingPlan); transport = network.
     stages: {
-      transcriber: round(pm.transcriberLatencyAverage),
-      model: round(pm.modelLatencyAverage),
-      voice: round(pm.voiceLatencyAverage),
-      endpointing: round(pm.endpointingLatencyAverage),
+      transcriber: mean((t) => t.transcriberLatency),
+      model: mean((t) => t.modelLatency),
+      voice: mean((t) => t.voiceLatency),
+      endpointing: mean((t) => t.endpointingLatency),
       transport: round(pm.fromTransportLatencyAverage) + round(pm.toTransportLatencyAverage),
     },
     turnsDetail: turns.map((t) => ({
@@ -139,10 +149,12 @@ function perfFromEleven(detail: any) {
     // The felt turn latency: caller goes silent → agent audio starts. This IS the
     // comparable-to-Vapi number; the service ttfbs above are just sub-components.
     const s = m.convai_ttf_audio_since_silence ? Math.round(m.convai_ttf_audio_since_silence.elapsed_time * 1000) : 0
-    if (a) asr.push(a)
-    if (l) llm.push(l)
-    if (v) tts.push(v)
-    if (s) {
+    // Only count real turns — a silence→audio gap over REAL_TURN_MAX is the caller
+    // not talking / trailing silence, not a response time. Excludes the 17s outliers.
+    if (s > 0 && s <= REAL_TURN_MAX) {
+      if (a) asr.push(a)
+      if (l) llm.push(l)
+      if (v) tts.push(v)
       // Endpointing = the turn-taking wait ElevenLabs adds internally (silence →
       // audio, minus the STT/LLM/TTS pipeline). Its equivalent of Vapi endpointing.
       const e = Math.max(0, s - a - l - v)

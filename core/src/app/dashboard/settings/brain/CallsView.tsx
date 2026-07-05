@@ -135,7 +135,7 @@ function EngineBadge({ engine }: { engine: 'vapi' | 'elevenlabs' }) {
 function SplitRow({ engine, split }: { engine: 'vapi' | 'elevenlabs'; split: EngineSplit }) {
   const is11 = engine === 'elevenlabs'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
       <EngineBadge engine={engine} />
       <StageChip label="STT" value={split.transcriber} where="outside" />
       <StageChip label="LLM" value={split.model} where="outside" />
@@ -282,36 +282,32 @@ export default function CallsView() {
           <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{eng === 'all' ? 'comparing all engines' : `${ENG_TABS.find((t) => t.id === eng)!.label} only`}</span>
         </div>
 
-        {/* stats | comparison */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        {/* headline stats + language filter */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <StatCard label="Calls" value={view.phone} spark={view.sparkTurns} sparkColor="#60a5fa" />
-            <StatCard label="Mins" value={view.totalMinutes.toFixed(1)} spark={view.sparkMins} sparkColor="#a78bfa" />
-            <StatCard label="Spend" value={`$${view.totalSpend.toFixed(2)}`} spark={view.sparkCost} sparkColor="#34d399" />
-          </div>
-          {langsPresent.length > 0 && (
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginRight: 2 }}>Language</span>
-              {['all', ...langsPresent].map((L) => {
-                const on = lang === L
-                return (
-                  <button key={L} onClick={() => setLang(L)} style={{
-                    fontSize: 11.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
-                    border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
-                    background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
-                    color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  }}>{L === 'all' ? 'All' : (LANG_LABEL[L] || L)}</button>
-                )
-              })}
+        {/* stats + controls row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <StatCard label="Calls" value={view.phone} spark={view.sparkTurns} sparkColor="#60a5fa" />
+              <StatCard label="Mins" value={view.totalMinutes.toFixed(1)} spark={view.sparkMins} sparkColor="#a78bfa" />
+              <StatCard label="Spend" value={`$${view.totalSpend.toFixed(2)}`} spark={view.sparkCost} sparkColor="#34d399" />
             </div>
-          )}
-        </div>
-
-        {/* right column: controls, then a comparison row per engine */}
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {langsPresent.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginRight: 2 }}>Language</span>
+                {['all', ...langsPresent].map((L) => {
+                  const on = lang === L
+                  return (
+                    <button key={L} onClick={() => setLang(L)} style={{
+                      fontSize: 11.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                      border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                      background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                      color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    }}>{L === 'all' ? 'All' : (LANG_LABEL[L] || L)}</button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             {view.webCount > 0 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <input type="checkbox" checked={showWeb} onChange={(e) => setShowWeb(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
@@ -325,6 +321,10 @@ export default function CallsView() {
               <MdRefresh size={15} /> {loading ? '…' : 'Refresh'}
             </button>
           </div>
+        </div>
+
+        {/* engine comparison — full-width block, V1/V2/V3 rows left-aligned into columns */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start' }}>
           {view.vapi && <SplitRow engine="vapi" split={view.vapi} />}
           {view.elevenlabs && <SplitRow engine="elevenlabs" split={view.elevenlabs} />}
           {(eng === 'all' || eng === 'sarvam') && <V3Row />}
@@ -336,7 +336,6 @@ export default function CallsView() {
           {eng !== 'sarvam' && !view.vapi && !view.elevenlabs && shown.length > 0 && (
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
           )}
-        </div>
         </div>
       </div>
 
