@@ -32,6 +32,17 @@ function ms(x?: string | null): number | null {
 }
 const round = (n: any): number => Math.round(Number(n) || 0)
 
+// Normalize a language code to our small set. Latency differs by language (STT/TTS
+// models perform differently), so this is a first-class filter dimension.
+function normLang(x?: string | null): string | null {
+  const s = (x || '').toLowerCase().trim()
+  if (!s || s === 'undefined' || s === 'null') return null
+  if (s.startsWith('pa')) return 'pa'
+  if (s.startsWith('hi')) return 'hi'
+  if (s.startsWith('en')) return 'en'
+  return 'other'
+}
+
 // stt / model / tts providers, from Vapi's per-component costs[] array.
 function connectorOf(c: any) {
   const costs = Array.isArray(c.costs) ? c.costs : []
@@ -88,6 +99,7 @@ function computeCall(c: any) {
     id: c.id,
     source: isWeb ? 'web' : 'phone',
     engine: 'vapi' as 'vapi' | 'elevenlabs', // Vapi-API calls are the Vapi pipeline
+    language: normLang(c.analysis?.structuredData?.language), // from post-call extraction
     callerName: null as string | null,        // filled from voice_sessions -> all_leads
     callee: c.customer?.number || (isWeb ? 'Web test' : 'unknown'),
     createdAt: c.createdAt || null,
@@ -117,23 +129,33 @@ const ELEVEN_DETAIL_CAP = 15
 
 function perfFromEleven(detail: any) {
   const turns: any[] = Array.isArray(detail?.transcript) ? detail.transcript : []
-  const asr: number[] = [], llm: number[] = [], tts: number[] = []
+  const asr: number[] = [], llm: number[] = [], tts: number[] = [], ep: number[] = [], sil: number[] = []
   const detailRows: any[] = []
   for (const t of turns) {
     const m = t?.conversation_turn_metrics?.metrics || {}
     const a = m.convai_asr_trailing_service_latency ? Math.round(m.convai_asr_trailing_service_latency.elapsed_time * 1000) : 0
     const l = m.convai_llm_service_ttfb ? Math.round(m.convai_llm_service_ttfb.elapsed_time * 1000) : 0
     const v = m.convai_tts_service_ttfb ? Math.round(m.convai_tts_service_ttfb.elapsed_time * 1000) : 0
+    // The felt turn latency: caller goes silent → agent audio starts. This IS the
+    // comparable-to-Vapi number; the service ttfbs above are just sub-components.
+    const s = m.convai_ttf_audio_since_silence ? Math.round(m.convai_ttf_audio_since_silence.elapsed_time * 1000) : 0
     if (a) asr.push(a)
     if (l) llm.push(l)
     if (v) tts.push(v)
-    if (l || v) detailRows.push({ total: a + l + v, transcriber: a, model: l, voice: v, endpointing: 0 })
+    if (s) {
+      // Endpointing = the turn-taking wait ElevenLabs adds internally (silence →
+      // audio, minus the STT/LLM/TTS pipeline). Its equivalent of Vapi endpointing.
+      const e = Math.max(0, s - a - l - v)
+      sil.push(s); ep.push(e)
+      detailRows.push({ total: s, transcriber: a, model: l, voice: v, endpointing: e })
+    }
   }
   const avg = (arr: number[]) => (arr.length ? Math.round(arr.reduce((x, y) => x + y, 0) / arr.length) : 0)
-  const stages = { transcriber: avg(asr), model: avg(llm), voice: avg(tts), endpointing: 0, transport: 0 }
+  // transport (network) is NOT exposed by ElevenLabs — it's folded into the
+  // silence→audio measurement, so we report it as null (shown as "—"), not zero.
+  const stages = { transcriber: avg(asr), model: avg(llm), voice: avg(tts), endpointing: avg(ep), transport: null as number | null }
   const totals = detailRows.map((r) => r.total)
-  // ElevenLabs manages turn-taking internally — no comparable "endpointing" number.
-  const turnAvg = stages.transcriber + stages.model + stages.voice
+  const turnAvg = avg(sil)
   if (!totals.length && !turnAvg) return null
   return {
     turnAvg: turnAvg || null,
@@ -174,6 +196,7 @@ async function fetchElevenCalls(): Promise<any[]> {
         id: c.conversation_id || c.id,
         source: meta.phone_call ? 'phone' : 'web',
         engine: 'elevenlabs',
+        language: normLang(c.main_language),
         callerName: null,
         callee: phone || (meta.phone_call ? 'unknown' : 'Web test'),
         createdAt: started,
@@ -273,7 +296,12 @@ export async function GET() {
     // Aggregate. Totals span both engines; the latency SPLIT is computed PER ENGINE
     // (endpointing/transport are Vapi-only concepts) so Vapi vs 11Labs is comparable.
     // No-answer / zeroed calls are excluded via the turnAvg guard.
-    const mean = (arr: number[]) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null)
+    // null-safe mean — ignores nulls (e.g. ElevenLabs transport) so a not-exposed
+    // stage stays null ("—") instead of poisoning the average with NaN/0.
+    const mean = (arr: Array<number | null | undefined>) => {
+      const xs = arr.filter((x): x is number => typeof x === 'number')
+      return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
+    }
     const splitFor = (engine: string) => {
       const wp = calls.filter((c) => c.engine === engine && c.perf && c.perf.turnAvg)
       if (!wp.length) return null
