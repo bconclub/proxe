@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · lokazen: transparent loading logo (drop the square .jpg box)
+
+- **lokazen** — the dashboard loading screen + page-transition loader showed the square `lokazen-icon.jpg` (JPGs have no transparency → a visible box). Added a `markPath` brand-config field (transparent logo for loaders, defaults to `iconPath`) and set lokazen's to `/lokazen-mark.svg` (transparent 3-orb). `iconPath` is unchanged so the favicon stays correct. Both `FounderDashboard` and `PageTransitionLoader` now use `markPath || iconPath`.
+
 ## 2026-07-05 · lokazen: Connector as a second Gig type (dashboard support)
 
 - **lokazen** — the Gigs segment now spans two worker types: **Scout + Connector**. Dashboard support added: `GIG_TYPES = ['scout','connector']`; the Gigs page (`/dashboard/scouts`) now filters to the **'gig' umbrella** (scout OR connector) instead of scout-only; new **Connector** type chip (emerald tint) + a **Connectors** filter option; and connectors are excluded from sales-Lead counts everywhere scouts are (Overview/founder-metrics, Today snapshot, Pipeline kanban, PipelineFunnel, and the general Leads view).

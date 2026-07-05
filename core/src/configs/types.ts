@@ -5,6 +5,7 @@ export interface BrandConfig {
   website?: string;          // public site linked from auth pages
   themeDataAttr?: string;    // <html data-theme> value (defaults to `brand`)
   iconPath?: string;         // favicon/app icon path in the brand's public/ (defaults to /logo.png)
+  markPath?: string;         // transparent logo mark for loading screens (defaults to iconPath); use a PNG/SVG with no background box
   // Widget chrome + copy. Everything here used to be hardcoded windchasers
   // strings in ChatWidget — brand identity lives in the pack, not in core.
   widget?: {

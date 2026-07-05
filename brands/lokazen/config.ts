@@ -6,6 +6,7 @@ export const lokazenConfig: BrandConfig = {
   tagline: 'Bangalore',
   website: 'https://lokazen.in',
   iconPath: '/lokazen-icon.jpg',
+  markPath: '/lokazen-mark.svg', // transparent 3-orb mark for loading screens (iconPath jpg is a square box)
   widget: {
     headerName: 'Lokazen',
     welcomeSequence: [
