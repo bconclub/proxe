@@ -22,6 +22,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { playSound as playEventSound } from '@/lib/sound-prefs'
+import { PRODUCT_UPDATES } from '@/lib/product-updates'
+import { getCurrentBrandId } from '@/configs'
 import {
   MdNotificationsNone,
   MdNotificationsActive,
@@ -34,17 +36,19 @@ import {
   MdEvent,
   MdLocalFireDepartment,
   MdPersonAdd,
+  MdRocketLaunch,
 } from 'react-icons/md'
 
 const POLL_MS = 30_000
 const SEEN_AT_KEY = 'wc-notif-seen-at'
 const MUTED_KEY = 'wc-notif-muted'
+const UPDATE_SEEN_KEY = 'wc-notif-update-seen'
 
 type NotificationEvent = {
   id: string
   leadId: string
   leadName: string
-  type: 'stage_change' | 'new_lead_scored' | 'score_change'
+  type: 'stage_change' | 'new_lead_scored' | 'score_change' | 'product_update'
   content: string
   channel: string
   timestamp: string
@@ -77,8 +81,35 @@ function channelLabel(ch?: string): string | null {
   return c.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
 }
 
+// The newest curated product update visible to THIS brand that the viewer
+// hasn't dismissed yet. Returns a synthetic event so it flows through the same
+// toast + drawer rendering as lead activity. Client-only (reads localStorage).
+function pendingUpdate(): NotificationEvent | null {
+  if (typeof window === 'undefined') return null
+  let seen: string[] = []
+  try { seen = JSON.parse(localStorage.getItem(UPDATE_SEEN_KEY) || '[]') } catch { /* ignore */ }
+  const brandId = getCurrentBrandId()
+  const u = PRODUCT_UPDATES.find(
+    (x) => (!x.brands || x.brands.includes('*') || x.brands.includes(brandId)) && !seen.includes(x.id),
+  )
+  if (!u) return null
+  return {
+    id: `update-${u.id}`,
+    leadId: '',
+    leadName: '',
+    type: 'product_update',
+    content: u.detail ? `${u.title} — ${u.detail}` : u.title,
+    channel: 'system',
+    timestamp: new Date(`${u.date}T00:00:00`).toISOString(),
+    metadata: { updateId: u.id },
+  }
+}
+
 // New leads read green with a NEW LEAD tag; updates keep stage/score colours.
 function eventVisual(ev: { type: string; content: string; metadata?: any }): Visual {
+  if (ev.type === 'product_update') {
+    return { Icon: MdRocketLaunch, color: '#6366F1', kind: 'new', label: 'UPDATE' }
+  }
   if (ev.type === 'new_lead_scored') {
     return { Icon: MdPersonAdd, color: '#22C55E', kind: 'new', label: 'NEW LEAD' }
   }
@@ -107,6 +138,8 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   const [open, setOpen] = useState(false)
   const [muted, setMuted] = useState(false)
   const [unread, setUnread] = useState(0)
+  // Curated "what we shipped" card — pinned above lead activity until dismissed.
+  const [updateEvent, setUpdateEvent] = useState<NotificationEvent | null>(null)
 
   const knownIdsRef = useRef<Set<string>>(new Set())
   const baselineSetRef = useRef(false)
@@ -119,7 +152,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   const enqueueToasts = useCallback((items: NotificationEvent[]) => {
     items.forEach((t, i) => {
       setTimeout(() => {
-        setToasts((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev].slice(0, 3)))
+        setToasts((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev].slice(0, 2)))
       }, i * 600)
     })
   }, [])
@@ -162,11 +195,16 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
         baselineSetRef.current = true
         setEvents(incoming)
         recomputeUnread(incoming)
+        // At most TWO toasts on load: the curated product update (if unseen)
+        // pinned first, then the latest missed lead activity.
+        const upd = pendingUpdate()
+        setUpdateEvent(upd)
         const seenAt = new Date(seenAtRef.current).getTime()
         const missed = incoming.filter((e) => new Date(e.timestamp).getTime() > seenAt)
-        if (missed.length > 0) {
-          enqueueToasts(missed.slice(0, 3))
-          playSound(missed.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
+        const load = [...(upd ? [upd] : []), ...missed].slice(0, 2)
+        if (load.length > 0) {
+          enqueueToasts(load)
+          playSound(upd || missed.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
         }
         return
       }
@@ -177,7 +215,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
         // Only ever surface the latest TWO as toasts — newest on top. Anything
         // beyond that lives behind the "View all notifications" button. Keeps
         // the corner stack from blasting 3-4 cards at once.
-        enqueueToasts(fresh.slice(0, 3))
+        enqueueToasts(fresh.slice(0, 2))
         // New leads take sound priority over plain updates.
         playSound(fresh.some((e) => e.type === 'new_lead_scored') ? 'new' : 'update')
       }
@@ -223,6 +261,20 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   }, [])
 
   const goToLead = useCallback(() => { setOpen(false); router.push('/dashboard/leads') }, [router])
+
+  // Product-update cards show once — dismissing (X, click, or "Got it") records
+  // the id so it never re-appears for this viewer.
+  const markUpdateSeen = useCallback((ev: NotificationEvent) => {
+    const uid = ev.metadata?.updateId
+    if (uid) {
+      try {
+        const seen: string[] = JSON.parse(localStorage.getItem(UPDATE_SEEN_KEY) || '[]')
+        if (!seen.includes(uid)) { seen.push(uid); localStorage.setItem(UPDATE_SEEN_KEY, JSON.stringify(seen)) }
+      } catch { /* ignore */ }
+    }
+    setUpdateEvent((cur) => (cur && cur.id === ev.id ? null : cur))
+    setToasts((prev) => prev.filter((x) => x.id !== ev.id))
+  }, [])
 
   return (
     <>
@@ -297,8 +349,28 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
             </div>
 
             <div className="overflow-y-auto flex-1">
+              {updateEvent && (() => {
+                const ev = updateEvent!
+                const v = eventVisual(ev)
+                return (
+                  <button
+                    onClick={() => markUpdateSeen(ev)}
+                    className="w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-b"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: `${v.color}0d` }}
+                  >
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${v.color}22`, color: v.color }}>
+                      <v.Icon size={16} />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded mb-1" style={{ backgroundColor: `${v.color}22`, color: v.color }}>{v.label}</span>
+                      <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{ev.content}</span>
+                      <span className="block text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{timeAgo(ev.timestamp)} · tap to dismiss</span>
+                    </span>
+                  </button>
+                )
+              })()}
               {events.length === 0 ? (
-                <p className="text-sm text-center py-12" style={{ color: 'var(--text-secondary)' }}>No status changes yet</p>
+                !updateEvent && <p className="text-sm text-center py-12" style={{ color: 'var(--text-secondary)' }}>No status changes yet</p>
               ) : (
                 events.map((ev) => {
                   const v = eventVisual(ev)
@@ -343,13 +415,13 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
           Narrow + clean (reference panel was too wide). */}
       {toasts.length > 0 && !open && (
         <div className="fixed z-[80] flex flex-col gap-2" style={{ bottom: '20px', right: '20px', width: '340px', maxWidth: 'calc(100vw - 32px)' }}>
-          {toasts.slice(0, 3).map((t) => {
+          {toasts.slice(0, 2).map((t) => {
             const v = eventVisual(t)
             const chan = channelLabel(t.channel)
             return (
               <div
                 key={t.id}
-                onClick={goToLead}
+                onClick={() => (t.type === 'product_update' ? markUpdateSeen(t) : goToLead())}
                 className="flex items-start gap-3 px-3.5 py-3 rounded-xl shadow-2xl cursor-pointer"
                 style={{
                   backgroundColor: 'var(--bg-secondary)',
@@ -366,7 +438,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
                   <span className="flex items-start justify-between gap-2">
                     <span className="block text-sm font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>{t.content}</span>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
+                      onClick={(e) => { e.stopPropagation(); if (t.type === 'product_update') markUpdateSeen(t); else setToasts((prev) => prev.filter((x) => x.id !== t.id)) }}
                       className="p-0.5 -mt-0.5 -mr-0.5 rounded flex-shrink-0"
                       style={{ color: 'var(--text-secondary)' }}
                       aria-label="Dismiss"
@@ -387,7 +459,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
                     <span className="ml-auto text-[11px]" style={{ color: 'var(--text-secondary)' }}>{timeAgo(t.timestamp)}</span>
                   </span>
                   {/* action */}
-                  <span className="block text-[11px] font-medium mt-1.5 hover:underline" style={{ color: v.color }}>View lead →</span>
+                  <span className="block text-[11px] font-medium mt-1.5 hover:underline" style={{ color: v.color }}>{t.type === 'product_update' ? 'Got it →' : 'View lead →'}</span>
                 </span>
               </div>
             )

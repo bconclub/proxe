@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+  /* Let the browser paint NATIVE scrollbars + form controls to match the theme. */
+  color-scheme: light;
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
@@ -22,6 +24,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   /* Dark mode theme variables — overridden by ThemeProvider from brand config */
   --bg-primary: #0A0A0A;
   --bg-secondary: #0A0A0A;
@@ -69,30 +72,13 @@ body:not(.dark) {
   }
 }
 
-/* Custom Scrollbar Styles */
-/* Webkit browsers (Chrome, Safari, Edge) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-medium);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-
-/* Firefox */
+/* Native, theme-aware scrollbars.
+   `color-scheme` (set on :root / .dark above) lets the browser draw its OWN
+   native scrollbar, tinted to light/dark automatically — no custom-drawn bar.
+   `scrollbar-width: thin` keeps it slim + modern in Chromium/Firefox. We do NOT
+   use a `::-webkit-scrollbar` override: that forced the chunky, non-native bar. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-medium) transparent;
 }
 
 /* Channel icons - adapt to theme */
