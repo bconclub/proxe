@@ -376,19 +376,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return (
       <div className="dashboard-layout-auth-loader min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="dashboard-layout-auth-loader-content text-center">
-          <div className="dashboard-layout-auth-loader-icon-container relative mb-4">
+          <div className="dashboard-layout-auth-loader-icon-container relative mb-4 mx-auto" style={{ width: '80px', height: '80px' }}>
             <div
               className="dashboard-layout-auth-loader-pulse absolute inset-0 rounded-full animate-ping opacity-30"
               style={{
                 backgroundColor: brandColors?.primary || 'var(--accent-primary)',
-                width: '100px',
-                height: '100px',
-                margin: '-10px auto',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                margin: '-10px',
               }}
             />
-            <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
+            <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse" style={{ width: '80px', height: '80px' }}>
               {brandMark && (
                 <img
                   src={brandMark}

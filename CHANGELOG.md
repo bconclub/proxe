@@ -18,6 +18,7 @@
 
 - **lokazen** — the dashboard loading screen + page-transition loader showed the square `lokazen-icon.jpg` (JPGs have no transparency → a visible box). Added a `markPath` brand-config field (transparent logo for loaders, defaults to `iconPath`) and set lokazen's to `/lokazen-mark.svg` (transparent 3-orb). `iconPath` is unchanged so the favicon stays correct. Both `FounderDashboard` and `PageTransitionLoader` now use `markPath || iconPath`.
 - **all brands** — the three full-screen loaders (auth "Checking authentication…", dashboard "Loading…", page transition) had a hardcoded purple glow (`--accent-primary` = `#8B5CF6`, the pre-hydration default). The auth loader also still used the square avatar. Now all three pulse the **brand's own primary** (`colors.primary`, falling back to the CSS var) and the auth loader uses the transparent `markPath`. lokazen's loaders read orange instead of purple.
+- **all brands** — fixed the auth loader's off-centre "sideways" pulse: its ping was `absolute inset-0` inside a full-width container with a stray `left:50% / translateX`, so it anchored to the whole row. Now the container is an 80px centred box (matching the other two loaders), so the pulse is concentric with the logo.
 
 ## 2026-07-05 · lokazen: Connector as a second Gig type (dashboard support)
 
