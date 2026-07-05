@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · lokazen: Connector as a second Gig type (dashboard support)
+
+- **lokazen** — the Gigs segment now spans two worker types: **Scout + Connector**. Dashboard support added: `GIG_TYPES = ['scout','connector']`; the Gigs page (`/dashboard/scouts`) now filters to the **'gig' umbrella** (scout OR connector) instead of scout-only; new **Connector** type chip (emerald tint) + a **Connectors** filter option; and connectors are excluded from sales-Lead counts everywhere scouts are (Overview/founder-metrics, Today snapshot, Pipeline kanban, PipelineFunnel, and the general Leads view).
+- NOTE: intake/classification does not yet tag anyone as `connector` (audience detection is brand/owner/scout only), so no Connector rows appear until the capture side is wired. This commit is the dashboard scaffolding.
+
 ## 2026-07-05 · lokazen: "Gigs" segment (nav/label/chip) + scouts excluded from lead counts; scrub passwords from docs
 
 - **lokazen** — Scout segment surfaces as **"Gigs"** (umbrella): nav item renamed via a shared `navLabel` helper (pop's Leads→People preserved), Gigs page title, and the nav entry moved directly under **Pipeline** (above Events). Nav icon changed bike → handshake (`MdHandshake`). Per-lead **type chip stays "Scout"** (Scout is a type under Gigs; Connector reserved for later) and was restyled from a big solid pill to a small tinted chip.

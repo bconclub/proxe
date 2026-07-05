@@ -164,13 +164,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Ensure leads is an array. Scouts (lokazen's "Gig" segment) are NOT sales
+    // Ensure leads is an array. Gig workers (scout + connector) are NOT sales
     // leads — they have their own dashboard page and must never inflate the
     // Overview lead totals or stage buckets. Mirrors the exclusion the Leads
-    // table applies (LeadsTable: user_type !== 'scout' when scouts are on).
+    // table applies (LeadsTable: GIG_TYPES excluded when scouts are on).
     const rawLeads = leads || []
+    // Gig workers (scout + connector) are not sales leads.
+    const GIG_TYPES = ['scout', 'connector']
     const safeLeads = brandConfig.features?.scouts
-      ? rawLeads.filter((lead: any) => lead?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+      ? rawLeads.filter((lead: any) => !GIG_TYPES.includes(lead?.unified_context?.[BRAND_ID]?.user_type))
       : rawLeads
 
     // Conversations: PostgREST hard-caps a single response at 1000 rows, and the

@@ -80,10 +80,11 @@ export async function GET(request: Request) {
       .lte('created_at', endIso)
       .order('created_at', { ascending: false });
 
-    // Scouts (lokazen's "Gig" segment) are not sales leads — keep them out of
+    // Gig workers (scout + connector) are not sales leads — keep them out of
     // today's lead total + breakdowns, mirroring the Leads table + Overview.
+    const GIG_TYPES = ['scout', 'connector'];
     const leads = brandConfig.features?.scouts
-      ? (todayLeads || []).filter((l: any) => l?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+      ? (todayLeads || []).filter((l: any) => !GIG_TYPES.includes(l?.unified_context?.[BRAND_ID]?.user_type))
       : (todayLeads || []);
 
     // Resolve a friendly source label, mirroring LeadsTable's logic at a higher

@@ -172,11 +172,12 @@ export default function PipelinePage() {
       const res = await fetch('/api/dashboard/leads?limit=1000')
       const data = await res.json()
       const rawLeads: Lead[] = data.leads || []
-      // Scouts (lokazen's "Gig" segment) are not sales leads — keep them out of
+      // Gig workers (scout + connector) are not sales leads — keep them out of
       // the pipeline kanban, mirroring the Leads table + Overview exclusion.
+      const GIG_TYPES = ['scout', 'connector']
       setLeads(
         brandConfig.features?.scouts
-          ? rawLeads.filter((l) => l?.unified_context?.[BRAND_ID]?.user_type !== 'scout')
+          ? rawLeads.filter((l) => !GIG_TYPES.includes(l?.unified_context?.[BRAND_ID]?.user_type as string))
           : rawLeads,
       )
     } catch (err) {

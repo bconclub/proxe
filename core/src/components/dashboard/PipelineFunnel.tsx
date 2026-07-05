@@ -66,12 +66,14 @@ export default function PipelineFunnel() {
     ;(async () => {
       try {
         const supabase = createClient()
-        // Scouts (lokazen's "Gig" segment) are not sales leads — exclude them from
+        // Gig workers (scout + connector) are not sales leads — exclude them from
         // every funnel count. Rows with no user_type are kept (only explicit
-        // scouts are dropped), mirroring the Leads table + Overview exclusion.
-        const scoutPath = `unified_context->${BRAND_ID}->>user_type`
+        // gig types are dropped), mirroring the Leads table + Overview exclusion.
+        const gigPath = `unified_context->${BRAND_ID}->>user_type`
         const excludeScouts = (q: any) =>
-          brandConfig.features?.scouts ? q.or(`${scoutPath}.is.null,${scoutPath}.neq.scout`) : q
+          brandConfig.features?.scouts
+            ? q.or(`${gigPath}.is.null,and(${gigPath}.neq.scout,${gigPath}.neq.connector)`)
+            : q
         const countFor = async (stages: readonly string[]) => {
           const { count } = await excludeScouts(supabase.from('all_leads').select('id', { count: 'exact', head: true }).in('lead_stage', stages as string[]))
           return count || 0

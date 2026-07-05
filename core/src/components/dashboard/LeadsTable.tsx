@@ -238,6 +238,10 @@ export default function LeadsTable({
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
   const showAviationColumns = brandId === 'windchasers'
+  // Gigs = lokazen's non-lead worker segment. Scout + Connector are its types;
+  // both are kept out of the sales Leads view and counts. The Gigs page filters
+  // to the 'gig' umbrella (scout OR connector).
+  const GIG_TYPES = ['scout', 'connector']
   // Scout segment — gated by the brand's features.scouts toggle (lokazen) so
   // scout UI never leaks into brands that don't run scouts.
   const showScouts = Boolean(brandConfig.features?.scouts)
@@ -265,7 +269,7 @@ export default function LeadsTable({
   // Scout VIEW = the scouts feature is on AND the table is filtered to scouts
   // (either via the dropdown or the locked initialUserTypeFilter on /dashboard/scouts).
   // Swaps the brand/owner columns for scout-specific ones.
-  const scoutView = showScouts && userTypeFilter === 'scout'
+  const scoutView = showScouts && (userTypeFilter === 'scout' || userTypeFilter === 'gig')
 
   useEffect(() => {
     if (initialLimit) {
@@ -337,16 +341,18 @@ export default function LeadsTable({
           const normalizedUserType = brandData.user_type === 'property_owner'
             ? 'owner'
             : (brandData.user_type || brandData.business_type)
+          // 'gig' = the Gigs umbrella (scout OR connector).
+          if (userTypeFilter === 'gig') return GIG_TYPES.includes(normalizedUserType)
           return normalizedUserType === userTypeFilter
         }
         return (brandData.user_type || brandData.business_type) === userTypeFilter
       })
     } else if (showScouts) {
-      // Scouts have their own dedicated page — keep them out of the
-      // general Leads view, which is brand + property-owner only.
+      // Gig workers (scout/connector) have their own page — keep them out of
+      // the general Leads view, which is brand + property-owner only.
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
-        return brandData.user_type !== 'scout'
+        return !GIG_TYPES.includes(brandData.user_type)
       })
     }
 
@@ -682,6 +688,7 @@ export default function LeadsTable({
                   <option value="brand">Brands</option>
                   <option value="owner">Property owners</option>
                   <option value="scout">Scouts</option>
+                  <option value="connector">Connectors</option>
                 </select>
               )}
 
@@ -922,7 +929,7 @@ export default function LeadsTable({
                 const lkz = showScouts ? (uc?.[brandId] || {}) : {}
                 const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
                 const lkzType = showScouts
-                  ? (lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : '')
+                  ? (lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : lkzUserType === 'connector' ? 'Connector' : '')
                   : ''
                 // Scouts show their lifecycle stage (from scout_event), not a lead stage.
                 const isScoutRow = showScouts && lkzUserType === 'scout'
@@ -1458,9 +1465,11 @@ export default function LeadsTable({
                               ? { backgroundColor: 'rgba(255,82,0,0.14)', color: '#FF7A33' }
                               : lkzType === 'Scout'
                               ? { backgroundColor: 'rgba(139,92,246,0.16)', color: '#A78BFA' }
+                              : lkzType === 'Connector'
+                              ? { backgroundColor: 'rgba(16,185,129,0.16)', color: '#34D399' }
                               : { backgroundColor: 'rgba(37,99,235,0.16)', color: '#60A5FA' }}
                           >
-                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : 'Owner'}
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : lkzType === 'Connector' ? 'Connector' : 'Owner'}
                           </span>
                         )}
                       </div>
