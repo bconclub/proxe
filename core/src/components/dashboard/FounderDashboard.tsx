@@ -58,6 +58,9 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
+  // Gigs tab only — count of scouts/connectors who have actually submitted a
+  // property or been paid (same definition as the Gigs table's STATUS column).
+  activeGigsCount?: number
   // POP-only: inbound/outbound voice volume for the Calls KPI card (ported from the pop fork).
   calls?: {
     total: number
@@ -495,6 +498,11 @@ export default function FounderDashboard() {
   const engWarm = fn ? fn.warm : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
   const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
   const engBooked = fn ? fn.booked : (flow.booked || 0)
+  // Gigs tab: scouts/connectors don't book calls, so the funnel's last node
+  // swaps from "Booked" to "Active" — how many are actually submitting
+  // (scout_event submission/payout), not a meaningless booking count.
+  const isGigsView = showGigsTab && view === 'gigs'
+  const engLastCount = isGigsView ? (metrics.activeGigsCount ?? 0) : engBooked
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
   // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
   const engK = (n: number): number | string => (isPop ? abbrevK(n) : n)
@@ -766,7 +774,14 @@ export default function FounderDashboard() {
             <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
             <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
             <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engK(engBooked)} label="Booked" sub={hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week'} last />
+            <EngineNode
+              icon={isGigsView ? <MdCheckCircle size={28} /> : <MdCalendarToday size={28} />}
+              color="#10b981"
+              count={engK(engLastCount)}
+              label={isGigsView ? 'Active' : 'Booked'}
+              sub={isGigsView ? 'Submitting properties' : (hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week')}
+              last
+            />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />

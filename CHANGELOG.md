@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · lokazen: Gigs tab's Engine Overview shows "Active", not "Booked"
+
+- The Engine Overview funnel's last node ("Booked", calendar icon) is meaningless on the Gigs tab — scouts/connectors don't book calls. Swapped it to "Active" (checkmark icon, "Submitting properties") on the Gigs tab only — count of scouts who've actually submitted a property or been paid (`scout_event` = submission/payout), the same definition the Gigs table's STATUS column already uses. Leads tab is untouched.
+- `founder-metrics` gained `activeGigsCount` (0 unless `scope=gigs`), computed alongside `leadFlow` from the same `safeLeads` slice — no duplicated logic.
+- Note: the top "Booked Calls / Events" KPI card has the same booking-based mismatch for gigs, but wasn't in scope for this pass — flagged for a follow-up if wanted.
+
 ## 2026-07-06 · fix: WhatsApp delivery-tick icon had no working tooltip
 
 - The inbox's per-message delivery tick (sent/delivered/read/failed) relied on a native HTML `title` attribute for its tooltip — inconsistent across browsers, easy to miss, no visible styling. A proven custom tooltip mechanism (`template-status-tag` class + `data-tooltip` attribute, backed by real CSS with a visible dark popover) already exists in this same file for the send-failure pill, but was never applied to the tick icon itself. Both render sites (template messages + regular WhatsApp messages) now use that mechanism instead, so hovering the tick always shows a real, visible "Status: Sent / Delivered / Read by customer / Failed — &lt;reason&gt;" popover.
