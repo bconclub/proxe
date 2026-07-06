@@ -416,12 +416,15 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
 }
 
 
-function DeliveryStatusIcon({ deliveredAt, readAt, createdAt }: { deliveredAt?: string | null; readAt?: string | null; createdAt?: string }) {
-  // Check for failed state: no delivery confirmation after 10 minutes
-  const isFailed = !deliveredAt && !readAt && createdAt && 
-    (Date.now() - new Date(createdAt).getTime()) > 10 * 60 * 1000;
-
-  if (isFailed) {
+function DeliveryStatusIcon({ deliveredAt, readAt, failed }: { deliveredAt?: string | null; readAt?: string | null; failed?: boolean }) {
+  // Red warning icon ONLY for a REAL, confirmed send/delivery failure (caller
+  // passes this from metadata.send_succeeded===false or delivery_status===
+  // 'failed'). This used to be inferred from "no delivery/read confirmation
+  // within 10 minutes" — but Meta's status webhook not calling back yet is
+  // normal and common (batched receipts, recipient hasn't opened WhatsApp,
+  // etc.), NOT evidence the message failed to send. That false positive
+  // painted plenty of genuinely-sent messages with a scary red icon.
+  if (failed) {
     // Warning icon
     return (
       <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
@@ -2318,7 +2321,7 @@ export default function InboxPage() {
                               )}
                               {!sendFailed && (
                                 <span className="template-status-tag flex items-center cursor-help" data-tooltip={tooltip}>
-                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                                  <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} />
                                 </span>
                               )}
                             </div>
@@ -2396,7 +2399,13 @@ export default function InboxPage() {
                             )}
                           </div>
                         )}
-                        {!isCustomer && msg.channel === 'whatsapp' && (
+                        {!isCustomer && msg.channel === 'whatsapp' && (() => {
+                          // Real failure = the send itself failed (no message ID ever
+                          // existed, e.g. Graph API rejected it) OR Meta's own delivery
+                          // webhook reported 'failed'. NOT "no delivery/read receipt yet" —
+                          // that's Meta not having called back, which is normal and common.
+                          const realSendFailed = msg.metadata?.send_succeeded === false || msg.metadata?.delivery_status === 'failed'
+                          return (
                           <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5">
                             {msg.metadata?.delivery_status === 'failed' && msg.metadata?.delivery_error && (
                               <div className="relative group flex items-center">
@@ -2427,10 +2436,11 @@ export default function InboxPage() {
                               className="template-status-tag cursor-help"
                               data-tooltip={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}
                             >
-                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
+                              <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} failed={realSendFailed} />
                             </span>
                           </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     </div>
                     </React.Fragment>

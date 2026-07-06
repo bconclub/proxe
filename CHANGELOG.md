@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: delivery-tick showed a scary red "failed" icon on messages that sent fine
+
+- `DeliveryStatusIcon` inferred a genuine send/delivery failure purely from "no delivery/read confirmation within 10 minutes." Confirmed via runtime logs (real conversation, ~8 sent replies) that Meta's status webhook doesn't reliably call back for every single message — receipts arrive periodically, sometimes batched, sometimes late — which is normal, not evidence anything failed. That false positive painted a scary red warning icon on messages that had actually sent successfully (Graph API accepted them, real message ID returned).
+- Both call sites already only reach this component for messages that sent successfully (an actual send failure renders a separate, dedicated error indicator) — so the red icon was pure noise. Replaced the 10-minute timing heuristic with an explicit `failed` flag the caller derives from the real signals: `metadata.send_succeeded === false` (the send itself failed) or `metadata.delivery_status === 'failed'` (Meta's own delivery webhook reported a failure). A message with neither now correctly shows a plain "sent" tick instead of a false alarm.
+
 ## 2026-07-06 · lokazen: Gigs tab's Engine Overview shows the scout lifecycle, not the lead funnel
 
 - Engaged/Warm/Follow-up Due/Booked don't mean anything for scouts. All 4 middle+last Engine Overview nodes now swap to the scout onboarding lifecycle on the Gigs tab: **KYC Started → KYC Done → Live (UPI added) → Active (submitting)**. "Total Leads" (slot 1) is unchanged either way.
