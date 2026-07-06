@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: scout support requests could claim to Slack the team, silently do nothing
+
+- A scout (e.g. "Monish") reported a payout problem in live chat; the AI correctly replied "I've raised a support request with the Lokazen team" — and `flagForHumanFollowup` genuinely was called (confirmed in logs) and did set the DB flag. But the actual Slack ping (`notifySlackLead`) soft-fails **completely silently** when `SLACK_WEBHOOK_URL` isn't set — no log, no warning, nothing — so it was never possible to tell from the logs whether the team was actually notified or the AI's claim was hollow.
+- `flagForHumanFollowup` now checks the Slack call's result and logs the real outcome explicitly: sent, **SKIPPED (webhook not configured)**, or failed with the error — so a missing/broken Slack integration is visible immediately instead of silently assumed working.
+- Still to confirm: whether `SLACK_WEBHOOK_URL` is actually set on lokazen-proxe's Vercel project — the new logging will show this the next time a scout support issue (or any "needs human" case) fires.
+
 ## 2026-07-06 · fix: extend the duplicate-send gate to EVERY outbound template
 
 - The 5-minute dedup gate built for the scout-message duplicate bug only covered scout templates. Audited every outbound WhatsApp send in this webhook and found the same unguarded pattern on two more: **`sendPATResult`** (windchasers PAT result) and **`sendDemoConfirmation`** (windchasers demo booking) — both fire on every matching webhook call with zero protection against the site calling this endpoint twice for the same event (retry/reload/double-submit), the exact class of bug already confirmed live for scouts.

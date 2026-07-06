@@ -818,7 +818,7 @@ async function flagForHumanFollowup(
     // channel reads "Scout support request" (with the number + issue) rather than
     // a generic lead follow-up.
     const isScout = input.lokazenAudience === 'scout';
-    await notifySlackLead({
+    const slackResult = await notifySlackLead({
       brandLabel,
       title: isScout ? 'Scout support request' : 'Needs human follow-up',
       name: input.userProfile.name || null,
@@ -829,6 +829,18 @@ async function flagForHumanFollowup(
       detail: reason,
       footer: isScout ? 'scout support' : 'needs human',
     });
+    // notifySlackLead soft-fails SILENTLY (no log at all) when SLACK_WEBHOOK_URL
+    // isn't set — the AI tells the person "I've raised a support request" and
+    // the DB flag is real, but the team never actually gets pinged, with zero
+    // trace of that gap anywhere. Log the real outcome so a missing/broken
+    // webhook is visible instead of assumed from the conversational claim.
+    if (slackResult.skipped) {
+      console.warn(`[Engine] Slack alert SKIPPED for lead ${lead.id} (SLACK_WEBHOOK_URL not set) — "${reason}" was NOT sent to the team.`);
+    } else if (!slackResult.success) {
+      console.error(`[Engine] Slack alert FAILED for lead ${lead.id}: ${slackResult.error || 'unknown error'} — "${reason}" was NOT sent to the team.`);
+    } else {
+      console.log(`[Engine] Slack alert sent for lead ${lead.id}: "${reason}"`);
+    }
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
   }
