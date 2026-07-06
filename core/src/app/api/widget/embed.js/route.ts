@@ -14,20 +14,23 @@ export const runtime = 'nodejs';
  *
  * Usage: <script src="https://your-domain.com/api/widget/embed.js"></script>
  */
-// Kill switch history: disabled 2026-07-06 after the widget rendered
-// broken/cut-off live. The first fix (91e3e89c, an open/resize race) did NOT
-// resolve it. Actual root cause found afterward: lokazen's button sits at
-// bottom:96px (clears the site's own mobile footer nav) + 56px tall, needing
-// >=152px of vertical room, but the collapsed iframe was only 100px tall --
-// clipping the button almost entirely, leaving just a few-px sliver visible.
-// Fixed by raising collapsedHeight to 165px below. Verified locally via a
-// same-origin harness: button rect moved from y:-52 (clipped) to y:13 (fully
-// visible); open state (450x760) also confirmed unclipped.
-const WIDGET_DISABLED = false;
+// Kill switch history: disabled globally 2026-07-06 after the widget
+// rendered broken/cut-off live. First fix (91e3e89c, an open/resize race)
+// did NOT resolve it. Real root cause: our collapsed iframe was too short
+// for lokazen's button offset (fixed in 0687451b, collapsedHeight -> 165px)
+// -- confirmed working on windchasers.in. STILL broken on lokazen.in/scout
+// specifically because that site's own HTML has a hardcoded inline
+// <style>#wc-chat-widget{width:125px!important;height:125px!important;}</style>
+// baked in from before our sizing fixes -- it overrides ANY size our script
+// sets, no matter what we ship here. That's on lokazen.in's own page code,
+// not this repo; we can't patch it from here. Disabling lokazen ONLY (not
+// the other 4 brands, which are unaffected) until whoever maintains
+// lokazen.in removes/updates that rule.
+const DISABLED_BRANDS = ['lokazen'];
 
 export async function GET() {
-  if (WIDGET_DISABLED) {
-    return new NextResponse('// Lokazen chat widget temporarily disabled', {
+  if (DISABLED_BRANDS.includes(getCurrentBrandId())) {
+    return new NextResponse('// Chat widget temporarily disabled for this brand', {
       headers: {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
