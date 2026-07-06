@@ -137,6 +137,10 @@ const hasNewHomeLook = isPop || isBcon
 // BCON/POP use subtler KPI-card tints (4% bg / 14% border); other brands keep core's 7%/22%.
 const TINT_BG = hasNewHomeLook ? '4%' : '7%'
 const TINT_BORDER = hasNewHomeLook ? '14%' : '22%'
+// lokazen-only Leads/Gigs tab: same dashboard, same components, wired to
+// scout/connector leads instead of business leads when the Gigs tab is active.
+// Gated on the brand's scouts feature so no other brand ever sees the toggle.
+const showGigsTab = brandCfg.features?.scouts === true
 
 // Thousands separator for the full KPI numbers (8,832 / 1,284). Indian grouping.
 const fmtComma = (n: number | string): string => (typeof n === 'number' ? n.toLocaleString('en-IN') : String(n))
@@ -201,6 +205,9 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
+  // Leads/Gigs tab (lokazen only, see showGigsTab) — identical dashboard,
+  // wired to a different slice of the same founder-metrics endpoint.
+  const [view, setView] = useState<'leads' | 'gigs'>('leads')
 
   // Per-card date ranges (founder: "put the toggle inside the cards, as we used
   // to have"). Active Conversations defaults to Today (24h); the trend to 7D.
@@ -276,7 +283,8 @@ export default function FounderDashboard() {
 
   const loadMetrics = useCallback(async () => {
     try {
-      const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}`)
+      const scopeParam = showGigsTab ? `&scope=${view}` : ''
+      const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}${scopeParam}`)
       if (response.ok) {
         const data = await response.json()
         // POP pitch dashboard: the People table stays real (125), but the
@@ -298,7 +306,7 @@ export default function FounderDashboard() {
         playSound('ready') // once per mount; gated by the Configure toggle + mute
       }
     }
-  }, [hotLeadThreshold])
+  }, [hotLeadThreshold, view])
 
   useEffect(() => {
     loadMetrics()
@@ -551,6 +559,31 @@ export default function FounderDashboard() {
           <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
             {greeting}, {firstName} <span aria-hidden>👋</span>
           </h1>
+          {/* lokazen only: Leads (business leads) / Gigs (scouts + connectors) —
+              same dashboard below, wired to a different slice of the same data. */}
+          {showGigsTab && (
+            <div
+              className="inline-flex items-center gap-0.5 mt-1.5 p-0.5 rounded-lg border"
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+              role="tablist"
+              aria-label="Leads or Gigs"
+            >
+              {(['leads', 'gigs'] as const).map((v) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => setView(v)}
+                  className="px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors"
+                  style={view === v
+                    ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
+                    : { color: 'var(--text-secondary)' }}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an

@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · lokazen: Leads/Gigs tab on the Overview dashboard
+
+- lokazen's Overview page now has a Leads/Gigs tab switch (next to the greeting, only visible when `features.scouts` is on). Leads = current business-lead view, unchanged. Gigs = the exact same dashboard — same cards, same layout, same components — wired to scout/connector leads instead.
+- `founder-metrics` API gained a `scope=leads|gigs` param that flips the existing gig-exclusion filter to a gig-only filter. Every downstream metric (hot/engaged/warm counts, funnel, conversations via the lead-id-scoped session join, leads-needing-attention, stale leads, score distribution) derives from that one filtered list, so the Gigs tab required zero duplicated computation logic — just a different slice of the same data. Booked Calls/Events naturally reads ~0 for Gigs since scouts don't book.
+- In-memory metrics cache changed from a single slot to a `scope+threshold` keyed map so the Leads tab and Gigs tab never serve each other's cached numbers.
+- Non-lokazen brands are unaffected: the tab never renders, and the fetch URL / server-side filter logic is byte-identical to before when scope is omitted.
+
 ## 2026-07-06 · fix: scout template sends didn't update Last Touch; inbox missing the template's button
 
 - Scout WhatsApp template sends never updated `last_touchpoint`/`last_interaction_at` on success — unlike the brand/owner welcome path, which already does. So a scout who'd just been messaged on WhatsApp by PROXe still showed "Web" as their last touch on the Leads table. Now mirrors the brand/owner path.

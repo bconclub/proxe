@@ -14,14 +14,14 @@ const dn = (raw?: string | null): string => {
 
 export const dynamic = 'force-dynamic'
 
-// In-memory cache for metrics (5 minutes TTL)
+// In-memory cache for metrics (5 minutes TTL). Keyed by scope+threshold so the
+// Leads tab and the Gigs tab (lokazen) never serve each other's cached data.
 interface CachedMetrics {
   data: any
   timestamp: number
-  hotLeadThreshold: number
 }
 
-let metricsCache: CachedMetrics | null = null
+const metricsCache = new Map<string, CachedMetrics>()
 const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 
 // PostgREST caps any un-ranged select at 1000 rows, which silently clipped
@@ -46,6 +46,11 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+    // Gigs tab (lokazen only — see brandConfig.features.scouts check below):
+    // same dashboard, wired to scout/connector leads instead of business leads.
+    // Any other brand/value falls back to the normal 'leads' scope untouched.
+    const scope = searchParams.get('scope') === 'gigs' ? 'gigs' : 'leads'
+    const cacheKey = `${scope}_${hotLeadThreshold}`
 
     const authClient = await createClient()
     const {
@@ -55,16 +60,13 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     // Check cache
     const cacheNow = Date.now()
-    if (
-      metricsCache &&
-      metricsCache.hotLeadThreshold === hotLeadThreshold &&
-      (cacheNow - metricsCache.timestamp) < CACHE_TTL
-    ) {
+    const cached = metricsCache.get(cacheKey)
+    if (cached && (cacheNow - cached.timestamp) < CACHE_TTL) {
       // Return cached data
-      return NextResponse.json(metricsCache.data, {
+      return NextResponse.json(cached.data, {
         headers: {
           'X-Cache': 'HIT',
           'Cache-Control': 'private, max-age=300',
@@ -165,15 +167,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure leads is an array. Gig workers (scout + connector) are NOT sales
-    // leads — they have their own dashboard page and must never inflate the
-    // Overview lead totals or stage buckets. Mirrors the exclusion the Leads
-    // table applies (LeadsTable: GIG_TYPES excluded when scouts are on).
+    // leads — they have their own dashboard page/tab and must never inflate the
+    // Overview lead totals or stage buckets, and vice versa. Mirrors the
+    // exclusion the Leads table applies (LeadsTable: GIG_TYPES excluded when
+    // scouts are on). scope=gigs flips this to ONLY gig workers — same
+    // downstream computation (hot/engaged/warm/funnel/sessions all derive from
+    // safeLeads via leadIdSet below), just a different slice of the same table,
+    // so the Gigs tab is wired with zero duplicated logic.
     const rawLeads = leads || []
-    // Gig workers (scout + connector) are not sales leads.
     const GIG_TYPES = ['scout', 'connector']
     const safeLeads = brandConfig.features?.scouts
-      ? rawLeads.filter((lead: any) => !GIG_TYPES.includes(lead?.unified_context?.[BRAND_ID]?.user_type))
-      : rawLeads
+      ? rawLeads.filter((lead: any) => {
+          const isGig = GIG_TYPES.includes(lead?.unified_context?.[BRAND_ID]?.user_type)
+          return scope === 'gigs' ? isGig : !isGig
+        })
+      : (scope === 'gigs' ? [] : rawLeads)
 
     // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
     // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
@@ -1869,11 +1877,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Cache the response
-    metricsCache = {
+    metricsCache.set(cacheKey, {
       data: responseData,
       timestamp: Date.now(),
-      hotLeadThreshold,
-    }
+    })
     
     return NextResponse.json(responseData, {
       headers: {
