@@ -14,13 +14,16 @@ export const runtime = 'nodejs';
  *
  * Usage: <script src="https://your-domain.com/api/widget/embed.js"></script>
  */
-// Kill switch: back ON 2026-07-06. The open/resize-race fix (91e3e89c) did
-// NOT resolve the live issue per direct user report -- widget still broken
-// on production despite passing local verification. Disabled again at the
-// source (pulls it from every site embedding embed.js) until root-caused
-// properly against the real failure, not just the race condition found so
-// far. Do not flip this back without the user confirming it live themselves.
-const WIDGET_DISABLED = true;
+// Kill switch history: disabled 2026-07-06 after the widget rendered
+// broken/cut-off live. The first fix (91e3e89c, an open/resize race) did NOT
+// resolve it. Actual root cause found afterward: lokazen's button sits at
+// bottom:96px (clears the site's own mobile footer nav) + 56px tall, needing
+// >=152px of vertical room, but the collapsed iframe was only 100px tall --
+// clipping the button almost entirely, leaving just a few-px sliver visible.
+// Fixed by raising collapsedHeight to 165px below. Verified locally via a
+// same-origin harness: button rect moved from y:-52 (clipped) to y:13 (fully
+// visible); open state (450x760) also confirmed unclipped.
+const WIDGET_DISABLED = false;
 
 export async function GET() {
   if (WIDGET_DISABLED) {
@@ -48,13 +51,20 @@ export async function GET() {
   iframe.setAttribute('allow', 'microphone; camera; autoplay; clipboard-write');
   iframe.setAttribute('allowusermedia', '');
 
-  // Widget shows immediately on page load. Collapsed size is sized to the
+  // Widget shows immediately on page load. Collapsed WIDTH is sized to the
   // bubble button itself (48-56px) plus offset + shadow bleed, not a fixed
   // 125px — a bigger box than the button left a dead margin that read as a
   // stray dark box behind the circle on brands without a solid page bg.
+  // Collapsed HEIGHT has to stay generous: lokazen's button sits at
+  // bottom:96px (clears the site's own mobile footer nav) + 56px tall, so a
+  // short box (previously 100px) clipped almost the entire button, leaving
+  // only a sliver visible -- the actual "black box" bug, not a resize race.
+  // 165px covers every brand's offset with room to spare; harmless since the
+  // extra space is transparent.
   var isMobileInit = window.innerWidth <= 768;
-  var collapsedSize = isMobileInit ? 88 : 100;
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedSize + 'px;height:' + collapsedSize + 'px;border:none;background:transparent;z-index:2147483647;';
+  var collapsedWidth = isMobileInit ? 88 : 100;
+  var collapsedHeight = 165;
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedWidth + 'px;height:' + collapsedHeight + 'px;border:none;background:transparent;z-index:2147483647;';
 
   // Check for pre-loaded lead context from host page
   var leadContext = window.__proxe_lead || null;
@@ -102,9 +112,8 @@ export async function GET() {
       iframe.style.left = 'auto';
       iframe.style.right = '0';
       iframe.style.bottom = '0';
-      var closedSize = window.innerWidth <= 768 ? 88 : 100;
-      iframe.style.width = closedSize + 'px';
-      iframe.style.height = closedSize + 'px';
+      iframe.style.width = (window.innerWidth <= 768 ? 88 : 100) + 'px';
+      iframe.style.height = '165px';
     }
   });
 
