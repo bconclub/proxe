@@ -800,16 +800,23 @@ export async function POST(request: NextRequest) {
     // {{1}}=name) for brand+owner; scout_welcome (POSITIONAL, {{1}}=name,
     // {{2}}=portal URL) for scouts. Awaited (Vercel won't drop it), soft-fails,
     // and logged to conversations so the inbox reflects the send.
-    // PROXe now owns ALL scout messaging: the website forwards each scout_event
-    // (signup / kyc_submitted / kyc_verified / upi_added / submission / payout)
-    // and no longer sends its own scout WhatsApp. Every scout template is OPT-IN
-    // via this allowlist (env LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) so
-    // nothing fires until each is confirmed live on PROXe's WABA — this prevents
-    // double-texting during the site->PROXe cutover. Scouts are handled entirely
-    // by the dedicated sender below, never by the brand/owner welcome here.
+    // PROXe owns ALL scout messaging: the website forwards each scout_event
+    // (signup / kyc_received / kyc_approved / upi_saved / submission / payout)
+    // and never sends its own scout WhatsApp (confirmed: its own
+    // notifyPayoutSent/etc. are Slack+email admin alerts only, not scout-facing).
+    // All 6 Meta-approved templates are active by default — no Vercel env-var
+    // step needed. LOKAZEN_ACTIVE_SCOUT_TEMPLATES remains as an optional
+    // override (e.g. to disable one template without a code change) but is
+    // never required. Scouts are handled entirely by the dedicated sender
+    // below, never by the brand/owner welcome here.
+    const DEFAULT_ACTIVE_SCOUT_TEMPLATES = [
+      'scout_signup', 'scout_kyc_received', 'scout_kyc_approved',
+      'scout_upi_saved', 'scout_submission_received', 'scout_payout_sent',
+    ]
     const activeScoutTemplates = new Set(
-      (process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES || '')
-        .split(',').map((s) => s.trim()).filter(Boolean),
+      process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES
+        ? process.env.LOKAZEN_ACTIVE_SCOUT_TEMPLATES.split(',').map((s) => s.trim()).filter(Boolean)
+        : DEFAULT_ACTIVE_SCOUT_TEMPLATES,
     )
     const scoutEventToSend = brandCtxData.user_type === 'scout'
       ? String(brandCtxData.scout_event || (isNew ? 'signup' : ''))
@@ -862,14 +869,11 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Lokazen SCOUT messaging — PROXe owns the whole drip ──────────────────
-    // The website forwards every scout_event and no longer texts scouts itself.
-    // Templates 1-4 REUSE the exact names + param order the site already had
-    // Meta-approved (scout_welcome / scout_kyc_submitted / scout_kyc_verified /
-    // scout_upi_added); 5-6 (scout_submission_received / scout_payout) are new.
-    // A template only fires when its name is in the ACTIVE allowlist (env
-    // LOKAZEN_ACTIVE_SCOUT_TEMPLATES, DEFAULT EMPTY) — so during cutover an event
-    // persists context WITHOUT sending until that template is confirmed live on
-    // PROXe's WABA. Add names to the env to switch them on, no redeploy.
+    // The website forwards every scout_event and never texts scouts itself.
+    // All 6 templates (scout_signup / scout_kyc_received / scout_kyc_approved /
+    // scout_upi_saved / scout_submission_received / scout_payout_sent) are the
+    // exact names approved on Lokazen's WABA and are active by default (see
+    // DEFAULT_ACTIVE_SCOUT_TEMPLATES above) — no env var required.
     if (leadBrand === 'lokazen' && scoutEventToSend && normalizedPhone) {
       try {
         const firstName = (leadName || 'there').split(' ')[0]
@@ -933,7 +937,7 @@ export async function POST(request: NextRequest) {
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
-          console.log(`[inbound] Lokazen scout template not yet active: ${mapped.template} (context persisted, no send). Add to LOKAZEN_ACTIVE_SCOUT_TEMPLATES once live on PROXe's WABA.`)
+          console.log(`[inbound] Lokazen scout template disabled via LOKAZEN_ACTIVE_SCOUT_TEMPLATES override: ${mapped.template} (context persisted, no send).`)
         } else {
           const waRes = await sendWhatsAppTemplate(
             normalizedPhone,

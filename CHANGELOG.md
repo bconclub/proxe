@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · lokazen: scout WhatsApp templates active by default (no Vercel env step)
+
+- The 6 scout lifecycle templates (signup, kyc_received, kyc_approved, upi_saved, submission_received, payout_sent) were gated behind `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` defaulting EMPTY — a leftover safety gate from when it was unconfirmed whether the website was still sending its own scout WhatsApp (double-texting risk). That's now confirmed false: the site's own scout notifications (`notifyPayoutSent` etc.) are Slack + email admin alerts only, never scout-facing WhatsApp. Hardcoded all 6 as active by default in code — PROXe now sends every scout event without any Vercel configuration. `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` remains as an optional override/kill-switch, never required.
+
 ## 2026-07-06 · fix: "Property Owner" placeholder name/email leaking onto the dashboard
 
 - **lokazen** — a lead card showed the name **"Property Owner"** and a synthetic **`owner_<phone>_<ts>@noemail.lokazen.in`** email. Root cause: the Lokazen owner app stamps `name: 'Property Owner'` on a brand-new account before the person enters their real name (`api/owner/auth/verify-otp`, `onboarding/owner`); if never updated, that literal flows straight through `sendLeadToProxe` into PROXe.
