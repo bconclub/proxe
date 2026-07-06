@@ -2317,7 +2317,7 @@ export default function InboxPage() {
                                 </span>
                               )}
                               {!sendFailed && (
-                                <span className="flex items-center" title={ds || 'pending'}>
+                                <span className="template-status-tag flex items-center cursor-help" data-tooltip={tooltip}>
                                   <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
                                 </span>
                               )}
@@ -2423,7 +2423,10 @@ export default function InboxPage() {
                                 </div>
                               </div>
                             )}
-                            <span title={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}>
+                            <span
+                              className="template-status-tag cursor-help"
+                              data-tooltip={getDeliveryTooltip(msg.metadata?.delivery_status, msg.metadata?.delivery_error)}
+                            >
                               <DeliveryStatusIcon deliveredAt={msg.delivered_at} readAt={msg.read_at} createdAt={msg.created_at} />
                             </span>
                           </div>
