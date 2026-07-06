@@ -339,14 +339,11 @@ export async function POST(req: NextRequest) {
           cols.loop_status = 'raised';
         }
         if (capturedName) {
-          // For pop the in-call name is authoritative — it also corrects any
-          // brand-name leak already on the row. Other brands only fill a blank.
-          if (BRAND_ID === 'pop') {
-            cols.customer_name = capturedName;
-          } else if (!vapiName) {
-            const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
-            if (cur && !cur.customer_name) cols.customer_name = capturedName;
-          }
+          // A name already on the row — whether set by a prior call or a manual
+          // dashboard edit — is authoritative and must never be overwritten by a
+          // later call's captured name. Only fill it in when it's genuinely blank.
+          const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
+          if (cur && !cur.customer_name) cols.customer_name = capturedName;
         }
         if (Object.keys(cols).length) {
           const { error: gErr } = await supabase.from('all_leads').update(cols).eq('id', leadId);
