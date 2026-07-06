@@ -643,6 +643,17 @@ export async function GET(request: NextRequest) {
       }).length,
     }
 
+    // Gigs tab last funnel node: gigs don't "book" anything, so the Engine
+    // Overview's final stage swaps to "Active" — a scout/connector who has
+    // actually submitted a property or been paid (same definition the Gigs
+    // table's STATUS column uses: scout_event 'submission' or 'payout').
+    const activeGigsCount = scope === 'gigs'
+      ? safeLeads.filter(l => {
+          const ev = String(l?.unified_context?.[BRAND_ID]?.scout_event || '').toLowerCase()
+          return ev === 'submission' || ev === 'payout'
+        }).length
+      : 0
+
     // 9. Channel Performance
     const channelPerformance = {
       web: {
@@ -1818,6 +1829,8 @@ export async function GET(request: NextRequest) {
         leads: staleLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown' })),
       },
       leadFlow,
+      // Gigs tab only (scope=gigs) — 0 otherwise, see activeGigsCount above.
+      activeGigsCount,
       // POP-only calls overview — key omitted entirely for other brands.
       ...(calls ? { calls } : {}),
       channelPerformance,
