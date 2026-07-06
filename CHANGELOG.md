@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: WhatsApp delivery-tick icon had no working tooltip
+
+- The inbox's per-message delivery tick (sent/delivered/read/failed) relied on a native HTML `title` attribute for its tooltip — inconsistent across browsers, easy to miss, no visible styling. A proven custom tooltip mechanism (`template-status-tag` class + `data-tooltip` attribute, backed by real CSS with a visible dark popover) already exists in this same file for the send-failure pill, but was never applied to the tick icon itself. Both render sites (template messages + regular WhatsApp messages) now use that mechanism instead, so hovering the tick always shows a real, visible "Status: Sent / Delivered / Read by customer / Failed — &lt;reason&gt;" popover.
+
 ## 2026-07-06 · fix: "Hi Lead" greeting — the no-name fallback itself read badly
 
 - Fixed "Hi Property" earlier by generalizing `cleanName()`, but its own fallback value — the literal string `'Lead'`, used when no real name is ever captured — reads just as badly as a greeting ("Hi Lead"). `'Lead'` is a fine placeholder for DB storage/dashboard display; it just shouldn't be spoken back to the person. All 3 firstName-for-greeting call sites (lokazen welcome, windchasers PAT result, windchasers demo confirmation) now treat that exact sentinel as no-name too and greet with "there" instead — the DB/dashboard fallback is untouched.
