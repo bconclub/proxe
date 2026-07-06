@@ -26,6 +26,20 @@ export const dynamic = 'force-dynamic'
 const LOKAZEN_SCOUT_ONBOARDING_URL =
   process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://www.lokazen.in/scout#scout-form'
 
+// Upstream forms sometimes send a category/placeholder label instead of an
+// actual name (e.g. "Property" from a property-listing form with no name
+// field) — that literal then gets greeted back at the person ("Hi Property,
+// ..."). Treat these as no-name so callers fall through to their own default.
+const NAME_PLACEHOLDER_BLOCKLIST = new Set([
+  'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
+  'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
+])
+function cleanName(raw?: string | null): string {
+  const trimmed = (raw || '').trim()
+  if (!trimmed) return ''
+  return NAME_PLACEHOLDER_BLOCKLIST.has(trimmed.toLowerCase()) ? '' : trimmed
+}
+
 /**
  * POST /api/agent/leads/inbound
  * Inbound lead API for Facebook, Google, website forms, manual entry.
@@ -498,7 +512,7 @@ export async function POST(request: NextRequest) {
         last_touchpoint: storedTouchpoint,
       }
       if (email) updates.email = email.trim().toLowerCase()
-      if (name && !existing.customer_name) updates.customer_name = name.trim()
+      if (cleanName(name) && !existing.customer_name) updates.customer_name = cleanName(name)
 
       // Merge inbound context into unified_context
       if (Object.keys(inboundContext).length > 0) {
@@ -538,7 +552,7 @@ export async function POST(request: NextRequest) {
       const { data: created, error: createErr } = await supabase
         .from('all_leads')
         .insert({
-          customer_name: name?.trim() || null,
+          customer_name: cleanName(name) || null,
           email: email?.trim().toLowerCase() || null,
           phone,
           customer_phone_normalized: normalizedPhone,
@@ -674,7 +688,7 @@ export async function POST(request: NextRequest) {
     // (e.g. the same Meta form is re-submitted, or the user fills the PAT
     // form after the lead form). Without this guard, every submission appends
     // a duplicate "First Outreach to X" task to the dashboard.
-    const leadName = name?.trim() || existing?.customer_name || 'Lead'
+    const leadName = cleanName(name) || cleanName(existing?.customer_name) || 'Lead'
     // Track whether we have a first_outreach in flight for the response payload.
     // Hoisted out of the else block so it's in scope at the return below
     // (this was a latent ReferenceError once the function actually got called).

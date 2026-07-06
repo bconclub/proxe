@@ -3,24 +3,29 @@
 @tailwind utilities;
 
 :root {
-  /* Let the browser paint NATIVE scrollbars + form controls to match the theme. */
-  color-scheme: light;
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-  
-  /* Light mode theme variables */
-  --bg-primary: #f6f6f6;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: rgba(0, 0, 0, 0.02);
-  --bg-hover: #ececec;
-  --border-primary: #d0d0d0;
+  /* Dark is the app's actual default theme (see layout.tsx theme-init:
+     localStorage.getItem('proxe-theme') || 'bw-dark'). :root used to hold the
+     LIGHT values, so before the beforeInteractive script attaches the .dark
+     class, anything painting off --bg-primary (e.g. a full-screen loader) would
+     flash the light background — a visible white/cream patch behind the dark
+     loading box. :root now matches dark so there is no pre-JS flash; .light
+     below holds the (unchanged) light-theme values as an explicit override. */
+  color-scheme: dark;
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #0A0A0A;
+  --bg-tertiary: rgba(255, 255, 255, 0.02);
+  --bg-hover: #1A1A1A;
+  --border-primary: #262626;
   /* Accent colors set by ThemeProvider from brand config */
   --accent-primary: #8B5CF6;
   --accent-light: #8B5CF6;
   --accent-subtle: #8B5CF620;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
+  --text-primary: #ffffff;
+  --text-secondary: #999999;
 }
 
 .dark {
@@ -36,6 +41,21 @@
   --accent-subtle: #8B5CF620;
   --text-primary: #ffffff;
   --text-secondary: #999999;
+}
+
+.light {
+  color-scheme: light;
+  /* Light mode theme variables — unchanged from the old :root defaults. */
+  --bg-primary: #f6f6f6;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: rgba(0, 0, 0, 0.02);
+  --bg-hover: #ececec;
+  --border-primary: #d0d0d0;
+  --accent-primary: #8B5CF6;
+  --accent-light: #8B5CF6;
+  --accent-subtle: #8B5CF620;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
 }
 
 @media (prefers-color-scheme: dark) {
