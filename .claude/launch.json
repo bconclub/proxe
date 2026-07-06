@@ -68,6 +68,12 @@
       "port": 4006
     },
     {
+      "name": "lokazen-fresh",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd .multi\\lokazen-fresh&&set BRAND_ID=lokazen&&npx next dev -p 4009"],
+      "port": 4009
+    },
+    {
       "name": "kargil-gas",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd /d C:\\Users\\user\\Desktop\\Gas\\kargil-gas-app && npm run dev -- -p 4100"],
