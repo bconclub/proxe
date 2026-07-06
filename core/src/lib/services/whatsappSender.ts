@@ -357,6 +357,33 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   windchasers_pat_result_v2:    ['Book a Demo Class', 'Plan My Pilot Career'],
   windchasers_demo_online_v2:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
   windchasers_demo_offline_v2:  ['Get Directions', 'Join Pilot Community'],
+  // All 6 lokazen scout lifecycle templates carry the same single button —
+  // this is a STATIC URL button baked into the approved template, not a
+  // quick-reply, so it renders in the inbox with a distinct external-link
+  // icon rather than the quick-reply icon (see TEMPLATE_BUTTON_TYPES below).
+  scout_signup:                ['Open Scout Portal'],
+  scout_kyc_received:           ['Open Scout Portal'],
+  scout_kyc_approved:           ['Open Scout Portal'],
+  scout_upi_saved:              ['Open Scout Portal'],
+  scout_submission_received:    ['Open Scout Portal'],
+  scout_payout_sent:            ['Open Scout Portal'],
+};
+
+/**
+ * Button TYPE per template — 'url' (opens a link, no reply sent) vs the
+ * default 'quick_reply' (taps send a message back). The inbox renders these
+ * differently so a URL button never looks tappable-as-a-reply. We don't know
+ * the exact destination URL Meta has baked into these templates (it's
+ * configured at template-approval time in WhatsApp Manager, not sent by us),
+ * so the inbox shows the label + an external-link icon without a live href.
+ */
+export const TEMPLATE_BUTTON_TYPES: Record<string, 'url' | 'quick_reply'> = {
+  scout_signup:                'url',
+  scout_kyc_received:           'url',
+  scout_kyc_approved:           'url',
+  scout_upi_saved:              'url',
+  scout_submission_received:    'url',
+  scout_payout_sent:            'url',
 };
 
 /**

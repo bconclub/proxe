@@ -14,6 +14,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: scout template sends didn't update Last Touch; inbox missing the template's button
+
+- Scout WhatsApp template sends never updated `last_touchpoint`/`last_interaction_at` on success — unlike the brand/owner welcome path, which already does. So a scout who'd just been messaged on WhatsApp by PROXe still showed "Web" as their last touch on the Leads table. Now mirrors the brand/owner path.
+- The inbox's WhatsApp-bubble mockup never rendered the template's button — `metadata.template_buttons` (an existing, working mechanism already used for windchasers templates) was simply never populated for scout messages. Added `TEMPLATE_BUTTONS` entries for all 6 scout templates ("Open Scout Portal") and wired them into the scout message insert.
+- All 6 scout templates carry a STATIC URL button (opens a link), not a quick-reply (taps send a message back) — the inbox was hardcoded to render every button as a quick-reply (reply-arrow icon, "Quick Reply: X" tooltip), which would have mislabeled it. Added a `TEMPLATE_BUTTON_TYPES` map and a URL-button variant (external-link icon, "Opens a link: X" tooltip) — shown as a label only, no href, since the actual destination is configured on Meta's side at template-approval time and isn't something we send or know for certain.
+- Verified via runtime logs that Meta's delivery/read receipts ARE being processed correctly (SENT/DELIVERED/READ all logged around the exact timestamps in question) — if the inbox still shows a single tick, it's a stale/non-realtime view, not a broken pipeline.
+- Note: WhatsApp does not send click webhooks for URL-type buttons (only quick-reply taps generate a message back) — button-tap analytics for "Open Scout Portal" isn't retrievable via the WhatsApp API; it would need to be tracked on the destination page itself.
+
 ## 2026-07-06 · fix: known scouts got the generic brand/owner welcome on WhatsApp
 
 - A registered, active scout texting "Hi" on WhatsApp got the generic brand/owner welcome ("Which one can I help you with? Find a space / List my property / Talk to Lokazen team") instead of scout-appropriate handling — despite `unified_context.lokazen.user_type` already being `'scout'` on their lead record.

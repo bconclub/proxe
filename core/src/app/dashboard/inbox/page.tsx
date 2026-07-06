@@ -2326,28 +2326,44 @@ export default function InboxPage() {
                         })()}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
                           isTemplate ? (
-                            // WhatsApp-style Quick Reply buttons — stacked, divided by hairlines.
+                            // WhatsApp-style buttons — stacked, divided by hairlines.
                             // Theme-aware: uses var(--accent-primary) for label + var(--border-primary)
                             // for dividers so it renders correctly in light AND dark mode.
+                            // A URL button (opens a link, no reply sent) gets an
+                            // external-link icon instead of the quick-reply arrow —
+                            // its destination is baked into the approved template on
+                            // Meta's side, not something we send, so it's shown as a
+                            // label only (no href) rather than guessing a link.
                             <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
-                                <div
-                                  key={btnIdx}
-                                  className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
-                                  style={{
-                                    color: 'var(--accent-primary)',
-                                    borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
-                                    background: 'var(--bg-primary)',
-                                  }}
-                                  title={`Quick Reply: ${btn}`}
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
-                                    <polyline points="9 17 4 12 9 7" />
-                                    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-                                  </svg>
-                                  {btn}
-                                </div>
-                              ))}
+                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => {
+                                const isUrlButton = msg.metadata?.template_button_type === 'url'
+                                return (
+                                  <div
+                                    key={btnIdx}
+                                    className="flex items-center justify-center gap-1.5 text-[12px] font-medium py-2 px-2"
+                                    style={{
+                                      color: 'var(--accent-primary)',
+                                      borderTop: btnIdx > 0 ? '1px solid var(--border-primary)' : undefined,
+                                      background: 'var(--bg-primary)',
+                                    }}
+                                    title={isUrlButton ? `Opens a link: ${btn}` : `Quick Reply: ${btn}`}
+                                  >
+                                    {isUrlButton ? (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                      </svg>
+                                    ) : (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+                                        <polyline points="9 17 4 12 9 7" />
+                                        <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                                      </svg>
+                                    )}
+                                    {btn}
+                                  </div>
+                                )
+                              })}
                             </div>
                           ) : (
                             <div className="flex flex-wrap gap-1.5 mt-1.5">

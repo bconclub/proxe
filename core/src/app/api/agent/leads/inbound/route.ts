@@ -14,6 +14,7 @@ import {
   TIER_MESSAGES,
   TEMPLATE_HEADERS,
   TEMPLATE_BUTTONS,
+  TEMPLATE_BUTTON_TYPES,
   notifySlackLead,
   sendWhatsAppTemplate,
 } from '@/lib/services'
@@ -956,6 +957,8 @@ export async function POST(request: NextRequest) {
             metadata: {
               template_name: mapped.template,
               template_language: 'en',
+              template_buttons: TEMPLATE_BUTTONS[mapped.template] || [],
+              template_button_type: TEMPLATE_BUTTON_TYPES[mapped.template] || 'quick_reply',
               auto_sent: true,
               trigger: `scout_${scoutEventToSend}`,
               sent_by: 'system (inbound webhook)',
@@ -969,6 +972,13 @@ export async function POST(request: NextRequest) {
             console.error(`[inbound] Lokazen scout WA FAILED lead=${leadId} template=${mapped.template} status=${(waRes as any).statusCode} error=${waRes.error}`)
             await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
           } else {
+            // We just reached the scout on WhatsApp — that's the latest touch now
+            // (mirrors the brand/owner welcome path above, which already does this;
+            // the scout path never did, so the Leads table kept showing "Web" as
+            // last touch even after PROXe sent a scout template).
+            await supabase.from('all_leads')
+              .update({ last_touchpoint: 'whatsapp', last_interaction_at: new Date().toISOString() })
+              .eq('id', leadId)
             console.log(`[inbound] Lokazen scout WA sent lead=${leadId} template=${mapped.template} messageId=${(waRes as any).messageId}`)
           }
         }
