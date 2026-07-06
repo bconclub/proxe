@@ -876,48 +876,45 @@ export async function POST(request: NextRequest) {
     // DEFAULT_ACTIVE_SCOUT_TEMPLATES above) — no env var required.
     if (leadBrand === 'lokazen' && scoutEventToSend && normalizedPhone) {
       try {
-        const firstName = (leadName || 'there').split(' ')[0]
-        const url = String(brandCtxData.scout_url || LOKAZEN_SCOUT_ONBOARDING_URL)
-        const area = String(brandCtxData.last_submission_area || brandCtxData.scout_area_covered || 'your area')
-        const amount = String(brandCtxData.last_payout_amount || '')
-        const upi = String(brandCtxData.scout_upi_id || '')
-        const t = (text: string) => ({ type: 'text' as const, text })
         // Canonical scout event → the EXACT Meta-approved template on Lokazen's
-        // WABA (verified live 2026-07-03: scout_signup / scout_kyc_received /
-        // scout_kyc_approved / scout_upi_saved / scout_submission_received /
-        // scout_payout_sent). params[] order must match each template's {{n}}
-        // placeholders — VERIFY against the live template body before enabling in
-        // LOKAZEN_ACTIVE_SCOUT_TEMPLATES, or Meta hard-fails on a param mismatch.
+        // WABA (verified live in WhatsApp Manager, 2026-07-06: every one of these
+        // 6 templates is FULLY STATIC — zero {{n}} body placeholders, just a
+        // static "Open Scout Portal" URL button — so params is always []. (Body
+        // text below is copied verbatim from the approved previews, purely for
+        // the conversations-table timeline; it is never sent to Meta. If a
+        // future template adds real placeholders, rebuild the per-lead values —
+        // leadName/brandCtxData.scout_url/scout_area_covered/last_payout_amount/
+        // scout_upi_id — here and pass them via params instead of [].)
         const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
           signup: {
             template: 'scout_signup',
-            params: [t(firstName), t(url)],
-            body: `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC) so we can pay you - it takes about 5 minutes. Open your dashboard: ${url}\n\nSee you out there.`,
+            params: [],
+            body: `Welcome to Lokazen Scout! Your account is ready. Spot vacant shops and offices in Bangalore, submit them from your phone, and earn for every verified property. Log in anytime with your phone number - no password needed.`,
           },
           kyc_received: {
             template: 'scout_kyc_received',
-            params: [t(firstName)],
-            body: `Thanks ${firstName} - we have received your KYC details. Verification is in progress and we'll message you the moment it's reviewed. You can keep spotting and submitting shops meanwhile - payout is simply held until verification completes.`,
+            params: [],
+            body: `We have received your KYC details. Verification is usually completed within 24 hours, and we will message you as soon as you are approved. You can check your status anytime in your Scout dashboard.`,
           },
           kyc_approved: {
             template: 'scout_kyc_approved',
-            params: [t(firstName), t(url)],
-            body: `Good news ${firstName} - your KYC is verified. You are all set to be paid. Last step: add your UPI ID so we can send your ₹250 per verified property. Add it here: ${url}\n\nAlmost there.`,
+            params: [],
+            body: `Good news - your KYC is verified. You are all set to earn as a Lokazen Scout. Add your UPI ID in your profile (if you have not already) so payouts reach you directly.`,
           },
           upi_saved: {
             template: 'scout_upi_saved',
-            params: [t(firstName), t(upi || 'your UPI')],
-            body: `All set, ${firstName}! Your UPI ID (${upi || 'your UPI'}) has been saved. Payouts for your verified listings will land there within 24 to 48 hours. Go spot a To Let shop and submit - happy scouting.`,
+            params: [],
+            body: `Your UPI ID has been saved. Payouts for your verified properties will be sent directly to this UPI. You are fully set up - happy scouting!`,
           },
           submission: {
             template: 'scout_submission_received',
-            params: [t(firstName), t(area)],
-            body: `Hi ${firstName}, we have received your property submission at ${area}. Our team will verify it and update you soon.`,
+            params: [],
+            body: `We have received your property submission. Our team will verify it and update you soon.`,
           },
           payout: {
             template: 'scout_payout_sent',
-            params: [t(firstName), t(amount || 'Your reward')],
-            body: `Hi ${firstName}, your Lokazen Scout payout of ${amount || 'your reward'} has been sent to your UPI. Keep spotting To Let shops to earn more.`,
+            params: [],
+            body: `Your Lokazen Scout payout has been sent to your UPI. It should reflect in your account shortly. You can see your full earnings summary in your dashboard - keep scouting!`,
           },
         }
         // Normalise the website's scout_event vocabulary onto the canonical keys
@@ -939,10 +936,15 @@ export async function POST(request: NextRequest) {
         } else if (!activeTemplates.has(mapped.template)) {
           console.log(`[inbound] Lokazen scout template disabled via LOKAZEN_ACTIVE_SCOUT_TEMPLATES override: ${mapped.template} (context persisted, no send).`)
         } else {
+          // Fully static templates (params.length === 0) get an empty components
+          // array — Meta hard-fails on a BODY component whose parameter count
+          // doesn't match the template's placeholder count (seen live: sending 2
+          // params to a 0-param template → 132000 error), so don't send a BODY
+          // component at all when there's nothing to fill in.
           const waRes = await sendWhatsAppTemplate(
             normalizedPhone,
             mapped.template,
-            [{ type: 'body', parameters: mapped.params }],
+            mapped.params.length > 0 ? [{ type: 'body', parameters: mapped.params }] : [],
             'en',
           )
           await supabase.from('conversations').insert({

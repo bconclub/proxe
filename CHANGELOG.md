@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: scout WhatsApp sends hard-failing on Meta (wrong param count)
+
+- First real test (submitting a property as a scout) revealed every one of the 6 scout templates was built on a wrong assumption: I'd guessed each needed personalized params (name/URL/area/amount/UPI), but the real approved copy in WhatsApp Manager is **fully static** — zero `{{n}}` placeholders, just a static "Open Scout Portal" button. Meta hard-rejected the send: `scout_submission_received` got 2 params, expected 0 (`132000` error) — so scouts got nothing.
+- Rebuilt all 6 template bodies verbatim from the approved previews (signup, kyc_received, kyc_approved, upi_saved, submission_received, payout_sent) with `params: []`, and changed the send call to omit the BODY component entirely when there are no params (rather than trust an empty `parameters: []` array behaves identically) — the safer, unambiguous shape for a fully static template.
+
 ## 2026-07-06 · lokazen: scout WhatsApp templates active by default (no Vercel env step)
 
 - The 6 scout lifecycle templates (signup, kyc_received, kyc_approved, upi_saved, submission_received, payout_sent) were gated behind `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` defaulting EMPTY — a leftover safety gate from when it was unconfirmed whether the website was still sending its own scout WhatsApp (double-texting risk). That's now confirmed false: the site's own scout notifications (`notifyPayoutSent` etc.) are Slack + email admin alerts only, never scout-facing WhatsApp. Hardcoded all 6 as active by default in code — PROXe now sends every scout event without any Vercel configuration. `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` remains as an optional override/kill-switch, never required.
