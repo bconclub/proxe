@@ -695,6 +695,10 @@ export async function POST(request: NextRequest) {
     // (e.g. the same Meta form is re-submitted, or the user fills the PAT
     // form after the lead form). Without this guard, every submission appends
     // a duplicate "First Outreach to X" task to the dashboard.
+    // 'Lead' is a placeholder, fine for DB storage/dashboard display, but reads
+    // badly as a WhatsApp greeting ("Hi Lead" — the same class of bug as "Hi
+    // Property"). Every firstName-for-greeting derivation below checks for this
+    // exact sentinel and uses 'there' instead, without changing the DB fallback.
     const leadName = cleanName(name) || cleanName(existing?.customer_name) || 'Lead'
     // Track whether we have a first_outreach in flight for the response payload.
     // Hoisted out of the else block so it's in scope at the return below
@@ -824,7 +828,7 @@ export async function POST(request: NextRequest) {
       : null
     if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
       try {
-        const firstName = (leadName || 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
         const templateName = 'lokazen_lead_confirm'
         const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
         const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
@@ -1016,7 +1020,7 @@ export async function POST(request: NextRequest) {
         // AWAIT (not fire-and-forget) — Vercel kills in-flight promises after
         // NextResponse.json() returns. Also always log to conversations,
         // success OR failure, so the dashboard reflects reality.
-        const firstName = (leadName || 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
         const tierKey = (derivedTier || tier || '').toLowerCase().trim()
         const tierLabel = TIER_LABELS[tierKey] || (tier || 'Pending')
         const tierMessage = TIER_MESSAGES[tierKey] || 'A counsellor can walk you through the next steps.'
@@ -1219,7 +1223,7 @@ export async function POST(request: NextRequest) {
           : 'windchasers_demo_offline_v2'
 
         // AWAIT (not fire-and-forget) — see PAT block above for rationale.
-        const firstName = (leadName || 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
         const renderedBody = demoFormat === 'online'
           ? renderDemoOnlineBody(firstName, dateDisplay, timeDisplay)
           : renderDemoOfflineBody(firstName, dateDisplay, timeDisplay)
