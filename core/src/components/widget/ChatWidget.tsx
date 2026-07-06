@@ -327,16 +327,45 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   }, []);
 
   const handleOpenChat = useCallback(() => {
-    setShowCloseConfirm(false);
-    setIsDockedBubble(true);
-    setIsOpen(true);
-    setIsExpanded(false);
-    setShowQuickButtons(false);
-    setIsInputActive(true);
-    // Notify parent iframe to enable pointer events
-    if (window.parent !== window) {
-      window.parent.postMessage('wc-chat-open', '*');
+    const commitOpen = () => {
+      setShowCloseConfirm(false);
+      setIsDockedBubble(true);
+      setIsOpen(true);
+      setIsExpanded(false);
+      setShowQuickButtons(false);
+      setIsInputActive(true);
+    };
+
+    if (window.parent === window) {
+      commitOpen();
+      return;
     }
+
+    // Wait for the parent to actually resize the outer <iframe> before we
+    // grow our own panel -- embed.js already acks the resize via a
+    // 'wc-viewport' message right after it applies the new width/height.
+    // Committing open immediately (no wait) let the panel's expand render
+    // before that round-trip landed, clipping it to a thin sliver against
+    // the still-small outer box -- worse on slower devices/embeds where the
+    // round-trip takes longer than a frame. Bounded fallback in case an
+    // older cached embed.js never sends the ack.
+    let settled = false;
+    const onAck = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'wc-viewport') {
+        settled = true;
+        window.removeEventListener('message', onAck);
+        commitOpen();
+      }
+    };
+    window.addEventListener('message', onAck);
+    window.parent.postMessage('wc-chat-open', '*');
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        window.removeEventListener('message', onAck);
+        commitOpen();
+      }
+    }, 120);
   }, []);
 
   // Once chat opens, keep widget in docked bubble mode so it docks right as a bubble
