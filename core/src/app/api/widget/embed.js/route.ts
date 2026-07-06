@@ -30,8 +30,13 @@ export async function GET() {
   iframe.setAttribute('allow', 'microphone; camera; autoplay; clipboard-write');
   iframe.setAttribute('allowusermedia', '');
 
-  // Widget shows immediately on page load
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:125px;height:125px;border:none;background:transparent;z-index:2147483647;';
+  // Widget shows immediately on page load. Collapsed size is sized to the
+  // bubble button itself (48-56px) plus offset + shadow bleed, not a fixed
+  // 125px — a bigger box than the button left a dead margin that read as a
+  // stray dark box behind the circle on brands without a solid page bg.
+  var isMobileInit = window.innerWidth <= 768;
+  var collapsedSize = isMobileInit ? 88 : 100;
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedSize + 'px;height:' + collapsedSize + 'px;border:none;background:transparent;z-index:2147483647;';
 
   // Check for pre-loaded lead context from host page
   var leadContext = window.__proxe_lead || null;
@@ -79,8 +84,9 @@ export async function GET() {
       iframe.style.left = 'auto';
       iframe.style.right = '0';
       iframe.style.bottom = '0';
-      iframe.style.width = '125px';
-      iframe.style.height = '125px';
+      var closedSize = window.innerWidth <= 768 ? 88 : 100;
+      iframe.style.width = closedSize + 'px';
+      iframe.style.height = closedSize + 'px';
     }
   });
 
