@@ -26,7 +26,7 @@ function getCredentials() {
 /**
  * GET - List all templates from Meta Business Account
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const creds = getCredentials()
     if (!creds) {
@@ -35,6 +35,9 @@ export async function GET() {
         { status: 500 }
       )
     }
+    // Manual override for when auto-discovery can't resolve the WABA (e.g. lokazen):
+    // GET /api/whatsapp/templates?waba=<WABA_ID>. Skips discovery, lists directly.
+    const wabaOverride = request.nextUrl.searchParams.get('waba')
 
     // Step 1: Get phone info
     const phoneRes = await fetch(
@@ -43,8 +46,8 @@ export async function GET() {
     )
     const phoneData = await phoneRes.json()
 
-    // Step 2: Resolve WABA ID - env var > edge lookup > debug_token
-    let wabaId: string | null = creds.wabaId || null
+    // Step 2: Resolve WABA ID - ?waba override > env var > edge lookup > debug_token
+    let wabaId: string | null = wabaOverride || creds.wabaId || null
     const debugInfo: Record<string, any> = {}
 
     if (!wabaId) {

@@ -858,41 +858,57 @@ export async function POST(request: NextRequest) {
         const amount = String(brandCtxData.last_payout_amount || '')
         const upi = String(brandCtxData.scout_upi_id || '')
         const t = (text: string) => ({ type: 'text' as const, text })
+        // Canonical scout event → the EXACT Meta-approved template on Lokazen's
+        // WABA (verified live 2026-07-03: scout_signup / scout_kyc_received /
+        // scout_kyc_approved / scout_upi_saved / scout_submission_received /
+        // scout_payout_sent). params[] order must match each template's {{n}}
+        // placeholders — VERIFY against the live template body before enabling in
+        // LOKAZEN_ACTIVE_SCOUT_TEMPLATES, or Meta hard-fails on a param mismatch.
         const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
-          // 1-4: same names + param order as the site's approved templates.
           signup: {
-            template: 'scout_welcome',
+            template: 'scout_signup',
             params: [t(firstName), t(url)],
             body: `Hi ${firstName}, welcome to Lokazen Scout! Spot an empty commercial shop with a To Let board, take one clear photo, and earn ₹250 per verified listing.\n\nNext step: complete your one-time ID check (KYC) so we can pay you - it takes about 5 minutes. Open your dashboard: ${url}\n\nSee you out there.`,
           },
-          kyc_submitted: {
-            template: 'scout_kyc_submitted',
+          kyc_received: {
+            template: 'scout_kyc_received',
             params: [t(firstName)],
-            body: `Thanks ${firstName} - your ID verification request is submitted. We'll message you the moment it's reviewed. You can keep spotting and submitting shops in the meantime - your payout is simply held until verification completes.`,
+            body: `Thanks ${firstName} - we have received your KYC details. Verification is in progress and we'll message you the moment it's reviewed. You can keep spotting and submitting shops meanwhile - payout is simply held until verification completes.`,
           },
-          kyc_verified: {
-            template: 'scout_kyc_verified',
+          kyc_approved: {
+            template: 'scout_kyc_approved',
             params: [t(firstName), t(url)],
-            body: `You're verified, ${firstName}! Your identity check is complete and you can now be paid. Last step: add your UPI ID in your profile so we can send your ₹250 per verified property. Add it here: ${url}\n\nAlmost there.`,
+            body: `Good news ${firstName} - your KYC is verified. You are all set to be paid. Last step: add your UPI ID so we can send your ₹250 per verified property. Add it here: ${url}\n\nAlmost there.`,
           },
-          upi_added: {
-            template: 'scout_upi_added',
-            params: [t(firstName), t(upi || 'your UPI'), t(url)],
-            body: `All set, ${firstName}! Your UPI (${upi || 'your UPI'}) is saved and you're ready to earn. Go spot a To Let shop, take one clear photo, and submit - most verified listings pay within 24 to 48 hours. Submit here: ${url}\n\nHappy scouting.`,
+          upi_saved: {
+            template: 'scout_upi_saved',
+            params: [t(firstName), t(upi || 'your UPI')],
+            body: `All set, ${firstName}! Your UPI ID (${upi || 'your UPI'}) has been saved. Payouts for your verified listings will land there within 24 to 48 hours. Go spot a To Let shop and submit - happy scouting.`,
           },
-          // 5-6: net-new touchpoints the site never messaged.
           submission: {
             template: 'scout_submission_received',
             params: [t(firstName), t(area)],
-            body: `Hi ${firstName}, we have received your shop submission at ${area}. Our team will verify it and update you soon.`,
+            body: `Hi ${firstName}, we have received your property submission at ${area}. Our team will verify it and update you soon.`,
           },
           payout: {
-            template: 'scout_payout',
-            params: [t(firstName), t(area), t(amount || 'Your reward')],
-            body: `Hi ${firstName}, your submission at ${area} is verified and ${amount || 'your reward'} has been sent to your UPI. Keep spotting To Let shops to earn more.`,
+            template: 'scout_payout_sent',
+            params: [t(firstName), t(amount || 'Your reward')],
+            body: `Hi ${firstName}, your Lokazen Scout payout of ${amount || 'your reward'} has been sent to your UPI. Keep spotting To Let shops to earn more.`,
           },
         }
-        const mapped = SCOUT_EVENT_MAP[scoutEventToSend]
+        // Normalise the website's scout_event vocabulary onto the canonical keys
+        // above so a naming drift (kyc_submitted vs kyc_received, upi_added vs
+        // upi_saved, payout vs payout_sent, etc.) still fires the right template.
+        const SCOUT_EVENT_ALIASES: Record<string, string> = {
+          signup: 'signup', welcome: 'signup', scout_signup: 'signup',
+          kyc_submitted: 'kyc_received', kyc_received: 'kyc_received', kyc: 'kyc_received',
+          kyc_verified: 'kyc_approved', kyc_approved: 'kyc_approved', verified: 'kyc_approved',
+          upi_added: 'upi_saved', upi_saved: 'upi_saved', upi: 'upi_saved',
+          submission: 'submission', submission_received: 'submission', submitted: 'submission',
+          payout: 'payout', payout_sent: 'payout', paid: 'payout',
+        }
+        const canonicalEvent = SCOUT_EVENT_ALIASES[scoutEventToSend] || scoutEventToSend
+        const mapped = SCOUT_EVENT_MAP[canonicalEvent]
         const activeTemplates = activeScoutTemplates
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)

@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · lokazen: point scout drip at the real approved template names + WABA pull override
+
+- **lokazen** — the scout lifecycle sender (`agent/leads/inbound`) had placeholder template names (`scout_welcome`, `scout_kyc_submitted`, `scout_kyc_verified`, `scout_upi_added`, `scout_payout`). Repointed to the **actually-approved** names on Lokazen's WABA: `scout_signup`, `scout_kyc_received`, `scout_kyc_approved`, `scout_upi_saved`, `scout_submission_received`, `scout_payout_sent`. Added `SCOUT_EVENT_ALIASES` so the website's `scout_event` vocabulary normalises onto the canonical keys regardless of drift. **Not yet enabled** — `LOKAZEN_ACTIVE_SCOUT_TEMPLATES` still default-empty; params must be verified against each live template body first (a param-count mismatch hard-fails at Meta).
+- **infra** — `GET /api/whatsapp/templates?waba=<WABA_ID>` now accepts a manual WABA override (auto-discovery returns empty for lokazen's system-user token), so template definitions can be pulled on demand.
+
 ## 2026-07-05 · lokazen: transparent loading logo (drop the square .jpg box) + brand-colour loader glow
 
 - **lokazen** — the dashboard loading screen + page-transition loader showed the square `lokazen-icon.jpg` (JPGs have no transparency → a visible box). Added a `markPath` brand-config field (transparent logo for loaders, defaults to `iconPath`) and set lokazen's to `/lokazen-mark.svg` (transparent 3-orb). `iconPath` is unchanged so the favicon stays correct. Both `FounderDashboard` and `PageTransitionLoader` now use `markPath || iconPath`.
