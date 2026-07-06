@@ -14,7 +14,24 @@ export const runtime = 'nodejs';
  *
  * Usage: <script src="https://your-domain.com/api/widget/embed.js"></script>
  */
+// Kill switch: widget is rendering broken/cut-off on live marketing sites
+// (lokazen, windchasers). Disabled at the source so every site embedding
+// <script src=".../api/widget/embed.js"> stops showing it immediately,
+// without needing to touch each external site's HTML. Flip back to false
+// once the underlying render bug is fixed and verified locally.
+const WIDGET_DISABLED = true;
+
 export async function GET() {
+  if (WIDGET_DISABLED) {
+    return new NextResponse('// Lokazen chat widget temporarily disabled', {
+      headers: {
+        'Content-Type': 'application/javascript',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+
   const embedCode = `
 (function() {
   if (document.getElementById('wc-chat-widget')) return;
