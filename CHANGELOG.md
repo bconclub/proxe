@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: extend the duplicate-send gate to EVERY outbound template
+
+- The 5-minute dedup gate built for the scout-message duplicate bug only covered scout templates. Audited every outbound WhatsApp send in this webhook and found the same unguarded pattern on two more: **`sendPATResult`** (windchasers PAT result) and **`sendDemoConfirmation`** (windchasers demo booking) — both fire on every matching webhook call with zero protection against the site calling this endpoint twice for the same event (retry/reload/double-submit), the exact class of bug already confirmed live for scouts.
+- Extracted the dedup check into a shared `wasTemplateRecentlySent()` helper and applied it to all three send paths (scout, PAT, demo) — one gate, checked the same way everywhere, instead of one-off protection per template. (The 4th send site, `lokazen_lead_confirm` for brand/owner, was checked too — it's already race-safe via the `all_leads` unique-constraint fallback, so it wasn't touched.)
+
 ## 2026-07-06 · fix: scout templates were sending duplicate WhatsApp messages
 
 - Confirmed live: the same `scout_kyc_received` template fired **4 times to the same scout within 6 minutes** (twice at the identical minute) — the website calling the inbound webhook more than once for the same `scout_event` (reload/retry/double form-submit) had no dedup gate at all.
