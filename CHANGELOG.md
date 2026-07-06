@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: "Hi Lead" greeting — the no-name fallback itself read badly
+
+- Fixed "Hi Property" earlier by generalizing `cleanName()`, but its own fallback value — the literal string `'Lead'`, used when no real name is ever captured — reads just as badly as a greeting ("Hi Lead"). `'Lead'` is a fine placeholder for DB storage/dashboard display; it just shouldn't be spoken back to the person. All 3 firstName-for-greeting call sites (lokazen welcome, windchasers PAT result, windchasers demo confirmation) now treat that exact sentinel as no-name too and greet with "there" instead — the DB/dashboard fallback is untouched.
+
 ## 2026-07-06 · lokazen: Leads/Gigs tab on the Overview dashboard
 
 - lokazen's Overview page now has a Leads/Gigs tab switch (next to the greeting, only visible when `features.scouts` is on). Leads = current business-lead view, unchanged. Gigs = the exact same dashboard — same cards, same layout, same components — wired to scout/connector leads instead.
