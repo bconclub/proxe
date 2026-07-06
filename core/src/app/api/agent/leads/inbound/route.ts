@@ -936,10 +936,36 @@ export async function POST(request: NextRequest) {
         const canonicalEvent = SCOUT_EVENT_ALIASES[scoutEventToSend] || scoutEventToSend
         const mapped = SCOUT_EVENT_MAP[canonicalEvent]
         const activeTemplates = activeScoutTemplates
+        // Dedup gate: the website can call this webhook more than once for the
+        // exact same scout_event (page reload, retry, double form-submit —
+        // observed live: the same scout_kyc_received fired 4x within 6 minutes,
+        // twice at the identical minute). Skip the send if we already sent this
+        // SAME template to this lead within the last 5 minutes. Time-based
+        // (not "only once ever") so genuinely repeatable events — a scout
+        // submitting a 2nd, 3rd, 4th property, or a later payout — still send;
+        // only true back-to-back duplicates get squashed.
+        const DEDUP_WINDOW_MS = 5 * 60 * 1000
+        let recentDuplicate = false
+        if (mapped) {
+          const { data: recentSend } = await supabase
+            .from('conversations')
+            .select('id, created_at')
+            .eq('lead_id', leadId)
+            .eq('channel', 'whatsapp')
+            .filter('metadata->>template_name', 'eq', mapped.template)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (recentSend?.created_at && (Date.now() - new Date(recentSend.created_at).getTime()) < DEDUP_WINDOW_MS) {
+            recentDuplicate = true
+          }
+        }
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
           console.log(`[inbound] Lokazen scout template disabled via LOKAZEN_ACTIVE_SCOUT_TEMPLATES override: ${mapped.template} (context persisted, no send).`)
+        } else if (recentDuplicate) {
+          console.log(`[inbound] Lokazen scout template SKIPPED as duplicate (sent within last 5 min): ${mapped.template} lead=${leadId}`)
         } else {
           // Fully static templates (params.length === 0) get an empty components
           // array — Meta hard-fails on a BODY component whose parameter count

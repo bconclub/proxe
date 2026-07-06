@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: scout templates were sending duplicate WhatsApp messages
+
+- Confirmed live: the same `scout_kyc_received` template fired **4 times to the same scout within 6 minutes** (twice at the identical minute) — the website calling the inbound webhook more than once for the same `scout_event` (reload/retry/double form-submit) had no dedup gate at all.
+- Added a 5-minute dedup window: before sending, check the lead's `conversations` for the same `template_name` sent recently — skip (log only, context still persists) if found. Time-based rather than "only ever once" so genuinely repeatable events — a scout's 2nd/3rd/4th property submission, or a later payout — still send correctly; only true back-to-back duplicates get squashed.
+
 ## 2026-07-06 · lokazen: Gigs tab's Engine Overview shows "Active", not "Booked"
 
 - The Engine Overview funnel's last node ("Booked", calendar icon) is meaningless on the Gigs tab — scouts/connectors don't book calls. Swapped it to "Active" (checkmark icon, "Submitting properties") on the Gigs tab only — count of scouts who've actually submitted a property or been paid (`scout_event` = submission/payout), the same definition the Gigs table's STATUS column already uses. Leads tab is untouched.
