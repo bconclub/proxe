@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: known scouts got the generic brand/owner welcome on WhatsApp
+
+- A registered, active scout texting "Hi" on WhatsApp got the generic brand/owner welcome ("Which one can I help you with? Find a space / List my property / Talk to Lokazen team") instead of scout-appropriate handling — despite `unified_context.lokazen.user_type` already being `'scout'` on their lead record.
+- Root cause: `detectLokazenAudience()` only reads the live conversation (message text, prior assistant question, buttons tapped) — it has nothing to detect on a fresh "Hi" with no history in that turn. It's only ever called from the website chat route; the WhatsApp meta webhook handler never called it and never set `AgentInput.lokazenAudience` at all, so every WhatsApp message — including from known scouts — arrived with zero audience context and fell through to the default flow.
+- Fixed at the source: `handleIncomingMessage` (meta webhook) now looks up the lead's own stored `unified_context.lokazen.user_type` right after resolving the lead and passes it as `lokazenAudience` on `AgentInput`. This engages the SCOUT SUPPORT prompt logic that already existed (open, flexible handling — never a call, never the owner/brand flow, draws from the scout KB) but had never been reachable from WhatsApp.
+
 ## 2026-07-06 · fix: scout WhatsApp sends hard-failing on Meta (wrong param count)
 
 - First real test (submitting a property as a scout) revealed every one of the 6 scout templates was built on a wrong assumption: I'd guessed each needed personalized params (name/URL/area/amount/UPI), but the real approved copy in WhatsApp Manager is **fully static** — zero `{{n}}` placeholders, just a static "Open Scout Portal" button. Meta hard-rejected the send: `scout_submission_received` got 2 params, expected 0 (`132000` error) — so scouts got nothing.

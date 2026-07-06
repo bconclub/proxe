@@ -644,6 +644,25 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       await tagMetaFormClickThrough(leadId, messageText, supabase);
     }
 
+    // A returning lokazen scout/owner/brand texting "Hi" has NO conversation
+    // history in this session, so detectLokazenAudience() (which only reads the
+    // live conversation) has nothing to detect — the generic brand/owner welcome
+    // fired instead, even for a known, active scout. Recover the audience from
+    // the lead's OWN stored record instead of re-asking every time they text in.
+    let knownLokazenAudience: 'brand' | 'owner' | 'scout' | null = null;
+    if (brand === 'lokazen') {
+      const { data: existingLeadCtx } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .maybeSingle();
+      const storedType = existingLeadCtx?.unified_context?.lokazen?.user_type;
+      knownLokazenAudience = storedType === 'scout' ? 'scout'
+        : storedType === 'brand' ? 'brand'
+        : (storedType === 'owner' || storedType === 'property_owner') ? 'owner'
+        : null;
+    }
+
     // 1b–4. Parallelize: dedup checks + session creation + cross-channel context
     const dedupCutoff30s = new Date(Date.now() - 30_000).toISOString();
     const [
@@ -802,6 +821,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       conversationHistory,
       summary: existingSummary,
       usedButtons: [],
+      lokazenAudience: knownLokazenAudience,
     };
 
     // FINAL DEDUP CHECK — race protection.
