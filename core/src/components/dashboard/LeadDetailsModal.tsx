@@ -21,6 +21,14 @@ import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } fr
 // resend import was added to the barrel.
 import { cleanDisplayName } from '@/lib/services/utils'
 
+// Property-owner leads get a synthetic placeholder email
+// (owner_<phone>_<ts>@noemail.lokazen.in) when they have no real email. It's an
+// internal id, not a contact — never show it as the lead's email.
+function displayEmail(email: string | null | undefined): string | null {
+  if (!email) return null
+  return /@noemail\.|noreply|no-reply|placeholder/i.test(email) ? null : email
+}
+
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
   if (!dateString) return '-';
@@ -2044,8 +2052,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
               {/* Contact Info Section - Bottom */}
               <address className="lead-contact-info space-y-1 mt-auto not-italic">
-                {/* Email with icon */}
-                {currentLead.email && (
+                {/* Email with icon — hidden for synthetic @noemail placeholders */}
+                {currentLead.email && displayEmail(currentLead.email) && (
                   <div className="lead-contact-email group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                       <MdEmail className="text-[var(--text-secondary)]" size={14} />
@@ -2287,7 +2295,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {!currentLead.email && !currentLead.phone && (
+                {!displayEmail(currentLead.email) && !currentLead.phone && (
                   <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
                 )}
               </address>

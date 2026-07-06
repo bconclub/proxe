@@ -26,10 +26,14 @@ export const dynamic = 'force-dynamic'
 const LOKAZEN_SCOUT_ONBOARDING_URL =
   process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://www.lokazen.in/scout#scout-form'
 
-// Upstream forms sometimes send a category/placeholder label instead of an
-// actual name (e.g. "Property" from a property-listing form with no name
-// field) — that literal then gets greeted back at the person ("Hi Property,
-// ..."). Treat these as no-name so callers fall through to their own default.
+// Upstream forms/apps sometimes send a category/placeholder label instead of an
+// actual name — a single word (e.g. "Property") or a compound default a signup
+// flow stamps on a brand-new account before the person enters their real name
+// (e.g. the Lokazen owner app's account default "Property Owner"). Either way
+// it then gets greeted back at the person ("Hi Property, ...") or displayed as
+// their name on the dashboard. A name counts as a placeholder when EVERY word
+// in it is a known placeholder token — so "Property Owner" is blocked but a
+// real name like "Owner Smith" is not (only one word matches).
 const NAME_PLACEHOLDER_BLOCKLIST = new Set([
   'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
   'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
@@ -37,7 +41,9 @@ const NAME_PLACEHOLDER_BLOCKLIST = new Set([
 function cleanName(raw?: string | null): string {
   const trimmed = (raw || '').trim()
   if (!trimmed) return ''
-  return NAME_PLACEHOLDER_BLOCKLIST.has(trimmed.toLowerCase()) ? '' : trimmed
+  const words = trimmed.toLowerCase().split(/\s+/)
+  const isPlaceholder = words.every((w) => NAME_PLACEHOLDER_BLOCKLIST.has(w))
+  return isPlaceholder ? '' : trimmed
 }
 
 /**

@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: "Property Owner" placeholder name/email leaking onto the dashboard
+
+- **lokazen** — a lead card showed the name **"Property Owner"** and a synthetic **`owner_<phone>_<ts>@noemail.lokazen.in`** email. Root cause: the Lokazen owner app stamps `name: 'Property Owner'` on a brand-new account before the person enters their real name (`api/owner/auth/verify-otp`, `onboarding/owner`); if never updated, that literal flows straight through `sendLeadToProxe` into PROXe.
+- `cleanName()` (added earlier for the "Hi Property" bug) only blocked single-word placeholders — generalized it to block a name when **every word** in it is a known placeholder token, so "Property Owner" / "Brand Owner" are caught while a real name like "Owner Smith" is untouched (verified against both cases).
+- Ported a fix that existed only in the pre-migration lokazen fork and was never carried into `core`: `LeadDetailsModal`'s `displayEmail()` filter, which hides synthetic `@noemail.` / noreply / placeholder addresses instead of showing them as the lead's contact email. Also fixed the "No contact info" empty-state check to agree with it (previously a lead with only a synthetic email showed neither the email row nor the empty-state message).
+
 ## 2026-07-05 · fix: dashboard loading screen cropped into a corner (min-h-screen → fixed inset-0)
 
 - **all brands** — `FounderDashboard`'s `if (loading)` overlay and the dev-only auth loader in `DashboardLayout` used `min-h-screen`, which sizes relative to their PARENT (the sidebar-offset main-content container, itself nested inside padded wrapper divs) — not the actual viewport. Any ancestor padding/margin could push the "centered" box down/sideways, cropping it into a corner with a visible seam against the sidebar. `PageTransitionLoader` already used the correct pattern (`fixed inset-0`, viewport-anchored, immune to parent layout) — applied the same fix to the other two so all three full-screen loaders now render identically and always cover the true viewport.
