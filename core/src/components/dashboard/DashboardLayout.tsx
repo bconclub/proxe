@@ -374,7 +374,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Show loading while checking auth in development
   if (isCheckingAuth && process.env.NODE_ENV === 'development') {
     return (
-      <div className="dashboard-layout-auth-loader min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <div className="dashboard-layout-auth-loader fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="dashboard-layout-auth-loader-content text-center">
           <div className="dashboard-layout-auth-loader-icon-container relative mb-4 mx-auto" style={{ width: '80px', height: '80px' }}>
             <div

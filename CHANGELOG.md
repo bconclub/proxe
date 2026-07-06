@@ -14,6 +14,10 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-05 · fix: dashboard loading screen cropped into a corner (min-h-screen → fixed inset-0)
+
+- **all brands** — `FounderDashboard`'s `if (loading)` overlay and the dev-only auth loader in `DashboardLayout` used `min-h-screen`, which sizes relative to their PARENT (the sidebar-offset main-content container, itself nested inside padded wrapper divs) — not the actual viewport. Any ancestor padding/margin could push the "centered" box down/sideways, cropping it into a corner with a visible seam against the sidebar. `PageTransitionLoader` already used the correct pattern (`fixed inset-0`, viewport-anchored, immune to parent layout) — applied the same fix to the other two so all three full-screen loaders now render identically and always cover the true viewport.
+
 ## 2026-07-05 · fix: light-theme FOUC flash on load + wrong-name greeting ("Hi Property")
 
 - **all brands** — `globals.css` `:root` held the LIGHT theme's colours (`--bg-primary: #f6f6f6`), even though the app's actual default theme is dark (`bw-dark`, set by the `theme-init` script). CSS custom properties resolve as soon as the stylesheet parses — before any JS runs — so anything painting off `--bg-primary` (e.g. a full-screen loader) could flash the light background for a moment before the `.dark` class landed, producing a visible white/cream patch behind the dark loading box. Swapped the defaults: `:root` now holds the dark values (matching the real default), and light mode moved to an explicit new `.light` class with the old light values unchanged. Verified: `--bg-primary` now resolves dark even with zero classes on `<html>`.

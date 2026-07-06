@@ -445,7 +445,7 @@ export default function FounderDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: brandCfg.colors?.primary || 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
