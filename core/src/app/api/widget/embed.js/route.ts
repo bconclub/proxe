@@ -14,12 +14,13 @@ export const runtime = 'nodejs';
  *
  * Usage: <script src="https://your-domain.com/api/widget/embed.js"></script>
  */
-// Kill switch: widget is rendering broken/cut-off on live marketing sites
-// (lokazen, windchasers). Disabled at the source so every site embedding
-// <script src=".../api/widget/embed.js"> stops showing it immediately,
-// without needing to touch each external site's HTML. Flip back to false
-// once the underlying render bug is fixed and verified locally.
-const WIDGET_DISABLED = true;
+// Kill switch: was flipped on 2026-07-06 after the widget rendered
+// broken/cut-off on live marketing sites (lokazen, windchasers). Root cause
+// found and fixed in ChatWidget.tsx's handleOpenChat (open/resize race with
+// the parent iframe) -- verified locally via a same-origin embed harness.
+// Left at false here, uncommitted/unpushed pending sign-off; production
+// still has this at true until that push happens.
+const WIDGET_DISABLED = false;
 
 export async function GET() {
   if (WIDGET_DISABLED) {
