@@ -643,16 +643,30 @@ export async function GET(request: NextRequest) {
       }).length,
     }
 
-    // Gigs tab last funnel node: gigs don't "book" anything, so the Engine
-    // Overview's final stage swaps to "Active" — a scout/connector who has
-    // actually submitted a property or been paid (same definition the Gigs
-    // table's STATUS column uses: scout_event 'submission' or 'payout').
-    const activeGigsCount = scope === 'gigs'
-      ? safeLeads.filter(l => {
-          const ev = String(l?.unified_context?.[BRAND_ID]?.scout_event || '').toLowerCase()
-          return ev === 'submission' || ev === 'payout'
-        }).length
-      : 0
+    // Gigs tab Engine Overview: gigs don't have Engaged/Warm/Follow-up
+    // Due/Booked — the funnel that actually matters is the scout lifecycle.
+    // Mirrors LeadsTable's SCOUT_STAGE_BY_EVENT/scoutStageLabel EXACTLY (same
+    // derivation from scout_event/kyc_status) so the Gigs table's STATUS
+    // column and this funnel can never disagree on where a scout stands.
+    type GigStage = 'loggedIn' | 'kycStarted' | 'kycDone' | 'live' | 'active'
+    const SCOUT_STAGE_BY_EVENT: Record<string, GigStage> = {
+      signup: 'loggedIn',
+      kyc_submitted: 'kycStarted',
+      kyc_verified: 'kycDone',
+      upi_added: 'live',
+      submission: 'active',
+      payout: 'active',
+    }
+    const gigStageCounts: Record<GigStage, number> = { loggedIn: 0, kycStarted: 0, kycDone: 0, live: 0, active: 0 }
+    if (scope === 'gigs') {
+      for (const l of safeLeads) {
+        const lkz = (l as any)?.unified_context?.[BRAND_ID] || {}
+        const ev = String(lkz.scout_event || '').toLowerCase()
+        const bucket = SCOUT_STAGE_BY_EVENT[ev]
+          || (String(lkz.kyc_status || '').toLowerCase() === 'verified' ? 'kycDone' : 'loggedIn')
+        gigStageCounts[bucket]++
+      }
+    }
 
     // 9. Channel Performance
     const channelPerformance = {
@@ -1829,8 +1843,8 @@ export async function GET(request: NextRequest) {
         leads: staleLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown' })),
       },
       leadFlow,
-      // Gigs tab only (scope=gigs) — 0 otherwise, see activeGigsCount above.
-      activeGigsCount,
+      // Gigs tab only (scope=gigs) — all-zero object otherwise, see gigStageCounts above.
+      gigStageCounts,
       // POP-only calls overview — key omitted entirely for other brands.
       ...(calls ? { calls } : {}),
       channelPerformance,

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -58,9 +58,9 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
-  // Gigs tab only — count of scouts/connectors who have actually submitted a
-  // property or been paid (same definition as the Gigs table's STATUS column).
-  activeGigsCount?: number
+  // Gigs tab only — scout lifecycle stage breakdown (all zero otherwise). Same
+  // stage derivation as the Gigs table's STATUS column, so they never disagree.
+  gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
   // POP-only: inbound/outbound voice volume for the Calls KPI card (ported from the pop fork).
   calls?: {
     total: number
@@ -498,11 +498,12 @@ export default function FounderDashboard() {
   const engWarm = fn ? fn.warm : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
   const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
   const engBooked = fn ? fn.booked : (flow.booked || 0)
-  // Gigs tab: scouts/connectors don't book calls, so the funnel's last node
-  // swaps from "Booked" to "Active" — how many are actually submitting
-  // (scout_event submission/payout), not a meaningless booking count.
+  // Gigs tab: Engaged/Warm/Follow-up Due/Booked don't mean anything for
+  // scouts — the funnel that matters is their onboarding lifecycle (same
+  // stage derivation the Gigs table's STATUS column uses), so all 4 middle+
+  // last nodes swap to it. Slot 1 (Total Leads) stays as-is either way.
   const isGigsView = showGigsTab && view === 'gigs'
-  const engLastCount = isGigsView ? (metrics.activeGigsCount ?? 0) : engBooked
+  const gigStages = metrics.gigStageCounts || { loggedIn: 0, kycStarted: 0, kycDone: 0, live: 0, active: 0 }
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
   // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
   const engK = (n: number): number | string => (isPop ? abbrevK(n) : n)
@@ -771,13 +772,25 @@ export default function FounderDashboard() {
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label="Total Leads" sub={engTopSub} />
-            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
-            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
+            {isGigsView ? (
+              <EngineNode icon={<MdAssignment size={28} />} color="#22c55e" count={engK(gigStages.kycStarted)} label="KYC Started" sub={engPct(gigStages.kycStarted)} />
+            ) : (
+              <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
+            )}
+            {isGigsView ? (
+              <EngineNode icon={<MdVerified size={28} />} color="#f59e0b" count={engK(gigStages.kycDone)} label="KYC Done" sub={engPct(gigStages.kycDone)} />
+            ) : (
+              <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
+            )}
+            {isGigsView ? (
+              <EngineNode icon={<MdAccountBalanceWallet size={28} />} color="#a855f7" count={engK(gigStages.live)} label="Live" sub="UPI added" />
+            ) : (
+              <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
+            )}
             <EngineNode
               icon={isGigsView ? <MdCheckCircle size={28} /> : <MdCalendarToday size={28} />}
               color="#10b981"
-              count={engK(engLastCount)}
+              count={engK(isGigsView ? gigStages.active : engBooked)}
               label={isGigsView ? 'Active' : 'Booked'}
               sub={isGigsView ? 'Submitting properties' : (hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week')}
               last

@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · lokazen: Gigs tab's Engine Overview shows the scout lifecycle, not the lead funnel
+
+- Engaged/Warm/Follow-up Due/Booked don't mean anything for scouts. All 4 middle+last Engine Overview nodes now swap to the scout onboarding lifecycle on the Gigs tab: **KYC Started → KYC Done → Live (UPI added) → Active (submitting)**. "Total Leads" (slot 1) is unchanged either way.
+- Server (`founder-metrics`): `gigStageCounts` mirrors the Gigs table's `SCOUT_STAGE_BY_EVENT`/`scoutStageLabel` derivation from `scout_event`/`kyc_status` EXACTLY, so the funnel and the table's STATUS column can never disagree on where a scout stands. Replaces the earlier one-off `activeGigsCount`.
+- Leads tab is completely unaffected — same nodes, same data, as before.
+
 ## 2026-07-06 · fix: scout support requests could claim to Slack the team, silently do nothing
 
 - A scout (e.g. "Monish") reported a payout problem in live chat; the AI correctly replied "I've raised a support request with the Lokazen team" — and `flagForHumanFollowup` genuinely was called (confirmed in logs) and did set the DB flag. But the actual Slack ping (`notifySlackLead`) soft-fails **completely silently** when `SLACK_WEBHOOK_URL` isn't set — no log, no warning, nothing — so it was never possible to tell from the logs whether the team was actually notified or the AI's claim was hollow.
