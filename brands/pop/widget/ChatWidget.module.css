@@ -2620,8 +2620,8 @@
 }
 
 .bubbleIcon {
-  width: 39px;
-  height: 39px;
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2631,6 +2631,20 @@
 .bubbleIcon svg {
   width: 100%;
   height: 100%;
+}
+
+/* Smaller footprint on phones — matches the tuned mobile tap target used
+   elsewhere (e.g. lokazen's bubble) instead of carrying the desktop size down. */
+@media (max-width: 768px) {
+  .bubbleButton {
+    width: 48px;
+    height: 48px;
+  }
+
+  .bubbleIcon {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* Chatbox container for bubble style - matches agent.windchasers.in */
