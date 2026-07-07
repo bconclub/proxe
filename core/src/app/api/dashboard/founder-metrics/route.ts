@@ -311,6 +311,14 @@ export async function GET(request: NextRequest) {
     const leadIdSet = new Set(safeLeads.map((lead: any) => lead.id))
     const isLinkedToActiveLead = (session: any) =>
       !!session?.lead_id && leadIdSet.has(session.lead_id)
+    // `messages` (conversations table) is fetched with NO brand or scope filter
+    // at all — just a 45-day time cutoff — so every metric derived from it
+    // must go through this scoped copy instead, or leads/gigs (or even other
+    // brands, since there's no brand filter on the query) leak into each
+    // other's counts. This was a real, currently-visible bug: the Active
+    // Conversations KPI, its trend chart, and the Avg Response Time KPI all
+    // read straight off unscoped `messages`.
+    const scopedMessages = messages.filter((msg: any) => msg?.lead_id && leadIdSet.has(msg.lead_id))
     const safeWebSessions = (webSessions || []).filter(
       (session: any) => hasActivity(session) && isLinkedToActiveLead(session)
     )
@@ -416,8 +424,8 @@ export async function GET(request: NextRequest) {
     const uniqueLeadIds30D = new Set<string>()
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-    if (messages && messages.length > 0) {
-      messages.forEach((msg: any) => {
+    if (scopedMessages && scopedMessages.length > 0) {
+      scopedMessages.forEach((msg: any) => {
         if (!msg.lead_id || msg.sender === 'system') return
         uniqueLeadIds.add(msg.lead_id)
 
@@ -449,7 +457,7 @@ export async function GET(request: NextRequest) {
     let hotLeads: typeof safeLeads = []
 
     // 2. Today's Activity
-    const todayMessages = messages?.filter(msg => {
+    const todayMessages = scopedMessages?.filter(msg => {
       const msgDate = new Date(msg.created_at)
       return msgDate >= todayStart && msgDate <= todayEnd
     }) || []
@@ -472,7 +480,7 @@ export async function GET(request: NextRequest) {
     try {
       // Strategy 1: Use pre-calculated input_to_output_gap_ms from conversations (already fetched)
       // Only use the last 10 agent messages (most recent) to reflect current system performance
-      const conversationsForResponse = messages.filter((msg: any) =>
+      const conversationsForResponse = scopedMessages.filter((msg: any) =>
         (msg.channel === 'web' || msg.channel === 'whatsapp') &&
         msg.sender === 'agent' &&
         msg.metadata?.input_to_output_gap_ms != null
@@ -500,12 +508,12 @@ export async function GET(request: NextRequest) {
 
       // Strategy 2 (fallback): Calculate from consecutive customer→agent timestamps
       // Use only last 10 messages overall to reflect current performance
-      if (avgResponseTimeMs === 0 && messages && messages.length > 0) {
+      if (avgResponseTimeMs === 0 && scopedMessages && scopedMessages.length > 0) {
         let totalGapMs2 = 0
         let pairCount = 0
 
         // Take the last 20 messages (enough to find ~10 customer→agent pairs)
-        const recentMessages = messages.slice(-20)
+        const recentMessages = scopedMessages.slice(-20)
 
         for (let i = 0; i < recentMessages.length - 1; i++) {
           const current = recentMessages[i]
@@ -738,17 +746,22 @@ export async function GET(request: NextRequest) {
       .slice(0, 20)
 
     webBookingSessions?.forEach((session: any) => {
+      // Same gate every other event source in this file uses: only surface
+      // this booking if its lead is actually in scope (a scout's session
+      // leaking a "booked a call" event onto the Gigs tab, or vice versa,
+      // was a real bug here — booking_date!=null alone isn't a scope check).
       const lead = safeLeads.find(l => l.id === session.lead_id)
-      const leadName = session.customer_name || lead?.customer_name || 'Unknown'
+      if (!lead) return
+      const leadName = session.customer_name || lead.customer_name || 'Unknown'
       const eventType = session.booking_status === 'cancelled' ? 'booking_cancelled' : 'booking_made'
-      
+
       keyEvents.push({
         id: `booking-web-${session.lead_id}-${session.booking_created_at}`,
         leadId: session.lead_id,
         leadName,
         eventType,
         timestamp: session.booking_created_at || session.updated_at,
-        content: eventType === 'booking_cancelled' 
+        content: eventType === 'booking_cancelled'
           ? `${leadName} cancelled their booking`
           : `${leadName} booked a call${session.booking_date && !isNaN(new Date(session.booking_date).getTime()) ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
         channel: 'web',
@@ -763,10 +776,12 @@ export async function GET(request: NextRequest) {
       .slice(0, 20)
 
     whatsappBookingSessions?.forEach((session: any) => {
+      // Same scope gate as the web-booking block above.
       const lead = safeLeads.find(l => l.id === session.lead_id)
-      const leadName = session.customer_name || lead?.customer_name || 'Unknown'
+      if (!lead) return
+      const leadName = session.customer_name || lead.customer_name || 'Unknown'
       const eventType = session.booking_status === 'cancelled' ? 'booking_cancelled' : 'booking_made'
-      
+
       keyEvents.push({
         id: `booking-whatsapp-${session.lead_id}-${session.booking_created_at}`,
         leadId: session.lead_id,
@@ -897,8 +912,8 @@ export async function GET(request: NextRequest) {
     })
 
     // Get system messages with event_type metadata
-    const systemMessages = messages?.filter((msg: any) => 
-      msg.sender === 'system' || 
+    const systemMessages = scopedMessages?.filter((msg: any) =>
+      msg.sender === 'system' ||
       (msg.metadata && typeof msg.metadata === 'object' && 'event_type' in msg.metadata)
     ) || []
 
@@ -941,7 +956,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Add first-message events from conversations (recent customer messages)
-    const recentCustomerMessages = messages?.filter((msg: any) => {
+    const recentCustomerMessages = scopedMessages?.filter((msg: any) => {
       if (msg.sender !== 'customer') return false
       const msgDate = new Date(msg.created_at)
       const daysAgo = (now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -1000,7 +1015,7 @@ export async function GET(request: NextRequest) {
 
     // Busiest hour (from messages)
     const hourCounts: Record<number, number> = {}
-    messages?.forEach(msg => {
+    scopedMessages?.forEach(msg => {
       const hour = new Date(msg.created_at).getHours()
       hourCounts[hour] = (hourCounts[hour] || 0) + 1
     })
@@ -1060,9 +1075,9 @@ export async function GET(request: NextRequest) {
       
       // Response time trend (daily average)
       // Use input_to_output_gap_ms from conversations table
-      const dayMessages = messages?.filter(m => {
+      const dayMessages = scopedMessages?.filter(m => {
         const msgDate = new Date(m.created_at).toISOString().split('T')[0]
-        return msgDate === dateStr && 
+        return msgDate === dateStr &&
                m.sender === 'agent' && 
                (m.channel === 'web' || m.channel === 'whatsapp')
       }) || []
@@ -1110,7 +1125,7 @@ export async function GET(request: NextRequest) {
       const hourEnd = new Date(hourDate)
       hourEnd.setHours(i, 59, 59, 999)
       
-      const hourMessages = messages?.filter(m => {
+      const hourMessages = scopedMessages?.filter(m => {
         const msgDate = new Date(m.created_at)
         return msgDate >= hourDate && msgDate <= hourEnd
       }).length || 0
@@ -1305,8 +1320,8 @@ export async function GET(request: NextRequest) {
     //
     // A higher rate indicates better customer service responsiveness.
     // Note: This is NOT the same as "customer response rate" (how often customers reply).
-    const customerMessages = messages?.filter(m => m.sender === 'customer').length || 0
-    const agentReplies = messages?.filter(m => m.sender === 'agent').length || 0
+    const customerMessages = scopedMessages?.filter(m => m.sender === 'customer').length || 0
+    const agentReplies = scopedMessages?.filter(m => m.sender === 'agent').length || 0
     // Response rate = share of customer messages that received an agent reply
     // in the same conversation before the customer spoke again (bounded 0–100%).
     // The old formula (agentReplies / customerMessages) exceeded 100% whenever the
@@ -1317,7 +1332,7 @@ export async function GET(request: NextRequest) {
     // are grouped by their session_id from metadata.
     const convoKeyOf = (m: any) => m.lead_id || m.metadata?.session_id || 'unknown'
     const messagesByConvo: Record<string, any[]> = {}
-    for (const m of (messages || [])) {
+    for (const m of (scopedMessages || [])) {
       const k = convoKeyOf(m)
       ;(messagesByConvo[k] = messagesByConvo[k] || []).push(m)
     }
@@ -1438,10 +1453,10 @@ export async function GET(request: NextRequest) {
     // This metric helps identify if you're over-relying on a single channel
     // or successfully engaging customers across multiple touchpoints.
     const channelMessageCounts: Record<string, number> = {}
-    const totalMessages = messages?.length || 0
-    
+    const totalMessages = scopedMessages?.length || 0
+
     // Count messages per channel from conversations/messages table
-    messages?.forEach(msg => {
+    scopedMessages?.forEach(msg => {
       const channel = msg.channel || 'unknown'
       if (channel !== 'unknown') {
         channelMessageCounts[channel] = (channelMessageCounts[channel] || 0) + 1
@@ -1490,7 +1505,7 @@ export async function GET(request: NextRequest) {
         : 0
 
       // Daily response rate (messages with agent replies)
-      const dailyMessages = messages?.filter((msg: any) => {
+      const dailyMessages = scopedMessages?.filter((msg: any) => {
         const msgDate = new Date(msg.created_at)
         return msgDate >= date && msgDate < nextDate
       }) || []
@@ -1553,7 +1568,7 @@ export async function GET(request: NextRequest) {
 
     const allTrendDates = [
       ...safeLeads.map((lead: any) => lead.created_at),
-      ...messages.map((msg: any) => msg.created_at),
+      ...scopedMessages.map((msg: any) => msg.created_at),
       ...safeWebSessions.map((session: any) => session.last_message_at || session.created_at),
       ...safeWhatsappSessions.map((session: any) => session.last_message_at || session.created_at),
     ].filter(Boolean)
@@ -1594,11 +1609,11 @@ export async function GET(request: NextRequest) {
       return values
     }
 
-    const hasConversationMessages = messages.some((msg: any) => msg.lead_id && msg.sender !== 'system')
+    const hasConversationMessages = scopedMessages.some((msg: any) => msg.lead_id && msg.sender !== 'system')
     const countConversationsForDay = (dayStart: Date, dayEnd: Date) => {
       if (hasConversationMessages) {
         const leadIds = new Set<string>()
-        messages.forEach((msg: any) => {
+        scopedMessages.forEach((msg: any) => {
           if (!msg.lead_id || msg.sender === 'system') return
           const msgDate = new Date(msg.created_at)
           if (msgDate >= dayStart && msgDate < dayEnd) {
@@ -1666,7 +1681,7 @@ export async function GET(request: NextRequest) {
       const GAP_MS = 7 * 24 * 60 * 60 * 1000
       const recentMs = Date.now() - 30 * 24 * 60 * 60 * 1000
       const byLead: Record<string, Array<{ t: number; cust: boolean }>> = {}
-      for (const m of messages) {
+      for (const m of scopedMessages) {
         if (!m.lead_id) continue
         const t = new Date(m.created_at).getTime()
         if (isNaN(t)) continue
