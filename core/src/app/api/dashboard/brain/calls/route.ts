@@ -19,6 +19,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { getLlmTurns } from '@/lib/server/voiceLlmTelemetry'
 
 export const dynamic = 'force-dynamic'
 
@@ -273,6 +274,24 @@ export async function GET() {
     // own per-turn latency.
     const eleven = await fetchElevenCalls()
     calls.push(...eleven)
+
+    // Custom-LLM bridge (core/api/agent/voice/custom-llm) routes V1/V2 through
+    // Groq instead of each platform's own model — but the platforms still
+    // report their OWN name for "model" (Vapi shows whatever the custom-llm
+    // config says; ElevenLabs' connector above is hardcoded to '11labs' since
+    // its API doesn't expose a distinct custom-LLM identity). Overlay OUR
+    // measured per-turn Groq latency (voiceLlmTelemetry, Redis-backed) so a
+    // call that actually went through the bridge shows "groq" and the real
+    // measured ms instead of the provider's own (possibly stale/wrong) number.
+    try {
+      await Promise.all(calls.map(async (c) => {
+        const turns = await getLlmTurns(c.id)
+        if (!turns.length) return
+        const avgMs = Math.round(turns.reduce((a, t) => a + t.groqMs, 0) / turns.length)
+        c.connector.model = `groq:${turns[turns.length - 1].model}`
+        if (c.perf) c.perf.stages.model = avgMs
+      }))
+    } catch { /* soft-fail: falls back to provider-reported model/latency */ }
 
     // Enrich Vapi calls with the caller NAME captured at dial time (voice_sessions
     // → all_leads). Brand-scoped, soft-fail — names just won't show if it errors.
