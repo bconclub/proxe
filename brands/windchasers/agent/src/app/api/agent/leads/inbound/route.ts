@@ -735,7 +735,9 @@ export async function POST(request: NextRequest) {
       const welcomeSignals = [
         leadSource, normalizedSource, campaign,
         cf2.utm_campaign, cf2.utm_source, cf2.form_type,
-        cf2.course_interest, brandCtxData.course_interest,
+        cf2.course_interest, cf2.interest, cf2.course, cf2.course_details,
+        body.course_interest, body.course, body.course_details,
+        brandCtxData.course_interest,
         cf2.ad_name, cf2.adset_name, cf2.campaign_name,
         brandCtxData.user_type, notes,
       ]
@@ -757,8 +759,8 @@ export async function POST(request: NextRequest) {
           channel: 'whatsapp',
           sender: 'agent',
           content: result.success
-            ? (isParentPilotLead ? `Parent pilot welcome sent to ${firstName}.` : (renderWelcomeBody(welcomeTpl, leadName) || `Welcome message sent to ${firstName}.`))
-            : `[Welcome failed to send] ${isParentPilotLead ? welcomeTpl : (renderWelcomeBody(welcomeTpl, leadName) || welcomeTpl)}`,
+            ? (renderWelcomeBody(welcomeTpl, leadName) || `Welcome message sent to ${firstName}.`)
+            : `[Welcome failed to send] ${renderWelcomeBody(welcomeTpl, leadName) || welcomeTpl}`,
           message_type: 'template',
           metadata: {
             template_name: welcomeTpl,
