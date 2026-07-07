@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: Leads/Gigs tab switch could show the previous tab's data, mislabeled
+
+- Traced the whole computation to confirm Leads and Gigs already use fully separate data (`safeLeads` filtered per scope, session/conversation counts gated through the same scope-filtered `leadIdSet`, cache keyed by `scope+threshold`) — no actual cross-contamination. But switching tabs didn't clear the old numbers first, so for however long the new-scope fetch takes, the PREVIOUS tab's data stayed on screen — now mislabeled under the new tab (e.g. Leads' Active Conversations count briefly showing under the Gigs label).
+- Clicking a tab now shows the existing full-page loader immediately, hiding the stale data until the new scope's fetch resolves — no window where numbers from one tab can appear attributed to the other.
+
 ## 2026-07-06 · fix: delivery-tick showed a scary red "failed" icon on messages that sent fine
 
 - `DeliveryStatusIcon` inferred a genuine send/delivery failure purely from "no delivery/read confirmation within 10 minutes." Confirmed via runtime logs (real conversation, ~8 sent replies) that Meta's status webhook doesn't reliably call back for every single message — receipts arrive periodically, sometimes batched, sometimes late — which is normal, not evidence anything failed. That false positive painted a scary red warning icon on messages that had actually sent successfully (Graph API accepted them, real message ID returned).
