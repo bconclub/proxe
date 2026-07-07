@@ -582,7 +582,15 @@ export default function FounderDashboard() {
                   key={v}
                   role="tab"
                   aria-selected={view === v}
-                  onClick={() => setView(v)}
+                  onClick={() => {
+                    if (v === view) return
+                    // Show the loader immediately on tab switch — otherwise the
+                    // PREVIOUS tab's numbers stay on screen (now mislabeled
+                    // under the new tab) for however long the new-scope fetch
+                    // takes. loadMetrics's finally clears this once it resolves.
+                    setLoading(true)
+                    setView(v)
+                  }}
                   className="px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors"
                   style={view === v
                     ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
