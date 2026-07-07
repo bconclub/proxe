@@ -1,3 +1,32 @@
+const fs = require('fs')
+const path = require('path')
+
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return
+  for (const rawLine of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const idx = line.indexOf('=')
+    if (idx === -1) continue
+    const key = line.slice(0, idx).trim()
+    if (!key || (process.env[key] != null && process.env[key] !== '')) continue
+    let value = line.slice(idx + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    process.env[key] = value
+  }
+}
+
+// The POP brand env lives one level above this artifact app. Load it first so
+// existing Vapi/VoBiz/ElevenLabs keys work locally without duplicating secrets.
+loadEnvFile(path.resolve(__dirname, '..', '.env.local'))
+loadEnvFile(path.resolve(__dirname, '.env.local'))
+
+if (!process.env.NEXT_PUBLIC_VOICE_NUMBER && process.env.VOBIZ_FROM_NUMBER) {
+  process.env.NEXT_PUBLIC_VOICE_NUMBER = process.env.VOBIZ_FROM_NUMBER
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
