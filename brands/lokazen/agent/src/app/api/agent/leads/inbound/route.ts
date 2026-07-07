@@ -298,6 +298,22 @@ export async function POST(request: NextRequest) {
         return null
       }
       const asStr = (v: any) => (v == null ? null : String(Array.isArray(v) ? v.join(', ') : v).trim() || null)
+      const setIfEmpty = (key: string, value: any) => {
+        const s = asStr(value)
+        if (s && !brandCtxData[key]) brandCtxData[key] = s
+      }
+      const captureLocationDetails = () => {
+        setIfEmpty('property_address', pick('property_address', 'full_address', 'address', 'street_address', 'formatted_address'))
+        setIfEmpty('location_details', pick('location_details', 'location_detail', 'location_description', 'address_details', 'nearby_landmark', 'landmark'))
+        setIfEmpty('locality', pick('locality', 'area', 'neighbourhood', 'neighborhood', 'sub_locality', 'sublocality', 'micromarket'))
+        setIfEmpty('city', pick('city', 'City', 'property_city'))
+        setIfEmpty('state', pick('state', 'property_state'))
+        setIfEmpty('pincode', pick('pincode', 'pin_code', 'postal_code', 'zip'))
+        const lat = asStr(pick('latitude', 'lat', 'property_latitude'))
+        const lng = asStr(pick('longitude', 'lng', 'lon', 'property_longitude'))
+        if (lat && lng && !brandCtxData.coordinates) brandCtxData.coordinates = `${lat}, ${lng}`
+        setIfEmpty('google_place_id', pick('google_place_id', 'place_id'))
+      }
       // The lokazen.in website posts user_type "seeker" (wants space = brand)
       // and "provider" (lists space = owner). Handle those FIRST, then the
       // generic words, so real payloads classify correctly.
@@ -362,6 +378,7 @@ export async function POST(request: NextRequest) {
         if (upi) brandCtxData.scout_upi_id = upi
       } else if (lkzType === 'owner') {
         brandCtxData.user_type = 'owner'
+        captureLocationDetails()
         // Live website keys first: space_type / area_sqft / location_preference / budget_rent.
         const propType = asStr(pick('space_type', 'propertyType', 'property_type', 'spaceTypes', 'space_types', 'property_kind'))
         if (propType) brandCtxData.property_type = propType
@@ -385,6 +402,7 @@ export async function POST(request: NextRequest) {
         if (gmaps) brandCtxData.google_maps_url = gmaps
       } else if (lkzType === 'brand') {
         brandCtxData.user_type = 'brand'
+        captureLocationDetails()
         const bname = asStr(pick('brand_name', 'brandName', 'company', 'brand'))
         if (bname) brandCtxData.brand_name = bname
         // Live website sends "business_type" (e.g. "Cafe / Coffee").
@@ -743,6 +761,8 @@ export async function POST(request: NextRequest) {
                 ['Property type', lkz.property_type],
                 ['Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
                 ['Area', lkz.property_zone],
+                ['Address', lkz.property_address],
+                ['Location details', lkz.location_details || lkz.locality],
                 ['Rent', lkz.asking_rent_monthly],
                 ['Floor', lkz.floor],
               ]
@@ -751,6 +771,7 @@ export async function POST(request: NextRequest) {
                 ['Brand', lkz.brand_name],
                 ['Category', lkz.brand_category],
                 ['Areas', lkz.target_zones],
+                ['Location details', lkz.location_details || lkz.locality || lkz.city],
                 ['Format', lkz.preferred_format],
                 ['Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
                 ['Budget', lkz.budget_monthly_rent],
@@ -821,6 +842,8 @@ export async function POST(request: NextRequest) {
             send_error: waRes.success ? null : (waRes.error || 'unknown'),
             http_status: (waRes as any).statusCode ?? null,
             wa_message_id: (waRes as any).messageId ?? null,
+            whatsapp_message_id: (waRes as any).messageId ?? null,
+            delivery_status: waRes.success ? 'sent' : 'failed',
           },
         })
         if (!waRes.success) {
@@ -920,6 +943,8 @@ export async function POST(request: NextRequest) {
               send_error: waRes.success ? null : (waRes.error || 'unknown'),
               http_status: (waRes as any).statusCode ?? null,
               wa_message_id: (waRes as any).messageId ?? null,
+              whatsapp_message_id: (waRes as any).messageId ?? null,
+              delivery_status: waRes.success ? 'sent' : 'failed',
             },
           })
           if (!waRes.success) {
@@ -1001,6 +1026,8 @@ export async function POST(request: NextRequest) {
               send_error: result.success ? null : (result.error || 'unknown'),
               http_status: (result as any).statusCode ?? null,
               wa_message_id: (result as any).messageId ?? null,
+              whatsapp_message_id: (result as any).messageId ?? null,
+              delivery_status: result.success ? 'sent' : 'failed',
             },
           })
 
@@ -1199,6 +1226,8 @@ export async function POST(request: NextRequest) {
               send_error: result.success ? null : (result.error || 'unknown'),
               http_status: (result as any).statusCode ?? null,
               wa_message_id: (result as any).messageId ?? null,
+              whatsapp_message_id: (result as any).messageId ?? null,
+              delivery_status: result.success ? 'sent' : 'failed',
             },
           })
 

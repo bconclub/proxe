@@ -1080,8 +1080,8 @@ export default function InboxPage() {
           message_type: String(msg?.message_type ?? ''),
           metadata: msg?.metadata ?? null,
           created_at: String(msg?.created_at ?? ''),
-          delivered_at: msg?.delivered_at ?? null,
-          read_at: msg?.read_at ?? null,
+          delivered_at: msg?.delivered_at ?? msg?.metadata?.delivered_at ?? null,
+          read_at: msg?.read_at ?? msg?.metadata?.read_at ?? null,
         }))
         console.log(`[fetchMessages] anonymous session ${sid}: ${messagesData.length} messages`)
         if (!selectedChannel && messagesData[0]?.channel) {
@@ -1161,8 +1161,8 @@ export default function InboxPage() {
         message_type: String(msg?.message_type ?? ''),
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
-        delivered_at: msg?.delivered_at ?? null,
-        read_at: msg?.read_at ?? null,
+        delivered_at: msg?.delivered_at ?? msg?.metadata?.delivered_at ?? null,
+        read_at: msg?.read_at ?? msg?.metadata?.read_at ?? null,
       }))
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {

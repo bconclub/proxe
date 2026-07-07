@@ -891,6 +891,7 @@ export default function LeadsTable({
                 //   landing_page.city (from /api/integrations/landing-pages)
                 const city =
                   uc?.[brandId]?.city ||
+                  uc?.[brandId]?.property_city ||
                   uc?.windchasers?.city ||
                   uc?.bcon?.city ||
                   uc?.whatsapp?.profile?.city ||
@@ -914,9 +915,9 @@ export default function LeadsTable({
                 const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
                 const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyleFor(rowStage) : (stageColor.style || {})
                 const rawLocation = lkzUserType === 'brand'
-                  ? (lkz.target_zones || lkz.area || '')
+                  ? (lkz.target_zones || lkz.locality || lkz.city || lkz.area || '')
                   : lkzUserType === 'owner'
-                  ? (lkz.property_zone || lkz.area || '')
+                  ? (lkz.property_zone || lkz.locality || lkz.property_address || lkz.city || lkz.area || '')
                   : lkzUserType === 'scout'
                   ? (lkz.scout_area_covered || '')
                   : ''
