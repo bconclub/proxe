@@ -964,9 +964,21 @@ export async function POST(request: NextRequest) {
         const canonicalEvent = SCOUT_EVENT_ALIASES[scoutEventToSend] || scoutEventToSend
         const mapped = SCOUT_EVENT_MAP[canonicalEvent]
         const activeTemplates = activeScoutTemplates
-        // Dedup gate (shared helper — observed live: the same scout_kyc_received
-        // fired 4x within 6 minutes before this existed).
-        const recentDuplicate = mapped ? await wasTemplateRecentlySent(supabase, leadId, mapped.template) : false
+        // Dedup gate. signup/kyc_received/kyc_approved/upi_saved are ONE-TIME
+        // lifecycle stages — a scout can only reach "KYC received" once, ever,
+        // so a 5-minute time window isn't enough: confirmed live, the website
+        // kept re-sending the same kyc_submitted event hours apart (6:42 PM,
+        // 6:50 PM, 7:00 AM next day) and each one slipped past the old
+        // 5-minute-only gate as a "new" send. These 4 use an unbounded
+        // (Infinity) window — ANY prior send of this template to this lead,
+        // no matter how old, blocks another. submission/payout are genuinely
+        // repeatable (a scout's 2nd/3rd property, a later payout) so they keep
+        // the 5-minute window — only true back-to-back duplicates are squashed.
+        const ONE_TIME_SCOUT_EVENTS = new Set(['signup', 'kyc_received', 'kyc_approved', 'upi_saved'])
+        const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity : undefined
+        const recentDuplicate = mapped
+          ? await wasTemplateRecentlySent(supabase, leadId, mapped.template, dedupWindowMs)
+          : false
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
