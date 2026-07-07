@@ -106,7 +106,13 @@ async function handle(req: NextRequest, provider: 'vapi' | 'elevenlabs') {
 
   if (!stream) {
     const data = await groqRes.json();
-    recordLlmTurn(callId || 'unknown', { at: new Date().toISOString(), groqMs: Date.now() - startedAt, provider, model: getGroqModel() }).catch(() => {});
+    // MUST be awaited — an un-awaited write here gets silently dropped because
+    // Vercel freezes the function right after the response is sent, before a
+    // detached background promise resolves (confirmed: this exact bug lost
+    // every write until fixed).
+    await recordLlmTurn(callId || 'unknown', { at: new Date().toISOString(), groqMs: Date.now() - startedAt, provider, model: getGroqModel() }).catch((e) => {
+      console.error(`[custom-llm:${provider}] telemetry write failed:`, e?.message);
+    });
     return NextResponse.json(data);
   }
 
@@ -120,7 +126,10 @@ async function handle(req: NextRequest, provider: 'vapi' | 'elevenlabs') {
       controller.enqueue(chunk);
     },
     flush() {
-      recordLlmTurn(callId || 'unknown', {
+      // Returning the promise lets the stream machinery wait for it before
+      // treating the stream as fully closed, instead of a detached write
+      // that could get dropped the moment the response finishes.
+      return recordLlmTurn(callId || 'unknown', {
         at: new Date().toISOString(),
         groqMs: (firstTokenAt ?? Date.now()) - startedAt,
         provider,
