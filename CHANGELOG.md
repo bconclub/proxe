@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-07 · fix(lokazen): Gigs tab "Booked Calls / Events" KPI still showed lead-booking data
+
+- The KPI card next to Follow-up Health kept showing "Booked Calls / Events" (a business-lead metric) on the Gigs tab, since it was never converted when the rest of the tab was — same class of mismatch already flagged and fixed for the Engine Overview funnel's "Booked" node.
+- Added a `kycStarted` daily trend (mirrors the existing `bookingTrend`/`leadTrend` pattern in `founder-metrics/route.ts`) bucketing scouts whose current lifecycle stage is `kycStarted` by their `last_interaction_at`/`created_at` day, plus a `kycStarted7D` total and % change vs the prior 7 days.
+- On the Gigs tab this card now reads "KYC Started" with a real 7-day count, delta, and sparkline; the Leads tab is untouched.
+
 ## 2026-07-06 · fix: scout lifecycle templates still duplicating — 5-minute window wasn't enough
 
 - Confirmed live: the same `scout_kyc_received` fired 4 times to one scout — 6:42 PM, 6:42 PM, 6:50 PM, then 7:00 AM the next day. The earlier 5-minute dedup window only blocks back-to-back retries; it does nothing when the website re-sends the same `kyc_submitted` event hours (or overnight) apart, which is what's actually happening.

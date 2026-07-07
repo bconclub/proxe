@@ -1025,6 +1025,7 @@ export async function GET(request: NextRequest) {
     // 13. Trend Data (7 days for sparklines)
     const leadTrend = []
     const bookingTrend = []
+    const kycStartedTrend = [] // Gigs tab only — daily scouts reaching KYC-started
     const conversationTrend = [] // Daily unique conversations
     const hotLeadsTrend = [] // Daily hot leads count
     const responseTimeTrend = []
@@ -1047,7 +1048,20 @@ export async function GET(request: NextRequest) {
         return bookingDate && bookingDate.startsWith(dateStr)
       }).length
       bookingTrend.push({ value: dayBookings })
-      
+
+      // KYC-started trend (gigs scope only) — same stage derivation as
+      // gigStageCounts above, bucketed by last_interaction_at/created_at day.
+      const dayKycStarted = scope === 'gigs' ? safeLeads.filter(l => {
+        const lkz = (l as any)?.unified_context?.[BRAND_ID] || {}
+        const ev = String(lkz.scout_event || '').toLowerCase()
+        const bucket = SCOUT_STAGE_BY_EVENT[ev]
+          || (String(lkz.kyc_status || '').toLowerCase() === 'verified' ? 'kycDone' : 'loggedIn')
+        if (bucket !== 'kycStarted') return false
+        const last = l.last_interaction_at ? new Date(l.last_interaction_at) : new Date(l.created_at)
+        return last.toISOString().split('T')[0] === dateStr
+      }).length : 0
+      kycStartedTrend.push({ value: dayKycStarted })
+
       // Conversations trend (unique sessions with engagement per day)
       // Count sessions created on this day with message_count >= 1
       const dayWebSessions = safeWebSessions.filter(session => {
@@ -1108,6 +1122,8 @@ export async function GET(request: NextRequest) {
     }
     const leadChange = leadTrend.length >= 2 ? pctChangeTrend(leadTrend[0].value, leadTrend[leadTrend.length - 1].value) : 0
     const bookingChange = bookingTrend.length >= 2 ? pctChangeTrend(bookingTrend[0].value, bookingTrend[bookingTrend.length - 1].value) : 0
+    const kycStartedChange = kycStartedTrend.length >= 2 ? pctChangeTrend(kycStartedTrend[0].value, kycStartedTrend[kycStartedTrend.length - 1].value) : 0
+    const kycStarted7D = kycStartedTrend.reduce((sum, d) => sum + d.value, 0)
     // Only compute a % change when the baseline day actually has response data.
     // The old Math.max(value,1) denominator turned a 0ms baseline into a
     // divide-by-1, so a recent 7500ms read as -750000% (the "712055" bug).
@@ -1860,6 +1876,8 @@ export async function GET(request: NextRequest) {
       leadFlow,
       // Gigs tab only (scope=gigs) — all-zero object otherwise, see gigStageCounts above.
       gigStageCounts,
+      // Gigs tab only — scouts reaching KYC-started in the last 7 days (0 otherwise).
+      kycStarted7D,
       // POP-only calls overview — key omitted entirely for other brands.
       ...(calls ? { calls } : {}),
       channelPerformance,
@@ -1873,6 +1891,7 @@ export async function GET(request: NextRequest) {
       trends: {
         leads: { data: leadTrend, change: leadChange },
         bookings: { data: bookingTrend, change: bookingChange },
+        kycStarted: { data: kycStartedTrend, change: kycStartedChange },
         conversations: { data: conversationTrend, change: 0 }, // Daily unique conversations
         hotLeads: { data: hotLeadsTrend, change: 0 }, // Daily hot leads count
         responseTime: { data: responseTimeTrend, change: responseTimeChange },
