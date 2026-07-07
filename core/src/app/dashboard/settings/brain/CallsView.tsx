@@ -223,18 +223,20 @@ export default function CallsView() {
     () => calls.filter((c) => (showWeb || c.source === 'phone') && (lang === 'all' || c.language === lang) && (eng === 'all' || c.engine === eng)),
     [calls, showWeb, lang, eng],
   )
-  // Aggregates above (splitFor, sparklines) always use the FULL filtered set —
-  // only the list below is capped, so "last 10" doesn't skew the V1/V2/V3 stats.
+  // "Last 5/10/All" caps BOTH the list and the aggregate stats above it — the
+  // point is "what does the last N calls look like", not just a shorter list
+  // under an unrelated fixed-history number.
   const visible = useMemo(() => (limit === 'all' ? shown : shown.slice(0, limit)), [shown, limit])
-  // per-engine split + totals, recomputed from the filtered set so the language
-  // and web filters live-update the header comparison.
+  // per-engine split + totals, recomputed from the visible (limit-applied) set
+  // so the language/web filters AND the Last-N toggle both live-update the
+  // header comparison.
   const view = useMemo(() => {
     const num = (arr: Array<number | null | undefined>) => {
       const xs = arr.filter((x): x is number => typeof x === 'number')
       return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
     }
     const splitFor = (engine: 'vapi' | 'elevenlabs'): EngineSplit | null => {
-      const eng = shown.filter((c) => c.engine === engine)
+      const eng = visible.filter((c) => c.engine === engine)
       if (!eng.length) return null
       const wp = eng.filter((c) => c.perf && c.perf.turnAvg) // latency only from real turns
       const cost = eng.reduce((a, c) => a + (c.cost || 0), 0)
@@ -252,7 +254,7 @@ export default function CallsView() {
         groqCalls: eng.filter((c) => c.connector.model?.startsWith('groq')).length,
       }
     }
-    const phones = shown.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
+    const phones = visible.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
     const vapi = splitFor('vapi'), elevenlabs = splitFor('elevenlabs')
     // headline insight: which engine wins on latency / cost, with the margin.
     let insight: { text: string; tone: string } | null = null
@@ -264,14 +266,14 @@ export default function CallsView() {
     return {
       phone: phones.length,
       webCount: calls.filter((c) => c.source === 'web').length,
-      totalSpend: shown.reduce((a, c) => a + (c.cost || 0), 0),
-      totalMinutes: shown.reduce((a, c) => a + (c.durationSec || 0), 0) / 60,
+      totalSpend: visible.reduce((a, c) => a + (c.cost || 0), 0),
+      totalMinutes: visible.reduce((a, c) => a + (c.durationSec || 0), 0) / 60,
       sparkTurns: phones.map((c) => c.turns || 0),
       sparkMins: phones.map((c) => c.durationSec || 0),
       sparkCost: phones.map((c) => c.cost || 0),
       vapi, elevenlabs, insight,
     }
-  }, [shown, calls])
+  }, [visible, calls])
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border-primary)' }}>
@@ -359,7 +361,7 @@ export default function CallsView() {
               <MdBolt size={13} /> {view.insight.text}
             </span>
           )}
-          {eng !== 'sarvam' && !view.vapi && !view.elevenlabs && shown.length > 0 && (
+          {eng !== 'sarvam' && !view.vapi && !view.elevenlabs && visible.length > 0 && (
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
           )}
         </div>
