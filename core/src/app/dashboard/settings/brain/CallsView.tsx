@@ -29,6 +29,7 @@ type Call = {
 type EngineSplit = {
   calls: number; turnAvg: number | null; cost: number; costPerMin: number | null
   transcriber: number | null; model: number | null; voice: number | null; endpointing: number | null; transport: number | null
+  groqCalls: number
 }
 type Agg = {
   total: number; phone: number; web: number; totalSpend: number; totalMinutes: number
@@ -137,6 +138,12 @@ function SplitRow({ engine, split }: { engine: 'vapi' | 'elevenlabs'; split: Eng
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
       <EngineBadge engine={engine} />
+      {split.groqCalls > 0 && (
+        <span title="Calls where the response actually came from our Groq custom-LLM bridge, not the provider's own default model"
+          style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, padding: '2px 8px', borderRadius: 999, color: '#22c55e', background: '#22c55e1f', border: '1px solid #22c55e55', flexShrink: 0 }}>
+          Groq · {split.groqCalls}/{split.calls}
+        </span>
+      )}
       <StageChip label="STT" value={split.transcriber} where="outside" />
       <StageChip label="LLM" value={split.model} where="outside" />
       <StageChip label="Voice" value={split.voice} where="outside" />
@@ -188,6 +195,7 @@ export default function CallsView() {
   const [showWeb, setShowWeb] = useState(false)
   const [lang, setLang] = useState<string>('all')
   const [eng, setEng] = useState<Eng>('all')
+  const [limit, setLimit] = useState<number | 'all'>(10)
 
   const load = async () => {
     setLoading(true); setErr(null)
@@ -215,6 +223,9 @@ export default function CallsView() {
     () => calls.filter((c) => (showWeb || c.source === 'phone') && (lang === 'all' || c.language === lang) && (eng === 'all' || c.engine === eng)),
     [calls, showWeb, lang, eng],
   )
+  // Aggregates above (splitFor, sparklines) always use the FULL filtered set —
+  // only the list below is capped, so "last 10" doesn't skew the V1/V2/V3 stats.
+  const visible = useMemo(() => (limit === 'all' ? shown : shown.slice(0, limit)), [shown, limit])
   // per-engine split + totals, recomputed from the filtered set so the language
   // and web filters live-update the header comparison.
   const view = useMemo(() => {
@@ -238,6 +249,7 @@ export default function CallsView() {
         voice: wp.length ? num(wp.map((c) => c.perf!.stages.voice)) : null,
         endpointing: wp.length ? num(wp.map((c) => c.perf!.stages.endpointing)) : null,
         transport: wp.length ? num(wp.map((c) => c.perf!.stages.transport)) : null,
+        groqCalls: eng.filter((c) => c.connector.model?.startsWith('groq')).length,
       }
     }
     const phones = shown.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
@@ -308,6 +320,20 @@ export default function CallsView() {
             )}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
+              {([5, 10, 'all'] as const).map((n) => {
+                const on = limit === n
+                return (
+                  <button key={n} onClick={() => setLimit(n)} style={{
+                    fontSize: 11.5, fontWeight: 700, padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                    background: on ? 'var(--accent-subtle)' : 'transparent', color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  }}>{n === 'all' ? 'All' : `Last ${n}`}</button>
+                )
+              })}
+            </div>
+            {limit !== 'all' && shown.length > visible.length && (
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{visible.length} of {shown.length}</span>
+            )}
             {view.webCount > 0 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <input type="checkbox" checked={showWeb} onChange={(e) => setShowWeb(e.target.checked)} style={{ accentColor: 'var(--accent-primary)' }} />
@@ -361,7 +387,7 @@ export default function CallsView() {
             <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 8, padding: '9px 14px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)', fontSize: 10, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 1 }}>
               <span>When</span><span>Callee</span><span>Dur</span><span>Turns</span><span>Wait</span><span>Turn avg</span><span>Worst</span><span>Cost</span><span />
             </div>
-            {shown.map((c) => {
+            {visible.map((c) => {
               const isOpen = open === c.id
               return (
                 <div key={c.id} style={{ borderBottom: '1px solid var(--border-primary)' }}>
