@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { getServiceClient, getClient } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 import Anthropic from '@anthropic-ai/sdk';
+
+// Vapi retries end-of-call-report, so this handler runs concurrently for the
+// same call more than once. A select-then-insert idempotency check has a
+// race — both deliveries can pass the SELECT before either INSERT lands,
+// doubling every transcript row (confirmed in prod: one call had 32 rows for
+// what should've been ~16 turns). Deterministic per-message ids + upsert
+// closes the race at the DB level instead of a check-then-act.
+function deterministicId(seed: string): string {
+  const hash = createHash('sha256').update(seed).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -68,22 +80,16 @@ async function upsertSession(
     const row: Record<string, any> = { ...rest, updated_at: new Date().toISOString() };
     Object.keys(row).forEach((k) => (row[k] == null) && delete row[k]);
 
-    const { data: sess, error: selErr } = await supabase
-      .from('voice_sessions')
-      .select('id')
-      .eq('external_session_id', callId)
-      .maybeSingle();
-    if (selErr) console.error('[vapi-webhook] session SELECT failed:', selErr.message);
-
-    if (sess?.id) {
-      const { error } = await supabase.from('voice_sessions').update(row).eq('id', sess.id);
-      if (error) console.error('[vapi-webhook] session UPDATE failed:', error.message, error.details, error.hint);
-    } else {
-      const insertRow: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
-      insertRow.created_at = createdAtIfNew || new Date().toISOString();
-      const { error } = await supabase.from('voice_sessions').insert(insertRow);
-      if (error) console.error('[vapi-webhook] session INSERT failed:', error.message, error.details, error.hint);
-    }
+    // external_session_id now has a UNIQUE constraint (added 2026-07-07 after
+    // this exact select-then-insert-or-update let Vapi's webhook retries pile
+    // up 71 duplicate rows for one call). Real upsert closes the race; created_at
+    // is only included when explicitly given, since an upsert's ON CONFLICT DO
+    // UPDATE sets every column present — including it unconditionally would
+    // reset created_at to "now" on every retry instead of just the first insert.
+    const payload: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
+    if (createdAtIfNew) payload.created_at = createdAtIfNew;
+    const { error } = await supabase.from('voice_sessions').upsert(payload, { onConflict: 'external_session_id' });
+    if (error) console.error('[vapi-webhook] session UPSERT failed:', error.message, error.details, error.hint);
   } catch (e: any) {
     console.error('[vapi-webhook] upsertSession threw:', e?.message);
   }
@@ -364,61 +370,47 @@ export async function POST(req: NextRequest) {
     //    lead_id may be null (column is nullable); the Calls view joins by call_id,
     //    so the transcript still surfaces even when no lead could be resolved.
     if (messages.length) {
-      const { data: already } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'eq', callId)
-        .limit(1);
-      if (!already || already.length === 0) {
-        const rows = messages
-          .filter((m: any) => ['user', 'bot', 'assistant'].includes(m.role) && (m.message || m.content))
-          .map((m: any) => ({
-            lead_id: leadId,
-            channel: 'voice',
-            sender: m.role === 'user' ? 'customer' : 'agent',
-            content: String(m.message || m.content || '').slice(0, 4000),
-            message_type: 'text',
-            metadata: { call_id: callId, source: 'vapi', direction },
-            created_at: m.time ? new Date(m.time).toISOString() : new Date().toISOString(),
-          }));
-        if (rows.length) {
-          const { error: cErr } = await supabase.from('conversations').insert(rows);
-          if (cErr) console.error('[vapi-webhook] conversations insert error:', cErr.message);
-        }
+      const rows = messages
+        .filter((m: any) => ['user', 'bot', 'assistant'].includes(m.role) && (m.message || m.content))
+        .map((m: any, i: number) => ({
+          id: deterministicId(`${callId}:msg:${i}`),
+          lead_id: leadId,
+          channel: 'voice',
+          sender: m.role === 'user' ? 'customer' : 'agent',
+          content: String(m.message || m.content || '').slice(0, 4000),
+          message_type: 'text',
+          metadata: { call_id: callId, source: 'vapi', direction },
+          created_at: m.time ? new Date(m.time).toISOString() : new Date().toISOString(),
+        }));
+      if (rows.length) {
+        const { error: cErr } = await supabase.from('conversations').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+        if (cErr) console.error('[vapi-webhook] conversations upsert error:', cErr.message);
       }
     }
 
-    // 4) Store the call summary + recording link as a summary row (idempotent per
-    //    call_id; lead_id may be null — the Calls view joins by call_id).
+    // 4) Store the call summary + recording link as a summary row — same
+    //    deterministic-id + upsert pattern closes the retry-duplicate race.
     if (summary || recordingUrl) {
-      const { data: existingSummary } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'eq', callId)
-        .filter('metadata->>summary', 'eq', 'true')
-        .limit(1);
-      if (existingSummary && existingSummary.length) {
-        // already stored — skip to avoid duplicate recording rows on webhook retry
-      } else {
-      const { error: smErr } = await supabase.from('conversations').insert({
-        lead_id: leadId,
-        channel: 'voice',
-        sender: 'agent',
-        content: summary || '(call recording)',
-        message_type: 'text',
-        metadata: {
-          call_id: callId,
-          summary: true,
-          recording_url: recordingUrl,
-          ended_reason: endedReason,
-          duration_seconds: durationSecs,
+      const { error: smErr } = await supabase.from('conversations').upsert(
+        {
+          id: deterministicId(`${callId}:summary`),
+          lead_id: leadId,
+          channel: 'voice',
+          sender: 'agent',
+          content: summary || '(call recording)',
+          message_type: 'text',
+          metadata: {
+            call_id: callId,
+            summary: true,
+            recording_url: recordingUrl,
+            ended_reason: endedReason,
+            duration_seconds: durationSecs,
+          },
+          created_at: endedAt || new Date().toISOString(),
         },
-        created_at: endedAt || new Date().toISOString(),
-      });
-      if (smErr) console.error('[vapi-webhook] summary insert error:', smErr.message);
-      }
+        { onConflict: 'id', ignoreDuplicates: true },
+      );
+      if (smErr) console.error('[vapi-webhook] summary upsert error:', smErr.message);
     }
 
     // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the
