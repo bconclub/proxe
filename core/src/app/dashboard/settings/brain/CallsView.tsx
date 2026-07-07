@@ -236,7 +236,12 @@ export default function CallsView() {
       return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
     }
     const splitFor = (engine: 'vapi' | 'elevenlabs'): EngineSplit | null => {
-      const eng = visible.filter((c) => c.engine === engine)
+      // Last-N is per-ENGINE, not "last N calls overall then split" — the combined
+      // list interleaves V1/V2 chronologically, so slicing before splitting could
+      // give V2 just 1-2 calls' worth of "last 5" stats depending on how the two
+      // engines happened to interleave. This takes each engine's own last N.
+      const engAll = shown.filter((c) => c.engine === engine)
+      const eng = limit === 'all' ? engAll : engAll.slice(0, limit)
       if (!eng.length) return null
       const wp = eng.filter((c) => c.perf && c.perf.turnAvg) // latency only from real turns
       const cost = eng.reduce((a, c) => a + (c.cost || 0), 0)
