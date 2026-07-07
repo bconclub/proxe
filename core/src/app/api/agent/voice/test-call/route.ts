@@ -294,7 +294,10 @@ async function sarvamPipelineCall(body: any) {
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
   const digits = String(phone).replace(/\D/g, '');
   const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${digits.slice(-10)}`;
-  const url = process.env.V3_PIPELINE_URL || 'http://localhost:8080';
+  const url = process.env.V3_PIPELINE_URL;
+  if (!url) {
+    return NextResponse.json({ success: false, error: 'V3_PIPELINE_URL not configured' }, { status: 500 });
+  }
   try {
     const res = await fetch(`${url}/start`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: e164 }),
