@@ -180,6 +180,25 @@ function perfFromEleven(detail: any) {
   }
 }
 
+// Real per-call connector values, from ElevenLabs' own billing breakdown —
+// asr_usage.asr_model and tts_usage.primary_tts_model are always present;
+// the LLM name only appears as a key in charging.llm_usage's model_usage
+// once actual generation happened (a call that disconnects before the model
+// is invoked — e.g. right after the static first message — has an empty
+// model_usage, so this can genuinely be null for very short calls).
+function elevenConnector(meta: any): { stt: string | null; model: string | null; tts: string | null } {
+  const charging = meta?.charging || {}
+  const modelKeys = new Set<string>()
+  for (const bucket of [charging.llm_usage?.initiated_generation?.model_usage, charging.llm_usage?.irreversible_generation?.model_usage]) {
+    if (bucket && typeof bucket === 'object') Object.keys(bucket).forEach((k) => modelKeys.add(k))
+  }
+  return {
+    stt: charging.asr_usage?.asr_model || null,
+    model: modelKeys.size ? Array.from(modelKeys).join(', ') : null,
+    tts: charging.tts_usage?.primary_tts_model || null,
+  }
+}
+
 async function fetchElevenCalls(): Promise<any[]> {
   const key = process.env.ELEVENLABS_API_KEY
   const agent = process.env.ELEVENLABS_AGENT_ID
@@ -223,7 +242,7 @@ async function fetchElevenCalls(): Promise<any[]> {
         endedReason: c.termination_reason || null,
         turns: c.message_count ?? 0,
         perf: perfFromEleven(d),
-        connector: { stt: '11labs', model: '11labs', tts: '11labs' },
+        connector: elevenConnector(meta),
         summary: c.transcript_summary || meta.transcript_summary || null,
         recordingUrl: null,
       }
