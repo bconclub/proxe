@@ -301,6 +301,8 @@ const WELCOME_BODIES: Record<string, string> = {
     'Hi {{customer_name}}, welcome to *Windchasers*. We are here to guide you with your Aviation Career.\n\nWhat are you looking to explore?',
   windchasers_pilot_welcome_v2:
     "Hi {{customer_name}}, welcome to *Windchasers.*\n\nYou're one step closer to the cockpit. Where would you like to start?",
+  windchasers_pilot_parents_welcome_v1:
+    "Hi {{parent_name}}, welcome to *Windchasers.*\n\nThanks for enquiring about pilot training for your child. Where would you like to start?",
 };
 
 /** Render a welcome template's real body with the lead's first name filled in. */
@@ -308,7 +310,9 @@ export function renderWelcomeBody(templateName: string, name: string): string {
   const tpl = WELCOME_BODIES[templateName]
   if (!tpl) return ''
   const first = (name || 'there').split(' ')[0]
-  return tpl.replace(/\{\{\s*customer_name\s*\}\}/g, first)
+  return tpl
+    .replace(/\{\{\s*customer_name\s*\}\}/g, first)
+    .replace(/\{\{\s*parent_name\s*\}\}/g, first)
 }
 
 /**
@@ -482,7 +486,7 @@ export async function sendFacebookLeadWelcome(
  */
 export function isPilotSource(...signals: Array<string | null | undefined>): boolean {
   const hay = signals.filter(Boolean).join(' ').toLowerCase()
-  return /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
+  return /\bpilot\b|pilot[-_ ]|\bcommercial[-_ ]?pilot\b|\bcpl\b|\bppl\b|\bhpl\b|\bchpl\b|\bphpl\b|\bdgca\b|\begc\b|flying|flight[-_ ]?training/.test(hay)
 }
 
 /** Cabin-crew lead — came from the cabin-crew page/form/interest. */
