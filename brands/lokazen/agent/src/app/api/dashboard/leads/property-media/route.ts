@@ -19,6 +19,14 @@ const LOKA_BASE = process.env.LOKAZEN_SITE_URL || 'https://www.lokazen.in'
 const MAX_IMAGES = 6
 const MAX_IMAGE_BYTES = 3_000_000
 
+function firstText(prop: Record<string, any>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = prop[key]
+    if (value != null && String(value).trim()) return String(value).trim()
+  }
+  return null
+}
+
 export async function GET(request: NextRequest) {
   const propertyId = request.nextUrl.searchParams.get('property_id')?.trim()
   if (!propertyId) {
@@ -55,6 +63,14 @@ export async function GET(request: NextRequest) {
         count: images.length,
         property_url: `${LOKA_BASE}/properties/${encodeURIComponent(propertyId)}`,
         title: typeof prop.title === 'string' ? prop.title : null,
+        details: {
+          locality: firstText(prop, ['locality', 'area', 'neighbourhood', 'neighborhood', 'micromarket']),
+          address: firstText(prop, ['address', 'full_address', 'formatted_address', 'property_address']),
+          city: firstText(prop, ['city', 'property_city']),
+          state: firstText(prop, ['state', 'property_state']),
+          pincode: firstText(prop, ['pincode', 'pin_code', 'postal_code', 'zip']),
+          map_url: firstText(prop, ['google_maps_url', 'google_maps_link', 'map_link', 'maps_url']),
+        },
       },
       { headers: { 'Cache-Control': 'private, max-age=300' } },
     )

@@ -14,6 +14,14 @@ interface MediaResponse {
   count: number
   property_url: string | null
   title: string | null
+  details?: {
+    locality?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    pincode?: string | null
+    map_url?: string | null
+  }
 }
 
 const ORANGE = '#FF5200'
@@ -38,6 +46,15 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
   }, [propertyId])
 
   const images = data?.images || []
+  const locationRows = data?.details
+    ? [
+        ['Locality', data.details.locality],
+        ['Address', data.details.address],
+        ['City', data.details.city],
+        ['State', data.details.state],
+        ['Pincode', data.details.pincode],
+      ].filter(([, value]) => value && String(value).trim())
+    : []
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -86,6 +103,29 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
             }}>+{images.length - 1}</span>
           )}
         </button>
+      )}
+
+      {locationRows.length > 0 && (
+        <div style={{
+          marginTop: 10,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: '8px 12px',
+          fontSize: 12,
+        }}>
+          {locationRows.map(([label, value]) => (
+            <div key={label} style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted, #6B7280)' }}>{label}</div>
+              <div style={{ color: 'var(--text-primary, #111827)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={String(value)}>{String(value)}</div>
+            </div>
+          ))}
+          {data?.details?.map_url && (
+            <a href={data.details.map_url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 12, fontWeight: 700, color: ORANGE, textDecoration: 'none' }}>
+              Open map
+            </a>
+          )}
+        </div>
       )}
 
       {lightbox != null && images[lightbox] && (

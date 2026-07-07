@@ -356,7 +356,7 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
       const { data: msg } = await supabase
         .from('conversations')
         .select('id, lead_id, metadata')
-        .filter('metadata->>wa_message_id', 'eq', waMessageId)
+        .or(`metadata->>wa_message_id.eq.${waMessageId},metadata->>whatsapp_message_id.eq.${waMessageId},metadata->>meta_message_id.eq.${waMessageId}`)
         .limit(1)
         .maybeSingle();
 
@@ -373,8 +373,12 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
         await supabase
           .from('conversations')
           .update({
-            read_at: statusTime,
-            metadata: { ...msg.metadata, delivery_status: 'read', read_at: statusTime },
+            metadata: {
+              ...msg.metadata,
+              delivery_status: 'read',
+              read_at: statusTime,
+              delivered_at: msg.metadata?.delivered_at || statusTime,
+            },
           })
           .eq('id', msg.id);
 
@@ -408,7 +412,6 @@ async function handleStatusUpdates(statuses: any[]): Promise<void> {
         await supabase
           .from('conversations')
           .update({
-            delivered_at: statusTime,
             metadata: { ...msg.metadata, delivery_status: 'delivered', delivered_at: statusTime },
           })
           .eq('id', msg.id);

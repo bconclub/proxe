@@ -435,6 +435,9 @@ export async function POST(request: NextRequest) {
             ? bodyParamsNamed
             : (Array.isArray(bodyParams) ? bodyParams : []),
           meta_message_id: result.messageId || null,
+          wa_message_id: result.messageId || null,
+          whatsapp_message_id: result.messageId || null,
+          delivery_status: result.messageId ? 'sent' : 'pending',
           test_mode: isTest,
           test_recipient: isTest ? phone : undefined,
         },

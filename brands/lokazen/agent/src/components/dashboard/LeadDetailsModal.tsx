@@ -40,12 +40,15 @@ function LokazenCreCard({ ctx }: { ctx: any }) {
   const title = isBrand ? 'Brand Requirement' : 'Property Listing'
   const brandFields: [string, any][] = [
     ['Brand', lkz.brand_name], ['Category', lkz.brand_category], ['Current outlets', lkz.current_outlets],
-    ['Expansion', lkz.expansion_intent], ['Target zones', lkz.target_zones], ['Size (sqft)', lkz.required_size_sqft],
+    ['Expansion', lkz.expansion_intent], ['Target zones', lkz.target_zones], ['Location details', lkz.location_details],
+    ['Locality', lkz.locality], ['City', lkz.city], ['State', lkz.state], ['Pincode', lkz.pincode], ['Size (sqft)', lkz.required_size_sqft],
     ['Budget/mo', lkz.budget_monthly_rent], ['Format', lkz.preferred_format], ['Timeline', lkz.timeline],
     ['Language', LANG[lkz.preferred_language] || lkz.preferred_language],
   ]
   const ownerFields: [string, any][] = [
-    ['Zone', lkz.property_zone], ['Type', lkz.property_type], ['Address', lkz.property_address], ['Maps URL', lkz.google_maps_url],
+    ['Zone', lkz.property_zone], ['Type', lkz.property_type], ['Address', lkz.property_address], ['Location details', lkz.location_details],
+    ['Locality', lkz.locality], ['City', lkz.city], ['State', lkz.state], ['Pincode', lkz.pincode], ['Coordinates', lkz.coordinates],
+    ['Google Place ID', lkz.google_place_id], ['Maps URL', lkz.google_maps_url],
     ['Size (sqft)', lkz.property_size_sqft], ['Asking rent/mo', lkz.asking_rent_monthly], ['Floor', lkz.floor],
     ['Frontage (ft)', lkz.frontage_ft], ['Available', lkz.availability_date], ['Amenities', lkz.amenities],
     ['Photos received', lkz.photos_received],
@@ -2574,9 +2577,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       onClick={async () => {
                         setShowActionDropdown(false)
                         const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {}
+                        const lkz = currentLead.unified_context?.lokazen || {}
                         const rff = currentLead.unified_context?.raw_form_fields || {}
                         const attr = currentLead.unified_context?.attribution || {}
-                        const city = wc.city
+                        const city = lkz.city
+                          || wc.city
                           || currentLead.unified_context?.whatsapp?.profile?.city
                           || currentLead.unified_context?.web?.profile?.city
                           || rff.city
@@ -2605,7 +2610,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           `Phone: ${currentLead.phone || '—'}`,
                           currentLead.email ? `Email: ${currentLead.email}` : null,
                           city ? `City: ${city}` : null,
-                          wc.user_type ? `Type: ${String(wc.user_type).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}` : null,
+                          lkz.property_zone || lkz.target_zones ? `Location: ${lkz.property_zone || lkz.target_zones}` : null,
+                          lkz.property_address ? `Address: ${lkz.property_address}` : null,
+                          lkz.location_details ? `Location details: ${lkz.location_details}` : null,
+                          lkz.google_maps_url ? `Maps: ${lkz.google_maps_url}` : null,
+                          (lkz.user_type || wc.user_type) ? `Type: ${String(lkz.user_type || wc.user_type).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}` : null,
                           wc.course_interest ? `Course: ${wc.course_interest}` : null,
                           wc.class_12_pcm ? `Education: ${eduMap[wc.class_12_pcm] || wc.class_12_pcm}` : (wc.education ? `Education: ${wc.education}` : null),
                           wc.timeline ? `Timeline: ${wc.timeline}` : null,
