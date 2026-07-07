@@ -61,6 +61,8 @@ interface FounderMetrics {
   // Gigs tab only — scout lifecycle stage breakdown (all zero otherwise). Same
   // stage derivation as the Gigs table's STATUS column, so they never disagree.
   gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
+  // Gigs tab only — scouts reaching KYC-started in the last 7 days (0 otherwise).
+  kycStarted7D?: number
   // POP-only: inbound/outbound voice volume for the Calls KPI card (ported from the pop fork).
   calls?: {
     total: number
@@ -84,6 +86,7 @@ interface FounderMetrics {
   trends?: {
     leads: { data: Array<{ value: number }>; change: number }
     bookings: { data: Array<{ value: number }>; change: number }
+    kycStarted?: { data: Array<{ value: number }>; change: number }
     conversations: { data: Array<{ value: number }>; change: number }
     hotLeads: { data: Array<{ value: number }>; change: number }
     responseTime: { data: Array<{ value: number }>; change: number }
@@ -728,15 +731,27 @@ export default function FounderDashboard() {
           </div>
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {hasNewHomeLook ? (healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention') : 'on track'}</span>
         </div>
-        <KpiCard
-          icon={<MdEvent size={15} />} iconColor="#a855f7"
-          label="Booked Calls / Events"
-          value={fmt(bookedVal)}
-          delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
-          sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
-          sub="vs last 7 days"
-          onClick={() => router.push('/dashboard/bookings')}
-        />
+        {isGigsView ? (
+          <KpiCard
+            icon={<MdAssignment size={15} />} iconColor="#a855f7"
+            label="KYC Started"
+            value={fmt(metrics.kycStarted7D ?? 0)}
+            delta={<KpiDelta change={metrics.trends?.kycStarted?.change} />}
+            sparkData={metrics.trends?.kycStarted?.data} sparkColor="#a855f7"
+            sub="vs last 7 days"
+            onClick={() => router.push('/dashboard/leads')}
+          />
+        ) : (
+          <KpiCard
+            icon={<MdEvent size={15} />} iconColor="#a855f7"
+            label="Booked Calls / Events"
+            value={fmt(bookedVal)}
+            delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
+            sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
+            sub="vs last 7 days"
+            onClick={() => router.push('/dashboard/bookings')}
+          />
+        )}
         <KpiCard
           icon={<MdSpeed size={15} />} iconColor="#3B82F6"
           label="Avg Response Time"
