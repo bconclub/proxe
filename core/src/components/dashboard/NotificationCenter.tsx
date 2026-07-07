@@ -44,6 +44,12 @@ const SEEN_AT_KEY = 'wc-notif-seen-at'
 const MUTED_KEY = 'wc-notif-muted'
 const UPDATE_SEEN_KEY = 'wc-notif-update-seen'
 
+// Paused 2026-07-06 across all brands: toasts were surfacing "random stuff"
+// (founder feedback). Bell badge + drawer (full history) keep working as
+// normal -- this only stops the auto-popping corner toast + its sound.
+// Flip back to false once the underlying selection logic is fixed.
+const TOASTS_PAUSED = true
+
 type NotificationEvent = {
   id: string
   leadId: string
@@ -150,6 +156,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   // them all in at once (founder: "the notification has to come one by one
   // slide in"). Each item appears ~600ms after the previous.
   const enqueueToasts = useCallback((items: NotificationEvent[]) => {
+    if (TOASTS_PAUSED) return
     items.forEach((t, i) => {
       setTimeout(() => {
         setToasts((prev) => (prev.some((x) => x.id === t.id) ? prev : [t, ...prev].slice(0, 2)))
@@ -169,6 +176,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
   }, [])
 
   const playSound = useCallback((kind: 'new' | 'update') => {
+    if (TOASTS_PAUSED) return
     // Master-mute + per-event gating both live in playEventSound.
     playEventSound(kind)
   }, [])
