@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-07 · fix(lokazen): Gigs tab "High Intent Leads" KPI always read 0
+
+- Same class of mismatch as the "Booked Calls / Events" card above: `lead_score` is a business-lead concept and scouts never get one, so this card was permanently stuck at 0 on the Gigs tab.
+- On Gigs it now shows "Engaged Scouts" — distinct scouts with a WhatsApp/social conversation in the last 7 days, reusing the already-scoped `totalConversations.count7D`/`trend7D` (no new backend metric needed). Leads tab unchanged.
+
 ## 2026-07-07 · fix(lokazen): Gigs tab "Booked Calls / Events" KPI still showed lead-booking data
 
 - The KPI card next to Follow-up Health kept showing "Booked Calls / Events" (a business-lead metric) on the Gigs tab, since it was never converted when the rest of the tab was — same class of mismatch already flagged and fixed for the Engine Overview funnel's "Booked" node.

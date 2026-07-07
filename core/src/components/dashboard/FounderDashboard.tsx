@@ -706,15 +706,29 @@ export default function FounderDashboard() {
           })()}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
-        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
-        <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
-          label="High Intent Leads"
-          value={fmt(metrics.hotLeads?.count ?? 0)}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
-          sub="flagged high-intent by PROXe"
-          onClick={() => router.push('/dashboard/leads?filter=hot')}
-        />
+        {/* Card 2 — Leads: hot/sales-ready leads PROXe scored. Gigs: engaged
+            scouts (active conversation on WhatsApp or social, last 7 days) —
+            lead_score doesn't apply to scouts, so "High Intent" always read 0. */}
+        {isGigsView ? (
+          <KpiCard
+            icon={<MdMessage size={15} />} iconColor="#22c55e"
+            label="Engaged Scouts"
+            value={fmt(metrics.totalConversations?.count7D ?? 0)}
+            delta={<KpiDelta change={metrics.totalConversations?.trend7D} />}
+            sparkData={metrics.trends?.conversations?.data} sparkColor="#22c55e"
+            sub="active on WhatsApp or social, last 7 days"
+            onClick={() => router.push('/dashboard/leads')}
+          />
+        ) : (
+          <KpiCard
+            icon={<MdLocalFireDepartment size={15} />} iconColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
+            label="High Intent Leads"
+            value={fmt(metrics.hotLeads?.count ?? 0)}
+            sparkData={metrics.trends?.hotLeads?.data} sparkColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
+            sub="flagged high-intent by PROXe"
+            onClick={() => router.push('/dashboard/leads?filter=hot')}
+          />
+        )}
         {/* Follow-up Health — status + ring; whole card follows the status colour. */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
