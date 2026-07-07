@@ -100,6 +100,8 @@ export {
   sendWelcomeTemplate,
   pickWelcomeTemplate,
   isPilotSource,
+  isParentSource,
+  sendParentWelcomeTemplate,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';

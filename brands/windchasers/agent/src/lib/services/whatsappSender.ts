@@ -288,6 +288,7 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   windchasers_demo_offline_v2:  ['Get Directions', 'Join Pilot Community'],
   windchasers_generic_welcome_v1: ['Pilot Training', 'Cabin Crew', 'Other'],
   windchasers_pilot_welcome_v2:   ['Pilot Training Details', 'Visit Academy', 'Book a Demo Class'],
+  windchasers_pilot_parents_welcome_v1: ['Pilot Training Details', 'Visit Academy', 'Book a Demo Class'],
 };
 
 /**
@@ -490,6 +491,11 @@ export function isCabinCrewSource(...signals: Array<string | null | undefined>):
   return /cabin[-_ ]?crew|\bcabin\b|air[-_ ]?hostess|flight[-_ ]?attendant/.test(hay)
 }
 
+export function isParentSource(...signals: Array<string | null | undefined>): boolean {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  return /\bparent\b|\bparents\b/.test(hay)
+}
+
 // The Meta-approved cabin-crew welcome template name. Stays null until the
 // template is created + APPROVED in Meta — sending an unapproved name fails, so
 // until then cabin-crew leads fall back to the generic welcome. Flip this to the
@@ -529,6 +535,20 @@ export async function sendWelcomeTemplate(
     {
       type: 'body',
       parameters: [{ type: 'text', parameter_name: 'customer_name', text: firstName }],
+    },
+  ])
+}
+
+export async function sendParentWelcomeTemplate(
+  to: string,
+  name: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_pilot_parents_welcome_v1', [
+    {
+      type: 'body',
+      parameters: [{ type: 'text', parameter_name: 'parent_name', text: firstName }],
     },
   ])
 }

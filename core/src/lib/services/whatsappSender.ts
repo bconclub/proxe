@@ -565,6 +565,37 @@ export function pickWelcomeTemplate(...signals: Array<string | null | undefined>
 }
 
 /**
+ * True when the lead's form/campaign/ad context marks it as a parent enquiry
+ * (a parent enquiring on behalf of their child), as opposed to the student
+ * enquiring for themselves.
+ */
+export function isParentSource(...signals: Array<string | null | undefined>): boolean {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  return /\bparent\b|\bparents\b/.test(hay)
+}
+
+/**
+ * Welcome message for parent-enquiry leads. Uses a NAMED body param
+ * (`parent_name`), unlike the student welcome templates which use
+ * `customer_name` — the two are not interchangeable at the Graph API level.
+ *
+ * Template: windchasers_pilot_parents_welcome_v1
+ */
+export async function sendParentWelcomeTemplate(
+  to: string,
+  name: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_pilot_parents_welcome_v1', [
+    {
+      type: 'body',
+      parameters: [{ type: 'text', parameter_name: 'parent_name', text: firstName }],
+    },
+  ])
+}
+
+/**
  * Pick the RNR (no-reply / missed-call) re-engagement template.
  * Two steps per segment — step 1 = first re-attempt, step 2 = "tried again".
  * Routed pilot vs generic by the lead's source. Names are Meta-approved with a
