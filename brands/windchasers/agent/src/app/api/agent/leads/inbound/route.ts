@@ -7,8 +7,10 @@ import {
   sendDemoConfirmation,
   sendPATResult,
   sendWelcomeTemplate,
+  sendParentWelcomeTemplate,
   pickWelcomeTemplate,
   renderWelcomeBody,
+  isParentSource,
   buildAttribution,
   renderPATResultBody,
   renderDemoOnlineBody,
@@ -23,19 +25,34 @@ import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
+async function hasPriorOutboundWhatsApp(supabase: any, leadId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('lead_id', leadId)
+    .eq('channel', 'whatsapp')
+    .eq('sender', 'agent')
+    .limit(1)
+    .maybeSingle()
+
+  return !!data
+}
+
 /**
  * POST /api/agent/leads/inbound
  * Inbound lead API for Facebook, Google, website forms, manual entry.
  * Creates or updates a lead and schedules a first_outreach task.
  *
- * Auth: x-api-key header must match INBOUND_API_KEY env var.
+ * Auth: x-api-key or xapi-key header must match INBOUND_API_KEY env var.
  * Body: { name, phone, email?, source, campaign?, notes?, brand?,
  *         city?, brand_name?, urgency?, custom_fields? }
  */
 export async function POST(request: NextRequest) {
   try {
     // Auth check
-    const apiKey = request.headers.get('x-api-key')
+    const apiKey =
+      request.headers.get('x-api-key') ||
+      request.headers.get('xapi-key')
     const expectedKey = process.env.INBOUND_API_KEY
     if (!expectedKey || apiKey !== expectedKey) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -85,7 +102,49 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+    let { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+
+    const parseCustomFields = (value: any): any => {
+      if (typeof value !== 'string') return value
+      try {
+        const parsed = JSON.parse(value)
+        return parsed && typeof parsed === 'object' ? parsed : value
+      } catch {
+        return value
+      }
+    }
+    custom_fields = parseCustomFields(custom_fields)
+
+    const normalizeFieldData = (value: any): Record<string, any> => {
+      let data = value
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data) } catch { return {} }
+      }
+      if (!Array.isArray(data)) return {}
+
+      return data.reduce((acc: Record<string, any>, field: any) => {
+        const key = String(field?.name || '').trim()
+        if (!key) return acc
+        const raw = Array.isArray(field?.values) ? field.values[0] : field?.value
+        if (raw != null && String(raw).trim() !== '') acc[key] = raw
+        return acc
+      }, {})
+    }
+
+    const metaFieldData = normalizeFieldData(custom_fields)
+    if (Object.keys(metaFieldData).length > 0) {
+      custom_fields = {
+        ...metaFieldData,
+        user_type: custom_fields?.user_type || metaFieldData.user_type || 'student',
+        form_type: custom_fields?.form_type || 'meta_lead_form',
+      }
+      name = name || metaFieldData.full_name || metaFieldData.name
+      phone = phone || metaFieldData.phone || metaFieldData.phone_number
+      email = email || metaFieldData.email
+      city = city || metaFieldData.city
+      source = source || 'facebook'
+      campaign = campaign || body.campaign_name || body.utm_campaign || 'Meta Lead Form'
+    }
 
     // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
     let notes: string | null = null
@@ -194,7 +253,13 @@ export async function POST(request: NextRequest) {
     // have the data in custom_fields.
     const brandCtxData: Record<string, any> = {}
     const cf2 = (custom_fields || {}) as Record<string, any>
-    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    const audienceRaw = String(
+      cf2.audience ||
+      cf2.user_type ||
+      body.user_type ||
+      body.lead_type ||
+      ''
+    ).toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
       audienceRaw === 'parent' ||
@@ -205,16 +270,34 @@ export async function POST(request: NextRequest) {
     }
     if (leadBrand === 'windchasers') {
       // Map the interest value the form sends to the short course label the
-      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
-      const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
+      // dashboard's filter dropdown uses (CPL / DGCA / HPL / Cabin / Drone).
+      const interestRaw = String(
+        cf2.interest ||
+        cf2.course_interest ||
+        body.course_interest ||
+        body.course ||
+        body.course_details ||
+        ''
+      ).toLowerCase().trim()
       const courseMap: Record<string, string> = {
+        commercial_pilot: 'CPL',
+        commercial_pilot_cpl: 'CPL',
+        'commercial_pilot_(cpl)': 'CPL',
+        cpl: 'CPL',
         dgca_ground: 'DGCA',
         dgca: 'DGCA',
-        pilot_training_abroad: 'Flight',
-        flight: 'Flight',
-        helicopter_license: 'Heli',
-        helicopter: 'Heli',
-        heli: 'Heli',
+        egc: 'DGCA',
+        dgca_cpl: 'DGCA',
+        cpl_dgca: 'DGCA',
+        pilot_training_abroad: 'CPL',
+        flight: 'CPL',
+        helicopter_license: 'HPL',
+        helicopter_pilot: 'HPL',
+        helicopter: 'HPL',
+        heli: 'HPL',
+        hpl: 'HPL',
+        chpl: 'HPL',
+        phpl: 'HPL',
         cabin_crew: 'Cabin',
         cabin: 'Cabin',
         drone: 'Drone',
@@ -642,23 +725,40 @@ export async function POST(request: NextRequest) {
     // (the old windchasers_followup was unapproved → silent fails). Pilot-source
     // leads (campaign / source / form / interest mentions pilot/cpl/dgca/flying)
     // get windchasers_pilot_welcome_v2; everyone else windchasers_generic_welcome_v1.
-    // NEW leads only (once per lead), and AWAITED so Vercel doesn't drop the send.
-    if (phone && isNew && !isPatSubmission && !isDemoBooking) {
-      const welcomeTpl = pickWelcomeTemplate(
+    // Send only when we have not already messaged this lead on WhatsApp. This
+    // covers the common path where the person clicks into WhatsApp first, chats
+    // with the agent, and then Pabbly forwards the Meta lead form afterwards.
+    const alreadyMessagedOnWhatsApp = phone
+      ? await hasPriorOutboundWhatsApp(supabase, leadId)
+      : false
+    if (phone && !alreadyMessagedOnWhatsApp && !isPatSubmission && !isDemoBooking) {
+      const welcomeSignals = [
         leadSource, normalizedSource, campaign,
         cf2.utm_campaign, cf2.utm_source, cf2.form_type,
-        cf2.course_interest, brandCtxData.course_interest, notes,
-      )
+        cf2.course_interest, brandCtxData.course_interest,
+        cf2.ad_name, cf2.adset_name, cf2.campaign_name,
+        brandCtxData.user_type, notes,
+      ]
+      const isParentPilotLead =
+        brandCtxData.user_type === 'parent' ||
+        cf2.user_type === 'parent' ||
+        cf2.audience === 'parent' ||
+        isParentSource(...welcomeSignals)
+      const welcomeTpl = isParentPilotLead
+        ? 'windchasers_pilot_parents_welcome_v1'
+        : pickWelcomeTemplate(...welcomeSignals)
       const firstName = (leadName || 'there').split(' ')[0]
       try {
-        const result = await sendWelcomeTemplate(phone, leadName, welcomeTpl)
+        const result = isParentPilotLead
+          ? await sendParentWelcomeTemplate(phone, leadName)
+          : await sendWelcomeTemplate(phone, leadName, welcomeTpl)
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
           sender: 'agent',
           content: result.success
-            ? (renderWelcomeBody(welcomeTpl, leadName) || `Welcome message sent to ${firstName}.`)
-            : `[Welcome failed to send] ${renderWelcomeBody(welcomeTpl, leadName) || welcomeTpl}`,
+            ? (isParentPilotLead ? `Parent pilot welcome sent to ${firstName}.` : (renderWelcomeBody(welcomeTpl, leadName) || `Welcome message sent to ${firstName}.`))
+            : `[Welcome failed to send] ${isParentPilotLead ? welcomeTpl : (renderWelcomeBody(welcomeTpl, leadName) || welcomeTpl)}`,
           message_type: 'template',
           metadata: {
             template_name: welcomeTpl,
@@ -683,6 +783,8 @@ export async function POST(request: NextRequest) {
         console.error(`[inbound] welcome WA EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
         await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
       }
+    } else if (phone && alreadyMessagedOnWhatsApp && !isPatSubmission && !isDemoBooking) {
+      console.log(`[inbound] welcome WA skipped lead=${leadId} phone=${phone}: prior outbound WhatsApp exists`)
     }
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null

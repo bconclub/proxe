@@ -44,7 +44,7 @@
 - **Method:** POST
 - **File:** [brands/windchasers/agent/src/app/api/agent/leads/inbound/route.ts](brands/windchasers/agent/src/app/api/agent/leads/inbound/route.ts) — windchasers only
 - **Purpose:** Single inbound funnel for Facebook lead-ads, Google ads, website forms, manual entry, and Pabbly. Creates or updates a lead and schedules a `first_outreach` task.
-- **Auth:** `x-api-key` header must match `INBOUND_API_KEY` env var.
+- **Auth:** `x-api-key` header must match `INBOUND_API_KEY` env var. The inbound route also accepts Pabbly-style `xapi-key`.
 - **Expected payload shape:**
 ```json
 {
@@ -514,7 +514,7 @@ Filtering the inventory to routes that `pilot.windchasers.in` (or any windchaser
 
 | Endpoint | Auth | Best for |
 |---|---|---|
-| `POST /api/agent/leads/inbound` | `x-api-key: INBOUND_API_KEY` | **Generic inbound lead** — designed exactly for this. Accepts JSON or form-urlencoded. Schedules a `first_outreach` task automatically. |
+| `POST /api/agent/leads/inbound` | `x-api-key` or `xapi-key`: `INBOUND_API_KEY` | **Generic inbound lead** — designed exactly for this. Accepts JSON or form-urlencoded. Schedules a `first_outreach` task automatically. |
 | `POST /api/integrations/landing-pages` | `x-api-key: WHATSAPP_API_KEY` | **Landing-page form submission** with course/training/UTM fields and a visible inbox conversation row. |
 | `POST /api/website` | `Authorization: Bearer WEBHOOK_SECRET` | **Generic website form** (contact / newsletter). Auto-sends a `bcon_welcome_web_v1` WhatsApp template to new leads. |
 | `POST /api/agent/web/chat` (SSE) | None | **Embedded chat**. Used by the widget; can be called directly to drive a chat from your own UI. |

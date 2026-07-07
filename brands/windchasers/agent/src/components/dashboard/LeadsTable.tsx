@@ -603,9 +603,9 @@ export default function LeadsTable({
               {showAviationColumns && (
                 <select value={courseInterestFilter} onChange={(e) => setCourseInterestFilter(e.target.value)} className={filterClass} style={filterStyle}>
                   <option value="all">All courses</option>
+                  <option value="CPL">CPL</option>
                   <option value="DGCA">DGCA</option>
-                  <option value="Flight">Flight</option>
-                  <option value="Heli">Heli</option>
+                  <option value="HPL">HPL</option>
                   <option value="Cabin">Cabin</option>
                   <option value="Drone">Drone</option>
                 </select>
@@ -766,6 +766,13 @@ export default function LeadsTable({
                 // If no name, use email as primary identifier
                 const displayName = resolvedName || lead.email || lead.phone || '-'
                 const isEmailAsName = !resolvedName && !!lead.email
+                const brandCtx = uc?.[brandId] || uc?.windchasers || {}
+                const leadTypeRaw = String(brandCtx.user_type || brandCtx.business_type || '').toLowerCase().trim()
+                const leadTypeChip = leadTypeRaw === 'parent'
+                  ? { label: 'Parent', style: { backgroundColor: '#2563eb', color: '#fff' } }
+                  : leadTypeRaw === 'student'
+                  ? { label: 'Student', style: { backgroundColor: '#7c3aed', color: '#fff' } }
+                  : null
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -1067,8 +1074,18 @@ export default function LeadsTable({
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                        {displayName}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold truncate min-w-0" style={{ color: 'var(--text-primary)' }} title={displayName}>
+                          {displayName}
+                        </span>
+                        {leadTypeChip && (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex-shrink-0 whitespace-nowrap"
+                            style={leadTypeChip.style}
+                          >
+                            {leadTypeChip.label}
+                          </span>
+                        )}
                       </div>
                       {(brandName || city) && !isEmailAsName && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
