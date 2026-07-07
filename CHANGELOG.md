@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: scout lifecycle templates still duplicating — 5-minute window wasn't enough
+
+- Confirmed live: the same `scout_kyc_received` fired 4 times to one scout — 6:42 PM, 6:42 PM, 6:50 PM, then 7:00 AM the next day. The earlier 5-minute dedup window only blocks back-to-back retries; it does nothing when the website re-sends the same `kyc_submitted` event hours (or overnight) apart, which is what's actually happening.
+- Root issue: `signup`/`kyc_received`/`kyc_approved`/`upi_saved` are **one-time lifecycle stages** — a scout reaches "KYC received" exactly once, ever. A time window is the wrong tool for a fact that never changes back. Those 4 templates now use an unbounded dedup check (any prior send to this lead, no matter how old, blocks another) instead of the 5-minute window. `submission`/`payout` stay on the 5-minute window since they're genuinely repeatable (a 2nd/3rd property submission, a later payout) — no code change needed there, `wasTemplateRecentlySent`'s existing `windowMs` parameter already supported this via `Infinity`.
+
 ## 2026-07-06 · fix: Active Conversations, its trend, and Avg Response Time were never actually scoped — real leads/gigs mixing
 
 - Re-audited after the tab-switch UX fix and found the actual data-level bug the earlier "no cross-contamination" claim had missed: the `conversations` table query backing `messages` has **no brand or scope filter at all** — just a 45-day time cutoff. Multiple visible metrics read straight off this raw, unfiltered array: `totalConversationsCount` (the main Active Conversations KPI — its "primary" path takes precedence over the properly-scoped session-count fallback, which is essentially never used), the Avg Response Time KPI + its trend, and the Conversations Trend chart. All of them could mix leads and gigs (and in principle any other brand, since there's no brand filter on the query).
