@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { getVoiceTelemetryBulk } from '@/lib/server/voiceTelemetry'
 
 export const dynamic = 'force-dynamic'
 
@@ -152,6 +153,15 @@ export async function GET(request: NextRequest) {
         createdAt: r.created_at,
       }
     })
+
+    const telemetryByCallId = await getVoiceTelemetryBulk(
+      calls.map((call) => call.callId).filter((callId): callId is string => Boolean(callId)),
+    )
+
+    calls = calls.map((call) => ({
+      ...call,
+      telemetry: call.callId ? telemetryByCallId.get(call.callId) || null : null,
+    }))
 
     // Name search (post-join) — phone search already applied at the DB layer.
     if (search && search.length >= 2 && !/^\d+$/.test(search.replace(/\D/g, ''))) {

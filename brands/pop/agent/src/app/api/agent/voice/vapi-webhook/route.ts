@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, getClient } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
+import { extractVapiPerformance, writeVoiceTelemetry } from '@/lib/server/voiceTelemetry';
+import { enrichCompletedCall } from '@/lib/server/callEnrichment';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,22 +47,19 @@ async function upsertSession(
     const row: Record<string, any> = { ...rest, updated_at: new Date().toISOString() };
     Object.keys(row).forEach((k) => (row[k] == null) && delete row[k]);
 
-    const { data: sess, error: selErr } = await supabase
-      .from('voice_sessions')
-      .select('id')
-      .eq('external_session_id', callId)
-      .maybeSingle();
-    if (selErr) console.error('[vapi-webhook] session SELECT failed:', selErr.message);
-
-    if (sess?.id) {
-      const { error } = await supabase.from('voice_sessions').update(row).eq('id', sess.id);
-      if (error) console.error('[vapi-webhook] session UPDATE failed:', error.message, error.details, error.hint);
-    } else {
-      const insertRow: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
-      insertRow.created_at = createdAtIfNew || new Date().toISOString();
-      const { error } = await supabase.from('voice_sessions').insert(insertRow);
-      if (error) console.error('[vapi-webhook] session INSERT failed:', error.message, error.details, error.hint);
-    }
+    // external_session_id now has a UNIQUE constraint (added after a webhook-
+    // retry race produced 71 duplicate rows for one call — see 2026-07-07
+    // incident). A real DB upsert on that constraint closes the race instead
+    // of the old select-then-insert-or-update, which let concurrent retries
+    // both miss the SELECT and both INSERT. created_at is only included when
+    // explicitly given (createdAtIfNew) — an upsert's ON CONFLICT DO UPDATE
+    // sets every column in the payload, so including it unconditionally would
+    // reset created_at to "now" on every retry instead of the DB default only
+    // applying on genuine first insert.
+    const payload: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
+    if (createdAtIfNew) payload.created_at = createdAtIfNew;
+    const { error } = await supabase.from('voice_sessions').upsert(payload, { onConflict: 'external_session_id' });
+    if (error) console.error('[vapi-webhook] session UPSERT failed:', error.message, error.details, error.hint);
   } catch (e: any) {
     console.error('[vapi-webhook] upsertSession threw:', e?.message);
   }
@@ -100,6 +99,31 @@ async function recoverOutboundDestination(startedAtIso: string | null): Promise<
   }
 }
 
+// Vapi sometimes fires end-of-call-report before its own artifact (transcript,
+// recording) has finished processing — the "Vikram" call that showed a
+// duration and "completed" status but no transcript/recording was this: the
+// webhook payload's messages/recordingUrl were genuinely empty at delivery
+// time, even though Vapi had them moments later. One short delayed re-fetch
+// of the call object covers that window without adding a retry queue.
+async function fetchVapiArtifactFallback(callId: string): Promise<{ messages: any[]; recordingUrl: string | null; summary: string | null }> {
+  const key = process.env.VAPI_PRIVATE_API_KEY;
+  if (!key) return { messages: [], recordingUrl: null, summary: null };
+  await new Promise((r) => setTimeout(r, 4000));
+  try {
+    const res = await fetch(`https://api.vapi.ai/call/${callId}`, { headers: { Authorization: `Bearer ${key}` } });
+    if (!res.ok) return { messages: [], recordingUrl: null, summary: null };
+    const d: any = await res.json();
+    return {
+      messages: d.artifact?.messages || d.messages || [],
+      recordingUrl: d.recordingUrl || d.artifact?.recordingUrl || null,
+      summary: d.summary || d.analysis?.summary || null,
+    };
+  } catch (e: any) {
+    console.error('[vapi-webhook] artifact fallback fetch failed:', e?.message);
+    return { messages: [], recordingUrl: null, summary: null };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Optional shared-secret auth. Set VAPI_WEBHOOK_SECRET (Vercel) + the same
@@ -135,6 +159,15 @@ export async function POST(req: NextRequest) {
           call_status: status === 'in-progress' ? 'in-progress' : status,
           call_direction: provisionalDir,
           createdAtIfNew: call.createdAt || new Date().toISOString(),
+        });
+        await writeVoiceTelemetry({
+          callId,
+          status,
+          direction: provisionalDir,
+          provider: 'vapi',
+          startedAt: call.startedAt || call.createdAt || null,
+          updatedAt: new Date().toISOString(),
+          performance: extractVapiPerformance(msg.artifact?.performanceMetrics || call.artifact?.performanceMetrics),
         });
       }
       return NextResponse.json({ ok: true, status: msg.status || null });
@@ -190,9 +223,19 @@ export async function POST(req: NextRequest) {
     }
 
     const endedReason = msg.endedReason || null;
-    const summary = msg.summary || msg.analysis?.summary || null;
-    const recordingUrl = msg.recordingUrl || msg.artifact?.recordingUrl || call.recordingUrl || null;
-    const messages: any[] = msg.artifact?.messages || msg.messages || [];
+    let summary = msg.summary || msg.analysis?.summary || null;
+    let recordingUrl = msg.recordingUrl || msg.artifact?.recordingUrl || call.recordingUrl || null;
+    let messages: any[] = msg.artifact?.messages || msg.messages || [];
+
+    if (callId && !messages.length && !recordingUrl && !summary) {
+      const fallback = await fetchVapiArtifactFallback(callId);
+      if (fallback.messages.length || fallback.recordingUrl || fallback.summary) {
+        console.log('[vapi-webhook] artifact fallback recovered data', { callId, turns: fallback.messages.length, hasRecording: !!fallback.recordingUrl });
+        messages = fallback.messages;
+        recordingUrl = fallback.recordingUrl;
+        summary = fallback.summary;
+      }
+    }
 
     // The contact name the call was placed with (passed as assistantOverrides at
     // dial time) — so a lead created/updated from a voice call carries a name
@@ -202,139 +245,52 @@ export async function POST(req: NextRequest) {
 
     console.log('[vapi-webhook] end-of-call', { callId, phone: norm, direction, durationSecs, endedReason, turns: messages.length, name: vapiName });
 
-    // 1) Find or create the lead (prefer a match in this brand)
-    let leadId: string | null = null;
-    if (norm) {
-      const { data: leads } = await supabase
-        .from('all_leads')
-        .select('id, brand, customer_name')
-        .eq('customer_phone_normalized', norm);
-      const existing = leads?.find((l: any) => l.brand === BRAND_ID) || leads?.[0] || null;
-      if (existing) {
-        leadId = existing.id;
-        const updates: any = { last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() };
-        if (existing.brand === 'default') updates.brand = BRAND_ID;
-        if (vapiName && !existing.customer_name) updates.customer_name = vapiName;
-        await supabase.from('all_leads').update(updates).eq('id', leadId);
-      } else {
-        const { data: created, error: cErr } = await supabase
-          .from('all_leads')
-          .insert({
-            customer_name: vapiName,
-            phone,
-            customer_phone_normalized: norm,
-            brand: BRAND_ID,
-            first_touchpoint: 'voice',
-            last_touchpoint: 'voice',
-            last_interaction_at: new Date().toISOString(),
-            lead_stage: 'New',
-          })
-          .select('id')
-          .single();
-        if (cErr) console.error('[vapi-webhook] lead insert error:', cErr.message);
-        leadId = created?.id || null;
-      }
-    }
-
     // 1b) If phone-based resolution failed (e.g. outbound bridge couldn't recover
-    //     the number), fall back to the lead linked at call INITIATION — the
-    //     test-call route stamps lead_id onto the session up front.
-    if (!leadId && callId) {
-      const { data: s } = await supabase
-        .from('voice_sessions')
-        .select('lead_id')
-        .eq('external_session_id', callId)
-        .maybeSingle();
-      if (s?.lead_id) leadId = s.lead_id;
-    }
+    //     the number), the shared helper falls back to the lead linked at call
+    //     INITIATION — the test-call route stamps lead_id onto the session up front.
+    const normalizedMessages = messages
+      .filter((m: any) => ['user', 'bot', 'assistant'].includes(m.role) && (m.message || m.content))
+      .map((m: any) => ({
+        role: (m.role === 'user' ? 'user' : 'agent') as 'user' | 'agent',
+        content: String(m.message || m.content || ''),
+        at: m.time ? new Date(m.time).toISOString() : null,
+      }));
 
-    // 2) Enrich the session row now that lead + final direction + phone are known.
+    const { leadId } = callId
+      ? await enrichCompletedCall({
+          supabase,
+          callId,
+          provider: 'vapi',
+          phone,
+          phoneNorm: norm,
+          direction,
+          durationSeconds: durationSecs,
+          endedReason,
+          startedAt,
+          endedAt,
+          summary,
+          recordingUrl,
+          contactName: vapiName,
+          messages: normalizedMessages,
+        })
+      : { leadId: null };
+
+    // Vapi-specific performance metrics aren't covered by the shared helper's
+    // generic telemetry write — overwrite with the richer per-turn breakdown.
     if (callId) {
-      await upsertSession(supabase, callId, {
-        lead_id: leadId,
-        customer_phone: phone,
-        customer_phone_normalized: norm,
-        call_status: 'completed',
-        call_direction: direction,
-        call_duration_seconds: durationSecs,
+      await writeVoiceTelemetry({
+        callId,
+        status: 'completed',
+        direction,
+        leadId,
+        durationSeconds: durationSecs,
+        endedReason,
+        startedAt,
+        endedAt,
+        provider: 'vapi',
+        updatedAt: new Date().toISOString(),
+        performance: extractVapiPerformance(msg.artifact?.performanceMetrics || call.artifact?.performanceMetrics),
       });
-    }
-
-    // 3) Log transcript turns into conversations (idempotent per call_id).
-    //    lead_id may be null (column is nullable); the Calls view joins by call_id,
-    //    so the transcript still surfaces even when no lead could be resolved.
-    if (messages.length) {
-      const { data: already } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'eq', callId)
-        .limit(1);
-      if (!already || already.length === 0) {
-        const rows = messages
-          .filter((m: any) => ['user', 'bot', 'assistant'].includes(m.role) && (m.message || m.content))
-          .map((m: any) => ({
-            lead_id: leadId,
-            channel: 'voice',
-            sender: m.role === 'user' ? 'customer' : 'agent',
-            content: String(m.message || m.content || '').slice(0, 4000),
-            message_type: 'text',
-            metadata: { call_id: callId, source: 'vapi', direction },
-            created_at: m.time ? new Date(m.time).toISOString() : new Date().toISOString(),
-          }));
-        if (rows.length) {
-          const { error: cErr } = await supabase.from('conversations').insert(rows);
-          if (cErr) console.error('[vapi-webhook] conversations insert error:', cErr.message);
-        }
-      }
-    }
-
-    // 4) Store the call summary + recording link as a summary row (idempotent per
-    //    call_id; lead_id may be null — the Calls view joins by call_id).
-    if (summary || recordingUrl) {
-      const { data: existingSummary } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'eq', callId)
-        .filter('metadata->>summary', 'eq', 'true')
-        .limit(1);
-      if (existingSummary && existingSummary.length) {
-        // already stored — skip to avoid duplicate recording rows on webhook retry
-      } else {
-      const { error: smErr } = await supabase.from('conversations').insert({
-        lead_id: leadId,
-        channel: 'voice',
-        sender: 'agent',
-        content: summary || '(call recording)',
-        message_type: 'text',
-        metadata: {
-          call_id: callId,
-          summary: true,
-          recording_url: recordingUrl,
-          ended_reason: endedReason,
-          duration_seconds: durationSecs,
-        },
-        created_at: endedAt || new Date().toISOString(),
-      });
-      if (smErr) console.error('[vapi-webhook] summary insert error:', smErr.message);
-      }
-    }
-
-    // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the
-    //    Vercel lambda freezes) but it runs LAST — all call persistence above is
-    //    already committed, so even if scoring is slow/times out the call is saved.
-    if (leadId) {
-      try {
-        const origin = new URL(req.url).origin;
-        await fetch(`${origin}/api/webhooks/message-created`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead_id: leadId }),
-        });
-      } catch (e: any) {
-        console.error('[vapi-webhook] scoring trigger failed:', e?.message);
-      }
     }
 
     return NextResponse.json({ ok: true, leadId, callId, durationSecs });

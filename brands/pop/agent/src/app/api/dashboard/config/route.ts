@@ -56,6 +56,20 @@ const INTEGRATIONS: IntegrationSpec[] = [
     ],
   },
   {
+    id: 'groq', name: 'Groq (fast inference)', desc: 'Low-latency text generation',
+    fields: [
+      { env: 'AI_PROVIDER', label: 'Active provider' },
+      { env: 'GROQ_API_KEY', label: 'API key', secret: true, required: false },
+      { env: 'GROQ_MODEL', label: 'Model', required: false },
+    ],
+  },
+  {
+    id: 'redis', name: 'Redis cache', desc: 'Call telemetry and response cache',
+    fields: [
+      { env: 'REDIS_URL', label: 'Redis URL', secret: true, required: false },
+    ],
+  },
+  {
     id: 'whatsapp', name: 'WhatsApp (Meta)', desc: 'WhatsApp Business messaging',
     fields: [
       { env: 'META_WHATSAPP_PHONE_NUMBER_ID', label: 'Phone number ID', required: true },

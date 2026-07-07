@@ -1,32 +1,59 @@
+import { getBrandConfig, getCurrentBrandId, BRAND_ID } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server';
+import { getServiceClient } from '@/lib/services';
+import { ensureOrUpdateLead } from '@/lib/services/leadManager';
+import { writeVoiceTelemetry } from '@/lib/server/voiceTelemetry';
 
-// Outbound calls are ORIGINATED by Vapi (Vapi -> VoBiz BYO trunk -> PSTN), NOT by
-// the VoBiz Call API. This is the only path that carries lead context: the old
-// VoBiz->Vapi bridge drops all custom SIP headers, so the agent never saw the name.
-// Originating from Vapi lets us pass name/business/industry as assistantOverrides
-// variableValues -> the prompt's {{vh-contactname}} / {{vh-businessname}} /
-// {{vh-industry}} -> the agent greets the lead by name with full context.
+// Two outbound flavors, picked per brand:
 //
+// VAPI (bcon, pop — the voice-enabled brands): calls are ORIGINATED by Vapi
+// (Vapi -> VoBiz BYO trunk -> PSTN), NOT by the VoBiz Call API. This is the only
+// path that carries lead context: the old VoBiz->Vapi bridge drops all custom SIP
+// headers, so the agent never saw the name. Originating from Vapi lets us pass
+// name/business/industry as assistantOverrides variableValues -> the prompt's
+// {{vh-contactname}} / {{vh-businessname}} / {{vh-industry}} -> the agent greets
+// the lead by name with full context.
 // Requires (Vercel env): VAPI_PRIVATE_API_KEY. The phone number + assistant ids
 // default to the live BCON outbound number (on the VoBiz "Vapi Outbound" trunk
 // credential, outboundLeadingPlusEnabled MUST be false) and the PROXe assistant.
+//
+// VOBIZ (lokazen, windchasers — voice currently off): legacy direct VoBiz Call API
+// with the /answer webhook. Kept as-is for fork parity until those brands move.
+
+const VAPI_BRANDS = ['bcon', 'pop'];
 
 const VAPI_OUTBOUND_PHONE_NUMBER_ID =
   process.env.VAPI_OUTBOUND_PHONE_NUMBER_ID || 'e03b4b96-a3ce-4b4f-91d3-de9ad5c70529';
 const VAPI_ASSISTANT_ID =
   process.env.VAPI_ASSISTANT_ID || '999bf28c-6c2e-402d-8b05-a24899749a22';
 
-export async function POST(req: NextRequest) {
-  const { phone, leadName, contactName, businessName, industry } = await req.json();
+// ElevenLabs end-to-end telephony (POP A/B). The agent "Grievance PUNJAB" dials
+// out over the SAME Vobiz trunk as Vapi (a dedicated `elevenlabs-pop` SIP
+// credential), so it's the same number/caller — only the brain differs. Lets us
+// compare 11labs' own STT+LLM+TTS+turn-taking against the Vapi pipeline.
+const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+
+async function vapiTestCall(body: any) {
+  const { phone, leadName, contactName, businessName, industry } = body;
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
 
   const name = (contactName || leadName || '').trim();
-  const business = (businessName || '').trim();
+  // POP grievance calls have NO business concept — ignore any businessName the
+  // client sends (a stale form defaulted it to the brand name, which then leaked
+  // into the greeting and named leads "Pulse of Punjab"). Other brands keep it.
+  const business = BRAND_ID === 'pop' ? '' : (businessName || '').trim();
   // Greeting target: confirm the person if we have a name, else the company.
   // ("Hi, is this Thanzeel?" vs "Hi, is this AB Developers?"). When there's no
   // person, vh-contactname stays empty so the agent asks to be put through.
+  //
+  // POP grievance calls dial constituents whose name is often UNKNOWN — a bare
+  // number must still call. Empty vh-greetingname/vh-contactname tell the
+  // grievance agent to introduce itself and ask who it's speaking with. The
+  // name requirement stays for bcon's B2B flow, where a nameless cold call is
+  // always a mistake.
   const greetingName = name || business;
-  if (!greetingName) {
+  if (!greetingName && BRAND_ID !== 'pop') {
     return NextResponse.json({ error: 'A contact name or business name is required' }, { status: 400 });
   }
   const vapiKey = process.env.VAPI_PRIVATE_API_KEY;
@@ -49,6 +76,26 @@ export async function POST(req: NextRequest) {
     hour: '2-digit', minute: '2-digit', hour12: true,
   }).format(new Date());
 
+  // POP's grievance agent GREETS in Punjabi, but its base transcriber on Vapi is
+  // English-only (deepgram flux-general-en) — so constituent replies come back as
+  // garbage and the agent loops its opening. Override the transcriber per-call
+  // (never touching the shared Vapi assistant) to a Punjabi-capable model. All
+  // three knobs are env-tunable so the provider/language can be swapped without a
+  // code change if accuracy needs work. POP only; other brands keep their config.
+  // Transcriber override is OPT-IN: only when VAPI_POP_TRANSCRIBER_PROVIDER is
+  // explicitly set. Default = no override, so the POP Grievance assistant's OWN
+  // transcriber (set in the Vapi dashboard) wins — that assistant is POP-dedicated,
+  // so tuning it in Vapi is the clean home for this, and an unconditional code
+  // override would otherwise silently mask whatever's picked in the dashboard.
+  const popTranscriber =
+    BRAND_ID === 'pop' && process.env.VAPI_POP_TRANSCRIBER_PROVIDER
+      ? {
+          provider: process.env.VAPI_POP_TRANSCRIBER_PROVIDER,
+          ...(process.env.VAPI_POP_TRANSCRIBER_MODEL ? { model: process.env.VAPI_POP_TRANSCRIBER_MODEL } : {}),
+          ...(process.env.VAPI_POP_TRANSCRIBER_LANGUAGE ? { language: process.env.VAPI_POP_TRANSCRIBER_LANGUAGE } : {}),
+        }
+      : null;
+
   try {
     const res = await fetch('https://api.vapi.ai/call', {
       method: 'POST',
@@ -60,6 +107,7 @@ export async function POST(req: NextRequest) {
         phoneNumberId: VAPI_OUTBOUND_PHONE_NUMBER_ID,
         assistantId: VAPI_ASSISTANT_ID,
         assistantOverrides: {
+          ...(popTranscriber ? { transcriber: popTranscriber } : {}),
           variableValues: {
             'vh-contactname': name,
             'vh-greetingname': greetingName,
@@ -76,8 +124,282 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       return NextResponse.json({ success: false, error: data?.message || data }, { status: res.status });
     }
-    return NextResponse.json({ success: true, callId: data?.id });
+
+    const callId: string | null = data?.id || null;
+
+    // Persist the call NOW, at initiation — so it shows up in the Calls list with
+    // the real contact (name + number) instead of "Unknown caller", and carries a
+    // lead_id for the transcript/recording join. The Vapi webhook later ENRICHES
+    // this same row (keyed on external_session_id) without clobbering these fields.
+    // Soft-fail: a DB hiccup must never break the call that's already dialing.
+    if (callId) {
+      try {
+        const supabase = getServiceClient();
+        if (supabase) {
+          // Create/link the lead with the name the user entered, so leadName
+          // resolves (the agent already greets by this name on the call).
+          const leadId = await ensureOrUpdateLead(
+            name || business || null, null, e164, 'voice', undefined, supabase,
+          );
+
+          const sessionFields: Record<string, any> = {
+            lead_id: leadId,
+            customer_phone: e164,
+            customer_phone_normalized: last10,
+            call_direction: 'outbound',
+            call_status: 'queued',
+            brand: BRAND_ID,
+            updated_at: new Date().toISOString(),
+          };
+
+          const { data: existing } = await supabase
+            .from('voice_sessions')
+            .select('id')
+            .eq('external_session_id', callId)
+            .maybeSingle();
+
+          // Supabase does NOT throw on write errors — it returns { error }. These
+          // were previously unchecked, so a failing insert vanished silently (no
+          // row, no log) and the call never appeared in the dashboard.
+          if (existing?.id) {
+            const { error: upErr } = await supabase.from('voice_sessions').update(sessionFields).eq('id', existing.id);
+            if (upErr) console.error('[test-call] voice_sessions update failed:', upErr.message, upErr.details || '');
+          } else {
+            const { error: insErr } = await supabase
+              .from('voice_sessions')
+              .insert({ external_session_id: callId, created_at: new Date().toISOString(), ...sessionFields });
+            if (insErr) console.error('[test-call] voice_sessions insert failed:', insErr.message, insErr.details || '');
+          }
+        } else {
+          console.error('[test-call] getServiceClient() returned null — no service key at runtime');
+        }
+      } catch (e: any) {
+        console.error('[test-call] failed to persist lead/session (non-fatal):', e?.message);
+      }
+    }
+
+    return NextResponse.json({ success: true, callId });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
+}
+
+async function vobizTestCall(req: NextRequest) {
+  const { phone, leadName, direction = 'outbound' } = await req.json();
+  if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+
+  try {
+    const authId = process.env.VOBIZ_AUTH_ID;
+    const authToken = process.env.VOBIZ_AUTH_TOKEN;
+    const fromNumber = process.env.VOBIZ_FROM_NUMBER;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.bconclub.com';
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const answerUrl = `${baseUrl}/api/agent/voice/answer?direction=${direction}&lead_name=${encodeURIComponent(leadName || '')}&lead_phone=${cleanPhone}`;
+
+    const res = await fetch(
+      `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Auth-ID': authId || '',
+          'X-Auth-Token': authToken || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST', caller_name: getBrandConfig().name }),
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ success: false, error: data }, { status: res.status });
+    return NextResponse.json({ success: true, callId: data?.request_uuid });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+// POP A/B: dial the SAME Vobiz number/trunk through ElevenLabs' native SIP
+// telephony instead of Vapi. Enrichment (transcript/recording) will come from
+// ElevenLabs' own conversation API later; for now this places the call so the
+// voice/latency/turn-taking can be compared head-to-head.
+async function elevenLabsTestCall(body: any) {
+  const apiStartedAt = Date.now();
+  const { phone, contactName, leadName } = body;
+  if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey || !ELEVENLABS_AGENT_ID || !ELEVENLABS_PHONE_NUMBER_ID) {
+    return NextResponse.json(
+      { success: false, error: 'ElevenLabs not configured (ELEVENLABS_API_KEY / ELEVENLABS_AGENT_ID / ELEVENLABS_PHONE_NUMBER_ID)' },
+      { status: 500 },
+    );
+  }
+
+  const digits = String(phone).replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
+  const name = (contactName || leadName || '').trim();
+
+  try {
+    const providerStartedAt = Date.now();
+    const res = await fetch('https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call', {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        agent_id: ELEVENLABS_AGENT_ID,
+        agent_phone_number_id: ELEVENLABS_PHONE_NUMBER_ID,
+        to_number: e164,
+      }),
+    });
+    const providerStartMs = Date.now() - providerStartedAt;
+    const data = await res.json();
+    if (!res.ok) {
+      return NextResponse.json({ success: false, error: data?.detail || data }, { status: res.status });
+    }
+    if (data?.success === false) {
+      return NextResponse.json(
+        { success: false, error: data?.message || data?.detail || 'ElevenLabs outbound call was not accepted', details: data },
+        { status: 502 },
+      );
+    }
+    const callId: string | null =
+      data?.conversation_id || data?.callSid || data?.call_sid || data?.sip_call_id || null;
+    if (!callId) {
+      return NextResponse.json(
+        { success: false, error: data?.message || 'ElevenLabs did not return a conversation or SIP call id', details: data },
+        { status: 502 },
+      );
+    }
+    try {
+      await writeVoiceTelemetry({
+        callId,
+        status: 'queued',
+        direction: 'outbound',
+        provider: 'elevenlabs',
+        updatedAt: new Date().toISOString(),
+        performance: null,
+        trace: {
+          appApiMs: Date.now() - apiStartedAt,
+          providerStartMs,
+          vobizDialMs: providerStartMs,
+          groqMs: null,
+          groqCacheHit: null,
+          notes: ['V2 runs inside ElevenLabs; Groq is not in this call path unless the ElevenLabs agent is configured to call our Groq endpoint.'],
+        },
+      });
+    } catch (e: any) {
+      console.error('[test-call:11labs] telemetry write failed (non-fatal):', e?.message);
+    }
+
+    // Best-effort persist so the call surfaces in the Calls list, tagged as the
+    // 11labs engine (call_summary marker — no schema change needed for the A/B).
+    try {
+      const supabase = getServiceClient();
+      if (supabase) {
+        const leadId = await ensureOrUpdateLead(name || null, null, e164, 'voice', undefined, supabase);
+        const { error: insErr } = await supabase.from('voice_sessions').insert({
+          external_session_id: callId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          lead_id: leadId,
+          customer_phone: e164,
+          customer_phone_normalized: last10,
+          call_direction: 'outbound',
+          call_status: 'queued',
+          brand: BRAND_ID,
+          call_summary: 'engine:elevenlabs',
+        });
+        if (insErr) console.error('[test-call:11labs] voice_sessions insert failed:', insErr.message);
+      }
+    } catch (e: any) {
+      console.error('[test-call:11labs] persist failed (non-fatal):', e?.message);
+    }
+    return NextResponse.json({ success: true, callId, engine: 'elevenlabs' });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+// V3 (POP A/B): dial through the Sarvam pipeline — Vobiz's own <Stream> forwards
+// the call audio to our Pipecat+Sarvam server (STT+LLM+TTS), same trunk/number.
+// This route just proxies to the pipeline's /start (server-side → no browser CORS).
+// V3_PIPELINE_URL points at the running pipeline (localhost:8080 in local dev; the
+// VPS/tunnel host in prod).
+async function sarvamPipelineCall(body: any) {
+  const apiStartedAt = Date.now();
+  const { phone, contactName, leadName } = body;
+  if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+  const digits = String(phone).replace(/\D/g, '');
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${digits.slice(-10)}`;
+  const name = (contactName || leadName || '').trim();
+  const url = process.env.V3_PIPELINE_URL;
+  if (!url) {
+    return NextResponse.json({ success: false, error: 'V3_PIPELINE_URL not configured' }, { status: 500 });
+  }
+  try {
+    const pipelineStartedAt = Date.now();
+    const res = await fetch(`${url}/start`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: e164 }),
+    });
+    const pipelineStartMs = Date.now() - pipelineStartedAt;
+    const data = await res.json().catch(() => ({}));
+    // pipeline returns { status: <vobiz http status>, body: <vobiz response text> }
+    const vobizOk = typeof data.status === 'number' && data.status >= 200 && data.status < 300;
+    if (!res.ok || !vobizOk) {
+      return NextResponse.json({ success: false, error: `V3 dial failed: ${data.body || data.error || res.status}` }, { status: 502 });
+    }
+    let callId = `v3-${Date.now()}`;
+    try { const vb = JSON.parse(data.body); callId = vb.request_uuid || vb.api_id || callId; } catch { /* keep synth id */ }
+    try {
+      await writeVoiceTelemetry({
+        callId,
+        status: 'queued',
+        direction: 'outbound',
+        provider: 'sarvam',
+        updatedAt: new Date().toISOString(),
+        performance: null,
+        trace: {
+          appApiMs: Date.now() - apiStartedAt,
+          providerStartMs: pipelineStartMs,
+          vobizDialMs: pipelineStartMs,
+          groqMs: null,
+          groqCacheHit: null,
+          notes: ['V3 goes through the Sarvam pipeline; per-turn Groq/Sarvam spans need the pipeline to emit telemetry back to Redis.'],
+        },
+      });
+    } catch (e: any) {
+      console.error('[test-call:sarvam] telemetry write failed (non-fatal):', e?.message);
+    }
+    try {
+      const supabase = getServiceClient();
+      if (supabase) {
+        const leadId = await ensureOrUpdateLead(name || null, null, e164, 'voice', undefined, supabase);
+        const { error: insErr } = await supabase.from('voice_sessions').insert({
+          external_session_id: callId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          lead_id: leadId,
+          customer_phone: e164,
+          customer_phone_normalized: digits.slice(-10),
+          call_direction: 'outbound',
+          call_status: 'queued',
+          brand: BRAND_ID,
+          call_summary: 'engine:sarvam',
+        });
+        if (insErr) console.error('[test-call:sarvam] voice_sessions insert failed:', insErr.message);
+      }
+    } catch (e: any) {
+      console.error('[test-call:sarvam] persist failed (non-fatal):', e?.message);
+    }
+    return NextResponse.json({ success: true, callId, engine: 'sarvam' });
+  } catch {
+    return NextResponse.json({ success: false, error: `V3 pipeline unreachable at ${url} — is the pipeline server running?` }, { status: 502 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  if (!VAPI_BRANDS.includes(getCurrentBrandId())) return vobizTestCall(req);
+  // VAPI brands share one JSON body read here so we can dispatch by engine.
+  const body = await req.json().catch(() => ({} as any));
+  if (getCurrentBrandId() === 'pop' && body?.engine === 'sarvam') return sarvamPipelineCall(body);
+  if (getCurrentBrandId() === 'pop' && body?.engine === 'elevenlabs') return elevenLabsTestCall(body);
+  return vapiTestCall(body);
 }
