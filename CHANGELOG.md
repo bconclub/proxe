@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-06 · fix: Active Conversations, its trend, and Avg Response Time were never actually scoped — real leads/gigs mixing
+
+- Re-audited after the tab-switch UX fix and found the actual data-level bug the earlier "no cross-contamination" claim had missed: the `conversations` table query backing `messages` has **no brand or scope filter at all** — just a 45-day time cutoff. Multiple visible metrics read straight off this raw, unfiltered array: `totalConversationsCount` (the main Active Conversations KPI — its "primary" path takes precedence over the properly-scoped session-count fallback, which is essentially never used), the Avg Response Time KPI + its trend, and the Conversations Trend chart. All of them could mix leads and gigs (and in principle any other brand, since there's no brand filter on the query).
+- Added one `scopedMessages` array (filtered through the same `leadIdSet` every other correctly-scoped metric already uses) and routed every metric computation through it — Active Conversations, Avg Response Time, Conversations Trend, busiest hour, channel health, response rate, hourly activity, and the recovered-leads calc all now genuinely scope-separated between Leads and Gigs.
+- Also fixed two `recentActivity`/`keyEvents` sources (web/whatsapp booking events) that pushed events unconditionally instead of gating on `safeLeads`, matching every other event source in the file.
+
 ## 2026-07-06 · fix: Leads/Gigs tab switch could show the previous tab's data, mislabeled
 
 - Traced the whole computation to confirm Leads and Gigs already use fully separate data (`safeLeads` filtered per scope, session/conversation counts gated through the same scope-filtered `leadIdSet`, cache keyed by `scope+threshold`) — no actual cross-contamination. But switching tabs didn't clear the old numbers first, so for however long the new-scope fetch takes, the PREVIOUS tab's data stayed on screen — now mislabeled under the new tab (e.g. Leads' Active Conversations count briefly showing under the Gigs label).
