@@ -115,6 +115,60 @@ export async function POST(request: NextRequest) {
     }
     custom_fields = parseCustomFields(custom_fields)
 
+    const cleanMappedValue = (value: any): any => {
+      if (value == null || typeof value !== 'string') return value
+      const trimmed = value.trim()
+      const colonIndex = trimmed.lastIndexOf(':')
+      if (/^\d+\.\s*res\d+/i.test(trimmed) && colonIndex >= 0) {
+        return trimmed.slice(colonIndex + 1).trim()
+      }
+      return trimmed
+    }
+
+    const normalizeFieldKey = (key: string): string => {
+      const normalized = key
+        .trim()
+        .toLowerCase()
+        .replace(/['’]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+
+      const aliases: Record<string, string> = {
+        platform: 'utm_source',
+        campaign: 'utm_campaign',
+        campaign_name: 'utm_campaign',
+        ad_name: 'utm_content',
+        ad: 'utm_content',
+        lead_type: 'user_type',
+        type: 'user_type',
+        form_type: 'form_type',
+        education_level: 'education',
+        current_education_level: 'education',
+        what_is_your_childs_current_education_level: 'education',
+        what_is_your_child_s_current_education_level: 'education',
+        course: 'course_interest',
+        course_interest: 'course_interest',
+        what_course_are_you_interested_in: 'course_interest',
+        which_course_are_you_interested_in: 'course_interest',
+        have_you_completed_class_12_with_physics_and_maths: 'education',
+      }
+
+      return aliases[normalized] || normalized
+    }
+
+    const normalizeCustomFields = (value: any): any => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+      return Object.entries(value).reduce((acc: Record<string, any>, [key, raw]) => {
+        const normalizedKey = normalizeFieldKey(key)
+        const cleaned = cleanMappedValue(raw)
+        acc[key] = cleaned
+        if (normalizedKey && acc[normalizedKey] == null) acc[normalizedKey] = cleaned
+        return acc
+      }, {})
+    }
+
+    custom_fields = normalizeCustomFields(custom_fields)
+
     const normalizeFieldData = (value: any): Record<string, any> => {
       let data = value
       if (typeof data === 'string') {
@@ -126,7 +180,11 @@ export async function POST(request: NextRequest) {
         const key = String(field?.name || '').trim()
         if (!key) return acc
         const raw = Array.isArray(field?.values) ? field.values[0] : field?.value
-        if (raw != null && String(raw).trim() !== '') acc[key] = raw
+        if (raw != null && String(raw).trim() !== '') {
+          const cleaned = cleanMappedValue(raw)
+          acc[key] = cleaned
+          acc[normalizeFieldKey(key)] = cleaned
+        }
         return acc
       }, {})
     }
@@ -143,8 +201,28 @@ export async function POST(request: NextRequest) {
       email = email || metaFieldData.email
       city = city || metaFieldData.city
       source = source || 'facebook'
-      campaign = campaign || body.campaign_name || body.utm_campaign || 'Meta Lead Form'
+      campaign = campaign || metaFieldData.utm_campaign || body.campaign_name || body.utm_campaign || 'Meta Lead Form'
     }
+
+    const normalizedCustomFields = (custom_fields && typeof custom_fields === 'object' && !Array.isArray(custom_fields))
+      ? custom_fields as Record<string, any>
+      : {}
+    name = cleanMappedValue(name)
+    phone = cleanMappedValue(phone)
+    email = cleanMappedValue(email)
+    city = cleanMappedValue(city)
+    source = cleanMappedValue(source)
+    campaign = cleanMappedValue(campaign)
+
+    if (!source || /^res\d+/i.test(String(source))) {
+      source = normalizedCustomFields.utm_source || normalizedCustomFields.channel || source
+    }
+    campaign =
+      campaign ||
+      normalizedCustomFields.utm_campaign ||
+      normalizedCustomFields.campaign_name ||
+      body.utm_campaign ||
+      body.campaign_name
 
     // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
     let notes: string | null = null
@@ -271,14 +349,20 @@ export async function POST(request: NextRequest) {
     if (leadBrand === 'windchasers') {
       // Map the interest value the form sends to the short course label the
       // dashboard's filter dropdown uses (CPL / DGCA / HPL / Cabin / Drone).
-      const interestRaw = String(
+      const interestRaw = String(cleanMappedValue(
         cf2.interest ||
         cf2.course_interest ||
+        cf2.course ||
+        cf2.course_details ||
         body.course_interest ||
         body.course ||
         body.course_details ||
         ''
-      ).toLowerCase().trim()
+      ) || '').toLowerCase().trim()
+      const interestKey = interestRaw
+        .replace(/['’]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
       const courseMap: Record<string, string> = {
         commercial_pilot: 'CPL',
         commercial_pilot_cpl: 'CPL',
@@ -302,14 +386,20 @@ export async function POST(request: NextRequest) {
         cabin: 'Cabin',
         drone: 'Drone',
       }
-      if (interestRaw && courseMap[interestRaw]) {
-        brandCtxData.course_interest = courseMap[interestRaw]
+      if (interestKey && courseMap[interestKey]) {
+        brandCtxData.course_interest = courseMap[interestKey]
+      } else if (/\bcommercial[_ ]?pilot\b|\bcpl\b|\bflight[_ ]?training\b|\bflying\b/.test(interestKey)) {
+        brandCtxData.course_interest = 'CPL'
+      } else if (/\bdgca\b|\begc\b/.test(interestKey)) {
+        brandCtxData.course_interest = 'DGCA'
+      } else if (/\bhelicopter\b|\bheli\b|\bhpl\b|\bchpl\b|\bphpl\b/.test(interestKey)) {
+        brandCtxData.course_interest = 'HPL'
       } else if (interestRaw && interestRaw !== 'other') {
         brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
       }
-      const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
+      const demoTypeRaw = String(cleanMappedValue(cf2.demo_type) || '').toLowerCase().trim()
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
-      const educationRaw = String(cf2.education || '').toLowerCase().trim()
+      const educationRaw = String(cleanMappedValue(cf2.education) || '').toLowerCase().trim()
       if (educationRaw) brandCtxData.education = educationRaw
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
