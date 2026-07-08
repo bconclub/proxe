@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(web): persist the pre-chat name the widget passes, so web leads stop showing "Hi there"
+
+- Web-chat route accepted a pre-chat name (`session.user.name`) and used it for the AI greeting, but the ONLY thing ever promoted to `customer_name` was the AI-extracted chat name (`profile.full_name`). So a website lead that entered their name still saved a nameless card and got "Hi there" on the welcome template.
+- The AI-intent promotion now falls back to the pre-chat `session.user.name` (guarded by `isLikelyRealPersonName`) when no chat name was extracted — so a provided pre-chat name is persisted.
+- Investigation note (via live DB): of 372 recent lokazen leads, 250 are nameless and 247 of those are `web` leads with NO name anywhere in their record — so for most of them the website isn't sending a name at all. This fix covers the case where it IS sent; the broader gap is upstream (the lokazen website widget/form must capture + pass the visitor's name). Flagged for confirmation.
+- Known limitation: the promotion runs inside the AI-intent block, which early-returns if the conversation yields no extractable profile — so a pre-chat name is persisted only once some profile is extracted (typical for any real chat).
+
 ## 2026-07-08 · fix(lokazen): lead summary was empty because the summarizer was hardcoded for Windchasers aviation
 
 - A lead with 20 messages of real content (Praveen Kumar — owner who shared full property details: 950 sqft, ground floor, ₹1.5L rent, 6mo advance, 3yr lock-in, BH Road Nelamangala) showed only "…is currently in the In Sequence stage." Root cause: `api/dashboard/leads/[id]/summary` built its Claude prompt with "Summarize this lead for an aviation training academy (Windchasers)… which course/program (CPL/PPL/helicopter)… this is a pilot-training lead, not a business." For a lokazen commercial-real-estate lead there was no matching domain, so Claude found no aviation info and the route fell back to the trivial stage line.

@@ -834,19 +834,26 @@ async function postProcess(
           // from the form, but the customer later typed their real name in
           // chat.
           const storedName = ctxRow?.customer_name as string | null | undefined;
+          // Promote a real name to customer_name when the stored one is junk/missing.
+          // Prefer the name the visitor typed in chat (AI-extracted); fall back to the
+          // PRE-CHAT form name the website widget passes in session.user.name — which
+          // we otherwise use only for the greeting and never persisted, so a website
+          // lead that DID enter their name still showed "Hi there" and a nameless card.
+          const preChatName = typeof agentInput.userProfile.name === 'string' ? agentInput.userProfile.name.trim() : '';
+          const nameSource = profile.full_name || (isLikelyRealPersonName(preChatName) ? preChatName : '');
           const promote =
-            profile.full_name && !isLikelyRealPersonName(storedName);
+            !!nameSource && !isLikelyRealPersonName(storedName);
 
           const update: Record<string, any> = {
             unified_context: { ...ctx, [brandId]: mergedBrandCtx },
           };
-          if (promote) update.customer_name = profile.full_name;
+          if (promote) update.customer_name = nameSource;
 
           await supabase.from('all_leads').update(update).eq('id', leadId);
 
           if (promote) {
             console.log(
-              `[agent/web/chat/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${profile.full_name}"`,
+              `[agent/web/chat/ai-intent] lead=${leadId} promoted customer_name "${storedName}" → "${nameSource}"`,
             );
           }
           console.log(`[agent/web/chat/ai-intent] lead=${leadId} extracted=${JSON.stringify(profile)}`);
