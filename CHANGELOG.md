@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): scout chat invented a Play Store app + looped the user back to the same number
+
+- Live scout chat: asked for an app link, the AI fabricated `https://play.google.com/store/apps/details?id=com.lokazen.scout` (no such listing — nowhere in the prompt/config, pure hallucination), claimed "iOS and Android", and when the scout said "not available" it sent the fake link again. Root cause: the prompt tells the model "scouts submit through the Scout app" but gives no link and only forbids inventing "numbers/policy" — nothing about URLs.
+- Also handed the scout the company WhatsApp number (+91 63668 26978, hardcoded in the prompt) as "message our support team on WhatsApp" — the exact line they were already texting. Circular by construction.
+- Added two hard scout rules to `lokazen-prompt.ts`: (1) NEVER invent/send a Play Store / App Store / download URL — if asked for the app, share only the real onboarding link `lokazen.in/scout#scout-form` and say the team will help; don't claim store availability. (2) NEVER hand a phone/WhatsApp number (esp. the company number) to someone already on WhatsApp — you ARE the channel; raise the support request and say the team replies here. Also added a guard note under COMPANY DETAILS so no audience gets looped back to the same number.
+- (Runtime confirmed: no `agent_prompt` DB override for lokazen, so the file prompt is live.)
+
 ## 2026-07-08 · fix(lokazen): stop showing synthetic ids as a lead's name/email (list + modal)
 
 - A lead was showing its NAME and email as `owner_9341333999_1783481293327@noemail.lokazen.in` — an internal id the owner app stamps before a real name/email exists. The modal already hid it as the *email*, but the leads LIST used it as the *name* (falls back to email when no name), and the modal header showed it as the name.
