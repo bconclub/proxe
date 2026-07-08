@@ -1,3 +1,13 @@
+## 2026-07-08 22:50 IST · feat(pop): Listen analytics row to reference + dashboard card fix + map click polish + variety
+
+- FIX: dashboard home broke (Engine/Events squeezed to nothing) because Activity Sources rendered full width inside the fixed height home grid. It is now a compact card back in the Conversations Trend slot; Priority Constituencies back to its normal width. All rows visible again.
+- User-facing: Listen analytics row rebuilt pixel to pixel to the new reference: Top Trending Keywords as tile cards (rank color, category icon + label, big signal count, up/down % vs last 7d, tracked total + updated footer), Sentiment Over Time as stacked smooth areas with KPI chips (Positive/Neutral/Negative/Total with deltas), its own day range select and tap to hide legend, Mood by Region with a mini Punjab map (numbered mood score badges), score sorted list and the Mood Score formula footer.
+- Source variety: reddit + blog added to the Listen source enum (migration 031, applied); demo cross platform signals seeded (Twitter, Reddit, Facebook, Instagram, YouTube, blog, WhatsApp) with images so the inbox and evidence board show the full mix.
+- No hyphens anywhere: page copy, AI narrative strings, action texts, news titles (trailing outlet suffix stripped), source/author names in DB, Door to Door labels.
+- War Room map: cluster bubbles smaller (30-54px, tighter halo); constituency polygons no longer steal clicks aimed at bubbles - polygon click only activates when zoomed right in (>= 10.75).
+- D2D: worker rows now show real portrait photos (8 Unsplash portraits bundled at brands/pop/public/unsplash/workers, credited in _credits.json), initials fallback kept.
+- `(75e94c2b)`
+
 ## 2026-07-08 06:10 IST · feat(pop): Language column on Calls + drop dead rows + fix transcript writes
 
 - Language column added to the Calls list (after Direction): English/Hindi/Punjabi. Dialed language now stored at call time in voice_sessions.channel_data (jsonb; no schema change).
@@ -10,7 +20,7 @@
 - User-facing: **Upcoming Events** cards rebuilt to the reference: orange timeline rail + dots, date tiles (SAT/11/JUL), event-type badges (Sabha/March/Cultural/Rally), pin + clock lines, Going/Interested/Volunteers/Supporters chips, countdown pill, chevron, "All times shown in local time" footer.
 - User-facing: **War Room map clustering** - zoomed out shows one aggregated bubble per district (total voices + seat count, halo ring); clicking a cluster zooms into that district where per-seat bubbles take over (click seat = drawer, as before). No more 115 overlapping bubbles.
 - API: founder-metrics campaignHome.sources gains total30d + mix[] (per-magnet 30d count/share + last-7d-vs-prior-7d delta).
-- `(d4d29608)`
+- `(26042f86)`
 
 ## 2026-07-08 20:45 IST · feat(pop): Listen realness pass — real media, real logos, real trending phrases
 

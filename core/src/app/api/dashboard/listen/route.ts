@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
     const tilt = pos > neg ? 'net positive' : neg > pos * 1.3 ? 'clearly negative' : 'mixed';
     const thinkParts: string[] = [];
     if (topIssue) thinkParts.push(`${cap(topIssue.category)} is the loudest issue (${topIssue.count} signals${topIssue.trend > 0 ? `, up ${topIssue.trend} vs the prior window` : topIssue.trend < 0 ? `, easing ${Math.abs(topIssue.trend)}` : ''}).`);
-    thinkParts.push(`Overall mood is ${tilt} — ${pos} positive vs ${neg} negative across ${tot} signals.`);
+    thinkParts.push(`Overall mood is ${tilt}: ${pos} positive vs ${neg} negative across ${tot} signals.`);
     if (crisis > 0) thinkParts.push(`${crisis} crisis-grade signal${crisis > 1 ? 's need' : ' needs'} rapid response now.`);
     if (hottestSeat && hottestSeat.heat >= 40) thinkParts.push(`${hottestSeat.constituency} is running hottest (heat ${hottestSeat.heat}); watch it closely.`);
     const whatProxeThinks = { heat: heatScore, label: heatLabel, delta: heatScore - prevHeat, text: thinkParts.join(' ') };
@@ -193,29 +193,35 @@ export async function GET(req: NextRequest) {
     const actions: { title: string; detail: string; kind: 'crisis' | 'issue' | 'opposition' | 'positive' | 'seat' }[] = [];
     if (crisis > 0) {
       const cs = cur.find((s: any) => s.is_crisis);
-      actions.push({ kind: 'crisis', title: `Deploy rapid response on ${crisis} crisis signal${crisis > 1 ? 's' : ''}`, detail: cs ? `${cs.constituency || 'multiple seats'} — ${(cs.content || '').slice(0, 90)}` : 'Assign a war-room owner and push a holding statement.' });
+      actions.push({ kind: 'crisis', title: `Deploy rapid response on ${crisis} crisis signal${crisis > 1 ? 's' : ''}`, detail: cs ? `${cs.constituency || 'multiple seats'} · ${(cs.content || '').slice(0, 90)}` : 'Assign a war-room owner and push a holding statement.' });
     }
     if (topIssue && topIssue.trend > 0) {
-      actions.push({ kind: 'issue', title: `Get ahead of ${cap(topIssue.category)} — rising ${topIssue.trend}`, detail: `${topIssue.count} signals this window. Brief field teams and prep a ground response.` });
+      actions.push({ kind: 'issue', title: `Get ahead of ${cap(topIssue.category)} rising ${topIssue.trend}`, detail: `${topIssue.count} signals this window. Brief field teams and prep a ground response.` });
     }
     if (opp > 0) {
       const os = cur.find((s: any) => s.is_opposition);
-      actions.push({ kind: 'opposition', title: `Counter opposition narrative (${opp} mentions)`, detail: os ? `${os.constituency || 'state-wide'} — draft a rebuttal and seed it via WhatsApp.` : 'Draft a rebuttal and seed it via WhatsApp.' });
+      actions.push({ kind: 'opposition', title: `Counter opposition narrative (${opp} mentions)`, detail: os ? `${os.constituency || 'statewide'} · draft a rebuttal and seed it via WhatsApp.` : 'Draft a rebuttal and seed it via WhatsApp.' });
     }
     if (hottestSeat && hottestSeat.heat >= 40) {
-      actions.push({ kind: 'seat', title: `Prioritise ${hottestSeat.constituency}`, detail: `Highest heat (${hottestSeat.heat}) — ${hottestSeat.neg} negative signals. Send a senior contact.` });
+      actions.push({ kind: 'seat', title: `Prioritise ${hottestSeat.constituency}`, detail: `Highest heat (${hottestSeat.heat}): ${hottestSeat.neg} negative signals. Send a senior contact.` });
     }
     const topPos = moodBySeat.filter((m) => m.pos > 0).sort((a, b) => b.pos - a.pos)[0];
     if (topPos && posN > 0) {
-      actions.push({ kind: 'positive', title: `Amplify the win in ${topPos.constituency}`, detail: `${topPos.pos} positive signals — turn it into content and share it wider.` });
+      actions.push({ kind: 'positive', title: `Amplify the win in ${topPos.constituency}`, detail: `${topPos.pos} positive signals, turn it into content and share it wider.` });
     }
 
     return NextResponse.json({
       totals: { signals: cur.length, crisis, opposition: opp, positive: posN, negative: neg, neutral: neu,
+        sentPositive: pos,
         prevSignals: prev.length, trendSignals: cur.length - prev.length,
         prevCrisis: prev.filter((s: any) => s.is_crisis).length,
         prevOpposition: prev.filter((s: any) => s.is_opposition).length,
-        prevPositive: prev.filter((s: any) => s.is_positive).length },
+        prevPositive: prev.filter((s: any) => s.is_positive).length,
+        prevSentPositive: prev.filter((s: any) => s.sentiment === 'positive').length,
+        prevNegative: prev.filter((s: any) => s.sentiment === 'negative').length,
+        prevNeutral: prev.filter((s: any) => s.sentiment !== 'positive' && s.sentiment !== 'negative').length },
+      keywordsTracked: Object.keys(phraseStats).filter((k) => phraseStats[k].count >= 2).length,
+      updatedAt: cur[0]?.created_at || null,
       heatScore, heatLabel, prevHeat,
       whatProxeThinks,
       recommendedActions: actions.slice(0, 5),

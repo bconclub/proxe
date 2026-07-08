@@ -186,7 +186,7 @@ const MAGNET_META: Record<string, { label: string; color: string }> = {
   pulse_app: { label: 'Pulse App', color: '#a78bfa' },
   qr: { label: 'QR', color: '#f06c18' },
   missed_call: { label: 'Missed call', color: '#f59e0b' },
-  d2d: { label: 'Door-to-door', color: '#fb7185' },
+  d2d: { label: 'Door to Door', color: '#fb7185' },
   event: { label: 'Event', color: '#2ec4b6' },
   landing: { label: 'Landing', color: '#6ea5d4' },
   web: { label: 'Web', color: '#38bdf8' },
@@ -1110,7 +1110,7 @@ export default function FounderDashboard() {
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
-        <section className={`${popMix ? 'xl:col-span-12' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
@@ -1303,127 +1303,106 @@ export default function FounderDashboard() {
           )}
         </section>
         )}
-      </div>
 
-      {/* ── ROW 4 (POP) · Activity Sources - unified 30d source mix panel ── */}
-      {popMix && (() => {
-        const mixTotal = metrics.campaignHome?.sources?.total30d || popMix.reduce((a, b) => a + b.count, 0)
-        const top = popMix[0]
-        const offline = popMix.find((s) => ['d2d', 'qr', 'event', 'missed_call'].includes(s.magnet))
-        const voiceShare = popMix.filter((s) => ['voice', 'missed_call'].includes(s.magnet)).reduce((a, b) => a + b.share, 0)
-        const iconTile = (m: string, size = 30) => (
-          <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
-        )
-        return (
-          <section className="wc-bento rounded-xl border p-4 sm:p-5 shrink-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
-            {/* header: title + PROXe badge | stats strip */}
-            <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(139,92,246,0.16)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>PROXe</span>
+        {/* Activity Sources (POP) - compact card, lives in the trend slot */}
+        {popMix && (() => {
+          const mixTotal = metrics.campaignHome?.sources?.total30d || popMix.reduce((a, b) => a + b.count, 0)
+          const top = popMix[0]
+          const offline = popMix.find((s) => ['d2d', 'qr', 'event', 'missed_call'].includes(s.magnet))
+          const voiceShare = popMix.filter((s) => ['voice', 'missed_call'].includes(s.magnet)).reduce((a, b) => a + b.share, 0)
+          const iconTile = (m: string, size = 24) => (
+            <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
+          )
+          return (
+            <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+              <div className="flex items-center justify-between gap-3 shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.16)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>PROXe</span>
+                  </div>
+                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Unified source mix · last 30 days</p>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Unified source mix · last 30 days</p>
-              </div>
-              <div className="flex items-stretch rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
-                <div className="flex items-center gap-2.5 px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}><MdShowChart size={17} /></span>
+                <div className="flex items-center gap-3 text-right shrink-0">
                   <div>
-                    <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Total touchpoints</div>
-                    <div className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmtComma(mixTotal)}</div>
+                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmtComma(mixTotal)}</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>touchpoints</div>
                   </div>
-                </div>
-                <div className="w-px self-stretch" style={{ background: 'var(--border-primary)' }} />
-                <div className="flex flex-col justify-center px-4 py-2.5">
-                  <div className="text-sm font-extrabold flex items-center gap-1" style={{ color: heatChange >= 0 ? '#22c55e' : '#ef4444' }}>
-                    <MdTrendingUp size={15} /> {heatChange >= 0 ? '+' : ''}{heatChange}%
-                  </div>
-                  <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>vs prior 7d</div>
-                </div>
-                <div className="w-px self-stretch" style={{ background: 'var(--border-primary)' }} />
-                <div className="flex items-center gap-2.5 px-4 py-2.5">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}><MdCalendarToday size={15} /></span>
                   <div>
-                    <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Daily avg</div>
-                    <div className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{heatAvg}</div>
+                    <div className="text-base font-extrabold leading-tight flex items-center gap-0.5 justify-end" style={{ color: heatChange >= 0 ? '#22c55e' : '#ef4444' }}><MdTrendingUp size={13} />{heatChange >= 0 ? '+' : ''}{heatChange}%</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>vs prior 7d</div>
+                  </div>
+                  <div>
+                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{heatAvg}</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>daily avg</div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* body: donut | table | insights */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
-              <div className="xl:col-span-3 rounded-xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
-                <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Source mix</div>
-                <SourceDonut mix={popMix} total={mixTotal} />
-              </div>
-              <div className="xl:col-span-6 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
-                <div className="grid px-4 py-2.5 text-[11px] font-medium border-b" style={{ gridTemplateColumns: 'minmax(0,1.6fr) 0.6fr 0.9fr 0.8fr', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
-                  <span>Source</span><span className="text-right">Share</span><span className="text-right">Touchpoints</span><span className="text-right">vs prior 7d</span>
-                </div>
-                {popMix.slice(0, 6).map((s, i) => (
-                  <div key={s.magnet} className="grid items-center px-4 py-2.5 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.6fr) 0.6fr 0.9fr 0.8fr', borderColor: 'var(--border-primary)' }}>
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: magnetMeta(s.magnet).color }} />
-                      {iconTile(s.magnet)}
-                      <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
-                    </span>
-                    <span className="text-right text-[13px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
-                    <span className="text-right text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
-                    <span className="text-right text-[12.5px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {s.delta7 >= 0 ? <MdArrowUpward size={13} /> : <MdTrendingDown size={13} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
-                    </span>
+              <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 pr-1">
+                {/* donut + insights side by side */}
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  <SourceDonut mix={popMix} total={mixTotal} />
+                  <div className="flex flex-col gap-2">
+                    {top && (
+                      <div className="flex items-center gap-2">
+                        {iconTile(top.magnet)}
+                        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Most active: <b style={{ color: magnetMeta(top.magnet).color }}>{magnetMeta(top.magnet).label}</b></span>
+                      </div>
+                    )}
+                    {offline && (
+                      <div className="flex items-center gap-2">
+                        {iconTile(offline.magnet)}
+                        <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Strong offline: <b style={{ color: magnetMeta(offline.magnet).color }}>{magnetMeta(offline.magnet).label}</b></span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      {iconTile('voice')}
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Voice led: <b style={{ color: '#a78bfa' }}>{voiceShare}%</b></span>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div className="xl:col-span-3 rounded-xl border p-4 flex flex-col gap-3.5" style={{ borderColor: 'rgba(139,92,246,0.35)', background: 'rgba(139,92,246,0.06)' }}>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full" style={{ background: 'rgba(139,92,246,0.22)', color: '#a78bfa' }}><MdAutoAwesome size={14} /></span>
-                  <span className="text-[14px] font-bold" style={{ color: 'var(--text-primary)' }}>Insights</span>
                 </div>
-                {top && (
-                  <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
-                    {iconTile(top.magnet, 38)}
-                    <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Most active channel:<br /><b style={{ color: magnetMeta(top.magnet).color, fontSize: 14 }}>{magnetMeta(top.magnet).label}</b></div>
-                  </div>
-                )}
-                {offline && (
-                  <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
-                    {iconTile(offline.magnet, 38)}
-                    <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Strong offline source:<br /><b style={{ color: magnetMeta(offline.magnet).color, fontSize: 14 }}>{magnetMeta(offline.magnet).label}</b></div>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  {iconTile('voice', 38)}
-                  <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Voice-led sources<br />contribute <b style={{ color: '#a78bfa', fontSize: 14 }}>{voiceShare}%</b></div>
-                </div>
-              </div>
-            </div>
 
-            {/* footer: share-of-total stacked bar + legend */}
-            <div className="mt-4 rounded-xl border p-4 flex flex-col gap-3" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="text-[12px] font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>Share of total<br />touchpoints</span>
-                <div className="flex-1 flex h-8 rounded-full overflow-hidden min-w-[240px]">
-                  {popMix.map((s) => (
-                    <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
-                      {s.share >= 6 && <span className="text-[11px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+                {/* per-source rows */}
+                <div className="rounded-lg border overflow-hidden shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                  {popMix.slice(0, 6).map((s) => (
+                    <div key={s.magnet} className="grid items-center px-3 py-1.5 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.5fr) 0.5fr 0.7fr 0.7fr', borderColor: 'var(--border-primary)' }}>
+                      <span className="flex items-center gap-2 min-w-0">
+                        {iconTile(s.magnet, 20)}
+                        <span className="text-[11.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
+                      </span>
+                      <span className="text-right text-[11.5px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
+                      <span className="text-right text-[11.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
+                      <span className="text-right text-[11px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {s.delta7 >= 0 ? <MdArrowUpward size={11} /> : <MdTrendingDown size={11} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
+                      </span>
                     </div>
                   ))}
                 </div>
+
+                {/* share-of-total bar + legend */}
+                <div className="shrink-0">
+                  <div className="flex h-5 rounded-full overflow-hidden">
+                    {popMix.map((s) => (
+                      <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
+                        {s.share >= 8 && <span className="text-[9.5px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5">
+                    {popMix.slice(0, 6).map((s) => (
+                      <span key={s.magnet} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: magnetMeta(s.magnet).color }} />
+                        {magnetMeta(s.magnet).label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-center gap-x-6 gap-y-1.5 flex-wrap">
-                {popMix.slice(0, 6).map((s) => (
-                  <span key={s.magnet} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
-                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: magnetMeta(s.magnet).color }} />
-                    {magnetMeta(s.magnet).label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
-        )
-      })()}
+            </section>
+          )
+        })()}
+      </div>
 
       {/* Lead Details Modal */}
       {showLeadModal && selectedLead && (

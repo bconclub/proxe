@@ -162,7 +162,7 @@ const POP_MAGNET: Record<string, { label: string; color: string }> = {
   pulse_app:   { label: 'Pulse App',  color: '#A78BFA' },
   qr:          { label: 'QR Scan',    color: '#F06C18' },
   missed_call: { label: 'Missed Call',color: '#F59E0B' },
-  d2d:         { label: 'Door-to-Door', color: '#FB7185' },
+  d2d:         { label: 'Door to Door', color: '#FB7185' },
   event:       { label: 'Event',      color: '#2EC4B6' },
   landing:     { label: 'Landing',    color: '#6EA5D4' },
 }

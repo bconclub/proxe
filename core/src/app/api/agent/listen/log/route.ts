@@ -15,7 +15,7 @@ import { getCurrentBrandId, BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
-const SOURCES = ['twitter', 'facebook', 'instagram', 'youtube', 'news', 'whatsapp_trend', 'complaint', 'call_centre', 'volunteer_report', 'survey'];
+const SOURCES = ['twitter', 'facebook', 'instagram', 'youtube', 'news', 'whatsapp_trend', 'complaint', 'call_centre', 'volunteer_report', 'survey', 'reddit', 'blog'];
 const SENTIMENTS = ['positive', 'negative', 'neutral'];
 const CATEGORIES = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other'];
 

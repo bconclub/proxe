@@ -45,6 +45,9 @@ const DISTRICT_BY_SEAT: Record<string, string> = Object.fromEntries(
 // Below this zoom the map shows one aggregated bubble per DISTRICT; clicking a
 // cluster flies into that district, where the per-seat bubbles take over.
 const CLUSTER_MAX_ZOOM = 8.75;
+// Polygons only become click targets when really close in - otherwise a click
+// aimed at a bubble keeps landing on the constituency shape underneath it.
+const POLY_CLICK_MIN_ZOOM = 10.75;
 
 export default function PunjabLeafletMap({
   mode, byConstituency, pulseSeat, selected, onSelect,
@@ -137,10 +140,10 @@ export default function PunjabLeafletMap({
             case 'turnout': return mix(P.turnLo, P.turnHi, 0.25 + 0.75 * (a.total / maxTotal));
           }
         })();
-        const size = Math.round(42 + 34 * Math.sqrt(a.total / maxTotal)); // 42-76px
+        const size = Math.round(30 + 24 * Math.sqrt(a.total / maxTotal)); // 30-54px
         const center = L.latLng(a.latSum / a.w, a.lngSum / a.w);
-        const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${clusterColor};border:3px solid rgba(255,255,255,0.65);box-shadow:0 0 0 6px ${clusterColor}33,0 3px 10px rgba(0,0,0,0.4);display:grid;place-items:center;color:#fff;font-family:Inter,system-ui,sans-serif;line-height:1.05;text-align:center;cursor:pointer;">
-          <div><div style="font-weight:800;font-size:${size < 54 ? 13 : 15}px;">${fmtK(a.total)}</div><div style="font-size:8.5px;font-weight:600;opacity:0.85;">${a.seats} seats</div></div>
+        const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${clusterColor};border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 0 3px ${clusterColor}33,0 2px 8px rgba(0,0,0,0.4);display:grid;place-items:center;color:#fff;font-family:Inter,system-ui,sans-serif;line-height:1.05;text-align:center;cursor:pointer;">
+          <div><div style="font-weight:800;font-size:${size < 42 ? 10.5 : 12}px;">${fmtK(a.total)}</div><div style="font-size:7.5px;font-weight:600;opacity:0.85;">${a.seats} seats</div></div>
         </div>`;
         const icon = L.divIcon({ html, className: 'wr-count-marker', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
         const m = L.marker(center, { icon, riseOnHover: true, keyboard: false });
@@ -202,7 +205,13 @@ export default function PunjabLeafletMap({
         const name = f.properties.name as string;
         layersByName.current[name] = layer as L.Path;
         try { centerByName.current[normName(name)] = (layer as L.Polygon).getBounds().getCenter(); } catch {}
-        layer.on('click', (e) => { L.DomEvent.stop(e); onSelectRef.current(name); });
+        layer.on('click', (e) => {
+          L.DomEvent.stop(e);
+          // ignore polygon clicks until really close in - bubbles are the click
+          // targets at cluster/seat-bubble zoom levels
+          if ((mapRef.current?.getZoom() ?? 0) < POLY_CLICK_MIN_ZOOM) return;
+          onSelectRef.current(name);
+        });
         layer.on('mouseover', () => (layer as L.Path).setStyle({ weight: 2.2 }));
         layer.on('mouseout', () => (layer as L.Path).setStyle(styleFor(name)));
       },

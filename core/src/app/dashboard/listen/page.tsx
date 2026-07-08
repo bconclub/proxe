@@ -9,8 +9,10 @@
 // and the RSS source fetcher.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { MdSensors, MdRefresh, MdFilterList, MdWarning, MdHeadsetMic, MdPoll, MdVolunteerActivism, MdReportProblem, MdOutlineRssFeed, MdChevronLeft, MdChevronRight, MdInfoOutline, MdCampaign, MdEditNote, MdVisibility, MdNorthEast, MdSouthEast, MdTrendingFlat } from 'react-icons/md'
-import { FaTwitter, FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp, FaRegNewspaper } from 'react-icons/fa'
+import { MdSensors, MdRefresh, MdFilterList, MdWarning, MdHeadsetMic, MdPoll, MdVolunteerActivism, MdReportProblem, MdOutlineRssFeed, MdChevronLeft, MdChevronRight, MdInfoOutline, MdCampaign, MdEditNote, MdVisibility, MdNorthEast, MdSouthEast, MdTrendingFlat, MdWaterDrop, MdCurrencyRupee, MdWorkOutline, MdBolt, MdAddRoad, MdMedication, MdLocalHospital, MdSchool, MdErrorOutline, MdMood, MdSentimentNeutral, MdMoodBad, MdStackedLineChart } from 'react-icons/md'
+import { FaTwitter, FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp, FaRegNewspaper, FaRedditAlien } from 'react-icons/fa'
+import punjabGeo from '@/data/punjab-ac.json'
+import { normName } from '@/lib/war-room/constituencies'
 
 // ── types ──────────────────────────────────────────────────────────────────
 interface SignalRow {
@@ -19,7 +21,9 @@ interface SignalRow {
   is_crisis: boolean; is_opposition: boolean; is_positive: boolean; created_at: string
 }
 interface Digest {
-  totals: { signals: number; crisis: number; opposition: number; positive: number; negative: number; neutral: number; prevSignals: number; prevCrisis: number; prevOpposition: number; prevPositive: number }
+  totals: { signals: number; crisis: number; opposition: number; positive: number; negative: number; neutral: number; sentPositive: number; prevSignals: number; prevCrisis: number; prevOpposition: number; prevPositive: number; prevSentPositive: number; prevNegative: number; prevNeutral: number }
+  keywordsTracked: number
+  updatedAt: string | null
   heatScore: number; heatLabel: string; prevHeat: number
   whatProxeThinks: { heat: number; label: string; delta: number; text: string }
   recommendedActions: { title: string; detail: string; kind: string }[]
@@ -58,7 +62,24 @@ const SRC_META: Record<string, { label: string; icon: React.ReactNode; color: st
   call_centre: { label: 'Call Centre', icon: <MdHeadsetMic size={15} />, color: '#38bdf8' },
   volunteer_report: { label: 'Volunteer Report', icon: <MdVolunteerActivism size={15} />, color: '#a78bfa' },
   survey: { label: 'Survey', icon: <MdPoll size={15} />, color: '#34d399' },
+  reddit: { label: 'Reddit', icon: <FaRedditAlien size={14} />, color: '#ff4500' },
+  blog: { label: 'Blog', icon: <MdOutlineRssFeed size={15} />, color: '#f59e0b' },
 }
+
+// issue category → icon + label for the keyword tiles
+const CAT_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  water: { label: 'Water', icon: <MdWaterDrop size={14} />, color: '#38bdf8' },
+  farm_debt: { label: 'Farm Debt', icon: <MdCurrencyRupee size={14} />, color: '#a78bfa' },
+  jobs: { label: 'Jobs', icon: <MdWorkOutline size={14} />, color: '#f97316' },
+  power: { label: 'Power', icon: <MdBolt size={14} />, color: '#f59e0b' },
+  roads: { label: 'Roads', icon: <MdAddRoad size={14} />, color: '#8b7bff' },
+  drugs: { label: 'Drugs', icon: <MdMedication size={14} />, color: '#f43f5e' },
+  health: { label: 'Health', icon: <MdLocalHospital size={14} />, color: '#22c55e' },
+  education: { label: 'Education', icon: <MdSchool size={14} />, color: '#c084fc' },
+  other: { label: 'General', icon: <MdErrorOutline size={14} />, color: '#94a3b8' },
+}
+const catMeta = (c: string | null) => CAT_META[c || 'other'] || { label: 'Grievance', icon: <MdErrorOutline size={14} />, color: '#f59e0b' }
+const RANK_COLORS = ['#22c55e', '#3b82f6', '#a78bfa', '#f97316', '#ec4899', '#f59e0b', '#fb7185', '#8b5cf6']
 const srcMeta = (s: string) => SRC_META[s] || { label: cap(s), icon: <MdOutlineRssFeed size={14} />, color: 'var(--text-secondary)' }
 
 // Real outlet logo for news items: the article domain's favicon. Social
@@ -133,44 +154,105 @@ function HeatGauge({ score }: { score: number }) {
   )
 }
 
-function SentimentChart({ series }: { series: Digest['dailySeries'] }) {
-  const W = 620; const H = 172; const padL = 28; const padB = 22; const padT = 10
-  const max = Math.max(...series.map((d) => Math.max(d.pos, d.neg, d.neutral)), 4)
-  const x = (i: number) => padL + (i / Math.max(series.length - 1, 1)) * (W - padL - 10)
-  const y = (v: number) => padT + (1 - v / max) * (H - padT - padB)
-  // Catmull-Rom → cubic bezier for smooth mockup-style lines
-  const smooth = (pts: [number, number][]) => {
-    if (pts.length < 2) return ''
-    let dPath = `M ${pts[0][0]} ${pts[0][1]}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)]
-      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6
-      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6
-      dPath += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
-    }
-    return dPath
+// Catmull-Rom → cubic bezier for smooth reference-style curves
+const smoothPath = (pts: [number, number][]) => {
+  if (pts.length < 2) return ''
+  let dPath = `M ${pts[0][0]} ${pts[0][1]}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)]
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6
+    dPath += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
   }
-  const pts = (key: 'pos' | 'neg' | 'neutral'): [number, number][] => series.map((dd, i) => [x(i), y(dd[key])])
-  const posPts = pts('pos')
+  return dPath
+}
+
+// Stacked smooth sentiment areas (red base, gray, green on top) with
+// tap-to-hide legend, per the reference design.
+function StackedSentiment({ series, hidden }: { series: Digest['dailySeries']; hidden: Set<string> }) {
+  const W = 620; const H = 190; const padL = 30; const padR = 6; const padB = 20; const padT = 8
+  const on = (k: string) => !hidden.has(k)
+  const stackOf = (dd: Digest['dailySeries'][number]) => {
+    const neg = on('neg') ? dd.neg : 0
+    const neu = on('neutral') ? dd.neutral : 0
+    const pos = on('pos') ? dd.pos : 0
+    return { negTop: neg, neuTop: neg + neu, posTop: neg + neu + pos }
+  }
+  const max = Math.max(...series.map((dd) => stackOf(dd).posTop), 4)
+  const x = (i: number) => padL + (i / Math.max(series.length - 1, 1)) * (W - padL - padR)
+  const y = (v: number) => padT + (1 - v / max) * (H - padT - padB)
+  const layerPts = (key: 'negTop' | 'neuTop' | 'posTop'): [number, number][] => series.map((dd, i) => [x(i), y(stackOf(dd)[key])])
+  const areaBetween = (topPts: [number, number][], bottomPts: [number, number][]) => {
+    const bottomRev = [...bottomPts].reverse()
+    return `${smoothPath(topPts)} L ${bottomRev[0][0]} ${bottomRev[0][1]} ${smoothPath(bottomRev).slice(1)} Z`
+  }
+  const zero: [number, number][] = series.map((_, i) => [x(i), y(0)])
+  const negPts = layerPts('negTop'); const neuPts = layerPts('neuTop'); const posPts = layerPts('posTop')
   const ticks = [0, Math.round(max / 3), Math.round((2 * max) / 3), max]
-  const labelEvery = Math.ceil(series.length / 8)
+  const labelEvery = Math.ceil(series.length / 7)
+  const monthDay = (d: string) => { const [m, dd] = d.split('/'); return `${dd} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m) - 1]}` }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       {ticks.map((t) => (
         <g key={t}>
-          <line x1={padL} x2={W - 10} y1={y(t)} y2={y(t)} stroke="var(--border-primary)" strokeDasharray="3 4" strokeWidth={0.6} />
-          <text x={padL - 6} y={y(t) + 3} fontSize={9} fill="var(--text-muted)" textAnchor="end">{t}</text>
+          <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="var(--border-primary)" strokeDasharray="3 4" strokeWidth={0.6} />
+          <text x={padL - 5} y={y(t) + 3} fontSize={8.5} fill="var(--text-muted)" textAnchor="end">{t}</text>
         </g>
       ))}
-      <path d={`${smooth(posPts)} L ${posPts[posPts.length - 1][0]} ${y(0)} L ${posPts[0][0]} ${y(0)} Z`} fill="rgba(34,197,94,0.10)" stroke="none" />
-      <path d={smooth(pts('neutral'))} fill="none" stroke="#6b7280" strokeWidth={1.5} />
-      <path d={smooth(pts('neg'))} fill="none" stroke="#ef4444" strokeWidth={2} />
-      <path d={smooth(posPts)} fill="none" stroke="#22c55e" strokeWidth={2} />
+      {on('neg') && <path d={areaBetween(negPts, zero)} fill="rgba(220,38,38,0.55)" stroke="none" />}
+      {on('neutral') && <path d={areaBetween(neuPts, negPts)} fill="rgba(107,114,128,0.45)" stroke="none" />}
+      {on('pos') && <path d={areaBetween(posPts, neuPts)} fill="rgba(34,197,94,0.5)" stroke="none" />}
+      {on('neg') && <path d={smoothPath(negPts)} fill="none" stroke="#ef4444" strokeWidth={1.6} />}
+      {on('neutral') && <path d={smoothPath(neuPts)} fill="none" stroke="#9ca3af" strokeWidth={1.4} />}
+      {on('pos') && <path d={smoothPath(posPts)} fill="none" stroke="#22c55e" strokeWidth={1.6} />}
       {series.map((dd, i) => (
-        <g key={i}>
-          <circle cx={x(i)} cy={y(dd.pos)} r={2.2} fill="#22c55e" />
-          <circle cx={x(i)} cy={y(dd.neg)} r={2.2} fill="#ef4444" />
-          {i % labelEvery === 0 && <text x={x(i)} y={H - 5} fontSize={9} fill="var(--text-muted)" textAnchor="middle">{dd.day}</text>}
+        i % labelEvery === 0 ? <text key={i} x={x(i)} y={H - 4} fontSize={8.5} fill="var(--text-muted)" textAnchor="middle">{monthDay(dd.day)}</text> : null
+      ))}
+    </svg>
+  )
+}
+
+// Mini Punjab silhouette with numbered mood-score badges for the top regions.
+const GEO_FEATURES: any[] = (punjabGeo as any).features || []
+function MoodMiniMap({ seats }: { seats: Array<{ constituency: string; score: number }> }) {
+  const { paths, badges } = useMemo(() => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    const rings: number[][][] = []
+    const centByName: Record<string, [number, number]> = {}
+    GEO_FEATURES.forEach((f) => {
+      const geoms = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates
+      let cx = 0, cy = 0, cn = 0
+      geoms.forEach((poly: number[][][]) => {
+        const ring = poly[0]
+        rings.push(ring)
+        ring.forEach(([lon, lat]) => {
+          minX = Math.min(minX, lon); maxX = Math.max(maxX, lon)
+          minY = Math.min(minY, lat); maxY = Math.max(maxY, lat)
+          cx += lon; cy += lat; cn++
+        })
+      })
+      if (cn) centByName[normName(f.properties.name)] = [cx / cn, cy / cn]
+    })
+    const W = 240; const H = 260; const pad = 10
+    const sx = (W - 2 * pad) / (maxX - minX); const sy = (H - 2 * pad) / (maxY - minY)
+    const s = Math.min(sx, sy)
+    const px = (lon: number) => pad + (lon - minX) * s
+    const py = (lat: number) => H - pad - (lat - minY) * s
+    const pathStrs = rings.map((ring) => 'M ' + ring.map(([lon, lat]) => `${px(lon).toFixed(1)} ${py(lat).toFixed(1)}`).join(' L ') + ' Z')
+    const badgeList = seats.map((st) => {
+      const c = centByName[normName(st.constituency)]
+      return c ? { ...st, x: px(c[0]), y: py(c[1]) } : null
+    }).filter(Boolean) as Array<{ constituency: string; score: number; x: number; y: number }>
+    return { paths: pathStrs, badges: badgeList }
+  }, [seats])
+  const scoreColor = (v: number) => (v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444')
+  return (
+    <svg viewBox="0 0 240 260" style={{ width: '100%', height: 'auto', display: 'block' }}>
+      {paths.map((p, i) => <path key={i} d={p} fill="rgba(122,138,160,0.06)" stroke="rgba(122,138,160,0.22)" strokeWidth={0.5} />)}
+      {badges.map((b) => (
+        <g key={b.constituency}>
+          <circle cx={b.x} cy={b.y} r={12} fill="var(--bg-primary)" stroke={scoreColor(b.score)} strokeWidth={2} />
+          <text x={b.x} y={b.y + 3.5} fontSize={9.5} fontWeight={800} fill={scoreColor(b.score)} textAnchor="middle">{b.score}</text>
         </g>
       ))}
     </svg>
@@ -185,6 +267,7 @@ export default function ListenPage() {
   const [inboxLimit, setInboxLimit] = useState(9)
   const [showFilters, setShowFilters] = useState(false)
   const [filter, setFilter] = useState<'all' | 'crisis' | 'negative' | 'positive'>('all')
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set())
   // Sources
   const [sources, setSources] = useState<Source[]>([])
   const [showSources, setShowSources] = useState(false)
@@ -290,7 +373,7 @@ export default function ListenPage() {
         <span style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)', color: '#f97316' }}><MdSensors size={21} /></span>
         <div style={{ flex: 1, minWidth: 200 }}>
           <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>PROXe <span style={{ color: '#f97316' }}>Listen</span></h1>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Listen first, engage better - signals across social, news, WhatsApp, call centre and the field.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Listen first, engage better. Signals across social, news, WhatsApp, call centre and the field.</p>
         </div>
         <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '8px 10px', fontSize: 12, fontWeight: 600 }}>
           <option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option>
@@ -393,9 +476,11 @@ export default function ListenPage() {
               <div>
                 {inbox.slice(0, inboxLimit).map((s, i) => {
                   const m = srcMeta(s.source); const sb = sentBadge(s); const sv = sevBadge(s)
-                  const firstBreak = s.content.search(/[.!?]\s|[.!?]$/)
-                  const title = firstBreak > 15 && firstBreak < 120 ? s.content.slice(0, firstBreak + 1) : s.content.slice(0, 90)
-                  const rest = s.content.slice(title.length).trim()
+                  // strip the trailing "- Outlet" news feeds append, and any stray hyphens
+                  const body = s.source === 'news' ? s.content.replace(/\s[-–|]\s[^-–|]{2,60}$/, '') : s.content
+                  const firstBreak = body.search(/[.!?]\s|[.!?]$/)
+                  const title = firstBreak > 15 && firstBreak < 120 ? body.slice(0, firstBreak + 1) : body.slice(0, 90)
+                  const rest = body.slice(title.length).trim()
                   const media = mediaOf(s)
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 14px', borderBottom: i < Math.min(inbox.length, inboxLimit) - 1 ? '1px solid var(--border-primary)' : 'none' }}>
@@ -487,85 +572,153 @@ export default function ListenPage() {
             </div>
           </div>
 
-          {/* ── analytics row: keywords | sentiment chart | mood by region ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, alignItems: 'stretch' }}>
-            {/* Trending Keywords */}
-            <div style={card}>
+          {/* ── analytics row: keyword tiles | stacked sentiment | mood by region (reference design) ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 12, alignItems: 'stretch' }}>
+            {/* Top Trending Keywords - tile grid */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Trending Keywords</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Top Trending Keywords</span>
                 <MdInfoOutline size={13} color="var(--text-muted)" />
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>View all keywords</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 52px 34px 70px', gap: 6, fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600, padding: '0 2px 6px', borderBottom: '1px solid var(--border-primary)' }}>
-                <span>#</span><span>Keyword</span><span style={{ textAlign: 'right' }}>Signals</span><span style={{ textAlign: 'center' }}>Trend</span><span>Sentiment</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8, flex: 1 }}>
                 {d.keywords.slice(0, 8).map((k, i) => {
-                  const dashColor = k.neg > k.pos ? '#ef4444' : k.pos > k.neg ? '#22c55e' : '#f59e0b'
-                  const dashes = Math.max(1, Math.min(5, Math.round((Math.max(k.pos, k.neg) / Math.max(k.count, 1)) * 5)))
+                  const prevN = Math.max(0, k.count - k.trend)
+                  const pctT = prevN > 0 ? Math.round((k.trend / prevN) * 100) : (k.trend > 0 ? 100 : 0)
+                  const cm = catMeta(k.category)
+                  const rc = RANK_COLORS[i % RANK_COLORS.length]
                   return (
-                    <div key={k.word} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 52px 34px 70px', gap: 6, alignItems: 'center', padding: '6px 2px', borderBottom: i < 7 ? '1px solid var(--border-primary)' : 'none', fontSize: 12.5 }}>
-                      <span style={{ color: '#f97316', fontWeight: 700, fontSize: 11 }}>{i + 1}</span>
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{k.word}</span>
-                        {k.category && <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}> · {cap(k.category)}</span>}
-                      </span>
-                      <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{k.count}</span>
-                      <span style={{ display: 'flex', justifyContent: 'center' }}>{k.trend > 0 ? <MdNorthEast size={13} color="#22c55e" /> : k.trend < 0 ? <MdSouthEast size={13} color="#ef4444" /> : <MdTrendingFlat size={13} color="var(--text-muted)" />}</span>
-                      <span style={{ display: 'flex', gap: 3 }}>
-                        {Array.from({ length: dashes }).map((_, j) => <span key={j} style={{ width: 9, height: 3, borderRadius: 2, background: dashColor }} />)}
-                      </span>
+                    <div key={k.word} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 11, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 800, color: rc }}>{i + 1}</span>
+                        <span style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${cm.color}1f`, color: cm.color }}>{cm.icon}</span>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.word}</div>
+                        <div style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>{cm.label}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 4 }}>
+                        <span>
+                          <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{k.count}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}> signals</span>
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 9.5, fontWeight: 700, color: pctT >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
+                          {pctT >= 0 ? '▲' : '▼'} {pctT >= 0 ? '+' : ''}{pctT}%<span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> vs last 7d</span>
+                        </span>
+                      </div>
                     </div>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-primary)' }}>
+                <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Total unique keywords tracked <b style={{ color: 'var(--text-secondary)' }}>{d.keywordsTracked}</b></span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--text-muted)' }}>Updated {d.updatedAt ? `${ago(d.updatedAt)} ago` : 'now'} <MdRefresh size={11} /></span>
+              </div>
+            </div>
+
+            {/* Sentiment Over Time - KPI chips + stacked areas + tap-to-hide legend */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Sentiment Over Time</span>
+                <MdInfoOutline size={13} color="var(--text-muted)" />
+                <div style={{ flex: 1 }} />
+                <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 600 }}>
+                  <option value={7}>7 Days</option><option value={14}>14 Days</option><option value={30}>30 Days</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
+                {([
+                  ['Positive', d.totals.sentPositive, d.totals.prevSentPositive, '#22c55e', <MdMood key="p" size={15} />],
+                  ['Neutral', d.totals.neutral, d.totals.prevNeutral, '#9ca3af', <MdSentimentNeutral key="n" size={15} />],
+                  ['Negative', d.totals.negative, d.totals.prevNegative, '#ef4444', <MdMoodBad key="g" size={15} />],
+                  ['Total Signals', d.totals.signals, d.totals.prevSignals, '#3b82f6', <MdStackedLineChart key="t" size={15} />],
+                ] as const).map(([label, val, prevV, color, icon]) => {
+                  const dl = pct(val as number, prevV as number)
+                  return (
+                    <div key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 10, padding: '7px 9px' }}>
+                      <span style={{ width: 24, height: 24, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${color}1f`, color: color as string, flexShrink: 0 }}>{icon}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{(val as number).toLocaleString('en-IN')}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: dl >= 0 ? '#22c55e' : '#ef4444' }}>{dl >= 0 ? '▲' : '▼'} {Math.abs(dl)}%</span>
+                        </div>
+                        <div style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>{label}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <StackedSentiment series={d.dailySeries} hidden={hiddenSeries} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', flex: 1 }}>Tap on legend to show / hide</span>
+                {([['pos', 'Positive', '#22c55e'], ['neutral', 'Neutral', '#9ca3af'], ['neg', 'Negative', '#ef4444']] as const).map(([key, label, color]) => {
+                  const off = hiddenSeries.has(key)
+                  return (
+                    <button key={key} onClick={() => setHiddenSeries((prev) => { const nx = new Set(prev); if (nx.has(key)) nx.delete(key); else nx.add(key); return nx })}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 16, padding: '4px 11px', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', color: off ? 'var(--text-muted)' : 'var(--text-primary)', opacity: off ? 0.55 : 1 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 7, background: color }} />{label}
+                    </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Sentiment Over Time */}
-            <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Sentiment Over Time</span>
-                <div style={{ flex: 1 }} />
-                {([['Positive', '#22c55e'], ['Neutral', '#9ca3af'], ['Negative', '#ef4444']] as const).map(([l, c]) => (
-                  <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 8, background: c }} />{l}
-                  </span>
-                ))}
-              </div>
-              <SentimentChart series={d.dailySeries} />
-            </div>
-
-            {/* Mood by Region */}
-            <div style={card}>
+            {/* Mood by Region - mini map + score list */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Mood by Region</span>
                 <MdInfoOutline size={13} color="var(--text-muted)" />
                 <div style={{ flex: 1 }} />
-                <a href="/dashboard/map" style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none' }}>View map →</a>
+                <a href="/war-room" style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-secondary)', textDecoration: 'none' }}>View on map →</a>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 1fr) minmax(80px, 1.4fr) 38px 38px 38px 30px', gap: 6, fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, paddingBottom: 6, borderBottom: '1px solid var(--border-primary)' }}>
-                <span>Region</span><span>Mood</span><span style={{ textAlign: 'right' }}>Neg</span><span style={{ textAlign: 'right' }}>Neu</span><span style={{ textAlign: 'right' }}>Pos</span><span style={{ textAlign: 'right' }}>Heat</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {d.moodBySeat.filter((m) => m.total >= 5).slice(0, 8).map((m, i) => {
+              {(() => {
+                const rows = d.moodBySeat.filter((m) => m.total >= 5).map((m) => {
                   const t = m.total || 1
-                  const negP = Math.round((m.neg / t) * 100); const posP = Math.round((m.pos / t) * 100); const neuP = Math.max(0, 100 - negP - posP)
-                  const heatBg = m.heat >= 70 ? '#ef4444' : m.heat >= 55 ? '#f97316' : m.heat >= 40 ? '#f59e0b' : '#22c55e'
-                  return (
-                    <div key={m.constituency} style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 1fr) minmax(80px, 1.4fr) 38px 38px 38px 30px', gap: 6, alignItems: 'center', padding: '7px 0', borderBottom: i < 7 ? '1px solid var(--border-primary)' : 'none' }}>
-                      <span title={`${m.total} signals`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.constituency}</span>
-                      <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', background: 'var(--bg-hover)', gap: 1 }}>
-                        {negP > 0 && <div style={{ width: `${negP}%`, background: '#dc2626', borderRadius: 3 }} />}
-                        {neuP > 0 && <div style={{ width: `${neuP}%`, background: '#4b5563', borderRadius: 3 }} />}
-                        {posP > 0 && <div style={{ width: `${posP}%`, background: '#16a34a', borderRadius: 3 }} />}
+                  return { ...m, score: Math.round(((m.pos * 1 + m.neutral * 0.5) / t) * 100) }
+                }).sort((a, b) => b.score - a.score).slice(0, 8)
+                const scoreColor = (v: number) => (v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444')
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: 10, flex: 1, minHeight: 0 }}>
+                      <div style={{ flex: '0 0 42%', minWidth: 0 }}>
+                        <MoodMiniMap seats={rows.map((r) => ({ constituency: r.constituency, score: r.score }))} />
                       </div>
-                      <span style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-secondary)' }}>{negP}%</span>
-                      <span style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-secondary)' }}>{neuP}%</span>
-                      <span style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-secondary)' }}>{posP}%</span>
-                      <span style={{ fontSize: 10.5, fontWeight: 800, textAlign: 'center', color: '#fff', background: heatBg, borderRadius: 5, padding: '2px 0' }}>{m.heat}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(60px, 1fr) 44px minmax(60px, 1fr)', gap: 6, fontSize: 9.5, color: 'var(--text-muted)', fontWeight: 600, paddingBottom: 5, borderBottom: '1px solid var(--border-primary)' }}>
+                          <span>Region</span><span>Mood Score</span><span>Sentiment Mix</span>
+                        </div>
+                        {rows.map((m, i) => {
+                          const t = m.total || 1
+                          const negP = Math.round((m.neg / t) * 100); const posP = Math.round((m.pos / t) * 100); const neuP = Math.max(0, 100 - negP - posP)
+                          return (
+                            <div key={m.constituency} style={{ display: 'grid', gridTemplateColumns: 'minmax(60px, 1fr) 44px minmax(60px, 1fr)', gap: 6, alignItems: 'center', padding: '6px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--border-primary)' : 'none' }}>
+                              <span title={`${m.total} signals`} style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.constituency}</span>
+                              <span style={{ fontSize: 10, fontWeight: 800, textAlign: 'center', color: '#0b0d12', background: scoreColor(m.score), borderRadius: 5, padding: '2px 0' }}>{m.score}</span>
+                              <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', background: 'var(--bg-hover)', gap: 1 }}>
+                                {posP > 0 && <div style={{ width: `${posP}%`, background: '#16a34a', borderRadius: 3 }} />}
+                                {neuP > 0 && <div style={{ width: `${neuP}%`, background: '#4b5563', borderRadius: 3 }} />}
+                                {negP > 0 && <div style={{ width: `${negP}%`, background: '#dc2626', borderRadius: 3 }} />}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, paddingTop: 7, borderTop: '1px solid var(--border-primary)', flexWrap: 'wrap' }}>
+                      {([['Positive', '#22c55e'], ['Neutral', '#9ca3af'], ['Negative', '#ef4444']] as const).map(([l, c]) => (
+                        <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-secondary)' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: 7, background: c }} />{l}
+                        </span>
+                      ))}
+                      <span style={{ flex: 1 }} />
+                      <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>Mood Score = (Positive x 1) + (Neutral x 0.5) + (Negative x 0)</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 
@@ -604,7 +757,7 @@ export default function ListenPage() {
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{outlet}</span>
                           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ago(s.created_at)}</span>
                         </div>
-                        <p style={{ fontSize: 11.5, lineHeight: 1.4, color: media ? 'var(--text-secondary)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: media ? 2 : 5, WebkitBoxOrient: 'vertical', flex: 1 }}>{s.content}</p>
+                        <p style={{ fontSize: 11.5, lineHeight: 1.4, color: media ? 'var(--text-secondary)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: media ? 2 : 5, WebkitBoxOrient: 'vertical', flex: 1 }}>{s.source === 'news' ? s.content.replace(/\s[-–|]\s[^-–|]{2,60}$/, '') : s.content}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           {!media && s.is_crisis && badge('#ef4444', 'Crisis')}
                           {s.constituency && chip(s.constituency)}
