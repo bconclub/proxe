@@ -515,7 +515,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               if (item.href === '/war-room' && !brandFeatures.warRoom) return null
               // POP is a campaign, not a sales org — keep the nav clear and
               // direct: no sales Pipeline, no Flow builder, no Humans page.
-              if (brandId === 'pop' && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans'].includes(item.href)) return null
+              // War Room is reachable from the collapsed sidebar / brand logo, so
+              // it's kept out of the main menu list too.
+              if (brandId === 'pop' && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans', '/war-room'].includes(item.href)) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
