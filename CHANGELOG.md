@@ -1,3 +1,9 @@
+## 2026-07-08 04:30 IST · feat(pop): V3 native Sarvam voice, name-aware greeting, V1 anti-cutoff
+
+- V3 voice: switched the pipeline's TTS from ElevenLabs (which anglicized Hindi/Punjabi — "English person speaking Hindi") to native Sarvam Bulbul (anushka). Proven: Hindi + Punjabi audio render natively. Env-switchable back to 11labs.
+- Name-aware greeting: if we already know the caller, the agent greets them by name and SKIPS the "what's your name?" step — across V1, V2, and V3 (the prompt endpoint personalizes; the pipeline passes the name through).
+- V1 cutting/noise: enabled Vapi background denoising + a stopSpeakingPlan (3 words / 0.35s before it counts as an interruption) so the agent isn't cut off mid-sentence by noise.
+- `(pending-sha)` + VPS pipeline redeploy
 ## 2026-07-08 03:40 IST · fix(pop): V3 pipeline TTS on eleven_v3 (Monika renders correctly)
 
 - V3's ElevenLabs TTS was on eleven_flash_v2_5, which mangles the Monika voice. eleven_v3 is the correct model (same as V1/RelevanceLab) but it's REJECTED (403) on ElevenLabs' realtime websocket — only the HTTP TTS service accepts it.

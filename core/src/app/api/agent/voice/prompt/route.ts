@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveVoicePrompt } from '@/lib/server/voicePromptConfig';
+import { withKnownName } from '@brand/prompts/voice-langs';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const lang = req.nextUrl.searchParams.get('lang');
-  const vp = await resolveVoicePrompt(lang);
+  const name = req.nextUrl.searchParams.get('name');
+  // Name-aware: if the caller is known, greet by name + skip the name question.
+  const vp = withKnownName(await resolveVoicePrompt(lang), name);
   return NextResponse.json({
     lang: vp.lang,
     opening: vp.opening,

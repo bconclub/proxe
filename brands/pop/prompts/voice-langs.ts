@@ -179,3 +179,29 @@ export function isVoiceLang(v: unknown): v is VoiceLang {
 export function popVoicePrompt(lang?: string | null): VoicePrompt {
   return POP_VOICE_PROMPTS[isVoiceLang(lang) ? lang : 'pa'];
 }
+
+// Name-aware greeting: when we ALREADY know who we're calling, greet them by
+// name and skip the "what's your name?" step. Inserts the name after the
+// salutation in the opening and tells the agent to skip step 1.
+const NAME_SUFFIX: Record<VoiceLang, string> = { pa: ' ji', hi: ' जी', en: '' };
+const NAME_SALUTATION: Record<VoiceLang, RegExp> = {
+  pa: /^(Sat sri akal)/i,
+  hi: /^(नमस्ते)/,
+  en: /^(Hello|Hi)/i,
+};
+const NAME_DIRECTIVE: Record<VoiceLang, (n: string) => string> = {
+  pa: (n) => `\n\nCALLER KNOWN: tuhanu pata hai ki caller da naam "${n}" hai. Opening vich naam naal namaskar karo. Naam DObaara na poochho (step 1 NAME chhad do) — sidha AREA te jao.`,
+  hi: (n) => `\n\nCALLER KNOWN: आपको पता है कि कॉलर का नाम "${n}" है। Opening में नाम लेकर अभिवादन करें। नाम दोबारा न पूछें (step 1 NAME छोड़ दें) — सीधे AREA पर जाएं।`,
+  en: (n) => `\n\nCALLER KNOWN: you already know the caller's name is "${n}". Greet them by name in the opening. Do NOT ask for their name (skip step 1 NAME) — go straight to AREA.`,
+};
+
+export function withKnownName(vp: VoicePrompt, name?: string | null): VoicePrompt {
+  const n = (name || '').trim();
+  if (!n) return vp;
+  const sal = NAME_SALUTATION[vp.lang];
+  const opening = sal.test(vp.firstMessage)
+    ? vp.firstMessage.replace(sal, `$1 ${n}${NAME_SUFFIX[vp.lang]}`)
+    : vp.firstMessage;
+  const prompt = vp.prompt + NAME_DIRECTIVE[vp.lang](n);
+  return { ...vp, opening, firstMessage: opening, prompt };
+}

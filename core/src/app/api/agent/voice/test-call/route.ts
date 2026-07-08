@@ -7,7 +7,7 @@ import { ensureOrUpdateLead } from '@/lib/services/leadManager';
 // back to the brand file defaults. Overriding the Vapi prompt + opening per call
 // (below) carries the edited prompt onto the LIVE assistant without touching the
 // API-managed golden config, and lets us dial the same number in any language.
-import { VOICE_ASR_LANG, isVoiceLang } from '@brand/prompts/voice-langs';
+import { VOICE_ASR_LANG, isVoiceLang, withKnownName } from '@brand/prompts/voice-langs';
 import { resolveVoicePrompt } from '@/lib/server/voicePromptConfig';
 
 // Two outbound flavors, picked per brand:
@@ -48,11 +48,6 @@ async function vapiTestCall(body: any) {
   // override the assistant's system prompt + opening with the matching variant
   // so (a) the no-repeat guardrail is always on and (b) the same number can be
   // dialed in any language. Other brands keep their own assistant prompt.
-  const isPopGrievance = BRAND_ID === 'pop';
-  // Resolve from the dashboard-editable override (falls back to file defaults).
-  const voicePrompt = isPopGrievance ? await resolveVoicePrompt(body.language) : null;
-  const voiceLang = voicePrompt?.lang ?? null;
-
   const name = (contactName || leadName || '').trim();
   // POP grievance calls have NO business concept — ignore any businessName the
   // client sends (a stale form defaulted it to the brand name, which then leaked
@@ -71,6 +66,13 @@ async function vapiTestCall(body: any) {
   if (!greetingName && BRAND_ID !== 'pop') {
     return NextResponse.json({ error: 'A contact name or business name is required' }, { status: 400 });
   }
+
+  // POP grievance: language + prompt from the one-core editor. If we already know
+  // the caller's name, greet them by name and skip the "what's your name?" step.
+  const isPopGrievance = BRAND_ID === 'pop';
+  const baseVoicePrompt = isPopGrievance ? await resolveVoicePrompt(body.language) : null;
+  const voicePrompt = baseVoicePrompt ? withKnownName(baseVoicePrompt, name) : null;
+  const voiceLang = voicePrompt?.lang ?? null;
   const vapiKey = process.env.VAPI_PRIVATE_API_KEY;
   if (!vapiKey) {
     return NextResponse.json(
@@ -172,6 +174,16 @@ async function vapiTestCall(body: any) {
         assistantId: VAPI_ASSISTANT_ID,
         assistantOverrides: {
           ...(popTranscriber ? { transcriber: popTranscriber } : {}),
+          // Stop the agent getting cut off mid-sentence by background noise:
+          // denoise the caller audio, and require real speech (words + voiced
+          // seconds) before treating it as an interruption. POP only.
+          ...(isPopGrievance
+            ? {
+                backgroundDenoisingEnabled: true,
+                startSpeakingPlan: { waitSeconds: 0.6 },
+                stopSpeakingPlan: { numWords: 3, voiceSeconds: 0.35, backoffSeconds: 1.2 },
+              }
+            : {}),
           // Per-language prompt + opening. Deep-merged by Vapi, so only the
           // system message + first line change — provider/model/voice stay as
           // configured on the assistant. This is where the no-repeat guardrail
@@ -330,7 +342,9 @@ async function elevenLabsTestCall(body: any) {
   // POP: drive the ElevenLabs agent in the SELECTED language with the SAME
   // one-core-place prompt (the agent otherwise runs its hardcoded pa default —
   // why V2 Hindi didn't work). Per-call overrides were enabled on the agent.
-  const vp = BRAND_ID === 'pop' ? await resolveVoicePrompt(body.language) : null;
+  // Name-aware: greet by name + skip asking if we know who we're calling.
+  const vpBase = BRAND_ID === 'pop' ? await resolveVoicePrompt(body.language) : null;
+  const vp = vpBase ? withKnownName(vpBase, name) : null;
 
   try {
     const res = await fetch('https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call', {
@@ -411,7 +425,11 @@ async function sarvamPipelineCall(body: any) {
   try {
     const res = await fetch(`${url}/start`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: e164, language: isVoiceLang(body.language) ? body.language : 'pa' }),
+      body: JSON.stringify({
+        to: e164,
+        language: isVoiceLang(body.language) ? body.language : 'pa',
+        name: (contactName || leadName || '').trim() || undefined,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     // pipeline returns { status: <vobiz http status>, body: <vobiz response text> }
