@@ -22,6 +22,12 @@ interface SnapshotData {
   scoreHistogram: { hot: number; warm: number; cold: number; unscored: number }
   callsByUser?: Array<{ name: string; count: number }>
   topActive: Array<{ id: string; name: string; phone: string | null; score: number | null; messageCount: number }>
+  // POP campaign snapshot (replaces the aviation PAT/demo/parent-student view).
+  pop?: {
+    grievances: number; volunteers: number; supporters: number
+    byTier: Record<string, number>
+    byCategory: Record<string, number>
+  }
 }
 
 function formatHHMM(iso: string): string {
@@ -204,12 +210,23 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
 
               {data && (
                 <>
-                  {/* Top KPI strip — 4 hero numbers across */}
+                  {/* Top KPI strip — 4 hero numbers across (POP: campaign view) */}
                   <div className="grid grid-cols-4 gap-2 mb-1">
-                    <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
-                    <KpiCell label="PAT done" value={data.events.pat_submitted} accent="#a5b4fc" />
-                    <KpiCell label="Demos booked" value={data.events.demo_booked} accent="#22c55e" />
-                    <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
+                    {data.pop ? (
+                      <>
+                        <KpiCell label="New voices" value={data.leads.total} accent="#C9A961" />
+                        <KpiCell label="Grievances" value={data.pop.grievances} accent="#f59e0b" />
+                        <KpiCell label="Volunteers" value={data.pop.volunteers} accent="#22c55e" />
+                        <KpiCell label="Supporters" value={data.pop.supporters} accent="#06b6d4" />
+                      </>
+                    ) : (
+                      <>
+                        <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
+                        <KpiCell label="PAT done" value={data.events.pat_submitted} accent="#a5b4fc" />
+                        <KpiCell label="Demos booked" value={data.events.demo_booked} accent="#22c55e" />
+                        <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
+                      </>
+                    )}
                   </div>
 
                   {/* 2-column grid: source + score / events + top active */}
@@ -243,8 +260,18 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                         </ul>
                       )}
 
-                      {/* Lead type — Parent vs Student */}
-                      {data.leads.byType && (
+                      {/* Person type — POP: intensity tiers; else Parent/Student */}
+                      {data.pop ? (
+                        <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Person type</p>
+                          {([['Voter', '#3B82F6'], ['Supporter', '#22C55E'], ['Volunteer', '#F59E0B'], ['Cadre', '#F06C18']] as const).map(([k, c]) => (
+                            <div key={k} className="flex items-center justify-between">
+                              <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{k}</span>
+                              <span className="text-[11px] font-semibold tabular-nums" style={{ color: c }}>{data.pop!.byTier[k] || 0}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : data.leads.byType ? (
                         <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Lead type</p>
                           <div className="flex items-center justify-between">
@@ -256,7 +283,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                             <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#22c55e' }}>{data.leads.byType.Student || 0}</span>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </section>
 
                     {/* Score histogram */}
@@ -280,10 +307,21 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                     >
                       <SectionLabel>Activity</SectionLabel>
                       <div className="grid grid-cols-2 gap-1.5">
-                        <EventCell label="PAT submitted" value={data.events.pat_submitted} />
-                        <EventCell label="Demos booked" value={data.events.demo_booked} />
-                        <EventCell label="Agent replies" value={data.events.agent_replies} />
-                        <EventCell label="Calls logged" value={data.events.calls_logged} />
+                        {data.pop ? (
+                          <>
+                            <EventCell label="Grievances" value={data.pop.grievances} />
+                            <EventCell label="Volunteers" value={data.pop.volunteers} />
+                            <EventCell label="Agent replies" value={data.events.agent_replies} />
+                            <EventCell label="Calls logged" value={data.events.calls_logged} />
+                          </>
+                        ) : (
+                          <>
+                            <EventCell label="PAT submitted" value={data.events.pat_submitted} />
+                            <EventCell label="Demos booked" value={data.events.demo_booked} />
+                            <EventCell label="Agent replies" value={data.events.agent_replies} />
+                            <EventCell label="Calls logged" value={data.events.calls_logged} />
+                          </>
+                        )}
                       </div>
 
                       {/* Who logged calls + how many each */}
@@ -428,25 +466,25 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
   const MESSAGES: Record<RangeKey, string[]> = {
     today: [
       "Pulling today's leads…",
-      'Counting PAT submissions & demos booked…',
+      'Counting activity…',
       'Sorting by lead score…',
       'Ranking most active conversations…',
     ],
     '7d': [
       'Pulling leads from the last 7 days…',
-      'Counting PAT submissions & demos booked…',
+      'Counting activity…',
       'Sorting by lead score…',
       'Ranking most active conversations…',
     ],
     '14d': [
       'Pulling leads from the last 14 days…',
-      'Counting PAT submissions & demos booked…',
+      'Counting activity…',
       'Sorting by lead score…',
       'Ranking most active conversations…',
     ],
     '28d': [
       'Pulling leads from the last 28 days…',
-      'Counting PAT submissions & demos booked…',
+      'Counting activity…',
       'Sorting by lead score…',
       'Ranking most active conversations…',
     ],

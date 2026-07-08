@@ -73,9 +73,12 @@ export async function GET(request: Request) {
     const endIso = new Date().toISOString();
 
     // ── 1) Leads created today + by source ──────────────────────────────────
-    const { data: todayLeads } = await supabase
+    const { data: todayLeads } = await (supabase as any)
       .from('all_leads')
-      .select('id, customer_name, phone, lead_score, first_touchpoint, unified_context, created_at')
+      // POP campaign columns appended only for pop (migration 022/026); other
+      // brands' schemas lack them, so a select would error.
+      .select('id, customer_name, phone, lead_score, first_touchpoint, unified_context, created_at'
+        + (BRAND_ID === 'pop' ? ', grievance_category, engagement_type, intensity, magnet, lean, action_intent' : ''))
       .gte('created_at', startIso)
       .lte('created_at', endIso)
       .order('created_at', { ascending: false });
@@ -300,6 +303,21 @@ export async function GET(request: Request) {
       });
     }
 
+    // ── POP campaign snapshot — replaces the aviation (PAT/demo/parent/student)
+    //    view with what a campaign director actually watches. ──
+    let pop: any = undefined;
+    if (BRAND_ID === 'pop') {
+      const L = leads as any[];
+      const grievances = L.filter((l) => l.grievance_category).length;
+      const volunteers = L.filter((l) => l.engagement_type === 'volunteer' || l.action_intent === 'volunteer' || (l.intensity ?? 0) >= 3).length;
+      const supporters = L.filter((l) => (l.intensity ?? 0) === 2 || l.lean === 'supporter').length;
+      const byTier: Record<string, number> = { Voter: 0, Supporter: 0, Volunteer: 0, Cadre: 0 };
+      L.forEach((l) => { const t = l.intensity ?? 0; if (t === 1) byTier.Voter++; else if (t === 2) byTier.Supporter++; else if (t === 3) byTier.Volunteer++; else if (t >= 4) byTier.Cadre++; });
+      const byCategory: Record<string, number> = {};
+      L.forEach((l) => { if (l.grievance_category) byCategory[l.grievance_category] = (byCategory[l.grievance_category] || 0) + 1; });
+      pop = { grievances, volunteers, supporters, byTier, byCategory };
+    }
+
     return NextResponse.json({
       window: { startIso, endIso, label: RANGE_LABELS[range] || 'Today (IST)', range },
       leads: { total: leads.length, bySource, byType },
@@ -307,6 +325,7 @@ export async function GET(request: Request) {
       callsByUser,
       scoreHistogram,
       topActive,
+      ...(pop ? { pop } : {}),
     });
   } catch (err: any) {
     console.error('[today-snapshot] error:', err?.message || err);
