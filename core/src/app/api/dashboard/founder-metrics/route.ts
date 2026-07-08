@@ -30,16 +30,21 @@ const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 const PAGE_SIZE = 1000
 async function fetchAllRows<T = any>(
   buildQuery: () => any,
+  // Safety cap: OFFSET pagination is O(N²), so an unbounded scan of a very large
+  // table (POP hit 27k leads → 475s) can hang the whole route. Callers that only
+  // need a working sample pass a cap; the default stays effectively unbounded for
+  // the small-brand tables this was written for.
+  maxRows = 200000,
 ): Promise<{ data: T[] | null; error: any }> {
   const all: T[] = []
-  for (let from = 0; ; from += PAGE_SIZE) {
+  for (let from = 0; from < maxRows; from += PAGE_SIZE) {
     const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1)
     if (error) return { data: all.length ? all : null, error }
     if (!data || data.length === 0) break
     all.push(...data)
-    if (data.length < PAGE_SIZE) break
+    if (data.length < PAGE_SIZE || all.length >= maxRows) break
   }
-  return { data: all, error: null }
+  return { data: all.length > maxRows ? all.slice(0, maxRows) : all, error: null }
 }
 
 export async function GET(request: NextRequest) {
@@ -90,11 +95,14 @@ export async function GET(request: NextRequest) {
       { data: stageChanges },
     ] = await Promise.all([
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
+      // Capped: the generic funnel/booking match only needs the top leads by
+      // score. POP's real campaign totals come from the pop_home_agg RPC (exact,
+      // server-side), so this bounded scan keeps the route fast at 27k+ volume.
       fetchAllRows(() => supabase
         .from('all_leads')
         .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
         .order('lead_score', { ascending: false })
-        .order('id', { ascending: true })),
+        .order('id', { ascending: true }), 2000),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       fetchAllRows(() => supabase
         .from('web_sessions')
@@ -1821,53 +1829,21 @@ export async function GET(request: NextRequest) {
     let campaignHome: any = undefined
     if (BRAND_ID === 'pop') {
       try {
-        const [{ data: popLeads }, { data: evRows }] = await Promise.all([
-          // Paginated — campaign volume exceeds PostgREST's 1000-row cap.
-          fetchAllRows(() => supabase.from('all_leads')
-            .select('constituency, district, grievance_category, loop_status, salience, lean, magnet, intensity, created_at')
-            .eq('brand', 'pop')
-            .order('created_at', { ascending: false })),
+        // Aggregate the whole home payload server-side in ONE round-trip
+        // (pop_home_agg RPC). Fetching every pop lead to roll up in JS was fine
+        // at 2k rows but ruinous at campaign volume (27k → 27 paginated fetches).
+        const [aggRes, { data: evRows }] = await Promise.all([
+          supabase.rpc('pop_home_agg'),
           supabase.from('campaign_events')
             .select('id, title, topic, constituency, district, venue, event_date, status')
             .in('status', ['planned', 'live'])
             .order('event_date', { ascending: true }).limit(8),
         ])
-        const L: any[] = popLeads || []
+        const agg: any = aggRes.data || {}
         const EV: any[] = evRows || []
-        const leanScore = (v: string) => (v === 'supporter' ? 1 : v === 'leaning' ? 0.5 : v === 'opposed' ? -1 : 0)
+        const seatBase: Record<string, { volunteers: number; supporters: number }> = agg.seatBase || {}
 
-        // Per-constituency rollup: mood, loop health, unresolved grievances, and
-        // the mobilizable base (supporters = tier≥2, volunteers = tier≥3).
-        const seats = new Map<string, any>()
-        L.forEach((r) => {
-          if (!r.constituency) return
-          const s = seats.get(r.constituency) || { constituency: r.constituency, district: r.district || null, total: 0, grievances: 0, unresolved: 0, salSum: 0, leanSum: 0, leanN: 0, supporters: 0, volunteers: 0, cats: {} as Record<string, number> }
-          s.total++
-          if (r.grievance_category) {
-            s.grievances++; s.salSum += r.salience || 1
-            s.cats[r.grievance_category] = (s.cats[r.grievance_category] || 0) + 1
-            if (r.loop_status !== 'resolved') s.unresolved++
-          }
-          if (r.lean) { s.leanN++; s.leanSum += leanScore(r.lean) }
-          if ((r.intensity ?? 0) >= 2) s.supporters++
-          if ((r.intensity ?? 0) >= 3) s.volunteers++
-          if (!s.district && r.district) s.district = r.district
-          seats.set(r.constituency, s)
-        })
-        const seatArr = Array.from(seats.values()).map((s) => {
-          const topCategory = Object.entries(s.cats).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] || null
-          const loopHealthPct = s.grievances ? Math.round((100 * (s.grievances - s.unresolved)) / s.grievances) : 100
-          const avgSal = s.grievances ? s.salSum / s.grievances : 0
-          const mood = s.leanN ? s.leanSum / s.leanN : 0
-          // Attention = unresolved grievances, weighted up by salience and by a
-          // negative mood in the seat.
-          const attention = s.unresolved * (1 + avgSal / 3) * (mood < 0 ? 1.5 : 1)
-          return { constituency: s.constituency, district: s.district, total: s.total, grievances: s.grievances, unresolved: s.unresolved, loopHealthPct, topCategory, mood: Math.round(mood * 100) / 100, supporters: s.supporters, volunteers: s.volunteers, attention }
-        })
-        const attentionSeats = seatArr.filter((s) => s.unresolved > 0).sort((a, b) => b.attention - a.attention).slice(0, 6)
-
-        // Events + their mobilizable base (from the seat rollup) + RSVP counts.
-        const seatBy = new Map(seatArr.map((s) => [s.constituency, s]))
+        // Events + RSVP counts + the seat's mobilizable base (from the RPC).
         const rsvpBy = new Map<string, { going: number; interested: number }>()
         if (EV.length) {
           const { data: rsvps } = await supabase.from('event_rsvps').select('event_id, status').in('event_id', EV.map((e) => e.id))
@@ -1879,73 +1855,23 @@ export async function GET(request: NextRequest) {
           })
         }
         const events = EV.map((e) => {
-          const seat = e.constituency ? seatBy.get(e.constituency) : null
+          const sb = e.constituency ? seatBase[e.constituency] : null
           const rs = rsvpBy.get(e.id) || { going: 0, interested: 0 }
           return {
             id: e.id, title: e.title, topic: e.topic, constituency: e.constituency, district: e.district, venue: e.venue, event_date: e.event_date, status: e.status,
             going: rs.going, interested: rs.interested,
-            seatVolunteers: seat?.volunteers || 0, seatSupporters: seat?.supporters || 0,
+            seatVolunteers: sb?.volunteers || 0, seatSupporters: sb?.supporters || 0,
           }
         })
 
-        // Where conversations came from — entry-channel (magnet) mix, last 7 days.
-        const win = L.filter((r) => r.created_at && new Date(r.created_at) >= sevenDaysAgo)
-        const magCount: Record<string, number> = {}
-        win.forEach((r) => { const m = r.magnet || 'other'; magCount[m] = (magCount[m] || 0) + 1 })
-        const magTotal = win.length || 1
-        // Full 30-day unified source mix + per-source momentum (last 7d vs the
-        // 7d before) — feeds the home "Activity Sources" panel.
-        const d30 = new Date(now.getTime() - 30 * 86400000)
-        const d14 = new Date(now.getTime() - 14 * 86400000)
-        const win30 = L.filter((r) => r.created_at && new Date(r.created_at) >= d30)
-        const mag30: Record<string, { count: number; last7: number; prev7: number }> = {}
-        win30.forEach((r) => {
-          const m = r.magnet || 'other'
-          const a = mag30[m] || (mag30[m] = { count: 0, last7: 0, prev7: 0 })
-          a.count++
-          const t = new Date(r.created_at)
-          if (t >= sevenDaysAgo) a.last7++
-          else if (t >= d14) a.prev7++
-        })
-        const total30 = win30.length || 1
-        const sources = {
-          total7d: win.length,
-          byMagnet: Object.entries(magCount).map(([magnet, count]) => ({ magnet, count, share: Math.round((100 * count) / magTotal) })).sort((a, b) => b.count - a.count),
-          total30d: win30.length,
-          mix: Object.entries(mag30).map(([magnet, a]) => ({
-            magnet, count: a.count, share: Math.round((100 * a.count) / total30),
-            delta7: a.prev7 ? Math.round(((a.last7 - a.prev7) / a.prev7) * 100) : (a.last7 > 0 ? 100 : 0),
-          })).sort((a, b) => b.count - a.count),
+        campaignHome = {
+          events,
+          attentionSeats: agg.attentionSeats || [],
+          sources: agg.sources || { total7d: 0, byMagnet: [], total30d: 0, mix: [] },
+          dailyActivity: agg.dailyActivity || [],
+          weekHour: agg.weekHour || [],
+          ladder: agg.ladder || null,
         }
-
-        // 30-day daily voices captured — feeds the home activity heatmap.
-        const HDAYS = 30
-        const hkeys = Array.from({ length: HDAYS }, (_, i) => new Date(now.getTime() - (HDAYS - 1 - i) * 86400000).toISOString().slice(0, 10))
-        const hidx: Record<string, number> = Object.fromEntries(hkeys.map((k, i) => [k, i]))
-        const daily = new Array(HDAYS).fill(0)
-        // weekHour[dayOfWeek 0=Sun..6=Sat][hour 0..23] — the touchpoint rhythm
-        // that feeds the weekday x hour Activity Heatmap.
-        const weekHour = Array.from({ length: 7 }, () => new Array(24).fill(0))
-        L.forEach((r) => {
-          const dt = new Date(r.created_at)
-          if (isNaN(dt.getTime())) return
-          const i = hidx[dt.toISOString().slice(0, 10)]
-          if (i !== undefined) { daily[i]++; weekHour[dt.getUTCDay()][dt.getUTCHours()]++ }
-        })
-        const dailyActivity = hkeys.map((date, i) => ({ date, count: daily[i] }))
-
-        // Intensity ladder totals - the home Outreach Engine reads campaign
-        // stages (Voters → Supporters → Volunteers → Cadre → Grievances), not
-        // the generic marketing funnel.
-        const ladder = {
-          voters: L.filter((r) => (r.intensity ?? 0) >= 1).length,
-          supporters: L.filter((r) => (r.intensity ?? 0) >= 2).length,
-          volunteers: L.filter((r) => (r.intensity ?? 0) >= 3).length,
-          cadre: L.filter((r) => (r.intensity ?? 0) >= 4).length,
-          grievances: L.filter((r) => r.grievance_category).length,
-        }
-
-        campaignHome = { events, attentionSeats, sources, dailyActivity, weekHour, ladder }
       } catch (e) {
         console.error('[founder-metrics] campaignHome failed:', (e as Error).message)
       }

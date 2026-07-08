@@ -896,7 +896,7 @@ export default function FounderDashboard() {
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
             Volunteers → Cadre → Grievances), narrower so Events breathes. */}
-        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-5' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
             {!(isPop && metrics.campaignHome?.ladder) && (
@@ -960,8 +960,8 @@ export default function FounderDashboard() {
           </div>
         </section>
 
-        {/* Upcoming Events - POP gets the WIDE slot (rich reference cards); other brands keep it narrow */}
-        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-7' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Upcoming Events - POP splits the row 50-50 with the engine; compact cards (going/interested inline) fit 2-3 at a glance */}
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -1005,32 +1005,28 @@ export default function FounderDashboard() {
                             </span>
                           )}
                           <div className="flex-1 min-w-0">
+                            {/* Line 1 — title + kind, with Going / Interested INLINE on the right */}
                             <div className="flex items-center gap-2 min-w-0">
                               <p className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: `${kind.c}1f`, color: kind.c, border: `1px solid ${kind.c}45` }}>{kind.label}</span>
+                              <span className="flex-1" />
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }} title={`${ev.going} going`}>
+                                <MdGroups size={12} /> {ev.going}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }} title={`${ev.interested} interested`}>
+                                <MdStarBorder size={12} /> {ev.interested}
+                              </span>
                             </div>
-                            <p className="text-[10.5px] truncate mt-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                              <MdPlace size={11} style={{ color: 'var(--text-muted)' }} />
-                              {[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}
+                            {/* Line 2 — location · time on one line */}
+                            <p className="text-[10.5px] truncate mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                              <MdPlace size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                              <span className="truncate">{[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}</span>
+                              {timeIST && (<><span style={{ opacity: 0.4 }}>·</span><MdAccessTime size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /><span className="whitespace-nowrap">{timeIST}</span></>)}
                             </p>
-                            {timeIST && (
-                              <p className="text-[10.5px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                                <MdAccessTime size={11} style={{ color: 'var(--text-muted)' }} /> {timeIST}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }}>
-                                <MdGroups size={12} /> {ev.going} Going
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}>
-                                <MdStarBorder size={12} /> {ev.interested} Interested
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
-                                <MdPeople size={12} /> {ev.seatVolunteers} Volunteers
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
-                                <MdPeople size={12} /> {ev.seatSupporters} Supporters
-                              </span>
+                            {/* Line 3 — mobilizable base (compact, muted) */}
+                            <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatVolunteers} volunteers</span>
+                              <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatSupporters} supporters</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-end justify-between self-stretch shrink-0 gap-2">
