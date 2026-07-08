@@ -29,8 +29,18 @@ const env = Object.fromEntries(
 );
 
 const SEATS = require('./_seats.json'); // {name, district, region}[]
-let s = 20260708;
-const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+// mulberry32 — a proper 32-bit PRNG (Math.imul, no float overflow). The old LCG
+// (s*1103515245 & 0x7fffffff) overflowed JS's 2^53 safe-integer range, so
+// CONSECUTIVE draws were correlated → runs of identical rows in a sorted table.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rnd = mulberry32(20260708);
 const pick = (a) => a[Math.floor(rnd() * a.length)];
 const weighted = (pairs) => { const t = pairs.reduce((x, [, w]) => x + w, 0); let r = rnd() * t; for (const [v, w] of pairs) { if ((r -= w) <= 0) return v; } return pairs[0][0]; };
 
