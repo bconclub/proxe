@@ -1,3 +1,10 @@
+## 2026-07-08 14:55 IST · fix(pop): harden model override + Brain quick-link on Calls
+
+- Harden the Vapi model override: build a minimal { provider, model, messages } from the assistant's real config instead of spreading the whole object (a null `temperature` could itself be rejected). Fallback openai/gpt-4o-mini keeps provider present.
+- Calls page: new "Brain" button (brain-gated) jumps straight to the Eval bench — /dashboard/settings/brain?tab=eval, which the Brain page now deep-links via ?tab=.
+- User-facing: all 3 languages dial on V1; one-click Calls → Eval.
+- `(pending-sha)`
+
 ## 2026-07-08 14:40 IST · fix(pop): Vapi model override needs provider
 
 - Hindi/English (and Punjabi) test calls failed: "assistantOverrides.model.provider must be one of…". A Vapi `model` override is validated standalone and requires `provider`; we sent only `messages`.

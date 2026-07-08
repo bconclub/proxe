@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import {
@@ -17,8 +18,10 @@ import {
   MdSmartToy,
   MdLanguage,
   MdTranslate,
+  MdPsychology,
 } from 'react-icons/md'
 import { getCurrentBrandId } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 // bcon tags anonymous web-widget calls (no phone, no lead name) with a
 // "Website" source badge so operators can tell them from phone calls.
@@ -109,6 +112,7 @@ function DirectionBadge({ direction }: { direction: string }) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function CallsTable() {
+  const { brain } = useFeatureFlags()
   const [calls, setCalls] = useState<CallRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -231,15 +235,29 @@ export default function CallsTable() {
             </button>
           ))}
         </div>
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <MdSearch size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or phone…"
-            className="w-full rounded-lg pl-8 pr-3 py-2 text-sm border outline-none"
-            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          />
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-[180px]">
+          <div className="relative flex-1 max-w-xs">
+            <MdSearch size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or phone…"
+              className="w-full rounded-lg pl-8 pr-3 py-2 text-sm border outline-none"
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            />
+          </div>
+          {/* Quick jump straight to the Eval bench (the Brain's Eval tab) so you
+              don't have to go Configure → Brain → Eval to test a call. */}
+          {brain && (
+            <Link
+              href="/dashboard/settings/brain?tab=eval"
+              title="Open the Brain — Eval bench"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold border whitespace-nowrap transition-colors"
+              style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}
+            >
+              <MdPsychology size={17} /> Brain
+            </Link>
+          )}
         </div>
       </div>
 

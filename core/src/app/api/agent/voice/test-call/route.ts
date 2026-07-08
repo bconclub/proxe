@@ -129,14 +129,21 @@ async function vapiTestCall(body: any) {
       });
       const assistant = aRes.ok ? await aRes.json() : null;
       const baseModel = assistant?.model;
-      if (baseModel?.provider) {
-        // Keep everything (provider/model/temp/tools/knowledgeBase); replace only
-        // the system message so tools + config stay intact.
-        const kept = { ...baseModel };
+      if (baseModel?.provider && baseModel?.model) {
+        // Build a MINIMAL override: provider + model are required; carry
+        // temperature/maxTokens only if the assistant actually set them (sending
+        // a null field back can itself be rejected). Preserve any non-system
+        // messages, then prepend our per-language system prompt.
         const nonSystem = Array.isArray(baseModel.messages)
           ? baseModel.messages.filter((m: any) => m.role !== 'system')
           : [];
-        modelOverride = { ...kept, messages: [sysMsg, ...nonSystem] };
+        modelOverride = {
+          provider: baseModel.provider,
+          model: baseModel.model,
+          ...(baseModel.temperature != null ? { temperature: baseModel.temperature } : {}),
+          ...(baseModel.maxTokens != null ? { maxTokens: baseModel.maxTokens } : {}),
+          messages: [sysMsg, ...nonSystem],
+        };
       }
     } catch {
       /* fall through to default below */

@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { MdPsychology, MdArrowBack } from 'react-icons/md'
 import { brandConfig } from '@/configs'
@@ -28,7 +28,11 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ]
 
 export default function BrainPage() {
-  const [tab, setTab] = useState<Tab>('brain')
+  // Deep-link support: /dashboard/settings/brain?tab=eval opens the Eval bench
+  // directly (used by the quick "Brain" button on the Calls page).
+  const params = useSearchParams()
+  const initialTab = (TABS.find((t) => t.id === params.get('tab'))?.id ?? 'brain') as Tab
+  const [tab, setTab] = useState<Tab>(initialTab)
   const router = useRouter()
 
   // Feature-gated per brand (features.brain in the brand pack config).
