@@ -79,9 +79,16 @@ function boothRows(): BoothRow[] {
     const supportive = withLean.filter((v) => v.survey!.lean === 'supporter' || v.survey!.lean === 'leaning').length
     const contact = vs.length ? Math.round((met.length / vs.length) * 100) : 0
     const support = withLean.length ? Math.round((supportive / withLean.length) * 100) : 0
-    const target = camp ? Math.round(camp.targetDoors / camp.booths.length) : Math.max(vs.length, 100)
-    const done = Math.min(vs.length * 4, target) // ~4 doors covered per logged visit in the mock
-    const priority: Priority = camp?.status === 'completed' ? 'LOW' : contact >= 65 && support >= 70 ? 'MEDIUM' : contact >= 55 ? 'HIGH' : done === 0 ? 'LOW' : 'HIGH'
+    // deterministic per-booth hash → varied booth size + realistic progress so
+    // doors-left and the priority mix don't all collapse to "sparse = critical"
+    const h = (boothNo * 73 + 17) % 100
+    const target = camp ? Math.round(camp.targetDoors / camp.booths.length) : 140 + (h % 12) * 15 // ~140-305
+    const donePct = camp ? Math.min(100, Math.round((camp.doorsDone / camp.targetDoors) * 100)) : 35 + ((boothNo * 37) % 60) // 35-94%
+    const done = Math.min(target, Math.round((donePct / 100) * target))
+    const priority: Priority =
+      camp?.status === 'completed' || donePct >= 90 ? 'LOW'
+      : support < 45 || donePct < 30 ? 'HIGH'
+      : h < 30 ? 'LOW' : h < 66 ? 'MEDIUM' : 'HIGH'
     const latest = vs.reduce((a, b) => (+new Date(b.visitedAt) > +new Date(a.visitedAt) ? b : a))
     out.push({
       boothNo, boothName: vs[0].boothName, constituency: vs[0].constituency, campaign: camp?.name || null,
@@ -235,7 +242,9 @@ export default function D2DCampaignsTab() {
   // KPI derivations
   const activeCampaigns = CAMPAIGNS.filter((c) => c.status === 'active').length
   const highBooths = rows.filter((r) => r.priority === 'HIGH').length
-  const doorsRemaining = CAMPAIGNS.reduce((a, c) => a + Math.max(0, c.targetDoors - c.doorsDone), 0)
+  // doors remaining across the WHOLE booth universe (campaign scale), not just
+  // the 5 headline campaigns' booths
+  const doorsRemaining = rows.reduce((a, r) => a + r.doorsLeft, 0)
   const photos = VISITS.reduce((a, v) => a + (v.photos?.length || 0), 0)
   const spoken = VISITS.reduce((a, v) => a + (v.survey?.membersSpokenTo || 0), 0)
   const withLean = VISITS.filter((v) => v.survey?.lean)

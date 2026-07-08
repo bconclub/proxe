@@ -1,3 +1,10 @@
+## 2026-07-09 05:40 IST · feat(pop): X icon (no more Twitter bird), suppress Google-logo thumbnails, booth numbers to campaign scale
+
+- Signal Inbox / Source Mix / Evidence Board: the Twitter bird is replaced by the X logo everywhere (FaXTwitter), label X. Social signals surfaced so X / YouTube / Reddit / WhatsApp / Facebook / Instagram icons actually show at the top of the inbox.
+- Google News redirect pages hand back Googles own logo as og:image - those (and any google/gstatic-hosted image) are now filtered out, so the inbox and evidence board stop showing the blue GN logo as fake article media.
+- Booth Campaigns numbers scaled to campaign level: booth universe expanded to 48 (procedural, deterministic), ~240 more visits generated, a 5th active campaign added. Active Campaigns 4, Booths 48, Doors Remaining ~3.4k, Members 338, Photos 193, and a balanced priority mix (High 14 / Medium 17 / Low 17) instead of everything reading critical.
+- (pending-sha)
+
 ## 2026-07-09 05:00 IST · feat(pop): real outlet identity + article media in Signal Inbox, Priority Constituencies to reference design
 
 - Signal Inbox: rows now name the actual OUTLET (The Express Tribune, DD News, NDTV) parsed from the article - the useless news.google.com chip and aggregator logo are gone; outlet favicons only when the link is the real site. RSS fetch now follows a budgeted set of article links per run and reads the page og:image, so news rows carry real media thumbnails on the right (28 of the latest 60 already have images, grows every fetch).

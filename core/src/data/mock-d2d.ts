@@ -202,6 +202,31 @@ const BOOTHS: Record<number, BoothDef> = {
   63:  { no: 63,  name: 'Govt Sr Sec School, Paras Ram Nagar',  constituency: 'Bathinda Urban', district: 'Bathinda', acNo: 96, lat: 30.2100, lng: 74.9455 },
   67:  { no: 67,  name: 'Community Centre, Amrik Singh Road',   constituency: 'Bathinda Urban', district: 'Bathinda', acNo: 96, lat: 30.2077, lng: 74.9510 },
 };
+// Expand the booth universe to campaign scale (~48 booths) so the Booth
+// Campaigns view (priority queue, breakdown donut, headline KPIs) reads like a
+// real week of ground work, not a handful of curated rows. Deterministic via a
+// local seeded RNG (the module `rnd` isn't defined yet at this point).
+;(function expandBooths() {
+  const AREAS = ['Ranjit Nagar', 'Gopal Nagar', 'Maqbool Road', 'Basti Bawa Khel', 'Rama Mandi', 'Dugri', 'Model Town', 'Bhadson Road', 'Kheri Gujran', 'Paras Ram Nagar', 'Amrik Singh Road', 'Sunder Nagar', 'Guru Nanak Pura', 'Ram Tirath Road', 'Chheharta', 'Focal Point', 'Kot Khalsa', 'Gandhi Camp', 'Preet Nagar', 'Shastri Nagar', 'Ekta Vihar', 'Sultanwind', 'Verka', 'Majitha Road', 'Green Avenue', 'Nai Abadi', 'Bank Colony', 'Partap Avenue', 'Krishna Nagar', 'Haibowal', 'Jamalpur', 'Baddowal', 'Threeke', 'Sahnewal', 'Doraha', 'Rajpura', 'Nabha Road', 'Cantt Area']
+  const TEMPLATES = ['Govt Primary School', 'Govt Girls School', 'Govt Sr Sec School', 'Community Hall', 'Panchayat Ghar', 'Municipal School', 'Anganwadi Centre', 'Village Dharamshala']
+  const SEATS = [
+    { constituency: 'Amritsar East', district: 'Amritsar', acNo: 18, lat: 31.63, lng: 74.87 },
+    { constituency: 'Jalandhar West', district: 'Jalandhar', acNo: 34, lat: 31.31, lng: 75.56 },
+    { constituency: 'Ludhiana South', district: 'Ludhiana', acNo: 63, lat: 30.87, lng: 75.85 },
+    { constituency: 'Patiala Rural', district: 'Patiala', acNo: 106, lat: 30.37, lng: 76.39 },
+    { constituency: 'Bathinda Urban', district: 'Bathinda', acNo: 96, lat: 30.21, lng: 74.95 },
+  ]
+  let s = 0x9e3779b9 | 0
+  const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+  const p = <T,>(a: T[]): T => a[Math.floor(r() * a.length)]
+  let no = 130
+  for (let i = 0; i < 37; i++) {
+    while (BOOTHS[no]) no++
+    const seat = p(SEATS)
+    BOOTHS[no] = { no, name: `${p(TEMPLATES)}, ${p(AREAS)}`, constituency: seat.constituency, district: seat.district, acNo: seat.acNo, lat: seat.lat + (r() - 0.5) * 0.05, lng: seat.lng + (r() - 0.5) * 0.05 }
+    no++
+  }
+})();
 const BOOTH_NOS = Object.keys(BOOTHS).map(Number);
 
 // ── workers ──────────────────────────────────────────────────────────────────
@@ -440,7 +465,7 @@ const GRV_NOTE: Record<GrievanceKey, string[]> = {
 
 // Table shows a short RECENT sample (≤5 pages). The hero aggregates below are
 // separate, at real campaign scale (a week of D2D reaches tens of thousands).
-export const VISITS: D2DVisit[] = [...CURATED, ...generated(28)];
+export const VISITS: D2DVisit[] = [...CURATED, ...generated(240)];
 
 // ── campaign-scale aggregates (headline KPIs / donut / issues) ───────────────
 // Magnitudes are fixed to a realistic week; PROPORTIONS (outcome mix, issue mix,
@@ -494,6 +519,8 @@ export const CAMPAIGNS: BoothCampaign[] = [
     constituency: 'Jalandhar West', district: 'Jalandhar', booths: [118, 122], startDate: daysAgo(9), endDate: daysAgo(-6), targetDoors: 300, doorsDone: 182, workerIds: ['w3', 'w7'], status: 'active' },
   { id: 'c3', name: 'Naujawan Voter-ID Drive', description: 'Register first-time & missing young voters (18–25) at the doorstep',
     constituency: 'Ludhiana South', district: 'Ludhiana', booths: [88, 91], startDate: daysAgo(6), endDate: daysAgo(-10), targetDoors: 250, doorsDone: 97, workerIds: ['w4'], status: 'active' },
+  { id: 'c5', name: 'Nasha-Mukt Ward Drive', description: 'De-addiction awareness + at-risk household mapping, ward by ward',
+    constituency: 'Bathinda Urban', district: 'Bathinda', booths: [63, 67], startDate: daysAgo(8), endDate: daysAgo(-9), targetDoors: 350, doorsDone: 213, workerIds: ['w6', 'w2'], status: 'active' },
   { id: 'c4', name: 'Revisit Undecided — Doaba', description: 'Second-touch on undecided households flagged in first pass',
     constituency: 'Patiala Rural', district: 'Patiala', booths: [12, 19], startDate: daysAgo(20), endDate: daysAgo(3), targetDoors: 150, doorsDone: 150, workerIds: ['w5', 'w6'], status: 'completed' },
 ];

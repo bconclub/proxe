@@ -10,7 +10,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { MdSensors, MdRefresh, MdFilterList, MdWarning, MdHeadsetMic, MdPoll, MdVolunteerActivism, MdReportProblem, MdOutlineRssFeed, MdChevronLeft, MdChevronRight, MdInfoOutline, MdCampaign, MdEditNote, MdVisibility, MdNorthEast, MdSouthEast, MdTrendingFlat, MdWaterDrop, MdCurrencyRupee, MdWorkOutline, MdBolt, MdAddRoad, MdMedication, MdLocalHospital, MdSchool, MdErrorOutline, MdMood, MdSentimentNeutral, MdMoodBad, MdStackedLineChart } from 'react-icons/md'
-import { FaTwitter, FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp, FaRegNewspaper, FaRedditAlien } from 'react-icons/fa'
+import { FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp, FaRegNewspaper, FaRedditAlien } from 'react-icons/fa'
+import { FaXTwitter } from 'react-icons/fa6'
 import punjabGeo from '@/data/punjab-ac.json'
 import { normName } from '@/lib/war-room/constituencies'
 
@@ -52,7 +53,7 @@ const pct = (curV: number, prevV: number) => { if (!prevV) return curV > 0 ? 100
 const CATEGORIES = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other']
 
 const SRC_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  twitter: { label: 'Twitter / X', icon: <FaTwitter size={13} />, color: '#1d9bf0' },
+  twitter: { label: 'X', icon: <FaXTwitter size={13} />, color: '#71767b' },
   facebook: { label: 'Facebook', icon: <FaFacebookF size={13} />, color: '#1877f2' },
   instagram: { label: 'Instagram', icon: <FaInstagram size={14} />, color: '#e4405f' },
   youtube: { label: 'YouTube', icon: <FaYoutube size={14} />, color: '#ff4444' },
@@ -90,7 +91,10 @@ const ytThumb = (url: string | null) => {
   const m = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/)
   return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
 }
-const mediaOf = (s: SignalRow) => s.image_url || ytThumb(s.url)
+// Google News redirect pages hand back Google's own logo as og:image - that's
+// not article media, so drop any image served off a Google / gstatic host.
+const isJunkMedia = (u: string | null) => !!u && /(?:googleusercontent|gstatic|news\.google|google\.com\/s2)/i.test(u)
+const mediaOf = (s: SignalRow) => (isJunkMedia(s.image_url) ? null : s.image_url) || ytThumb(s.url)
 
 // outlet name a news feed appended to the title ("… - NDTV" → NDTV)
 const outletOf = (s: SignalRow): string | null => {
