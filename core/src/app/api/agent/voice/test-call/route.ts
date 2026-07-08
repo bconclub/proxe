@@ -290,10 +290,11 @@ async function elevenLabsTestCall(body: any) {
 // V3_PIPELINE_URL points at the running pipeline (localhost:8080 in local dev; the
 // VPS/tunnel host in prod).
 async function sarvamPipelineCall(body: any) {
-  const { phone } = body;
+  const { phone, contactName, leadName } = body;
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
   const digits = String(phone).replace(/\D/g, '');
-  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${digits.slice(-10)}`;
+  const last10 = digits.slice(-10);
+  const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
   const url = process.env.V3_PIPELINE_URL;
   if (!url) {
     return NextResponse.json({ success: false, error: 'V3_PIPELINE_URL not configured' }, { status: 500 });
@@ -310,6 +311,31 @@ async function sarvamPipelineCall(body: any) {
     }
     let callId = `v3-${Date.now()}`;
     try { const vb = JSON.parse(data.body); callId = vb.request_uuid || vb.api_id || callId; } catch { /* keep synth id */ }
+
+    // Best-effort persist so the call surfaces in the Calls list + the eval's
+    // caller-name join works — mirrors the 11labs path, tagged engine:sarvam.
+    try {
+      const supabase = getServiceClient();
+      if (supabase) {
+        const name = (contactName || leadName || '').trim();
+        const leadId = await ensureOrUpdateLead(name || null, null, e164, 'voice', undefined, supabase);
+        const { error: insErr } = await supabase.from('voice_sessions').insert({
+          external_session_id: callId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          lead_id: leadId,
+          customer_phone: e164,
+          customer_phone_normalized: last10,
+          call_direction: 'outbound',
+          call_status: 'queued',
+          brand: BRAND_ID,
+          call_summary: 'engine:sarvam',
+        });
+        if (insErr) console.error('[test-call:sarvam] voice_sessions insert failed:', insErr.message);
+      }
+    } catch (e: any) {
+      console.error('[test-call:sarvam] persist failed (non-fatal):', e?.message);
+    }
     return NextResponse.json({ success: true, callId, engine: 'sarvam' });
   } catch {
     return NextResponse.json({ success: false, error: `V3 pipeline unreachable at ${url} — is the pipeline server running?` }, { status: 502 });

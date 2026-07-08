@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 import { getLlmTurns } from '@/lib/server/voiceLlmTelemetry'
+import { listV3Calls } from '@/lib/server/voiceV3Telemetry'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,7 +110,7 @@ function computeCall(c: any) {
   return {
     id: c.id,
     source: isWeb ? 'web' : 'phone',
-    engine: 'vapi' as 'vapi' | 'elevenlabs', // Vapi-API calls are the Vapi pipeline
+    engine: 'vapi' as 'vapi' | 'elevenlabs' | 'sarvam', // Vapi-API calls are the Vapi pipeline
     language: normLang(c.analysis?.structuredData?.language), // from post-call extraction
     callerName: null as string | null,        // filled from voice_sessions -> all_leads
     callee: c.customer?.number || (isWeb ? 'Web test' : 'unknown'),
@@ -252,6 +253,78 @@ async function fetchElevenCalls(): Promise<any[]> {
   }
 }
 
+// ── V3 — our own pipeline (Vobiz <Stream> → Pipecat: Sarvam STT → Groq LLM →
+// ElevenLabs TTS on the VPS). The pipeline POSTs one telemetry record per call
+// to api/agent/voice/v3-telemetry (Redis) — this reads them back and maps to
+// the same Call row shape as V1/V2. Costs are pipeline-side estimates from
+// env-configured rates (no provider billing API for a self-hosted stack).
+async function fetchSarvamCalls(): Promise<any[]> {
+  try {
+    const records = await listV3Calls(50)
+    return records.map((r) => {
+      // Same trailing-silence discipline as V1/V2: a real conversational turn
+      // tops out a few seconds; longer "turns" are someone not talking.
+      const real = (r.turns || []).filter((t) => t.total > 0 && t.total <= REAL_TURN_MAX)
+      const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0)
+      const detailRows = real.map((t) => {
+        const stt = Math.round(t.stt || 0), llm = Math.round(t.llm || 0), tts = Math.round(t.tts || 0)
+        return {
+          total: Math.round(t.total),
+          transcriber: stt,
+          model: llm,
+          voice: tts,
+          // Turn-taking wait: silence→audio minus the service pipeline — the
+          // same derived endpointing as the ElevenLabs path.
+          endpointing: Math.max(0, Math.round(t.total) - stt - llm - tts),
+        }
+      })
+      const totals = detailRows.map((d) => d.total)
+      const perf = detailRows.length
+        ? {
+            turnAvg: avg(totals),
+            worst: Math.max(...totals),
+            best: Math.min(...totals),
+            stages: {
+              transcriber: avg(detailRows.map((d) => d.transcriber)),
+              model: avg(detailRows.map((d) => d.model)),
+              voice: avg(detailRows.map((d) => d.voice)),
+              endpointing: avg(detailRows.map((d) => d.endpointing)),
+              // network is folded into the measured silence→audio total (same
+              // as ElevenLabs) — null renders "—", not a fake zero.
+              transport: null as number | null,
+            },
+            turnsDetail: detailRows,
+          }
+        : null
+      return {
+        id: r.callId,
+        source: 'phone',
+        engine: 'sarvam',
+        language: null, // no post-call extraction on the pipeline yet
+        callerName: null,
+        callee: r.to || 'unknown',
+        createdAt: r.startedAt || null,
+        startedAt: r.startedAt || null,
+        durationSec: r.durationSec ?? null,
+        waitSec: null,
+        cost: r.cost?.total ?? null,
+        costBreakdown: r.cost
+          ? { stt: r.cost.stt ?? null, llm: r.cost.llm ?? null, tts: r.cost.tts ?? null, vapi: null, total: r.cost.total ?? null }
+          : null,
+        status: 'ended',
+        endedReason: null,
+        turns: (r.turns || []).length,
+        perf,
+        connector: r.connector || { stt: 'sarvam', model: null, tts: '11labs' },
+        summary: null,
+        recordingUrl: null,
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
 export async function GET() {
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
@@ -293,6 +366,11 @@ export async function GET() {
     // own per-turn latency.
     const eleven = await fetchElevenCalls()
     calls.push(...eleven)
+
+    // V3 pipeline calls — read back from the Redis telemetry the pipeline ships
+    // at hangup. Empty when Redis/telemetry isn't configured (soft-degrade).
+    const sarvam = await fetchSarvamCalls()
+    calls.push(...sarvam)
 
     // Custom-LLM bridge (core/api/agent/voice/custom-llm) routes V1/V2 through
     // Groq instead of each platform's own model — but the platforms still
@@ -374,6 +452,7 @@ export async function GET() {
       totalMinutes: Number((calls.reduce((a, c) => a + (c.durationSec || 0), 0) / 60).toFixed(1)),
       vapi: splitFor('vapi'),
       elevenlabs: splitFor('elevenlabs'),
+      sarvam: splitFor('sarvam'),
     }
     return NextResponse.json({ calls, agg, brand: BRAND_ID, configured: true })
   } catch (e: any) {
