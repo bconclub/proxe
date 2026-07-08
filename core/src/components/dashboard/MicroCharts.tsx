@@ -1,6 +1,67 @@
 'use client'
 
+import React from 'react'
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, YAxis, XAxis, CartesianGrid, LabelList } from 'recharts'
+
+// Activity heatmap — GitHub-contribution-style square grid, weekday-aligned
+// (rows = Sun→Sat, columns = weeks). Reads {date, count}[] (oldest→newest) and
+// buckets counts into 5 shades. Clean, at-a-glance "what's happening across N
+// days" — used for the POP campaign home.
+export function ActivityHeatmap({ data, color = 'var(--accent-primary)' }: { data: Array<{ date: string; count: number }>; color?: string }) {
+  if (!data || data.length === 0) return null
+  const max = Math.max(...data.map((d) => d.count), 1)
+  // 0 → empty; then 4 buckets by fraction of max.
+  const shadeOf = (c: number): { bg: string; op: number } => {
+    if (c <= 0) return { bg: 'var(--bg-tertiary)', op: 1 }
+    const f = c / max
+    const op = f > 0.75 ? 1 : f > 0.5 ? 0.78 : f > 0.25 ? 0.52 : 0.3
+    return { bg: color, op }
+  }
+  // Pad the front so the first cell lands on its real weekday.
+  const first = new Date(data[0].date)
+  const startPad = isNaN(first.getTime()) ? 0 : first.getDay() // 0 = Sun
+  const cells: Array<{ date: string; count: number } | null> = [
+    ...Array(startPad).fill(null),
+    ...data,
+  ]
+  // Chunk into week-columns of 7 (Sun→Sat top→bottom).
+  const cols: Array<Array<{ date: string; count: number } | null>> = []
+  for (let i = 0; i < cells.length; i += 7) cols.push(cells.slice(i, i + 7))
+  const fmtDate = (iso: string) => {
+    try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) } catch { return iso }
+  }
+  const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+      {/* weekday labels */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+        {WEEKDAYS.map((w, i) => (
+          <span key={i} style={{ height: 15, fontSize: 8, lineHeight: '15px', color: 'var(--text-muted)', opacity: i % 2 ? 0.9 : 0 }}>{w}</span>
+        ))}
+      </div>
+      {/* week columns */}
+      <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+        {cols.map((col, ci) => (
+          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+            {Array.from({ length: 7 }, (_, ri) => {
+              const cell = col[ri]
+              if (!cell) return <div key={ri} style={{ aspectRatio: '1', borderRadius: 3, background: 'transparent' }} />
+              const s = shadeOf(cell.count)
+              return (
+                <div
+                  key={ri}
+                  title={`${fmtDate(cell.date)} · ${cell.count} voices`}
+                  style={{ aspectRatio: '1', borderRadius: 3, background: s.bg, opacity: s.op, border: '1px solid var(--border-primary)' }}
+                />
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // Helper to get theme accent color
 const getAccentColor = () => {

@@ -31,6 +31,14 @@ export const popConfig: BrandConfig = {
   // key); see brands/pop/docs/artifacts.md for the full architecture.
   artifacts: [
     {
+      id: 'overview',
+      name: 'Overview',
+      description: 'Campaign command dashboard — the engine home',
+      status: 'live',
+      href: '/dashboard',
+      icon: 'grid',
+    },
+    {
       id: 'war-room',
       name: 'War Room',
       description: 'The command center — voices, seats, intensity, grievance loop',

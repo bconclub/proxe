@@ -19,6 +19,7 @@ import {
   Sparkline,
   ActivityArea,
   ConversationsTrendChart,
+  ActivityHeatmap,
   RadialProgress,
 } from './MicroCharts'
 
@@ -120,6 +121,7 @@ interface FounderMetrics {
       topCategory?: string | null; mood: number; supporters: number; volunteers: number; attention: number
     }>
     sources: { total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }> }
+    dailyActivity?: Array<{ date: string; count: number }>
   }
 }
 
@@ -560,6 +562,13 @@ export default function FounderDashboard() {
     : range === '30D'
       ? metrics.totalConversations.trend30D
       : metrics.totalConversations.trend7D
+  // POP home → activity heatmap over 30 days instead of the line trend.
+  const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
+  const heatTotal = popHeat ? popHeat.reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatAvg = popHeat && popHeat.length ? Math.round((heatTotal / popHeat.length) * 10) / 10 : 0
+  const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatPrev7 = popHeat ? popHeat.slice(-14, -7).reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatChange = heatPrev7 ? Math.round(((heatLast7 - heatPrev7) / heatPrev7) * 100) : 0
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : brandLabel('Founder'))
   const firstName = displayName.split(' ')[0] || brandLabel('Founder')
   const profileInitials = getInitials(displayName)
@@ -1106,23 +1115,36 @@ export default function FounderDashboard() {
         <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
-              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{popHeat ? 'Activity Heatmap' : 'Conversations Trend'}</h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{popHeat ? 'Voices captured per day · last 30 days' : 'Conversations initiated per day'}</p>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              {(['7D', '14D', '30D'] as const).map((p) => (
-                <button
-                  key={p} type="button" onClick={() => setRange(p)}
-                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
-                  style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            {!popHeat && (
+              <div className="flex items-center gap-0.5 shrink-0">
+                {(['7D', '14D', '30D'] as const).map((p) => (
+                  <button
+                    key={p} type="button" onClick={() => setRange(p)}
+                    className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                    style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-h-0">
-            {convSeries.length > 1 ? (
+          <div className="flex-1 min-h-0 flex flex-col justify-center">
+            {popHeat && popHeat.length ? (
+              <>
+                <ActivityHeatmap data={popHeat} color="var(--accent-primary)" />
+                <div className="flex items-center justify-end gap-1.5 mt-2 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  <span>Less</span>
+                  {[0.3, 0.52, 0.78, 1].map((op) => (
+                    <span key={op} style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-primary)', opacity: op, border: '1px solid var(--border-primary)' }} />
+                  ))}
+                  <span>More</span>
+                </div>
+              </>
+            ) : convSeries.length > 1 ? (
               <ConversationsTrendChart data={convSeries} days={rangeDays} color={hasNewHomeLook ? 'var(--accent-primary)' : '#afd510'} />
             ) : (
               <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
@@ -1130,15 +1152,15 @@ export default function FounderDashboard() {
           </div>
           <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
             <div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{popHeat ? fmtComma(heatTotal) : convTotal}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{popHeat ? 'Voices · 30d' : 'Total'}</div>
             </div>
             <div>
-              <KpiDelta change={convChange} />
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {rangeDays}d</div>
+              <KpiDelta change={popHeat ? heatChange : convChange} />
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {popHeat ? 7 : rangeDays}d</div>
             </div>
             <div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dailyAvg}</div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{popHeat ? heatAvg : dailyAvg}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
             </div>
           </div>

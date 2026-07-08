@@ -9,6 +9,22 @@ export const dynamic = 'force-dynamic';
 const CATEGORIES = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other'];
 const LEAN_SCORE: Record<string, number> = { supporter: 1, leaning: 0.4, undecided: 0, opposed: -1 };
 
+// PostgREST caps a single response at ~1000 rows regardless of .limit(); page
+// through with .range() so the War Room aggregates the FULL dataset at campaign
+// volume (tens of thousands of rows) instead of silently the first 1000.
+async function fetchAllRows(build: () => any, cap = 60000): Promise<any[]> {
+  const PAGE = 1000;
+  const out: any[] = [];
+  for (let from = 0; from < cap; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw error;
+    const batch = data || [];
+    out.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const sb = getServiceClient();
@@ -23,23 +39,24 @@ export async function GET(req: NextRequest) {
       days: q.get('days') || 'all',
     };
 
-    // Build a filtered query against the read-only base view.
-    let query = sb.from('vw_war_room_base').select('*');
-    if (f.constituency) query = query.eq('constituency', f.constituency);
-    if (f.district) query = query.eq('district', f.district);
-    if (f.channel) query = query.eq('magnet', f.channel);
-    if (f.language) query = query.eq('language', f.language);
-    if (f.days !== 'all') {
-      const d = parseInt(f.days, 10);
-      const since = f.days === '1'
-        ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
-        : new Date(Date.now() - d * 86400000).toISOString();
-      query = query.gte('created_at', since);
-    }
-    // Cap to keep the payload bounded; aggregation is on these rows.
-    const { data: rows, error } = await query.order('created_at', { ascending: false }).limit(5000);
-    if (error) throw error;
-    const R = rows || [];
+    // Build a filtered query against the read-only base view. Rebuildable so
+    // pagination can re-issue it per page.
+    const buildBase = () => {
+      let query = sb.from('vw_war_room_base').select('*');
+      if (f.constituency) query = query.eq('constituency', f.constituency);
+      if (f.district) query = query.eq('district', f.district);
+      if (f.channel) query = query.eq('magnet', f.channel);
+      if (f.language) query = query.eq('language', f.language);
+      if (f.days !== 'all') {
+        const d = parseInt(f.days, 10);
+        const since = f.days === '1'
+          ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+          : new Date(Date.now() - d * 86400000).toISOString();
+        query = query.gte('created_at', since);
+      }
+      return query.order('created_at', { ascending: false });
+    };
+    const R = await fetchAllRows(buildBase);
 
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
     const now = Date.now();
@@ -179,19 +196,20 @@ export async function GET(req: NextRequest) {
     // War Room down, so this degrades to d2d: null. Worker phone stays server-side.
     let d2d: any = null;
     try {
-      let dq = sb.from('d2d_visits').select('constituency, district, worker_name, outcome, created_at');
-      if (f.constituency) dq = dq.eq('constituency', f.constituency);
-      if (f.district) dq = dq.eq('district', f.district);
-      if (f.days !== 'all') {
-        const d = parseInt(f.days, 10);
-        const since = f.days === '1'
-          ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
-          : new Date(Date.now() - d * 86400000).toISOString();
-        dq = dq.gte('created_at', since);
-      }
-      const { data: visits, error: dErr } = await dq.order('created_at', { ascending: false }).limit(5000);
-      if (dErr) throw dErr;
-      const V = visits || [];
+      const buildD2d = () => {
+        let dq = sb.from('d2d_visits').select('constituency, district, worker_name, outcome, created_at');
+        if (f.constituency) dq = dq.eq('constituency', f.constituency);
+        if (f.district) dq = dq.eq('district', f.district);
+        if (f.days !== 'all') {
+          const d = parseInt(f.days, 10);
+          const since = f.days === '1'
+            ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+            : new Date(Date.now() - d * 86400000).toISOString();
+          dq = dq.gte('created_at', since);
+        }
+        return dq.order('created_at', { ascending: false });
+      };
+      const V = await fetchAllRows(buildD2d);
       if (V.length) {
         const totals = { visits: V.length, met: 0, not_home: 0, refused: 0, revisit: 0, today: 0, workers: 0 };
         const workerAgg = new Map<string, { visits: number; met: number }>();

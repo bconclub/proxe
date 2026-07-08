@@ -109,6 +109,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navLabel = (name: string): string => {
     if (name === 'Leads' && brandId === 'pop') return 'People'
     if (name === 'Scouts' && brandId === 'lokazen') return 'Gigs'
+    // POP: the Tasks page is the automated agent-task queue → name it so, to sit
+    // next to Agents (Agents · Agent Tasks · Humans).
+    if (name === 'Tasks' && brandId === 'pop') return 'Agent Tasks'
     return name
   }
   const { setTheme } = useTheme()
@@ -567,7 +570,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               // direct: no sales Pipeline, no Flow builder, no Humans page.
               // War Room is reachable from the collapsed sidebar / brand logo, so
               // it's kept out of the main menu list too.
-              if (brandId === 'pop' && item.href && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans', '/war-room'].includes(item.href)) return null
+              if (brandId === 'pop' && item.href && ['/dashboard/pipeline', '/dashboard/flows', '/war-room'].includes(item.href)) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:

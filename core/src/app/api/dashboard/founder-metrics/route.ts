@@ -1822,9 +1822,11 @@ export async function GET(request: NextRequest) {
     if (BRAND_ID === 'pop') {
       try {
         const [{ data: popLeads }, { data: evRows }] = await Promise.all([
-          supabase.from('all_leads')
+          // Paginated — campaign volume exceeds PostgREST's 1000-row cap.
+          fetchAllRows(() => supabase.from('all_leads')
             .select('constituency, district, grievance_category, loop_status, salience, lean, magnet, intensity, created_at')
-            .eq('brand', 'pop').limit(10000),
+            .eq('brand', 'pop')
+            .order('created_at', { ascending: false })),
           supabase.from('campaign_events')
             .select('id, title, topic, constituency, district, venue, event_date, status')
             .in('status', ['planned', 'live'])
@@ -1896,7 +1898,15 @@ export async function GET(request: NextRequest) {
           byMagnet: Object.entries(magCount).map(([magnet, count]) => ({ magnet, count, share: Math.round((100 * count) / magTotal) })).sort((a, b) => b.count - a.count),
         }
 
-        campaignHome = { events, attentionSeats, sources }
+        // 30-day daily voices captured — feeds the home activity heatmap.
+        const HDAYS = 30
+        const hkeys = Array.from({ length: HDAYS }, (_, i) => new Date(now.getTime() - (HDAYS - 1 - i) * 86400000).toISOString().slice(0, 10))
+        const hidx: Record<string, number> = Object.fromEntries(hkeys.map((k, i) => [k, i]))
+        const daily = new Array(HDAYS).fill(0)
+        L.forEach((r) => { const i = hidx[new Date(r.created_at).toISOString().slice(0, 10)]; if (i !== undefined) daily[i]++ })
+        const dailyActivity = hkeys.map((date, i) => ({ date, count: daily[i] }))
+
+        campaignHome = { events, attentionSeats, sources, dailyActivity }
       } catch (e) {
         console.error('[founder-metrics] campaignHome failed:', (e as Error).message)
       }

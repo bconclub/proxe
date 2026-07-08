@@ -20,11 +20,13 @@ import {
   MdApps,
   MdOpenInNew,
   MdCheck,
+  MdSpaceDashboard,
 } from 'react-icons/md'
 
 // Config keeps icons as string keys (stays serializable); the mapping to real
 // icon components lives here.
 const ICONS: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
+  grid: MdSpaceDashboard,
   map: MdMap,
   pulse: MdMonitorHeart,
   door: MdDoorFront,
