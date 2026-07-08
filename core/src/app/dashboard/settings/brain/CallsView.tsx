@@ -17,7 +17,7 @@ type Perf = {
   turnsDetail: Array<{ total: number; transcriber: number; model: number; voice: number; endpointing: number }>
 }
 type Call = {
-  id: string; source: 'web' | 'phone'; engine: 'vapi' | 'elevenlabs'; language: string | null; callerName: string | null; callee: string
+  id: string; source: 'web' | 'phone'; engine: 'vapi' | 'elevenlabs' | 'sarvam'; language: string | null; callerName: string | null; callee: string
   createdAt: string | null; startedAt: string | null
   durationSec: number | null; waitSec: number | null; cost: number | null
   costBreakdown: { stt: number | null; llm: number | null; tts: number | null; vapi: number | null; total: number | null } | null
@@ -33,7 +33,7 @@ type EngineSplit = {
 }
 type Agg = {
   total: number; phone: number; web: number; totalSpend: number; totalMinutes: number
-  vapi: EngineSplit | null; elevenlabs: EngineSplit | null
+  vapi: EngineSplit | null; elevenlabs: EngineSplit | null; sarvam: EngineSplit | null
 }
 
 // Colour a latency by magnitude. Sub-second good, ~1.5s borderline, beyond = stall.
@@ -117,29 +117,36 @@ function StatCard({ label, value, tone, spark, sparkColor }: { label: string; va
 }
 
 // Which engine placed the call. V1 = Vapi pipeline (Azure STT · GPT · 11Labs voice),
-// V2 = ElevenLabs end-to-end. Open a call to see each engine's actual stack.
-function EngineBadge({ engine }: { engine: 'vapi' | 'elevenlabs' }) {
-  const is2 = engine === 'elevenlabs'
-  const tone = is2 ? '#f59e0b' : '#14b8a6'
+// V2 = ElevenLabs end-to-end. V3 = our own pipeline (Sarvam STT · Groq LLM ·
+// 11Labs voice on the VPS). Open a call to see each engine's actual stack.
+const ENGINE_META = {
+  vapi: { label: 'V1', tone: '#14b8a6', title: 'V1 · Vapi pipeline (Azure · GPT · 11Labs voice)' },
+  elevenlabs: { label: 'V2', tone: '#f59e0b', title: 'V2 · ElevenLabs end-to-end' },
+  sarvam: { label: 'V3', tone: '#8b5cf6', title: 'V3 · Own pipeline (Sarvam STT · Groq LLM · 11Labs voice)' },
+} as const
+type EngineId = keyof typeof ENGINE_META
+
+function EngineBadge({ engine }: { engine: EngineId }) {
+  const m = ENGINE_META[engine] || ENGINE_META.vapi
   return (
-    <span title={is2 ? 'V2 · ElevenLabs end-to-end' : 'V1 · Vapi pipeline (Azure · GPT · 11Labs voice)'} style={{
+    <span title={m.title} style={{
       fontSize: 9.5, fontWeight: 800, letterSpacing: 0.5, padding: '2px 8px', borderRadius: 999, flexShrink: 0,
-      color: tone, background: `${tone}1f`, border: `1px solid ${tone}55`,
+      color: m.tone, background: `${m.tone}1f`, border: `1px solid ${m.tone}55`,
     }}>
-      {is2 ? 'V2' : 'V1'}
+      {m.label}
     </span>
   )
 }
 
 // One engine's latency split as a single comparison row (Vapi shows endpointing +
-// network; ElevenLabs manages turn-taking itself so it has neither).
-function SplitRow({ engine, split }: { engine: 'vapi' | 'elevenlabs'; split: EngineSplit }) {
-  const is11 = engine === 'elevenlabs'
+// network; ElevenLabs and the V3 pipeline fold network into the measured turn).
+function SplitRow({ engine, split }: { engine: EngineId; split: EngineSplit }) {
+  const foldedNetwork = engine !== 'vapi' // 11labs + V3: network inside the silence→audio metric
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
       <EngineBadge engine={engine} />
       {split.groqCalls > 0 && (
-        <span title="Calls where the response actually came from our Groq custom-LLM bridge, not the provider's own default model"
+        <span title="Calls where the response actually came from Groq inference (custom-LLM bridge or the V3 pipeline), not the provider's own default model"
           style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, padding: '2px 8px', borderRadius: 999, color: '#22c55e', background: '#22c55e1f', border: '1px solid #22c55e55', flexShrink: 0 }}>
           Groq · {split.groqCalls}/{split.calls}
         </span>
@@ -148,9 +155,9 @@ function SplitRow({ engine, split }: { engine: 'vapi' | 'elevenlabs'; split: Eng
       <StageChip label="LLM" value={split.model} where="outside" />
       <StageChip label="Voice" value={split.voice} where="outside" />
       <StageChip label="Endpoint" value={split.endpointing} where="inside" />
-      {/* ElevenLabs doesn't expose network separately — shows "—" */}
+      {/* ElevenLabs/V3 don't expose network separately — shows "—" */}
       <StageChip label="Network" value={split.transport} where="network" />
-      {is11 && <span title="ElevenLabs manages turn-taking internally; network is folded into the silence→audio metric" style={{ fontSize: 14, color: 'var(--text-muted)', cursor: 'help' }}>ⓘ</span>}
+      {foldedNetwork && <span title="This engine measures silence→audio directly; network is folded into that metric rather than reported separately" style={{ fontSize: 14, color: 'var(--text-muted)', cursor: 'help' }}>ⓘ</span>}
       <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 82 }}>
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
         <div style={{ fontSize: 19, fontWeight: 800, color: latColor(split.turnAvg), fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{M(split.turnAvg)}</div>
@@ -179,7 +186,7 @@ function V3Row() {
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
         <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>—</div>
       </div>
-      <span title="Sarvam pipeline built; live calls pending Vobiz Call-API creds" style={{ fontSize: 10.5, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf618', border: '1px solid #8b5cf644', borderRadius: 999, padding: '4px 10px', cursor: 'help' }}>Sarvam · wiring</span>
+      <span title="Pipeline live (Sarvam STT · Groq LLM · 11Labs voice); stats appear after the first logged call" style={{ fontSize: 10.5, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf618', border: '1px solid #8b5cf644', borderRadius: 999, padding: '4px 10px', cursor: 'help' }}>V3 · no calls yet</span>
     </div>
   )
 }
@@ -235,7 +242,7 @@ export default function CallsView() {
       const xs = arr.filter((x): x is number => typeof x === 'number')
       return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
     }
-    const splitFor = (engine: 'vapi' | 'elevenlabs'): EngineSplit | null => {
+    const splitFor = (engine: EngineId): EngineSplit | null => {
       // Last-N is per-ENGINE, not "last N calls overall then split" — the combined
       // list interleaves V1/V2 chronologically, so slicing before splitting could
       // give V2 just 1-2 calls' worth of "last 5" stats depending on how the two
@@ -260,13 +267,18 @@ export default function CallsView() {
       }
     }
     const phones = visible.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
-    const vapi = splitFor('vapi'), elevenlabs = splitFor('elevenlabs')
-    // headline insight: which engine wins on latency / cost, with the margin.
+    const vapi = splitFor('vapi'), elevenlabs = splitFor('elevenlabs'), sarvam = splitFor('sarvam')
+    // headline insight: fastest engine among those with latency data, with the
+    // margin over the runner-up.
     let insight: { text: string; tone: string } | null = null
-    if (vapi?.turnAvg != null && elevenlabs?.turnAvg != null) {
-      const lower = vapi.turnAvg <= elevenlabs.turnAvg ? 'V1' : 'V2'
-      const diff = Math.abs(vapi.turnAvg - elevenlabs.turnAvg)
-      insight = { text: `${lower} is ${diff} ms faster per turn`, tone: lower === 'V1' ? '#14b8a6' : '#f59e0b' }
+    const ranked = ([['vapi', vapi], ['elevenlabs', elevenlabs], ['sarvam', sarvam]] as const)
+      .filter((e): e is [EngineId, EngineSplit] => e[1] != null && e[1].turnAvg != null)
+      .sort((a, b) => a[1].turnAvg! - b[1].turnAvg!)
+    if (ranked.length >= 2) {
+      const [winId, win] = ranked[0]
+      const runnerUp = ranked[1][1]
+      const meta = ENGINE_META[winId]
+      insight = { text: `${meta.label} is ${runnerUp.turnAvg! - win.turnAvg!} ms faster per turn`, tone: meta.tone }
     }
     return {
       phone: phones.length,
@@ -276,7 +288,7 @@ export default function CallsView() {
       sparkTurns: phones.map((c) => c.turns || 0),
       sparkMins: phones.map((c) => c.durationSec || 0),
       sparkCost: phones.map((c) => c.cost || 0),
-      vapi, elevenlabs, insight,
+      vapi, elevenlabs, sarvam, insight,
     }
   }, [visible, calls])
 
@@ -360,7 +372,9 @@ export default function CallsView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start' }}>
           {view.vapi && <SplitRow engine="vapi" split={view.vapi} />}
           {view.elevenlabs && <SplitRow engine="elevenlabs" split={view.elevenlabs} />}
-          {(eng === 'all' || eng === 'sarvam') && <V3Row />}
+          {view.sarvam
+            ? <SplitRow engine="sarvam" split={view.sarvam} />
+            : (eng === 'all' || eng === 'sarvam') && <V3Row />}
           {view.insight && eng === 'all' && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: view.insight.tone, background: `${view.insight.tone}18`, border: `1px solid ${view.insight.tone}44`, borderRadius: 999, padding: '4px 11px' }}>
               <MdBolt size={13} /> {view.insight.text}
@@ -383,7 +397,7 @@ export default function CallsView() {
         {!loading && configured && shown.length === 0 && !err && (
           <div style={{ padding: 24, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', fontSize: 13 }}>
             {eng === 'sarvam'
-              ? 'No V3 calls — Sarvam isn’t wired to live calls yet. Its STT/TTS quality is proven; wiring it as a live engine is the open build.'
+              ? 'No V3 calls logged yet. Place a V3 test call from the Voice agent tab — telemetry lands here at hangup.'
               : 'No calls yet. Place a test call from the Voice agent tab and refresh.'}
           </div>
         )}
