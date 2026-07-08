@@ -1,17 +1,18 @@
 // LEADER API — volunteer energy: how alive is the cadre machine.
 // Auth: x-api-key = LEADER_API_KEY.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServiceClient } from '@/lib/services';
-import { leaderAuthGate } from '@/lib/server/leaderAuth';
+import { leaderAuthGate, corsJson, leaderOptions } from '@/lib/server/leaderAuth';
 
 export const dynamic = 'force-dynamic';
+export const OPTIONS = leaderOptions;
 
 export async function GET(req: NextRequest) {
   const denied = leaderAuthGate(req);
   if (denied) return denied;
   const sb: any = getServiceClient();
-  if (!sb) return NextResponse.json({ error: 'database unavailable' }, { status: 500 });
+  if (!sb) return corsJson({ error: 'database unavailable' }, { status: 500 });
 
   try {
     const DAYS = 14;
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
       bySeat.set(v.constituency, a);
     });
 
-    return NextResponse.json({
+    return corsJson({
       totals: {
         volunteers: V.filter((v: any) => (v.intensity ?? 0) === 3).length,
         cadre: V.filter((v: any) => (v.intensity ?? 0) >= 4).length,
@@ -65,6 +66,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (e) {
     console.error('[leader/volunteers]', (e as Error).message);
-    return NextResponse.json({ error: 'aggregation failed' }, { status: 500 });
+    return corsJson({ error: 'aggregation failed' }, { status: 500 });
   }
 }

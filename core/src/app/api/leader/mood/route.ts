@@ -1,11 +1,12 @@
 // LEADER API — constituency mood: where support stands, seat by seat.
 // Auth: x-api-key = LEADER_API_KEY.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServiceClient } from '@/lib/services';
-import { leaderAuthGate } from '@/lib/server/leaderAuth';
+import { leaderAuthGate, corsJson, leaderOptions } from '@/lib/server/leaderAuth';
 
 export const dynamic = 'force-dynamic';
+export const OPTIONS = leaderOptions;
 
 const LS: Record<string, number> = { supporter: 1, leaning: 0.5, undecided: 0, opposed: -1 };
 
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const denied = leaderAuthGate(req);
   if (denied) return denied;
   const sb: any = getServiceClient();
-  if (!sb) return NextResponse.json({ error: 'database unavailable' }, { status: 500 });
+  if (!sb) return corsJson({ error: 'database unavailable' }, { status: 500 });
 
   try {
     const constituency = req.nextUrl.searchParams.get('constituency') || '';
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
       bySeat.set(r.constituency, a);
     });
 
-    return NextResponse.json({
+    return corsJson({
       overall: {
         net: Math.round(net * 100) / 100,
         shiftPp: Math.round((avg(last7) - avg(prev7)) * 100),
@@ -51,6 +52,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (e) {
     console.error('[leader/mood]', (e as Error).message);
-    return NextResponse.json({ error: 'aggregation failed' }, { status: 500 });
+    return corsJson({ error: 'aggregation failed' }, { status: 500 });
   }
 }

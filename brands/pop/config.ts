@@ -112,6 +112,7 @@ export const popConfig: BrandConfig = {
       name: 'PROXe Listen',
       description: 'Listen first, engage better — sentiment capture (internal)',
       status: 'wip',
+      href: '/dashboard/listen',
       icon: 'radar',
       features: [
         { name: 'Signal intake API (all 10 sources)', status: 'live' },

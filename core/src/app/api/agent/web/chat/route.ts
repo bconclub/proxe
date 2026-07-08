@@ -656,6 +656,69 @@ async function updateLokazenLeadContext(
   }
 }
 
+// ─── POP (Pulse of Punjab) engagement capture ───────────────────────────────
+// The web widget is POP's citizen surface (MyVoice). Deterministically derive
+// the campaign fields from the tapped quick-buttons + message keywords so a
+// grievance/volunteer/support on web climbs the intensity ladder (026) and
+// shows in the War Room — the same fields the D2D + leader-app paths write.
+// Keyword-based (no LLM, no latency); never clobbers an existing grievance.
+const POP_CATEGORY_KEYWORDS: [string, RegExp][] = [
+  ['water', /\b(water|paani|ਪਾਣੀ|पानी)\b/i],
+  ['power', /\b(power|electric\w*|bijli|ਬਿਜਲੀ|बिजली)\b/i],
+  ['jobs', /\b(job|jobs|naukri|employ\w*|unemploy\w*|rozgar|ਨੌਕਰੀ|नौकरी)\b/i],
+  ['roads', /\b(road|roads|sadak|transport|\bbus\b|ਸੜਕ|सड़क)\b/i],
+  ['drugs', /\b(drug|drugs|nasha|ਨਸ਼ਾ|नशा)\b/i],
+  ['farm_debt', /\b(farm|kisan|karza|loan|debt|msp|paddy|crop|ਕਰਜ਼ਾ|किसान)\b/i],
+  ['health', /\b(health|hospital|sehat|medical|clinic|ਸਿਹਤ|अस्पताल)\b/i],
+  ['education', /\b(school|college|education|teacher|ਸਿੱਖਿਆ|स्कूल)\b/i],
+];
+function classifyPopCategory(text: string): string | null {
+  for (const [cat, re] of POP_CATEGORY_KEYWORDS) if (re.test(text)) return cat;
+  return null;
+}
+async function updatePopEngagement(
+  leadId: string,
+  userMessage: string,
+  usedButtons: string[],
+  supabase: any,
+) {
+  const msg = (userMessage || '').toLowerCase();
+  const btns = usedButtons.map((b) => b.toLowerCase());
+  const said = (re: RegExp) => re.test(msg) || btns.some((b) => re.test(b));
+
+  const cols: Record<string, any> = {};
+  // Intent signals (deterministic from buttons/keywords).
+  if (said(/volunteer|karyakarta|join.*(campaign|team)|help.*campaign/)) {
+    cols.engagement_type = 'volunteer';
+    cols.action_intent = 'volunteer';
+  } else if (said(/\bsupport\b|with you|vote for|i('| a)m with|samarthan/)) {
+    cols.engagement_type = 'support';
+    cols.lean = 'supporter';
+    if (said(/vote/)) cols.action_intent = 'vote';
+  } else if (said(/share|forward|spread the word/)) {
+    cols.action_intent = 'share';
+  }
+
+  // Grievance capture — only when it reads like one and none is stored yet.
+  const cat = classifyPopCategory(msg);
+  const looksGrievance = said(/grievance|complain\w*|problem|issue|shikayat|masla|not working|no water|no power|broken/) || (cat && msg.length > 12);
+  if (cat || looksGrievance) {
+    const { data: cur } = await supabase.from('all_leads').select('grievance_text').eq('id', leadId).maybeSingle();
+    if (!cur?.grievance_text) {
+      if (cat) cols.grievance_category = cat;
+      if (userMessage && userMessage.trim().length > 6) cols.grievance_text = userMessage.trim().slice(0, 2000);
+      cols.engagement_type = cols.engagement_type || 'grievance';
+      cols.loop_status = 'raised';
+    }
+  }
+
+  if (Object.keys(cols).length === 0) return;
+  cols.magnet = cols.magnet || 'pulse_app';
+  const { error } = await supabase.from('all_leads').update(cols).eq('id', leadId);
+  if (error) console.error('[agent/web/chat/pop] update failed:', error.message);
+  else console.log(`[agent/web/chat/pop] lead=${leadId} captured=${JSON.stringify(cols)}`);
+}
+
 async function postProcess(
   externalSessionId: string,
   userMessage: string,
@@ -771,6 +834,15 @@ async function postProcess(
         supabase,
         originAudience,
       );
+    }
+
+    // POP: capture campaign engagement so web (MyVoice) feeds the ladder.
+    if (leadId && BRAND_ID === 'pop') {
+      try {
+        await updatePopEngagement(leadId, userMessage, usedButtons, supabase);
+      } catch (popErr) {
+        console.error('[agent/web/chat/pop] capture failed:', popErr);
+      }
     }
 
     // 4. Generate and save conversation summary (every 3rd message to save tokens)

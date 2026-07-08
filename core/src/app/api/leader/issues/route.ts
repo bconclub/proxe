@@ -1,17 +1,18 @@
 // LEADER API — emerging issues: which grievances are trending, where.
 // Auth: x-api-key = LEADER_API_KEY.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServiceClient } from '@/lib/services';
-import { leaderAuthGate } from '@/lib/server/leaderAuth';
+import { leaderAuthGate, corsJson, leaderOptions } from '@/lib/server/leaderAuth';
 
 export const dynamic = 'force-dynamic';
+export const OPTIONS = leaderOptions;
 
 export async function GET(req: NextRequest) {
   const denied = leaderAuthGate(req);
   if (denied) return denied;
   const sb: any = getServiceClient();
-  if (!sb) return NextResponse.json({ error: 'database unavailable' }, { status: 500 });
+  if (!sb) return corsJson({ error: 'database unavailable' }, { status: 500 });
 
   try {
     const days = parseInt(req.nextUrl.searchParams.get('days') || '7', 10);
@@ -50,9 +51,9 @@ export async function GET(req: NextRequest) {
     // Emerging = growing off a small base (new narratives, not the perennials).
     const emerging = issues.filter((i) => i.trend > 0 && i.prev7d <= 2 && i.count7d >= 2).map((i) => i.category);
 
-    return NextResponse.json({ issues, emerging, windowDays: days });
+    return corsJson({ issues, emerging, windowDays: days });
   } catch (e) {
     console.error('[leader/issues]', (e as Error).message);
-    return NextResponse.json({ error: 'aggregation failed' }, { status: 500 });
+    return corsJson({ error: 'aggregation failed' }, { status: 500 });
   }
 }

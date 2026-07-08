@@ -2,24 +2,25 @@
 // directive to the war-room team. Lands in the War Room's Directives tab
 // (realtime). Auth: x-api-key = LEADER_API_KEY.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServiceClient } from '@/lib/services';
-import { leaderAuthGate } from '@/lib/server/leaderAuth';
+import { leaderAuthGate, corsJson, leaderOptions } from '@/lib/server/leaderAuth';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
+export const OPTIONS = leaderOptions;
 
 export async function POST(req: NextRequest) {
   const denied = leaderAuthGate(req);
   if (denied) return denied;
   const sb: any = getServiceClient();
-  if (!sb) return NextResponse.json({ error: 'database unavailable' }, { status: 500 });
+  if (!sb) return corsJson({ error: 'database unavailable' }, { status: 500 });
 
   try {
     const body = await req.json().catch(() => ({} as any));
     const { title, body: recoBody, constituency, created_by } = body || {};
     if (!title || typeof title !== 'string' || !title.trim()) {
-      return NextResponse.json({ error: 'title is required' }, { status: 400 });
+      return corsJson({ error: 'title is required' }, { status: 400 });
     }
 
     const { data, error } = await sb.from('campaign_recommendations')
@@ -36,9 +37,9 @@ export async function POST(req: NextRequest) {
       .single();
     if (error) throw error;
 
-    return NextResponse.json({ ok: true, id: data.id });
+    return corsJson({ ok: true, id: data.id });
   } catch (e) {
     console.error('[leader/recommendations]', (e as Error).message);
-    return NextResponse.json({ error: 'insert failed' }, { status: 500 });
+    return corsJson({ error: 'insert failed' }, { status: 500 });
   }
 }
