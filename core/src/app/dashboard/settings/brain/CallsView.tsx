@@ -44,6 +44,14 @@ function latColor(v: number | null): string {
   return '#ef4444'
 }
 const M = (v: number | null) => (v == null ? '—' : `${v} ms`)
+
+// A call only counts toward the eval aggregates (latency, cost, turn avg) if it
+// was a REAL conversation — more than 20s AND more than one turn. Calls that drop
+// in the first few seconds with no back-and-forth otherwise flatter the averages
+// and make the system look faster than it is. The call list still shows them all.
+const MIN_QUAL_SECS = 20
+const MIN_QUAL_TURNS = 1
+const isQualified = (c: Call) => (c.durationSec ?? 0) > MIN_QUAL_SECS && (c.turns ?? 0) > MIN_QUAL_TURNS
 const LANG_LABEL: Record<string, string> = { pa: 'Punjabi', hi: 'Hindi', en: 'English', other: 'Other' }
 // Primary pivot: the whole eval reorganizes around the selected engine version.
 const ENG_TABS = [
@@ -297,7 +305,9 @@ export default function CallsView() {
       // list interleaves V1/V2 chronologically, so slicing before splitting could
       // give V2 just 1-2 calls' worth of "last 5" stats depending on how the two
       // engines happened to interleave. This takes each engine's own last N.
-      const engAll = shown.filter((c) => c.engine === engine)
+      // Only qualified calls (>20s, >1 turn) feed the aggregate — a 5s no-turn
+      // call must not flatter the turn average.
+      const engAll = shown.filter((c) => c.engine === engine && isQualified(c))
       const eng = limit === 'all' ? engAll : engAll.slice(0, limit)
       if (!eng.length) return null
       const wp = eng.filter((c) => c.perf && c.perf.turnAvg) // latency only from real turns
@@ -322,7 +332,7 @@ export default function CallsView() {
     // Per-language comparison — Hindi vs English vs Punjabi latency, over the
     // current engine filter (all engines when eng==='all'), ignoring the language
     // filter so all three always show side by side. Last-N applied per language.
-    const engBase = calls.filter((c) => (showWeb || c.source === 'phone') && (eng === 'all' || c.engine === eng))
+    const engBase = calls.filter((c) => (showWeb || c.source === 'phone') && (eng === 'all' || c.engine === eng) && isQualified(c))
     const langRows = langsPresent
       .map((l) => {
         const list = engBase.filter((c) => c.language === l)
@@ -330,6 +340,12 @@ export default function CallsView() {
         return { lang: l, split: aggregateSplit(capped) }
       })
       .filter((r): r is { lang: string; split: EngineSplit } => !!r.split)
+
+    // Transparency: how many calls fed the aggregate vs were excluded as too
+    // short/no-turn, so the "faster" numbers can't hide a pile of dropped calls.
+    const engBaseAll = calls.filter((c) => (showWeb || c.source === 'phone') && (eng === 'all' || c.engine === eng))
+    const qualifiedCount = engBaseAll.filter(isQualified).length
+    const excludedCount = engBaseAll.length - qualifiedCount
     // headline insight: fastest engine among those with latency data, with the
     // margin over the runner-up.
     let insight: { text: string; tone: string } | null = null
@@ -350,7 +366,7 @@ export default function CallsView() {
       sparkTurns: phones.map((c) => c.turns || 0),
       sparkMins: phones.map((c) => c.durationSec || 0),
       sparkCost: phones.map((c) => c.cost || 0),
-      vapi, elevenlabs, sarvam, insight, langRows,
+      vapi, elevenlabs, sarvam, insight, langRows, qualifiedCount, excludedCount,
     }
   }, [visible, calls])
 
@@ -445,6 +461,10 @@ export default function CallsView() {
           {eng !== 'sarvam' && !view.vapi && !view.elevenlabs && visible.length > 0 && (
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
           )}
+          <span style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>
+            Aggregates count only real conversations — &gt;{MIN_QUAL_SECS}s &amp; &gt;{MIN_QUAL_TURNS} turn
+            {' · '}{view.qualifiedCount} counted{view.excludedCount > 0 ? `, ${view.excludedCount} short call${view.excludedCount === 1 ? '' : 's'} excluded` : ''}
+          </span>
         </div>
 
         {/* per-language comparison — Hindi vs English vs Punjabi latency */}

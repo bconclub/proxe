@@ -1,3 +1,8 @@
+## 2026-07-08 18:20 IST · fix(pop): eval aggregates only count real conversations (>20s, >1 turn)
+
+- Short calls dropped in the first few seconds with no turns were flattering the latency/cost averages, making the system look faster than it is. Engine + language aggregates now count only calls >20s AND >1 turn.
+- The call list still shows every call; a note surfaces how many were counted vs excluded so nothing is hidden.
+- `(pending-sha)`
 ## 2026-07-08 18:00 IST · fix(pop): V2/V3 calls stop showing "queued · 0s"
 
 - V2 and V3 calls connected fine but the dashboard never moved them off "queued" (only V1 had the Vapi webhook). Now:
