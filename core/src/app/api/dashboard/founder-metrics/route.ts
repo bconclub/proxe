@@ -1864,9 +1864,36 @@ export async function GET(request: NextRequest) {
           }
         })
 
+        // 8-day new-voices sparkline + momentum per attention seat (one small
+        // indexed query over just those seats - the RPC stays untouched).
+        let attentionSeats: any[] = agg.attentionSeats || []
+        if (attentionSeats.length) {
+          try {
+            const names = attentionSeats.map((s: any) => s.constituency)
+            const since8 = new Date(now.getTime() - 8 * 86400000).toISOString()
+            const { data: recent } = await supabase.from('all_leads')
+              .select('constituency, created_at')
+              .eq('brand', 'pop').in('constituency', names).gte('created_at', since8)
+              .limit(5000)
+            const byName: Record<string, number[]> = {}
+            names.forEach((n: string) => { byName[n] = new Array(8).fill(0) })
+            ;(recent || []).forEach((r: any) => {
+              const dAgo = Math.floor((now.getTime() - new Date(r.created_at).getTime()) / 86400000)
+              if (dAgo >= 0 && dAgo < 8 && byName[r.constituency]) byName[r.constituency][7 - dAgo]++
+            })
+            attentionSeats = attentionSeats.map((s: any) => {
+              const series = byName[s.constituency] || new Array(8).fill(0)
+              const first = series.slice(0, 4).reduce((a: number, b: number) => a + b, 0)
+              const last = series.slice(4).reduce((a: number, b: number) => a + b, 0)
+              const deltaPct = first > 0 ? Math.round(((last - first) / first) * 100) : (last > 0 ? 100 : 0)
+              return { ...s, series, deltaPct }
+            })
+          } catch { /* sparkline is decoration - seats render without it */ }
+        }
+
         campaignHome = {
           events,
-          attentionSeats: agg.attentionSeats || [],
+          attentionSeats,
           sources: agg.sources || { total7d: 0, byMagnet: [], total30d: 0, mix: [] },
           dailyActivity: agg.dailyActivity || [],
           weekHour: agg.weekHour || [],

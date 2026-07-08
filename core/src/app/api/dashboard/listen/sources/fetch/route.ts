@@ -84,14 +84,28 @@ function parseFeed(xml: string): Array<{ title: string; link: string; image: str
   return out;
 }
 
-async function fetchText(url: string): Promise<string | null> {
+async function fetchText(url: string, timeoutMs = 12000): Promise<string | null> {
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 12000);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'PROXe-Listen/1.0 (+https://goproxe.com)' } });
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PROXe-Listen/1.0; +https://goproxe.com)' } });
     if (!res.ok) return null;
     return await res.text();
   } catch { return null; } finally { clearTimeout(t); }
+}
+
+// og:image from the article page itself - the media the row shows on the right.
+// Feeds like Google News carry no images, so we follow a handful of links per
+// run (budgeted) and read the page's own preview image.
+async function ogImage(url: string): Promise<string | null> {
+  const html = await fetchText(url, 6000);
+  if (!html) return null;
+  const m =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+    html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+  const u = m ? m[1].trim() : null;
+  return u && /^https?:\/\//i.test(u) ? u.slice(0, 1000) : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -109,12 +123,20 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     let totalInserted = 0;
+    let ogBudget = 12; // article-page fetches per run (og:image backfill)
     const perSource: Array<{ id: string; name: string; found: number; inserted: number }> = [];
 
     for (const src of (sources || [])) {
       if (!src.url) continue;
       const xml = await fetchText(src.url);
       const items = xml ? parseFeed(xml) : [];
+      // feed items without an inline image: follow the article (budgeted) and
+      // take its og:image so the inbox/evidence board show real media
+      for (const it of items) {
+        if (it.image || ogBudget <= 0) continue;
+        ogBudget--;
+        it.image = await ogImage(it.link);
+      }
       let inserted = 0;
       if (items.length) {
         const rows = items.map((it) => {

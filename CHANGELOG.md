@@ -1,3 +1,9 @@
+## 2026-07-09 05:00 IST · feat(pop): real outlet identity + article media in Signal Inbox, Priority Constituencies to reference design
+
+- Signal Inbox: rows now name the actual OUTLET (The Express Tribune, DD News, NDTV) parsed from the article - the useless news.google.com chip and aggregator logo are gone; outlet favicons only when the link is the real site. RSS fetch now follows a budgeted set of article links per run and reads the page og:image, so news rows carry real media thumbnails on the right (28 of the latest 60 already have images, grows every fetch).
+- Home Priority Constituencies rebuilt to the reference: glowing red OPEN tiles, seat name + colored issue chip, pin + district, loop / mood / supporters pills, an 8 day new-voices sparkline with momentum % and arrow per seat (new small indexed query on top of the pop_home_agg RPC), and View details. 
+- (pending-sha)
+
 ## 2026-07-09 04:00 IST · feat(pop): Booth Campaigns tab to reference design
 
 - User-facing: the On Ground Booth Campaigns tab is the full command view now: 6 KPI cards with sparklines (Active Campaigns, High Priority Booths, Doors Remaining, Photos Collected, Members Spoken To, Support Trend), Priority Campaigns cards (status badge, location + booths, doors progress, Contact/Support/Flags, priority pill + worker photo stack + Review/Assign/View), Booth Priority Queue table (priority pills, doors left + progress, contact/support bars, 7 day issue trend sparkline, last activity, assigned worker with photo, pagination), and a right rail: Priority Breakdown donut, Top Issues by Booth, Worker Allocation, Booths Needing Revisit.

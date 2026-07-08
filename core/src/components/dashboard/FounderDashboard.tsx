@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -122,6 +122,7 @@ interface FounderMetrics {
       constituency: string; district?: string | null; total: number
       grievances: number; unresolved: number; loopHealthPct: number
       topCategory?: string | null; mood: number; supporters: number; volunteers: number; attention: number
+      series?: number[]; deltaPct?: number
     }>
     sources: {
       total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }>
@@ -1126,9 +1127,16 @@ export default function FounderDashboard() {
         {/* Priority Lead Queue. POP: narrower (it's a compact list) so Activity Sources gets the width */}
         <section className={`${popMix ? 'xl:col-span-6' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : brandLabel('Leads that need your attention now')}</p>
+            <div className="flex items-center gap-3 min-w-0">
+              {isPop && metrics.campaignHome && (
+                <span className="flex items-center justify-center rounded-xl shrink-0" style={{ width: 36, height: 36, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+                  <MdMyLocation size={18} />
+                </span>
+              )}
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : brandLabel('Leads that need your attention now')}</p>
+              </div>
             </div>
             <button onClick={() => router.push(isPop && metrics.campaignHome ? '/war-room' : '/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
               {isPop && metrics.campaignHome ? 'War Room' : `View ${brandLabel('Lead') === 'Person' ? 'People' : 'Leads'}`} <MdArrowForward size={13} />
@@ -1136,37 +1144,55 @@ export default function FounderDashboard() {
           </div>
           {isPop && metrics.campaignHome ? (
             metrics.campaignHome.attentionSeats.length > 0 ? (
-              <div className="overflow-auto flex-1 min-h-0 divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2 p-3">
                 {metrics.campaignHome.attentionSeats.map((s) => {
                   const health = s.loopHealthPct >= 70 ? '#22c55e' : s.loopHealthPct >= 40 ? '#f59e0b' : '#ef4444'
                   const moodColor = s.mood > 0.1 ? '#22c55e' : s.mood < -0.1 ? '#ef4444' : 'var(--text-muted)'
                   const moodLabel = s.mood > 0.1 ? 'positive' : s.mood < -0.1 ? 'negative' : 'neutral'
+                  const catColors: Record<string, string> = { jobs: '#a78bfa', drugs: '#60a5fa', health: '#2ec4b6', water: '#38bdf8', power: '#f59e0b', roads: '#8b7bff', farm_debt: '#22c55e', education: '#c084fc', other: '#7a8aa0' }
+                  const catC = catColors[s.topCategory || 'other'] || '#7a8aa0'
+                  const up = (s.deltaPct ?? 0) >= 0
+                  const sparkC = up ? '#22c55e' : '#ef4444'
+                  const seatChip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 9, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }
                   return (
                     <button key={s.constituency} type="button" onClick={() => router.push('/war-room')}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors block"
-                      style={{ borderColor: 'var(--border-primary)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      className="w-full text-left rounded-xl border flex items-center gap-3 px-3 py-2.5 transition-colors"
+                      style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.45)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
                     >
-                      {/* Unresolved count - the headline attention number */}
-                      <div className="shrink-0 flex flex-col items-center justify-center rounded-lg" style={{ width: 44, height: 44, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                        <span className="text-[15px] font-bold leading-none" style={{ color: '#ef4444' }}>{s.unresolved}</span>
-                        <span className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>open</span>
+                      {/* glowing OPEN tile - the headline attention number */}
+                      <div className="shrink-0 flex flex-col items-center justify-center rounded-xl" style={{ width: 52, height: 52, background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.55)', boxShadow: '0 0 12px rgba(239,68,68,0.25)' }}>
+                        <span className="text-[19px] font-extrabold leading-none" style={{ color: '#ef4444' }}>{s.unresolved}</span>
+                        <span className="text-[8px] uppercase tracking-widest mt-0.5" style={{ color: '#ef4444', opacity: 0.85 }}>open</span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.constituency}</p>
+                      <div className="min-w-0" style={{ width: 148 }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-[14.5px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{s.constituency}</p>
                           {s.topCategory && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0 capitalize" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0 capitalize" style={{ background: `${catC}1f`, color: catC, border: `1px solid ${catC}45` }}>
                               {s.topCategory.replace('_', ' ')}
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                          {s.district ? `${s.district} · ` : ''}loop <b style={{ color: health }}>{s.loopHealthPct}%</b> · mood <b style={{ color: moodColor }}>{moodLabel}</b> · {s.supporters} supporters
+                        <p className="text-[11px] truncate mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                          <MdPlace size={11} style={{ color: 'var(--text-muted)' }} />{s.district || 'Punjab'}
                         </p>
                       </div>
-                      <MdArrowForward size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                        <span style={seatChip}><MdRefresh size={12} /> loop <b style={{ color: health }}>{s.loopHealthPct}%</b></span>
+                        <span style={seatChip}><MdMood size={12} style={{ color: moodColor }} /> mood <b style={{ color: moodColor }}>{moodLabel}</b></span>
+                        <span style={seatChip}><MdPeople size={12} /> <b style={{ color: 'var(--text-primary)' }}>{s.supporters}</b> supporters</span>
+                      </div>
+                      {s.series && s.series.some((v) => v > 0) && (
+                        <span className="hidden lg:flex items-center gap-1.5 shrink-0">
+                          <span style={{ width: 92 }}><Sparkline data={s.series.map((v) => ({ value: v }))} color={sparkC} height={26} showGradient /></span>
+                          <span className="text-[10.5px] font-bold" style={{ color: sparkC }}>{up ? '+' : ''}{s.deltaPct}% {up ? '↗' : '↘'}</span>
+                        </span>
+                      )}
+                      <span className="hidden sm:flex items-center gap-1 shrink-0 text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                        View details <MdArrowForward size={13} />
+                      </span>
                     </button>
                   )
                 })}

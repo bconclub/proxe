@@ -92,9 +92,21 @@ const ytThumb = (url: string | null) => {
 }
 const mediaOf = (s: SignalRow) => s.image_url || ytThumb(s.url)
 
+// outlet name a news feed appended to the title ("… - NDTV" → NDTV)
+const outletOf = (s: SignalRow): string | null => {
+  if (s.source !== 'news') return null
+  const m = (s.content || '').match(/\s[-–|]\s([^-–|]{2,60})$/)
+  if (m) return m[1].trim()
+  const h = hostOf(s.url)
+  return h && h !== 'news.google.com' ? h : null
+}
+
 function SourceGlyph({ s, size = 30 }: { s: SignalRow; size?: number }) {
   const m = srcMeta(s.source)
-  const fav = s.source === 'news' ? faviconOf(s.url) : null
+  // Real outlet favicons only - the google news aggregator logo says nothing,
+  // so those rows keep the generic news glyph.
+  const host = hostOf(s.url)
+  const fav = s.source === 'news' && host && host !== 'news.google.com' ? faviconOf(s.url) : null
   return (
     <span style={{ width: size, height: size, borderRadius: size * 0.28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${m.color}1f`, color: m.color, flexShrink: 0, overflow: 'hidden' }}>
       {fav
@@ -495,7 +507,7 @@ export default function ListenPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, justifyContent: 'flex-end' }}>
-                        {chip(s.source === 'news' ? (hostOf(s.url) || m.label) : m.label)}
+                        {chip(s.source === 'news' ? (outletOf(s) || 'News') : m.label)}
                         {s.constituency && chip(s.constituency)}
                         {badge(sb.color, sb.text)}
                         {badge(sv.color, sv.text)}
@@ -736,7 +748,7 @@ export default function ListenPage() {
                   const m = srcMeta(s.source)
                   const media = mediaOf(s)
                   const isVideo = !!ytThumb(s.url) || s.source === 'youtube'
-                  const outlet = s.source === 'news' ? (s.author || hostOf(s.url) || m.label) : m.label
+                  const outlet = s.source === 'news' ? (outletOf(s) || s.author || 'News') : m.label
                   const card = (
                     <div style={{ flex: '0 0 240px', width: 240, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                       {media && (
