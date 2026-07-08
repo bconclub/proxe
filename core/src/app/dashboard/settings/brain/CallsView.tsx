@@ -141,7 +141,11 @@ function EngineBadge({ engine }: { engine: EngineId }) {
 // One engine's latency split as a single comparison row (Vapi shows endpointing +
 // network; ElevenLabs and the V3 pipeline fold network into the measured turn).
 function SplitRow({ engine, split }: { engine: EngineId; split: EngineSplit }) {
-  const foldedNetwork = engine !== 'vapi' // 11labs + V3: network inside the silence→audio metric
+  // V3 (sarvam) now measures the Vobiz carrier leg (residual of the real
+  // perceived latency). ElevenLabs still folds network into its metric; V3 only
+  // folds when transport is missing (pre-telemetry-change records).
+  const netLabel = engine === 'sarvam' ? 'Vobiz' : 'Network'
+  const foldedNetwork = engine === 'elevenlabs' || (engine === 'sarvam' && split.transport == null)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
       <EngineBadge engine={engine} />
@@ -155,8 +159,8 @@ function SplitRow({ engine, split }: { engine: EngineId; split: EngineSplit }) {
       <StageChip label="LLM" value={split.model} where="outside" />
       <StageChip label="Voice" value={split.voice} where="outside" />
       <StageChip label="Endpoint" value={split.endpointing} where="inside" />
-      {/* ElevenLabs/V3 don't expose network separately — shows "—" */}
-      <StageChip label="Network" value={split.transport} where="network" />
+      {/* Carrier/network leg. V1 = Vapi transport; V3 = the Vobiz stream round-trip. */}
+      <StageChip label={netLabel} value={split.transport} where="network" />
       {foldedNetwork && <span title="This engine measures silence→audio directly; network is folded into that metric rather than reported separately" style={{ fontSize: 14, color: 'var(--text-muted)', cursor: 'help' }}>ⓘ</span>}
       <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 82 }}>
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
@@ -457,7 +461,7 @@ export default function CallsView() {
                             <StageChip label="LLM" value={c.perf.stages.model} where="outside" />
                             <StageChip label="Voice" value={c.perf.stages.voice} where="outside" />
                             <StageChip label="Endpoint" value={c.perf.stages.endpointing} where="inside" />
-                            <StageChip label="Network" value={c.perf.stages.transport} where="network" />
+                            <StageChip label={c.engine === 'sarvam' ? 'Vobiz' : 'Network'} value={c.perf.stages.transport} where="network" />
                           </div>
                           {/* per-turn totals — coloured RELATIVE to this call:
                               fastest turn green, slowest red, the rest amber, so the

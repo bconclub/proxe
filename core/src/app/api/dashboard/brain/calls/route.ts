@@ -268,16 +268,17 @@ async function fetchSarvamCalls(): Promise<any[]> {
       const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0)
       const detailRows = real.map((t) => {
         const stt = Math.round(t.stt || 0), llm = Math.round(t.llm || 0), tts = Math.round(t.tts || 0)
-        return {
-          total: Math.round(t.total),
-          transcriber: stt,
-          model: llm,
-          voice: tts,
-          // Turn-taking wait: silence→audio minus the service pipeline — the
-          // same derived endpointing as the ElevenLabs path.
-          endpointing: Math.max(0, Math.round(t.total) - stt - llm - tts),
-        }
+        // Endpoint (our VAD turn-taking wait) and transport (Vobiz carrier +
+        // network leg) now come straight from the pipeline telemetry. Fall back
+        // to the old derivation for records shipped before the pipeline change.
+        const endpointing = t.endpoint != null ? Math.round(t.endpoint) : Math.max(0, Math.round(t.total) - stt - llm - tts)
+        const transport = t.transport != null ? Math.round(t.transport) : null
+        return { total: Math.round(t.total), transcriber: stt, model: llm, voice: tts, endpointing, transport }
       })
+      const avgTransport = (() => {
+        const xs = detailRows.map((d) => d.transport).filter((x): x is number => typeof x === 'number')
+        return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
+      })()
       const totals = detailRows.map((d) => d.total)
       const perf = detailRows.length
         ? {
@@ -289,9 +290,9 @@ async function fetchSarvamCalls(): Promise<any[]> {
               model: avg(detailRows.map((d) => d.model)),
               voice: avg(detailRows.map((d) => d.voice)),
               endpointing: avg(detailRows.map((d) => d.endpointing)),
-              // network is folded into the measured silence→audio total (same
-              // as ElevenLabs) — null renders "—", not a fake zero.
-              transport: null as number | null,
+              // Vobiz carrier + network leg, now measured (residual of the real
+              // perceived latency). Null only for pre-change records.
+              transport: avgTransport,
             },
             turnsDetail: detailRows,
           }

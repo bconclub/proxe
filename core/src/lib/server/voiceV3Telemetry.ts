@@ -10,10 +10,12 @@ const INDEX_KEY = 'voice:v3-calls';
 const MAX_INDEXED = 100;
 
 export interface V3TurnRecord {
-  total: number; // ms, user-stop → bot-speaking
-  stt?: number;  // ms TTFB per stage
+  total: number;      // ms, user-stop → bot-speaking (real perceived latency)
+  stt?: number;       // ms TTFB per stage
   llm?: number;
   tts?: number;
+  endpoint?: number;  // ms — our VAD turn-taking wait (silence before we finalize)
+  transport?: number | null; // ms — Vobiz carrier + network leg (residual), null if unmeasured
 }
 
 export interface V3CallRecord {

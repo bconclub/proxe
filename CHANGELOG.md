@@ -1,3 +1,10 @@
+## 2026-07-08 15:40 IST · fix(pop): V3 voice eval — real TTS, endpoint, + Vobiz leg
+
+- Root bug: pipeline bucketed TTS TTFB as STT because "ElevenLabsTTSService" contains the substring "stt" and the check ran stt-first. Now checks "tts" first — VOICE shows the real number, STT shows Sarvam.
+- Endpoint: reports the VAD trailing-silence wait (our turn-taking config) per turn instead of 0.
+- Vobiz leg: new transport metric = residual of the real perceived latency minus STT+LLM+TTS+endpoint. Shows as a "Vobiz" chip in the V3 split + per-call detail.
+- User-facing: V3 eval now shows STT / LLM / Voice / Endpoint / Vobiz, not two mislabeled numbers.
+- `(pending-sha)` + VPS pipeline redeploy
 ## 2026-07-08 15:15 IST · fix(pop): kill hardcoded windchasers.in in web-agent preview
 
 - Web Agent settings widget-preview address bar showed "windchasers.in" for every brand (hardcoded fallback). Now uses the brand's own website (pop=goproxe.com) via getBrandConfig().website, neutral placeholder if none.
