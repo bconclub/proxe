@@ -180,14 +180,19 @@ async function vapiTestCall(body: any) {
             ? {
                 firstMessage: voicePrompt.firstMessage,
                 ...(modelOverride ? { model: modelOverride } : {}),
-                // Force the Indian-accent voice (Monika) on a multilingual model
-                // so English isn't rendered US-accented. flash_v2_5 keeps the
-                // voice's native accent across pa/hi/en; both env-tunable.
-                voice: {
-                  provider: '11labs',
-                  voiceId: process.env.VAPI_POP_TTS_VOICE || '1qEiC6qsybMkmnNdVMbK',
-                  model: process.env.VAPI_POP_TTS_MODEL || 'eleven_flash_v2_5',
-                },
+                // Voice: keep the assistant's NATIVE voice (Monika + eleven_v3)
+                // — that's the V1 sound that worked. Only override if the env
+                // explicitly asks for a different model (opt-in, not default), so
+                // the earlier flash_v2_5 experiment can't quietly change V1.
+                ...(process.env.VAPI_POP_TTS_MODEL
+                  ? {
+                      voice: {
+                        provider: '11labs',
+                        voiceId: process.env.VAPI_POP_TTS_VOICE || '1qEiC6qsybMkmnNdVMbK',
+                        model: process.env.VAPI_POP_TTS_MODEL,
+                      },
+                    }
+                  : {}),
               }
             : {}),
           variableValues: {

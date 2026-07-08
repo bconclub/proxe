@@ -1,3 +1,8 @@
+## 2026-07-08 03:10 IST · fix(pop): restore V1 voice + put the prompt editor IN the Voice tab
+
+- V1 voice reverted to its native Monika + eleven_v3 (I'd swapped it to flash_v2_5, which changed how it sounded). A different TTS model is now opt-in via env only, never silently applied.
+- The per-language prompt editor (English/Hindi/Punjabi) is now embedded directly in the Voice agent tab as a collapsible "Voice Prompts" panel — plus the standalone page. Same one source, read by V1/V2/V3. Makes crystal clear it's NOT hardcoded and NOT Vapi.
+- `(pending-sha)`
 ## 2026-07-08 18:20 IST · fix(pop): eval aggregates only count real conversations (>20s, >1 turn)
 
 - Short calls dropped in the first few seconds with no turns were flattering the latency/cost averages, making the system look faster than it is. Engine + language aggregates now count only calls >20s AND >1 turn.

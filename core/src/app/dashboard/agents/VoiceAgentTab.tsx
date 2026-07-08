@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   MdContentCopy, MdCheckCircle, MdPhone, MdGraphicEq, MdSignalCellularAlt,
   MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd, MdEdit,
+  MdExpandMore, MdExpandLess, MdRecordVoiceOver,
 } from 'react-icons/md';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import VoicePromptsEditor from '@/components/dashboard/VoicePromptsEditor';
 
 export default function VoiceAgentTab() {
   const isBcon = getCurrentBrandId() === 'bcon';
@@ -32,6 +34,7 @@ export default function VoiceAgentTab() {
   // switches to whatever language the caller speaks. Lets us test pa/hi/en calls
   // individually. Same number, same engine — only the prompt + opening change.
   const [lang, setLang] = useState<'pa' | 'hi' | 'en'>('pa');
+  const [showPrompts, setShowPrompts] = useState(false);
   const LANGS: Record<'pa' | 'hi' | 'en', { label: string; native: string }> = {
     pa: { label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
     hi: { label: 'Hindi', native: 'हिंदी' },
@@ -295,9 +298,9 @@ export default function VoiceAgentTab() {
                 </div>
                 <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>Agent opens in {LANGS[lang].label}, then follows the caller&apos;s language.</span>
-                  <a href="/dashboard/settings/voice-prompts" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  <button onClick={() => setShowPrompts(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 11 }}>
                     <MdEdit size={12} /> Edit prompts
-                  </a>
+                  </button>
                 </p>
               </div>
             )}
@@ -398,6 +401,28 @@ export default function VoiceAgentTab() {
           </button>
         </div>
       </div>
+
+      {/* Voice Prompts — editable right here, per language (pop grievance) */}
+      {isPop && (
+        <div style={{ marginTop: 20, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, overflow: 'hidden' }}>
+          <button onClick={() => setShowPrompts((v) => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '16px 20px',
+            background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+          }}>
+            <MdRecordVoiceOver size={19} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-primary)' }}>Voice Prompts — English · Hindi · Punjabi</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>The one place the call reads from — edits apply to V1, V2 and V3 on the next call. Not hardcoded, not Vapi.</div>
+            </div>
+            {showPrompts ? <MdExpandLess size={20} style={{ color: 'var(--text-muted)' }} /> : <MdExpandMore size={20} style={{ color: 'var(--text-muted)' }} />}
+          </button>
+          {showPrompts && (
+            <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--border-primary)' }}>
+              <div style={{ marginTop: 16 }}><VoicePromptsEditor compact /></div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
