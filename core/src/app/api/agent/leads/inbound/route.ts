@@ -17,6 +17,10 @@ import {
   TEMPLATE_BUTTON_TYPES,
   notifySlackLead,
   sendWhatsAppTemplate,
+  sendWelcomeTemplate,
+  sendParentWelcomeTemplate,
+  pickWelcomeTemplate,
+  isParentSource,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -42,6 +46,13 @@ const NAME_PLACEHOLDER_BLOCKLIST = new Set([
 function cleanName(raw?: string | null): string {
   const trimmed = (raw || '').trim()
   if (!trimmed) return ''
+  // Synthetic account ids / placeholder emails the owner & scout apps stamp on a
+  // brand-new account BEFORE a real name exists — never a person's name. e.g.
+  // "owner_9341333999_1783481293327@noemail.lokazen.in", any @noemail./noreply
+  // address, or an "<type>_<digits>…" internal id. Without this the id leaks into
+  // the dashboard as the lead's name and into "Hi <id>" greetings.
+  if (/@noemail\.|noreply|no-reply|placeholder/i.test(trimmed)) return ''
+  if (/^(owner|brand|scout|connector|lead|user|customer)_\d/i.test(trimmed)) return ''
   const words = trimmed.toLowerCase().split(/\s+/)
   const isPlaceholder = words.every((w) => NAME_PLACEHOLDER_BLOCKLIST.has(w))
   return isPlaceholder ? '' : trimmed
@@ -75,19 +86,34 @@ async function wasTemplateRecentlySent(
   return !!(recentSend?.created_at && (Date.now() - new Date(recentSend.created_at).getTime()) < windowMs)
 }
 
+async function hasPriorOutboundWhatsApp(supabase: any, leadId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('lead_id', leadId)
+    .eq('channel', 'whatsapp')
+    .eq('sender', 'agent')
+    .limit(1)
+    .maybeSingle()
+
+  return !!data
+}
+
 /**
  * POST /api/agent/leads/inbound
  * Inbound lead API for Facebook, Google, website forms, manual entry.
  * Creates or updates a lead and schedules a first_outreach task.
  *
- * Auth: x-api-key header must match INBOUND_API_KEY env var.
+ * Auth: x-api-key or xapi-key header must match INBOUND_API_KEY env var.
  * Body: { name, phone, email?, source, campaign?, notes?, brand?,
  *         city?, brand_name?, urgency?, custom_fields? }
  */
 export async function POST(request: NextRequest) {
   try {
     // Auth check
-    const apiKey = request.headers.get('x-api-key')
+    const apiKey =
+      request.headers.get('x-api-key') ||
+      request.headers.get('xapi-key')
     const expectedKey = process.env.INBOUND_API_KEY
     if (!expectedKey || apiKey !== expectedKey) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -137,7 +163,49 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+    let { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+
+    const parseCustomFields = (value: any): any => {
+      if (typeof value !== 'string') return value
+      try {
+        const parsed = JSON.parse(value)
+        return parsed && typeof parsed === 'object' ? parsed : value
+      } catch {
+        return value
+      }
+    }
+    custom_fields = parseCustomFields(custom_fields)
+
+    const normalizeFieldData = (value: any): Record<string, any> => {
+      let data = value
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data) } catch { return {} }
+      }
+      if (!Array.isArray(data)) return {}
+
+      return data.reduce((acc: Record<string, any>, field: any) => {
+        const key = String(field?.name || '').trim()
+        if (!key) return acc
+        const raw = Array.isArray(field?.values) ? field.values[0] : field?.value
+        if (raw != null && String(raw).trim() !== '') acc[key] = raw
+        return acc
+      }, {})
+    }
+
+    const metaFieldData = normalizeFieldData(custom_fields)
+    if (Object.keys(metaFieldData).length > 0) {
+      custom_fields = {
+        ...metaFieldData,
+        user_type: custom_fields?.user_type || metaFieldData.user_type || 'student',
+        form_type: custom_fields?.form_type || 'meta_lead_form',
+      }
+      name = name || metaFieldData.full_name || metaFieldData.name
+      phone = phone || metaFieldData.phone || metaFieldData.phone_number
+      email = email || metaFieldData.email
+      city = city || metaFieldData.city
+      source = source || 'facebook'
+      campaign = campaign || body.campaign_name || body.utm_campaign || 'Meta Lead Form'
+    }
 
     // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
     let notes: string | null = null
@@ -257,7 +325,13 @@ export async function POST(request: NextRequest) {
     // have the data in custom_fields.
     const brandCtxData: Record<string, any> = {}
     const cf2 = (custom_fields || {}) as Record<string, any>
-    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    const audienceRaw = String(
+      cf2.audience ||
+      cf2.user_type ||
+      body.user_type ||
+      body.lead_type ||
+      ''
+    ).toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
       audienceRaw === 'parent' ||
@@ -268,16 +342,34 @@ export async function POST(request: NextRequest) {
     }
     if (leadBrand === 'windchasers') {
       // Map the interest value the form sends to the short course label the
-      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
-      const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
+      // dashboard's filter dropdown uses (CPL / DGCA / HPL / Cabin / Drone).
+      const interestRaw = String(
+        cf2.interest ||
+        cf2.course_interest ||
+        body.course_interest ||
+        body.course ||
+        body.course_details ||
+        ''
+      ).toLowerCase().trim()
       const courseMap: Record<string, string> = {
+        commercial_pilot: 'CPL',
+        commercial_pilot_cpl: 'CPL',
+        'commercial_pilot_(cpl)': 'CPL',
+        cpl: 'CPL',
         dgca_ground: 'DGCA',
         dgca: 'DGCA',
-        pilot_training_abroad: 'Flight',
-        flight: 'Flight',
-        helicopter_license: 'Heli',
-        helicopter: 'Heli',
-        heli: 'Heli',
+        egc: 'DGCA',
+        dgca_cpl: 'DGCA',
+        cpl_dgca: 'DGCA',
+        pilot_training_abroad: 'CPL',
+        flight: 'CPL',
+        helicopter_license: 'HPL',
+        helicopter_pilot: 'HPL',
+        helicopter: 'HPL',
+        heli: 'HPL',
+        hpl: 'HPL',
+        chpl: 'HPL',
+        phpl: 'HPL',
         cabin_crew: 'Cabin',
         cabin: 'Cabin',
         drone: 'Drone',
@@ -1149,10 +1241,103 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    // NOTE: generic first-outreach for new non-PAT, non-demo leads is DISABLED.
-    // The 'windchasers_followup' template was never approved in Meta, so every
-    // send was failing silently. Path removed until we set up real responses.
-    // Re-enable by approving a template in Meta and restoring the branch.
+    if (BRAND_ID === 'windchasers' && phone && !isPatSubmission && !isDemoBooking) {
+      const alreadyMessaged = await hasPriorOutboundWhatsApp(supabase, leadId)
+      if (alreadyMessaged) {
+        console.log(`[inbound] Windchasers welcome WA SKIPPED; prior outbound message exists lead=${leadId} phone=${phone}`)
+      } else {
+        const welcomeSignals = [
+          source,
+          normalizedSource,
+          leadSource,
+          campaign,
+          cfields.utm_source,
+          cfields.utm_campaign,
+          cfields.utm_content,
+          cfields.form_type,
+          cfields.course_interest,
+          cfields.interest,
+          cfields.campaign_name,
+          cfields.ad_name,
+          cfields.adset_name,
+          cfields.user_type,
+          notes,
+        ]
+        const isParentLead =
+          String((brandCtxData as any).user_type || '').toLowerCase() === 'parent' ||
+          String(cfields.user_type || '').toLowerCase() === 'parent' ||
+          String(cfields.audience || '').toLowerCase() === 'parent' ||
+          isParentSource(...welcomeSignals)
+        const templateName = isParentLead
+          ? 'windchasers_pilot_parents_welcome_v1'
+          : pickWelcomeTemplate(...welcomeSignals)
+
+        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+
+        try {
+          const result = isParentLead
+            ? await sendParentWelcomeTemplate(phone, leadName)
+            : await sendWelcomeTemplate(phone, leadName, templateName)
+          const content = result.success
+            ? `Hi ${firstName}, welcome to Windchasers.`
+            : `[Template send FAILED: ${templateName}]\n\nHi ${firstName}, welcome to Windchasers.`
+
+          const { error: logErr } = await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content,
+            message_type: 'template',
+            metadata: {
+              template_name: templateName,
+              template_language: 'en',
+              template_buttons: TEMPLATE_BUTTONS[templateName] || [],
+              template_button_type: TEMPLATE_BUTTON_TYPES[templateName] || 'quick_reply',
+              auto_sent: true,
+              trigger: 'lead_inbound_welcome',
+              sent_by: 'system (inbound webhook)',
+              lead_user_type: (brandCtxData as any).user_type || cfields.user_type || null,
+              send_succeeded: !!result.success,
+              send_error: result.success ? null : (result.error || 'unknown'),
+              http_status: (result as any).statusCode ?? null,
+              wa_message_id: (result as any).messageId ?? null,
+            },
+          })
+
+          if (logErr) {
+            console.error(`[inbound] Windchasers welcome log FAILED lead=${leadId} phone=${phone}: ${logErr.message}`)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          }
+          if (!result.success) {
+            console.error(`[inbound] Windchasers welcome WA FAILED lead=${leadId} template=${templateName} status=${(result as any).statusCode} error=${result.error}`)
+            await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+          } else {
+            await supabase.from('all_leads')
+              .update({ last_touchpoint: 'whatsapp', last_interaction_at: new Date().toISOString() })
+              .eq('id', leadId)
+            console.log(`[inbound] Windchasers welcome WA OK lead=${leadId} template=${templateName} messageId=${(result as any).messageId}`)
+          }
+        } catch (err: any) {
+          console.error(`[inbound] Windchasers welcome WA EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: `[Template send EXCEPTION: ${templateName}]\n\nHi ${firstName}, welcome to Windchasers.`,
+            message_type: 'template',
+            metadata: {
+              template_name: templateName,
+              auto_sent: true,
+              trigger: 'lead_inbound_welcome',
+              send_succeeded: false,
+              send_error: err?.message || String(err),
+              send_exception: true,
+            },
+          })
+          await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
+        }
+      }
+    }
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
     const preferredTime = cfields.preferred_time || cfields.preferredTime || null

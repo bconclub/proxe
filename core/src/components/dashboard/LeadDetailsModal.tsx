@@ -29,6 +29,22 @@ function displayEmail(email: string | null | undefined): string | null {
   return /@noemail\.|noreply|no-reply|placeholder/i.test(email) ? null : email
 }
 
+// The same synthetic ids can land in the NAME field (e.g. a lead created with only
+// "owner_<phone>_<ts>@noemail.lokazen.in" or the account default "Property Owner").
+// Never show an internal id / placeholder as a person's name — fall back to blank
+// so callers render "Unknown Lead" instead of the id.
+const NAME_PLACEHOLDER_TOKENS = new Set([
+  'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
+  'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
+])
+function displayName(name: string | null | undefined): string | null {
+  const t = (name || '').trim()
+  if (!t) return null
+  if (/@noemail\.|noreply|no-reply|placeholder/i.test(t)) return null
+  if (/^(owner|brand|scout|connector|lead|user|customer)_\d/i.test(t)) return null
+  return t.toLowerCase().split(/\s+/).every((w) => NAME_PLACEHOLDER_TOKENS.has(w)) ? null : t
+}
+
 // Helper functions for IST date/time formatting
 function formatDateIST(dateString: string | null | undefined): string {
   if (!dateString) return '-';
@@ -1921,11 +1937,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           id="lead-modal-title"
                           className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
                         >
-                          {currentLead.name || 'Unknown Lead'}
+                          {displayName(currentLead.name) || 'Unknown Lead'}
                         </h2>
                         <button
                           onClick={() => {
-                            setEditingNameValue(currentLead.name || '')
+                            setEditingNameValue(displayName(currentLead.name) || '')
                             setEditingName(true)
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
